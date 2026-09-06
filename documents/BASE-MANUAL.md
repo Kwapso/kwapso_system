@@ -59,6 +59,11 @@ never copies and never synced.
 
 There are two kinds of database, and the split is deliberate.
 
+> A **user** and a **member** are not the same thing, and the split below is the
+> reason: a user is an identity in the global core, a member is that identity on
+> one team. [DATA-MODEL.md § `users`](DATA-MODEL.md) states the three-way
+> distinction (user, member, person) once; it is not repeated here.
+
 **One global core DB (`kwapso-core`), reached natively via `env.DB`.** It holds
 everything that is about *identity and billing across teams*:
 

@@ -56,14 +56,45 @@ collections, `record-detail`'s avatar) and every other number kept its original
 row, so an older citation of 1–29 still lands where it did. In a document this
 long the row number is most of the navigation there is; do not reuse one.
 
-**2 · Every open row's evidence PREDATES the current pin. Re-check before you
-build.** The `RE-CHECKED …` stamps below say the date and the kit tag the
-evidence was gathered at — they are **not** a claim about today. Today's pin is
-in `shared/ui/VERSION.json`; the open rows were last checked against **v1.2.24**
-and **v1.2.27**, which are many tags behind it. A "still genuinely missing"
-verdict gathered against an older kit is not evidence that the kit still lacks
-the part, and acting on a stale row means building or keeping a workaround for
-something the kit may already ship — the exact cost R39 and R46 exist to avoid.
+**2 · RE-CHECKED AGAINST v1.2.44 ON 2026-09-06.** Every genuinely open row below
+was read against the pinned kit on that date. What the sweep found, so the next
+reader starts from it rather than repeating it:
+
+- **Row 32(b) and row 33 have moved.** The kit now ships `sort-control`, and
+  `data-table` carries `sortable` per column plus `sortKey` / `sortDirection` /
+  `onSortChange` and the ARIA announcement for a sortable header. The sentence
+  "a `data-table` header sorts NOTHING" is no longer true of the pinned kit, and
+  `SortControl` is already imported by 14 files here. Row 33's "they simply have
+  no control" is the part still worth doing: the control exists and the ~30
+  record panels have not all been given it.
+- **Row 30 and row 34 read as closed and are.** `calendar-view` now exposes
+  `onSelectDay` / `onSelectEvent` / `onSelectItem`, so a record on the calendar
+  is openable; `record-detail` takes a `mark?: React.ReactNode` the host
+  supplies, so nothing forces a circle onto a record that is not a person.
+- **Row 20's evidence is stale in a way worth knowing about.** Its status names
+  `StatItem.icon`, shipped at v0.11.0 — and `StatItem` at v1.2.44 has **no
+  `icon` field**. It carries `chart`, `tone`, `span`, `visible`, `loading`,
+  `onSelect` and `ariaLabel` instead. Nothing broke, because
+  `work-logs-panel.tsx` hands the glyph to `support` instead, and TypeScript
+  never objected because the object goes through a `.map` before it meets the
+  typed prop. But the glyph now sits UNDER the number rather than beside it,
+  which is a design question nobody has been asked. The same call site still
+  passes `trend`, which `StatItem` also no longer has.
+- **Rows 1, 4, 14, 15, 17, 21, 22, 23, 24, 31 stand.** Spot-checked at v1.2.44:
+  there is still no `code-input` / one-time-code control under any name among the
+  115 components; `screen-renderer` has no `serverSide`; `collection-frame` has
+  no `groupBy`; `choice` has no way to ask a door (no async, remote or query
+  prop). Row 22 is now HALF true — `sheet` has four `side` variants, `dialog`
+  still draws one shape.
+
+**Older stamps are still evidence of their own date, not of today.** The
+`RE-CHECKED …` stamps inside individual rows say the date and the kit tag the
+evidence was gathered at. Where a row below still carries a v1.2.24 or v1.2.27
+stamp and is not named in the list above, it has not been re-read since. A
+"still genuinely missing" verdict gathered against an older kit is not evidence
+that the kit still lacks the part, and acting on a stale row means building or
+keeping a workaround for something the kit may already ship — the exact cost
+R39 and R46 exist to avoid.
 Before you touch a row: read the tag in `shared/ui/VERSION.json`, run
 `node scripts/kit-coverage.mjs` for the current roster, look under
 `shared/ui/components/` for the part, and re-stamp the row with what you find.
