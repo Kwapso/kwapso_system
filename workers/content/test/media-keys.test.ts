@@ -326,6 +326,20 @@ describe("every object prefix a tenant's files live under is written down", () =
     'guard.teamId, "brand"': "the brand library's files (workers/content/src/routes/brand-assets.ts)",
     'guard.teamId, "staff"': "staff photos and certificates — one generic upload door, two destination columns (workers/content/src/routes/staff.ts)",
     'guard.teamId, "deliverables"': "what we handed over on an app (workers/content/src/routes/deliverables.ts)",
+    // THE ONE MINT WHOSE PREFIX IS NOT A LITERAL, and the only reason it is
+    // allowed to be. The presign door serves several modules from one handler,
+    // so its owners come out of `UPLOAD_TARGETS` rather than out of the call —
+    // and a spread is opaque to the scan above, which is exactly the kind of
+    // hole this table exists to refuse.
+    //
+    // It is admitted here because the property is proved somewhere STRONGER
+    // instead: `upload-targets.test.ts` asserts every entry's owners are a
+    // prefix a streaming door already mints and this table already describes.
+    // So the spread can only ever produce a described prefix, and a new table
+    // entry with a novel one goes red there rather than passing quietly here.
+    // Delete this line the day the presign door mints its own key literally.
+    'guard.teamId, ...target.owners':
+      "a presigned direct upload — the prefix is whichever UPLOAD_TARGETS entry the caller named, each of which is proved to be one of the four above (workers/content/src/routes/uploads.ts)",
   }
 
   const minted = () => {

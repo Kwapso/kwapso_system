@@ -48,6 +48,7 @@ import { useTaskFormOptions } from "@/lib/use-task-form-options"
 import { TodoFormDialog, type TodoFormValues } from "@/components/todo-form-dialog"
 import { TodosPanel } from "@/components/work-panels"
 import { content as contentApi } from "@/lib/api"
+import { LoadMore } from "@/components/load-more"
 import { usePermissions } from "@/lib/perms"
 import { listFetch, tasksKey, todosKey, type TaskView } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
@@ -451,11 +452,30 @@ export function TasksScreen({
               // ROWS ONLY — the toolbar above is already real.
               <Skeleton variant="list" lines={4} />
             ) : (
-              <RecordCalendar
-                entries={calendarEntries}
-                onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
-                emptyText={calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")}
-              />
+              <>
+                <RecordCalendar
+                  entries={calendarEntries}
+                  onOpen={(id) => onIntent({ kind: "open", module: "tasks", id })}
+                  emptyText={
+                    calendarQuery !== "" ? t("No tasks match your search.") : t("Nothing due this month.")
+                  }
+                />
+                {/* THE CALENDAR NEEDS THIS MORE THAN THE TABLE DOES, not less.
+                    It draws from the same paged list, and it pages MONTHS in the
+                    browser over whatever rows are loaded — so without a way to
+                    reach page two, moving forward a month would show an empty
+                    grid whenever the next fifty rows had not been fetched, and
+                    the tab would have gone from a thousand dated tasks to fifty
+                    the day paging landed. Same key, same cursor, same control as
+                    the other five tabs. */}
+                <LoadMore
+                  listKey={tasksKey(teamId, view)}
+                  label={t("Load more tasks")}
+                  fetchPage={(cursor) =>
+                    contentApi.tasks(view, cursor).then((r) => ({ rows: r.tasks, nextCursor: r.nextCursor }))
+                  }
+                />
+              </>
             )}
           </div>
         ) : tasksLoading ? (
@@ -467,14 +487,30 @@ export function TasksScreen({
           // "nothing here" read of an empty `[]` default.
           <Skeleton variant="list" lines={4} />
         ) : (
-          <RecordTable
-            columns={tableColumns}
-            rows={data.rows}
-            config={tableRecipe.collection as CollectionConfig}
-            actions={visibleActions(tableRecipe, rights, onAction)}
-            onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
-            useKitPanel
-          />
+          <>
+            <RecordTable
+              columns={tableColumns}
+              rows={data.rows}
+              config={tableRecipe.collection as CollectionConfig}
+              actions={visibleActions(tableRecipe, rights, onAction)}
+              onRowClick={(row) => onIntent({ kind: "open", module: "tasks", id: String(row.id) })}
+              useKitPanel
+            />
+            {/* R14 — HOW PAGE TWO IS REACHED. Tasks page by key now: three of
+                the six tabs (completed, all, calendar) ask for piles that only
+                ever grow, so the thousand-row cap they used to wear was a list
+                with an invisible end under a badge counting the whole thing.
+                The cursor for THIS tab's own read hangs off THIS tab's own key
+                — `tasksKey(teamId, view)` — because each view is its own
+                ordering and a position in one is nonsense in another. */}
+            <LoadMore
+              listKey={tasksKey(teamId, view)}
+              label={t("Load more tasks")}
+              fetchPage={(cursor) =>
+                contentApi.tasks(view, cursor).then((r) => ({ rows: r.tasks, nextCursor: r.nextCursor }))
+              }
+            />
+          </>
         )}
       </SectionWithCreate>
 

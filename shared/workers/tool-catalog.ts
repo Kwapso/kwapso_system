@@ -1372,15 +1372,19 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_tasks",
     summary:
-      "List KWAPSO'S OWN internal admin, never anything a client sees, which is list_todos. `view` is 'open' by default (everything not finished); the other five are 'overdue' (past its deadline), 'upcoming' (due today or later), 'completed', 'calendar' (everything with a deadline, finished or not) and 'all'. `assigneeId` narrows to one person's. Every view's count comes back whichever one you ask for, `openTotal`, `overdueTotal`, `upcomingTotal`, `completedTotal`, `calendarTotal`, `allTotal`, plus `dueTodayTotal` and `dueTodayDone`, which are everything due today or earlier and how many of those are done.",
+      "List KWAPSO'S OWN internal admin, never anything a client sees, which is list_todos. `view` is 'open' by default (everything not finished); the other five are 'overdue' (past its deadline), 'upcoming' (due today or later), 'completed', 'calendar' (everything with a deadline, finished or not) and 'all'. `assigneeId` narrows to one person's. Pass `id` to fetch just that one, which is the only way to reach a task that is not on the page in front of you. Every view's count comes back whichever one you ask for, `openTotal`, `overdueTotal`, `upcomingTotal`, `completedTotal`, `calendarTotal`, `allTotal`, plus `dueTodayTotal` and `dueTodayDone`, which are everything due today or earlier and how many of those are done. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/tasks",
-    schema: obj({ view: S, assigneeId: S }),
+    schema: obj({ view: S, assigneeId: S, id: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const k of ["view", "assigneeId"]) if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
+      for (const k of ["view", "assigneeId", "id", "cursor"])
+        if (str(i, k)) q.push(`${k}=${encodeURIComponent(str(i, k))}`)
       return q.length ? `?${q.join("&")}` : ""
     },
-    agent: { write: false, summarize: () => "List our own admin" },
+    agent: {
+      write: false,
+      summarize: (i) => (str(i, "id") ? "Look up one task" : "List our own admin"),
+    },
   },
   {
     name: "create_task",

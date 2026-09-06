@@ -1960,6 +1960,16 @@ export const GROWING_COLLECTIONS: Record<
     pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
+  tasks: {
+    lib: "workers/content/src/lib/tasks.ts",
+    fn: "listTasks",
+    routes: "workers/content/src/routes/todos.ts",
+    rowsKey: "tasks",
+    webKey: "tasksKey(",
+    pagerFile: "components/tasks-screen.tsx",
+    pagerKey: "tasksKey(",
+    why: "the SAME mistake the to-do below made, in the file next door, and it survived the round that caught that one. `listTasks` carried a hard cap on the reasoning that admin 'shrinks as fast as it grows because the done ones fall out of the default view' — true of the default view, and false of three of the six this door offers: `completed` asks for exactly the rows that fall out, `all` asks for every row there has ever been, and `calendar` asks for every dated one. On those three a thousand rows was a list with an invisible end, under a badge (R16) reporting the true number, so the screen said 'at least a million' above a list of a thousand and offered no way to reach the rest. Not caught by anything, because GROWING_COLLECTIONS is DATA: a growing collection nobody adds is never asked to page, which is the one shape this law cannot detect for itself. The four-key priority sort is folded into one lexicographic string (TASK_SORTS) because a cursor names a position and a position in a four-key order needs all four keys in it",
+  },
   todos: {
     lib: "workers/content/src/lib/todos.ts",
     fn: "listTodos",

@@ -89,6 +89,7 @@ import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
+import { postPresignUpload } from "./routes/uploads"
 import type { Env } from "./env"
 import {
   getHelp,
@@ -451,6 +452,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // A file becomes a source: stored whole, read where we can, and honest about
   // it where we cannot. A MUTATION, not housekeeping — unlike the brand-library
   // upload door below, this one writes the record as well as the bytes.
+  // PERMISSION TO PUT A FILE, without the file passing through us. HOUSEKEEPING,
+  // not a mutation: it writes no row, no object and no counter — it decides and
+  // signs. The row is written later by the module's own door, which is where the
+  // publish and the activity line belong. Answers `{ direct: false }` in any
+  // environment with no R2 credential, so it is inert until somebody turns it on.
+  "POST /api/content/uploads/presign": { handler: postPresignUpload, kind: "housekeeping" },
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },

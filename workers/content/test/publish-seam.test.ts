@@ -28,6 +28,13 @@ const HOUSEKEEPING = [
   // changes no record anybody else can see and no screen anybody else is looking
   // at, so there is nothing for a ping to patch.
   "POST /api/content/work-logs/auto-stop",
+  // PERMISSION TO PUT A FILE, and not the file. This one is further from a
+  // mutation than the byte-shovels below it: they at least put an object in a
+  // bucket, and this writes NOTHING — no row, no object, no counter. It decides
+  // whether a caller may upload, mints the key, and signs. A POST because it
+  // carries a body and must not sit in a URL, not because it changes state.
+  // The row is written later by the module's own door, which publishes there.
+  "POST /api/content/uploads/presign",
   // The agency's own housekeeping: two more byte-shovels, same reasoning. The
   // brand library re-hosts 74 legacy files that die with the Glide account, and
   // a staff photo or a certificate PDF lands the same way. Neither writes a row

@@ -53,13 +53,57 @@ oversight. It is written here so it is a known cost rather than a discovery.
 | **No fallback identity, on purpose** | There is no cached session, no "assume signed in". Guessing on the identity read is guessing on the gate, and the permission spine is the product. Availability is not bought with a weaker fence. |
 | **Realtime degrades, it does not fail** | `kwapso-realtime` has fan-in 6 and is the one dependency that is genuinely optional. `publishChange` is wrapped, capped at 2s, and swallows its own failure: a live-layer outage costs a screen its instant refresh and nothing else, because the write already committed and the client is cache-first ([CACHING.md](CACHING.md)). Same for member-notification email (`sendBrandedEmail`, 15s cap). ARCHITECTURE §5 already locks the state change as the authority. |
 
-### The recommendation this review did NOT act on
+### The recommendation, now taken — and it is NOT a cache
 
-A read-through identity cache in the gating seam, a short-lived signed copy of
-`/api/auth/me`, would let already-signed-in people keep working through an auth
-outage. It is **not** built, because it is a change to how the permission spine
-decides, and that is an owner's decision, not a reviewer's. The cost of leaving
-it: an auth deploy that goes wrong is a total outage rather than a degraded one.
+The 2026-08-14 review proposed a read-through identity cache in the gating seam,
+a short-lived signed copy of `/api/auth/me`, and left it unbuilt because it
+changes how the permission spine decides. **The owner ruled on 2026-09-05: keep
+people working for a few minutes if the sign-in service goes down.**
+
+**A cache was the wrong shape and is not what was built.** A cached identity is
+stale by construction: it cannot see a session that has since expired, a member
+who has since been deactivated, or a sign-out — so it buys availability with
+exactly the accuracy the permission spine exists to have, which is the one trade
+this base has consistently refused. It also fails where it is most needed, on a
+cold isolate that has never seen the caller.
+
+**What the fallback does instead is READ THE SAME ROW AUTH READS.** The session
+lives in the core database, and **every caller of this seam already holds a
+binding to it** — `GatingEnv` declares `DB` as a required field, so a worker that
+can call `whoAmI` at all can read `sessions`, by construction rather than by
+coincidence. (`requireMember`, three lines further down this same file, has
+always read `team_members` and `teams` from it directly.) The two gateways do not
+bind core and never needed to: they forward, they do not gate — neither names
+`whoAmI`, `teamContext`, `requireRight` or `gated` anywhere in its source.
+
+So when, and *only* when, the auth worker is unreachable, `whoAmI` resolves the
+caller itself: SHA-256 the session cookie, look up `sessions` by `token_hash`
+joined to `users`, refuse an expired row, refuse a deactivated user, honour
+`team_pin`. No staleness, no grace window to tune, and it works on an isolate
+that has never seen this person.
+
+Three properties make it a narrow change rather than a second session system:
+
+| | |
+|---|---|
+| **It is READ-ONLY, so auth is still the only master** | `getSessionUser` in the auth worker also *writes*: it slides the expiry forward, stamps `last_seen_at`, and deletes a row it finds expired. The fallback does none of those. Auth remains the only thing that mints, slides or destroys a session — ARCHITECTURE §3's "one session system, one master" is about the WRITER, and it still holds. During an outage a session simply stops sliding, which is the correct behaviour: nothing is being kept alive by a worker that cannot reach its owner. |
+| **It runs only on the failure path** | The happy path is untouched — every request still asks auth, and the fallback is reached only from the `catch` that used to throw `503 auth_unavailable` outright. A healthy system behaves byte-for-byte as it did, so nothing about normal operation is being traded. |
+| **Rights were never the problem** | `whoAmI` answers only WHO. Every permission decision — `requireMember`, `requireRight`, the account fence — already reads the core database directly and is unaffected by an auth outage. So the fallback restores identity and changes nothing about what that identity may do. A member deactivated mid-outage is still refused, by the same clause as always. |
+
+**What it costs, stated plainly.** Session resolution now exists in two places —
+`workers/auth/src/lib/sessions.ts` and the fallback in the gating seam — and two
+copies of one rule drift. A change to the hash, the cookie name or the expiry
+clause in one and not the other would mean the fallback quietly refuses
+everybody, or (worse) accepts somebody auth would not. That is a real cost and it
+is paid the way this base pays that cost everywhere else: the two are read off
+disk and compared, and the build goes red when they disagree. The check is
+`shared/rules/…` — see the gating seam's own test; a fallback nobody proved
+matches its master is a second opinion, not a fallback.
+
+**What this does NOT do.** It does not survive the core database being
+unreachable — nothing in the product does, and a fallback for that would be the
+cached identity this section just refused. If core is down the app is down, and
+that is the honest boundary of this mitigation.
 
 ---
 
