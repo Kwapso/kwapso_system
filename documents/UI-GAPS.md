@@ -81,8 +81,11 @@ reader starts from it rather than repeating it:
   which is a design question nobody has been asked. The same call site still
   passes `trend`, which `StatItem` also no longer has.
 - **Rows 1, 4, 14, 15, 17, 21, 22, 23, 24, 31 stand.** Spot-checked at v1.2.44:
-  there is still no `code-input` / one-time-code control under any name among the
-  115 components; `screen-renderer` has no `serverSide`; `collection-frame` has
+  there is still no `code-input` / one-time-code control under any name in
+  `shared/ui/components/` (the roster is whatever `node scripts/kit-coverage.mjs`
+  reports — this sentence said "115 components" for one day, and the derived
+  number was 116, which is exactly the count-in-prose defect two rows of this
+  file already carry a post-mortem for); `screen-renderer` has no `serverSide`; `collection-frame` has
   no `groupBy`; `choice` has no way to ask a door (no async, remote or query
   prop). Row 22 is now HALF true — `sheet` has four `side` variants, `dialog`
   still draws one shape.
