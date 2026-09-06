@@ -827,8 +827,23 @@ type StepCtx = {
   sources?: string[]
   /** THE MESSAGES THE MODEL IS READING, live — see `moneyTaintRefusal`. The
    * array itself, not a copy: both loops push each step's tool message onto it
-   * as the step finishes, so a call made after a money read sees that read. */
-  context?: ChatMessage[]
+   * as the step finishes, so a call made after a money read sees that read.
+   *
+   * REQUIRED, AND THAT IS THE WHOLE POINT. It was optional, and `toolNamesIn`
+   * reads `context ?? []` — so a construction site that simply forgot this field
+   * disabled the money taint entirely: no error, no failing test, the guard just
+   * saw no tools in the conversation and permitted every write. A guard that
+   * fails OPEN when an argument is omitted is not a guard, it is a habit.
+   *
+   * Latent rather than live when it was found (both sites did pass it), which is
+   * exactly when to fix it — the third site somebody adds next month is the one
+   * that would have shipped the hole. Required makes the omission impossible
+   * instead of unlikely, and it costs one word.
+   *
+   * `toolNamesIn` keeps its `?? []` on purpose: it is also called on an empty
+   * conversation, where "no tools have run yet" is the true answer. What changed
+   * is that the emptiness can no longer come from forgetting. */
+  context: ChatMessage[]
   emit?: Emit
 }
 

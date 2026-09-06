@@ -4043,6 +4043,9 @@ CREATE INDEX IF NOT EXISTS idx_activity_actor_feed ON activity (creator_id, crea
     version: "0063_an_import_can_be_resumed",
     sql: `
 ALTER TABLE data_import_batches ADD COLUMN cursor_json TEXT;
+`,
+  },
+  {
     // A SOURCE THAT CANNOT BE EMBEDDED STOPS BEING RETRIED FOR EVER.
     //
     // `embed` is best-effort by design and rightly so: an embedding failure must
