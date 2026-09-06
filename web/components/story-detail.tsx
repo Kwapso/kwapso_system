@@ -252,13 +252,6 @@ export function StoryDetailScreen({
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
       // WHAT THE STORY SHOWS FOR ITSELF. The same words the ticket's own tab
       // uses, because it is the same collection one record along and a second
       // name for it would be a second thing for a reader to learn (R6/R34).
@@ -267,6 +260,13 @@ export function StoryDetailScreen({
         label: t("Files and links"),
         icon: "paperclip",
         badge: formatCount(attachmentsTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "activity",
+        label: t("Activity"),
+        icon: CONCEPT_ICON.activity,
+        badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
     ],

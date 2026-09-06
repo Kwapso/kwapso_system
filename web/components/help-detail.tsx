@@ -513,13 +513,6 @@ export function HelpDetailScreen({
       },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
-      {
         value: "stories",
         label: t("Related stories"),
         icon: CONCEPT_ICON.stories,
@@ -556,6 +549,22 @@ export function HelpDetailScreen({
         // The stakeholder set is COMPUTED in full (raiser + admins + mentions + adds),
         // not a capped table read — its size IS the true total, shown via the one seam.
         badge: stakeholderBadge,
+        badgeVariant: "" as const,
+      },
+      /* ACTIVITY LAST, THE FURTHEST RIGHT — client, 2026-09-06: "in all the
+         screens across the app, Activity is always the last tab". It sat third
+         here, with Related stories, Work logs, Files and links and Stakeholders
+         to its right, which made the ticket the one record where the log
+         interrupted the record. Activity is the only tab that is ABOUT the
+         record rather than part of it, so it belongs where a person stops
+         looking. `web/test/activity-is-the-last-tab.test.ts` holds the rule for
+         every screen, because appending a new tab — the ordinary way to add one
+         — is also the way to break it. */
+      {
+        value: "activity",
+        label: t("Activity"),
+        icon: "clock-counter-clockwise",
+        badge: formatCount(activity.total),
         badgeVariant: "" as const,
       },
     ],
