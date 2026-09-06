@@ -443,9 +443,17 @@ export const content = {
     api<{ tickets: HelpTicket[] }>("/api/content/help/validate", post({ id })),
   /** ANSWER IT AND TELL THEM (5.6 + 5.7). The resolution is REQUIRED — the door
    * refuses without it, which is the whole of 5.6 — and the send goes to whoever
-   * raised it and that client's main stakeholder. */
-  resolveHelp: (id: string, resolution: string) =>
-    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
+   * raised it and that client's main stakeholder.
+   *
+   * `leaving` is the composer's five-second hold reaching zero because the TAB
+   * IS CLOSING (web/lib/send-hold.ts). See `replyHelp` below for the whole
+   * argument; the same one applies here and matters more, because this door
+   * emails the client. */
+  resolveHelp: (id: string, resolution: string, leaving?: boolean) =>
+    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", {
+      ...post({ id, resolution }),
+      keepalive: leaving === true,
+    }),
   /** Several files and several links on one ticket (5.10). The same three doors
    * the client portal calls — this is one record with one list, not two. */
   helpAttachments: (id: string) =>
@@ -462,8 +470,26 @@ export const content = {
       "/api/content/help/attachments/remove",
       post({ id, attachmentId })
     ),
-  replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
+  /** ADD A REPLY TO THE CONVERSATION.
+   *
+   * `leaving` is the one unusual argument and it is worth its paragraph. The
+   * ticket composer holds a reply for five seconds before it is sent at all
+   * (web/lib/send-hold.ts), and one of the four ways that wait ends is the
+   * person CLOSING THE TAB. The send then has to outlive the document, which is
+   * exactly what `keepalive` is for: the browser keeps the request in flight
+   * after the page it was made from is gone.
+   *
+   * WHY NOT `navigator.sendBeacon`, which is the usual answer to this question:
+   * a beacon sends a body and cannot set request headers, so it cannot carry
+   * the `Content-Type: application/json` every worker door parses on, and it
+   * gives back no response to reconcile the thread with. `fetch` with
+   * `keepalive` does both, at the cost of a 64 KB body limit that a reply
+   * (TEXT_LIMITS.long) is nowhere near. */
+  replyHelp: (helpId: string, body: string, taggedUserIds?: string[], leaving?: boolean) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", {
+      ...post({ helpId, body, taggedUserIds }),
+      keepalive: leaving === true,
+    }),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>

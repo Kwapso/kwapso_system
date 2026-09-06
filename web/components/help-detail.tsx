@@ -20,6 +20,22 @@ import { TicketChips } from "@shared/web/ticket-chips"
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
 type TicketMember = { id: string; name: string }
+
+/** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
+ * ordinary team member and used to be offered here, which would have put a "you
+ * were mentioned" email in a client's inbox about our internal note — and the
+ * portal has never offered mentions in the other direction, on purpose. The one
+ * seam decides (lib/members).
+ *
+ * MODULE LEVEL, not a value computed inside the render, because the one caller
+ * left runs FIVE SECONDS after the press and on the way out of a screen that may
+ * have already returned early — see `sendReply` below. */
+function mentionableTeamMembers(
+  members: TeamMember[] | undefined,
+  myUserId: string | null
+): TicketMember[] {
+  return assignableMembers(members).filter((m) => m.id !== myUserId)
+}
 import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import type {
@@ -29,6 +45,8 @@ import type {
   SelectableValue,
   TeamMember,
 } from "@shared/types"
+// A VALUE, not a type — it must not ride the `import type` block above.
+import { ticketTypeKeptForMigration } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import type { HelpAccountFacet } from "@/lib/api/content"
 import {
@@ -59,6 +77,7 @@ import { createStoryFrom, useStoryFormOptions } from "@/components/stories-scree
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { RecordTimerButton } from "@/components/timer-bar"
+import { ReplyComposer, useReplySend } from "@/components/reply-composer"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
@@ -224,8 +243,22 @@ export function HelpDetailScreen({
   const newestReply = replyRows[replyRows.length - 1]
   useFollowNewest(newestReply?.id ?? null, Boolean(myUserId) && newestReply?.authorId === myUserId)
 
+  // THE RETIRED KIND IS NOT OFFERED HERE EITHER — the last picker that could
+  // still put a ticket INTO it. Client, 2026-09-06: "keep the existing
+  // requirements (we will use that later) but do not display them in tickets."
+  //
+  // Existing rows keep their word and stay readable; what must not happen is a
+  // NEW one, or an existing ticket being MOVED into a kind the collection then
+  // hides — which from her side would look exactly like the ticket vanishing.
+  // The door refuses it as well (`refuseKeptForMigration`), so this is the
+  // second of two fences rather than the only one; the picker exists so a
+  // person is never offered a choice the door will reject.
+  //
+  // It still does not filter `active`, deliberately: that is a separate
+  // question about the team's own vocabulary, and narrowing this dialog for a
+  // reason nobody asked for is how a screen quietly loses an option.
   const helpTypeOptions = (selectableQ.data ?? [])
-    .filter((v) => v.type === "Ticket type")
+    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
     .map((v) => v.value)
 
   // READ THIS CONVERSATION IN YOUR OWN LANGUAGE, if you ask. The whole screen's
@@ -237,6 +270,14 @@ export function HelpDetailScreen({
     ticket?.description,
     ...replyRows.map((r) => r.body),
   ])
+
+  // THE FIVE-SECOND HOLD, HELD BY THE SCREEN AND NOT BY THE COMPOSER. It lives
+  // above the tab strip on purpose: the strip unmounts the panel it is not
+  // showing, so a hold owned by the composer would be flushed by a glance at
+  // Related stories — and the client's ruling is that she can carry on reading
+  // the ticket while it counts. Leaving the TICKET still sends it; leaving the
+  // TAB is not leaving. A hook, so it sits above the three early returns below.
+  const reply = useReplySend({ ticketId: helpId, onSend: sendReply })
 
   /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
    * happens by itself — a sprint is picked, a timer starts, the last story
@@ -337,7 +378,40 @@ export function HelpDetailScreen({
     invalidate(recordActivityKey("help", helpId))
   }
 
-  async function onReply(body: string, _files: File[], mentions: TicketMember[]) {
+  /** THE TWO SENDS, AND THEY ARE ONE FUNCTION ON PURPOSE.
+   *
+   * The client's ruling gives the composer two controls — a wordless send and
+   * "Send and close" — and the artifact is explicit that they behave identically
+   * for the five seconds before either of them happens: same delay, same toast,
+   * same pending bubble, same Undo, same restored text. The ONLY differences are
+   * the sentence the toast settles on and which door is called at zero. So they
+   * are one function with one flag, rather than two that will drift.
+   *
+   * It is called by `ReplyComposer` only when the hold reaches zero (or is cut
+   * short by her leaving), never on the press — nothing here happens during the
+   * five seconds. `leaving` rides through to `fetch` as `keepalive`, which is
+   * what lets the send outlive a tab that is closing.
+   *
+   * It returns the words the settling toast should say, because only this
+   * function knows what the door answered — a "Send and close" on a ticket
+   * somebody else already answered comes back `alreadyResolved` and emails
+   * nobody (R17 is the send guard), and that is a different sentence.
+   *
+   * IT THROWS ON A REFUSAL rather than swallowing it: the composer catches it,
+   * says so, and puts her words back in the field. A reply lost to a 500 is the
+   * one outcome worse than a slow one. */
+  async function sendReply(body: string, andClose: boolean, leaving: boolean): Promise<string> {
+    // The mention list is read OUT OF the sent text by name-match against the
+    // members we may tag, exactly as the kit composer's own call site did.
+    //
+    // Computed HERE rather than read off a value the render happened to leave
+    // lying around: this runs five seconds after the press, and on the way out
+    // of a screen that may already have returned early. A function that only
+    // works when the component got as far as its happy path is a function that
+    // throws on the one path this whole file exists to make reliable.
+    const mentions = mentionableTeamMembers(membersQ.data, myUserId).filter((m) =>
+      body.includes(`@${m.name}`)
+    )
     const prev = repliesQ.data ?? []
     const optimistic: HelpMessage = {
       id: `optimistic-${Date.now()}`,
@@ -349,18 +423,37 @@ export function HelpDetailScreen({
       authorName: "You",
       createdAt: new Date().toISOString(),
     }
-    primeCache(`help-thread:${helpId}`, [...prev, optimistic]) // ~instant echo (WhatsApp-style)
+    // ~instant echo (WhatsApp-style). It takes over from the pending bubble at
+    // the exact moment the bubble goes, so the message never blinks out of the
+    // thread between the wait ending and the door answering.
+    primeCache(`help-thread:${helpId}`, [...prev, optimistic])
     try {
+      if (andClose) {
+        // THE HOLE THIS FILLS. "Answer and close" on the title is offered only at
+        // status `ready`, and `readyFlipForTicket` returns early on a ticket with
+        // no stories — so a Question answered in one line had NO way to be closed
+        // except Archive, which is not closing it, it is hiding it. This works at
+        // every status, and it satisfies `/help/resolve` the honest way: the door
+        // refuses without a resolution, and the reply she just typed IS the
+        // resolution, sent as the `resolution` field. The door is unchanged.
+        const r = await content.resolveHelp(helpId, body, leaving)
+        invalidate(`help-thread:${helpId}`)
+        invalidate(`help:${teamId}`)
+        invalidate(recordActivityKey("help", helpId))
+        return r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told.")
+      }
       const { replies } = await content.replyHelp(
         helpId,
         body,
-        mentions.map((m) => m.id)
+        mentions.map((m) => m.id),
+        leaving
       )
       primeCache(`help-thread:${helpId}`, replies) // reconcile with server truth
       invalidate(`help:${teamId}`)
+      return t("Sent.")
     } catch (err) {
       primeCache(`help-thread:${helpId}`, prev) // rollback the echo
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't post your reply."))
+      throw err
     }
   }
 
@@ -452,15 +545,6 @@ export function HelpDetailScreen({
         }}
       />
     )
-
-  // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
-  // ordinary team member and used to be offered here, which would have put a
-  // "you were mentioned" email in a client's inbox about our internal note —
-  // and the portal has never offered mentions in the other direction, on
-  // purpose. The one seam decides (lib/members).
-  const mentionableMembers: TicketMember[] = assignableMembers(membersQ.data).filter(
-    (m) => m.id !== myUserId
-  )
 
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
@@ -884,14 +968,29 @@ export function HelpDetailScreen({
                     body: typeof r.body === "string" ? <RichText html={r.body} /> : r.body,
                   })),
                 ]}
-                composer
-                onSend={(body) =>
-                  onReply(
-                    body,
-                    [],
-                    mentionableMembers.filter((m) => body.includes(`@${m.name}`))
-                  )
-                }
+                /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.
+                   The client ruled two sends on this composer — a wordless
+                   paper plane and "Send and close" — and `TicketThread` holds
+                   exactly one `<button type="submit">` with one `sendLabel`,
+                   with no slot beside it. The kit is a pinned dependency (a
+                   hand-edit under `shared/ui/` turns the build red), so the
+                   second control is drawn app-side, out of the kit's own Button
+                   and the kit's own glyph, in the same pill. The thread itself —
+                   the bubbles, the sides, the receipts — is still entirely the
+                   kit's. Logged for the kit's owner: `TicketThread` wants a
+                   secondary send action and a wordless primary. */
+                composer={false}
+              />
+              <ReplyComposer
+                send={reply}
+                /* CLOSING IS `help:edit` — the right `/help/resolve` itself
+                   gates on — and there is nothing to close on a ticket that is
+                   already answered, so the control is not drawn rather than
+                   drawn and refused. Every OTHER status draws it, which is the
+                   whole point: the title's "Answer and close" appears only at
+                   `ready`, and a Question with no stories never reaches it. */
+                canClose={canEdit && ticket.status !== "resolved"}
+                answered={ticket.status === "resolved"}
               />
             </>
           )

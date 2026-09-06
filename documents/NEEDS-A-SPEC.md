@@ -156,6 +156,27 @@ against the spirit of it; but they are subtle surfaces rather than hovers, mostl
 in components you have not drawn, so nothing was changed. The clearly-banned
 subset WAS fixed: every `disabled:opacity-*` is now the disabled fill and ink.
 
+**k · `TicketThread`'s composer holds exactly one send.** Both of its variants —
+the pill and 27.10's card — draw a single `<button type="submit">` with a single
+`sendLabel`, and there is no slot beside it and no wordless mode. The client
+ruled two sends on the ticket's own composer on 6 Sep 2026 ("do the double
+button, the only icon for send and the send and close"), so the app now passes
+`composer={false}` and draws its own row from `Button` (`variant="inverse"` and
+`variant="cancel"`) and `PaperPlaneTilt`, in the same pill, in
+`web/components/reply-composer.tsx`. Nothing was hand-edited under `shared/ui/`.
+What the kit would need to take it back: a secondary send ACTION on the
+composer, and a `sendIconOnly` (or equivalent) that keeps `sendLabel` as the
+accessible name rather than dropping it — an icon-only send whose label is
+forgotten announces itself as "button".
+
+**l · A toast cannot show how long it has left.** The five-second hold in front
+of that composer counts down inside a `toast()` whose content the app redraws
+each second with the same id. That works, but the artifact draws a thin bar
+draining across the foot of the pill, and there is no way to put one there: the
+pill's inset and radius are the kit's, and a call site cannot reach the `<li>`
+sonner renders. A `progress` (0–1) on the toast, drawn as the chapter would draw
+it, would cover every "this is about to happen" toast rather than only this one.
+
 ## 5 · Debt this reskin created or inherited
 
 - **The vendored library has no tests.** Upstream has 200+, including XSS-sanitisation and link-scheme regressions, but its `package.json` excludes `**/*.test.*` from the published package — so they were never in `node_modules` and could not be copied. Anything held only by an upstream test is unguarded here. Not a design question, but it is the largest thing the move cost.
