@@ -245,12 +245,55 @@ resolves.
 > ("too many terms in compound SELECT"), so a per-table census has to be one
 > query per table.
 >
-> **STILL NOT DONE, and deliberately not claimed:** Time Travel has not been
-> restored to a bookmark, and the 132 MB **team** database
-> (`team-01kzwxfd86n0k3rzrbhkmkrwys`, `TEAM_DB_0_ID`) has not been exported —
-> only the 5 MB core. A team database holds the customer data, is 26× larger,
-> and is where a real restore would hurt; do not read the pass above as covering
-> it.
+> **AND THE TEAM DATABASE, same day. This is the one that matters, because it is
+> where the customer data lives.**
+>
+> Database `727537f7-653d-4114-af23-332d1aae0f90`, reached the only safe way:
+> **enumerated from core** (`SELECT database_id FROM teams`, which is the row
+> that owns it) rather than picked by name, then proved ours by **schema
+> conjunction** — nine of ten kwapso-specific tables present
+> (`accounts`, `account_links`, `member_roles`, `portal_users`,
+> `role_permissions`, `sprints`, `stories`, `triage_duty`, `work_logs`).
+> *A single shared table name is not proof of ownership:* eleven of the sixteen
+> D1 databases on this Cloudflare account belong to other companies, and at
+> least one of them also has a `help_threads`, which is exactly why that table
+> is not on the list above.
+>
+> | | |
+> |---|---|
+> | export (`--remote`) | **116,222,828 bytes in 28.6 s** |
+> | reload into an empty SQLite | **0 errors, 7 min 02 s** |
+> | schema | **64 tables, 120 indexes** |
+> | rows | **414,401 restored, against 414,401 `INSERT` statements in the dump** |
+>
+> Live-versus-restored on eight tables that do not take continuous writes — all
+> **exact**: `help` 2,051 · `stories` 329 · `sprints` 110 · `accounts` 134 ·
+> `member_roles` 7 · `role_permissions` 154 · `app_modules` 253 ·
+> `work_logs` 240. `knowledge_terms` (390,594 of the 414,401 rows) was
+> deliberately excluded: the 15-minute sweep rewrites it, so equality there would
+> prove nothing.
+>
+> **THE NUMBER TO PLAN A BAD DAY AROUND IS SEVEN MINUTES.** Not the 28 seconds
+> the export takes — the RELOAD. One team database, on a developer laptop, took
+> 7 min 02 s to come back, and this is the smaller kind of estate: 20 client
+> companies and about 125 accounts (§ *What softens it*). Budget the reload, and
+> budget it per team.
+>
+> **The dumps were deleted.** Both the 116 MB SQL and the 127 MB scratch database
+> were written to a session scratchpad outside the repository and removed as soon
+> as the counts were taken. They hold real customer records; what is written down
+> here is dates, database ids and counts, and nothing else.
+>
+> **COST: nothing measurable.** Every operation was a read. The two exports plus
+> the fifteen `COUNT(*)` queries touched roughly 421,000 rows, against D1's
+> 25-billion-rows-per-month included allowance on Workers Paid — about $0.0004
+> at the $0.001-per-million overage rate, i.e. zero. No resource was created and
+> nothing was written to any database.
+>
+> **STILL NOT DONE, and deliberately not claimed: Time Travel.** Nothing has been
+> restored to a bookmark. That is the path RUNBOOK § 2 sends you down for a live
+> database inside 30 days, so it is the most likely of all of these to be used
+> and the only one never tried.
 
 **An untested restore is not a restore**, and until 2026-09-05 that rule was
 enforced by nobody — which is how the recorded rehearsal came to be eight
@@ -261,18 +304,15 @@ the build red on the commit that adds it rather than on the day somebody needs a
 restore.
 
 The REMOTE half is still a manual rehearsal, and it is still the half that runs
-on the bad day. **Export-and-reload was rehearsed on 2026-09-06 and passed** —
-the figures are in the block above. Two pieces of it remain untested, and they
-are the two that matter most:
+on the bad day. **Export-and-reload was rehearsed on 2026-09-06, on both tiers,
+and passed** — core and a real team database, figures in the block above.
 
-1. **Time Travel.** Nothing has been restored to a bookmark. This is the path
-   RUNBOOK §2 sends you down for a live database inside 30 days, so it is the
-   one most likely to be used and the only one never tried.
-2. **A team database.** Only the 5 MB core was exported. The customer data lives
-   in the team databases; the staging one is 132 MB, 26× larger, and its export
-   time, dump size and reload behaviour are all unmeasured.
+**One piece remains untested, and it is now the most likely to be used:
+Time Travel.** Nothing has been restored to a bookmark. RUNBOOK § 2 sends you
+there for any live database inside 30 days, which is most bad days; the dump
+path rehearsed above is the one for a database that is *gone*. Do it in the next
+staging window and extend the block above.
 
-Do those two in the next staging window and extend the block above. Until then
-the honest statement is: *we know the export mechanism works and produces a dump
-that reloads faithfully; we do not know what it costs on a real team database,
-and we have never used Time Travel.*
+Until then the honest statement is: *we know the export mechanism works on both
+tiers and produces a dump that reloads faithfully, we know one team database
+takes about seven minutes to come back, and we have never used Time Travel.*
