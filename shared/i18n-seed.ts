@@ -3366,4 +3366,151 @@ export const SEED: Catalogue = {
     es: "{done} de {count} fila(s) escritas. Cada una se comprueba exactamente como si la hubiera escrito usted.",
     ca: "{done} de {count} fila/es escrites. Cadascuna es comprova exactament com si l'haguéssiu escrita vós.",
   },
+  /* ── THE TICKETS DASHBOARD (6 Sep 2026) ──────────────────────────────────
+     Written here rather than left to accumulate as ceiling debt (R44), and for
+     a reason particular to this screen: a dashboard is read at a glance and
+     never re-read. A list in the wrong language is still a list — the rows are
+     names and dates, and a reader recognises them. A CHART in the wrong
+     language is a picture with a caption somebody skips, and the captions here
+     are the half that says what the picture may NOT be used for: which months
+     were dropped, which tickets have no record of what they arrived as, that
+     the weekend does not count. Those are the sentences that stop a number
+     being misread, so they are the last ones that should ship in English to
+     somebody who chose German.
+
+     THE HOLES ARE THE CONTRACT — {count}, {moved}, {counted}, {median}, {low},
+     {high} and {max} must survive intact and keep their names. */
+  "The open work": {
+    de: "Die offene Arbeit",
+    es: "El trabajo abierto",
+    ca: "La feina oberta",
+  },
+  "Every open ticket, as one pipeline per kind down a shared set of stages.": {
+    de: "Jedes offene Ticket, als eine Strecke je Art entlang gemeinsamer Stufen.",
+    es: "Cada ticket abierto, como un recorrido por tipo a lo largo de unas etapas comunes.",
+    ca: "Cada tiquet obert, com un recorregut per tipus al llarg d'unes etapes comunes.",
+  },
+  "{count} past the three-day line": {
+    de: "{count} über der Drei-Tage-Grenze",
+    es: "{count} por encima del límite de tres días",
+    ca: "{count} per sobre del límit de tres dies",
+  },
+  "Open tickets against the thing you built.": {
+    de: "Offene Tickets zu dem, was Sie gebaut haben.",
+    es: "Tickets abiertos sobre lo que habéis construido.",
+    ca: "Tiquets oberts sobre el que heu construït.",
+  },
+  "No system named": {
+    de: "Kein System genannt",
+    es: "Sin sistema indicado",
+    ca: "Sense sistema indicat",
+  },
+  "And {count} more systems.": {
+    de: "Und {count} weitere Systeme.",
+    es: "Y {count} sistemas más.",
+    ca: "I {count} sistemes més.",
+  },
+  "Who has more": {
+    de: "Wer mehr hat",
+    es: "Quién tiene más",
+    ca: "Qui en té més",
+  },
+  "Open work by client, for the kinds that wait for a client to confirm.": {
+    de: "Offene Arbeit je Kunde, für die Arten, die auf die Bestätigung des Kunden warten.",
+    es: "Trabajo abierto por cliente, para los tipos que esperan la confirmación del cliente.",
+    ca: "Feina oberta per client, per als tipus que esperen la confirmació del client.",
+  },
+  "Raised as, then triaged as": {
+    de: "Eingegangen als, dann eingeordnet als",
+    es: "Entró como, y se clasificó como",
+    ca: "Va entrar com a, i es va classificar com a",
+  },
+  "What your morning is actually spent on.": {
+    de: "Womit Ihr Vormittag tatsächlich vergeht.",
+    es: "En qué se va realmente vuestra mañana.",
+    ca: "En què se'n va realment el vostre matí.",
+  },
+  "Became": {
+    de: "Wurde zu",
+    es: "Pasó a ser",
+    ca: "Va passar a ser",
+  },
+  "{moved} of {counted} tickets left triage as a different kind from the one they arrived as.": {
+    de: "{moved} von {counted} Tickets haben die Sichtung als andere Art verlassen, als sie eingegangen sind.",
+    es: "{moved} de {counted} tickets salieron de la clasificación con un tipo distinto del que entraron.",
+    ca: "{moved} de {counted} tiquets van sortir de la classificació amb un tipus diferent del que van entrar.",
+  },
+  "{count} older tickets have no record of what they arrived as.": {
+    de: "Bei {count} älteren Tickets ist nicht festgehalten, als was sie eingegangen sind.",
+    es: "De {count} tickets antiguos no consta como entraron.",
+    ca: "De {count} tiquets antics no consta com van entrar.",
+  },
+  "Nothing has been triaged since we started recording what a ticket arrived as, so there is nothing to compare yet.": {
+    de: "Seit wir festhalten, als was ein Ticket eingeht, wurde nichts eingeordnet — es gibt also noch nichts zu vergleichen.",
+    es: "No se ha clasificado nada desde que registramos como entra un ticket, así que aún no hay nada que comparar.",
+    ca: "No s'ha classificat res des que registrem com entra un tiquet, així que encara no hi ha res a comparar.",
+  },
+  "How long a ticket takes to close": {
+    de: "Wie lange ein Ticket bis zum Abschluss braucht",
+    es: "Cuánto tarda un ticket en cerrarse",
+    ca: "Quant triga un tiquet a tancar-se",
+  },
+  "Working days only — Saturday and Sunday do not count towards how long it took.": {
+    de: "Nur Werktage — Samstag und Sonntag zählen nicht dazu, wie lange es gedauert hat.",
+    es: "Solo días laborables: el sábado y el domingo no cuentan para lo que tardó.",
+    ca: "Només dies laborables: el dissabte i el diumenge no compten per al que va trigar.",
+  },
+  "What it is now": {
+    de: "Wie es jetzt ist",
+    es: "Cómo está ahora",
+    ca: "Com està ara",
+  },
+  "Which way it is going": {
+    de: "Wohin es sich bewegt",
+    es: "Hacia dónde va",
+    ca: "Cap on va",
+  },
+  "{count} closed": {
+    de: "{count} abgeschlossen",
+    es: "{count} cerrados",
+    ca: "{count} tancats",
+  },
+  "Middle ticket {median} days · middle half {low} to {high} · longest {max}": {
+    de: "Mittleres Ticket {median} Tage · mittlere Hälfte {low} bis {high} · längstes {max}",
+    es: "Ticket central {median} días · mitad central {low} a {high} · el más largo {max}",
+    ca: "Tiquet central {median} dies · meitat central {low} a {high} · el més llarg {max}",
+  },
+  "Nothing has closed in the last {count} days.": {
+    de: "In den letzten {count} Tagen wurde nichts abgeschlossen.",
+    es: "No se ha cerrado nada en los últimos {count} días.",
+    ca: "No s'ha tancat res en els darrers {count} dies.",
+  },
+  "The middle ticket, month by month": {
+    de: "Das mittlere Ticket, Monat für Monat",
+    es: "El ticket central, mes a mes",
+    ca: "El tiquet central, mes a mes",
+  },
+  "Only a month where at least {count} of a kind closed is drawn — a middle ticket out of six is one ticket wearing a statistic.": {
+    de: "Gezeichnet wird nur ein Monat, in dem mindestens {count} einer Art abgeschlossen wurden — ein mittleres Ticket aus sechs ist ein einzelnes Ticket im Gewand einer Statistik.",
+    es: "Solo se dibuja un mes en el que se cerraron al menos {count} de un tipo: un ticket central de seis es un solo ticket disfrazado de estadística.",
+    ca: "Només es dibuixa un mes en què es van tancar almenys {count} d'un tipus: un tiquet central de sis és un sol tiquet disfressat d'estadística.",
+  },
+  "No kind has closed at least {count} tickets in two of the last months, so there is no trend to draw yet.": {
+    de: "Keine Art hat in zwei der letzten Monate mindestens {count} Tickets abgeschlossen — es gibt also noch keinen Verlauf zu zeichnen.",
+    es: "Ningún tipo ha cerrado al menos {count} tickets en dos de los últimos meses, así que aún no hay tendencia que dibujar.",
+    ca: "Cap tipus no ha tancat almenys {count} tiquets en dos dels darrers mesos, així que encara no hi ha tendència a dibuixar.",
+  },
+  "Couldn't load the dashboard.": {
+    de: "Das Dashboard konnte nicht geladen werden.",
+    es: "No se ha podido cargar el panel.",
+    ca: "No s'ha pogut carregar el tauler.",
+  },
+  /* A CORRECTION, NOT A NEW STRING. The generated catalogue answered "Type"
+     with "Eingeben" — the VERB, "to type on a keyboard" — which is what a
+     machine does with a one-word English string that is two different words.
+     It is the label on the ticket dashboard's second filter and on the ticket
+     list's own, so a German reader was being offered a chip that said "Enter".
+     The seed wins at run time (SPOKEN, shared/i18n.ts), so this fixes it on
+     screen without a generator run and without spending anything. */
+  "Type": { de: "Typ", es: "Tipo", ca: "Tipus" },
 }

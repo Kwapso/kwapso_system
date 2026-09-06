@@ -775,6 +775,37 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // LOWERED 244 -> 240 in all three on 6 Sep 2026, the tickets-dashboard lane,
+  // and this is the direction the pin is supposed to move. Twenty-five new
+  // English sentences landed with the Monday screen and NOT ONE of them is in
+  // this number, because all twenty-five were written into `shared/i18n-seed.ts`
+  // in German, Spanish and Catalan in the same commit. The four the pin actually
+  // records are RETIREMENTS, and all four were already untranslated:
+  //
+  //  · "Tickets by client", "No tickets are tied to a client yet.", "Raise a
+  //    ticket against a client and it shows up here." and "The agency's own
+  //    tickets aren't tied to a client, so they're left out here — these bars
+  //    won't add up to the total above." All four belonged to
+  //    `TicketsByAccountCard`, which existed only to be one of the two borrowed
+  //    charts on the old Dashboard tab. The tab is now its own screen over its
+  //    own door read, nothing else ever called that card, and a component with
+  //    no call sites is four sentences being translated on every build for a
+  //    screen nobody can reach — which is exactly the rot R28's ORPHAN clause
+  //    exists to stop, arriving here as ceiling debt instead.
+  //
+  // WHY THE TWENTY-FIVE WERE SEEDED RATHER THAN LEFT TO THE NEXT TRANSLATION
+  // RUN, when every entry below reasons the other way. The entries below are
+  // sentences on screens made of ROWS — a list in the wrong language is still a
+  // list, because the rows are names and dates and a reader recognises them.
+  // This screen has no rows. It is five pictures, and the sentences on it are
+  // the half that says what each picture may NOT be used for: which months were
+  // dropped and why, how many tickets the matrix cannot speak for, that the
+  // weekend does not count towards a duration. A chart whose caveats are in a
+  // language the reader did not choose is a chart read without its caveats, and
+  // a number nobody can check is the one place that costs something. So these
+  // were worth writing by hand; they also cost nothing to write, since the seed
+  // never goes to the model.
+  //
   // RAISED 233 -> 238 in all three on 6 Sep 2026, the triage-review lane (the
   // client's review of the sitting the entry below built), and the arithmetic is
   // written down because R44's whole point is that a ceiling cannot move
@@ -916,9 +947,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // ("no header"). Every verb it draws — Accept, Assign, Plan, Store — and the
   // picker's own strings were already catalogued by the card, which is what
   // sharing `triageAct` and `RecordPicker` between the two views buys.
-  de: 244,
-  es: 244,
-  ca: 244,
+  de: 240,
+  es: 240,
+  ca: 240,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -1330,6 +1361,9 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
     "bounded by ONE ticket — the files on the ticket in front of you. It does not page, and a client who can see the ticket can see all of them at once.",
   "web-portal/components/deliverables-screen.tsx":
     "bounded today: what the agency has deliberately marked visible for this client, unpaged. THIS ENTRY DIES THE DAY IT PAGES — the census refuses an exemption for any portal room carrying hasMore/loadMore, so adding paging here fails the build until it also searches.",
+  // ── THE ONE SCREEN WITH NO ROWS AT ALL ────────────────────────────────────
+  "web/components/tickets-dashboard.tsx":
+    "NOTHING ON THIS TAB IS TEXT A PERSON COULD SEARCH. R48's own stated ground is that a search box over a handful of rows is a control that cannot do anything; here the ground is one step further along — there are no rows, of any number. Every mark on the Tickets dashboard is a tally the database took over the whole backlog (open work per kind and stage, per system, per client, the recategorisation matrix, the closing-time quantiles and their twelve-month trend), and the only words on screen are the team's own ticket-type vocabulary and its client and system names, each of which is already a FILTER on this row rather than a haystack. A box here could only ever narrow a chart by a substring of a label, which is not a question anybody asks of a picture. THE SEARCH FOR TICKETS THEMSELVES IS ONE TAB AWAY and is the real one: `<PagedFind>` on the same screen, asking the door, over the paged collection (R14). Same file, same tab strip, so nothing became unreachable — it stopped being on the tab that has nothing to find. See TOOLBAR_SORT_EXEMPT's entry for the same component for why it has no sort either, and note the two are the same sentence twice: a dashboard is not a list.",
   // ── THE SIX PAGED RECIPES — search lives in the host's <PagedFind>, never
   // in the recipe's own in-memory engine (SEARCH.md's layered model: a
   // GROWING collection's search has to ask the door, because the frame can
@@ -1467,6 +1501,8 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
     "TIME IS READ IN TIME ORDER, and this list PAGES (`<LoadMore>`, R14). A browser-side reorder would put the fifty entries currently in hand into a new sequence and present it as the order of the whole log, which is exactly the defect `frameSortOptions` refuses for every paged collection in the engine. If this ever earns a sort it belongs on the door, as a `<PagedFind>` `sorts` option, not here.",
   "web/components/contact-panels.tsx#ContactTicketsPanel":
     "A PAGE-ONE SUMMARY OF A PAGED LIST (`<LoadMore>`, R14) on somebody's record — the whole ticket collection has its own screen, with its own door-backed search, filters and sort. Same reason as WorkLogsPanel above: ordering the loaded page and calling it the order of the list is the lie R14 exists to stop.",
+  "web/components/tickets-dashboard.tsx#TicketsDashboard":
+    "A DASHBOARD IS NOT A LIST, AND HAS NO ROW ORDER TO OFFER. The client asked for this toolbar in the same breath as the exemption — \"dashboard should also have toolbar / filter by client and type / no sort\", 6 Sep 2026 — and the reason is structural rather than a preference. There are no rows on this tab at ALL: every number on it is a COUNT(*) or a quantile the database took over the whole backlog, and the five panels under this row are a pipeline grid, a stacked bar per system, two ranked lists the DOOR ordered (busiest first), a 4×4 matrix and a duration distribution. Not one of them is a sequence a reader could ask to see differently — the pipeline's order is the ticket lifecycle, the matrix's is the ticket vocabulary, and the rankings are already the answer to \"who has the most\", which is the question. A `<SortControl>` here would offer to reorder a picture. The two FILTERS it does carry are not the browser narrowing loaded rows either (there are none to narrow): they are parameters of `GET /api/content/help/dashboard`, spent in the WHERE clause of all eight of its grouped reads and carried in the cache key, which is the only shape that can work when the screen holds no data of its own.",
   "web/components/sprints-screen.tsx#SprintsScreen":
     "THE BESPOKE ROW SERVES TWO BODIES THAT ARE NOT FLAT LISTS — Overview, which groups sprints under their own state headings, and Calendar, a month grid. A sort chip would either fight the grouping or reorder squares by something other than the date they sit on. The third tab, \"All sprints\", is a flat list drawn by the recipe engine, and it gets its picker from `frameSortOptions` off its own columns — which is why this screen looks sorted where it is a list and unsorted where it is not.",
 }

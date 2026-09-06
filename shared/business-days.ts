@@ -91,6 +91,70 @@ export function workingHoursBetween(from: Date | string, to: Date | string): num
   return Math.floor(workingMsBetween(from, to) / HOUR_MS)
 }
 
+/** THE SAME ARITHMETIC, SAID IN SQL — for the durations the DATABASE has to
+ * count, because the browser must never be handed the rows to count them from.
+ *
+ * WHY THERE IS A SECOND LANGUAGE IN THIS FILE AT ALL, since "one file and not
+ * six" is the whole point of it. The tickets dashboard reports three durations —
+ * the spread of closing times, the twelve-month trend of the middle one, and
+ * how long the unopened tickets have sat — over the WHOLE backlog, which is a
+ * growing collection the browser only ever holds page one of (R14). Answering
+ * any of them in Javascript would mean shipping a row per closed ticket and
+ * subtracting in a loop, so the picture would be of the newest fifty tickets
+ * under a heading that says backlog. The arithmetic has to happen where the rows
+ * are. What must NOT happen is a second definition of the rule living down
+ * there: the queue's card says "2 days" off `workingDaysBetween` and the
+ * dashboard's chart says "2 days" off this, and the two are one sentence written
+ * twice or they are two clocks on one product.
+ *
+ * SO IT IS THE EXACT TWIN, floor and all, and `working-days-agree.test.ts` runs
+ * both over the same instants and requires the same integer out of each — which
+ * is the only way a claim like this stays true after somebody edits one of them.
+ *
+ * ── HOW THE SQL SAYS IT ─────────────────────────────────────────────────────
+ *
+ * `sinceOrigin(x)` is the working days elapsed from one fixed origin to the
+ * instant `x`, as a fraction. Its own value is meaningless; the DIFFERENCE
+ * between two of them is the working-day span, and flooring that difference is
+ * what `workingDaysBetween` does to its millisecond total. Two parts:
+ *
+ *   · WHOLE WEEKDAYS BEFORE x's DATE. `strftime('%w', …)` answers 0 for Sunday,
+ *     so `(… + 6) % 7` rotates the week to start on Monday (Mon = 0 … Sun = 6),
+ *     which is what makes `MIN(m, 5)` the count of weekdays already gone this
+ *     week — a Saturday and a Sunday both sit after all five of them, which is
+ *     precisely why they contribute nothing. `n - m` is that date's own Monday,
+ *     so `(n - m) / 7` is whole weeks. SQLite's integer `/` truncates, and that
+ *     is safe rather than merely tolerated: every Monday's day number leaves the
+ *     same remainder mod 7, so the truncation shifts both ends of the
+ *     subtraction by one identical constant and cancels exactly.
+ *   · THE PART-DAY, on a weekday only. `julianday(x) - julianday(date(x))` is
+ *     the fraction of the day already gone; on a Saturday or a Sunday it is
+ *     dropped, which is the clock stopping at Friday midnight and restarting on
+ *     Monday — the same sentence the millisecond walk above implements.
+ *
+ * BOTH ARGUMENTS ARE SQL EXPRESSIONS THE CALLER CONTROLS — a column name, or
+ * something like `datetime('now')` — and they are INTERPOLATED, not bound,
+ * because a bound parameter cannot be an operand of `strftime` the way this
+ * needs. So this must never be handed anything that arrived on a request; every
+ * call site today passes a column name written in the source beside it.
+ *
+ * NULL IN, NULL OUT. `julianday` and `strftime` both answer null for a string
+ * they cannot parse, and null propagates through the whole expression, so a row
+ * with a broken or missing stamp falls OUT of every comparison rather than
+ * arriving as a duration. It does NOT clamp a negative span to zero the way the
+ * Javascript does — a closed-before-raised row is a data fault rather than a
+ * short ticket, and the callers filter it out in their own WHERE rather than
+ * having it silently counted as a same-day close. */
+export function workingDaysSql(from: string, to: string): string {
+  const sinceOrigin = (x: string) => {
+    const dayNumber = `CAST(julianday(date(${x})) AS INTEGER)`
+    const mondayIndex = `((CAST(strftime('%w', ${x}) AS INTEGER) + 6) % 7)`
+    const partDay = `(CASE WHEN ${mondayIndex} < 5 THEN julianday(${x}) - julianday(date(${x})) ELSE 0 END)`
+    return `(5 * ((${dayNumber} - ${mondayIndex}) / 7) + MIN(${mondayIndex}, 5) + ${partDay})`
+  }
+  return `CAST(${sinceOrigin(to)} - ${sinceOrigin(from)} AS INTEGER)`
+}
+
 /**
  * The instant `days` working days before `at` — the cutoff a query compares
  * `created_at` against.

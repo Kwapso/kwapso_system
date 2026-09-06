@@ -43,9 +43,28 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { storedWordColumns } from "@shared/selectable-homes"
+import { workingDaysAgo } from "@shared/business-days"
+import { CLOSURE_TREND_MIN_CLOSURES } from "@shared/types"
+import { TRIAGE_AFTER_DAYS } from "../src/lib/triage"
 
 const ROOT = join(__dirname, "..", "..", "..")
 const db = () => holder.db as DatabaseSync
+
+/** The most recent date (strictly before today) falling on `weekday`, where
+ * Sunday is 0 — SQLite's own `strftime('%w')` numbering, so a test that names a
+ * Friday and a door that recognises one are using one convention.
+ *
+ * Relative to now rather than a fixed calendar date, for the reason the closing
+ * seeds below are: everything on this dashboard is measured against a window
+ * that moves, so a hard-coded Friday is a test that expires. */
+function mostRecentWeekday(weekday: number): Date {
+  const d = new Date()
+  d.setUTCHours(0, 0, 0, 0)
+  do {
+    d.setUTCDate(d.getUTCDate() - 1)
+  } while (d.getUTCDay() !== weekday)
+  return d
+}
 
 function env(userId: string) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
@@ -227,19 +246,34 @@ describe("a rename is a re-spelling, not a recategorisation", () => {
 })
 
 describe("the dashboard door only counts what it can stand behind", () => {
-  /** Every chart on the tab, in one read. */
-  async function dashboard() {
-    const res = await call(IDS.staffUser, "GET /api/content/help/dashboard")
+  /** Every chart on the tab, in one read — optionally narrowed by the toolbar's
+   * own two filters, which are PARAMETERS of this door rather than a sieve in
+   * the browser (there are no rows on that tab to sieve). */
+  async function dashboard(query = "") {
+    const res = await call(IDS.staffUser, `GET /api/content/help/dashboard${query}`)
     expect(res.status, await res.clone().text()).toBe(200)
     return (await res.json()) as {
       openByTypeAndStatus: { helpType: string; status: string; n: number }[]
       byAccountAndType: { accountId: string; helpType: string; open: number; total: number }[]
       closureDays: { helpType: string; n: number; p25Days: number; medianDays: number; p75Days: number }[]
+      closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
       raisedVsCurrent: { raisedAsType: string; helpType: string | null; n: number }[]
       raisedAsNotRecorded: number
-      openByApp: { appId: string | null; open: number; total: number }[]
+      openByApp: { appId: string | null; helpType: string; open: number; total: number }[]
+      unopenedPastLine: number
     }
   }
+
+  /** WHERE THE CLOSING-TIME SEEDS SIT, and why they are not fixed dates any
+   * more. The spread is taken over the last `CLOSURE_WINDOW_DAYS`, so a ticket
+   * seeded at a hard-coded January date drops out of the answer the moment the
+   * calendar moves past it — which is a test that passes for a season and then
+   * starts failing on a Tuesday for no reason anybody changed. Everything below
+   * is anchored to NOW instead, and moved backwards with the product's own
+   * `workingDaysAgo`, which is the exact inverse of the count the door takes: a
+   * ticket seeded `d` working days before its close reports exactly `d`. */
+  const closedAt = workingDaysAgo(new Date(), 2)
+  const raisedFor = (workingDays: number) => workingDaysAgo(closedAt, workingDays).toISOString()
 
   /** A ticket written straight into the table, so a test can choose its dates,
    * its stage and whether its arrival was ever recorded — none of which the
@@ -298,18 +332,17 @@ describe("the dashboard door only counts what it can stand behind", () => {
   })
 
   it("days-to-close is a median and quartiles, not a mean", async () => {
-    // Five closed tickets at 1, 2, 3, 4 and 100 days. The mean is 22 and
+    // Five closed tickets at 1, 2, 3, 4 and 100 WORKING days. The mean is 22 and
     // describes none of them; the median is 3 and describes the middle one.
     // Nothing here may return 22.
-    const day = (n: number) => new Date(Date.UTC(2026, 0, 1 + n)).toISOString()
     for (const [i, days] of [1, 2, 3, 4, 100].entries())
       seed({
         id: `C${i}`,
         helpType: "Issue",
         raisedAs: "Issue",
         status: "resolved",
-        createdAt: day(0),
-        resolvedAt: day(days),
+        createdAt: raisedFor(days),
+        resolvedAt: closedAt.toISOString(),
       })
 
     const issues = (await dashboard()).closureDays.find((c) => c.helpType === "Issue")
@@ -322,19 +355,161 @@ describe("the dashboard door only counts what it can stand behind", () => {
   })
 
   it("…and with an EVEN count the median is the two middle rows averaged", async () => {
-    const day = (n: number) => new Date(Date.UTC(2026, 0, 1 + n)).toISOString()
     for (const [i, days] of [2, 4, 6, 8].entries())
       seed({
         id: `E${i}`,
         helpType: "Extra",
         raisedAs: "Extra",
         status: "resolved",
-        createdAt: day(0),
-        resolvedAt: day(days),
+        createdAt: raisedFor(days),
+        resolvedAt: closedAt.toISOString(),
       })
     const extras = (await dashboard()).closureDays.find((c) => c.helpType === "Extra")
     expect(extras?.n).toBe(4)
     expect(extras?.medianDays).toBeCloseTo(5, 6)
+  })
+
+  it("THE WEEKEND DOES NOT COUNT — the client's ruling, on the door itself", async () => {
+    // Her words, 6 Sep 2026: "the time counts monday-friday! saturday and sunday
+    // do not count towards how long it took! very very important!" The case she
+    // described is the first one here: raised on a Friday afternoon, closed on
+    // the Monday morning, which the calendar called three days and nobody
+    // worked. `working-days-agree.test.ts` proves the SQL and the Javascript
+    // agree; this proves the DOOR is built out of them rather than out of a
+    // subtraction somebody wrote at the chart.
+    const friday = mostRecentWeekday(5)
+    const monday = new Date(friday.getTime() + 3 * 86_400_000)
+    const setHour = (d: Date, h: number) => {
+      const out = new Date(d.getTime())
+      out.setUTCHours(h, 0, 0, 0)
+      return out.toISOString()
+    }
+    seed({
+      id: "W1",
+      helpType: "Question",
+      raisedAs: "Question",
+      status: "resolved",
+      createdAt: setHour(friday, 16),
+      resolvedAt: setHour(monday, 9),
+    })
+    const questions = (await dashboard()).closureDays.find((c) => c.helpType === "Question")
+    expect(questions?.n).toBe(1)
+    expect(
+      questions?.medianDays,
+      "a ticket raised on Friday evening and closed on Monday morning took no working days — the weekend is not time"
+    ).toBe(0)
+  })
+
+  it("the twelve-month trend refuses a month too thin to have a middle", async () => {
+    // The floor is the whole reason this is a read of its own: a median exists
+    // for a bucket of one, is drawn at the same weight as a median of a hundred,
+    // and a chart cannot refuse to be read. So the thin buckets never leave the
+    // database.
+    const enough = CLOSURE_TREND_MIN_CLOSURES
+    for (let i = 0; i < enough; i++)
+      seed({
+        id: `T${i}`,
+        helpType: "Request",
+        raisedAs: "Request",
+        status: "resolved",
+        createdAt: raisedFor(3),
+        resolvedAt: closedAt.toISOString(),
+      })
+    for (let i = 0; i < enough - 1; i++)
+      seed({
+        id: `S${i}`,
+        helpType: "Extra",
+        raisedAs: "Extra",
+        status: "resolved",
+        createdAt: raisedFor(3),
+        resolvedAt: closedAt.toISOString(),
+      })
+
+    const { closureTrend } = await dashboard()
+    const month = closedAt.toISOString().slice(0, 7)
+    const requests = closureTrend.find((r) => r.helpType === "Request" && r.month === month)
+    expect(requests?.n).toBe(enough)
+    expect(requests?.medianDays).toBeCloseTo(3, 6)
+    expect(
+      closureTrend.some((r) => r.helpType === "Extra"),
+      "a month with fewer than the floor is one ticket wearing a statistic — it must not reach the screen at all"
+    ).toBe(false)
+  })
+
+  it("the unopened count is the triage queue's own line, in working days", async () => {
+    // Same threshold, same function, so the chip on the dashboard and the length
+    // of the queue can never be two different numbers.
+    seed({
+      id: "U1",
+      helpType: "Issue",
+      raisedAs: "Issue",
+      status: "new",
+      createdAt: workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS + 2).toISOString(),
+    })
+    seed({
+      id: "U2",
+      helpType: "Issue",
+      raisedAs: "Issue",
+      status: "new",
+      createdAt: new Date().toISOString(),
+    })
+    // A ticket somebody already read is not one nobody has opened.
+    seed({
+      id: "U3",
+      helpType: "Issue",
+      raisedAs: "Issue",
+      status: "triaged",
+      createdAt: workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS + 9).toISOString(),
+    })
+
+    const queue = await call(IDS.staffUser, "GET /api/content/triage")
+    expect(queue.status).toBe(200)
+    const { total } = (await queue.json()) as { total: number }
+    expect(
+      (await dashboard()).unopenedPastLine,
+      "the dashboard and the triage queue disagree about what 'nobody has opened this' means"
+    ).toBe(total)
+  })
+
+  it("THE TOOLBAR'S TWO FILTERS ARE A WHERE CLAUSE ON EVERY READ", async () => {
+    // The client's ruling, 6 Sep 2026: "dashboard should also have toolbar /
+    // filter by client and type / no sort." There are no rows on that tab, so a
+    // filter that stopped at the browser would change nothing on screen — it has
+    // to reach the door and be taken again over a smaller WHERE.
+    seed({ id: "F1", helpType: "Issue", raisedAs: "Issue", status: "new", accountId: IDS.victimAccount })
+    seed({ id: "F2", helpType: "Extra", raisedAs: "Extra", status: "new", accountId: IDS.victimAccount })
+    seed({ id: "F3", helpType: "Issue", raisedAs: "Issue", status: "new", accountId: null })
+
+    const byType = await dashboard("?helpType=Extra")
+    expect(
+      byType.openByTypeAndStatus.every((r) => r.helpType === "Extra"),
+      "the kind filter did not reach the pipeline read"
+    ).toBe(true)
+    expect(
+      byType.raisedVsCurrent.every((r) => r.helpType === "Extra" || r.helpType === null),
+      "the kind filter did not reach the recategorisation matrix"
+    ).toBe(true)
+
+    const byClient = await dashboard(`?accountId=${IDS.victimAccount}`)
+    expect(
+      byClient.byAccountAndType.every((r) => r.accountId === IDS.victimAccount),
+      "the client filter did not reach the client ranking"
+    ).toBe(true)
+    expect(
+      byClient.openByTypeAndStatus.reduce((n, r) => n + r.n, 0),
+      "the client filter narrowed one chart and not the rest"
+    ).toBeLessThan((await dashboard()).openByTypeAndStatus.reduce((n, r) => n + r.n, 0))
+  })
+
+  it("…and the STAGE is still not a filter this door offers", async () => {
+    // A dashboard narrowed to one stage would draw a pipeline of one row and a
+    // closing-time chart of tickets that have not closed, under headings that
+    // all still say backlog. `status` is dropped inside the read, so a query
+    // string cannot smuggle one in.
+    seed({ id: "G1", helpType: "Issue", raisedAs: "Issue", status: "new" })
+    seed({ id: "G2", helpType: "Issue", raisedAs: "Issue", status: "triaged" })
+    const stages = (await dashboard("?status=new")).openByTypeAndStatus.map((r) => r.status)
+    expect(new Set(stages).size, "a stage filter reached the door").toBeGreaterThan(1)
   })
 
   it("open work by kind carries the stage INSIDE the kind, and leaves closed work out", async () => {
@@ -372,6 +547,20 @@ describe("the dashboard door only counts what it can stand behind", () => {
       rows.find((r) => r.appId === null)?.open,
       "work with no system named is a bar, not a rounding error"
     ).toBeGreaterThanOrEqual(1)
+  })
+
+  it("…and carries the KIND inside each system, which is what the bar is split by", async () => {
+    // An app carrying fourteen tickets of which eight are issues is a quality
+    // problem in one app; an app carrying fourteen requests is a client
+    // spending money. One tally per app cannot tell those apart, which is the
+    // same argument the pipeline read is built on.
+    seed({ id: "B1", helpType: "Issue", raisedAs: "Issue", status: "new", appId: IDS.victimApp })
+    seed({ id: "B2", helpType: "Issue", raisedAs: "Issue", status: "new", appId: IDS.victimApp })
+    seed({ id: "B3", helpType: "Request", raisedAs: "Request", status: "new", appId: IDS.victimApp })
+
+    const mine = (await dashboard()).openByApp.filter((r) => r.appId === IDS.victimApp)
+    expect(mine.find((r) => r.helpType === "Issue")?.open).toBe(2)
+    expect(mine.find((r) => r.helpType === "Request")?.open).toBe(1)
   })
 
   it("a client login is refused at the door (R21)", async () => {

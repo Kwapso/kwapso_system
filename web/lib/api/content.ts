@@ -262,9 +262,32 @@ export type TicketDashboard = {
    * a chart that folded it in would be reporting a rate over a denominator it
    * had quietly changed. Show it as "not recorded". */
   raisedAsNotRecorded: number
-  /** 6A — open work by system, ordered with the busiest first. `appId: null` is
-   * a real bar: the work nobody has said which system it is about. */
-  openByApp: { appId: string | null; appName: string | null; open: number; total: number }[]
+  /** 3B — the same middle ticket, month by month, by the month it CLOSED in.
+   * The rows a chart draws a line from.
+   *
+   * A (kind, month) bucket with fewer than `CLOSURE_TREND_MIN_CLOSURES` closures
+   * is NOT HERE — the floor is applied at the door, not dimmed by the chart,
+   * because a median of six is one ticket wearing a statistic and a chart cannot
+   * refuse to be read. That is why the picture shows the kinds that close in
+   * real numbers rather than one line per kind. */
+  closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
+  /** 6A — open work by system, with the KIND inside each system, ordered with
+   * the busiest system first (and every one of a system's kinds kept together,
+   * so the cap can only drop whole bars off the bottom, never a slice out of a
+   * bar still on screen). `appId: null` is a real bar: the work nobody has said
+   * which system it is about. */
+  openByApp: {
+    appId: string | null
+    appName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** How many tickets nobody has opened yet, past the line the triage queue
+   * already draws — counted in WORKING days, off the same threshold and the
+   * same function that queue uses, so the two can never disagree about what
+   * "late" means. */
+  unopenedPastLine: number
 }
 
 export const content = {
@@ -319,12 +342,23 @@ export const content = {
         byAccount: HelpAccountFacet[]
       }>
     >(`/api/content/help${listQuery({ scope: "all", view: "live", ...opts })}`),
-  /** THE DASHBOARD TAB'S FIVE CHARTS, in one round trip. No arguments on
-   * purpose: it always answers about the everyday list as a whole, which is what
-   * every one of its charts is titled with. Agency only — the door refuses a
-   * client login, because every chart on it compares one client against the
-   * rest. */
-  helpDashboard: () => api<TicketDashboard>("/api/content/help/dashboard"),
+  /** THE DASHBOARD TAB, in one round trip — every chart on it, counted by the
+   * database. Agency only: the door refuses a client login, because every chart
+   * on it compares one client against the rest.
+   *
+   * THE TWO ARGUMENTS ARE THE TAB'S TOOLBAR, and they are arguments rather than
+   * something the screen does to the answer. Everywhere else in this app a
+   * toolbar facet narrows rows the browser already holds; this tab has no rows —
+   * every number on it is a COUNT(*) the database took — so a filter that did
+   * not reach the door would change nothing at all on screen. Spread through
+   * `listQuery` for the reason every list read is: a parameter spelled out one
+   * `if` at a time is a parameter somebody can leave out.
+   *
+   * There is no `status` and no sort. A dashboard narrowed to one stage would
+   * draw a pipeline of one row under a heading that says backlog, and a
+   * dashboard has no row order to offer (R53 — the exemption is on file). */
+  helpDashboard: (opts: { accountId?: string; helpType?: string } = {}) =>
+    api<TicketDashboard>(`/api/content/help/dashboard${listQuery(opts)}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
    * the assistant and then never found again by a person. */

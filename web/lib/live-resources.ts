@@ -474,21 +474,32 @@ export function triageKey(teamId: string): string {
   return `triage:${teamId}`
 }
 
-/** THE TICKETS DASHBOARD — all five of its charts, in one cache entry.
+/** THE TICKETS DASHBOARD — every chart on it, in one cache entry.
  *
- * ONE KEY, for the reason the pulse below gives: the door answers the five
- * grouped reads together, and five keys would be five entries able to hold five
+ * ONE KEY, for the reason the pulse below gives: the door answers the grouped
+ * reads together, and a key each would be several entries able to hold several
  * different moments of the same backlog — a chart of open work beside a chart of
  * the same open work counted a minute earlier.
  *
+ * …AND ONE KEY PER QUESTION, which is what the two filter parts are for. The
+ * tab's toolbar narrows by client and by kind AT THE DOOR (a dashboard has no
+ * rows for a browser to sieve), so "all clients" and "Bergmann's" are two
+ * different answers and must not share an entry — the same arrangement
+ * `helpFacetKey` makes for the ticket list's own sub-tabs. Both parts are in the
+ * key even when empty, so the unfiltered key is a fixed shape rather than a
+ * prefix of every filtered one.
+ *
  * A DERIVED cache, so it is dropped and re-read rather than patched: there is no
- * row in it to patch. It is named in `help`'s own `deps` below, which is what
- * keeps it honest — a ticket raised, recategorised, resolved or archived on
- * somebody else's screen is exactly when every one of these five numbers stops
- * being true. Dropping a key nobody is subscribed to fetches nothing at all, so
- * a team who never opens the tab pays nothing for it. */
-export function helpDashboardKey(teamId: string): string {
-  return `help-dashboard:${teamId}`
+ * row in it to patch. Dropped by PREFIX in `help`'s own `slicePrefix` below
+ * rather than named in its `deps`, because a ping carries a row id and cannot
+ * know which filters anybody currently has on screen — and a ticket raised,
+ * recategorised, resolved or archived on somebody else's screen is exactly when
+ * every one of these numbers stops being true, under every filter. Dropping a
+ * key nobody is subscribed to fetches nothing at all, so a team who never opens
+ * the tab pays nothing for it. */
+export const HELP_DASHBOARD_PREFIX = "help-dashboard:"
+export function helpDashboardKey(teamId: string, accountId = "", helpType = ""): string {
+  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}`
 }
 
 /** THE PULSE — Home's big numbers and its two charts, in one cache entry.
@@ -1041,19 +1052,25 @@ export const TEAM_RESOURCES: Record<
       `total:${helpAttachmentsKey(id)}`,
       `help-mine:${t}`,
       insightsKey(t),
-      // …AND THE DASHBOARD TAB'S FIVE CHARTS, for the same reason as the pulse
-      // above it: they are counted off this collection by the server, so a
-      // ticket raised, recategorised, resolved or put away is precisely when
-      // every one of them stops being true. A derived cache has no row to patch,
-      // so it is dropped and re-read — and only actually re-read while somebody
-      // is looking at that tab.
-      helpDashboardKey(t),
       ...recordCountDeps("help"),
     ],
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
     // moment somebody else raises a ticket.
-    slicePrefix: ["tickets-account-of:", RECORD_MAP_PREFIX],
+    //
+    // …AND THE WHOLE DASHBOARD FAMILY, which moved OUT of `deps` above when that
+    // tab grew a toolbar. Its charts are counted off this collection by the
+    // server, so a ticket raised, recategorised, resolved or put away is
+    // precisely when every one of them stops being true — but they are now keyed
+    // by the reader's own two filters as well as the team, and a ping carries a
+    // row id and cannot know which filters anybody has on screen. `deps` could
+    // name the unfiltered key and only that one, so a reader who had picked a
+    // client would have sat in front of numbers that never moved again. This is
+    // the shape `slicePrefix` exists for (the header on this field says so): a
+    // family of keys the ping cannot name, dropped by prefix. A derived cache
+    // has no row to patch, and only the entry somebody is actually looking at is
+    // re-read.
+    slicePrefix: [HELP_DASHBOARD_PREFIX, "tickets-account-of:", RECORD_MAP_PREFIX],
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the

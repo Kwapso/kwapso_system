@@ -23,6 +23,9 @@ import { countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import {
+  CLOSURE_TREND_MIN_CLOSURES,
+  CLOSURE_TREND_MONTHS,
+  CLOSURE_WINDOW_DAYS,
   HELP_STATUSES,
   OPEN_HELP_STATUSES,
   ticketTypeWaitsForValidation,
@@ -30,6 +33,17 @@ import {
   type HelpStatus,
   type HelpTicket,
 } from "@shared/types"
+// EVERY DURATION ON THE DASHBOARD, FROM THE ONE PLACE THE RULE LIVES — Mon–Fri
+// only, the client's ruling of 6 Sep 2026. `workingDaysSql` is the SQL twin of
+// the `workingDaysBetween` the triage queue counts its cards with, proved equal
+// by `working-days-agree.test.ts`; `workingDaysAgo` is the same seam's cutoff,
+// used here for exactly the reason triage uses it — so the dashboard's count of
+// unopened tickets and the queue's own list can never disagree about "late".
+import { workingDaysAgo, workingDaysSql } from "@shared/business-days"
+// THE THREE-DAY LINE, read from the queue that draws it rather than retyped as a
+// 3 here. It is not a new promise: the dashboard is reporting on the queue's own
+// threshold, so the day somebody moves it, both move together.
+import { TRIAGE_AFTER_DAYS } from "./triage"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import {
@@ -679,13 +693,13 @@ export async function countTicketFacets(
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * THE TICKETS DASHBOARD — five questions about the whole backlog, in one read.
+ * THE TICKETS DASHBOARD — the whole backlog, asked eight ways, in one read.
  *
- * WHY THIS IS ITS OWN DOOR AND NOT FIVE MORE FACETS ON THE LIST. `countTicketFacets`
+ * WHY THIS IS ITS OWN DOOR AND NOT MORE FACETS ON THE LIST. `countTicketFacets`
  * above rides EVERY ticket page, because its three tallies badge a tab strip that
- * is on the screen whether anybody looks at it or not. These five do not badge
- * anything: they are five charts on one tab, opened deliberately. Hanging them
- * off the list door would put five extra grouped scans on every page of every
+ * is on the screen whether anybody looks at it or not. These do not badge
+ * anything: they are one tab's charts, opened deliberately. Hanging them
+ * off the list door would put eight extra grouped scans on every page of every
  * ticket list on both front doors, for a tab most reads never show — the same
  * argument, run the other way, that made the tab strip ONE grouped read instead
  * of six counts.
@@ -699,11 +713,20 @@ export async function countTicketFacets(
  *
  * EVERY READ IS BOUNDED BY ITS GROUPING and says its cap
  * (TICKET_DASHBOARD_GROUP_CAP, which explains why it is smaller than the badge
- * one). Four group over sets that cannot run away — the team's ticket vocabulary
- * and the seven-value status lifecycle, crossed with each other and with
- * themselves. The two that group over something that DOES grow (clients,
+ * one). Most group over sets that cannot run away — the team's ticket vocabulary,
+ * the seven-value status lifecycle, and twelve months — crossed with each other
+ * and with themselves. The two that group over something that DOES grow (clients,
  * systems) are ORDERED with the busiest first before they are capped, so the cap
- * can only ever drop the quiet tail, never the answer.
+ * can only ever drop the quiet tail, never the answer. Two more are single
+ * aggregate rows and are capped at one.
+ *
+ * EVERY DURATION HERE IS COUNTED IN WORKING DAYS, through the one shared
+ * expression (`businessDaysSql`, shared/workers/business-days.ts) and never by
+ * subtracting two `julianday`s at the chart that needs it. The client's ruling,
+ * 6 Sep 2026: "the time counts monday-friday! saturday and sunday do not count
+ * towards how long it took! very very important!" That seam's own header carries
+ * the arithmetic and the reason it is one function rather than three — including
+ * why public holidays are deliberately NOT subtracted.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 /** The stages a ticket is still OURS TO DO SOMETHING ABOUT, spelled for SQL.
@@ -768,26 +791,74 @@ export type TicketDashboard = {
    * denominator — 0065 refused to backfill precisely so that this number could
    * be told rather than absorbed. */
   raisedAsNotRecorded: number
-  /** 6A — OPEN WORK BY SYSTEM. `app_id` is indexed (0035) and has never been
-   * grouped by. The null bucket is KEPT and comes back as `appId: null`: "work
-   * nobody has said which system it is about" is one of the more useful bars on
-   * this chart, and dropping it would quietly shrink the total. */
-  openByApp: { appId: string | null; appName: string | null; open: number; total: number }[]
+  /** 3B — THE SAME STATISTIC, MONTH BY MONTH, BY THE MONTH A TICKET CLOSED IN.
+   * One row per (kind, month) over the last `CLOSURE_TREND_MONTHS`, carrying the
+   * median and the count it was taken over.
+   *
+   * BUCKETS BELOW `CLOSURE_TREND_MIN_CLOSURES` ARE NOT HERE, and that is the
+   * whole reason this is a separate read rather than a grouping of the one
+   * above: the floor is applied where the rows are, so a kind that closes six
+   * tickets in a typical month never reaches the screen at all. `n` still
+   * travels, so a reader can see how much each point is standing on.
+   *
+   * `month` is `YYYY-MM`, the month a ticket was CLOSED in and never the month
+   * it was raised in — this line answers "are we getting faster", which is a
+   * question about the moment the work finished. */
+  closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
+  /** 6A — OPEN WORK BY SYSTEM, WITH THE KIND VISIBLE INSIDE EACH SYSTEM. One row
+   * per (system, kind), so a bar can be split by what sort of work it is: an app
+   * carrying fourteen tickets of which eight are issues is a quality problem in
+   * one app, and an app carrying fourteen requests is a client spending money.
+   * Two tallies beside each other cannot tell those apart, which is the same
+   * argument `openByTypeAndStatus` above is built on.
+   *
+   * `app_id` is indexed (0035). The null bucket is KEPT and comes back as
+   * `appId: null`: "work nobody has said which system it is about" is one of the
+   * more useful bars on this chart, and dropping it would quietly shrink the
+   * total. `helpType` is never null — a ticket nobody gave a kind has no segment
+   * to sit in, exactly as it has no bar in 1B. */
+  openByApp: {
+    appId: string | null
+    appName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** HOW MANY TICKETS NOBODY HAS OPENED YET, past the line triage already draws
+   * (`TRIAGE_AFTER_DAYS`, counted in WORKING days). The one number on this whole
+   * screen that is about us rather than about the work: every other chart says
+   * what arrived, and this says what we did not pick up.
+   *
+   * IT IS NOT A NEW PROMISE — the threshold is the one the triage queue has used
+   * since it shipped, read from the same constant, so the dashboard and the
+   * queue cannot come to disagree about what "late" means. */
+  unopenedPastLine: number
 }
 
-/** THE FIVE CHARTS, IN ONE ROUND TRIP.
+/** THE WHOLE DASHBOARD, IN ONE ROUND TRIP.
  *
  * `filter` is the everyday list's own question — the fence, the archive view —
  * built by the same `ticketWhere` the list and its counts use, so a chart can
  * never be drawn over rows the list itself would not show (R16's sentence,
- * applied to a picture instead of a badge). The kind and stage facets are
- * dropped for the same reason `countTicketFacets` drops them: a dashboard
- * narrowed to Questions would draw five charts about Questions under headings
- * that say backlog.
+ * applied to a picture instead of a badge).
  *
- * FIVE STATEMENTS IN ONE WAVE. Each is its own round trip to the team database
+ * THE STAGE FACET IS DROPPED AND THE KIND FACET IS NOT, and the two used to be
+ * dropped together. A dashboard narrowed to one STAGE would draw a pipeline
+ * chart of one row and a closing-time chart of tickets that have not closed:
+ * every heading here would be about the backlog while every picture was about a
+ * slice of it. A dashboard narrowed to one KIND is a different sentence — it is
+ * the toolbar's second filter, ruled by the client on 6 Sep 2026 ("dashboard
+ * should also have toolbar / filter by client and type / no sort"), and every
+ * chart on the screen still answers its own heading with the kind held constant:
+ * "how long does an Issue take to close" is the same question as "how long does
+ * a ticket take to close", asked of fewer rows. The two filters are a WHERE
+ * clause on every read below rather than a narrowing of loaded rows, because a
+ * dashboard has no rows to narrow — there is nothing on that tab a browser could
+ * sieve.
+ *
+ * EIGHT STATEMENTS IN ONE WAVE. Each is its own round trip to the team database
  * (~150ms, measured 25 Aug 2026) and none depends on another's answer, so they
- * are one `Promise.all` rather than five consecutive lines — the same reasoning
+ * are one `Promise.all` rather than eight consecutive lines — the same reasoning
  * `createTicket`'s waves are built on. */
 export async function readTicketDashboard(
   cfg: D1Rest,
@@ -798,13 +869,23 @@ export async function readTicketDashboard(
   const where = ticketWhere(guard, scope, {
     ...filter,
     tab: "all",
-    helpType: undefined,
     status: undefined,
   })
   const fenced = where.sql.join(" AND ")
   const cap = TICKET_DASHBOARD_GROUP_CAP
+  // HOW LONG A TICKET TOOK, ONCE, for both reads below that need it (the
+  // client's Mon–Fri ruling; see the seam's own header). The column names are
+  // written here in the source and never taken off a request, which is the one
+  // condition `workingDaysSql` interpolating rather than binding asks for.
+  const tookDays = workingDaysSql("created_at", "resolved_at")
+  // …AND THE LINE A TICKET NOBODY HAS OPENED IS LATE PAST. Built the way the
+  // triage queue builds it — the same function, the same constant, a bound
+  // parameter rather than date arithmetic in the statement — because the number
+  // on this dashboard and the length of that queue are the same fact, and two
+  // ways of asking it would eventually be two answers.
+  const unopenedCutoff = workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS).toISOString()
 
-  const [openByType, byAccountType, closure, matrix, notRecorded, byApp] = await Promise.all([
+  const [openByType, byAccountType, closure, trend, matrix, notRecorded, byApp, unopened] = await Promise.all([
     // 1B. Bounded by GROUPING: at most (kinds × stages) rows, and both sets are
     // collections that cannot run away.
     d1Query<{ help_type: string; status: string; n: number }>(
@@ -869,6 +950,19 @@ export async function readTicketDashboard(
     // answers null for a date it cannot parse, and both comparisons then fail,
     // so those rows fall out rather than arriving as a negative duration that
     // would drag a quartile below zero.
+    //
+    // …AND EVERYTHING CLOSED MORE THAN `CLOSURE_WINDOW_DAYS` AGO, which is new
+    // and is a decision rather than a tidy-up. The panel is titled "what it is
+    // now", and a distribution taken over all time is a distribution over ways
+    // of working the team has already left behind. The trend read below is
+    // where the longer view lives, and it is a better shape for it: a year of
+    // months says WHICH WAY this is going, where one number over a year says
+    // only that a year happened.
+    //
+    // WORKING DAYS, NOT CALENDAR DAYS (`tookDays`). This read used to subtract
+    // two `julianday`s, so a ticket raised at five on a Friday and closed at
+    // nine on the Monday reported three days of work over a weekend nobody
+    // worked. The client's ruling is in the seam's own header.
     d1Query<{
       help_type: string
       n: number
@@ -881,10 +975,11 @@ export async function readTicketDashboard(
       cfg,
       guard.databaseId,
       `WITH closed AS (
-         SELECT help_type AS t, (julianday(resolved_at) - julianday(created_at)) AS days
+         SELECT help_type AS t, ${tookDays} AS days
            FROM help
           WHERE ${fenced} AND status = 'resolved' AND help_type IS NOT NULL
             AND julianday(resolved_at) >= julianday(created_at)
+            AND julianday(resolved_at) >= julianday('now') - ${CLOSURE_WINDOW_DAYS}
        ), ranked AS (
          SELECT t, days,
                 ROW_NUMBER() OVER (PARTITION BY t ORDER BY days) AS rn,
@@ -899,6 +994,49 @@ export async function readTicketDashboard(
               MAX(CASE WHEN rn = (n * 75 + 99) / 100 THEN days END) AS p75_days
          FROM ranked
         GROUP BY t, n
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // 3B. THE SAME MIDDLE TICKET, ONE MONTH AT A TIME — the line that says which
+    // way this is going, which is the question the box plot above cannot answer
+    // at all. Grouped by the month a ticket CLOSED in, because that is when the
+    // work finished: grouping by the month it was RAISED in would put a ticket
+    // that took four months into the month it arrived, so the most recent months
+    // would be built out of the fastest tickets and every trend would look like
+    // an improvement.
+    //
+    // THE FLOOR IS APPLIED HERE, IN THE ROWS, and that is the load-bearing part
+    // of this read. A median exists for a bucket of one, is drawn at the same
+    // weight as a median of a hundred, and a chart cannot refuse to be read.
+    // Dropping the thin buckets at the door is why the picture on screen shows
+    // the two kinds that close in real numbers and not four lines, two of them
+    // noise. `CLOSURE_TREND_MIN_CLOSURES` is shared with the sentence the screen
+    // writes under the chart, so the rule and its explanation cannot drift.
+    //
+    // BOUNDED BY ITS GROUPING: at most (kinds × twelve months) rows, and the cap
+    // is said anyway (R14). No ORDER BY for the cap to protect, because there is
+    // no tail to lose — the whole grouping is small by construction.
+    d1Query<{ help_type: string; month: string; n: number; median_days: number }>(
+      cfg,
+      guard.databaseId,
+      `WITH closed AS (
+         SELECT help_type AS t, strftime('%Y-%m', resolved_at) AS mo, ${tookDays} AS days
+           FROM help
+          WHERE ${fenced} AND status = 'resolved' AND help_type IS NOT NULL
+            AND julianday(resolved_at) >= julianday(created_at)
+            AND resolved_at >= strftime('%Y-%m-01', 'now', '-${CLOSURE_TREND_MONTHS - 1} months')
+       ), ranked AS (
+         SELECT t, mo, days,
+                ROW_NUMBER() OVER (PARTITION BY t, mo ORDER BY days) AS rn,
+                COUNT(*)     OVER (PARTITION BY t, mo)               AS n
+           FROM closed
+       )
+       SELECT t AS help_type, mo AS month, n AS n,
+              AVG(CASE WHEN rn IN ((n + 1) / 2, (n + 2) / 2) THEN days END) AS median_days
+         FROM ranked
+        WHERE n >= ${CLOSURE_TREND_MIN_CLOSURES}
+        GROUP BY t, mo, n
+        ORDER BY mo ASC
         LIMIT ${cap}`,
       where.params
     ),
@@ -923,18 +1061,78 @@ export async function readTicketDashboard(
       where.params
     ),
     // 6A. Same CTE shape and same reasoning as 2B, and the NULL app is kept.
-    d1Query<{ app_id: string | null; app_name: string | null; open_n: number; total_n: number }>(
+    //
+    // THE KIND IS CROSSED IN NOW, so a bar can be split by what sort of work it
+    // is — which is the whole point of the chart the client picked. That change
+    // breaks the ORDERING 2B can get away with, and the fix is the two extra
+    // CTEs below rather than a smarter ORDER BY. Ordering (app, kind) pairs by
+    // their own tally and capping at a hundred would rank pairs ACROSS apps, so
+    // the busiest app's smallest segment could be dropped while a quiet app's
+    // biggest one survived — and a stacked bar missing one segment does not look
+    // broken, it looks like an app with no extras. 2B is safe from that because
+    // it draws two independent ranked lists and a missing pair is a missing row;
+    // here a missing pair silently rewrites a bar that is still drawn.
+    //
+    // So the apps are ranked FIRST, by their own whole-app total, and the pairs
+    // are then ordered by their app's rank. The cap can now only ever drop the
+    // quiet apps at the bottom of the chart — entire bars, visibly absent —
+    // never a slice out of a bar that is still on screen.
+    //
+    // `r.app_id IS p.app_id` rather than `=`: the null app is a real bucket and
+    // `NULL = NULL` is null, so a plain equality would join that bucket to
+    // nothing and drop the very bar the comment above insists on keeping.
+    d1Query<{
+      app_id: string | null
+      app_name: string | null
+      help_type: string
+      open_n: number
+      total_n: number
+    }>(
       cfg,
       guard.databaseId,
-      `WITH scoped AS (SELECT app_id, status FROM help WHERE ${fenced})
-       SELECT s.app_id AS app_id, ap.name AS app_name,
-              SUM(CASE WHEN s.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
-              COUNT(*) AS total_n
-         FROM scoped s LEFT JOIN apps ap ON ap.id = s.app_id
-        GROUP BY s.app_id, ap.name
-        ORDER BY open_n DESC, total_n DESC
+      `WITH scoped AS (SELECT app_id, help_type, status FROM help WHERE ${fenced}),
+            pairs AS (
+              SELECT app_id, help_type,
+                     SUM(CASE WHEN status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+                     COUNT(*) AS total_n
+                FROM scoped
+               WHERE help_type IS NOT NULL
+               GROUP BY app_id, help_type
+            ),
+            ranked_apps AS (
+              SELECT app_id, SUM(open_n) AS app_open, SUM(total_n) AS app_total
+                FROM pairs GROUP BY app_id
+            )
+       SELECT p.app_id AS app_id, ap.name AS app_name, p.help_type AS help_type,
+              p.open_n AS open_n, p.total_n AS total_n
+         FROM pairs p
+         JOIN ranked_apps r ON r.app_id IS p.app_id
+         LEFT JOIN apps ap ON ap.id = p.app_id
+        ORDER BY r.app_open DESC, r.app_total DESC, p.open_n DESC
         LIMIT ${cap}`,
       where.params
+    ),
+    // …AND THE ONE NUMBER ON THIS SCREEN THAT IS ABOUT US. Tickets still sitting
+    // in `new` past the line the triage queue already draws, in WORKING days.
+    //
+    // THE SAME PREDICATE `needsTriage` USES, deliberately, down to the strict
+    // `<`: `status = 'new'` and raised before the cutoff. A dashboard chip that
+    // said seven over a queue holding six would be read as a bug in one of them,
+    // and nobody could tell which — so the two are one sentence, built from one
+    // function and one constant.
+    //
+    // `archived_at IS NULL` rides in `fenced` already (the everyday list's own
+    // `view: "live"`), which is the third clause that queue applies: a ticket
+    // somebody deliberately put away is not one nobody has looked at.
+    //
+    // ONE AGGREGATE ROW, so `LIMIT 1` is the honest cap (R14). The cutoff binds
+    // AFTER the fence's own parameters, because both are positional.
+    d1Query<{ n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT COUNT(*) AS n FROM help
+        WHERE ${fenced} AND status = 'new' AND created_at < ? LIMIT 1`,
+      [...where.params, unopenedCutoff]
     ),
   ])
 
@@ -969,12 +1167,20 @@ export async function readTicketDashboard(
       n: num(r.n),
     })),
     raisedAsNotRecorded: num(notRecorded[0]?.n),
+    closureTrend: trend.map((r) => ({
+      helpType: r.help_type,
+      month: r.month,
+      n: num(r.n),
+      medianDays: num(r.median_days),
+    })),
     openByApp: byApp.map((r) => ({
       appId: r.app_id,
       appName: r.app_name,
+      helpType: r.help_type,
       open: num(r.open_n),
       total: num(r.total_n),
     })),
+    unopenedPastLine: num(unopened[0]?.n),
   }
 }
 

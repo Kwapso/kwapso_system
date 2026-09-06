@@ -325,6 +325,35 @@ export function ticketTypeWaitsForValidation(helpType: string | null | undefined
  * client yet, and that telling is the resolution. */
 export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
 
+/** HOW FAR BACK "WHAT IT IS NOW" LOOKS, on the tickets dashboard's closing-time
+ * spread. Ninety days is the design's own window and it is the shorter of two
+ * honest answers: a distribution taken over all time is dominated by tickets
+ * closed under a way of working nobody here uses any more, and the question the
+ * panel is titled with — how long does a ticket take to close — is a question
+ * about now. The twelve-month trend beside it is where the longer view lives. */
+export const CLOSURE_WINDOW_DAYS = 90
+
+/** HOW MANY MONTHS OF THE CLOSING-TIME TREND ARE DRAWN. A year, so a season
+ * repeats once and a reader can tell a trend from a summer. */
+export const CLOSURE_TREND_MONTHS = 12
+
+/** THE FLOOR UNDER A MONTHLY MEDIAN, and the reason the trend draws two lines
+ * rather than four.
+ *
+ * A median is the middle VALUE, so it exists for any count at all — including
+ * one — and that is exactly the trap: a median of six closed tickets is one
+ * ticket wearing a statistic, and it is drawn at the same weight, in the same
+ * colour, on the same axis as a median of a hundred and eighteen. So a
+ * (month, kind) bucket with fewer than this many closures is DROPPED by the
+ * door rather than dimmed by the chart — a chart cannot refuse to be read, and
+ * a reader who can see a line will read a line.
+ *
+ * EIGHT is the design's own number and the sentence beside it on screen says so
+ * in words. Shared rather than typed twice, because a floor the SQL applies and
+ * a caption the screen writes are one fact: the day this moves, the sentence
+ * moves with it or it starts lying. */
+export const CLOSURE_TREND_MIN_CLOSURES = 8
+
 /** A support ticket (team-wide; the My/All tabs filter by raiser). The built-in
  * `status` is the source of truth; `helpType` is a cosmetic selectable value. */
 export type HelpTicket = {

@@ -129,7 +129,6 @@ import {
   ArrowCounterClockwise,
   Cards,
   ListBullets,
-  ArrowUpRight,
   Check,
   Paperclip,
   Plus,
@@ -149,13 +148,14 @@ import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { AddButton, CollectionCard, EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
-import { TicketStagesCard, TicketsByAccountCard } from "@/components/pulse"
+import { TicketsDashboard } from "@/components/tickets-dashboard"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api/tenancy"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
+import { AppMark } from "@/components/app-tiles"
 import { RecordPicker, Swatch, type PickerOption } from "@/components/record-picker"
 import { assignableMembers, staffedOn } from "@/lib/members"
 import { ticketTypeColour } from "@/lib/type-colours"
@@ -283,17 +283,47 @@ const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultD
  * `translatedFacets` makes for the paged screens: a select whose only content is
  * its own placeholder is a control that cannot do anything, and `useFilterBar`
  * counts it toward the pill's number all the same. */
-function triageFacets(rows: TriageWaiting[], t: (english: string) => string): FilterFacet[] {
+/* THE FACETS WEAR THE SAME MARKS THE RECORDS DO — client, 2026-09-06: "in
+   filter type i want to see the colored dot / on filter app i wanna see the
+   icon of the app."
+
+   `FacetOption.mark` is a NODE the caller draws, not a colour or an icon name,
+   for the same reason `ticket-chips.tsx` takes its dot and its link as props:
+   the facet machinery lives in `shared/web/`, which both front doors read, and
+   `ticketTypeColour` / `AppMark` are `web/`-only. The kit needed no change —
+   its own facet control already types a label as a node.
+
+   THE MARK NEVER CARRIES THE MEANING. It rides beside the word and is hidden
+   from assistive tech; the word stays the whole accessible name, and search
+   still matches the word. Two people who both see "no dot" is a design that has
+   already failed for one of them.
+
+   `apps` arrives as the full rows rather than the names the tickets carry,
+   because a mark is drawn from the app's own stage and logo — a ticket row
+   knows an `appId` and a name and nothing that could be drawn. */
+function triageFacets(
+  rows: TriageWaiting[],
+  t: (english: string) => string,
+  apps: AppRow[]
+): FilterFacet[] {
   const types = [...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v)))]
     .sort((a, b) => a.localeCompare(b))
-    .map((v) => ({ value: v, label: v }))
+    .map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
   // BY ID, LABELLED BY NAME. A Map rather than a Set of ids plus a second
   // lookup: one pass, and an app whose rows disagree about its name (they
   // cannot — the name comes from one subselect) would still produce one option.
-  const apps = new Map<string, string>()
-  for (const w of rows) if (w.appId) apps.set(w.appId, w.appName ?? t("An app"))
-  const appOptions = [...apps]
-    .map(([value, label]) => ({ value, label }))
+  const appsSeen = new Map<string, string>()
+  for (const w of rows) if (w.appId) appsSeen.set(w.appId, w.appName ?? t("An app"))
+  const appRows = new Map(apps.map((a) => [a.id, a]))
+  const appOptions = [...appsSeen]
+    .map(([value, label]) => {
+      const row = appRows.get(value)
+      // `choice` is the dense mark size — the one `record-picker` draws in its
+      // own option rows, which is exactly this context. An app the ticket names
+      // but the apps list does not hold (archived, or not yet arrived) keeps its
+      // word and simply has no mark, rather than the option vanishing.
+      return { value, label, mark: row ? <AppMark app={row} size="choice" /> : undefined }
+    })
     .sort((a, b) => a.label.localeCompare(b.label))
   return [
     // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
@@ -576,7 +606,19 @@ export function TicketsCollection({
       // of the collection counted above it, so a number here would be the same
       // collection counted twice. The dashboard above carries none for the
       // identical reason.
-      { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
+      /* THE BADGE IS THE QUEUE'S DEPTH — client, 2026-09-06: "on tab triage
+         show number of pending".
+
+         This carried `badge: ""` with an R16 argument: a tab that is not a
+         narrower slice of the collection counted above must not show a number,
+         or the same collection is counted twice. That argument still holds for
+         the DASHBOARD tab beside it, which is a view of everything. It does not
+         hold here. `status = 'new'` is a real, narrower subset — the tickets
+         nobody has sorted yet — and it is the one number on this strip that
+         says how much work is waiting for HER specifically. It is the same
+         predicate the triage queue itself selects on (`triage.ts`), so the tab
+         and the queue cannot disagree about what is pending. */
+      { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: formatCount(byStatus?.new), badgeVariant: "" as const },
       // OPEN, not "Ready" — her word, 2026-09-06: "open (status, when triaged
       // but not solved)". The facet token stays `status:ready` because that is
       // the STATUS the door stores and renaming it would be a migration for a
@@ -653,18 +695,36 @@ export function TicketsCollection({
               />
             </CollectionCard>
           ) : facet === DASHBOARD ? (
-            /* THE DASHBOARD (2026-09-01) — two charts and no numbers (R16: a
-               tab strip badge and a stat tile would both be counting the same
-               collection twice). Tickets by client is the door's own
-               `byAccount` facet, never drawn before tonight; Where the
-               tickets are sitting is `TicketStagesCard`, MOVED here from
-               below the list (see the note there) rather than duplicated. */
-            <CollectionCard>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <TicketsByAccountCard teamId={teamId} />
-                <TicketStagesCard teamId={teamId} />
-              </div>
-            </CollectionCard>
+            /* THE DASHBOARD — the Monday screen, and its own component
+               (`tickets-dashboard.tsx`) rather than more of this file.
+
+               WHAT IT REPLACED, 2026-09-06: two borrowed cards, `TicketsByAccountCard`
+               and `TicketStagesCard`, both reading OTHER screens' cache keys
+               (`help-by-account` off the ticket list, the pulse off Home) and
+               between them answering two of the questions the approved design
+               asks. Everything on the tab is now one door read of its own
+               (`content.helpDashboard`) — which is what makes the toolbar's two
+               filters possible at all: a facet has to reach a WHERE clause,
+               and two cards reading two other screens' caches have no WHERE to
+               reach. The two cards still exist and are still drawn where they
+               belong: `TicketStagesCard` on Home's band, beside the hours.
+
+               NOT INSIDE A `CollectionCard`. Every other branch here is one
+               card holding one collection; this branch is five panels and its
+               own toolbar, and wrapping them in a sixth card would put a card
+               inside a card — CLAUDE.md's own `useKitPanel` note calls that
+               the broken combination. The dashboard draws its own furniture. */
+            <TicketsDashboard
+              teamId={teamId}
+              helpTypeOptions={helpTypeOptions}
+              // R50's own question, asked of the WHOLE collection: `totals.help`
+              // is the door's exact COUNT(*) of the everyday list, before this
+              // tab's own two filters narrow anything. A dashboard filtered to a
+              // client with no tickets is an empty ANSWER, not an empty
+              // collection, and its toolbar must stay put so the reader can
+              // filter their way back out.
+              ticketTotal={totals.help}
+            />
           ) : scopedQ.error ? (
             <CollectionCard>
               <ShapeStateBody
@@ -1162,7 +1222,7 @@ function TriageQueue({
    * wrong the day somebody adds a third facet without options, and a latent
    * wrong default is worse than an unused right one. */
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
-    facets: triageFacets(waiting, t),
+    facets: triageFacets(waiting, t, appsQ.data ?? []),
     values: facetValues,
     data: waiting,
     onChange: (field, value) =>
@@ -1795,7 +1855,13 @@ function TriageQueue({
               <TableHead>{t("Title")}</TableHead>
               <TableHead>{t("Type")}</TableHead>
               <TableHead>{t("App")}</TableHead>
-              <TableHead>{t("Date")}</TableHead>
+              {/* "RAISED", NOT "DATE" — client, 2026-09-06, asked which of the
+                  two words she wanted when the same field wore both on one
+                  screen: "i choose raised". The sort control beside this table
+                  already said Raised; the column header said Date, so the list
+                  offered two names for one fact. Scoped to THIS screen: other
+                  collections say "Date" about their own different fields. */}
+              <TableHead>{t("Raised")}</TableHead>
               {/* NO HEADER OVER THE ACTIONS — client, asked directly: "no
                   header". It is also what her own reference screenshot does,
                   and the reason holds up: every other header names what the
@@ -2072,7 +2138,28 @@ function TriageQueue({
             label: [w.ref, richTextPlain(w.description)].filter(Boolean).join(" · "),
           }))}
           eyebrow={current && <TriageChips teamId={teamId} ticket={current} />}
-          title={current && ticketTitle(current)}
+          /* THE TITLE IS THE WAY IN — client, 2026-09-06: "when clicking in
+             title - go to detail screen." It replaces the Open button that used
+             to sit among the decisions (see the note below where it was).
+
+             A REAL BUTTON, not a div with an onClick: this is the only route
+             off the card now, so it has to be reachable by keyboard and
+             announced as a control. `text-start` because the kit sets the title
+             at the 24 step and a button would otherwise centre it; the type
+             itself is left to `Queue`'s own `title` slot rather than restated
+             here, so the heading looks identical whether or not it is
+             clickable. */
+          title={
+            current && (
+              <button
+                type="button"
+                onClick={() => onOpen(current.id)}
+                className="cursor-pointer text-start hover:underline"
+              >
+                {ticketTitle(current)}
+              </button>
+            )
+          }
           decisions={
             current && (
               <>
@@ -2134,42 +2221,21 @@ function TriageQueue({
                     sitting among them is noise on every single card. In the
                     TOOLBAR it can come and go without moving anything the hand
                     is aiming at, because the toolbar is not where the hand is. */}
-                {/* OPEN, MOVED HERE FROM THE CARD — client, 2026-09-06: "I want
-                    to keep the Open function, but not here. I want to have it
-                    next to Skip."
+                {/* OPEN IS GONE FROM THE SITTING — client, 2026-09-06: "in
+                    queue, remove the open button / when clicking in title - go
+                    to detail screen."
 
-                    It sits last among the decisions, which is where the kit
-                    then draws Skip, so the two ways OUT of the sitting end up
-                    adjacent and both read as ghosts against the one mango
-                    button at the other end. It is deliberately NOT a decision:
-                    it writes nothing, moves nothing and leaves the queue —
-                    which is exactly why it belongs beside Skip rather than
-                    beside Accept. It is also the whole reason the readiness
-                    sentence could be deleted from the card: a ticket missing a
-                    field is now fixed on the ticket, one press away. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onOpen(current.id)}
-                  /* `ms-auto` IS THE WHOLE FIX, and being last in the row was
-                     not enough. The kit draws Skip AFTER `decisions` and gives
-                     it `ms-auto` of its own, so Skip is thrown to the far end of
-                     the row while everything in `decisions` stays clustered at
-                     the reading start — Open sat with Accept and Change
-                     category with the entire width between it and Skip, which
-                     is exactly what the client saw and reported twice.
-
-                     Putting `ms-auto` HERE consumes the free space one item
-                     earlier: Open goes to the end, and Skip's own `ms-auto`
-                     then has nothing left to consume, so the two land side by
-                     side. That is the arrangement she asked for — the two ways
-                     OUT of the sitting together at one end, the decisions
-                     together at the other. */
-                  className="ms-auto gap-1"
-                >
-                  <ArrowUpRight className="size-3.5" />
-                  {t("Open")}
-                </Button>
+                    It arrived here that morning ("I want to keep the Open
+                    function, but not here, next to Skip") and took two attempts
+                    to place, because the kit gives Skip its own `ms-auto` and
+                    two `ms-auto` items SPLIT the free space rather than sitting
+                    together. All of that is deleted rather than kept as
+                    history: the title above is the affordance now, which is
+                    where a reader already looks and already expects a record to
+                    open, and a button whose job is "leave this card" competing
+                    with Skip for the same corner was always one control too
+                    many. Skip's own `ms-auto` is unopposed again, so the row
+                    reverts to the kit's own arrangement with nothing to fix. */}
               </>
             )
           }

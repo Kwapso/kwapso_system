@@ -642,15 +642,27 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
 /** GET /api/content/help/dashboard — the Tickets screen's Dashboard tab, in one
  * read (help:read).
  *
- * FIVE GROUPED READS, ONE DOOR, and none of them is a filter: it always answers
- * about the everyday list as a whole (`EVERYDAY_LIST`), because that is the
- * question every one of its charts is titled with. There is no query string here
- * on purpose — a dashboard that narrowed would be five charts about a slice
- * under headings that say backlog, and the charts already carry their own
- * breakdowns (by kind, by client, by system) inside themselves.
+ * EIGHT GROUPED READS, ONE DOOR, over the everyday list (`EVERYDAY_LIST`) —
+ * narrowed by the tab's own two filters and by nothing else.
+ *
+ * THE TWO FILTERS ARE PARAMETERS OF THIS DOOR, NOT A SIEVE IN THE BROWSER, and
+ * that is the whole reason they are parsed here rather than handled on the
+ * screen. The client's ruling, 6 Sep 2026: "dashboard should also have toolbar /
+ * filter by client and type / no sort." Everywhere else in the app a toolbar
+ * facet narrows rows that are already loaded; there are no rows on this tab.
+ * Every number on it is a COUNT(*) the database took, so narrowing it means
+ * taking the counts again over a smaller WHERE — a filter that did not reach the
+ * door would change nothing at all on screen.
+ *
+ * `accountId` and `helpType` and NOTHING ELSE. `status` is deliberately not
+ * offered and `readTicketDashboard` drops it if anything ever sets it: a
+ * dashboard narrowed to one stage would draw a pipeline of one row and a
+ * closing-time chart of tickets that have not closed, under headings that all
+ * say backlog. A kind is a different sentence — every chart still answers its
+ * own heading with the kind held constant.
  *
  * ITS OWN DOOR, NOT MORE FACETS ON THE LIST: `readTicketDashboard` (lib/help)
- * opens with the measurement — five extra grouped scans on every ticket page,
+ * opens with the measurement — eight extra grouped scans on every ticket page,
  * for a tab most reads never show.
  *
  * REFUSED TO A CLIENT LOGIN (R21), and this is the clearest case of that rule in
@@ -663,7 +675,18 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
 export async function getHelpDashboard(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
   const scope = await refusePortalCaller(cfg, guard)
-  return json(await readTicketDashboard(cfg, guard, scope, EVERYDAY_LIST))
+  // R20: both narrowings sit in a checking position — `queryText`'s first
+  // argument — exactly as the list door's own `accountId`/`helpType` do a few
+  // hundred lines up, and for the same reason: a value off a query string is
+  // untrusted whether it ends up in a WHERE or in a GROUP BY.
+  const params = new URL(request.url).searchParams
+  return json(
+    await readTicketDashboard(cfg, guard, scope, {
+      ...EVERYDAY_LIST,
+      accountId: queryText(params.get("accountId"), "Client"),
+      helpType: queryText(params.get("helpType"), "Type"),
+    })
+  )
 }
 
 /** GET /api/content/help/attachments?id=<ticketId> — the files and links on a
