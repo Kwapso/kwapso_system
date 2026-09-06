@@ -36,8 +36,9 @@ import { fileURLToPath } from "node:url"
 
 import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
 import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
-const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
+const BASE = process.env.SMOKE_BASE || FRONT_DOORS.staging.agency
 const REPO = fileURLToPath(new URL("..", import.meta.url))
 
 // Resend's test inbox: a real send path that always "delivers" and never
