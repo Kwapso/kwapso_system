@@ -451,7 +451,7 @@ export function TicketsCollection({
      again, this line changes with it, and the test that would have caught it
      is worth more than the comment: filed as a follow-up rather than pretended
      to be solved here. */
-  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", TRIAGE)
+  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", DASHBOARD)
   // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
   // above it has to answer "is the queue empty" to know whether to draw
   // itself at all, and only `TriageQueue` — which fetches the queue — ever
@@ -503,10 +503,13 @@ export function TicketsCollection({
     () => listFetch.helpFacet(teamId, "all", facet)
   )
   // R16: every badge on the strip is the door's own grouped COUNT(*), primed by
-  // whichever ticket read ran last and counted over the list IGNORING the kind
-  // and stage facets — so opening "Questions" does not make every other badge
-  // read zero.
-  const byType = useCachedValue<Record<string, number>>(`help-by-type:${teamId}`)
+  // whichever ticket read ran last and counted over the list IGNORING the stage
+  // facet — so opening "Closed" does not make every other badge read zero.
+  //
+  // `help-by-type` is still PRIMED below (the door keeps sending it, and the
+  // triage tally reads its own per-type counts from the rows in hand) but no
+  // longer read here: the per-type tabs it fed were retired with the client's
+  // 2026-09-06 ordering, and type became a filter rather than a tab.
   const byStatus = useCachedValue<Record<string, number>>(`help-by-status:${teamId}`)
 
   const scopedQ = narrowed ? facetQ : allQ
@@ -549,44 +552,37 @@ export function TicketsCollection({
     // header has the ruling). Inherited rather than spelled: `defaultTabsConfig`
     // already is it.
     tabs: [
-      // The one tab on this strip whose idea has a concept icon of its own. The
-      // KIND tabs beside it carry the team's own type MARKS, which `TabsView`
-      // takes as a NODE; Triage's own idea has a CONCEPT icon, which the same
-      // prop resolves as a lucide NAME — so the two kinds of mark sit on one
-      // strip without either being written into a LABEL, the one shape
-      // UI-CONVENTIONS §5 refuses. No badge, and that is R16 rather than an
-      // omission: this tab is not a narrower slice of the collection counted
-      // above it, so a number here would be the same collection counted twice.
-      /* FIRST, AND THAT POSITION IS LOAD-BEARING: `useRemembered`'s default
-         above names this tab because it is the leading one, on the client's
-         rule that a page with nothing remembered opens the tab on the left.
-         Move this entry and that default moves with it. */
+      /* THE CLIENT'S ORDER, 2026-09-06: dashboard, triage, open, closed, all.
+         It reads as a working day rather than as a taxonomy — where the work is
+         coming from, what has not been sorted, what is sorted and running, what
+         is finished, and everything.
+
+         THE PER-TYPE TABS ARE GONE. Issue / Question / Request / Extra each had
+         a tab here; none is in her list of five. Triage is now where a type is
+         decided, so a strip of type tabs beside it offered the same
+         categorisation twice, in a place that could not change it. Type is
+         still a FILTER — the toolbar's facets are built from the rows
+         themselves — so nothing became unreachable, it stopped being a tab.
+
+         FIRST IS LOAD-BEARING: `useRemembered`'s default below names whichever
+         tab leads, on her rule that a page with nothing remembered opens the
+         tab on the left. `web/test/default-tab-is-first.test.ts` compares the
+         two off the disk, so moving this entry without moving the default is a
+         red test rather than a surprise on refresh. */
+      { value: DASHBOARD, label: t("Dashboard"), icon: CONCEPT_ICON.dashboard, badge: "", badgeVariant: "" as const },
+      // The one tab whose idea has a concept icon of its own. No badge, and
+      // that is R16 rather than an omission: this tab is not a narrower slice
+      // of the collection counted above it, so a number here would be the same
+      // collection counted twice. The dashboard above carries none for the
+      // identical reason.
       { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
-      { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
-      // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
-      // library v0.11.0 and drew nothing for a pictograph, so ⚠️ beside Issue and
-      // ❓ beside Question were stored on the dropdown row and rendered on no tab
-      // — the owner edited an emoji and watched it change nowhere. It is a NODE
-      // now, and the glyph comes from the vocabulary rather than from a map here,
-      // so a team that renames a type or picks a new emoji is obeyed without a
-      // deploy. A type with no mark passes "" and the tab is the word alone,
-      // exactly as before.
-      ...helpTypeOptions.map((v) => ({
-        value: `type:${v}`,
-        label: v,
-        icon: ticketMarks.get(v) ?? "",
-        badge: formatCount(byType?.[v]),
-        badgeVariant: "" as const,
-      })),
+      // OPEN, not "Ready" — her word, 2026-09-06: "open (status, when triaged
+      // but not solved)". The facet token stays `status:ready` because that is
+      // the STATUS the door stores and renaming it would be a migration for a
+      // label; only the word a person reads has changed.
+      { value: READY, label: t("Open"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
-      // THE OTHER NON-NARROWING TAB (2026-09-01, beside Triage at the head of
-      // the strip): the dashboard — which client is generating the most work,
-      // and where the tickets are sitting. No badge, for the same reason
-      // Triage carries none — it is not a count of a narrower slice of THIS
-      // list, so a number here would be R16's exact violation (a collection's
-      // count shown more than once).
-      { value: DASHBOARD, label: t("Dashboard"), icon: CONCEPT_ICON.dashboard, badge: "", badgeVariant: "" as const },
     ],
   }
 
@@ -1000,7 +996,7 @@ function TriageQueue({
      the queue's own rows with nothing added — no columns, no sort headers, no
      selection. She asked for the SELECTOR to exist and a body behind it to
      prove the switch works; the details are the next conversation. */
-  const [triageView, setTriageView] = useRemembered<"queue" | "list">("triage-view", "queue")
+  const [triageView, setTriageView] = useRemembered<"queue" | "list">("triage-view", "list")
   /** Tickets settled in this sitting. They leave the front of the order the
    * instant Accept returns, rather than when the door's next answer lands —
    * without this the card would sit on a ticket it had just triaged for as long

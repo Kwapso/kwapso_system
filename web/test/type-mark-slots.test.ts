@@ -131,13 +131,22 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
       "TabItem no longer takes a node — the type marks on the ticket strip have gone dark"
     ).toBe(true)
 
-    // The host half: the strip reads the glyph out of the TEAM'S vocabulary
+    // The host half: the screen reads the glyph out of the TEAM'S vocabulary
     // rather than a map in the component, which is what makes an emoji edited on
-    // the Dropdown values screen reach the tab without a deploy.
+    // the Dropdown values screen arrive without a deploy.
+    //
+    // IT USED TO ASSERT `icon: ticketMarks.get(` — the per-type TABS, retired
+    // with the client's 2026-09-06 ordering (dashboard, triage, open, closed,
+    // all), because triage is where a type is decided and a strip of type tabs
+    // beside it offered the same categorisation twice. The seam it was really
+    // guarding is untouched and still has a live consumer, so the assertion
+    // moves to that consumer rather than being deleted: `shapeHelpList` hands
+    // the same `ticketMarks` to every row, which is where a person now sees the
+    // team's own glyph.
     const strip = readFileSync(join(ROOT, "web", "components", "tickets-collection.tsx"), "utf8")
     expect(
-      /icon:\s*ticketMarks\.get\(/.test(strip),
-      "the ticket type tabs no longer carry the team's own mark"
+      /shapeHelpList\(\s*rows\s*,\s*ticketMarks\s*\)/.test(strip),
+      "the ticket rows no longer carry the team's own type mark"
     ).toBe(true)
     expect(
       strip.includes("markMap("),
