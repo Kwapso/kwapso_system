@@ -47,6 +47,7 @@ import { join } from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
+import { noteSkip } from "@shared/rules/loud-skip"
 import {
   ARCS,
   DETAIL_TIERS,
@@ -570,6 +571,22 @@ describe("what the compiler actually shipped", () => {
   // skip, which is right for `npm run check` and wrong for a ship.
   const REQUIRED = process.env.REQUIRE_EXPORT === "1"
 
+  // AND SAY SO WHEN THEY DO NOT RUN. This file's own header already made the
+  // argument — "A skipped test and a passing test print the same colour on the
+  // way to a deploy" — and closed it for the DEPLOY path with `check:built`.
+  // What it could not do was tell somebody reading an ordinary `npm run check`
+  // that two cases stood down. This one IS by design; the note says so, and is
+  // printed anyway, because a reader counting tests deserves to know why the
+  // count moved.
+  if (!REQUIRED)
+    noteSkip({
+      suite: "the export tripwires (2 cases, one per front door)",
+      missing: "REQUIRE_EXPORT=1 — not set by `npm run check`, on purpose",
+      proves: "that a build actually produced an exported HTML file at all, so `check:built` cannot pass on a build that produced nothing",
+      get: "npm run check:built (it builds first, then re-runs this file strictly); the deploy scripts already call it",
+      byDesign: true,
+    })
+
   const DOORS = [
     ["the agency app", join(ROOT, "web", "out", "index.html")],
     ["the client portal", join(ROOT, "web-portal", "out", "index.html")],
@@ -583,6 +600,17 @@ describe("what the compiler actually shipped", () => {
 
   for (const [door, exported] of DOORS) {
     const html = existsSync(exported) ? readFileSync(exported, "utf8") : null
+
+    // NOT by design: `web/out` is a build output, so these stand down in a fresh
+    // clone AND in every `git worktree`, silently, which is how nine tests went
+    // missing from every lane's gate for a fortnight (shared/rules/loud-skip.ts).
+    if (!html)
+      noteSkip({
+        suite: `${door}: the splash bytes survive the build (3 cases)`,
+        missing: `${exported} — a build output, so it is absent in a fresh clone and in every git worktree`,
+        proves: `that the resting mark and the animator reach ${door}'s real export BYTE FOR BYTE, which no other test in this repo can see`,
+        get: "npm run check:built, or npm run build first",
+      })
 
     // The tripwire on the gate itself. Without this, `check:built` could pass on
     // a build that produced nothing and report the same green as one that

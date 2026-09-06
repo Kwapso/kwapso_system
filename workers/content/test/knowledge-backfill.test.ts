@@ -46,6 +46,7 @@ import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import { tokenise } from "../src/lib/knowledge-text"
 import type { KnowledgeAnswer } from "@shared/types"
+import { noteSkip } from "@shared/rules/loud-skip"
 
 const HISTORY = join(__dirname, "..", "..", "..", "glide", "normalised.json")
 const db = () => holder.db as DatabaseSync
@@ -154,6 +155,29 @@ const call = (route: string, body?: unknown, query = "") => {
 }
 
 const one = (sql: string): Record<string, number> => db().prepare(sql).get() as never
+
+// SAY SO WHEN IT DOES NOT RUN — and it does not run more often than anyone knew.
+//
+// `present` is `existsSync(glide/normalised.json)`, and that file is GIT-IGNORED
+// (.gitignore:86 — it is customer data). A `git worktree` materialises only
+// TRACKED files, so this suite is absent from every worktree by construction,
+// and every parallel lane in this codebase works in one. Measured 6 Sep 2026:
+// these three tests had never executed in any lane's gate, all fortnight, and
+// reported green every time — because a skip and a pass print the same colour.
+//
+// The note below is not decoration. These three are the ONLY automated statement
+// anybody has that the agency's real history was mirrored exactly once and that
+// each client's material landed in that client's own compartment. A reader
+// seeing this line is looking at the absence of that assurance, not at a tidy
+// green, and the words are chosen to leave no room to read it the other way.
+if (!present)
+  noteSkip({
+    suite: "the backfill, over the agency's own history (3 tests)",
+    missing: `${HISTORY} — git-ignored customer data (.gitignore:86), so it is absent from every git worktree, not just yours`,
+    proves:
+      "that the agency's real history is mirrored EXACTLY ONCE, that each client's material lands in that client's OWN compartment, and that a known-item question is answered out of the right source. Nothing else in this repo asserts any of the three.",
+    get: "run in the primary checkout, where glide/normalised.json exists (see glide/README.md). It cannot be made to run in a worktree, because the fixture cannot be tracked.",
+  })
 
 describe.skipIf(!present)("the backfill, over the agency's own history", () => {
   const stats = {
