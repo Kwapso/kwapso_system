@@ -152,8 +152,28 @@ export function afterResponse(request: Request, work: Promise<unknown>): void {
 
 /** This request's deferrer, as a value something can carry — for the two seams
  * handed a per-request object (`cfg`, a scoped `env`) rather than the Request
- * itself. Same guarantee as `afterResponse` and the same never-throws contract;
- * it simply travels differently. */
-export function deferrerFor(request: Request): (work: Promise<unknown>) => void {
+ * itself.
+ *
+ * `undefined` WHEN THERE IS NO LIFETIME TO DEFER ONTO, and that is the whole
+ * point of this function rather than inlining `afterResponse`.
+ *
+ * `afterResponse` is `waitUntil`-or-nothing: with no registered context the work
+ * runs and NOBODY awaits it. That is correct for its original callers, which
+ * were already fire-and-forget side errands started inside a handler that then
+ * returned — losing one is what "best-effort" meant there. It is NOT correct for
+ * `publishChange` and `logActivity`, which were AWAITED before this seam existed.
+ * Handing them an always-present deferrer would quietly convert "awaited" into
+ * "nobody is watching" wherever no context was passed — and that failure is
+ * invisible by construction: no error, no red suite, just a row that is
+ * sometimes absent.
+ *
+ * So the absence is reported honestly, and the seams await when they see it. In
+ * a deployed worker `canDefer` has always run by the time this is called, so the
+ * deferred path is the real one; a cron tick, a lib called directly and every
+ * suite that calls `fetch(request, env)` with two arguments get the behaviour
+ * they had before. `deferred-side-work.test.ts` fails if this ever returns a
+ * function that drops work. */
+export function deferrerFor(request: Request): ((work: Promise<unknown>) => void) | undefined {
+  if (!contexts.has(request)) return undefined
   return (work) => afterResponse(request, work)
 }

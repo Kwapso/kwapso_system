@@ -29,6 +29,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { logActivity } from "@shared/workers/activity"
 import { publishChange } from "@shared/workers/realtime"
+import { canDefer, deferrerFor } from "@shared/workers/parallel"
 import type { D1Rest } from "@shared/workers/d1-rest"
 
 /** A deferrer that collects, so a test can assert both halves: that the caller
@@ -176,5 +177,94 @@ describe("logActivity", () => {
     const cfg = { accountId: "a", apiToken: "t", defer: c.defer } as unknown as D1Rest
     await expect(logActivity(cfg, "db1", actor, entry)).resolves.toBeUndefined()
     await expect(c.settle()).resolves.toBeDefined()
+  })
+})
+
+// ── THE GUARANTEE ITSELF, not the speed ──────────────────────────────────────
+//
+// Everything above asks whether the caller stopped WAITING. This asks the
+// question that actually matters and is far harder to see: does the work still
+// HAPPEN? A deferred write that silently never runs looks exactly like one that
+// ran — no error, no red suite, just a history row that is sometimes absent and
+// a screen that is sometimes stale, on some requests, for no visible reason.
+//
+// The hole is real and this suite caught it: `afterResponse` is
+// `waitUntil`-or-nothing (`contexts.get(request)?.waitUntil`), so a deferrer
+// handed out where no context was ever registered runs the work with NOBODY
+// awaiting it. For `afterResponse`'s original callers that is the documented
+// best-effort contract. For these two seams — which were AWAITED before the
+// deferral landed — it would be a silent downgrade from "guaranteed" to "if we
+// are lucky". `deferrerFor` therefore reports absence rather than papering over
+// it, and these three tests are what stop that regressing.
+describe("the deferred work is guaranteed, not merely started", () => {
+  it("offers no deferrer at all when no lifetime was registered", () => {
+    // The honest answer, and the one that makes the seams fall back to awaiting.
+    expect(deferrerFor(new Request("https://x/none"))).toBeUndefined()
+  })
+
+  it("offers one once a context is registered, and it reaches waitUntil", () => {
+    const req = new Request("https://x/some")
+    const held: Promise<unknown>[] = []
+    canDefer(req, { waitUntil: (w) => void held.push(w) })
+    const defer = deferrerFor(req)
+    expect(defer, "a request with a lifetime gets a deferrer").toBeTypeOf("function")
+    defer?.(Promise.resolve("done"))
+    // THE GUARANTEE: the runtime is holding the request open for this work. If
+    // this array is empty the work is running with nobody awaiting it, which is
+    // the invisible failure this whole block exists for.
+    expect(held.length, "the work was handed to the runtime, not dropped").toBe(1)
+  })
+
+  it("THE WHOLE PATH: a request with no lifetime still lands its ping", async () => {
+    // The regression end to end, built exactly as a dispatcher builds it — the
+    // scoped env carries whatever `deferrerFor` gives for THIS request, and this
+    // request never had `canDefer` called on it (a cron tick, a direct call, a
+    // suite invoking fetch with two arguments).
+    //
+    // Under the defect this suite caught, `deferrerFor` handed back a working
+    // function anyway, `publishChange` took the deferred branch, and
+    // `afterResponse`'s optional chain dropped the work on the floor — so this
+    // returns with the hop still unstarted and NOTHING anywhere says so.
+    const req = new Request("https://x/no-lifetime")
+    let landed = false
+    // A MACROTASK GATE, so this cannot pass by accident. `await` on a dropped
+    // promise still drains the MICROtask queue, so a hop built out of resolved
+    // promises finishes either way and the test proves nothing. A `setTimeout`
+    // fires strictly after that queue drains: an awaiting caller reaches it, an
+    // abandoning one has already moved on. Deterministic in both directions.
+    const g = gate()
+    setTimeout(() => g.open(), 0)
+    const env = {
+      REALTIME: {
+        fetch: async () => {
+          await g.opened
+          landed = true
+          return new Response("{}")
+        },
+      },
+      DEFER: deferrerFor(req),
+    }
+    await publishChange(env as never, "team1", "help", "h1", "edit")
+    expect(landed, "the ping completed before the caller moved on — not abandoned").toBe(true)
+  })
+
+  it("THE WHOLE PATH, the other seam: the history row is written, not abandoned", async () => {
+    const req = new Request("https://x/no-lifetime-2")
+    let landed = false
+    const g = gate()
+    setTimeout(() => g.open(), 0)
+    vi.stubGlobal("fetch", async () => {
+      await g.opened
+      landed = true
+      return new Response(JSON.stringify({ success: true, result: [{ results: [] }] }))
+    })
+    const cfg = { accountId: "a", apiToken: "t", defer: deferrerFor(req) } as unknown as D1Rest
+    await logActivity(cfg, "db1", actor, {
+      type: "Ticket edited",
+      description: "x",
+      relatedTable: "help",
+      relatedRowId: "h1",
+    })
+    expect(landed, "the activity row was written before the caller moved on").toBe(true)
   })
 })
