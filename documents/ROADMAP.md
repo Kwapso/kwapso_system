@@ -20,10 +20,10 @@
 >
 > | You want | Read |
 > |---|---|
-> | What the base is and where every doc lives | [README.md](README.md) |
+> | What the base is and where every doc lives | [README.md](../README.md) |
 > | How the whole system works, and why | [BASE-MANUAL.md](BASE-MANUAL.md) |
 > | The decisions that are locked | [ARCHITECTURE.md](ARCHITECTURE.md) |
-> | The rules a change must obey | [CLAUDE.md](CLAUDE.md) + [RULES.md](RULES.md) |
+> | The rules a change must obey | [CLAUDE.md](../CLAUDE.md) + [RULES.md](../RULES.md) |
 > | What is still open, and where | [UI-GAPS.md](UI-GAPS.md) (library gaps), [EDGE-CASES.md](EDGE-CASES.md) (the two deferred perf wins), [AGENT-MODULES-PLAN.md](AGENT-MODULES-PLAN.md) (the deferred agent hooks), [BASE-IMPROVEMENTS.md](BASE-IMPROVEMENTS.md) (what each audit round changed) |
 >
 > There is deliberately **no single "what's next" document**. A roadmap file goes

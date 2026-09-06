@@ -4,8 +4,8 @@ This document has one job: walk you from a fresh clone to a change that is
 committed, in-rule, and provably not broken. It assumes you have never touched
 this codebase.
 
-It is deliberately not a tour. [README.md](README.md) is the map, and
-[CLAUDE.md](CLAUDE.md) is the law. This is the path *through* them the first
+It is deliberately not a tour. [README.md](../README.md) is the map, and
+[CLAUDE.md](../CLAUDE.md) is the law. This is the path *through* them the first
 time, in the order the work actually happens.
 
 **Who this is for.** Today one person has written nearly all of this
@@ -51,7 +51,7 @@ from every clone. A skip anywhere else is not green — investigate it.
 
 ## 1 · Before you write code: the planning ritual
 
-[CLAUDE.md](CLAUDE.md) opens with seven questions to answer **before** writing
+[CLAUDE.md](../CLAUDE.md) opens with seven questions to answer **before** writing
 anything. Do not skip them because the change looks small — the failure mode
 they exist for is precisely the change that looked fine and broke an unstated
 invariant.
@@ -63,7 +63,7 @@ of product words (Law R6, machine-checked). If there is no word for what you
 are adding, that is a glossary decision *first*. Never invent a synonym — Law
 R34 reads the app's own copy for known synonyms and will turn the build red.
 
-**Ask which Laws bite.** There are 38 of them ([RULES.md](RULES.md)), they are
+**Ask which Laws bite.** There are 38 of them ([RULES.md](../RULES.md)), they are
 machine-checked, and they are not advisory. The common ones, by what you are
 touching:
 
@@ -93,7 +93,7 @@ git checkout -b fix/the-thing-that-was-wrong
 ```
 
 Where the change goes, by kind, is the table in
-[README.md](README.md) § *The documents* — and for a whole new module,
+[README.md](../README.md) § *The documents* — and for a whole new module,
 [BUILD-A-MODULE.md](BUILD-A-MODULE.md) is the end-to-end golden path with a
 real worked example. Do not invent plumbing: every seam you need already
 exists (the data door, `requireRight`, the validation helpers,

@@ -158,7 +158,7 @@ describe("every shared-write table is written down", () => {
   /** The table names in RESILIENCE.md § "Who owns a fact" — the document IS the
    * registry, so there is no second list to keep in step with it. */
   function documented(): string[] {
-    const doc = readFileSync(join(ROOT, "RESILIENCE.md"), "utf8")
+    const doc = readFileSync(join(ROOT, "documents", "RESILIENCE.md"), "utf8")
     const section = doc.slice(doc.indexOf("## 2 · Who owns a fact"), doc.indexOf("## 3 ·"))
     return [...section.matchAll(/^\|\s*`([a-z_]+)`/gim)].map((m) => m[1])
   }

@@ -6,12 +6,12 @@ sit on stale data, and a cache can never hold something you're not allowed to
 see. Follow them for every new screen and module.
 
 The whole layer is tiny and dependency-free:
-- [`shared/web/store.ts`](shared/web/store.ts), the cache + `useCached` / `invalidate` /
+- [`shared/web/store.ts`](../shared/web/store.ts), the cache + `useCached` / `invalidate` /
   `primeCache`, plus `patchRow` (row-level: patch ONE row in a cached list) and
   `reconcile` (reconnect catch-up: diff-patch a whole list back in place).
-- [`shared/web/realtime.ts`](shared/web/realtime.ts), the live channel client. A browser
+- [`shared/web/realtime.ts`](../shared/web/realtime.ts), the live channel client. A browser
   opens **two** sockets: the active **team** channel and its **own user** channel.
-- [`shared/workers/realtime.ts`](shared/workers/realtime.ts), the publish side:
+- [`shared/workers/realtime.ts`](../shared/workers/realtime.ts), the publish side:
   `publishChange` (team channel), `publishUserChange` (one user's devices),
   `publishSignOut` (forced sign-out).
 
@@ -214,7 +214,7 @@ Locked by `web/test/cache-bounds.test.ts` and
 
 ### 10 · Edge / server
 - Content-hashed assets (`/_next/static/**`) → cached **forever, immutable**
-  (set in [`web/public/_headers`](web/public/_headers)).
+  (set in [`web/public/_headers`](../web/public/_headers)).
 - HTML → revalidated (`max-age=0, must-revalidate`).
 - Per-user API responses → **private, never edge-cached**. The client cache
   (rules 1–9) handles them.
@@ -226,7 +226,7 @@ navigated elsewhere in the same tab would otherwise reset to empty on return, th
 input lived only in component state. **Rule: every form dialog persists its draft.**
 
 - Back the form's values with `useFormDraft(draftKey, initialValues, open)`
-  ([`shared/web/use-form-draft.ts`](shared/web/use-form-draft.ts)) instead of plain
+  ([`shared/web/use-form-draft.ts`](../shared/web/use-form-draft.ts)) instead of plain
   `useState`. It restores a saved draft when the form opens and saves every change to
   `sessionStorage` (survives navigation AND reload within the tab; gone when the tab
   closes, "on-device per session").

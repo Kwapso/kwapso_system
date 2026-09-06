@@ -7,7 +7,7 @@ cache, the per-team data door, the agent, or a deploy. If you find yourself
 "simplifying" something below, stop: most of these are load-bearing.
 
 The canon lives in [ARCHITECTURE.md](ARCHITECTURE.md), [CACHING.md](CACHING.md),
-[CONCURRENCY.md](CONCURRENCY.md), and [RULES.md](RULES.md). This file is the
+[CONCURRENCY.md](CONCURRENCY.md), and [RULES.md](../RULES.md). This file is the
 field guide to the sharp edges those decisions leave behind.
 
 ---

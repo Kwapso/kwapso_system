@@ -3,12 +3,12 @@
 This is the narrative that ties the whole base together. Every other doc is a
 close-up: [ARCHITECTURE.md](ARCHITECTURE.md) is the locked decisions,
 [DATA-MODEL.md](DATA-MODEL.md) is every table, [CACHING.md](CACHING.md) is the
-live layer, [RULES.md](RULES.md) is the law-book. **This** is the map that shows
+live layer, [RULES.md](../RULES.md) is the law-book. **This** is the map that shows
 how those pieces fit and why they were cut the way they were, enough for a new
 developer (or an AI agent with no prior context) to rebuild the base from zero
 and extend it without breaking its invariants.
 
-Read the two prime directives in [CLAUDE.md](CLAUDE.md) first. Everything below
+Read the two prime directives in [CLAUDE.md](../CLAUDE.md) first. Everything below
 is downstream of them: **stay lean**, and **obey the Laws of the Base**.
 
 ---
@@ -352,7 +352,7 @@ A Law lives in three linked places:
   `publish-seam.test.ts` or a case in `web/test/rules.test.ts`. Break a law and
   `npm run check` turns **red**.
 
-**The laws today: read them in [RULES.md](RULES.md).** They are deliberately not
+**The laws today: read them in [RULES.md](../RULES.md).** They are deliberately not
 re-tabulated here. This manual once carried its own copy of the table, and the copy
 went stale the moment the laws grew past it, a second list of the laws is a second
 thing to keep in step, which is the exact failure the registry exists to prevent. The

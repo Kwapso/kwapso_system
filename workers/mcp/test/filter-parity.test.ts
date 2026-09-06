@@ -479,7 +479,7 @@ describe("agent-body-parity (R22): a write tool offers its door's whole contract
 // second source of truth — so it gets the same treatment every other deny-list in
 // the base gets: derived from the code, red when it disagrees.
 describe("the published catalogue (MCP.md) says what the code does", () => {
-  const DOC = readFileSync(join(ROOT, "MCP.md"), "utf8")
+  const DOC = readFileSync(join(ROOT, "documents", "MCP.md"), "utf8")
   // Backticked identifiers: tool names are snake_case, body fields camelCase.
   const namedInDoc = new Set([...DOC.matchAll(/`([a-zA-Z][a-zA-Z0-9_]+)`/g)].map((m) => m[1]))
 

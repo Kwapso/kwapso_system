@@ -1,7 +1,7 @@
 # CONVENTIONS.md, code + comment conventions
 
 The house style of the Kwapso System server. This is the *how we write code here* companion
-to [ARCHITECTURE.md](ARCHITECTURE.md) (the locked decisions) and [RULES.md](RULES.md)
+to [ARCHITECTURE.md](ARCHITECTURE.md) (the locked decisions) and [RULES.md](../RULES.md)
 (the machine-checked laws). Everything below is grounded in code that already exists,
 where a rule has a canonical file, it's named. A new developer (or an AI agent like
 Claude Code) should be able to read this once and write a new worker route that looks
@@ -777,7 +777,7 @@ the build red:
 
 A law without a passing check is not a law, you cannot add one to `RULES.md` and the
 registry without also adding its test (`registry-integrity` enforces the doc/registry/
-check triangle stays in sync). See [RULES.md](RULES.md).
+check triangle stays in sync). See [RULES.md](../RULES.md).
 
 ### `npm run check:built`, the second gate, for what only a BUILD can be wrong about
 

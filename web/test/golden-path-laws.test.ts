@@ -29,7 +29,7 @@ import { RULES_REGISTRY } from "@shared/rules/registry"
 
 const ROOT = join(__dirname, "..", "..")
 
-const goldenPath = () => readFileSync(join(ROOT, "BUILD-A-MODULE.md"), "utf8")
+const goldenPath = () => readFileSync(join(ROOT, "documents", "BUILD-A-MODULE.md"), "utf8")
 
 /** Every R-number the document names, however it names it — a heading, a
  * checklist line, a parenthesis. The question is whether a reader following this

@@ -640,7 +640,7 @@ missed one. DURABLE-OBJECTS.md describes it. The remaining lever is
 `REALTIME_SHARDS`.)*
 
 **What it means for kwapso: comfortably solved, with four times the margin it had.**
-The estate ([glide/RECONCILIATION.md](glide/RECONCILIATION.md) §3, confirmed with the
+The estate ([glide/RECONCILIATION.md](../glide/RECONCILIATION.md) §3, confirmed with the
 owner 14 Aug 2026) is 20 client companies, 104 contacts, 6 staff, about 125 rows in
 `accounts`. Realistic peak is ~40 concurrent sockets; every human it works with, at
 once, on three devices each, is ~350. Against 12,000–20,000 that is 300× and ~40×.
