@@ -34,6 +34,72 @@ is likely several were its doing — but "likely" is not a record, and writing a
 finding list inferred from a git log would be inventing the causal link this
 review exists to catch. If the original message is ever recovered, paste it here.
 
+## The 2026-09-06 walk — what it found
+
+Run to prove the tracked-report path actually writes, not for a score. **It
+wrote**: `.session-notes/lanes/empty-walk.json`, 20 destinations, canary ran.
+That file is the machine record; this is the readable one.
+
+**Team:** `01M1TK6003NMB8KYES7ZCXHNGP`, "Empty walk probe 2026-09-06", staging.
+Owned by a THROWAWAY account, `delivered+emptywalk@resend.dev`, deliberately —
+`createTeam` does an unconditional `UPDATE users SET current_team_id = ?`, and
+`TEAM_SCREENS_HIDDEN = true` hides the switcher, so naming a real person as the
+owner of a probe team would have stranded them in an empty world with no control
+to get back out. **Both the team and that user can be deactivated.**
+
+**Canary passed first**, as the script requires: the populated smoke team
+returned rows=2 on `/accounts` and rows=2 on `/tickets`, so every zero below is
+an empty screen rather than a probe that finds nothing.
+
+### What is genuinely good, seen live on a team with nothing in it
+
+- **18 of 20 destinations rendered with zero page errors** and a real empty
+  register on each.
+- **`/home` opens with "Start here"** and all three acts present and pressable —
+  "Add your first account", "Bring a spreadsheet in", "Raise the first ticket".
+  This is the fix from `b7f8cc8b` confirmed on a real cold account rather than in
+  jsdom.
+- **The seed works.** Members = 1 and Member roles = 2 (Admin + Viewer) on a team
+  created seconds earlier, with no script run by hand.
+- Accounts, Apps, Brand library, Knowledge, Meetings, Meeting purposes, Stories,
+  Tasks and Tickets all drew "Add the first", and most drew "Import a list"
+  beside it.
+
+### What it found
+
+1. **Sprints' landing tab draws a bare line.** The Overview tab — the one a new
+   team lands on — renders `<EmptyLine concept="sprints">No sprints yet.</EmptyLine>`
+   (`web/components/sprints-screen.tsx:547`): a title, no sentence, no action.
+   The helpful register exists one tab over on "All sprints", and the recipe
+   itself is fine (rendering `sprints.list` empty gives "No sprints yet. /
+   Whatever you add shows up here. The first one takes a minute. / Add the
+   first"). So this is a host-composed tab bypassing the engine's own empty
+   state. **No static check caught this and neither did the new cold-account
+   render tests** — they exercise the recipe, and this screen does not use it on
+   the tab in question. It is exactly what a live walk is for.
+
+### What is NOT a finding, and why — read this before filing either
+
+- **`/time` and `/waves` came back ERR. They are fine.** Both are a 20-second
+  `page.goto` timeout, not a broken screen. Re-probed in a real browser they
+  returned 200 with zero page errors in ~32s each — and the control in that
+  re-probe was `/accounts`, a route this same walk had already probed
+  successfully, which took 99s. The reading was about dev-server compile load,
+  never about those two screens. The navigation budget is now 120s and
+  configurable (`WALK_NAV_TIMEOUT_MS`); see the note at that line for why the
+  2026-08-29 fix to the wait-AFTER-load left this one behind.
+- **The 403s in the console are the harness, not the app.** Thirteen screens
+  logged `[google-catch-up] ApiFailure: That request didn't come from this
+  site.` That is `DEV_API_ORIGIN`'s documented blind spot: the walk runs against
+  a local dev server rewriting to staging, so a browser WRITE carries
+  `Origin: http://localhost:3065` and the CSRF guard in
+  `shared/workers/front-door.ts` correctly refuses it. `web/next.config.ts` names
+  this trade beside the benefit. Any walk run this way will show it, and it says
+  nothing about the product.
+
+**Nothing here spent AI.** The walk only navigates and screenshots; no agent turn
+was invoked on any screen.
+
 ## What is fixed now
 
 The script writes its results to `.session-notes/lanes/empty-walk.json` on every
