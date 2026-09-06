@@ -775,6 +775,41 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 211 -> 233 in all three on 6 Sep 2026, the triage-sitting lane, and
+  // the arithmetic is written down because R44's whole point is that a ceiling
+  // cannot move quietly. TWENTY-TWO new English sentences and THREE retired
+  // ones, and the three retired ones were all already translated, which is why
+  // the number moves by exactly the twenty-two:
+  //
+  //  · nine are the SITTING ITSELF, a shape the app has never drawn before —
+  //    the counted line ("{position} of {total}"), the bar's own accessible
+  //    name, the tail's heading and its "next" mark, the ruled word "Skip", the
+  //    queue's own accessible name, and the two sentences a finished sitting
+  //    says. There was nothing to reuse: the screen this replaces was a list of
+  //    rows and said none of them.
+  //  · six are the TWO ONE-ROW PICKERS the client chose in round eight — each
+  //    one's question ("Which type is this?", "Who is picking this up?"), the
+  //    reason line under it that makes a confirm button unnecessary, and what
+  //    each says when its vocabulary is empty.
+  //  · four are the DECISIONS and their results — "Change category", "Undo",
+  //    "Triaged.", "Filed as {type}.", "Put back as it was." — replacing "Mark
+  //    it read" / "Marked as read.", which were one act where there are now
+  //    four.
+  //  · three are the CARD: the date line the client dictated ("raised {date}"),
+  //    the attachment column's heading, and the way out of a readiness gap.
+  //
+  // THE THREE RETIRED SENTENCES WERE TRANSLATED IN ALL THREE LANGUAGES, so this
+  // is not the trade the entry below records (a fluent-but-false sentence for an
+  // English-but-true one): "Mark it read", "Marked as read." and "{days} days ·
+  // {when}" describe an act and a row that no longer exist, and nothing a German
+  // reader used to understand has become English.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, and for the same reason as both entries
+  // below: `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before, so a translation run is his to
+  // authorise and never a lane's to trigger. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 196 -> 211 in all three on 5 Sep 2026, first-run lane, and the
   // arithmetic is written down because R44's whole point is that a ceiling
   // cannot move quietly. SIXTEEN new English sentences and TWO retired ones:
@@ -816,9 +851,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 211,
-  es: 211,
-  ca: 211,
+  de: 233,
+  es: 233,
+  ca: 233,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -875,8 +910,6 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "the app's only history surfaces are the vertical ActivityFeed (already adopted) and Chart-based burndown/line charts — nothing draws a horizontal dated-event spine.",
   "components/split":
     "architecturally inconsistent on purpose: the app's convention is a list screen navigating to a full-page deep-link detail (web/components/deep-link-screen.tsx); a persistent, non-URL-addressable two-pane master-detail contradicts that by design, not by oversight.",
-  "components/queue":
-    "the ticket triage tab (web/components/tickets-collection.tsx) is a plain filtered list with per-row Edit/Reply/Open buttons — not a one-record-at-a-time decide/skip sitting.",
   "components/chat":
     "no human-to-human messaging feature exists — the app's two thread UIs (the AI assistant, ticket conversations) are both already-adopted, different kit parts (agent-chat, ticket-thread) solving a different problem.",
   "components/tiles":

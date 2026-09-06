@@ -48,7 +48,7 @@ import { storyAttachmentsKey } from "@/lib/live-resources"
 import { pickerKey, searchTickets } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/record-picker"
 import type { PickableRecord } from "@/lib/pickable"
-import type { PickablePerson } from "@/lib/members"
+import { staffedOn, type PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { primeCache, useCached } from "@shared/web/store"
@@ -242,8 +242,15 @@ export function StoryFormDialog({
   // FAIL-OPEN on an app nobody is staffed to, exactly as the door does: a rule
   // that made the assignee un-pickable on precisely the apps nobody has been
   // assigned to would stop the work being recorded at all.
-  const staffHere = appId ? (appStaff.get(appId) ?? []) : []
-  const assignable = staffHere.length ? members.filter((m) => staffHere.includes(m.id)) : members
+  //
+  // THE TWO LINES THAT USED TO BE HERE ARE `staffedOn` NOW (lib/members,
+  // 2026-09-06). The triage card asks the identical question of the identical
+  // pair of lists — "who could pick this up?" — and the fail-open above is the
+  // half that is easy to leave out of a second copy. It moved beside
+  // `assignableMembers`, which is the seam that already decides WHICH people are
+  // ours at all, for the reason that file's own header gives: a rule copied
+  // twice is a rule that holds once.
+  const assignable = staffedOn(members, appStaff, appId)
   // A story is describable once it has a name, a kind, and an answer about which
   // maps it changes — the same three the door insists on, so the button is never
   // enabled into a refusal.

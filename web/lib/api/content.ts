@@ -184,6 +184,20 @@ export type TriageWaiting = {
   appId: string | null
   moduleId: string | null
   raisedByContactId: string | null
+  /** THE CARD'S OWN FACTS (2026-09-06) — the client, the person who asked, and
+   * both faces, resolved by the DOOR rather than looked up here. The reasoning
+   * is on the worker's own `TriageView` (`workers/content/src/lib/triage.ts`)
+   * and it is R14's: `accounts` pages, so the accounts cache a screen holds is
+   * page one, and a card that resolved names against it would have gone blank
+   * on the fifty-first client. */
+  accountName: string | null
+  accountLogo: string | null
+  raisedByContactName: string | null
+  raisedByContactLogo: string | null
+  /** Both titles, never one standing in for the other — `HelpTicket`'s own
+   * ruling: 788 tickets from Glide exist only in German. */
+  titleDe: string | null
+  titleEn: string | null
 }
 
 /** ONE CLIENT'S TALLY — the shape `countTicketFacets`' `byAccount`

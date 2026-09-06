@@ -79,6 +79,46 @@ export function assignableMembers(members: TeamMember[] | undefined): PickablePe
   })
 }
 
+/** THE PEOPLE STAFFED TO ONE APP — narrowed from the list above, with the
+ * fail-open that makes the narrowing safe.
+ *
+ * WHAT THE RELATIONSHIP IS, AND WHERE IT COMES FROM. `app_staff` (team migration
+ * `0030_app_staff_and_stakeholders`) is our rota on one system: an app id, a user
+ * id, and which of them is the lead. It has NO DOOR OF ITS OWN and does not need
+ * one — it rides the app row, because whoever may read a system may read who is
+ * on it (`listApps` in `workers/tenancy/src/lib/processes.ts` returns
+ * `staff: canOpen ? … : []`, withheld from a client login and from anybody the
+ * 8.11 record fence keeps out). So "the people staffed to this app" is already
+ * an answer the bounded, gated apps list carries, and a second door for it would
+ * be a second place the same fence had to be got right.
+ *
+ * WHY IT IS HERE RATHER THAN AT THE CALL SITE. It was written inline in
+ * `story-form-dialog.tsx`, correctly, with the fail-open and the reason for it —
+ * and then the triage card needed the identical two lines for the identical
+ * question ("who could pick this up?"). Two copies of a rule is one copy and a
+ * countdown; this file's own header already makes that argument about the list
+ * these people come out of ("a rule copied nine times is a rule that holds eight
+ * times"), and the narrowing belongs beside it for the same reason.
+ *
+ * THE FAIL-OPEN IS THE LOAD-BEARING HALF. An app nobody has been staffed to
+ * narrows to NOBODY, and a picker offering nobody is a screen a person cannot
+ * finish — on precisely the apps where the staffing has not been filled in,
+ * which is the worst possible place to enforce it. So an empty staff list means
+ * the whole team, which is also what the DOOR does: `refuseOffAppAssignee`
+ * (`workers/content/src/lib/stories.ts`) refuses an assignee who is not on the
+ * app's staff ONLY when the app has staff. The picker is the courtesy half of a
+ * rule the server keeps; this makes the two say the same sentence. */
+export function staffedOn(
+  members: PickablePerson[],
+  /** app id → the user ids on it, straight off the apps list's own `staff` */
+  appStaff: Map<string, string[]>,
+  /** the app in question — `null`/`undefined` on a record that names none */
+  appId: string | null | undefined
+): PickablePerson[] {
+  const here = appId ? (appStaff.get(appId) ?? []) : []
+  return here.length ? members.filter((m) => here.includes(m.id)) : members
+}
+
 /** The same answer, fetched. Every screen that offers people reads the ONE
  * members cache four other screens already hold, so opening a form costs a round
  * trip only on a page that has never needed the list. */

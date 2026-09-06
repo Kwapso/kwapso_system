@@ -414,8 +414,19 @@ const NO_CONTROL: Record<string, string> = {
   // ratchet has done the one thing it exists to do and the excuse is gone.
   "POST /api/content/help/rank":
     "THE ORDER IS STILL THE PRIORITY, and it is still set — just not from the ticket's own screen. Drag-rank is the one priority signal SCOPE ch.07 allows, and Move up / Move down sat on the ticket detail until 17 Aug 2026, when the owner took them off it: a person reading ONE request is not deciding where it sits among forty, and two buttons that move a row you cannot see are a control with no feedback. The door stays because the machine surface still ranks (`rank_help_ticket`), and because the day this app grows a drag handle on the LIST is the day it is wanted back.",
-  "POST /api/content/help/status":
-    "FOR A MACHINE, and it became one on 17 Aug 2026 when the ticket lifecycle stopped being a control. Five of the seven stages are now reached by something HAPPENING — the work lands in a sprint, a timer starts, the last story closes, a person sends the answer, an extra is raised and waits — so a picker offering all seven is precisely the thing the tester asked us to take away ('a status is a fact, not a button', CHECKLIST 5.2). The two stages a person still decides have doors and words of their own, and both have controls: 'Mark it read' on the triage queue and 'They've confirmed it' on the ticket. What is left here is a CORRECTION, which is a sentence somebody says to the assistant ('put BERG-T0412 back to triaged') rather than a control on a screen. It refuses `resolved` outright, so the one move that leaves the building is not reachable through it at all.",
+  // THE STATUS DOOR IS NOT HERE ANY MORE (6 Sep 2026), and its own line said
+  // what would bring it back. It read: "What is left here is a CORRECTION,
+  // which is a sentence somebody says to the assistant ('put BERG-T0412 back to
+  // triaged') rather than a control on a screen." That was right about the
+  // lifecycle — five of the seven stages are still reached by something
+  // HAPPENING and there is still no status picker anywhere ("a status is a
+  // fact, not a button", CHECKLIST 5.2) — and it was describing the ONE
+  // correction a person now makes with a button: UNDO on the triage sitting,
+  // which puts a ticket she has just accepted back to `new`. That is exactly
+  // the sentence it named, said by a control instead of to the assistant, on
+  // the screen where the mistake is made and one click after making it. The
+  // door still refuses `resolved` outright, so the one move that leaves the
+  // building is still not reachable through it.
 
   /* ── for a machine ─────────────────────────────────────────────────────── */
   "POST /api/content/help/bulk-status":

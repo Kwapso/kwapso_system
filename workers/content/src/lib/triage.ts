@@ -64,6 +64,45 @@ export type TriageView = {
      * on a ticket that has one is telling somebody something untrue. */
     moduleId: string | null
     raisedByContactId: string | null
+
+    /* ── WHAT THE CARD SHOWS (2026-09-06) — the queue became a SITTING ────────
+     *
+     * Until today this list was a stack of one-line rows, and a line has room
+     * for a reference and a truncated description and nothing else. The client
+     * ruled a card that hands over one ticket at a time, and named what is on
+     * it: the number, the type, THE CLIENT, THE PERSON WHO RAISED IT WITH THEIR
+     * AVATAR, then the title, then the words.
+     *
+     * NAMES AND FACES RIDE THE ROW (R35). The alternative was to send back ids
+     * and let the screen resolve them against the caches it happens to hold —
+     * and that is not a choice between two working designs, it is a choice
+     * between a right answer and a wrong one: `accounts` is a
+     * GROWING_COLLECTIONS list (R14), so the cache the screen holds is PAGE ONE,
+     * and a card for a ticket raised by the fifty-first client would have shown
+     * a blank chip. `record-picker.tsx`'s own header tells that story about a
+     * picker built the same way ("offered the newest fifty companies and
+     * silently had no opinion about the rest").
+     *
+     * A CONTACT IS AN ACCOUNT ROW, which is why both faces come out of one
+     * table: `raised_by_contact_id` points at `accounts` (an
+     * `accountType: "individual"` row), exactly as `TICKET_COLS` in
+     * `lib/help.ts` already resolves the same id for the ticket list. Same
+     * subselect, same table, same answer — one read, not five. */
+    /** The client's own name and logo, for the client chip. Null on the
+     * agency's own tickets, which genuinely have no client. */
+    accountName: string | null
+    accountLogo: string | null
+    /** WHO ASKED, and their face. Null until somebody has said who — which is
+     * one of the four readiness gaps, so a card missing this is a card whose
+     * Accept is refused anyway, and the empty chip is the honest picture. */
+    raisedByContactName: string | null
+    raisedByContactLogo: string | null
+    /** BOTH TITLES, never one standing in for the other — `HelpTicket`'s own
+     * ruling, and the reason is the same here: 788 tickets from Glide exist
+     * only in German, and a card that showed `titleEn ?? ""` would have named
+     * those "". The screen chooses; the door carries both. */
+    titleDe: string | null
+    titleEn: string | null
   }[]
   /** R16: the exact server count of those, over the same question */
   total: number
@@ -116,6 +155,12 @@ export async function needsTriage(
     app_id: string | null
     module_id: string | null
     raised_by_contact_id: string | null
+    account_name: string | null
+    account_logo: string | null
+    raised_by_contact_name: string | null
+    raised_by_contact_logo: string | null
+    title_de: string | null
+    title_en: string | null
   }>(
     cfg,
     guard.databaseId,
@@ -125,7 +170,27 @@ export async function needsTriage(
     // The four readiness columns come back with the row so the queue can say
     // WHY a ticket cannot move. Four more columns on a capped read, not a
     // second query.
-    `SELECT id, ref, description, created_at, help_type, account_id, app_id, module_id, raised_by_contact_id FROM help
+    //
+    // …AND SIX MORE SINCE 2026-09-06, for the same reason and by the same
+    // means: the queue draws a CARD now, and a card names the client, the
+    // person who asked and the ticket's title. Four correlated subselects and
+    // two plain columns on a read that was already happening — the shape
+    // `TICKET_COLS` in `lib/help.ts` has used since tickets started paging, and
+    // the alternative (ids back, names resolved in the browser) is the R14
+    // page-one bug written up on the type above.
+    //
+    // `accounts` TWICE, once for each id, because a CONTACT is an account row:
+    // the ticket's `account_id` is the company and its `raised_by_contact_id` is
+    // a person, and both live in the one table this product keeps people and
+    // companies in ("Account: a company or a person you work with, both live in
+    // the same list").
+    `SELECT id, ref, description, created_at, help_type, account_id, app_id, module_id, raised_by_contact_id,
+            title_de, title_en,
+            (SELECT a.name FROM accounts a WHERE a.id = help.account_id) AS account_name,
+            (SELECT a.logo_url FROM accounts a WHERE a.id = help.account_id) AS account_logo,
+            (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
+            (SELECT a.logo_url FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_logo
+       FROM help
       WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [cutoff]
@@ -154,6 +219,12 @@ export async function needsTriage(
       appId: r.app_id,
       moduleId: r.module_id,
       raisedByContactId: r.raised_by_contact_id,
+      accountName: r.account_name,
+      accountLogo: r.account_logo,
+      raisedByContactName: r.raised_by_contact_name,
+      raisedByContactLogo: r.raised_by_contact_logo,
+      titleDe: r.title_de,
+      titleEn: r.title_en,
     })),
     total: counted[0]?.n ?? 0,
   }

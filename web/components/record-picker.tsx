@@ -34,8 +34,53 @@
 // a door. That gap is flagged in UI-GAPS.md; the day the library takes a
 // server-side seam, this file collapses onto it.
 //
+// ── IT HAS A SECOND PRESENTATION NOW, AND NOT A SECOND COMPONENT ────────────
+//
+// `layout="row"` (2026-09-06) draws the same options as ONE HORIZONTAL LINE of
+// chips, in place, with no trigger and nothing to open. The triage queue asked
+// for it twice on one card — "which type is this really?" and "who is picking
+// this up?" — and the client chose that shape herself out of eight drawn
+// alternatives.
+//
+// WHY IT IS A PROP AND NOT A SIBLING FILE. `one-record-picker` in
+// `web/test/rules.test.ts` makes this the ONLY file in `web/components/` allowed
+// to compose the library's `Command`, and the reason in its own header is the
+// one that applies here: nine screens each building their own picker is how they
+// came to behave nine different ways. A one-row picker written beside this one
+// would have been the tenth — a second answer to "which record do you mean?"
+// with its own idea of what a selected option looks like, its own idea of what
+// an option's face is, and no share in the swatch, the avatar or the phone
+// behaviour this file has spent a month getting right. So the OPTIONS, the
+// FACES, the swatch and the chosen-value contract are all one piece of code, and
+// only the surface they are laid out on differs.
+//
+// WHAT THE ROW GIVES UP, deliberately, and what that costs:
+//
+//   • NO SEARCH. cmdk is a search box over a scrolling list, and a line of four
+//     chips has nothing to search. `search`/`searchKey` (SERVER MODE) are
+//     therefore refused here rather than silently ignored — a row cannot page a
+//     growing collection, and a picker that quietly answered "no" about the rest
+//     of a list is the exact defect this whole file was written for. The row is
+//     `options` only, and a call site with more than a handful of them wants the
+//     control, not the row.
+//   • NO CLEAR X and no `emptyOption` row. A chip line commits on the click; a
+//     caller that needs "leave it off" puts it in `options` as its own chip,
+//     where it reads as one of the choices rather than as an escape hatch.
+//   • NO `placeholder`. Nothing is closed, so nothing has to say what it would
+//     hold.
+//
+// AND ONE THING IT ADDS: `leadValue`, the option promoted to the front of the
+// line with a divider after it. Today it is the ticket's CURRENT type, which is
+// the honest "start here" — and it is also the seam a SUGGESTION would land in
+// the day one is costed and built. That is a real decision that has not been
+// taken; nothing in this file or its callers makes a model call, and the divider
+// is a piece of layout rather than a promise.
+//
 // ON A PHONE IT IS A SHEET, NOT A POPOVER, and that is the part that is actually
-// about touch. A popover is anchored to its trigger in the LAYOUT viewport,
+// about touch. (The ROW LAYOUT has neither, and needs neither: it is already in
+// the page, so the software keyboard this whole paragraph is about never opens
+// over it. It wraps instead — a line of chips is the one picker shape that
+// narrows to a phone by itself.) A popover is anchored to its trigger in the LAYOUT viewport,
 // which the software keyboard is not in: open a picker on a field low in a form
 // and the keyboard covers the list and often the search box itself, so the one
 // control you must be able to see while typing is the one that disappears. Below
@@ -86,7 +131,27 @@ import { RecordMark } from "@shared/web/record-mark"
  * `picture` is a stored path (a logo, a photo), `mark` is the type's glyph, and
  * the record's own `label` is the last resort — its first letter. All optional:
  * a role, a meeting purpose and a process version genuinely have no picture, and
- * an option with none renders exactly what it rendered before. */
+ * an option with none renders exactly what it rendered before.
+ *
+ * AND A THIRD KIND OF MARK, ADDED 2026-09-06: a COLOUR SWATCH. The first two
+ * both resolve to a `RecordMark` — a box holding a picture, a glyph or a letter —
+ * because both answer "what does this record LOOK like". A ticket type has no
+ * picture and its glyph is a two-letter code (`IS`, `Q`, `RQ`) that already
+ * appears on the tab strip and the ticket's own header band; what tells four
+ * types apart AT A GLANCE, and what the client ruled in the eighth design round,
+ * is a colour. That is not a face and must not be drawn as one — a 24px box with
+ * a flat fill and no content reads as a picture that failed to load, which is
+ * the exact thing `RecordMark`'s whole state machine exists to prevent. So it is
+ * a small dot beside the label, and it is a SEPARATE field rather than a
+ * `mark: "🔴"`: a pictograph in a label is the shape UI-CONVENTIONS §5 refuses,
+ * and the client's own 2026-08-31 ruling ("i said no emojis. why are there still
+ * emojis? kill them!") closed that door for good.
+ *
+ * IT LIVES HERE RATHER THAN AT THE ONE CALL SITE THAT NEEDS IT TODAY, which is
+ * the whole point of this type: thirty-three pickers pass through it, and R35
+ * was earned by exactly this — a visual the type could not carry was a visual no
+ * picker COULD have drawn. The next screen that offers a coloured vocabulary (a
+ * sprint state, a department, a chart series a person picks) inherits it. */
 export type PickerOption = {
   value: string
   label: string
@@ -97,6 +162,40 @@ export type PickerOption = {
   mark?: string | null
   /** a person in their own right is a circle; a client, an app, a thing is not */
   shape?: "square" | "round"
+  /** THE THIRD KIND OF MARK — a colour this option is known by, drawn as a dot
+   * before the label. A CSS colour VALUE that must resolve through a token
+   * (`var(--chart-3)`, `var(--ink-tertiary)`); R32 has no opinion about a
+   * `style` attribute, so nothing here stops a hex, and `web/lib/type-colours.ts`
+   * — the one map that supplies these today — is where that discipline is kept
+   * and reasoned. Never drawn as a `RecordMark`: see this type's own header. */
+  swatch?: string | null
+}
+
+/** THE DOT ITSELF, drawn in one place so the closed control, the open list and
+ * the one-row layout below cannot end up three sizes.
+ *
+ * EXPORTED, and for R35's own reason read one step further out: the SAME record
+ * wearing the SAME colour appears outside a picker as well — a ticket's type is
+ * a chip on the triage card before it is an option in the row underneath — and
+ * two spellings of one dot is exactly the drift `RecordMark`'s own header
+ * counted seventeen of. One component, one size token, one shape. `--dot-status` is the
+ * kit's own status-dot size (the same token `badge.tsx` fills for its six
+ * `--dot-*` tones), so a type's dot and a state's dot are the same object at the
+ * same size even though their colours come from different vocabularies.
+ *
+ * `rounded-pill`, which is R31's second radius and the only one a circle has.
+ * `aria-hidden` for `RecordMark`'s own reason: the word beside it says
+ * everything the colour does, and a screen reader announcing a colour before
+ * every option is one fact read twice — and, for the pairs `tokens.css` measures
+ * as identical in luminance, a fact a reader may not be able to check anyway. */
+export function Swatch({ colour }: { colour: string }) {
+  return (
+    <span
+      aria-hidden
+      className="size-[var(--dot-status)] shrink-0 rounded-pill"
+      style={{ background: colour }}
+    />
+  )
 }
 
 export function RecordPicker({
@@ -115,6 +214,9 @@ export function RecordPicker({
   disabled,
   clearable = true,
   className,
+  layout = "control",
+  leadValue,
+  note,
 }: {
   /** the id the Field's label points at */
   id?: string
@@ -125,11 +227,25 @@ export function RecordPicker({
   /** the chosen value ("" or the `emptyOption`'s value when nothing is chosen) */
   value: string
   onChange: (value: string) => void
-  /** what the closed control says when nothing is chosen */
-  placeholder: string
-  /** the search box's own placeholder, in the screen's words */
+  /** What the CLOSED CONTROL says when nothing is chosen — so it is meaningless
+   * in `layout="row"`, where nothing is closed, and optional for that reason
+   * alone. Every one of the control-layout call sites passes it and must: a
+   * trigger reading "" is a button with no name on it. It is not a union type
+   * (`layout: "row"` forbidding it outright) because the honest version of that
+   * split would also have to fork `searchPlaceholder` and `emptyText`, and
+   * BOTH of those do real work in a row — see their own notes below. One
+   * optional prop with its reason written down is the smaller price. */
+  placeholder?: string
+  /** The search box's own placeholder, in the screen's words. IN ROW MODE it is
+   * the fallback accessible name for the group of chips (a row has no search
+   * box), so a row-layout caller should pass `ariaLabel` and this stays the
+   * safety net rather than the answer. */
   searchPlaceholder: string
-  /** what the list says when the search matched nothing */
+  /** What the list says when it has no rows. In the CONTROL layout that means
+   * "the search matched nothing"; IN ROW MODE it means the vocabulary itself is
+   * empty — a team that has deactivated every ticket type, an app with nobody
+   * on it — which is a real state and the one thing a row of no chips must not
+   * do silently. */
   emptyText: string
   /** CLIENT MODE — the whole list, already loaded. Bounded reads only.
    *
@@ -158,6 +274,28 @@ export function RecordPicker({
   /** Width/placement of the control in its own row. The list follows the
    * trigger's width, so this is the only size anything needs. */
   className?: string
+  /** HOW THE SAME OPTIONS ARE LAID OUT. `control` (the default, and every one of
+   * the call sites that existed before 2026-09-06) is the trigger that opens a
+   * searchable list. `row` is one horizontal line of chips, already open,
+   * committing on the click — `options` mode only, no search, no clear, no
+   * `emptyOption`. See this file's header for what the row gives up and why it
+   * is a prop rather than a second component. */
+  layout?: "control" | "row"
+  /** ROW MODE — the option promoted to the FRONT of the line, with a divider
+   * after it. `undefined`/`null`/a value not in `options` draws no lead and no
+   * divider, and the line is simply every option in the order it was given.
+   *
+   * THIS IS THE SUGGESTION SEAM, and it is empty on purpose. The triage card
+   * passes the ticket's CURRENT type, which is the honest first thing to offer;
+   * the day a suggestion is costed and built it lands here and NOTHING ELSE IN
+   * THIS FILE CHANGES. No model is called from here or from any caller of it
+   * today. */
+  leadValue?: string | null
+  /** ROW MODE — one line UNDER the chips saying why this row is being asked.
+   * Already-translated copy from the screen, like every other string prop on
+   * this component; a `ReactNode` because the reason a screen has for asking is
+   * the screen's to compose. */
+  note?: React.ReactNode
 }) {
   const t = useT()
   const phone = useIsPhone()
@@ -207,7 +345,7 @@ export function RecordPicker({
     : undefined
   const label = chosen
     ? (chosenOption?.label ?? picked ?? selectedLabel ?? value)
-    : placeholder
+    : (placeholder ?? "")
 
   function choose(next: string) {
     onChange(next)
@@ -256,6 +394,16 @@ export function RecordPicker({
           size="choice"
           className="mt-0.5"
         />
+      )}
+      {/* THE THIRD KIND OF MARK, in the same slot and never beside a face: an
+          option carries a picture, a glyph or a colour, and a record that
+          somehow had two would be saying the same thing twice in one row. The
+          `mt-1.5` is the dot's own optical centring against the first line of a
+          two-line option, the same job `mt-0.5` does for the 24px box above. */}
+      {!o.picture && !o.mark && o.swatch && (
+        <span className="mt-1.5 flex">
+          <Swatch colour={o.swatch} />
+        </span>
       )}
       <span className="flex min-w-0 flex-col">
         <span className="truncate">{o.label}</span>
@@ -327,6 +475,63 @@ export function RecordPicker({
       </CommandList>
     </Command>
   )
+
+  // ── THE ONE-ROW LAYOUT ────────────────────────────────────────────────────
+  //
+  // Returned BEFORE the trigger and the palette are even built, and after every
+  // hook above has run: `useCached`, `useDebouncedCallback` and the two
+  // `useState`s are all called unconditionally, so this branch cannot change the
+  // hook order however a caller flips `layout`. The state they hold (the typed
+  // text, the asked term, the session's last pick) is simply unused here — the
+  // cheaper alternative, hooks after an early return, is the React rule this
+  // file may not break.
+  if (layout === "row") {
+    // The lead first, then the rest in the order the caller gave them, with the
+    // lead subtracted so it is never offered twice. `find` rather than a
+    // filter-and-take: a `leadValue` naming nothing (no type set yet, or a word
+    // that has since been retired) must draw no lead AND no divider, and an
+    // undefined here is what makes both disappear together.
+    const lead = leadValue ? options?.find((o) => o.value === leadValue) : undefined
+    const rest = (options ?? []).filter((o) => o.value !== lead?.value)
+    return (
+      // `role="group"` + `aria-label`, not `radiogroup`: these are buttons that
+      // ACT (each one commits and closes the row) rather than a set of states
+      // being toggled before a submit, and announcing them as radios would
+      // promise a confirm step the client explicitly refused.
+      <div role="group" aria-label={ariaLabel ?? searchPlaceholder} className={className}>
+        {/* A ROW WITH NOTHING IN IT IS A REAL STATE AND SAYS SO. The control
+            layout has the same sentence inside its palette (`CommandEmpty`);
+            here there is no palette to put it in, so it takes the chips' own
+            place. It is not hypothetical: a team can deactivate every ticket
+            type on the Choices screen, and a line that simply drew nothing
+            would read as a screen that had failed to finish loading. */}
+        {(options ?? []).length === 0 && <p className="text-muted-foreground text-sm">{emptyText}</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          {lead && <RowChip option={lead} chosen={value === lead.value} disabled={disabled} onPick={choose} />}
+          {lead && rest.length > 0 && (
+            // THE DIVIDER, and it is the whole of what "suggested first" looks
+            // like today. A real `<Separator>` would be a horizontal rule laid
+            // on its side inside a wrapping flex row, which is the one place it
+            // draws badly — the kit's own is a full-width line and this is a
+            // 1px, one-chip-tall tick. `bg-border` is the token; `aria-hidden`
+            // because the grouping it marks is visual and the chips either side
+            // are already one labelled group.
+            <span aria-hidden className="bg-border h-5 w-px shrink-0" />
+          )}
+          {rest.map((o) => (
+            <RowChip key={o.value} option={o} chosen={value === o.value} disabled={disabled} onPick={choose} />
+          ))}
+        </div>
+        {note && (
+          // THE REASON LINE, under the chips. It is the row's own explanation of
+          // what a click here will do, and it is the reason no confirm button is
+          // needed: a person reads what happens BEFORE they commit rather than
+          // being asked to agree to it afterwards.
+          <p className="text-muted-foreground mt-2 text-xs">{note}</p>
+        )}
+      </div>
+    )
+  }
 
   // A PERSON IN THEIR OWN RIGHT gets their face on the closed control too, not
   // only in the open list — a staff Owner/Assignee field or a Contact field,
@@ -462,6 +667,65 @@ export function RecordPicker({
         </Button>
       )}
     </div>
+  )
+}
+
+/** ONE CHIP ON THE ONE-ROW LAYOUT — an option a person can click, wearing the
+ * same face the open list draws for the same record.
+ *
+ * IT IS A `Button`, not a styled span with an onClick (R39, and the kit's own
+ * law): focus, the pressed nudge, the disabled fill/ink pair and the global
+ * focus ring in `tokens.css` §8 all arrive with it, and none of them would have
+ * been remembered by hand. `variant="secondary"` for an ordinary chip and
+ * `default` (the one mango) for the one already chosen — the kit rules ONE mango
+ * per view, and on the triage card this row is the thing being decided, so the
+ * current answer is the right place for it.
+ *
+ * THE FACE COMES FROM THE SAME THREE FIELDS the open list reads, in the same
+ * precedence: a picture or a glyph is a `RecordMark`, a colour is a `Swatch`,
+ * and a record with neither is its word alone. That is R35 in the layout the
+ * client picked — the people row on this same card offers colleagues, and a
+ * colleague without their face is a name a person has to read rather than
+ * recognise.
+ *
+ * `size="sm"` (32, the kit's dense control height) and NO radius class at all:
+ * `Button`'s own base is already `rounded-pill`, which is the shape a chip wants
+ * and R31's second radius. The trigger further up this file DOES override it,
+ * to `rounded-[var(--radius)]`, because that one is a form control standing in a
+ * column of inputs; a chip in a line of chips is not, so it keeps the kit's. */
+function RowChip({
+  option,
+  chosen,
+  disabled,
+  onPick,
+}: {
+  option: PickerOption
+  chosen: boolean
+  disabled?: boolean
+  onPick: (value: string) => void
+}) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={chosen ? "default" : "secondary"}
+      disabled={disabled}
+      aria-pressed={chosen}
+      onClick={() => onPick(option.value)}
+      className="min-w-0 gap-2"
+    >
+      {(option.picture || option.mark) && (
+        <RecordMark
+          picture={option.picture}
+          mark={option.mark}
+          name={option.label}
+          shape={option.shape}
+          size="choice"
+        />
+      )}
+      {!option.picture && !option.mark && option.swatch && <Swatch colour={option.swatch} />}
+      <span className="truncate">{option.label}</span>
+    </Button>
   )
 }
 
