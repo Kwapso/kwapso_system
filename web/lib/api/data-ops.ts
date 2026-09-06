@@ -76,6 +76,10 @@ export const dataOps = {
   importBatches: () => api<{ batches: ImportBatchSummary[] }>("/api/data-ops/import/batches"),
   batchConfirm: (batchId: string) =>
     api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/confirm", post({ batchId })),
+  /** Pick up a run that did not finish, from its last checkpoint. Same answer
+   * shape as `batchConfirm` — the report covers the whole import, not the leg. */
+  batchContinue: (batchId: string) =>
+    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/continue", post({ batchId })),
   batchGet: (id: string) => api<{ batch: ImportBatchView }>(`/api/data-ops/import/batch?id=${enc(id)}`),
 
   agentUsage: () => api<{ quota: AgentQuota }>("/api/data-ops/agent/usage"),

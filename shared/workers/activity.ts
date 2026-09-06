@@ -122,22 +122,36 @@ export async function logActivity(
   actor: Actor,
   entry: ActivityEntry
 ): Promise<void> {
-  try {
-    await insertActivity(cfg, databaseId, actor, entry)
-  } catch (e) {
-    console.error("activity log failed:", e)
-    if (cfg.core)
-      await logError(cfg.core, {
-        source: "activity",
-        // The database and the ROW the missing line was about — which is the
-        // pair somebody needs to put it back by hand, and the pair the feed
-        // itself is keyed on.
-        place: `activity/${databaseId} ${entry.relatedTable ?? "?"}/${entry.relatedRowId ?? "?"}`,
-        message: `activity row NOT written ("${entry.type}"): ${e instanceof Error ? e.message : String(e)}. The action it describes SUCCEEDED; the record's history is missing this line.`,
-        stack: e instanceof Error ? e.stack : undefined,
-        userId: actor.id,
-      })
-  }
+  // OFF THE CALLER'S CLOCK (owner's ruling, 6 Sep 2026 — parallel.ts carries the
+  // reasoning and the provenance). The history entry is written a moment after
+  // the person is told "saved" rather than before it, on the request's own
+  // lifetime, so `waitUntil` still GUARANTEES it: the row is not skipped, not
+  // best-effort-er than it was, and its failure still lands in `error_logs` by
+  // the catch below. This qualifies precisely because the caller could never
+  // observe the outcome — the swallow below has always been the contract.
+  //
+  // The work is built as ONE promise including its own catch, so the deferred
+  // path and the awaited path record failure identically.
+  const write = (async () => {
+    try {
+      await insertActivity(cfg, databaseId, actor, entry)
+    } catch (e) {
+      console.error("activity log failed:", e)
+      if (cfg.core)
+        await logError(cfg.core, {
+          source: "activity",
+          // The database and the ROW the missing line was about — which is the
+          // pair somebody needs to put it back by hand, and the pair the feed
+          // itself is keyed on.
+          place: `activity/${databaseId} ${entry.relatedTable ?? "?"}/${entry.relatedRowId ?? "?"}`,
+          message: `activity row NOT written ("${entry.type}"): ${e instanceof Error ? e.message : String(e)}. The action it describes SUCCEEDED; the record's history is missing this line.`,
+          stack: e instanceof Error ? e.stack : undefined,
+          userId: actor.id,
+        })
+    }
+  })()
+  if (cfg.defer) return cfg.defer(write)
+  await write
 }
 
 /** The same insert, but it THROWS — for the callers where writing the row IS the

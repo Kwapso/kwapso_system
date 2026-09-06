@@ -3344,4 +3344,26 @@ export const SEED: Catalogue = {
     es: "Qué fuentes lee el asistente",
     ca: "Quines fonts llegeix l'assistent",
   },
+  /* PICKING UP AN IMPORT THAT DIED (6 Sep 2026). Written here rather than left
+     to accumulate as ceiling debt because these three sentences are the only
+     thing standing between a person and importing their file twice — an English
+     sentence on a German screen is a sentence they may not act on, and the
+     action it is asking for is the one that prevents duplicate rows. */
+  "Carry on from where it stopped": {
+    de: "Dort weitermachen, wo es aufgehört hat",
+    es: "Continuar donde se detuvo",
+    ca: "Continuar on s'ha aturat",
+  },
+  "It got part of the way through. Carry on from where it stopped — sending the file again would add everything it already wrote a second time.":
+    {
+      de: "Es ist ein Stück weit gekommen. Machen Sie dort weiter, wo es aufgehört hat — die Datei erneut zu senden würde alles bereits Geschriebene ein zweites Mal hinzufügen.",
+      es: "Avanzó una parte. Continúe donde se detuvo: volver a enviar el archivo añadiría por segunda vez todo lo que ya escribió.",
+      ca: "Ha avançat una part. Continueu on s'ha aturat: tornar a enviar el fitxer afegiria per segona vegada tot el que ja havia escrit.",
+    },
+  /* The placeholders are the contract — {done} and {count} must survive intact. */
+  "{done} of {count} row(s) written. Each one is checked exactly as if you typed it in yourself.": {
+    de: "{done} von {count} Zeile(n) geschrieben. Jede wird genau so geprüft, als hätten Sie sie selbst eingegeben.",
+    es: "{done} de {count} fila(s) escritas. Cada una se comprueba exactamente como si la hubiera escrito usted.",
+    ca: "{done} de {count} fila/es escrites. Cadascuna es comprova exactament com si l'haguéssiu escrita vós.",
+  },
 }

@@ -12,6 +12,7 @@ import { LIST_HARD_CAP } from "./limits"
 import { fail } from "./http"
 import { readOrigin, type ActivityOrigin } from "./origin"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
+import { deferrerFor } from "./parallel"
 import { beginD1Timing, noteTeam } from "./timing"
 import { requestId, traceHeaders } from "./trace"
 
@@ -287,6 +288,11 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   const cfg: D1Rest = {
     ...d1ConfigFrom(env, readOrigin(request)),
     stats: beginD1Timing(request),
+    // …and this request's lifetime, so `logActivity` writes the history entry
+    // just AFTER the person is told "saved" instead of just before it (owner's
+    // ruling, 6 Sep 2026 — shared/workers/parallel.ts carries the reasoning and
+    // the provenance). Per-request for exactly the reason `stats` above is.
+    defer: deferrerFor(request),
   }
   const guard = await requireMember(env, user.id, user.currentTeamId)
   // WHO WAS ASKING, for the central catch. error_logs has carried team_id and

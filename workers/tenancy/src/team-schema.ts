@@ -4023,6 +4023,28 @@ ALTER TABLE activity ADD COLUMN origin TEXT;
 CREATE INDEX IF NOT EXISTS idx_activity_actor_feed ON activity (creator_id, created_at DESC, id DESC);
 `,
   },
+  {
+    // AN IMPORT THAT DIED CAN BE PICKED UP WHERE IT STOPPED.
+    //
+    // The batch claim is deliberately one-way (`planned` → `running`, never
+    // back) because a re-runnable claim is how one import writes its rows twice.
+    // The cost was that a run which did not come home was UNRECOVERABLE: the
+    // rows already written stayed written, the batch sat on `running` for ever,
+    // and the only way forward was to upload the file again — which duplicates
+    // every row the dead run had already made. A 1,000-row import is minutes
+    // long and the thing at the other end is a person with a browser, so "it
+    // died half way" is not a rare case.
+    //
+    // `cursor_json` is where it got to: the target it was inside, how many of
+    // that target's rows were done, and the report so far. Written after every
+    // WAVE, so the unfinished work is bounded by one wave rather than by the
+    // whole file. `import-batch.ts` explains what that boundary does and does
+    // not promise.
+    version: "0063_an_import_can_be_resumed",
+    sql: `
+ALTER TABLE data_import_batches ADD COLUMN cursor_json TEXT;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

@@ -198,7 +198,7 @@ export default {
       // No ROUTES table here either, so the method decides the class: `POST /mcp`
       // carries a whole tool call and answers to the write budget, the token
       // reads to the read budget.
-      logIfSlow(request, route)
+      logIfSlow(request, route, undefined, env.DB)
       return withTiming(request, res)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)

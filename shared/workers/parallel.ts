@@ -76,13 +76,44 @@ export async function inOrder<T extends readonly unknown[]>(
 //     the outbound request leaves at exactly the moment it left before. Nobody
 //     downstream is told anything LATER; only the clicker is told sooner.
 //
-// WHAT MAY NOT, today: `publishChange` and `logActivity`. Both are awaited
-// before the response on every mutation in the app, and both would be safe to
-// move by the two rules above — but `shared/workers/realtime.ts` carries a
-// recorded decision about the ping and its write ("THE PING MUST NOT OUTLIVE THE
-// WRITE IT DESCRIBES"), and re-reading a recorded decision is the owner's to do,
-// not a speed lane's. Left where it is, deliberately, and worth ~150–350ms of
-// every write in the product when it is settled.
+// `publishChange` AND `logActivity` NOW GO HERE TOO — 6 September 2026.
+//
+// They were excluded when this file was written, on the grounds that
+// `shared/workers/realtime.ts` carried a recorded decision ("THE PING MUST NOT
+// OUTLIVE THE WRITE IT DESCRIBES") and that re-reading a recorded decision is
+// the owner's to do rather than a speed lane's. The owner has now done exactly
+// that, in answer to "say 'saved' straight away, and finish the history entry a
+// moment later?" — yes. realtime.ts records the overturn beside the sentence it
+// overturns; this is the other half of it.
+//
+// PROVENANCE, because a decision is only as good as its trail: that answer
+// reached this lane RELAYED through the planner session, not typed here. It is
+// recorded as the owner's because that is what it is, and the branch it lands on
+// is not merged and not deployed — so the owner sees it once more, in review,
+// before it is true of the running app. If the relay was wrong, this comment is
+// the first thing to correct.
+//
+// NEITHER IS OBSERVABLE BY THE CALLER, which is the rule above and the reason
+// they qualify. `logActivity` already swallows and self-reports its own failures
+// (activity.ts), and `publish` already catches its own (realtime.ts) — both were
+// best-effort before this and are best-effort after it. What changes is only who
+// waits: the clicker no longer does.
+//
+// HOW THEY REACH THIS SEAM, by two different roads because they take two
+// different first arguments. Neither costs a call site anything:
+//
+//   • `logActivity(cfg, …)` rides `cfg.defer`. `cfg` is built fresh per request
+//     in gating.ts and already carries `stats` from `beginD1Timing` there, so
+//     the deferrer sits on the line below it, per-request for the same reason.
+//   • `publishChange(env, …)` rides `env.DEFER`. `env` is per-ISOLATE and
+//     shared, so it cannot carry per-request state — the dispatcher therefore
+//     hands each handler a per-request SHALLOW COPY with the deferrer on it.
+//     Bindings copy by reference; the copy belongs to the request, so two
+//     requests can never share one.
+//
+// A caller with neither (a cron tick, a unit test, a lib called directly) awaits
+// them exactly as before — the same fallback `canDefer` already has, and the
+// reason no test needed changing.
 
 /** The half of `ExecutionContext` this needs. Typed structurally so `shared/`
  * keeps compiling in the web workspaces, which have no Workers types — the same
@@ -117,4 +148,12 @@ export function canDefer(request: Request, ctx: Deferrer | undefined): void {
 export function afterResponse(request: Request, work: Promise<unknown>): void {
   const settled = work.catch((e) => console.error("deferred work failed:", e))
   contexts.get(request)?.waitUntil(settled)
+}
+
+/** This request's deferrer, as a value something can carry — for the two seams
+ * handed a per-request object (`cfg`, a scoped `env`) rather than the Request
+ * itself. Same guarantee as `afterResponse` and the same never-throws contract;
+ * it simply travels differently. */
+export function deferrerFor(request: Request): (work: Promise<unknown>) => void {
+  return (work) => afterResponse(request, work)
 }
