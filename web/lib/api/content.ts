@@ -286,6 +286,10 @@ export const content = {
   // door decides that — a portal caller's account comes from the guard corridor
   // and the body is never consulted (workers/content/src/lib/help.ts).
   createHelp: (input: {
+    /** THE TICKET'S NAME. Optional: the portal's own raise dialog sends none,
+     * and 788 imported tickets never had one — `ticketTitle` falls back to the
+     * description's first line for exactly those. */
+    titleEn?: string
     description: string
     helpType?: string
     sourceScreen?: string
@@ -305,6 +309,7 @@ export const content = {
   }) => api<{ tickets: HelpTicket[]; id?: string }>("/api/content/help", post(input)),
   updateHelp: (input: {
     id: string
+    titleEn?: string
     description: string
     helpType?: string
     accountId?: string

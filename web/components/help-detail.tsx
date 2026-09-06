@@ -311,6 +311,7 @@ export function HelpDetailScreen({
    *
    * So it spreads. The door decides what it accepts; this is a courier. */
   async function editTicket(input: {
+    titleEn?: string
     description: string
     helpType?: string
     // Naming the client on a ticket that has none. Once it has one the form
@@ -955,6 +956,7 @@ export function HelpDetailScreen({
         teamId={teamId}
         helpTypeOptions={helpTypeOptions}
         initial={{
+          titleEn: ticket.titleEn,
           description: ticket.description,
           helpType: ticket.helpType,
           accountId: ticket.accountId,

@@ -33,6 +33,7 @@ import {
 } from "@shared/ui/components/dialog/dialog"
 import { Button } from "@shared/ui/components/button/button"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
+import { Input } from "@shared/ui/components/input/input"
 import { Paperclip, X } from "@shared/ui/foundations/icons"
 import { Field } from "@shared/web/field"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -52,6 +53,19 @@ import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useT } from "@shared/web/language"
 
+/** THE TICKET'S NAME, and the first time this form has offered one.
+ *
+ * `title_en` is not a new column — it has been on the row since the Glide
+ * import, `updateTicket` and the create door both accept it, `help-detail`
+ * shows it and `ticketTitle` reads it first. Only the FORM never asked, so
+ * every ticket raised through this app fell to the last resort in that chain:
+ * the first eighty characters of the description, shown above the paragraph it
+ * was cut from. The card was repeating itself because nothing else existed.
+ *
+ * OPTIONAL, because that fallback still works and always will — 788 imported
+ * tickets have no English title and a portal caller still cannot send one. A
+ * required field here would refuse tickets the door accepts. */
+const titleField = { ...defaultFieldConfig, label: "Title", required: false }
 const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
 const typeField = { ...defaultFieldConfig, label: "Type", required: false }
 const accountField = {
@@ -129,6 +143,7 @@ export function HelpFormDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (input: {
+    titleEn?: string
     description: string
     helpType?: string
     accountId?: string
@@ -157,6 +172,7 @@ export function HelpFormDialog({
   fixedApp?: { id: string; name: string }
   /** Present = EDIT mode (prefilled). */
   initial?: {
+    titleEn?: string | null
     description: string
     helpType?: string | null
     accountId?: string | null
@@ -197,6 +213,7 @@ export function HelpFormDialog({
     tenancy.appModules().then((r) => r.modules)
   )
   const initialValues = {
+    titleEn: initial?.titleEn ?? "",
     description: initial?.description ?? "",
     helpType: initial?.helpType || NONE,
     accountId: initial?.accountId || NONE,
@@ -275,6 +292,12 @@ export function HelpFormDialog({
     setBusy(true)
     try {
       const madeId = await onSubmit({
+        // Blank means "don't set one" rather than "set it to empty": the door's
+        // `optionalText` leaves the stored title alone on undefined, so clearing
+        // the box on an edit keeps whatever the row already had. Nobody has
+        // asked to DELETE a title, and inventing that here would let a stray
+        // keystroke silently unname an imported ticket.
+        titleEn: values.titleEn.trim() || undefined,
         description: richTextValue(values.description),
         helpType: values.helpType === NONE ? undefined : values.helpType,
         // On a ticket that already has a client, send the one it has — the door
@@ -329,73 +352,43 @@ export function HelpFormDialog({
         disabled: !richTextValue(values.description) || moduleMissing,
       }}
     >
-      <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
-        <Notes
-          key={open ? "open" : "shut"}
-          defaultValue={values.description}
-          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
-          placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
-          className="min-h-32"
-        />
+      {/* THE ORDER IS THE CLIENT'S, 2026-09-06: client, app, module, title,
+          description, author, screenshots. It is also the order the data
+          depends in — the app list is the team's, the module list belongs to
+          the app above it, the contact list belongs to the client at the top —
+          so answering downward never asks a question that has no answer yet. */}
+      {/* The picker reads `values.accountId || NONE` rather than the bare value:
+          a draft saved in this tab before this field existed restores an object
+          without it, and an undefined value would quietly make the control
+          uncontrolled. The COMPANIES only (`type: "entity"`), which is the same
+          narrowing the old in-memory filter did, asked of the door instead. */}
+      <Field config={accountField} htmlFor="help-account" className={fieldSpacing}>
+        {fixedAccount ? (
+          <p className="text-muted-foreground text-sm" id="help-account">
+            {fixedAccount.name}, a ticket can&apos;t be moved to another client.
+          </p>
+        ) : (
+          <RecordPicker
+            id="help-account"
+            value={values.accountId || NONE}
+            onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+            search={(term) => searchAccounts(term, { type: "entity" })}
+            searchKey={pickerKey("companies", teamId)}
+            emptyOption={{ value: NONE, label: t("Ours, no client") }}
+            placeholder={t("Ours, no client")}
+            searchPlaceholder={t("Search companies…")}
+            emptyText={t("No company matched.")}
+            disabled={busy}
+          />
+        )}
       </Field>
-      {/* THE SCREENSHOT, BESIDE THE WORDS THAT DESCRIBE IT — and on BOTH halves
-          of this dialog, which is the whole of the owner's ask: "while adding or
-          editing them, just like we have at the story level." One field, one
-          code path; the upload simply knows a different id on an edit.
-          Behind `help:edit`, because that is what the attachments door gates on
-          and a control that always refused would be worse than none. */}
-      {canAttach && (
-        <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
-          <div className="flex flex-col gap-2">
-            {pending.length > 0 && (
-              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
-                {pending.map((file, i) => (
-                  <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
-                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-6"
-                      aria-label={t("Take it off")}
-                      disabled={busy}
-                      onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
-                    >
-                      <X className="size-3.5" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <FileUpload
-              multiple
-              onFilesSelected={(files) => setPending((f) => [...f, ...files])}
-              className={busy ? "pointer-events-none opacity-60" : undefined}
-            />
-          </div>
-        </Field>
-      )}
-      {/* The type vocabulary is the team's own and grows on the Dropdown values
-          screen, so it gets the search box too — and the picker's own clear X
-          replaces the one this field used to draw by hand. */}
-      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
-        <RecordPicker
-          id="help-type"
-          value={values.helpType}
-          onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
-          options={helpTypeOptions.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
-          emptyOption={{ value: NONE, label: t("No type") }}
-          placeholder={t("Choose a type (optional)")}
-          searchPlaceholder={t("Search types…")}
-          emptyText={t("No type matched.")}
-          disabled={busy}
-        />
-        <ManageDropdownsLink teamId={teamId ?? null} />
-      </Field>
-      {/* WHICH SYSTEM (CHECKLIST 5.8). Above the client picker in the markup but
-          BELOW it in meaning: the contact list under it depends on which client
-          is chosen, so the three read top to bottom as one sentence. */}
+      {/* WHICH SYSTEM (CHECKLIST 5.8), now BELOW the client in the markup too.
+          This block used to carry a note conceding it sat "above the client
+          picker in the markup but BELOW it in meaning" — the dependency ran
+          client → app → module → contact while the eye ran the other way. The
+          client's ordering (2026-09-06) puts markup and meaning in the same
+          direction, so the four read top to bottom as one sentence and the note
+          has nothing left to apologise for. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
         <RecordPicker
           id="help-app"
@@ -429,30 +422,34 @@ export function HelpFormDialog({
           disabled={busy || !chosenAppId}
         />
       </Field>
-      {/* The picker reads `values.accountId || NONE` rather than the bare value:
-          a draft saved in this tab before this field existed restores an object
-          without it, and an undefined value would quietly make the control
-          uncontrolled. The COMPANIES only (`type: "entity"`), which is the same
-          narrowing the old in-memory filter did, asked of the door instead. */}
-      <Field config={accountField} htmlFor="help-account" className={fieldSpacing}>
-        {fixedAccount ? (
-          <p className="text-muted-foreground text-sm" id="help-account">
-            {fixedAccount.name}, a ticket can&apos;t be moved to another client.
-          </p>
-        ) : (
-          <RecordPicker
-            id="help-account"
-            value={values.accountId || NONE}
-            onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
-            search={(term) => searchAccounts(term, { type: "entity" })}
-            searchKey={pickerKey("companies", teamId)}
-            emptyOption={{ value: NONE, label: t("Ours, no client") }}
-            placeholder={t("Ours, no client")}
-            searchPlaceholder={t("Search companies…")}
-            emptyText={t("No company matched.")}
-            disabled={busy}
-          />
-        )}
+      {/* WHAT TO CALL IT, above the paragraph rather than below it: this is the
+          line the triage card, the list's title column and the ticket's own
+          screen all show, so it is asked in the position it is read.
+
+          NO PLACEHOLDER, on purpose. An example sentence here would be a new
+          English string, and a new string is a translation the catalogue does
+          not have — R44 pins the untranslated count exactly, so one placeholder
+          costs either a real translation in three languages or a raised
+          ceiling. The label is already translated, and the description field
+          directly below carries the worked example ("e.g. I can't invite a new
+          member, the button is greyed out") that this one would have echoed. */}
+      <Field config={titleField} htmlFor="help-title" className={fieldSpacing}>
+        <Input
+          id="help-title"
+          value={values.titleEn}
+          onChange={(e) => setValues((v) => ({ ...v, titleEn: e.target.value }))}
+          maxLength={200}
+          disabled={busy}
+        />
+      </Field>
+      <Field config={descField} htmlFor="help-desc" className={fieldSpacing}>
+        <Notes
+          key={open ? "open" : "shut"}
+          defaultValue={values.description}
+          onChange={(html) => setValues((v) => ({ ...v, description: html }))}
+          placeholder={t("Tell us what's going on, e.g. I can't invite a new member, the button is greyed out.")}
+          className="min-h-32"
+        />
       </Field>
       {/* WHO ASKED (CHECKLIST 5.9), narrowed to that account's own contacts —
           which is also what the door enforces, so the picker can never offer a
@@ -493,6 +490,68 @@ export function HelpFormDialog({
           />
         </Field>
       )}
+      {/* THE SCREENSHOT, BESIDE THE WORDS THAT DESCRIBE IT — and on BOTH halves
+          of this dialog, which is the whole of the owner's ask: "while adding or
+          editing them, just like we have at the story level." One field, one
+          code path; the upload simply knows a different id on an edit.
+          Behind `help:edit`, because that is what the attachments door gates on
+          and a control that always refused would be worse than none. */}
+      {canAttach && (
+        <Field config={fileField} htmlFor="help-files" className={fieldSpacing}>
+          <div className="flex flex-col gap-2">
+            {pending.length > 0 && (
+              <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+                {pending.map((file, i) => (
+                  <li key={`${file.name}-${i}`} className="flex items-center gap-2 px-3 py-2">
+                    <Paperclip className="text-muted-foreground size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-6"
+                      aria-label={t("Take it off")}
+                      disabled={busy}
+                      onClick={() => setPending((f) => f.filter((_, j) => j !== i))}
+                    >
+                      <X className="size-3.5" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <FileUpload
+              multiple
+              onFilesSelected={(files) => setPending((f) => [...f, ...files])}
+              className={busy ? "pointer-events-none opacity-60" : undefined}
+            />
+          </div>
+        </Field>
+      )}
+      {/* TYPE IS LAST AND OUTSIDE THAT SEQUENCE. It is not in the client's
+          list of seven, and triage is where a type is actually decided — "most
+          of the times tickets always come in as issue, so I recategorize them".
+          Kept rather than deleted because a person who already knows the answer
+          should not be made to walk through triage to give it; moved out of the
+          way because they usually don't. One line to remove if she wants it
+          gone. */}
+      {/* The type vocabulary is the team's own and grows on the Dropdown values
+          screen, so it gets the search box too — and the picker's own clear X
+          replaces the one this field used to draw by hand. */}
+      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
+        <RecordPicker
+          id="help-type"
+          value={values.helpType}
+          onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
+          options={helpTypeOptions.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
+          emptyOption={{ value: NONE, label: t("No type") }}
+          placeholder={t("Choose a type (optional)")}
+          searchPlaceholder={t("Search types…")}
+          emptyText={t("No type matched.")}
+          disabled={busy}
+        />
+        <ManageDropdownsLink teamId={teamId ?? null} />
+      </Field>
     </FormShellDialog>
   )
 }

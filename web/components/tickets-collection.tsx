@@ -2246,6 +2246,7 @@ function TriageQueue({
         initial={
           editing
             ? {
+                titleEn: editing.titleEn ?? undefined,
                 description: editing.description,
                 helpType: editing.helpType ?? undefined,
                 accountId: editing.accountId ?? undefined,
@@ -2274,6 +2275,7 @@ function TriageQueue({
    * could see a request and not change it, which is what made the readiness rule
    * feel like a wall rather than a step. */
   async function saveEdit(input: {
+    titleEn?: string
     description: string
     helpType?: string
     accountId?: string
