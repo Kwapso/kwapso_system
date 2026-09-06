@@ -47,7 +47,26 @@ async function probe(page, path, screenshotPath) {
 
   let status = null
   try {
-    const resp = await page.goto(`http://localhost:${PORT}/${path}`, { waitUntil: "domcontentloaded", timeout: 20000 })
+    // THE NAVIGATION BUDGET IS GENEROUS, AND THAT IS THE POINT.
+    //
+    // This was a fixed 20s and it produced two false ERRs on the 2026-09-06
+    // run — /time and /waves, both of which render perfectly. A re-probe of
+    // the SAME routes took 32s each, and the control in that re-probe was
+    // /accounts, a route this very walk had already probed successfully: it
+    // took 99s. So the reading was never about those screens. A dev server
+    // compiling twenty routes under load is simply slower than any fixed
+    // number somebody picks, and a `page.goto` timeout produces exactly the
+    // result a broken screen produces — which is the one thing this probe
+    // exists not to do.
+    //
+    // The 2026-08-29 run fixed this class of error for the wait AFTER load
+    // (polling for the nav and the skeletons instead of a fixed 2.5s sleep)
+    // and left the navigation itself on a fixed timeout. Same bug, one line
+    // higher, and it survived because the earlier fix looked complete.
+    const resp = await page.goto(`http://localhost:${PORT}/${path}`, {
+      waitUntil: "domcontentloaded",
+      timeout: Number(process.env.WALK_NAV_TIMEOUT_MS ?? 120000),
+    })
     status = resp?.status() ?? null
   } catch (e) {
     return { path, ok: false, crash: String(e), status: null }
