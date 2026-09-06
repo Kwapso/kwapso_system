@@ -1393,7 +1393,7 @@ const PANEL_BELOW_TABS =
  * collection screen; this is the detail screen's own copy of the same strip,
  * fixed in the same pass rather than left to be reported a second time. */
 export const STICKY_TABS =
-  "[&>[role=tablist]]:bg-[var(--surface-raised)] [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
+  "[&>[role=tablist]]:bg-surface-raised [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
   "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +

@@ -535,7 +535,25 @@ export function ToolbarRow({
         // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
         // genuinely different near-black tones), and this row's card-toned
         // surroundings suddenly sat on the wrong one of the two.
-        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
+        // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
+        // reason the toolbar's buttons had no background. The kit rebinds
+        // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
+        // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
+        // secondary button is always the other tone from whatever it stands on
+        // and no component needs a prop. `bg-[var(--surface-raised)]` paints
+        // the identical colour but is a DIFFERENT CLASS, so no selector in that
+        // list matched, the rebind never fired, and the token stayed at its
+        // base `var(--card)` — the same #FFFEF9 this container is painted with.
+        // Beige on beige: the client, twice, "the buttons in the toolbar are
+        // missing the background". `bg-surface-raised` is a real generated
+        // utility (tokens.css bridges `--color-surface-raised` precisely so it
+        // exists), paints the same colour, and IS in the list — so every
+        // secondary control inside now resolves to `--surface-panel` #F7F2EB.
+        //
+        // THE RULE, not the patch: an element that paints a GROUND uses the
+        // named utility. The `bg-[var(--token)]` escape hatch silently freezes
+        // every ground-aware token beneath it.
+        "flex min-w-0 flex-col bg-surface-raised",
         // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
         // reads as the same stadium pill every other toolbar control in this
         // app wears; expanded switches to the box radius so a tall facet

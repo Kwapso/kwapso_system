@@ -117,7 +117,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
     // i · CLOSED: one container, pill-shaped, one fill — the track itself
     // carries neither.
     expect(document.querySelector('[data-slot="filter-bar-row"]'), "nothing is open yet").toBeNull()
-    expect(column!.className).toContain("bg-[var(--surface-raised)]")
+    expect(column!.className).toContain("bg-surface-raised")
     expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
       "rounded-pill"
     )
@@ -164,7 +164,7 @@ describe("PagedFind's toolbar is one container, exactly like ToolbarRow's", () =
 
     // iv · OPEN: the SAME container switches shape.
     expect(column!.className, "the container still owns the single background").toContain(
-      "bg-[var(--surface-raised)]"
+      "bg-surface-raised"
     )
     expect(
       column!.className,

@@ -352,7 +352,7 @@ export type FolderTabStrip = {
    `--tab-content-gap` is padding on this same box, so the gap below the tabs
    takes the corrected colour with it. */
 export const STICKY_FOLDER_TABS =
-  "bg-[var(--surface-raised)] sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
+  "bg-surface-raised sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place
