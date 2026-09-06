@@ -516,6 +516,20 @@ export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
  * The same shape and the same reasoning as TRANSCRIPT_ATTEMPT_CAP next door. */
 export const EMBED_ATTEMPT_CAP = 5
 
+/** Open error rows one "resolve this whole failure" call will look at.
+ *
+ * The scan cannot be a WHERE clause — the volatile reference inside a message is
+ * normalised by a JavaScript regex and SQLite has no REGEXP — so the rows come
+ * back and are folded in the worker. 500 is comfortably more than any real
+ * signature's open tail (the live store held 5,086 rows across 109 distinct
+ * messages on 2026-09-05, and its single largest signature was 1,728 over three
+ * weeks, of which the OPEN ones are a fraction), and it is small enough that the
+ * read stays one indexed page.
+ *
+ * Past it the door says `capped: true` and the caller runs it again, rather than
+ * reporting a number that reads as "finished". */
+export const RESOLVE_SCAN_CAP = 500
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing
