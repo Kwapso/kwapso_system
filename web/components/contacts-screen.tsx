@@ -137,6 +137,15 @@ export function ContactsScreen({
           // exactly as Tickets' own row is when it has nothing to put beside
           // them either. `tabs` is a `FolderTabStrip`, so there is nowhere in
           // its shape for a button to have gone anyway.
+          //
+          // AND THE ABSENCE IS CHECKED NOW, not just explained here. A screen
+          // with no create act owes the reader the route that DOES exist, so
+          // `contacts.list` carries its own `emptyDescription` naming Accounts
+          // and web/test/cold-account.test.tsx (F6) fails if that sentence is
+          // ever dropped back to the frame's default — which promises an "Add
+          // the first" this screen deliberately does not have. Give Contacts a
+          // create button one day and that test is where it tells you the
+          // sentence has to change with it.
           tabs={{
             config: { ...defaultTabsConfig, tabs: contactsTabs },
             value: contactsTab,
