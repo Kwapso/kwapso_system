@@ -474,6 +474,29 @@ export const KNOWLEDGE_EXTRACT_MAX_BYTES = KNOWLEDGE_FILE_MAX_BYTES
  * open. Far deeper than any real org chart. */
 export const MAX_ACCOUNT_DEPTH = 64
 
+/** HOW LONG A PROPOSED DANGEROUS ACT STAYS APPROVABLE.
+ *
+ * The confirm panel exists because some acts are grave enough to stop and ask
+ * about — remove a member, revoke an invite, deactivate a record, set a rate.
+ * The proposal is stored on the assistant's message and the confirm path runs
+ * exactly what was proposed, never what the client sends, which is the half that
+ * was already right.
+ *
+ * What had no bound was TIME. `getPendingProposal` read the most recent
+ * assistant message carrying a proposal, `ORDER BY created_at DESC LIMIT 1`,
+ * with no floor under it — so "remove Jane Doe", proposed on a Tuesday and never
+ * answered, was still one click from running three weeks later. The person
+ * clicking would be answering a question they could not see, in a conversation
+ * they had forgotten, about a team that had moved on. Nothing was broken; it
+ * simply never expired.
+ *
+ * Thirty minutes: far longer than the 150-second turn deadline, so an ordinary
+ * "hang on, let me check" is never punished, and far shorter than a working day,
+ * so a proposal cannot outlive the context that produced it. Past it the panel
+ * finds nothing to run and says so, which is the same answer it already gives
+ * for a proposal somebody else already spent. */
+export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing

@@ -2397,12 +2397,25 @@ export const SHARED_TOOLS: SharedTool[] = [
     schema: obj({ roleName: S, centsPerHour: N, active: B }, ["roleName", "centsPerHour", "active"]),
     buildBody: (i) => ({
       roleName: str(i, "roleName"),
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : 0,
+      // `undefined`, NOT 0, and the four sibling rate writes all said so first.
+      // `0` is a VALID rate — it is what "this role costs nothing" looks like —
+      // so coercing a missing number to it does not refuse the call, it prices
+      // the role at zero and returns success. Every margin and every app saving
+      // computed from that role afterwards is quietly wrong, and nothing is in
+      // an error state to find. Sent as `undefined` the door's own validator
+      // sees `Number(undefined)` → NaN → "A rate is a whole number of cents an
+      // hour" (money.ts `centsPerHour`), which is the true answer.
+      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
       active: i.active !== false,
     }),
     agent: {
       write: true,
-      confirm: false,
+      // DECLARED true, and also DERIVED — `isMoneyWrite` would return true for
+      // this tool whatever this line said. Both, for the same reason the
+      // privilege writes carry both: the derivation is the guarantee, and the
+      // declaration is what makes the catalogue read honestly to somebody
+      // scanning it. agent.test.ts asserts they agree.
+      confirm: true,
       summarize: (i) => `Price an hour of ${str(i, "roleName")}`,
     },
   },

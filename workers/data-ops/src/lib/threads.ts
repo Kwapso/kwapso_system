@@ -8,7 +8,7 @@ import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import type { AgentMessage, AgentThread } from "@shared/types"
-import { LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
+import { AGENT_PROPOSAL_TTL_MS, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 
 type ThreadRow = { id: string; title: string | null; last_message_at: string | null; created_at: string }
 type MsgRow = {
@@ -154,18 +154,28 @@ UPDATE agent_threads SET last_message_at = ${sqlString(now)} WHERE id = ${sqlStr
 /** The dangerous calls the LAST turn proposed for this thread (name + input), read
  * from the most recent assistant message's stored proposal. The confirm path runs
  * exactly these — not whatever the client sends — so a client can't approve a call
- * the model never proposed. Owner-scoped (ownThreadOrThrow). */
+ * the model never proposed. Owner-scoped (ownThreadOrThrow).
+ *
+ * AND IT EXPIRES (AGENT_PROPOSAL_TTL_MS). The floor rides the SELECT rather than
+ * being checked after it, which is the same shape R17's idempotent transitions
+ * use and it matters for the same reason: a proposal read and then judged is a
+ * proposal that exists for a moment in a variable, and the next person to touch
+ * this function has to remember to judge it. Past the window the statement
+ * returns no row, so a stale proposal is indistinguishable from one already
+ * spent — which is exactly what it is, and the panel already knows how to say
+ * so. */
 export async function getPendingProposal(
   cfg: D1Rest,
   guard: MemberGuard,
   threadId: string
 ): Promise<{ name: string; input: Record<string, unknown> }[]> {
   await ownThreadOrThrow(cfg, guard, threadId)
+  const freshFrom = new Date(Date.now() - AGENT_PROPOSAL_TTL_MS).toISOString()
   const rows = await d1Query<{ tool_calls_json: string | null }>(
     cfg,
     guard.databaseId,
-    "SELECT tool_calls_json FROM agent_messages WHERE thread_id = ? AND role = 'assistant' AND tool_calls_json IS NOT NULL ORDER BY created_at DESC LIMIT 1",
-    [threadId]
+    "SELECT tool_calls_json FROM agent_messages WHERE thread_id = ? AND role = 'assistant' AND tool_calls_json IS NOT NULL AND created_at > ? ORDER BY created_at DESC LIMIT 1",
+    [threadId, freshFrom]
   )
   const raw = rows[0]?.tool_calls_json
   if (!raw) return []

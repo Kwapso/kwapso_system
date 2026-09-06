@@ -113,8 +113,58 @@ describe("the no-daily-cap switch", () => {
       ).toBeUndefined()
   })
 
-  it("is ON in staging, which is the environment that asked for it", () => {
-    for (const w of SPENDERS) expect(readCfg(w).env?.staging?.vars?.AGENT_NO_DAILY_CAP, w).toBe("true")
+  // ── THE RULE MOVED, 2026-09-06, AND HERE IS WHY ────────────────────────────
+  //
+  // This used to read `.toBe("true")`: staging was the environment that asked to
+  // be uncapped, so that testing could never be refused for running out. It was
+  // the right trade while staging was one person trying a screen.
+  //
+  // It stopped being one person. Eight review lanes and every `*-bench.mjs` run
+  // against staging now, and `AGENT_NO_DAILY_CAP` does not raise the ceiling —
+  // it REMOVES it (`capFor` returns MAX_SAFE_INTEGER). So a loop that retried
+  // the agent door could spend the account to zero and the first signal would be
+  // the Cloudflare bill. The meter kept measuring and nothing could ever say no.
+  //
+  // The owner's answer (relayed 2026-09-06) was not "put the cap back" — a cap
+  // of 50 would refuse a normal day's testing by mid-morning, which is how the
+  // flag came to exist. It was: a HIGH ceiling that only stops a runaway. So the
+  // flag is gone from all three staging blocks and the number is 2,000 a team a
+  // day, which is a real ceiling denominated in real money:
+  //
+  //     2,000 units × $0.0345 a step (COSTS.md, kimi-k2.6 at the measured
+  //     preamble) = about $69 a team a day, worst case, if every unit were spent
+  //
+  // — roughly forty times a heavy testing day and nowhere near an unattended
+  // loop, which is exactly the shape "only stops a runaway" describes. It is per
+  // TEAM, so the estate ceiling is that times the teams on staging.
+  //
+  // WHAT WOULD CHANGE OUR MIND: staging hitting 2,000 in ordinary work. That is
+  // a real signal, not a nuisance — it means something is looping — so the
+  // answer is to look, not to raise the number.
+  it("is set on NO environment now — a removed ceiling is not a high one", () => {
+    for (const w of SPENDERS)
+      expect(
+        readCfg(w).env?.staging?.vars?.AGENT_NO_DAILY_CAP,
+        `${w} staging must not remove its ceiling — raise AGENT_FREE_DAILY instead, so a runaway still stops`
+      ).toBeUndefined()
+  })
+
+  it("staging's ceiling is high enough to test under and low enough to stop a runaway", () => {
+    for (const w of SPENDERS) {
+      const staging = Number(readCfg(w).env?.staging?.vars?.AGENT_FREE_DAILY)
+      const production = Number(readCfg(w).vars?.AGENT_FREE_DAILY)
+      expect(staging, `${w} staging must declare a numeric ceiling`).toBeGreaterThan(0)
+      expect(
+        staging,
+        `${w}: staging must be roomier than production, or testing gets refused and the flag comes back`
+      ).toBeGreaterThan(production)
+      // The upper half is the point of the change. Left open, the next person
+      // "just raises it a bit" until it is a removed ceiling wearing a number.
+      expect(
+        staging,
+        `${w}: past 10,000 units a team a day this is not a ceiling — that is about $345 a day at COSTS.md's per-step price`
+      ).toBeLessThanOrEqual(10_000)
+    }
   })
 
   it("every spender reads the SAME ceiling — one allowance, one number", () => {

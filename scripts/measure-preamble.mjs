@@ -61,6 +61,13 @@ function measure() {
         // whatever their role. That count is the ceiling on what the existing
         // rights trim can ever save, and it has never been written down.
         `export const ungated = toolSpecs(new Set())`,
+        // STAGE ONE — what a step ACTUALLY sends since the two-stage catalogue
+        // landed (2026-09-06): the core tools plus a flat index of every other
+        // tool's name. `toolSpecs(undefined, new Set())` is "no rights filter,
+        // nothing loaded yet", which is the first step of every turn.
+        `export const stageOne = toolSpecs(undefined, new Set())`,
+        `import { toolIndex } from ${JSON.stringify(join(REPO, "workers/data-ops/src/lib/tools.ts"))}`,
+        `export const index = toolIndex()`,
         `export const system = systemFor(null)`,
         `export const systemRaw = SYSTEM`,
       ].join("\n")
@@ -100,6 +107,14 @@ if (!Array.isArray(tools) || tools.length === 0) problems.push("toolSpecs() retu
 // silent shrink this canary is for. Measured 2026-09-05.
 if (Array.isArray(tools) && tools.length < 100)
   problems.push(`toolSpecs() returned only ${tools.length} tools, which is far below the shipped catalogue`)
+if (!Array.isArray(mod.stageOne) || mod.stageOne.length === 0)
+  problems.push("toolSpecs(undefined, new Set()) returned no core tools — stage one is empty")
+if (Array.isArray(mod.stageOne) && mod.stageOne.length >= tools.length)
+  problems.push(
+    `stage one returned ${mod.stageOne.length} of ${tools.length} tools — the two-stage split is not being applied, so the saving below would be a lie`
+  )
+if (typeof mod.index !== "string" || mod.index.length < 500)
+  problems.push("toolIndex() returned nothing worth the name — the model would be shown no names to load")
 if (typeof system !== "string" || system.length < 1_000)
   problems.push("systemFor(null) returned no prompt worth the name")
 if (Array.isArray(tools) && tools.some((t) => !t?.name || !t?.schema))
@@ -135,6 +150,14 @@ const result = {
   floorTokens: tok(JSON.stringify(mod.ungated).length + systemChars),
   // The five biggest tools by their own JSON, because "the catalogue is large"
   // is not actionable and "these five are 9% of it" is.
+  // WHAT A STEP ACTUALLY SENDS. Everything above is the WHOLE catalogue, which
+  // is still the right thing to measure — it is what the model could reach, and
+  // what the bill would be without the split. This is what it costs today.
+  stageOneTools: mod.stageOne.length,
+  stageOneChars: JSON.stringify(mod.stageOne).length + mod.index.length + systemChars,
+  stageOneTokens: tok(JSON.stringify(mod.stageOne).length + mod.index.length + systemChars),
+  indexChars: mod.index.length,
+  cutPct: Number((100 * (1 - (JSON.stringify(mod.stageOne).length + mod.index.length + systemChars) / preambleChars)).toFixed(1)),
   biggest: [...tools]
     .map((t) => ({ name: t.name, chars: JSON.stringify(t).length }))
     .sort((a, b) => b.chars - a.chars)
@@ -156,6 +179,10 @@ if (JSON_OUT) {
     `trim FLOOR          ${result.floorChars.toLocaleString()} chars  (~${result.floorTokens.toLocaleString()} tokens) ` +
       `— what a caller holding NO rights still receives, i.e. the best the rights trim can ever do`
   )
+  console.log()
+  console.log(`STAGE ONE           ${result.stageOneChars.toLocaleString()} chars  (~${result.stageOneTokens.toLocaleString()} tokens) — what a step ACTUALLY sends`)
+  console.log(`  ${result.stageOneTools} core tools in full, plus ${result.indexChars.toLocaleString()} chars of names for the other ${result.tools - result.stageOneTools}`)
+  console.log(`  a cut of ${result.cutPct}% against the whole catalogue above, on every step of every turn`)
   console.log()
   console.log("the five largest tool definitions:")
   for (const b of result.biggest) console.log(`  ${b.chars.toLocaleString().padStart(7)}  ${b.name}`)
