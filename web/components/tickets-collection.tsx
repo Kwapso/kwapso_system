@@ -121,7 +121,6 @@ import {
   Tag,
 } from "@shared/ui/foundations/icons"
 import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
-import { RecordMark } from "@shared/web/record-mark"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
@@ -2006,13 +2005,19 @@ function TriageMeta({ teamId, ticket }: { teamId: string; ticket: TriageWaiting 
                 a client's logo are the same shape, and on the tickets where both
                 are wordmarks they are the same KIND of picture too. */}
             <span className="text-muted-foreground">{r.label}</span>
-            <RecordMark
-              picture={r.picture}
-              mark={r.mark}
-              name={r.name}
-              shape={r.shape}
-              size="choice"
-            />
+            {/* NO FACE HERE — client, 2026-09-06: "author inside the card is
+                no icon." The byline is one linked name under the words now, and
+                a 20px round picture beside it was the last decoration on a card
+                she has spent a day stripping: the client went, the module went,
+                the readiness sentence went, Reply and Edit went. R35 ("a record
+                is known by its picture") is not broken by this — it governs
+                where a record is OFFERED or LISTED, and this is a byline, not a
+                choice. The picker that offers people still draws every face,
+                which is where telling two colleagues apart actually matters.
+
+                `picture`/`mark`/`shape` stay on the row above rather than being
+                deleted with the element: they are what a different presentation
+                would need, and this block has moved three times in two days. */}
             {r.path ? (
               // THE TEAM PREFIX IS COMPOSED HERE, IN A TEMPLATE LITERAL, and
               // that is R20's render-side census rather than a style choice
