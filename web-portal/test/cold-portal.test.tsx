@@ -30,6 +30,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const tickets = vi.fn()
 const raise = vi.fn()
+const deliverables = vi.fn()
+const impactRead = vi.fn()
 /** The real `ApiFailure` beside the two mocked doors: `RaiseTicketDialog` (which
  * this screen mounts) imports it as a VALUE and catches on it, so a stub would
  * change what the dialog does with an error. */
@@ -39,10 +41,14 @@ vi.mock("@/lib/api", async () => {
     ApiFailure: real.ApiFailure,
     support: { tickets: (...a: unknown[]) => tickets(...a), raise: (i: unknown) => raise(i) },
     appModules: { list: async () => ({ modules: [] }) },
+    handover: { deliverables: () => deliverables() },
+    impact: { read: () => impactRead() },
   }
 })
 
 import { TicketsScreen } from "@/components/tickets-screen"
+import { DeliverablesScreen } from "@/components/deliverables-screen"
+import { ImpactScreen } from "@/components/impact-screen"
 import { clearCache } from "@shared/web/store"
 
 const ready = {
@@ -56,10 +62,27 @@ function mustRender(ui: React.ReactElement) {
   expect(container.textContent?.trim().length ?? 0, "the screen rendered nothing at all").toBeGreaterThan(0)
 }
 
+/** The same refusal, for a screen whose FIRST paint is text-free.
+ *
+ * Deliverables and Impact both open on bare `<Skeleton>`s — no heading, no
+ * words — so the synchronous `mustRender` above reports "rendered nothing at
+ * all" on a screen that is working perfectly and simply has not settled. That
+ * is the canary being right about the wrong moment, so the fix is to look
+ * later rather than to look less: wait for a sentence the settled screen must
+ * carry, THEN refuse an empty tree. A screen that never settles fails on the
+ * wait, which is the same protection said at the right time. */
+async function mustSettle(ui: React.ReactElement, waitFor: RegExp | string) {
+  const { container } = render(ui)
+  expect(await screen.findByText(waitFor), "the screen never settled").toBeTruthy()
+  expect(container.textContent?.trim().length ?? 0, "the screen rendered nothing at all").toBeGreaterThan(0)
+}
+
 beforeEach(() => {
   clearCache()
   tickets.mockReset()
   raise.mockReset()
+  deliverables.mockReset()
+  impactRead.mockReset()
 })
 afterEach(cleanup)
 
@@ -106,5 +129,61 @@ describe("F12 · the portal draws no toolbar over a collection with nothing in i
     expect(await screen.findByPlaceholderText(/Search your tickets/i)).toBeTruthy()
     // …and the empty body is gone with it, so the two states cannot both draw.
     expect(screen.queryByText("Nothing here yet.")).toBeNull()
+  })
+})
+
+/* ---------- F13 · the other two screens a client can reach with nothing ----- */
+
+// TICKETS WAS THE ONE THAT GOT FIXED, and it was not the only one. The fresh-
+// eyes review's F11 said all five portal screens said something true and gave
+// nobody anything to press; the 2026-09-05 change closed Tickets, and Home
+// turned out to have had its button all along. These two did not, and they are
+// the two a client is MOST likely to open first — "what did you hand over" and
+// "what was it worth" are the questions the portal exists to answer.
+//
+// THE ACT IS "ASK US", ON BOTH, and that is not a shortcut. A client cannot
+// hand themselves a deliverable and cannot map their own process, so there is
+// no create act here to surface — the only thing that is genuinely theirs is to
+// ask, which is the same act, the same dialog and the same already-catalogued
+// words the other two screens use. Nothing new was invented for either screen.
+
+describe("F13 · a client's other two empty screens name an act", () => {
+  it("Deliverables offers something to press, not just a sentence", async () => {
+    deliverables.mockResolvedValue({ deliverables: [], total: 0 })
+    // CANARY FIRST — the real empty body drew, so the button below is being
+    // looked for on a screen that exists.
+    await mustSettle(<DeliverablesScreen ready={ready} />, "Nothing here yet.")
+    expect(
+      screen.getByText("When we hand something over and share it with you, it turns up here.")
+    ).toBeTruthy()
+
+    const ask = screen.getByRole("button", { name: /Ask us something/i })
+    expect(ask, "the deliverables shelf is empty and there is nothing to press").toBeTruthy()
+    expect((ask as HTMLButtonElement).disabled, "the one act on the screen is dimmed").toBe(false)
+  })
+
+  it("Impact offers something to press, not just a sentence", async () => {
+    impactRead.mockResolvedValue({ apps: [], savedSecondsPerMonth: 0, currency: "EUR" })
+    await mustSettle(<ImpactScreen ready={ready} />, /As soon as we've mapped how a job used to be done/i)
+
+    const ask = screen.getByRole("button", { name: /Ask us something/i })
+    expect(ask, "the impact screen has no numbers and nothing to press").toBeTruthy()
+    expect((ask as HTMLButtonElement).disabled, "the one act on the screen is dimmed").toBe(false)
+  })
+
+  it("CANARY — neither screen draws the empty act once it has something to show", async () => {
+    deliverables.mockResolvedValue({
+      deliverables: [
+        { id: "d1", appId: "app1", app: "Ordering", title: "Handover pack", url: null, createdAt: "2026-09-01T09:00:00.000Z" },
+      ],
+      total: 1,
+    })
+    // The row is really there — so the absence below is about state, not a
+    // render that failed.
+    await mustSettle(<DeliverablesScreen ready={ready} />, "Handover pack")
+    expect(
+      screen.queryByRole("button", { name: /Ask us something/i }),
+      "the empty-state act is still drawn over a shelf that has something on it"
+    ).toBeNull()
   })
 })

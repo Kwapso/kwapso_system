@@ -47,7 +47,11 @@ vi.mock("@/lib/api", () => ({
   content: { insights: () => insights() },
 }))
 
-import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import {
+  CollectionCreateActionProvider,
+  CollectionEmptyState,
+} from "@shared/web/screen-engine/collection-frame"
+import { ScreenRenderer } from "@shared/web/screen-engine/screen-renderer"
 import { BASE_RECIPES } from "@/lib/screens"
 import { HomeScreen } from "@/components/screens/home-screen"
 import { clearCache } from "@shared/web/store"
@@ -246,5 +250,183 @@ describe("F3 · an empty collection's sentence is true of that collection", () =
       if (!said) continue
       expect(said, `${key} still tells a new team its rows arrive from the client portal`).not.toMatch(/portal/i)
     }
+  })
+})
+
+/* ------------- F5 · the SCREENS reach their empty state, not just the body --- */
+
+// EVERYTHING ABOVE THIS LINE TESTED THE PARTS. This section tests the SCREEN.
+//
+// The three `CollectionEmptyState` tests in F3 render that component directly,
+// with a title and a description handed to it — so they prove the empty BODY
+// draws what it is told and prove nothing at all about whether any screen ever
+// reaches it. A recipe could lose its `emptyText`, a host could stop publishing
+// its create action, the frame could take the no-results branch on a resting
+// collection, and all three would stay green.
+//
+// So this renders the real engine (`ScreenRenderer`) over the real recipes
+// (`BASE_RECIPES`) with `data={{ rows: [] }}` — the exact path every recipe
+// collection in the app takes — and asks the two questions a new team's screen
+// actually answers: what does it say, and is there something to press.
+//
+// `useKitPanel` is on because that is what the app passes at every one of these
+// call sites (collection-content.tsx for members/roles/invites, meetings-screen
+// and the accounts branch for the rest). It is not a test convenience: the
+// suppression of search/filter/sort/count over a genuinely empty collection
+// lives in that branch of `CollectionFrame` (its `isEmptyState` gate), so
+// rendering the other branch would be asking a question about a screen nobody
+// opens.
+//
+// THE CANARY IS THE ONE-ROW RENDER, and it is not optional. Every assertion
+// here is about a screen with nothing in it, and "nothing in it" is exactly
+// what a broken render looks like: a recipe key that no longer exists, a shaper
+// that throws, a frame stuck in `loading`. So each screen is drawn a second
+// time with a single row, and must then show that row and NOT show the empty
+// sentence. A screen that says "No accounts yet." whatever you hand it is
+// broken in the way this file exists to catch.
+
+/** What the host publishes above each of these collections today. `false` is
+ * never an oversight — Members and Contacts have no create act at all (a member
+ * arrives by accepting an invite; a contact is added from her company's own
+ * screen), and TEN STATES #10 says the control is then ABSENT, never dimmed. */
+const COLLECTIONS: [key: string, title: string, hasCreateAction: boolean][] = [
+  ["accounts.list", "No accounts yet.", true],
+  ["roles.list", "No roles yet.", true],
+  ["invites.list", "No invites yet.", true],
+  ["meetings.list", "Nothing in Meetings yet.", true],
+  ["contacts.list", "No contacts yet.", false],
+  ["members.list", "No members yet.", false],
+]
+
+const ALL_FOUR = { read: true, create: true, edit: true, delete: true }
+/** Every module any recipe below gates on. A recipe whose gate is missing draws
+ * NOTHING, which would pass every absence assertion in this section. */
+const EVERY_RIGHT = {
+  accounts: ALL_FOUR,
+  contacts: ALL_FOUR,
+  member_roles: ALL_FOUR,
+  team_members: ALL_FOUR,
+  meetings: ALL_FOUR,
+  help: ALL_FOUR,
+  work: ALL_FOUR,
+}
+
+function drawCollection(key: string, rows: Record<string, unknown>[], hasCreateAction: boolean) {
+  return mustRender(
+    <CollectionCreateActionProvider
+      action={hasCreateAction ? { label: "New", onCreate: () => {} } : null}
+    >
+      <ScreenRenderer
+        recipe={BASE_RECIPES[key]}
+        data={{ rows: rows as never }}
+        rights={EVERY_RIGHT}
+        onAction={() => {}}
+        onIntent={() => {}}
+        useKitPanel
+      />
+    </CollectionCreateActionProvider>
+  )
+}
+
+describe("F5 · a real collection screen with nothing in it", () => {
+  it.each(COLLECTIONS)("%s says its own sentence and nothing is loading", (key, title) => {
+    expect(BASE_RECIPES[key], `${key} is gone from BASE_RECIPES`).toBeTruthy()
+    drawCollection(key, [], true)
+    expect(screen.getByText(title), `${key} never reached its empty state`).toBeTruthy()
+  })
+
+  it.each(COLLECTIONS)("%s draws its create act exactly where one exists", (key, _title, hasCreateAction) => {
+    drawCollection(key, [], hasCreateAction)
+    const add = screen.queryByRole("button", { name: /Add the first/i })
+    if (hasCreateAction) {
+      expect(add, `${key} names no act on an empty screen — a new team has nothing to press`).not.toBeNull()
+      expect((add as HTMLButtonElement).disabled, "the one act on an empty screen is dimmed").toBe(false)
+    } else {
+      // TEN STATES #10: absent, never dimmed. Members and Contacts route
+      // elsewhere, and their own sentence (F3/F4) is what says where.
+      expect(add, `${key} offers "Add the first" for a record that cannot be created here`).toBeNull()
+    }
+  })
+
+  it.each(COLLECTIONS)("%s draws no toolbar over a collection that is genuinely empty (R50)", (key) => {
+    const container = drawCollection(key, [], true)
+    // R50 is about the whole row, so this asks for the row's contents rather
+    // than for `<ToolbarRow>` — the engine draws its own, and a law that only
+    // recognised one spelling is how the portal's hand-rolled row slipped it.
+    expect(container.querySelector("input"), `${key} draws a search box over zero rows`).toBeNull()
+    expect(screen.queryByText(/^Showing /), `${key} counts rows on an empty collection`).toBeNull()
+    expect(screen.queryByText(/results$/), `${key} draws a filter pill over zero rows`).toBeNull()
+  })
+
+  it.each(COLLECTIONS)("%s CANARY — one row and the empty sentence is gone", (key, title, hasCreateAction) => {
+    // Enough fields for any of these shapers; the ones a recipe does not read
+    // are ignored rather than rejected. THE SAME WORD IS IN ALL OF THEM on
+    // purpose — Invites titles its row from `email` and the others from `name`,
+    // so a canary pinned to one field would have reported "no row rendered" on
+    // a screen that drew one perfectly.
+    const row = {
+      id: "row-1",
+      name: "Vinter AB",
+      title: "Vinter AB",
+      label: "Vinter AB",
+      email: "vinter@vinter.se",
+      description: "Vinter AB",
+      active: true,
+    }
+    drawCollection(key, [row], hasCreateAction)
+    expect(
+      screen.getAllByText(/vinter/i).length,
+      `${key} rendered no row at all — every claim above is meaningless`
+    ).toBeGreaterThan(0)
+    expect(
+      screen.queryByText(title),
+      `${key} still says "${title}" while holding a row — its empty state is not reading the data`
+    ).toBeNull()
+  })
+})
+
+/* ------- F6 · a collection with no create act must say where the act IS ----- */
+
+// THE DELIBERATE CHOICE, MADE READABLE BY SOMETHING OTHER THAN A HUMAN.
+//
+// Contacts publishes no create action on purpose — a contact is a person AT a
+// company, so she is added from that company's own record, and a "New contact"
+// button here would either create an orphan or open a form whose first question
+// is "which company?", which is the Accounts screen with extra steps. Members
+// is the same shape for a different reason: a member arrives by accepting an
+// invite, and there is no door that makes one directly.
+//
+// Both reasons were written down in 2026 as CODE COMMENTS
+// (contacts-screen.tsx's own note, collection-content.tsx's members branch),
+// and a comment is read by people who are already looking at that file. What
+// nothing checked was the PAIR: the moment a collection has no act, its empty
+// state must say where the act actually is, because the frame's own default
+// sentence — "Whatever you add shows up here" — promises one that does not
+// exist on this screen.
+//
+// So this is the rule rather than the instance: no create act ⇒ its own
+// sentence. It goes red if somebody gives Contacts a button and leaves the
+// sentence pointing at Accounts, and red the other way if somebody deletes the
+// sentence and lets the generic promise back in.
+
+describe("F6 · no create act means the screen says where the act is", () => {
+  const ACTLESS = COLLECTIONS.filter(([, , hasCreateAction]) => !hasCreateAction)
+
+  it("there is at least one such collection, or this whole rule is vacuous", () => {
+    // A filter that matches nothing passes every `it.each` below it silently —
+    // the empty-result trap, said as a test.
+    expect(ACTLESS.length, "no collection is marked act-less, so the rule below checks nothing").toBeGreaterThan(0)
+  })
+
+  it.each(ACTLESS)("%s carries its own sentence naming the route that exists", (key) => {
+    const said = BASE_RECIPES[key]?.collection?.emptyDescription
+    expect(
+      said,
+      `${key} has no create act and no sentence of its own — a new team is shown the frame's default, which promises an "Add the first" this screen does not have`
+    ).toBeTruthy()
+    expect(
+      said,
+      `${key} falls back to the generic promise on a screen with nothing to press`
+    ).not.toMatch(/Whatever you add shows up here/i)
   })
 })

@@ -39,6 +39,8 @@ import {
   AccordionTrigger,
 } from "@shared/ui/components/accordion/accordion"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Plus } from "@shared/ui/foundations/icons"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Comments } from "@shared/ui/components/comments/comments"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -47,9 +49,10 @@ import { SAVINGS_CAPTION, hoursText, minutesText, savedHours, type StepSaving } 
 import type { ProcessComment } from "@shared/types"
 import { moneyText } from "@shared/web/money"
 import { invalidate, useCached } from "@shared/web/store"
-import { ApiFailure, impact as impactApi, type PortalImpact } from "@/lib/api"
+import { ApiFailure, impact as impactApi, support, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { ErrorPanel } from "@/components/error-panel"
+import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage, useT } from "@shared/web/language"
 import { formatDate } from "@shared/web/format"
@@ -142,9 +145,21 @@ function StepLine({ step }: { step: StepSaving }) {
 
 export function ImpactScreen({ ready }: { ready: PortalReady }) {
   const t = useT()
-  void ready // the account is decided by the server from the caller's own stamp
+  // `ready` is NOT read to decide what this screen shows — the account is
+  // decided by the server from the caller's own stamp, as it always was. It is
+  // read for one thing only: the per-account draft key on the raise dialog
+  // below, which is the same key shape home and tickets already use, so a
+  // half-typed question follows the person between the three screens that
+  // offer it rather than being three separate drafts.
   const { data, loading, refresh } = useCached<PortalImpact>(cacheKeys.impact, () => impactApi.read())
   const [openProcessId, setOpenProcessId] = React.useState<string | null>(null)
+  const [raising, setRaising] = React.useState(false)
+
+  async function raise(input: { description: string; appId?: string; moduleId?: string }) {
+    await support.raise(input)
+    invalidate(cacheKeys.tickets)
+    invalidate(cacheKeys.ticketsTotal)
+  }
   // The chart's rows, built above the early returns so the hook order is fixed
   // whatever the read is doing. Hours to one decimal, from the SAME rounding the
   // text below uses (savedHours), so a bar and the line under it can never say
@@ -186,9 +201,27 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
          * an inset shadow, never a stroke). `bg-surface-panel` is the same
          * fill every plain card in the app already draws on this page's
          * `--background`. */}
-        <p className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-          {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
-        </p>
+        {/* ONE LABELLED BUTTON UNDER THE SENTENCE — the register the tickets
+         * and deliverables screens draw too. A client cannot map their own
+         * process, so the only act that is genuinely theirs here is to ask;
+         * offering it is the difference between a screen that explains itself
+         * and one a first-time reader can leave. */}
+        <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
+          <p>
+            {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
+          </p>
+          <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
+            <Plus className="size-3.5" />
+            {t("Ask us something")}
+          </Button>
+        </div>
+
+        <RaiseTicketDialog
+          open={raising}
+          onOpenChange={setRaising}
+          onSubmit={raise}
+          draftKey={`portal:ticket:new:${ready.currentAccountId}`}
+        />
       </div>
     )
 

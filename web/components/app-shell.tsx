@@ -112,6 +112,22 @@ import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
 
+/** A list with at least one thing in it, said in the type.
+ *
+ * The nav is built by grouping every destination a role can reach and dropping
+ * the groups that came out empty, and three places downstream then read
+ * `group[0]` for the section's own name. Those reads are safe BECAUSE of that
+ * drop, which is the problem: the drop is one `.filter()` far above them, so
+ * the safety is a convention a reader has to go and find and a static check
+ * cannot see at all. Narrowing here makes it a fact the compiler holds. */
+type NonEmpty<T> = [T, ...T[]]
+
+/** `.filter(nonEmpty)` instead of `.filter(g => g.length > 0)` — the same test,
+ * written as a type predicate so the result type carries the answer. */
+function nonEmpty<T>(xs: T[]): xs is NonEmpty<T> {
+  return xs.length > 0
+}
+
 // Kwapso is `inRail: false` now (client, 31 Aug 2026 — see NavGroup in
 // pages.ts), so this mapping is never actually looked up — kept anyway, the
 // same way `settings` already sat here unused, so `NavItem.icon`'s union
@@ -519,9 +535,20 @@ export function AppShell({
   // a future NAV destination that DOES want a rail section costs it a group
   // field, not a rewrite here.
   const groupable: ShellLink[] = [...sidebarPages, ...universal.filter((i) => i.group !== "none")]
-  const namedGroups: ShellLink[][] = NAV_GROUP_ORDER.map((g) => groupable.filter((i) => i.group === g)).filter(
-    (g) => g.length > 0
-  )
+  // A GROUP THAT EXISTS HAS A FIRST ITEM, AND THE TYPE SAYS SO.
+  //
+  // Three reads below take `group[0]` — the section's own name and its open
+  // state — and every one of them was correct because of `.filter(g =>
+  // g.length > 0)` on THIS line. Correct, and unreadable: the nearest read is
+  // thirty lines down and the furthest is a thousand, so nothing at the read
+  // says why an index is safe, and a zero-row probe flags all three every time
+  // it is run. `nonEmpty` is a type predicate rather than a plain boolean, so
+  // the filter NARROWS: `namedGroups` is now a list of groups that each carry
+  // at least one link, and a future edit that could put an empty one in here
+  // stops compiling instead of blanking somebody's sidebar.
+  const namedGroups: NonEmpty<ShellLink>[] = NAV_GROUP_ORDER.map((g) =>
+    groupable.filter((i) => i.group === g)
+  ).filter(nonEmpty)
   // THE FLAT LIST — home, then every grouped section in order — is what the
   // phone's bottom bar, its "everything else" sheet and the active-link lookup
   // all read: none of them care about headings, only about "which destinations
@@ -535,7 +562,7 @@ export function AppShell({
   // draws (the standalone anchor, then each named section in order), so a
   // separator falls in the same places on a phone as a heading does on a
   // laptop.
-  const railBlocks: ShellLink[][] = [homeStandalone, ...namedGroups].filter((b) => b.length > 0)
+  const railBlocks: NonEmpty<ShellLink>[] = [homeStandalone, ...namedGroups].filter(nonEmpty)
 
   // THE RAIL'S GROUPS, IN THE KIT'S OWN SHAPE (R45) — the four NAMED sections
   // only; House is drawn outside the kit's own Rail entirely by

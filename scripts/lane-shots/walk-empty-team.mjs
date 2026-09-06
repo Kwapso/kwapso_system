@@ -12,7 +12,7 @@
 //   FRESH_COOKIE=<cookie> FRESH_TEAM=<id> CANARY_COOKIE=<cookie> CANARY_TEAM=<id> \
 //     node scripts/lane-shots/walk-empty-team.mjs
 import { chromium } from "playwright"
-import { mkdirSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 
 const PORT = process.env.VERIFY_PORT ?? "3065"
 const OUT = "/tmp/empty-walk-shots"
@@ -145,3 +145,35 @@ console.log(`screenshots saved to ${OUT}`)
 
 await browser.close()
 console.log("\nJSON:", JSON.stringify(results))
+
+// ── AND IT LANDS SOMEWHERE GIT CAN SEE ────────────────────────────────────
+//
+// THE 2026-08-29 WALK IS WHY THIS BLOCK EXISTS. It ran, it was canary-checked,
+// it found real things — and every one of its findings went into a message to
+// another session and nowhere else. This file's own commit says so: "Findings
+// from the actual walk are in the message to kwapso-cpaa-a7, not repeated here
+// — this commit is the instrument, not the result." Eight days later nobody
+// could say what it found, because a message is not a place: the screenshots
+// go to /tmp, the JSON went to a terminal, and .session-notes/ is gitignored
+// except for one re-admitted folder (.gitignore, "!.session-notes/lanes/").
+//
+// So the last walk now writes itself down. Overwritten each run on purpose —
+// this answers "what does the app look like empty TODAY", and the history of
+// that answer is the file's own git log, which is a better record than a
+// folder of dated blobs nobody prunes.
+const REPORT = process.env.WALK_REPORT ?? ".session-notes/lanes/empty-walk.json"
+writeFileSync(
+  REPORT,
+  JSON.stringify(
+    {
+      walkedAt: new Date().toISOString(),
+      team: FRESH_TEAM,
+      canaryRan: Boolean(CANARY_COOKIE && CANARY_TEAM),
+      destinations: DESTINATIONS.length,
+      results,
+    },
+    null,
+    2
+  ) + "\n"
+)
+console.log(`\nwritten to ${REPORT} — commit it, that is the point`)
