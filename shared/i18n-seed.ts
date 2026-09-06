@@ -3366,4 +3366,26 @@ export const SEED: Catalogue = {
     es: "{done} de {count} fila(s) escritas. Cada una se comprueba exactamente como si la hubiera escrito usted.",
     ca: "{done} de {count} fila/es escrites. Cadascuna es comprova exactament com si l'haguéssiu escrita vós.",
   },
+
+  /* THE LIVE-CONNECTION STRIP (shared/web/live-status.tsx). Hand-written here
+   * rather than left for the generator, because the generator spends the
+   * owner's own key and R44 will not let an untranslated string ship: two new
+   * sentences would have pushed all three ceilings up by two, which is the
+   * "accepted debt" exit rather than the right one for copy this short.
+   *
+   * "Live" is the hard word. It is not `Live` in German here — a person is
+   * being told their screen has stopped keeping itself up to date, and
+   * "aktualisiert sich gerade nicht" says that in the plain register the rest
+   * of this file uses. Same choice in Spanish and Catalan: describe what has
+   * stopped happening, rather than borrow an English adjective for it. */
+  "Not updating live right now — you may not be seeing the latest changes.": {
+    de: "Aktualisiert sich gerade nicht — du siehst möglicherweise nicht die neuesten Änderungen.",
+    es: "Ahora mismo no se actualiza solo — puede que no estés viendo los últimos cambios.",
+    ca: "Ara mateix no s'actualitza sol — potser no estàs veient els darrers canvis.",
+  },
+  "Refresh": {
+    de: "Aktualisieren",
+    es: "Actualizar",
+    ca: "Actualitza",
+  },
 }
