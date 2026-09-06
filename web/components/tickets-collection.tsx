@@ -112,6 +112,19 @@ import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recip
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card } from "@shared/ui/components/card/card"
 import { Queue } from "@shared/ui/components/queue/queue"
+/* THE LIST VIEW'S TABLE, composed from the kit's own primitives rather than
+   drawn through `RecordTable` — the reason is written out at the `triageView
+   === "list"` branch below, and it is R16's: `RecordTable` brings
+   `CollectionFrame`, which brings a second search box and a second count onto a
+   screen that already has one of each. */
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@shared/ui/components/table/table"
 import {
   ArrowCounterClockwise,
   Cards,
@@ -1585,43 +1598,244 @@ function TriageQueue({
         // at the wrong control, which is the most expensive kind.
         <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
       ) : triageView === "list" ? (
-        /* THE LIST, RAW AND SAID TO BE RAW — client: "so far only add the
-           selector and a raw version of list, we will work on the details for
-           list next."
+        /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
+           Her whole brief, verbatim: "Now let's build the list view: 1. Title.
+           2. Type with the colors, same as we have with the chips. Also include
+           the number, the ID. 3. App. 4. Date." — with a screenshot of the
+           kit's own List pattern beside it (uppercase column headers, one line
+           per row, a coloured pill in its own column, quiet text columns, row
+           hover, the date last).
 
-           It is the same narrowed, sorted rows the sitting draws, one per line,
-           and nothing else: no columns, no per-row decisions, no selection, no
-           paging. Deliberately NOT built on `PagedFind` or a table yet — either
-           would be a shape to argue with next round, and the point of this pass
-           is that the SWITCH works and has somewhere to land.
+           This REPLACES the raw `<ul>` of buttons that stood here since the
+           view switch shipped a few hours earlier. That placeholder said of
+           itself "no columns, no per-row decisions, no selection, no paging …
+           either would be a shape to argue with next round" — this is that next
+           round, and the shape she argued for is a table.
 
-           It shares `inOrder` with the queue, so the two views are the same
-           question answered twice rather than two reads that can disagree. Each
-           row opens the ticket, which is the one thing a list of tickets must
-           do whatever else it grows. */
-        <ul data-slot="triage-list" className="flex min-w-0 flex-col">
-          {inOrder.map((w) => (
-            <li key={w.id} className="min-w-0">
-              <button
-                type="button"
+           IT STILL SHARES `inOrder` WITH THE QUEUE, which is the one sentence
+           from the placeholder that survives unchanged and the one that
+           matters: the search, the two facets and the sort are functions over
+           rows at the top of this file rather than properties of the card
+           (`narrowTriage` / `triageFacets` / `TRIAGE_SORTS`), so the queue and
+           the list are one question answered twice and cannot disagree about
+           what is in the pile or what order it is in. That was the whole reason
+           those three were written up there before either view needed them.
+
+           ── WHY THE KIT'S `Table` PRIMITIVES AND NOT `RecordTable` ──────────
+
+           `record-table.tsx` is this app's own table and the default answer for
+           one; it is the wrong answer here, for two reasons that are both about
+           what it BRINGS rather than what it lacks.
+
+             1 · IT REQUIRES A `CollectionConfig` AND WRAPS `CollectionFrame`,
+                 which draws a collection's whole chrome — its own debounced
+                 search box, its own filter bar, a live "Showing X of Y" and a
+                 pager. This screen already has every one of those, drawn one
+                 element up by `<ToolbarRow>` (R53's five slots) and counted
+                 once by `<CollectionHeading>` far above (R16: a count is shown
+                 exactly ONCE, and the heading is where this collection shows
+                 it). Using `RecordTable` would put a second search box under
+                 the first and a second count on the screen — R16's founding
+                 defect, drawn deliberately.
+             2 · ITS REASON FOR EXISTING IS SORT HEADERS, and this table must
+                 not have them — see the next section. A component adopted for
+                 the one feature it must then suppress is not a reuse.
+
+           So it composes the kit's primitives directly, which is the same
+           category of decision `record-table.tsx`'s own header describes about
+           `CollectionFrame`: the CHROME stays the row's, only the rows are
+           drawn here. Nothing is forked and nothing under `shared/ui/` is
+           touched. The rules, the 56 row, the hover wash, the uppercase micro
+           header and the inline-axis scroll are all the primitive's own — which
+           is also how BUILD-A-SCREEN §6.1 is obeyed for free: the kit draws
+           every one of those separations as an INSET SHADOW, and there is no
+           `border` anywhere below.
+
+           ── THE COLUMNS, AND WHERE THE NUMBER WENT ─────────────────────────
+
+           Four, in her order: Title · Type · App · Date. The ID rides the TYPE
+           column beside the dot, which is what her item 2 asks for ("Type with
+           the colors … Also include the number, the ID") rather than a fifth
+           column she did not ask for. It reads well because the two happen to
+           make a phrase a person already says out loud — "Issue 1513",
+           "Question 1204" — so the pill and the number scan as one identifier
+           rather than as two facts crowding one cell. A ticket with no `ref`
+           draws no number (`HelpTicket.ref` is null until the client has a
+           reference code), the same subtraction the card's chip line makes, and
+           the pill is still there to hold the column.
+
+           THE HEADERS ARE THE CLIENT'S OWN WORDS and all four were already in
+           the catalogue, so this view adds no new copy and moves no ceiling —
+           "Type" and "App" are the very words `triageFacets` puts on the two
+           facets in the toolbar above, which is what stops the header and the
+           filter for one column being two different nouns.
+
+           ONE WORD IS WORTH FLAGGING RATHER THAN QUIETLY UNIFYING: the sort
+           chip in the toolbar says "Raised" for this same field and this header
+           says "Date", because that is the word she wrote. Both are defensible
+           (a sort menu names an ORDER, a column names a FIELD) and neither is a
+           glossary term, so nothing here is wrong — but one screen now has two
+           nouns for one date, which is the shape R34 exists to be suspicious
+           of. It is hers to settle; changing it is one word in one place.
+
+           ── THE ORDER IS THE TOOLBAR'S, AND THE HEADERS ARE PLAIN ───────────
+
+           Not one column header sorts, on purpose. `inOrder` arrives already
+           ordered by the toolbar's own sort control — the field pinned to
+           `raised`, the direction live (`TRIAGE_SORTS` says at length why one
+           option is the honest menu here) — so a clickable header would be a
+           SECOND control answering the one question the first is already
+           answering, and `record-table.tsx`'s own header is the record of what
+           that costs: a header that lights up while the rows sit still is
+           read as broken DATA, not a broken button. The two would not even
+           disagree quietly — sorting by Title would silently discard the
+           direction the toolbar's arrow is still pointing.
+
+           A plain header is honest, and `record-table.tsx` says the same
+           sentence about a paged column its door has no name for: "a plain
+           header is honest, and a live-looking one is what this file exists to
+           stop."
+
+           ── OPENING A TICKET: THE ROW AND THE TITLE, BOTH ──────────────────
+
+           The kit's own answer (GAPS-D TBL-5) is that "where a whole row
+           navigates, the call site puts a `Button variant="link"` in the first
+           cell and that control owns the press", and that is what the Title
+           cell is: a real control, focusable, in the tab order, announced, with
+           the row's own name as its label.
+
+           The ROW ALSO opens on click, which is the affordance in her
+           screenshot and which `TableRow` already hints at by hovering. It is
+           NOT `role="button"` + `tabIndex` on the `<tr>` (which is what
+           `record-table.tsx` does): that trades away the table's row semantics
+           for a keyboard path the Title link already provides, and it would
+           nest an interactive control inside an interactive row. So the mouse
+           gets the whole row, the keyboard and a screen reader get the link,
+           and neither is a second-class way in. The link stops the click
+           propagating so one press is never two `onOpen` calls.
+
+           ── THE APP COLUMN IS TEXT, NOT A LINK, AND THAT IS R37-SHAPED ─────
+
+           The card view links the app (`TriageChips`, through `<InAppLink>` as
+           R37 requires), and this column deliberately does not. A link inside a
+           row whose whole job is to open the TICKET gives one row two
+           destinations, and the one a click lands on becomes a matter of
+           pixels. Nothing is lost: the app is a FACET in the toolbar above, so
+           the thing a reader actually wants from this column in a list — "show
+           me only this app's" — is one control away, and the ticket's own
+           screen is one row-click away with the app link on it. If she wants
+           the column to navigate, it becomes an `<InAppLink>` with the cell
+           stopping propagation, exactly as the Title link does. */
+        <Table
+          // Four columns, so the kit's own specimen width is the right pin:
+          // its doc says a call site that knows its column count passes one,
+          // and offers `42rem` as the number its own drawn table uses. Below
+          // that the container scrolls on the inline axis rather than crushing
+          // the title column — the kit's stated mobile answer, and the reason
+          // it never restacks a table into cards.
+          minWidth="42rem"
+          // The table's own name, for a reader who arrives at it out of
+          // context. Reuses the sitting's label rather than inventing a second
+          // phrase for one collection.
+          aria-label={t("Triage queue")}
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t("Title")}</TableHead>
+              <TableHead>{t("Type")}</TableHead>
+              <TableHead>{t("App")}</TableHead>
+              <TableHead>{t("Date")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {inOrder.map((w) => (
+              <TableRow
+                key={w.id}
                 onClick={() => onOpen(w.id)}
-                className="hover:bg-surface-quiet flex w-full min-w-0 items-center gap-3 rounded-[var(--radius)] px-3 py-2 text-start"
+                className="cursor-pointer"
               >
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{w.ref}</span>
-                <Swatch colour={ticketTypeColour(w.helpType)} />
-                <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(w)}</span>
-                {w.appName && (
-                  <span className="text-muted-foreground hidden shrink-0 text-xs sm:inline">
-                    {w.appName}
+                <TableCell>
+                  <Button
+                    variant="link"
+                    // The row is already opening; without this one press
+                    // would call `onOpen` twice.
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen(w.id)
+                    }}
+                    // `variant="link"` is not a box (no height, no padding), so
+                    // it inherits the cell's own type and the first cell's
+                    // medium weight rather than drawing a control inside a row.
+                    // `block` + a measure is what lets a long title end in an
+                    // ellipsis instead of pushing the other three columns off
+                    // the screen — the kit's first cell never wraps by design,
+                    // and a title is the one column where that would otherwise
+                    // be a very wide table. `max-w-[16rem] truncate` is the
+                    // spelling the app already uses for this (google-scope-
+                    // dialog.tsx, timer-bar.tsx); this one is wider because a
+                    // ticket title is a sentence, not a filename.
+                    className="block max-w-[32rem] truncate text-start"
+                  >
+                    {ticketTitle(w)}
+                  </Button>
+                </TableCell>
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    {/* THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP
+                        as the card's chips and the type picker draw — client:
+                        "Type with the colors, same as we have with the chips."
+                        `Swatch` + `ticketTypeColour` rather than a second
+                        lozenge that agrees with them today: the whole reason
+                        `lib/type-colours.ts` is one file is that a type's
+                        colour cannot be decided twice.
+
+                        A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL,
+                        saying so with an em-dash, for the reason the card gives
+                        one: a column with a pill on four rows and a hole on the
+                        fifth reads as the broken row rather than the untyped
+                        one. The dot goes neutral on its own (`ticketTypeColour`
+                        never returns null, and says why).
+
+                        NO `--badge-quiet-fill` REBIND HERE, unlike the card's
+                        chip line: that row sits ON the soft-paper card and the
+                        client named that paper for it; a table row sits on the
+                        collection card and the badge's own `--surface-quiet` is
+                        a real tone step off it. The row's hover is `--accent`,
+                        a 5% wash that layers over whatever is beneath, so the
+                        pill stays distinct on a hovered row. */}
+                    <Badge variant="secondary" size="pill">
+                      <Swatch colour={ticketTypeColour(w.helpType)} />
+                      {w.helpType ?? "—"}
+                    </Badge>
+                    {/* THE NUMBER, BESIDE THE TYPE — her item 2. `tabular-nums`
+                        is what "monospaced" means everywhere else in this app
+                        (the card's own date chip carries it for the same
+                        reason); a second font family would be a type decision
+                        nobody has taken. */}
+                    {w.ref && (
+                      <span className="text-muted-foreground tabular-nums">{w.ref}</span>
+                    )}
                   </span>
-                )}
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                </TableCell>
+                {/* THE TWO QUIET COLUMNS, as her reference draws them: the
+                    facts, in secondary ink, so the title and the coloured pill
+                    are what the eye lands on going down the page. An em-dash
+                    for an absent app — a ticket raised with no app is one of
+                    the four readiness gaps the queue exists to fill, and a
+                    blank cell would look like a rendering fault rather than a
+                    missing answer. */}
+                <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                  {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same
+                      shared formatter and the reader's own language, so one
+                      ticket cannot carry two spellings of one day across two
+                      views of one collection. */}
                   {formatDate(w.createdAt, lang)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       ) : (
         <Queue
           /* OPEN AND SKIP, SIDE BY SIDE — client, twice: "open button next to
