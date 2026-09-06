@@ -1979,8 +1979,20 @@ function TriageChips({ teamId, ticket }: { teamId: string; ticket: TriageWaiting
           </Badge>
         </InAppLink>
       )}
-      <Badge variant="secondary" size="pill" className="tabular-nums">
-        {t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
+      <Badge
+        variant="secondary"
+        size="pill"
+        className="tabular-nums"
+        aria-label={t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
+      >
+        {/* THE DATE ALONE — client: "in the chip do not say raised on date, but
+            only date." The word was carrying its own weight when this line sat
+            under the description as a sentence; in a row of four facts beside a
+            number and a type, "raised" is the only chip that explains itself,
+            and a chip that needs explaining in a scanned row is one word too
+            many. What it is stays in the accessible name below, so a reader who
+            cannot see the row's shape still hears which date this is. */}
+        {formatDate(ticket.createdAt, lang)}
       </Badge>
     </span>
   )
