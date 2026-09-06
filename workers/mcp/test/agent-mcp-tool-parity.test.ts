@@ -29,14 +29,27 @@
 // a tool name as an external contract, kept publishing all 30 by name. The
 // owner's ruling: correct and deliberate, wire the one piece that was a genuine
 // gap (`set_record_active` had NO form on MCP at all — not even the generic
-// shape), and reason the rest. **THE DIRECTION THAT MATTERS: MCP is a STRICT
-// SUPERSET of the agent's catalog, never a subset.** Every one of these 30
-// names is MCP holding something the agent no longer carries by that name —
-// nothing a person can do through the UI became unreachable from MCP, which is
-// the owner's actual sentence. An agent-only column reappearing here would be
-// the dangerous direction; an mcp-only one growing is the safe one, and this
-// file's own coverage test (below) still fails loudly the day that stops being
-// true for any UNDOCUMENTED name.
+// shape), and reason the rest. **THE DIRECTION THAT MATTERS: an agent-only gap
+// is the dangerous one and an mcp-only one is safe** — nothing a person can do
+// through the UI should become unreachable from MCP, which is the owner's actual
+// sentence. Every one of those 30 names is MCP holding something the agent no
+// longer carries by that name, which is the harmless direction.
+//
+// THIS PARAGRAPH USED TO SAY "MCP is a STRICT SUPERSET of the agent's catalog,
+// never a subset", AND THAT WAS NOT TRUE — corrected 6 Sep 2026. There are 26
+// agent-only tools right below it, twenty-one of them the Google block, so MCP
+// has never been a superset of anything and the table proving it is in the same
+// file. What this file ENFORCES is the weaker and correct rule: every asymmetry,
+// in BOTH directions, is a named line with a reason, and an undocumented one in
+// either column fails the build. The test was always right; only the sentence
+// above it overstated what the test was doing.
+//
+// It is corrected rather than deleted because of HOW it survived: a strong claim
+// in a header, sitting directly above a data table that contradicts it, read by
+// people who came to this file to check something else. A reader who believed
+// the header had no reason to count the entries — which is the same shape as the
+// `translate-ticket` exemption that cited R22's authority for a field R22 cannot
+// see. A confident sentence is load-bearing whether or not anything checks it.
 //
 // Nothing here is hand-listed beyond the two reason tables: tool names come
 // from TOOL_CATALOG and MCP_TOOLS themselves, exactly as filter-parity.test.ts
