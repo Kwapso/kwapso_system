@@ -26,8 +26,6 @@
 //
 // ── THE FAILURE THIS EXISTS FOR, AND WHY IT NEEDS A TEST ────────────────────
 //
-// ── THE FAILURE THIS EXISTS FOR, AND WHY IT NEEDS A TEST ────────────────────
-//
 // The `__Host-` rename left the literal hand-written in three places: auth's
 // pair of constants and a third copy in the MCP bridge that mints the cookie for
 // the machine surface. Nothing compared them. A fourth was about to be added by
@@ -228,6 +226,111 @@ describe("the session cookie's name lives in one file", () => {
       "this door decides which session to KEEP when it signs the others out. The token it reads " +
         "is the whole of that decision, and it must come through readSessionToken"
     ).toContain("readSessionToken(request)")
+  })
+
+  /* ── CLAUSE D · THE OPS SCRIPTS, WHICH NO CHECK CAN RUN ──────────────────
+        A/B/C are about the PRODUCT's source. This is about the 29 `.mjs` files
+        under `scripts/` that name the same cookie — and it is a different kind
+        of clause, for a reason worth stating plainly because the next person
+        will ask why a source scan is standing in for a test:
+
+        `npm run check` DOES NOT EXECUTE `scripts/` AT ALL. Not one line. So a
+        rename that breaks every smoke and seed script passes the gate byte for
+        byte — which is exactly what happened on 6 Sep 2026: thirteen scripts
+        asserted `startsWith("kwapso_session=")`, the `__Host-` rename made all
+        thirteen false, and smoke-staging, smoke-portal, smoke-mcp and
+        seed-staging would have failed at DEPLOY time behind a green build. They
+        were found by grepping for a cookie name, not by any process.
+
+        A CHECK ON THE TEXT IS THE ONLY GUARD AN UNEXECUTED SURFACE CAN HAVE.
+        That is the whole justification for this clause, and it is why it reads
+        source rather than behaviour.
+
+        WHAT IT ASKS, and the distinction is the entire clause: a script pinned
+        to `domain: "localhost"` is talking to a DEV worker, which runs with
+        `INSECURE_COOKIE=1` and therefore MINTS THE LEGACY NAME on purpose
+        (`sessionCookieName`) — a browser will not take a `__Host-` cookie
+        without `Secure`, and dev is http. For those the bare name is correct
+        and will stay correct; demanding the prefix would break them. Every
+        OTHER script is talking to a real https environment, which mints the
+        prefixed name, and must therefore know both spellings.
+
+        Measured before this was written, because the first version of this
+        finding said "sixteen scripts will break" and that was an overcount:
+        fourteen of the sixteen setters pin localhost and are fine for ever.
+        TWO pointed at a real host. Counting the files that matched the pattern
+        rather than the files that had the property is the same mistake this
+        law's own header records, one level out. */
+  it("D · every ops script naming the cookie knows both spellings, or is pinned to dev", () => {
+    const scripts = sourceFiles(join(ROOT, "scripts"), {
+      extensions: [".mjs"],
+      relativeTo: ROOT,
+    })
+    // Tripwire FIRST: this clause is a search for an absent string across a
+    // directory the gate never runs, so a walk that finds no files reports the
+    // same clean green as a correct estate.
+    expect(scripts.length, "no scripts walked — this clause is measuring nothing").toBeGreaterThan(20)
+    const naming = scripts.filter((f) => /kwapso_session/.test(f.source))
+    expect(
+      naming.length,
+      "no script names the session cookie — either they stopped signing in, or this walk is blind"
+    ).toBeGreaterThanOrEqual(10)
+
+    // COMMENTS OFF, and this clause needed it as much as the one below. Caught by
+    // canarying rather than by reasoning: reverting a script to the legacy name
+    // left my own explanatory COMMENT naming `__Host-` behind, the clause read
+    // the prose as evidence the script knew the spelling, and the sabotage came
+    // back a healthy green. A law that reads source off the disk reads the
+    // comments too — the fourth time this codebase has written that sentence, and
+    // the second time in this one file.
+    const code = (f: { source: string }) => f.source.replace(/^\s*\/\/.*$/gm, "")
+    const offenders = naming
+      // Pinned to dev: the legacy name is what a dev worker mints, permanently.
+      .filter((f) => !/domain:\s*"localhost"/.test(code(f)))
+      // Knows the prefixed spelling — either minting it or accepting it via the
+      // `(__Host-)?` form the asserting scripts use.
+      .filter((f) => !code(f).includes("__Host-"))
+      .map((f) => f.rel)
+
+    expect(
+      offenders,
+      "these scripts name the session cookie against a REAL environment and know only the " +
+        "legacy spelling. A real environment mints `__Host-kwapso_session`, so they work today " +
+        "only through the reader's legacy fallback — and they will fail silently the day it is " +
+        "retired, because `npm run check` never runs them. Accept or mint both names."
+    ).toEqual([])
+  })
+
+  it("the one-reader clause STOPS at the workers, and that is a decision", () => {
+    // WRITTEN DOWN RATHER THAN LEFT SILENT. A/B/C walk the product's source and
+    // deliberately do not reach `scripts/`. The reason is not neglect: there is
+    // nothing there to reach. `readSessionToken` has THREE call sites in the
+    // whole repository and every one is inside a worker — a `.mjs` ops script
+    // cannot import a TypeScript constant from `shared/`, so it can never be
+    // held to "read through the seam" and holding it to that is how a check
+    // becomes one people route around.
+    //
+    // What a script CAN be held to is the spelling, which is clause D. So the
+    // boundary is: the workers owe you the SEAM, the scripts owe you BOTH NAMES.
+    const readers = sourceFiles(join(ROOT, "shared"), { extensions: [".ts"], skipTests: true, relativeTo: ROOT })
+      .concat(sourceFiles(join(ROOT, "workers"), { extensions: [".ts"], skipTests: true, relativeTo: ROOT }))
+      .filter((f) => /readSessionToken\s*\(/.test(f.source))
+      .map((f) => f.rel)
+    expect(readers.length, "readSessionToken has no callers — the seam is dead or the walk is blind").toBeGreaterThanOrEqual(2)
+    // COMMENTS OFF, and this fired on its own first run: a comment I had just
+    // written in `every-page-has-a-name.mjs` NAMES `readSessionToken` to explain
+    // why the script carries both spellings, and the census read the prose as
+    // evidence the script had reached the seam. `health-names-are-real.test.ts`
+    // records the identical mistake twice, in its own words — "a law that reads
+    // source off the disk reads the comments too". Third time; stripped here.
+    const scriptReaders = sourceFiles(join(ROOT, "scripts"), { extensions: [".mjs"], relativeTo: ROOT })
+      .filter((f) => /readSessionToken\s*\(/.test(f.source.replace(/^\s*\/\/.*$/gm, "")))
+      .map((f) => f.rel)
+    expect(
+      scriptReaders,
+      "a script now references readSessionToken — if scripts have gained a way to reach the seam, " +
+        "the one-reader clause should be widened to cover them rather than stopping here"
+    ).toEqual([])
   })
 
   it("the patterns can actually see the mistakes they look for", () => {

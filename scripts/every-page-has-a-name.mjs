@@ -75,7 +75,14 @@ async function signIn(email) {
 const token = await signIn("alaap@kwapso.com")
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
-await ctx.addCookies([{ name: "kwapso_session", value: token, domain: new URL(AGENCY).hostname, path: "/" }])
+// BOTH NAMES. A real environment mints `__Host-kwapso_session` (session-cookie.ts);
+// the bare name is kept so this still works against anything not yet migrated, and
+// because `readSessionToken` reads the prefixed one FIRST, carrying both is safe.
+// A localhost run is the other way round and is why the two are not interchangeable.
+const sessionCookies = ["__Host-kwapso_session", "kwapso_session"].map((name) => ({
+  name, value: token, domain: new URL(AGENCY).hostname, path: "/",
+}))
+await ctx.addCookies(sessionCookies)
 const page = await ctx.newPage()
 
 let bad = 0
