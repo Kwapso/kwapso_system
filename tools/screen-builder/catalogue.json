@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.55",
-  "sha": "add0c0452f6dc92c51d1c21c016ab6d518b541d4",
+  "tag": "v1.2.56",
+  "sha": "a246d3a18c12ec9c0f4da3d9dc518069eeecb69a",
   "syncedAt": "2026-09-06"
  },
- "generatedAt": "2026-09-06T15:39:33.197Z",
+ "generatedAt": "2026-09-06T15:50:26.286Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -3800,8 +3800,8 @@
        "options": [
         {
          "name": "default",
-         "classes": "shadow-[var(--hairline-strong)] bg-[var(--btn-secondary-fill)] text-foreground",
-         "note": "THE PILL TAKES THE OTHER PAPER, NOT THE PAGE'S — client, 2026-09-06: \"I don't like not seeing the contour of these buttons (the filter and so on). Please make it beige #F7F2EB.\" The contour was there all along: `--hairline-strong` is a real 20% edge. What was missing is a FILL, because this pill painted `bg-background` — the same tone as the toolbar track it sits on — so a hairline was the only thing separating a control from its own ground. tokens.css states the principle for buttons in as many words: \"a secondary button is a filled button in the other paper tone, which is why a header band and the buttons inside it are never the same paper tone\". A pill in a toolbar is that same object and was the one control breaking the rule: `SortControl` and `ViewSwitch` beside it already spend `--btn-secondary-fill`, which is why those two read as objects and this one read as text with a line round it. `--btn-secondary-fill` RATHER THAN THE LITERAL #F7F2EB she named, and it resolves to exactly that here: the token is GROUND-AWARE (tokens.css rebinds it per surface, so it is soft paper on an off-beige ground and off-beige on a soft-paper one). Writing the colour would have been right on this toolbar and invisible on a panel, which is the failure the rebind exists to prevent — and it has no dark half, so a hex here would have shipped a light-only pill."
+         "classes": "shadow-none bg-[var(--btn-secondary-fill)] text-foreground",
+         "note": "NO EDGE, JUST THE FILL — client, 2026-09-06, twice. First: \"I don't like not seeing the contour of these buttons (the filter and so on). Please make it beige #F7F2EB.\" Then, having seen the fill arrive beside the edge: \"for filter, sort, and all of the buttons in the toolbar, I do not want the border. I want them to have a background in the beige so I can see them at all times.\" She is right, and the kit already said so for the control next to this one: tokens.css, on buttons — \"NO border in any state — no outline, no hairline, no stroke. A secondary button is a filled button in the other paper tone\", and \"SECONDARY IS A FILL, AND THE FILL IS THE AFFORDANCE\". The pill was carrying both a fill and a 20% edge, which is one affordance too many and the only reason it looked unlike `SortControl` and `ViewSwitch` beside it — neither of which has ever drawn an edge. So the hairline goes and the fill stays. What follows is the history of how the fill got here, kept because the reasoning still governs WHICH beige this is. The contour was there all along: `--hairline-strong` is a real 20% edge. What was missing is a FILL, because this pill painted `bg-background` — the same tone as the toolbar track it sits on — so a hairline was the only thing separating a control from its own ground. tokens.css states the principle for buttons in as many words: \"a secondary button is a filled button in the other paper tone, which is why a header band and the buttons inside it are never the same paper tone\". A pill in a toolbar is that same object and was the one control breaking the rule: `SortControl` and `ViewSwitch` beside it already spend `--btn-secondary-fill`, which is why those two read as objects and this one read as text with a line round it. `--btn-secondary-fill` RATHER THAN THE LITERAL #F7F2EB she named, and it resolves to exactly that here: the token is GROUND-AWARE (tokens.css rebinds it per surface, so it is soft paper on an off-beige ground and off-beige on a soft-paper one). Writing the colour would have been right on this toolbar and invisible on a panel, which is the failure the rebind exists to prevent — and it has no dark half, so a hex here would have shipped a light-only pill."
         },
         {
          "name": "error",

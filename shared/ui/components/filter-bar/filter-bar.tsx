@@ -272,10 +272,26 @@ const facetFieldVariants = cva(
            swapped and promoted 8% to 20% on hover, so a resting facet and a
            disabled one carried the same stroke. The hover came from
            kwapso-ui.css; it is gone and nothing replaces it. */
-        /* THE PILL TAKES THE OTHER PAPER, NOT THE PAGE'S — client, 2026-09-06:
-           "I don't like not seeing the contour of these buttons (the filter and
-           so on). Please make it beige #F7F2EB."
-     
+        /* NO EDGE, JUST THE FILL — client, 2026-09-06, twice. First: "I don't
+           like not seeing the contour of these buttons (the filter and so on).
+           Please make it beige #F7F2EB." Then, having seen the fill arrive
+           beside the edge: "for filter, sort, and all of the buttons in the
+           toolbar, I do not want the border. I want them to have a background
+           in the beige so I can see them at all times."
+
+           She is right, and the kit already said so for the control next to
+           this one: tokens.css, on buttons — "NO border in any state — no
+           outline, no hairline, no stroke. A secondary button is a filled
+           button in the other paper tone", and "SECONDARY IS A FILL, AND THE
+           FILL IS THE AFFORDANCE". The pill was carrying both a fill and a 20%
+           edge, which is one affordance too many and the only reason it looked
+           unlike `SortControl` and `ViewSwitch` beside it — neither of which
+           has ever drawn an edge.
+
+           So the hairline goes and the fill stays. What follows is the history
+           of how the fill got here, kept because the reasoning still governs
+           WHICH beige this is.
+
            The contour was there all along: `--hairline-strong` is a real 20%
            edge. What was missing is a FILL, because this pill painted
            `bg-background` — the same tone as the toolbar track it sits on — so
@@ -295,8 +311,7 @@ const facetFieldVariants = cva(
            colour would have been right on this toolbar and invisible on a
            panel, which is the failure the rebind exists to prevent — and it has
            no dark half, so a hex here would have shipped a light-only pill. */
-        default:
-          "shadow-[var(--hairline-strong)] bg-[var(--btn-secondary-fill)] text-foreground",
+        default: "shadow-none bg-[var(--btn-secondary-fill)] text-foreground",
         /** Chapter 9's error hairline: poppy at 65%, so dark re-resolves for free. */
         /* The error pill moves with the resting one: it differs by its EDGE
            (`--hairline-error`), and leaving it on the page tone would have made
