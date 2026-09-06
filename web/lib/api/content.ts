@@ -192,6 +192,17 @@ export type TriageWaiting = {
    * on the fifty-first client. */
   accountName: string | null
   accountLogo: string | null
+  /** THE APP AND THE SECTION, with their own faces (2026-09-06, round nine).
+   * Widened for the meta block under the description — the client ruled client,
+   * app, module and author are four LINKS, each wearing its record's own face
+   * (R35) — and read a second time by the queue toolbar's "filter by app", whose
+   * options are built from these rows so the dropdown and the card cannot
+   * disagree. Resolved by the DOOR for the reason the two above it are: see
+   * `workers/content/src/lib/triage.ts`. */
+  appName: string | null
+  appLogo: string | null
+  moduleName: string | null
+  moduleMark: string | null
   raisedByContactName: string | null
   raisedByContactLogo: string | null
   /** Both titles, never one standing in for the other — `HelpTicket`'s own

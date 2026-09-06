@@ -76,6 +76,49 @@
 // taken; nothing in this file or its callers makes a model call, and the divider
 // is a piece of layout rather than a promise.
 //
+// ── THE CHOSEN CHIP IS BLACK, AND A SUGGESTION IS NOT MANGO (2026-09-06) ─────
+//
+// CLIENT DEFECT REPORT, round nine, and it is a defect about the SYSTEM rather
+// than about this row: the lead chip and the chosen chip were both mango, so on
+// a card where mango means "this is the chosen one" — which is what it means on
+// every other screen in this app — an OFFER was painted in the colour of a
+// DECISION. Two different claims, one fill, and the reader has to work out from
+// position which is which.
+//
+// So the two claims now look like two things, and neither of them borrows the
+// brand fill:
+//
+//   • CHOSEN → `variant="inverse"`. Charcoal fill, off-beige label, and it
+//     FLIPS with the palette, which is what makes "black chip" survive dark
+//     mode where an actual black would vanish. It is the same word, from the
+//     same kit component, as the black `#1513` chip on the card above this row
+//     (`TriageChips` in tickets-collection.tsx) — so the loudest mark in the
+//     queue means one thing in both places.
+//   • SUGGESTED → `variant="ghost"` plus the kit's own INSET HAIRLINE and the
+//     spark glyph. No fill at all, an edge, and a mark that says "offered".
+//
+// WHY THE EDGE IS A SHADOW AND NOT A DASHED BORDER, since the client offered
+// "dashed OR outlined" and dashed is the first thing anybody reaches for. A CSS
+// border is ruled out here (BUILD-A-SCREEN.md §6.1, "no CSS border, ever";
+// separation is a fill or an inset shadow), and the dashed spelling of it has
+// been REMOVED from this codebase twice already as a regression — process-map's
+// gap marker and `NothingYet`, both on 2026-09-01, both with the same note: the
+// one place the kit itself draws a dashed edge is `file-upload.tsx`'s dropzone,
+// documented there as deliberately not a pattern to extend. A chip is not a
+// dropzone. `shadow-[var(--hairline-strong)]` is the SAME outline the kit's own
+// `Badge variant="outline"` wears — the one uncoloured variant, and so the one
+// that carries an edge — so this is the outlined half of her ruling drawn in
+// the system's existing vocabulary rather than a second one invented for it.
+// No new colour token either way (R32): inverse, ghost and the hairline are all
+// already in the kit.
+//
+// AND CHOSEN BEATS SUGGESTED WHEN THEY ARE THE SAME CHIP. Today they always are
+// — `leadValue` is the ticket's current type, which is also `value` — so the
+// lead reads BLACK and no spark is drawn. That is the honest picture: a thing
+// that has been picked is not also being offered. The two only come apart the
+// day a real suggestion lands in `leadValue`, which is exactly the seam that
+// paragraph above describes, and the treatment for it is already here.
+//
 // ON A PHONE IT IS A SHEET, NOT A POPOVER, and that is the part that is actually
 // about touch. (The ROW LAYOUT has neither, and needs neither: it is already in
 // the page, so the software keyboard this whole paragraph is about never opens
@@ -108,7 +151,7 @@ import {
 import { Sheet, SheetContent, SheetTitle } from "@shared/ui/components/sheet/sheet"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
-import { Check, CaretUpDown, X } from "@shared/ui/foundations/icons"
+import { Check, CaretUpDown, Sparkle, X } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
 import { useIsPhone } from "@/lib/use-is-phone"
@@ -507,7 +550,21 @@ export function RecordPicker({
             would read as a screen that had failed to finish loading. */}
         {(options ?? []).length === 0 && <p className="text-muted-foreground text-sm">{emptyText}</p>}
         <div className="flex flex-wrap items-center gap-2">
-          {lead && <RowChip option={lead} chosen={value === lead.value} disabled={disabled} onPick={choose} />}
+          {lead && (
+            // `suggested` and `chosen` are two DIFFERENT questions asked of the
+            // same chip, and the chip resolves the clash rather than this line:
+            // see `RowChip`. Today the answer to both is the same option, so
+            // the lead draws black and no spark — say the two facts anyway,
+            // because the day a real suggestion lands in `leadValue` this call
+            // site must not need editing.
+            <RowChip
+              option={lead}
+              chosen={value === lead.value}
+              suggested
+              disabled={disabled}
+              onPick={choose}
+            />
+          )}
           {lead && rest.length > 0 && (
             // THE DIVIDER, and it is the whole of what "suggested first" looks
             // like today. A real `<Separator>` would be a horizontal rule laid
@@ -676,10 +733,38 @@ export function RecordPicker({
  * IT IS A `Button`, not a styled span with an onClick (R39, and the kit's own
  * law): focus, the pressed nudge, the disabled fill/ink pair and the global
  * focus ring in `tokens.css` §8 all arrive with it, and none of them would have
- * been remembered by hand. `variant="secondary"` for an ordinary chip and
- * `default` (the one mango) for the one already chosen — the kit rules ONE mango
- * per view, and on the triage card this row is the thing being decided, so the
- * current answer is the right place for it.
+ * been remembered by hand.
+ *
+ * THREE STATES, THREE WORDS OUT OF THE KIT, AND NONE OF THEM IS MANGO. The
+ * client's ruling of 2026-09-06 is written up at length in this file's header;
+ * the short version is that mango means "this is the chosen one" everywhere
+ * else in the app, so painting an OFFER in it put two different claims in one
+ * colour.
+ *
+ *   • CHOSEN     `variant="inverse"` — charcoal fill, off-beige label, flipping
+ *                with the palette. The same word the black `#1513` chip above
+ *                this row is drawn with, so the loudest mark on the card means
+ *                one thing in both places.
+ *   • SUGGESTED  `variant="ghost"` + `shadow-[var(--hairline-strong)]` + the
+ *                spark. No fill, an edge, and a glyph: "offered, not picked".
+ *                The edge is the kit's own inset hairline rather than a dashed
+ *                CSS border — see the header for why that spelling is refused
+ *                here, and why it has already been removed from this codebase
+ *                twice.
+ *   • ORDINARY   `variant="secondary"`, the filled chip it always was.
+ *
+ * CHOSEN WINS OVER SUGGESTED, and the precedence lives HERE rather than at the
+ * call site so it cannot be answered two ways by two callers. A chip that has
+ * been picked is not simultaneously being offered, and the black fill is the
+ * louder claim of the two, so it takes the chip and the spark stands down. That
+ * is not a hypothetical tidy-up: today `leadValue` IS the ticket's current type,
+ * so every lead chip in the app is in exactly this case.
+ *
+ * `aria-pressed` still carries the CHOSEN half to a screen reader, unchanged.
+ * The suggestion is deliberately NOT announced: it is an offer about which chip
+ * to read first, which is a visual ordering the row already expresses by putting
+ * it first, and announcing "suggested" on a lead that is also the current answer
+ * would be a second, contradictory claim in the same breath.
  *
  * THE FACE COMES FROM THE SAME THREE FIELDS the open list reads, in the same
  * precedence: a picture or a glyph is a `RecordMark`, a colour is a `Swatch`,
@@ -696,24 +781,44 @@ export function RecordPicker({
 function RowChip({
   option,
   chosen,
+  suggested = false,
   disabled,
   onPick,
 }: {
   option: PickerOption
   chosen: boolean
+  /** This chip is the one being OFFERED first — `leadValue`'s own chip. Ignored
+   * when `chosen` is true; see this function's header for why the precedence is
+   * settled here and not by the caller. */
+  suggested?: boolean
   disabled?: boolean
   onPick: (value: string) => void
 }) {
+  // Resolved once, above the JSX, so the three branches below read off ONE
+  // answer. Writing `chosen ? … : suggested ? … : …` three separate times in
+  // three attributes is how a variant and its glyph drift apart.
+  const offering = suggested && !chosen
   return (
     <Button
       type="button"
       size="sm"
-      variant={chosen ? "default" : "secondary"}
+      variant={chosen ? "inverse" : offering ? "ghost" : "secondary"}
       disabled={disabled}
       aria-pressed={chosen}
       onClick={() => onPick(option.value)}
-      className="min-w-0 gap-2"
+      // THE EDGE ONLY EXISTS ON THE OFFER. `--hairline-strong` is an inset
+      // box-shadow (tokens.css §7), so it costs no layout and cannot push the
+      // chip a pixel taller than the two beside it — which a 1px border would,
+      // and which is the second reason this is a shadow and not a border.
+      className={cn("min-w-0 gap-2", offering && "shadow-[var(--hairline-strong)]")}
     >
+      {/* THE SPARK, BEFORE THE FACE. It is a claim about the CHIP ("this one is
+          being offered") rather than about the record, so it sits outside the
+          record's own mark instead of replacing it — R35 is about the face, and
+          a suggestion may not cost an option its identity. `aria-hidden` for
+          UI-CONVENTIONS §5's reason: it is a pictograph, and the row's own
+          ordering already says what it says. */}
+      {offering && <Sparkle aria-hidden className="size-3.5 shrink-0" />}
       {(option.picture || option.mark) && (
         <RecordMark
           picture={option.picture}

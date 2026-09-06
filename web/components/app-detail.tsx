@@ -180,7 +180,36 @@ export function AppDetailScreen({
   // The open tab is remembered per record for as long as this document
   // lives (web/lib/nav-memory.ts) — leaving to another section and coming
   // back lands on the tab she was reading, and a miss lands on "overview".
-  const [tab, setTab] = useRemembered("tab", "overview")
+  //
+  // …WITH ONE DEEP-LINKABLE TAB, `?tab=modules` (2026-09-06). The exact shape
+  // `account-detail.tsx` already uses for `?tab=organisation`, and added for the
+  // same class of reason: a link that lands one tab away from what it named is a
+  // link that makes the reader hunt.
+  //
+  // WHY A MODULE'S LINK POINTS HERE AT ALL. The client ruled that the four facts
+  // under a triage card — client, app, module and author — are all LINKS she can
+  // navigate from. Three of the four already had an address. A MODULE HAS NONE:
+  // there is no `modules` segment in `TEAM_SECTIONS`, no `modules.detail`
+  // recipe, no branch in `module-content.tsx`, and `relationship-map.tsx`'s own
+  // `RECORD_PATH` deliberately has no `app_modules` entry — a module is a
+  // division OF an app, and the only screen it has ever appeared on is this
+  // record's Modules tab (`ModulesPanel`, below). Inventing a `/modules/<id>`
+  // URL to satisfy one link would have been a whole screen nobody asked for; the
+  // honest destination is the place the module actually is, and that place is a
+  // tab. So the tab got an address rather than the module getting a screen.
+  //
+  // AND A LINK BEATS THE MEMORY, which is `account-detail.tsx`'s own sentence
+  // and the reason this is not simply an initial value: an address that NAMES a
+  // tab is somebody telling us where to go, so the per-record memory does not
+  // get to argue with it — the third argument to `useRemembered` refuses the
+  // remembered value outright whenever the URL asked for one.
+  const askedTab = () =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  const [tab, setTab] = useRemembered(
+    "tab",
+    () => (askedTab() === "modules" ? "modules" : "overview"),
+    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+  )
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [mapOpen, setMapOpen] = React.useState(false)

@@ -92,6 +92,47 @@ export type TriageView = {
      * agency's own tickets, which genuinely have no client. */
     accountName: string | null
     accountLogo: string | null
+    /* ── AND THE APP AND THE SECTION'S OWN FACES (2026-09-06, round nine) ─────
+     *
+     * The client read the card back and moved four facts off the chip line and
+     * under the description — "client, app, module and author" — and ruled that
+     * all four are LINKS she can navigate from, each wearing its own face. Two
+     * of those faces already rode this row (the client's logo, the raiser's
+     * avatar). The other two did not, and there were exactly two ways to get
+     * them.
+     *
+     * THE WAY NOT TAKEN: resolve `appId` and `moduleId` in the browser against
+     * the `apps` and `app_modules` caches the triage screen already holds. It
+     * would have worked TODAY and it is the same mistake, one table along, that
+     * the paragraph above this one is a record of — a screen resolving an id
+     * against a cache is a screen betting the row it wants is in the window that
+     * cache happens to hold. `apps` is bounded today; the day it is not, a card
+     * for a ticket on the two-hundredth app draws a blank chip and nothing goes
+     * red. R35's own sentence is the rule here — a record never appears without
+     * its face — and the face is the DOOR's to hand over, exactly as
+     * `TICKET_COLS` (lib/help.ts) has handed over `app_name`, `module_name` and
+     * `module_mark` for every ticket in the list since modules existed. Two more
+     * correlated subselects on a read that was already happening; the queue
+     * stops guessing.
+     *
+     * THE FILTER ABOVE THE CARD IS THE SAME COLUMN, READ ONCE MORE. The toolbar
+     * now offers "filter by app", and its options are built from these very
+     * rows — so the words in the dropdown and the words on the card come from
+     * one answer and cannot disagree. That is the reason the app's NAME is here
+     * and not only its logo: a facet whose labels were resolved in the browser
+     * would be the page-one bug wearing a dropdown. */
+    /** The system this was raised about, and the mark a person recognises it by
+     * (`apps.logo_url`, a `/media/…` path we host). Null when nobody has said
+     * which app — which is one of the four readiness gaps, so the card already
+     * explains the hole rather than hiding it. */
+    appName: string | null
+    appLogo: string | null
+    /** WHICH SECTION OF THAT APP, with the emoji that rides beside its name
+     * everywhere else it is drawn (`app_modules.mark`). A section is NOT a
+     * readiness gap — a ticket about no app has no section to name — so null
+     * here is ordinary and the meta block simply leaves the line out. */
+    moduleName: string | null
+    moduleMark: string | null
     /** WHO ASKED, and their face. Null until somebody has said who — which is
      * one of the four readiness gaps, so a card missing this is a card whose
      * Accept is refused anyway, and the empty chip is the honest picture. */
@@ -157,6 +198,10 @@ export async function needsTriage(
     raised_by_contact_id: string | null
     account_name: string | null
     account_logo: string | null
+    app_name: string | null
+    app_logo: string | null
+    module_name: string | null
+    module_mark: string | null
     raised_by_contact_name: string | null
     raised_by_contact_logo: string | null
     title_de: string | null
@@ -188,6 +233,10 @@ export async function needsTriage(
             title_de, title_en,
             (SELECT a.name FROM accounts a WHERE a.id = help.account_id) AS account_name,
             (SELECT a.logo_url FROM accounts a WHERE a.id = help.account_id) AS account_logo,
+            (SELECT ap.name FROM apps ap WHERE ap.id = help.app_id) AS app_name,
+            (SELECT ap.logo_url FROM apps ap WHERE ap.id = help.app_id) AS app_logo,
+            (SELECT m.name FROM app_modules m WHERE m.id = help.module_id) AS module_name,
+            (SELECT m.mark FROM app_modules m WHERE m.id = help.module_id) AS module_mark,
             (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
             (SELECT a.logo_url FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_logo
        FROM help
@@ -221,6 +270,10 @@ export async function needsTriage(
       raisedByContactId: r.raised_by_contact_id,
       accountName: r.account_name,
       accountLogo: r.account_logo,
+      appName: r.app_name,
+      appLogo: r.app_logo,
+      moduleName: r.module_name,
+      moduleMark: r.module_mark,
       raisedByContactName: r.raised_by_contact_name,
       raisedByContactLogo: r.raised_by_contact_logo,
       titleDe: r.title_de,

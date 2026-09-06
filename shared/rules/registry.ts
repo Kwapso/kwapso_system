@@ -775,6 +775,38 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 233 -> 238 in all three on 6 Sep 2026, the triage-review lane (the
+  // client's review of the sitting the entry below built), and the arithmetic is
+  // written down because R44's whole point is that a ceiling cannot move
+  // quietly. SIX new English sentences and ONE retired one, which is why the
+  // number moves by exactly five:
+  //
+  //  · FOUR are the VERB PER TYPE on the queue's primary button — "Assign" for
+  //    an issue, "Plan" for a request, "Store" for an extra, and "An app", the
+  //    fallback label an app facet uses for a row whose app has somehow lost its
+  //    name. "Accept" was already catalogued and is still the word for a
+  //    question, so the button that used to say one thing now says four and
+  //    only three of them are new. The client ruled each word herself.
+  //  · ONE is the queue toolbar's sort chip, "Raised" — the collection had no
+  //    order to offer until she asked for one (`TRIAGE_SORTS`).
+  //  · ONE replaces the sentence that was retired: "No entries in the triage
+  //    queue match your search." became "Nothing in the triage queue matches
+  //    what you asked for." because two FILTERS now sit beside that search box,
+  //    and a reader who had narrowed by app and typed nothing would have been
+  //    told her search matched nothing — a sentence pointing at the wrong
+  //    control. THE RETIRED ONE WAS TRANSLATED IN ALL THREE LANGUAGES, so this
+  //    single swap is the one real loss in the five: a German reader who used
+  //    to read that line in German now reads a truer sentence in English. It is
+  //    the same trade the entry below records and it is made deliberately —
+  //    a fluent sentence naming the wrong control is worse than a plain one
+  //    naming the right one.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, for the reason every entry below gives:
+  // `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before, so a translation run is his to
+  // authorise and never a lane's to trigger. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 211 -> 233 in all three on 6 Sep 2026, the triage-sitting lane, and
   // the arithmetic is written down because R44's whole point is that a ceiling
   // cannot move quietly. TWENTY-TWO new English sentences and THREE retired
@@ -851,9 +883,17 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 233,
-  es: 233,
-  ca: 233,
+  // LOWERED 238 -> 237 in all three, same day, the triage-review lane's second
+  // pass. Not a translation run: the client removed the Reply button from the
+  // sitting's card ("remove all of this … I want to keep the Open function, but
+  // not here"), and the sentence it carried was one of the untranslated five.
+  // Deleting an English-only string lowers the true count by one, so the pin
+  // follows it down — R44 fails a ceiling left ABOVE the count for exactly this
+  // reason: a stale pin would hide the next regression behind an improvement it
+  // never recorded. It can fall; it can never rise without the count rising too.
+  de: 237,
+  es: 237,
+  ca: 237,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -990,6 +1030,11 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["property"],
     via: ["t(o.label)"],
     why: "APP_SORTS is the same shape as COLLECTION_SORTS one file over — a BOUNDED collection's own sort vocabulary, module-level so it sits beside the `value` each label belongs to, translated on the way to `<SortControl>` (`APP_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at declaration, where `t` is not a hook this constant could call.",
+  },
+  "web/components/tickets-collection.tsx": {
+    kinds: ["property"],
+    via: ["t(o.label)"],
+    why: "TRIAGE_SORTS, the same reasoning as APP_SORTS above — the triage queue's own one-option sort vocabulary (`Raised`, added 2026-09-06 when the client asked the queue for the full toolbar), module-level so the label sits beside the `value` the sort slot is keyed on, and translated where `<ToolbarRow>` reads it (`TRIAGE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the constant, where `t` is not a hook a module-level table could call.",
   },
   "web/components/deliverables-panel.tsx": {
     kinds: ["property"],
@@ -1391,8 +1436,6 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
   "web/components/tasks-screen.tsx#TasksScreen":
     "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
-  "web/components/tickets-collection.tsx#TriageQueue":
-    "A QUEUE, and reordering it is the one thing a queue is not. The rows are what has been sitting unread longest first, which is the whole claim the screen makes; a person can re-order it into any sequence they like and the queue stops being the answer to \"what has been waiting\".",
   "web/components/stakeholders-panel.tsx#StakeholdersPanel":
     "NOT ONE LIST. It draws two named groups — Ours and Theirs — each with the lead/main contact pinned at the top, so the grouping and that pin ARE the order; one search box narrows both (\"who is on this, on either side\" is one question). There is no single sequence for a sort control to act on, and applying one per group would order two lists from one chip.",
   "web/components/work-logs-panel.tsx#WorkLogsPanel":

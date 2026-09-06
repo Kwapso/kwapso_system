@@ -110,23 +110,24 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Card } from "@shared/ui/components/card/card"
 import { Queue } from "@shared/ui/components/queue/queue"
 import {
   ArrowCounterClockwise,
   ArrowUpRight,
   Check,
   Paperclip,
-  PencilSimple,
   Plus,
-  PaperPlaneTilt,
   Tag,
-  Warning,
 } from "@shared/ui/foundations/icons"
 import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { RecordMark } from "@shared/web/record-mark"
+import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
+import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
+import { InAppLink } from "@/components/in-app-link"
 import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -145,7 +146,6 @@ import { assignableMembers, staffedOn } from "@/lib/members"
 import { ticketTypeColour } from "@/lib/type-colours"
 import type { TriageGap } from "@shared/triage-readiness"
 import { HelpFormDialog } from "@/components/help-form-dialog"
-import { TriageReplyDialog } from "@/components/triage-reply-dialog"
 import {
   accountsKey,
   appModulesKey,
@@ -190,6 +190,208 @@ const ALL: HelpFacet = "all"
  * for any value it doesn't recognise, so this needs no change there — only
  * the render switch below and the `narrowed` check needed to know about it. */
 const DASHBOARD: HelpFacet = "dashboard"
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE TRIAGE QUEUE'S OWN VOCABULARY — the four things a person can ask of the
+   pile, written HERE rather than inside `TriageQueue` for one stated reason.
+
+   THE CLIENT HAS SAID A LIST VIEW IS COMING ("a list view will be added
+   later"). A queue and a list are two BODIES over one collection asking the
+   same four questions — what does it say, what kind is it, which system is it
+   about, and in what order do I read it — and the moment those questions live
+   inside the component that draws the CARD, the list gets its own copy of them
+   and the two drift. That is not a hypothetical here: it is precisely what
+   R53's own history is a record of (eleven toolbars, eight of them putting the
+   same control in the wrong slot, because nothing shared the answer).
+
+   So the NARROWING and the FACET VOCABULARY are functions over rows, the SORT
+   is a table, and `TriageQueue` below is one consumer of them. A list view is a
+   second consumer and changes none of this — which is the whole test of whether
+   these belong here.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** WHAT ORDER THE PILE IS READ IN (R53's `sort` slot, client ruling 2026-09-06:
+ * the queue's toolbar gets "sort by raised").
+ *
+ * ONE OPTION, AND THAT IS THE ANSWER RATHER THAN A STUB. `ToolbarSortSlot`'s own
+ * doc says so — "a single-option control is legitimate and common here: the
+ * FIELD is fixed and the DIRECTION is the live question" — and on this
+ * collection it is the only honest menu there is. The rows are what has been
+ * sitting unread; the one fact every one of them has, and the one this screen
+ * exists to be about, is how long it has been sitting. There is no `title` to
+ * order by (most of these tickets have none — `ticketTitle` falls back to the
+ * first line of the body), no rank, and no status (they are all `new`, which is
+ * what put them in this list).
+ *
+ * THIS REPLACES AN EXEMPTION RATHER THAN SITTING BESIDE ONE. `TriageQueue` was
+ * in `TOOLBAR_SORT_EXEMPT` until today, with the reason "a queue, and reordering
+ * it is the one thing a queue is not — the rows are what has been sitting unread
+ * longest first, which is the whole claim the screen makes." That argument was
+ * right about a FREE reorder and is not right about this control: the field is
+ * pinned to `raised`, so the only thing the reader can do is read the same pile
+ * from the other end. Oldest-first is still where it lands (`defaultDir: "asc"`),
+ * and that is still the claim the screen makes. The exemption is deleted in the
+ * same commit, because a pin whose sentence has stopped being true is worse than
+ * no pin at all (R53's rot check enforces exactly that).
+ *
+ * THE LABEL IS THE CLIENT'S OWN WORD. `collection-sorts.ts` asks for labels that
+ * say what the ORDER is rather than naming a column ("Newest first", never
+ * "created_at desc") — a rule about MENUS, where a bare column name leaves the
+ * reader guessing which way it points. A one-option control has an arrow beside
+ * it saying exactly that, and the card below already says "raised 10 June 2025"
+ * in the same word, so "Raised" names the thing both halves of the screen call
+ * it rather than inventing a second phrase for one field. */
+const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultDir: "asc" }]
+
+/** WHAT THE TOOLBAR MAY NARROW BY, derived from the rows themselves.
+ *
+ * BY TYPE AND BY APP — the client's two, and no more. Deliberately NOT by
+ * client: the pile is small (it is the tickets nobody has read in three days,
+ * not the ticket collection), and a third select on a row that also carries a
+ * search box, a sort chip and a create button is a toolbar that wraps on a
+ * laptop before it has been asked anything.
+ *
+ * DERIVED FROM THE WHOLE COLLECTION, NEVER FROM WHAT IS ALREADY NARROWED, which
+ * is the rule `filter-bar.tsx` states about its own defaults and `apps-screen`
+ * repeats at its call site: options taken off the filtered set VANISH as you
+ * filter, so picking "Issue" would empty the App menu and there would be no way
+ * back except clearing. Handed `rows` — the door's whole answer — for that
+ * reason, and it is the caller's job to keep passing the unnarrowed list.
+ *
+ * THE APP'S LABEL IS THE ROW'S OWN `appName` (R35, and the reason the triage
+ * door was widened today): resolving `appId` against the apps cache this screen
+ * happens to hold would have been the page-one bug in a dropdown — a facet that
+ * quietly says "A client" for every app past the window. The name rides the row
+ * now, so the words in this menu and the words on the card are one answer.
+ *
+ * A FACET WITH NOTHING TO OFFER IS NOT DRAWN, the same subtraction
+ * `translatedFacets` makes for the paged screens: a select whose only content is
+ * its own placeholder is a control that cannot do anything, and `useFilterBar`
+ * counts it toward the pill's number all the same. */
+function triageFacets(rows: TriageWaiting[], t: (english: string) => string): FilterFacet[] {
+  const types = [...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v)))]
+    .sort((a, b) => a.localeCompare(b))
+    .map((v) => ({ value: v, label: v }))
+  // BY ID, LABELLED BY NAME. A Map rather than a Set of ids plus a second
+  // lookup: one pass, and an app whose rows disagree about its name (they
+  // cannot — the name comes from one subselect) would still produce one option.
+  const apps = new Map<string, string>()
+  for (const w of rows) if (w.appId) apps.set(w.appId, w.appName ?? t("An app"))
+  const appOptions = [...apps]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  return [
+    // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
+    // value a team typed itself, so it is data rather than copy and `t()` would
+    // be looking up a sentence that is not in the catalogue (R28's own
+    // distinction; the tab strip above passes these same words as labels for
+    // exactly this reason). The FIELD's label is copy and is translated.
+    { field: "helpType", label: t("Type"), control: "select" as const, options: types },
+    { field: "appId", label: t("App"), control: "select" as const, options: appOptions },
+  ].filter((f) => f.options.length > 0)
+}
+
+/** THE PILE, NARROWED — the search box and the two facets, in one function so a
+ * list view cannot answer the same question differently from the card.
+ *
+ * SEARCH LOOKS AT THE REFERENCE AND THE WORDS, which are the two facts a person
+ * has to hand when they come looking for a specific ticket ("where did 1513
+ * go?", "the one about the invoice export"). Not the client's name and not the
+ * app's: those are what the FACETS are for, and a search box that also matched
+ * them would make the facets look broken (typing an app's name would return
+ * rows the App filter would not).
+ *
+ * EVERY NARROWING IS AND-ed, and each one is skipped when it was not asked —
+ * an unset facet contributes nothing rather than matching `undefined`, which is
+ * the difference between "no filter" and "rows whose app is missing". */
+function narrowTriage(
+  // NOT CALLED `rows`, and that is a real constraint rather than taste. R14's
+  // search census (`web/test/paged-search.test.ts`) binds on the shape every
+  // find-bar screen writes — `const rows = found.active ? found.rows` — and
+  // then fails the build on any `rows.filter(` in the same FILE, because a
+  // screen that re-narrows the door's own answer under the door's own exact
+  // count is R16's exact defect. This file holds such a screen (the ticket list
+  // above), so the name is spoken for; `waiting` is what the triage door calls
+  // this list anyway.
+  waiting: TriageWaiting[],
+  ask: { query: string; helpType?: string; appId?: string }
+): TriageWaiting[] {
+  const q = ask.query.trim().toLowerCase()
+  return waiting.filter((w) => {
+    if (q && !(w.ref ?? "").toLowerCase().includes(q) && !richTextPlain(w.description).toLowerCase().includes(q))
+      return false
+    if (ask.helpType && w.helpType !== ask.helpType) return false
+    if (ask.appId && w.appId !== ask.appId) return false
+    return true
+  })
+}
+
+/** WHAT THE PRIMARY BUTTON SAYS, AND WHETHER IT ASKS FOR A PERSON FIRST — the
+ * client's ruling of 2026-09-06, round nine, in one place.
+ *
+ * ── THE RULING, VERBATIM WHERE IT MATTERS ──────────────────────────────────
+ *
+ * The button used to say "Accept" on all four kinds, and opened the people row
+ * on an Issue only. Two things were wrong with that and she named both.
+ *
+ * FIRST, the missing capability: "I'm missing the functionality when I accept a
+ * request that I assign it." A REQUEST is work somebody has to pick up, exactly
+ * as an Issue is; the queue was accepting it and leaving it belonging to
+ * nobody. So Request now takes the identical path as Issue — the people row
+ * opens, and choosing somebody puts them on the ticket and marks it triaged in
+ * one motion (`accept(w, assignTo)`). The BEHAVIOUR of those two is now the
+ * same code, not two branches that happen to agree.
+ *
+ * SECOND, the word: one verb for four different acts told the reader nothing
+ * about what was about to happen. So each kind says what it does —
+ *
+ *   Question → "Accept"  files it to its tab; nobody is assigned, because a
+ *                        question is answered later by whoever is free.
+ *   Issue    → "Assign"  opens the people row. Somebody has to pick it up.
+ *   Request  → "Plan"    opens the people row. Same act as Issue.
+ *   Extra    → "Store"   put away for later. Nobody assigned, and — this is the
+ *                        client's own scope line for this pass — an Extra does
+ *                        NOTHING to the client in this version: no validation
+ *                        request, no portal state, no mail. It is `accept`,
+ *                        unchanged, exactly as Question is.
+ *
+ * "PLAN" IS HER PICK OUT OF A LIST OF ALTERNATIVES and it is shipped as ruled.
+ * It is the one word here that names a different act from the one the button
+ * performs: Assign and Plan run the same handler and open the same people row,
+ * so a reader who takes "Plan" to mean scheduling — a date, a sprint, an order
+ * of work — will be handed a list of colleagues instead. Flagged rather than
+ * quietly substituted; the client chose the word off a list and the word is
+ * hers to change.
+ *
+ * ── MATCHED ON THE WORD, WHICH IS THE ONLY THING THERE IS TO MATCH ─────────
+ *
+ * `Ticket type` is the team's own editable vocabulary (the Dropdown values
+ * screen), so there is no enum and no id here — only the word somebody typed.
+ * Lower-cased with a trailing "s" forgiven, which is the technique
+ * `ticketTypeWaitsForValidation` (shared/types.ts) already uses on this very
+ * field and for this very reason: a rule that hard-matched the seeded spelling
+ * would stop firing the day somebody typed "Issues".
+ *
+ * ANYTHING ELSE FALLS BACK TO "Accept" AND ASKS FOR NOBODY, which covers the
+ * retiring "Requirements" and "General", a word a team typed itself, and a
+ * ticket with no type at all. The same shape `type-colours.ts` keeps for the
+ * same vocabulary: the four the client named are answered, and the fifth word
+ * gets the neutral rather than being special-cased or refused. */
+function triageAct(
+  helpType: string | null | undefined,
+  t: (english: string) => string
+): { label: string; assigns: boolean } {
+  switch ((helpType ?? "").trim().toLowerCase().replace(/s$/, "")) {
+    case "issue":
+      return { label: t("Assign"), assigns: true }
+    case "request":
+      return { label: t("Plan"), assigns: true }
+    case "extra":
+      return { label: t("Store"), assigns: false }
+    default:
+      return { label: t("Accept"), assigns: false }
+  }
+}
 
 export function TicketsCollection({
   teamId,
@@ -692,17 +894,42 @@ function TriageQueue({
   onCreate: () => void
   onOpen: (id: string) => void
 }) {
-  const { t, lang } = useLanguage()
+  // `useT` rather than `useLanguage`: the reader's LANGUAGE is no longer needed
+  // in this component. It was, for one line — `formatDate(current.createdAt,
+  // lang)` under the description — and that line moved into the chip line on
+  // the client's 2026-09-06 ruling, so `TriageChips` is where the date is
+  // formatted and where the language is now read.
+  const t = useT()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState(false)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
-  const [replying, setReplying] = React.useState<TriageWaiting | null>(null)
   // THE QUEUE'S OWN SEARCH — moved in from the parent (R50, 2026-09-03 second
   // pass): the toolbar this narrows and the row count that gates it now live
   // in the same component, so "never toolbar on empty collection" can be
   // answered honestly instead of drawn unconditionally one component up from
   // the fetch that actually knows.
   const [query, setQuery] = React.useState("")
+  /** …AND THE REST OF THE TOOLBAR (client ruling, 2026-09-06: "the queue gets
+   * the full toolbar — search, filter by type, filter by app, sort by raised").
+   *
+   * ONE BAG RATHER THAN TWO NAMED PIECES OF STATE, and not for brevity:
+   * `useFilterBar` hands back `(field, value)` pairs off a menu it builds from
+   * `triageFacets` above, so the state has to be keyed by the same field names
+   * the facets declare. Two booleans-with-names here would be a third place
+   * those names are written down, and the day a fourth facet arrives it is the
+   * one place somebody forgets. Empty string clears, which is the hook's own
+   * contract; the key is DELETED rather than set to "" so `Object.keys` is an
+   * honest count of what is on. */
+  const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
+  /** WHICH END OF THE PILE SHE IS READING FROM. The FIELD never moves — there is
+   * one thing this collection can be ordered by and `TRIAGE_SORTS` says why —
+   * so this is really one boolean wearing the shape every other sort control in
+   * the app wears, which is the point: R53 exists because the same control was
+   * being built eleven different ways. Not `useRemembered`: a sitting is a
+   * sitting, and an order carried over from last Tuesday's queue is a surprise
+   * rather than a convenience — the tab's own facet IS remembered, one component
+   * up, because that is "where she was" rather than "how she was reading". */
+  const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
 
   // ── THE SITTING'S OWN BOOKKEEPING, and it is deliberately only two arrays ──
   //
@@ -762,24 +989,43 @@ function TriageQueue({
   // expression here is `?.`/`?? []` safe against a `triageQ` that has not
   // answered yet, which is the price of that ordering and the whole of it.
   const view = triageQ.data
-  const narrowed = query.trim() !== ""
-  const q = query.trim().toLowerCase()
-  // The toolbar's search, applied — the ticket's reference and its own words
-  // are the two facts on the card, so a query narrows by either.
-  const matching = (view?.waiting ?? []).filter(
-    (w) =>
-      !narrowed ||
-      (w.ref ?? "").toLowerCase().includes(q) ||
-      richTextPlain(w.description).toLowerCase().includes(q)
-  )
+  /** THE DOOR'S WHOLE ANSWER, before anything on the toolbar has narrowed it.
+   * Held as its own name because THREE separate things need the unnarrowed
+   * list and only one of them is obvious: the facet menus (options taken off a
+   * filtered set vanish as you filter — see `triageFacets`), `useFilterBar`'s
+   * own `data` argument, and R50's emptiness question, which is about the
+   * collection and never about the current search. */
+  const waiting = view?.waiting ?? []
+  // NARROWED MEANS "SOMETHING IS ASKED", AND THE FACETS COUNT TOO. This used to
+  // read `query.trim() !== ""` and was the whole truth while search was the only
+  // control; with two facets beside it, a reader who filters to an app with no
+  // rows would otherwise be shown the kit's "you have been through everything"
+  // register — a sitting reported as FINISHED because a dropdown was set. It is
+  // the same expression `apps-screen.tsx` writes one line below its own search.
+  const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
+  // The toolbar's three questions, applied in one place (see `narrowTriage`).
+  const matching = narrowTriage(waiting, {
+    query,
+    helpType: facetValues.helpType,
+    appId: facetValues.appId,
+  })
   const undecided = matching.filter((w) => !decided.includes(w.id))
-  // THE RING (the kit's own word for it): what is still in hand, in the door's
-  // own oldest-first order, then whatever has been passed over, in the order it
-  // was passed over. `filter` + `map` rather than a sort, because "the order the
-  // door gave me, with these moved to the end" is not a comparison between two
-  // tickets and writing it as one would invite somebody to add a second key.
+  // THE DOOR'S OWN ORDER, OR ITS REVERSE — and nothing else, which is what keeps
+  // this a queue. `needsTriage` returns oldest-first ("the oldest is the one
+  // that has been ignored longest, which is the only ordering this list can
+  // honestly have"), so `asc` is that answer untouched and `desc` is the same
+  // pile read from the other end. A COPY before `reverse`, because `reverse`
+  // mutates in place and `undecided` is read again two lines below for `total`
+  // — a reversed count is the same number, which is exactly why that bug would
+  // have been invisible.
+  const inOrder = sortDir === "asc" ? undecided : [...undecided].reverse()
+  // THE RING (the kit's own word for it): what is still in hand, in the order
+  // above, then whatever has been passed over, in the order it was passed over.
+  // `filter` + `map` rather than a sort, because "the order I was given, with
+  // these moved to the end" is not a comparison between two tickets and writing
+  // it as one would invite somebody to add a second key.
   const order = [
-    ...undecided.filter((w) => !skipped.includes(w.id)),
+    ...inOrder.filter((w) => !skipped.includes(w.id)),
     ...skipped
       .map((id) => undecided.find((w) => w.id === id))
       .filter((w): w is TriageWaiting => w !== undefined),
@@ -805,6 +1051,43 @@ function TriageQueue({
         return r.attachments
       })
   )
+
+  /** THE TOOLBAR'S FILTER PILL AND ITS PANEL (R53's `filters` + `toolbarPanel`
+   * slots) — `useFilterBar`'s own `{ pill, panel }` split, so the count chip
+   * sits in the track and the open panel is a real sibling BENEATH it rather
+   * than an overlay floating over the card (client ruling, 2 Sep 2026).
+   *
+   * CALLED UNCONDITIONALLY, AND THAT IS THE WHOLE REASON IT SITS HERE. It is a
+   * HOOK, and four early returns follow below (a failed read, an unanswered
+   * one, a reader who is not on duty, and a genuinely empty queue) — a hook
+   * after any of them would change the hook order between renders, which is the
+   * one React rule this file may not break. `apps-screen.tsx` keeps the same
+   * discipline for the same call, with the same note. Every expression it is
+   * handed is `?? []`-safe against a `triageQ` that has not answered yet, which
+   * is the price of that ordering and the whole of it.
+   *
+   * `data` IS THE UNNARROWED LIST, deliberately: the hook derives a facet's
+   * options from it whenever a facet declares none, and every one of ours
+   * declares its own — but handing it `matching` would make that fallback
+   * wrong the day somebody adds a third facet without options, and a latent
+   * wrong default is worse than an unused right one. */
+  const { pill: filterPill, panel: filterPanel } = useFilterBar({
+    facets: triageFacets(waiting, t),
+    values: facetValues,
+    data: waiting,
+    onChange: (field, value) =>
+      setFacetValues((prev) => {
+        const next = { ...prev }
+        // DELETED, never set to "" — `narrowed` above counts the KEYS, so a
+        // cleared facet left behind as an empty string would keep the whole
+        // screen in its "you asked something" mode for ever.
+        if (value === "") delete next[field]
+        else next[field] = value
+        return next
+      }),
+    onClearFacets: () => setFacetValues({}),
+    resultCount: matching.length,
+  })
 
   /** THE TEAM'S OWN TICKET TYPES, each with the colour the client ruled for it
    * — one map, `lib/type-colours.ts`, read by this row and by anything that
@@ -1007,13 +1290,11 @@ function TriageQueue({
   const gapsSentence = (w: TriageWaiting) =>
     t("Needs {gaps} before it can be triaged", { gaps: w.missing.map((g) => GAP_WORD[g]).join(", ") })
 
-  // AN ISSUE ASKS WHO IS PICKING IT UP; the other three do not. Matched on the
-  // WORD, case-insensitively and with a trailing "s" forgiven, which is the
-  // technique `ticketTypeWaitsForValidation` (shared/types.ts) already uses on
-  // this very field and for the same reason: `Ticket type` is the team's own
-  // editable vocabulary, so a rule that hard-matched the seeded spelling would
-  // stop firing the day somebody typed "Issues".
-  const isIssue = (current?.helpType ?? "").trim().toLowerCase().replace(/s$/, "") === "issue"
+  // WHAT THE BUTTON SAYS AND WHETHER IT ASKS FOR A PERSON FIRST — one answer,
+  // read off the ticket's own type. The reasoning, the client's ruling and the
+  // honest reservation about the word "Plan" are all on `triageAct` at the top
+  // of this file; nothing here decides anything.
+  const act = triageAct(current?.helpType, t)
 
   const pickerRow = current && picker && (
     // ORDER-LAST AND FULL-WIDTH, WHICH IS THE WHOLE OF "THE FOOTER MUST NOT
@@ -1025,6 +1306,35 @@ function TriageQueue({
     // buttons therefore do not move a pixel when this opens — they cannot, they
     // are still the whole of line one.
     <div className="order-last basis-full">
+      {/* ONE CONTAINER, BOTH PICKERS — CLIENT RULING, 2026-09-06: "the people
+          picker sits in the SAME container as the category picker; they must
+          read as one pattern."
+
+          IT IS DRAWN HERE, ABOVE THE TERNARY, WHICH IS THE WHOLE FIX. What she
+          was looking at was two rows that had grown apart: the type row leads
+          with the ticket's current answer and a divider after it, the people
+          row leads with nothing, and with no shared frame around them the
+          second read as a loose line of chips where the first read as a
+          panel. Putting the box inside each branch would have fixed the
+          picture and left the fault — two places to change, and the next
+          picker on this card is the third. One box, outside the branch, cannot
+          differ between them by construction; the branch is now only WHICH
+          options are offered.
+
+          A WELL, NOT A STROKE. She said "bordered", and a CSS border is the one
+          thing this codebase may not draw (BUILD-A-SCREEN.md §6.1, "no CSS
+          border, ever" — separation is a fill or an inset shadow, and the
+          dashed spelling of it has been removed twice as a regression;
+          `record-picker.tsx`'s header tells that story about the chip beside
+          this). The kit's own answer for exactly this shape is chapter 13's
+          WELL — "a well holds secondary detail inside a card… same radius, no
+          edge, no shadow" — and the queue's card is the card it is inside. So
+          the container that says "these two rows are one thing" is a tone step
+          off the card rather than a line drawn round it, which is what
+          `pulse.tsx`'s `NothingYet` was rewritten into on the same reasoning.
+          `Card` also brings R31's radius with it, so there is no shape decision
+          to take here at all. */}
+      <Card variant="well" className="p-3">
       {picker === "type" ? (
         <RecordPicker
           layout="row"
@@ -1056,14 +1366,39 @@ function TriageQueue({
           disabled={busy}
         />
       )}
+      </Card>
     </div>
   )
 
   return (
     <>
+      {/* THE FULL TOOLBAR — CLIENT RULING, 2026-09-06, ROUND NINE. This row was
+          a search box and a create button; she asked for the same five slots
+          every other collection in this app now draws (R53's fixed order:
+          search → filters → sort → view → actions).
+
+          `view` IS THE ONE SLOT STILL ABSENT, and that is a decision rather
+          than an omission — `ViewSwitch` renders nothing for fewer than two
+          views, so a single-body collection is self-exempting (R53 says so
+          about this exact prop). The client has said a LIST view is coming;
+          the day it does, this slot takes a two-entry config and NOTHING ELSE
+          on this row changes, because the search, the two facets and the sort
+          are already functions over rows rather than properties of the card
+          (see `triageFacets` / `narrowTriage` at the top of this file). That
+          is the whole reason they are up there.
+
+          THE ORDER, THE WRAPPERS AND THE CONTROLS ARE THE ROW'S (R53) — this
+          call site hands over only what it alone knows: what the collection
+          may be ordered by, which way it is pointing, and which facets its own
+          rows support. There is no `<SortControl>` in this file to put in the
+          wrong slot, which is the change of TYPE that law is. */}
       <ToolbarRow
         // Reached this line only past both genuinely-empty returns above, so
-        // the queue always has at least one waiting row here.
+        // the queue always has at least one waiting row here. R50's own
+        // question is about the COLLECTION and never about the current search:
+        // a queue narrowed to nothing still draws its toolbar, or there would
+        // be no way to widen it again (the `narrowed` branch below is that
+        // case, and it renders under this row rather than instead of it).
         empty={false}
         search={
           <SearchInput
@@ -1074,14 +1409,36 @@ function TriageQueue({
             className="w-full"
           />
         }
+        filters={filterPill}
+        toolbarPanel={filterPanel}
+        // SORT BY RAISED, one option and a direction — see `TRIAGE_SORTS` for
+        // why one option is the answer here rather than a stub, and for the
+        // `TOOLBAR_SORT_EXEMPT` entry this replaces.
+        sort={{
+          options: TRIAGE_SORTS.map((o) => ({ ...o, label: t(o.label) })),
+          value: "raised",
+          // The FIELD cannot move — there is one — so picking it again is a
+          // no-op rather than an unreachable branch. Written as an empty
+          // handler with the reason, never omitted: `ToolbarSortSlot` requires
+          // it, and a handler that quietly did something else would be worse.
+          onValueChange: () => {},
+          direction: sortDir,
+          onDirectionChange: setSortDir,
+        }}
         actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
       />
       {!current && narrowed && decided.length === 0 ? (
-        // The ordinary "your search matched nothing" case — the toolbar above
-        // stays up so it can be cleared or changed, exactly as `narrowed` does
-        // everywhere else in the app. Distinct from the kit's `done` register
-        // below, which is a sitting somebody FINISHED.
-        <EmptyLine concept="triage">{t("No entries in the triage queue match your search.")}</EmptyLine>
+        // The ordinary "nothing matched" case — the toolbar above stays up so it
+        // can be cleared or changed, exactly as `narrowed` does everywhere else
+        // in the app. Distinct from the kit's `done` register below, which is a
+        // sitting somebody FINISHED.
+        //
+        // THE SENTENCE STOPPED SAYING "your search" ON 2026-09-06, when the
+        // filters arrived: three controls can empty this list now, and a
+        // reader who had set the App facet and typed nothing would have been
+        // told her search matched nothing — a true-sounding sentence pointing
+        // at the wrong control, which is the most expensive kind.
+        <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
       ) : (
         <Queue
           label={t("Triage queue")}
@@ -1104,30 +1461,43 @@ function TriageQueue({
             id: w.id,
             label: [w.ref, richTextPlain(w.description)].filter(Boolean).join(" · "),
           }))}
-          eyebrow={current && <TriageChips ticket={current} />}
+          eyebrow={current && <TriageChips teamId={teamId} ticket={current} />}
           title={current && ticketTitle(current)}
           decisions={
             current && (
               <>
-                {/* ACCEPT — the one mango on the card, because it is the
-                    decision this whole screen exists to make. Disabled while a
-                    readiness gap stands: the DOOR refuses the move
-                    (shared/triage-readiness.ts rides the model, not the route),
-                    so an enabled button here would be a button that fails. */}
+                {/* THE ONE DECISION THIS SCREEN EXISTS TO MAKE, and it says
+                    what it does now (client ruling, 2026-09-06): Accept a
+                    question, Assign an issue, Plan a request, Store an extra.
+                    The word and the behaviour come from ONE place (`triageAct`)
+                    precisely so they cannot come apart — a button that said
+                    "Assign" and filed the ticket without asking is worse than
+                    the single "Accept" it replaces.
+
+                    IT IS STILL THE ONE MANGO ON THE CARD. The kit rules one per
+                    view and this is it; the picker row below no longer competes
+                    for it, which is the other half of the same evening's ruling
+                    (record-picker.tsx's own header: the chosen chip is black
+                    now, because mango meant "chosen" in two places at once).
+
+                    DISABLED WHILE A READINESS GAP STANDS, whichever verb it is
+                    wearing: the DOOR refuses the move (shared/triage-
+                    readiness.ts rides the model, not the route), so an enabled
+                    button here would be a button that fails. */}
                 {canTriage && (
                   <Button
                     size="sm"
                     disabled={busy || current.missing.length > 0}
                     title={current.missing.length > 0 ? gapsSentence(current) : undefined}
                     onClick={() =>
-                      isIssue
+                      act.assigns
                         ? setPicker((p) => (p === "person" ? null : "person"))
                         : void accept(current)
                     }
                     className="gap-1"
                   >
                     <Check className="size-3.5" />
-                    {t("Accept")}
+                    {act.label}
                   </Button>
                 )}
                 {canEdit && (
@@ -1156,6 +1526,28 @@ function TriageQueue({
                   <ArrowCounterClockwise className="size-3.5" />
                   {t("Undo")}
                 </Button>
+                {/* OPEN, MOVED HERE FROM THE CARD — client, 2026-09-06: "I want
+                    to keep the Open function, but not here. I want to have it
+                    next to Skip."
+
+                    It sits last among the decisions, which is where the kit
+                    then draws Skip, so the two ways OUT of the sitting end up
+                    adjacent and both read as ghosts against the one mango
+                    button at the other end. It is deliberately NOT a decision:
+                    it writes nothing, moves nothing and leaves the queue —
+                    which is exactly why it belongs beside Skip rather than
+                    beside Accept. It is also the whole reason the readiness
+                    sentence could be deleted from the card: a ticket missing a
+                    field is now fixed on the ticket, one press away. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onOpen(current.id)}
+                  className="gap-1"
+                >
+                  <ArrowUpRight className="size-3.5" />
+                  {t("Open")}
+                </Button>
                 {pickerRow}
               </>
             )
@@ -1178,79 +1570,33 @@ function TriageQueue({
                   countLabel={t("What they attached")}
                 />
               </div>
-              {/* THE DATE, SMALL AND TABULAR — the client's own "raised 10 June
-                  2025", and NO reference on this line: the number is already in
-                  the black chip above, and saying it twice on one card was the
-                  thing she struck. `tabular-nums` is what "monospaced" means
-                  everywhere else in this app (the kit's own eyebrow uses it for
-                  exactly this line); a second font family would be a type
-                  decision nobody has taken. */}
-              <p className="text-muted-foreground text-micro tabular-nums">
-                {t("raised {date}", { date: formatDate(current.createdAt, lang) })}
-              </p>
-              {/* WHY IT CANNOT MOVE, said on the card, with the way to fix it
-                  beside it. A ticket used to sit here with a button that would
-                  fail and no explanation — the owner asked for a pre-triage
-                  state, and what was actually missing was never a state but a
-                  REASON. The pencil is here rather than in the footer because
-                  the footer is the four decisions the client named, and because
-                  an edit belongs beside the sentence that says why it is needed:
-                  three of the four gaps (a client, an app, who raised it) can
-                  only be filled on the form. */}
-              {current.missing.length > 0 && (
-                <p
-                  // `--warning-strong` is the kit's own "the warning WORD"
-                  // token, and it resolves to PRIMARY INK rather than orange on
-                  // purpose: tokens.css measures the orange FILL at 2.23:1 as
-                  // text and rules it out for exactly this use. So the sentence
-                  // reads louder than the muted grey around it without
-                  // inventing a colour the kit has already refused.
-                  className="text-warning-strong flex flex-wrap items-center gap-2 text-xs"
-                >
-                  <Warning aria-hidden className="size-3.5 shrink-0" />
-                  {gapsSentence(current)}
-                  {canEdit && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setEditing(current)}
-                      aria-label={t("Edit")}
-                      className="gap-1"
-                    >
-                      <PencilSimple className="size-3.5" />
-                      {t("Fill it in")}
-                    </Button>
-                  )}
-                </p>
-              )}
-              {/* THE WAYS OUT, and they are not decisions — which is why they
-                  are here and not in the footer. Open leaves the queue for the
-                  ticket's own screen; Reply answers it. The client's ruling is
-                  that triage SORTS and does not resolve, so Reply is on the card
-                  as a way out of the sitting rather than as one of its moves. */}
-              <div className="flex flex-wrap items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => onOpen(current.id)} className="gap-1">
-                  <ArrowUpRight className="size-3.5" />
-                  {t("Open")}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setReplying(current)} className="gap-1">
-                  <PaperPlaneTilt className="size-3.5" />
-                  {t("Reply")}
-                </Button>
-                {canEdit && current.missing.length === 0 && (
-                  // ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil
-                  // icon"). It carries its label when a gap is standing, above,
-                  // because there it is the way OUT of a refusal.
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditing(current)}
-                    aria-label={t("Edit")}
-                  >
-                    <PencilSimple className="size-3.5" />
-                  </Button>
-                )}
-              </div>
+              {/* WHOSE IT IS, WHAT IT IS ABOUT, AND WHO ASKED — under the
+                  words, not over them (client ruling, 2026-09-06, round nine).
+                  THE DATE THAT USED TO BE HERE HAS MOVED UP into the chip line
+                  (`TriageChips`), which is the same ruling read the other way:
+                  the eyebrow is now the ticket's three FACTS — number, type,
+                  date — and everything that is a RECORD is a link down here.
+                  See `TriageMeta` for the whole of it. */}
+              <TriageMeta teamId={teamId} ticket={current} />
+              {/* THE STRIP THAT USED TO SIT HERE IS GONE — client, 2026-09-06:
+                  "the text that's now under the date … above the buttons that
+                  say Open, Reply and Edit: remove all of this. However, I want
+                  to keep the Open function, but not here. I want to have it
+                  next to Skip."
+
+                  What went: the readiness sentence naming the ticket's missing
+                  fields, the "Fill it in" pencil beside it, Reply, and the
+                  icon-only Edit. What stays, moved: Open, now in the sitting's
+                  tail beside Skip, where the other ways OUT of the queue live.
+
+                  THE CONSEQUENCE, WRITTEN DOWN RATHER THAN DISCOVERED LATER: an
+                  incomplete ticket no longer says on the card that it is
+                  incomplete, so it looks exactly like a complete one until you
+                  open it. That is the client's call and it is coherent — Open is
+                  one press away and the form is where three of the four gaps can
+                  be filled anyway — but if she ever wants the warning back, the
+                  cheap version is a mark on the chip whose fact is missing,
+                  never this paragraph again. */}
             </>
           )}
         </Queue>
@@ -1277,12 +1623,13 @@ function TriageQueue({
         helpId={editing?.id}
         canAttach={canEdit}
       />
-      <TriageReplyDialog
-        open={replying !== null}
-        onOpenChange={(o) => !o && setReplying(null)}
-        draftKey={`help:triage-reply:${replying?.id ?? "none"}`}
-        onSubmit={sendReply}
-      />
+      {/* THE REPLY DIALOG IS GONE WITH ITS BUTTON. Removing Reply from the
+          card (client, 2026-09-06) left this mounted and unreachable — nothing
+          could open it — which is worse than deleting it: a control a person
+          cannot reach is indistinguishable from one that is broken. Nothing is
+          lost. The ticket's own screen carries a full reply thread of its own
+          (`help-detail.tsx`, `onReply`), and Open is one press away in the
+          sitting's tail, which is the whole reason she kept it. */}
     </>
   )
 
@@ -1305,14 +1652,6 @@ function TriageQueue({
 
   /** Answer it without leaving the queue. The same door the ticket's own thread
    * posts through — this is a shorter route to it, not a second one. */
-  async function sendReply(body: string) {
-    if (!replying) return
-    await contentApi.replyHelp(replying.id, body)
-    // A reply re-sorts one ticket to the top; the row-level live ping the door
-    // publishes patches that. The full-list refetch here paid the whole
-    // five-read rebuild to move one row.
-    toast.success(t("Reply sent."))
-  }
 }
 
 /** THE ONE DECISION THAT CAN BE TAKEN BACK, and both of its shapes.
@@ -1351,37 +1690,80 @@ function ticketTitle(w: TriageWaiting): string {
   return w.titleEn?.trim() || w.titleDe?.trim() || (plain.length > 80 ? `${plain.slice(0, 80)}…` : plain)
 }
 
-/** THE CHIP LINE — the four facts the client named, in the order she named
- * them: the number, the type, the client, and the person who asked.
+/** THE CHIP LINE — three facts and nothing else: the number, the type, the date.
  *
- * IT SITS IN THE KIT'S `eyebrow`, which is the slot drawn for precisely this
- * ("#1513 · raised 10 June 2025", per the kit's own note on it) — except that
- * the date has moved to its own line under the description on the client's
- * ruling, so what is left here is the identity of the ticket rather than its
- * age.
+ * ── WHAT THE CLIENT MOVED, AND WHY IT IS A RULE RATHER THAN A TIDY-UP ───────
+ *
+ * This line used to carry four chips — number, type, CLIENT, PERSON WHO ASKED —
+ * and the date sat on its own line under the description. Round nine of the
+ * design review swapped those: "the chips above the title become number, type,
+ * date. Nothing else up there", and the client, the app, the module and the
+ * author go BELOW the content as links (`TriageMeta`, next).
+ *
+ * THE CUT IS NOT ARBITRARY AND IT IS WORTH NAMING, because it is the thing that
+ * keeps this line from growing back. What is left up here are the ticket's own
+ * FACTS — its number, its kind, its age — none of which is a record you could go
+ * and open. What went down there is every RECORD the ticket points at, all four
+ * of them navigable. A chip is a fact; a link is a record. Once that is the rule,
+ * "should the app be a chip?" has an answer instead of a preference.
  *
  * THE NUMBER IS A BLACK CHIP because she asked for one, and `variant="inverse"`
  * is the kit's word for it: charcoal fill, off-beige label, and it FLIPS with
  * the palette — so "black chip" is still the loudest thing on the card in dark
- * mode, where an actual black would disappear into the paper. R32 is satisfied
- * by construction: the fill is a token pair the kit owns, and this file names no
+ * mode, where an actual black would disappear into the paper. It KEEPS that fill
+ * through this pass, untouched by the paper below. R32 is satisfied by
+ * construction: the fill is a token pair the kit owns, and this file names no
  * colour at all.
  *
  * A TICKET WITH NO NUMBER DRAWS NO CHIP. `ref` is null on a ticket whose client
  * has no reference code yet (`HelpTicket.ref` says so), and an empty black
  * lozenge is worse than nothing.
  *
- * THE CLIENT AND THE RAISER CARRY THEIR OWN FACES (R35), resolved by the DOOR
- * and not looked up here — see `TriageWaiting`'s own note on why (the accounts
- * cache a screen holds is page one of a growing list). The raiser is `round`
- * because a contact is a person in their own right; the client is a square,
- * because a company is not. */
-function TriageChips({ ticket }: { ticket: TriageWaiting }) {
+ * ── THE PAPER THE QUIET CHIPS SIT ON (client ruling: `--kw-soft-paper`) ─────
+ *
+ * She named the colour by its raw pigment — `#F7F2EB`, the kit's
+ * `--kw-soft-paper` — and asked for the token rather than the hex. The token
+ * this file says is `--surface-panel`, and that is the same colour rather than a
+ * substitution: `tokens.css` defines `--surface-panel: var(--kw-soft-paper)`,
+ * byte-identical, and its own §L note rules the `--kw-*` ramp "additive
+ * tokens … never consumed directly" — they are the pigments the semantic tokens
+ * are mixed from, not names a screen says. `type-colours.ts` makes the identical
+ * argument at length about the same ramp. The second half is the one that
+ * actually matters: the raw pigment has NO DARK HALF, and `--surface-panel`
+ * does (`--kw-unlit-panel` on a dark palette), so writing the pigment here would
+ * have painted a light-mode-only chip and called it a token.
+ *
+ * IT IS APPLIED BY REBINDING THE KIT'S OWN HOOK, not by overriding a class.
+ * `Badge variant="secondary"` reads `--badge-quiet-fill` with `--surface-quiet`
+ * as its fallback, and its own doc names this exact move: "a caller who KNOWS a
+ * badge sits on that ground rebinds `--badge-quiet-fill` locally — a FILL shift,
+ * never a border or a shadow". Set ONCE on the wrapping span and inherited by
+ * every quiet chip inside it, so the three chips cannot end up two colours, and
+ * `variant="inverse"` above ignores it entirely because it reads neither
+ * property. Nothing in `shared/ui` is edited (it is vendored and hash-pinned)
+ * and no class is fought with `!important`.
+ *
+ * THE DATE CHIP CARRIES WHAT THE OLD LINE UNDER THE DESCRIPTION SAID, word for
+ * word — "raised 10 June 2025", the client's own phrasing — and keeps
+ * `tabular-nums`, which is what "monospaced" means everywhere else in this app
+ * (the kit's own eyebrow uses it for exactly this line). A second font family
+ * would be a type decision nobody has taken. */
+function TriageChips({ teamId, ticket }: { teamId: string; ticket: TriageWaiting }) {
+  const { t, lang } = useLanguage()
   return (
     // `flex` inside the kit's own `<span>`: an inline-level parent whose child
     // is a block-level flex row is legal here because both are spans, and the
     // kit's line already carries the type treatment these chips override.
-    <span className="flex flex-wrap items-center gap-2">
+    // THE ONE PLACE THE PAPER IS NAMED — see the header. The custom property is
+    // set on THIS row and inherits into every `variant="secondary"` badge inside
+    // it, so the chips cannot end up two colours. Spelled as a Tailwind
+    // arbitrary-property class rather than a `style` object because that is the
+    // spelling the app already uses for this exact rebind one file over
+    // (`record-chrome.tsx`'s own `[--badge-quiet-fill:var(--surface-quiet)]`,
+    // whose long comment is the history of why the kit built this hatch) — and
+    // because a class survives being moved onto a `Card` or a `Badge` that does
+    // not forward `style`, which a call site should not have to know.
+    <span className="[--badge-quiet-fill:var(--surface-panel)] flex flex-wrap items-center gap-2">
       {ticket.ref && (
         // NOT A BUTTON, though it was for about ten minutes. `Badge` takes no
         // `asChild` (the kit's own signature), and making the number clickable
@@ -1402,28 +1784,229 @@ function TriageChips({ ticket }: { ticket: TriageWaiting }) {
         <Swatch colour={ticketTypeColour(ticket.helpType)} />
         {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. The
             missing type is one of the four readiness gaps and the card already
-            explains it below; an absent chip here would leave a hole where three
-            other cards have a fact. */}
+            explains it below; an absent chip here would leave a hole where the
+            other two chips have a fact. */}
         {ticket.helpType ?? "—"}
       </Badge>
-      {ticket.accountName && (
-        <Badge variant="secondary" size="pill">
-          <RecordMark picture={ticket.accountLogo} name={ticket.accountName} size="choice" />
-          {ticket.accountName}
-        </Badge>
+      {/* THE APP, BACK IN THE EYEBROW AND WITHOUT ITS LOGO — client,
+          2026-09-06: "bring the app back in the chips at the top, without the
+          icon". It sat in the meta block below for one round; up here it is a
+          FACT about the ticket in the same breath as its number and its type,
+          which is how she reads the card. No `logoUrl`: the row is four chips
+          scanned at speed and a 20px picture in the middle of them is a third
+          kind of mark competing with the type's dot.
+
+          STILL A LINK, because navigating to the app was the whole reason she
+          asked for these to be clickable. `Badge` takes no `asChild`, so the
+          anchor wraps the badge rather than the badge becoming one — which also
+          keeps the black `#ref` chip the only inverse lozenge in the row. */}
+      {ticket.appId && ticket.appName && (
+        <InAppLink
+          href={`/t/${teamId}/apps/${ticket.appId}`}
+          /* NO RING OF ITS OWN — ruling 24: the focus ring is ONE rule in the
+             kit's own stylesheet and nothing focusable may restate it or
+             suppress the outline. The radius is here only so the shared ring
+             follows the lozenge it wraps instead of drawing a rectangle
+             around it. */
+          className="rounded-pill"
+        >
+          <Badge variant="secondary" size="pill">
+            {ticket.appName}
+          </Badge>
+        </InAppLink>
       )}
-      {ticket.raisedByContactName && (
-        <Badge variant="secondary" size="pill">
-          <RecordMark
-            picture={ticket.raisedByContactLogo}
-            name={ticket.raisedByContactName}
-            shape="round"
-            size="choice"
-          />
-          {ticket.raisedByContactName}
-        </Badge>
-      )}
+      <Badge variant="secondary" size="pill" className="tabular-nums">
+        {t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
+      </Badge>
     </span>
+  )
+}
+
+/** THE FOUR RECORDS A TICKET POINTS AT — the author, the client, the app and the
+ * section — under the words, each wearing its own face, each a link.
+ *
+ * ══ WHY THIS IS ONE COMPONENT AND NOT FOUR LINES ON THE CARD ════════════════
+ *
+ * The client is still choosing between three presentations of this block, and
+ * said so. So the BLOCK is the unit: the card hands over a ticket and a team,
+ * this decides what the four rows ARE (which of them exist, what each one's face
+ * is, where each one goes), and the return statement below is the only thing a
+ * layout change touches. Swapping the tinted band for a stacked list, a
+ * two-column grid or a run of inline chips is one edit in one place, and none of
+ * the four destinations, faces or absence rules move with it.
+ *
+ * ══ THEY ARE LINKS, AND THAT IS R37 RATHER THAN A PREFERENCE ════════════════
+ *
+ * She asked for links explicitly ("she wants to navigate from them"), and the
+ * law decides HOW: the whole post-auth app is one shell that mounts once, so a
+ * bare `<a href="/t/…">` throws the document away, re-runs every module from
+ * nothing, destroys the warm cache and any running agent, and replays the boot
+ * animation — the fault the owner reported on "Manage dropdowns" in exactly
+ * those words. `<InAppLink>` is a REAL anchor (middle-click, copy-address and
+ * screen readers all still work) with only the plain left click intercepted into
+ * `softNavigate`. There is no second way to write this and the census in
+ * `web/test/shell-nav.test.ts` reads every component off disk to keep it that
+ * way.
+ *
+ * ══ AND THEY CARRY THEIR FACES, RESOLVED BY THE DOOR (R35) ══════════════════
+ *
+ * Every one of the four arrives on the triage row already named and already
+ * pictured — the client's logo and the author's avatar rode it before today, the
+ * app's `logo_url` and the section's emoji were added to `needsTriage` for this
+ * block (`workers/content/src/lib/triage.ts` carries the reasoning). NOTHING
+ * HERE RESOLVES AN ID. That is not neatness: `accounts` is a paged collection, so
+ * a card that looked a client up in the cache this screen holds would have gone
+ * blank on the fifty-first client — the bug `record-picker.tsx`'s header is a
+ * monument to — and the same trap is one growth spurt away for apps.
+ *
+ * ══ WHERE EACH ONE GOES, INCLUDING THE AWKWARD ONE ══════════════════════════
+ *
+ *   AUTHOR   `/accounts/<contactId>`. A contact is a row of the SAME `accounts`
+ *            table a company is (SCOPE ch.03) — there is no contacts table, and
+ *            `deep-link-screen.tsx`'s own open-intent rewrites `contacts` to
+ *            `accounts` for this exact reason. Never a second `/contacts/<id>`
+ *            address for a record that already has one.
+ *   CLIENT   `/accounts/<accountId>`. The same door, the other kind of row.
+ *   APP      `/apps/<appId>`.
+ *   SECTION  `/apps/<appId>?tab=modules` — AND THIS ONE IS WORTH READING. A
+ *            module has no address of its own anywhere in this product: no
+ *            segment in `TEAM_SECTIONS`, no detail recipe, no branch in
+ *            `module-content.tsx`, and `relationship-map.tsx` deliberately omits
+ *            `app_modules` from its `RECORD_PATH` because a module is a division
+ *            OF an app rather than a record with a screen. Two ways to honour
+ *            "make it a link": invent `/modules/<id>` and the screen behind it —
+ *            a feature nobody asked for, on the strength of one chip — or send
+ *            the reader to the one place the module actually is, which is its
+ *            app's Modules tab. The tab was not addressable either, so it was
+ *            given an address (`app-detail.tsx`, the same six lines
+ *            `account-detail.tsx` already uses for `?tab=organisation`). The
+ *            module and the app therefore land on the same RECORD and different
+ *            TABS, which is the honest picture of what a module is.
+ *
+ * A ROW WITH NO NAME IS NOT DRAWN, and each absence is ordinary rather than an
+ * error: a ticket raised by the agency has no client, one nobody has attributed
+ * has no author, a ticket about no app has neither app nor section. Three of
+ * those four are readiness gaps, so the card already says out loud why it cannot
+ * move — a placeholder here would be the same complaint twice. AND A ROW WITH A
+ * NAME BUT NOWHERE TO GO IS DRAWN WITHOUT A LINK rather than dropped: `href` is
+ * nullable for the one shape that can occur, a section on a ticket whose app id
+ * is missing, where there is genuinely no destination. Losing the fact would be
+ * worse than losing the link. */
+function TriageMeta({ teamId, ticket }: { teamId: string; ticket: TriageWaiting }) {
+  const t = useT()
+  /** THE FOUR, DECIDED ONCE. Everything a presentation could want to know is
+   * settled here — whether the row exists, what it is called, what its face is,
+   * which box that face wears and where it goes — so the JSX below is pure
+   * layout and a different layout inherits all of it. `shape` is the one that
+   * is easy to get wrong twice: a person in their own right is a CIRCLE and
+   * everything else is a rounded square, which is `record-mark.tsx`'s rule and
+   * not this file's to restate per row. */
+  /* ONE ROW NOW, NOT FOUR — client, 2026-09-06: "at the bottom, in the quiet
+     style, just the author with the avatar."
+
+     The client, the app and the module were all here for one round and have
+     gone three different ways. The APP moved UP into the eyebrow as a chip, the
+     client and the module are simply not on this card any more: they live on
+     the ticket, one press of Open away. That is a real subtraction and it is
+     hers — the card is scanned forty times a sitting, and every item on it is
+     a thing the eye has to reject before it reaches the words the customer
+     wrote.
+
+     KEPT AS AN ARRAY OF ONE rather than collapsed into a single node, because
+     the shape is what made swapping presentations a one-edit job last round and
+     the client has moved this block three times in two days. A second row costs
+     one object here, not a rewrite of the render. */
+  const rows = [
+    ticket.raisedByContactName && {
+      key: "author",
+      label: t("Raised by"),
+      name: ticket.raisedByContactName,
+      picture: ticket.raisedByContactLogo,
+      mark: null,
+      shape: "round" as const,
+      path: ticket.raisedByContactId ? `accounts/${ticket.raisedByContactId}` : null,
+    },
+  ].filter(Boolean) as {
+    key: string
+    label: string
+    name: string
+    picture: string | null
+    mark: string | null
+    shape: "round" | "square"
+    path: string | null
+  }[]
+
+  return (
+    // ── THE DEFAULT PRESENTATION: A TINTED BAND ──────────────────────────────
+    // One quiet band under the words, the four rows reading left to right in the
+    // order the client named them, thin rules between. `bg-surface-quiet` is a
+    // real tone step off the card the queue draws on (and has a dark half of its
+    // own), which is what makes this read as a footer to the description rather
+    // than as more description. R31: the box radius, the only one a box may
+    // take. `flex-wrap` because on a phone four faces and four names do not fit
+    // on one line and a horizontally scrolling band is worse than a wrapped one.
+    // THE TINT IS GONE WITH THE OTHER THREE ROWS. A band earned its ground
+    // when it held four facts that needed separating from the description; one
+    // byline does not, and a second quiet block would now sit directly above the
+    // picker's own well — two tinted grounds stacked, which is the defect the
+    // band was drawn to avoid in the first place. Quiet style, as asked: small,
+    // muted, no fill of its own.
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {rows.map((r, i) => (
+        <React.Fragment key={r.key}>
+          {/* THE THIN RULE, and it is a FILL rather than a border — the same 1px
+              tick `record-picker.tsx`'s own divider draws, for the same reason
+              (BUILD-A-SCREEN.md §6.1: separation is a fill or an inset shadow,
+              never a CSS border). `aria-hidden` because the grouping it marks is
+              visual; each row already carries its own label in words. */}
+          {i > 0 && <span aria-hidden className="bg-border h-5 w-px shrink-0" />}
+          <span className="flex min-w-0 items-center gap-1.5 text-xs">
+            {/* WHAT KIND OF THING THIS IS, in words rather than by position.
+                Four faces in a row with no labels is a puzzle: an app's logo and
+                a client's logo are the same shape, and on the tickets where both
+                are wordmarks they are the same KIND of picture too. */}
+            <span className="text-muted-foreground">{r.label}</span>
+            <RecordMark
+              picture={r.picture}
+              mark={r.mark}
+              name={r.name}
+              shape={r.shape}
+              size="choice"
+            />
+            {r.path ? (
+              // THE TEAM PREFIX IS COMPOSED HERE, IN A TEMPLATE LITERAL, and
+              // that is R20's render-side census rather than a style choice
+              // (`web/test/rich-text.test.ts`): every URL bound to an anchor in
+              // either front door must be a literal we wrote, an inline
+              // `safeHref(…)`, or a named exemption. Handing the attribute a
+              // field off a row object is none of those, and it is refused for a
+              // good reason — a URL arriving from an object is a URL a reviewer
+              // cannot see the origin of. So the row above carries the
+              // RECORD-RELATIVE address (`accounts/<id>`, a fixed segment and an
+              // id) and the shell prefix is written where the anchor is.
+              // `InAppLink` puts the whole thing through `safeHref` again on the
+              // way to the DOM, which is its own seam and not this file's to
+              // repeat.
+              //
+              // AND THAT CENSUS READS RAW SOURCE, comments included — so this
+              // paragraph may not spell the attribute-plus-brace shape it is
+              // about, or it reports itself. Learned here, the ordinary way.
+              <InAppLink
+                href={`/t/${teamId}/${r.path}`}
+                className="text-foreground truncate underline-offset-2 hover:underline"
+              >
+                {r.name}
+              </InAppLink>
+            ) : (
+              // NO DESTINATION, SO NO LINK — never a dead anchor. See the
+              // header: this is the section-without-an-app case, and the fact
+              // is worth more than the affordance.
+              <span className="text-foreground truncate">{r.name}</span>
+            )}
+          </span>
+        </React.Fragment>
+      ))}
+    </div>
   )
 }
 
