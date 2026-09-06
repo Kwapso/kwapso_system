@@ -1740,7 +1740,16 @@ function TriageQueue({
           aria-label={t("Triage queue")}
         >
           <TableHeader>
-            <TableRow>
+            {/* NO HOVER ON THE HEADER — client: "when I hover over the title
+                row, there should be no action." `TableRow` carries the kit's
+                row wash unconditionally, because on a body row that wash is the
+                affordance saying "this opens". On the header it is a lie: the
+                header does nothing, and these columns deliberately do not sort
+                (the toolbar owns the order — see the note at the sort control).
+                A surface that lights under the pointer and then refuses the
+                click is read as broken rather than as inert, which is the exact
+                failure `record-table.tsx`'s own header describes. */}
+            <TableRow className="hover:bg-transparent">
               <TableHead>{t("Title")}</TableHead>
               <TableHead>{t("Type")}</TableHead>
               <TableHead>{t("App")}</TableHead>
@@ -1755,6 +1764,32 @@ function TriageQueue({
                 className="cursor-pointer"
               >
                 <TableCell>
+                  {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
+                      title to the left, with the usual black chip design." It
+                      rode the Type column for one pass, which was her earlier
+                      instruction ("also include the number, the ID"); seen on
+                      screen beside a coloured pill it read as a second fact
+                      crowding that cell rather than as the row's name. Leading
+                      the title it is what it always was on the card: the thing
+                      you say out loud to identify a ticket.
+
+                      `variant="inverse"` IS "the usual black chip design" —
+                      literally the same badge the card's eyebrow draws for the
+                      same number, so the one black lozenge in this product
+                      means one thing in both places. Not a link and not
+                      clickable, for the reason the card's own chip is not: the
+                      row already opens, and a control inside a clickable row is
+                      two destinations decided by pixels.
+
+                      `shrink-0` so a long title truncates and the number never
+                      does — an id with its tail cut off is worse than useless,
+                      it is wrong. */}
+                  <span className="flex min-w-0 items-center gap-2">
+                    {w.ref && (
+                      <Badge variant="inverse" size="pill" className="shrink-0 tabular-nums">
+                        {w.ref}
+                      </Badge>
+                    )}
                   <Button
                     variant="link"
                     // The row is already opening; without this one press
@@ -1778,6 +1813,7 @@ function TriageQueue({
                   >
                     {ticketTitle(w)}
                   </Button>
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="flex items-center gap-2">
@@ -1807,14 +1843,6 @@ function TriageQueue({
                       <Swatch colour={ticketTypeColour(w.helpType)} />
                       {w.helpType ?? "—"}
                     </Badge>
-                    {/* THE NUMBER, BESIDE THE TYPE — her item 2. `tabular-nums`
-                        is what "monospaced" means everywhere else in this app
-                        (the card's own date chip carries it for the same
-                        reason); a second font family would be a type decision
-                        nobody has taken. */}
-                    {w.ref && (
-                      <span className="text-muted-foreground tabular-nums">{w.ref}</span>
-                    )}
                   </span>
                 </TableCell>
                 {/* THE TWO QUIET COLUMNS, as her reference draws them: the
