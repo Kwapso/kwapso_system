@@ -8,9 +8,9 @@
 // browser only ever holds page one of, so a chart drawn from loaded rows would
 // be a picture of the newest fifty tickets under a heading that says backlog.
 // That single sentence decides almost everything below — why the toolbar's
-// filters are door parameters rather than a sieve, why there is no sort control,
-// and why this component fetches one object and draws it rather than reducing
-// arrays of tickets.
+// filters AND its search box are door parameters rather than a sieve, why there
+// is no sort control, and why this component fetches one object and draws it
+// rather than reducing arrays of tickets.
 //
 // …AND THE SAME SCREEN NARROWED TO ONE SYSTEM (2026-09-06). The app record's
 // Tickets tab has two views now — a list and this — and the dashboard view is
@@ -82,6 +82,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@shared/ui/components/hover-card/hover-card"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+// THE KIT'S OWN DEBOUNCE, the one the record picker already asks the door
+// through — see `askDoor` in the screen below for why a search box on THIS tab
+// needs one at all.
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
@@ -1246,18 +1251,58 @@ export function TicketsDashboard({
   const accountId = facetValues.accountId ?? ""
   const helpType = facetValues.helpType ?? ""
 
+  // ── THE SEARCH BOX ────────────────────────────────────────────────────────
+  //
+  // CLIENT, 7 SEP 2026, HAVING SAID IT TWICE: "on the dashboard, I'm missing the
+  // full toolbar", then "still missing full toolbar!". Sort is absent by her own
+  // earlier ruling on this exact row ("filter by client and type / no sort"), so
+  // the box was the only control a sibling ticket tab carried that this one did
+  // not — which is what she was looking at.
+  //
+  // IT IS A THIRD DOOR PARAMETER AND NOT A DECORATION, which is the only shape
+  // that can work here: there are no rows on this tab for a browser to sieve, so
+  // a box that narrowed anything client-side would narrow nothing at all. The
+  // term rides `content.helpDashboard` beside `accountId` and `helpType`, lands
+  // in the WHERE clause of all nine of the door's grouped reads, and every panel
+  // below is then a tally over the tickets that mention it. "The dashboard for
+  // tickets mentioning invoice" is a real reading of the backlog.
+  //
+  // IT IS THE LIST'S OWN SEARCH, NOT A SECOND ONE. The door binds `q` into the
+  // same `searchClause` — description, reference, title — that
+  // `GET /api/content/help?q=` binds it into, so a term finds the same tickets
+  // on this tab as on the list tab beside it. Two answers to one question, typed
+  // into two boxes on one screen, was the failure worth designing against, and
+  // the defence is that neither box owns a matcher of its own.
+  //
+  // WHAT IS TYPED AND WHAT IS ASKED ARE TWO VALUES, exactly as `record-picker`
+  // holds them, and for a sharper reason here: this door takes nine grouped
+  // scans of the backlog, so a keystroke that fired one would be nine scans per
+  // letter, each landing in its own cache key. The box keeps up with the
+  // keyboard; the request runs up to 200ms behind it, through the kit's own
+  // `useDebouncedCallback` at the same delay the picker's door search uses.
+  //
+  // NOT REMEMBERED ACROSS SESSIONS, for the same reason the two facets above are
+  // not: a dashboard silently narrowed to a word somebody typed last Tuesday is
+  // a screen whose every panel is about a slice while every heading says
+  // backlog — and unlike a list there are no rows on it to make that visible.
+  // The box being on screen with the word still in it is the whole disclosure.
+  const [text, setText] = React.useState("")
+  const [term, setTerm] = React.useState("")
+  const askDoor = useDebouncedCallback(setTerm, 200)
+
   // ONE CACHE ENTRY PER QUESTION (`helpDashboardKey` carries every narrowing —
   // both filters AND the system, when there is one), so switching client does
   // not overwrite the unfiltered answer, one app's dashboard can never be served
   // another's, and switching back paints instantly from the cache —
   // CACHING.md's cache-first rule, applied to a picture instead of a list.
   const dashQ = useCached<TicketDashboard>(
-    helpDashboardKey(teamId, accountId, helpType, appId ?? ""),
+    helpDashboardKey(teamId, accountId, helpType, appId ?? "", term),
     () =>
       contentApi.helpDashboard({
         accountId: accountId || undefined,
         helpType: helpType || undefined,
         appId,
+        q: term || undefined,
       })
   )
   // THE CLIENT FACET'S OPTIONS. `tenancy.accounts()` is page ONE of a growing
@@ -1276,6 +1321,20 @@ export function TicketsDashboard({
 
   const data = dashQ.data
   const loading = data === undefined
+  // DID THE QUESTION FIND ANYTHING? Asked of the DOOR's own count of the rows
+  // every panel was grouped over (`matched`), never inferred from whether the
+  // panel arrays came back empty: a ticket with no kind and nothing closed sits
+  // in none of those groupings, so "all the arrays are empty" is a fact about
+  // which reads exclude nulls today rather than about whether anything matched.
+  //
+  // GATED ON SOMETHING HAVING BEEN ASKED. A zero with an untouched toolbar is
+  // the collection's own empty state, which the branch above already owns off
+  // `ticketTotal` — and that branch has to keep owning it, because it reads the
+  // WHOLE collection's count while this reads the narrowed one (R50: the
+  // toolbar disappears for a team with no tickets, and must not disappear
+  // because somebody typed a word).
+  const asked = Boolean(term) || Object.keys(facetValues).length > 0
+  const narrowedToNothing = asked && data !== undefined && data.matched === 0
   // WHICH KINDS TO DRAW, AND IN WHICH ORDER — one decision, made once, obeyed by
   // every panel below.
   //
@@ -1381,19 +1440,52 @@ export function TicketsDashboard({
           implement that" — which was this row's `actions` slot standing empty
           while every sibling ticket tab drew a create button in it).
 
-          NO SEARCH BOX and NO SORT CONTROL, both recorded in the registry
-          (`TOOLBAR_EXEMPT` and `TOOLBAR_SORT_EXEMPT`) rather than decided here:
-          there is nothing on this tab to search through and no row order to
-          offer, because there are no rows. Both filters are door PARAMETERS —
-          they land in the cache key above and in the WHERE clause of every read
-          behind it — which is the only shape that can work when every number on
-          screen is a COUNT(*) somebody else took.
+          THE SEARCH BOX IS HERE NOW (client, 7 Sep 2026: "still missing full
+          toolbar!"), and `TOOLBAR_EXEMPT`'s line for this file was DELETED
+          rather than reworded in the same change — an exemption that no longer
+          describes the code is worse than none, because it reads as a decision
+          somebody made about the screen in front of you.
+
+          NO SORT CONTROL, and that one is still recorded (`TOOLBAR_SORT_EXEMPT`)
+          rather than decided here: a dashboard has no row order to offer,
+          because it has no rows. That is not the same sentence as the search
+          box's, which is why only one of the two entries died — searching a
+          backlog and reordering a picture are different acts.
+
+          ALL THREE NARROWINGS ARE DOOR PARAMETERS — they land in the cache key
+          above and in the WHERE clause of every read behind it — which is the
+          only shape that can work when every number on screen is a COUNT(*)
+          somebody else took.
 
           `empty` is the WHOLE collection's count and never this tab's own
           answer (R50): the row must disappear for a team with no tickets, and
-          must not disappear because somebody filtered to a quiet client. */}
+          must not disappear because somebody filtered to a quiet client, or
+          typed a word nothing matches. */}
       <ToolbarRow
         empty={ticketTotal === 0}
+        // THE SAME PLACEHOLDER THE LIST TAB'S OWN BOX SAYS, deliberately the
+        // same words rather than a dashboard-flavoured variant: it is the same
+        // search, over the same tickets, through the same door-side clause, and
+        // a second wording would advertise a difference that does not exist.
+        search={
+          <SearchInput
+            value={text}
+            onChange={(e) => {
+              setText(e.currentTarget.value)
+              askDoor(e.currentTarget.value)
+            }}
+            // CLEARING IS IMMEDIATE ON BOTH VALUES, never debounced: "show me
+            // everything again" is one deliberate act, and making somebody
+            // watch a stale answer for a fifth of a second after it is the one
+            // moment a debounce is felt rather than unnoticed.
+            onClear={() => {
+              setText("")
+              setTerm("")
+            }}
+            placeholder={t("Search tickets…")}
+            className="w-full"
+          />
+        }
         filters={filterPill}
         toolbarPanel={filterPanel}
         // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
@@ -1421,6 +1513,41 @@ export function TicketsDashboard({
                 emptyDescription: t(
                   "Every ticket a client raises shows here while it is being worked on."
                 ),
+              }}
+            />
+          </CardContent>
+        </Card>
+      ) : narrowedToNothing ? (
+        /* ── THE QUESTION FOUND NOTHING ──────────────────────────────────
+           ONE SENTENCE, AND THAT IS THE WHOLE POINT OF THIS BRANCH. Without
+           it a term nothing matches is six panels each drawing its own
+           private "Nothing is open right now." — six true statements that
+           together read as a broken screen rather than as an answer. A
+           reader who typed a word wants to be told about the WORD.
+
+           IT NAMES THE TERM when there is one, because "nothing matched" on
+           its own is the same sentence a screen would show for any reason at
+           all, and the reader's next move (retype it, clear it) depends on
+           seeing what was actually asked. With only the facets narrowing,
+           the app's existing sentence is the right one and is reused
+           verbatim — `PagedFind` says exactly this over a searched-and-
+           filtered collection, and one wording for one situation is the
+           whole reason it is not written again here.
+
+           IT IS NOT THE COLLECTION'S EMPTY STATE, and the branch above it is
+           why the two cannot be confused: `ticketTotal === 0` is a team with
+           no tickets, which is a different fact and gets a different, and
+           welcoming, sentence. This one only ever appears once somebody has
+           asked something. */
+        <Card>
+          <CardContent className="p-4">
+            <ShapeStateBody
+              shape="collectionScreen"
+              state="empty"
+              copy={{
+                emptyTitle: term
+                  ? t("Nothing matched “{term}”.", { term })
+                  : t("Nothing matched. Try fewer words, or clear the filters."),
               }}
             />
           </CardContent>

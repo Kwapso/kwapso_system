@@ -19,7 +19,7 @@
 import { listGaps, triageGaps } from "@shared/triage-readiness"
 import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
-import { countCollectionWith, reportedTotal } from "@shared/workers/count"
+import { countCollection, countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import {
@@ -1016,6 +1016,27 @@ export type TicketDashboard = {
    * since it shipped, read from the same constant, so the dashboard and the
    * queue cannot come to disagree about what "late" means. */
   unopenedPastLine: number
+  /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
+   * above was taken over, counted once, through the one bounded seam (R16).
+   *
+   * IT EXISTS SO THE SCREEN CAN SAY "NOTHING MATCHED" IN ONE SENTENCE. Without
+   * it a dashboard whose search term finds nothing is six panels each drawing
+   * its own private zero, which is a screen that looks broken rather than a
+   * screen that answered. And it cannot be INFERRED from the arrays: a ticket
+   * with no kind and nothing closed sits in none of the grouped reads above,
+   * so "every array is empty" is a proposition about which GROUPINGS happen to
+   * exclude nulls today rather than about whether anything matched. Two of
+   * those arrays happen to partition the population between them right now —
+   * which is exactly the kind of accident that stops being true when somebody
+   * adds a `WHERE`, silently, with nothing red.
+   *
+   * BOUNDED, like every other total over this collection: tickets are a
+   * `GROWING_COLLECTIONS` member, so it goes through `countCollection` and
+   * stops at `TOTAL_COUNT_CAP` exactly as `countTickets` does. Nothing renders
+   * the NUMBER — the screen reads it as "is this zero" — so the ceiling costs
+   * no honesty here; it is used because an unbounded `COUNT(*)` over a growing
+   * table is the one read this codebase does not allow, whoever reads it. */
+  matched: number
 }
 
 /** THE WHOLE DASHBOARD, IN ONE ROUND TRIP.
@@ -1039,10 +1060,21 @@ export type TicketDashboard = {
  * dashboard has no rows to narrow — there is nothing on that tab a browser could
  * sieve.
  *
- * EIGHT STATEMENTS IN ONE WAVE. Each is its own round trip to the team database
+ * …AND THE THIRD FILTER IS THE SEARCH BOX (`q`, 7 Sep 2026). It is the same
+ * field on the same `TicketFilter` the LIST door binds its own `?q=` into, so it
+ * reaches the same `searchClause` inside the same `ticketWhere` — one matcher
+ * over description, reference and title, and therefore one answer. A term that
+ * finds eleven tickets on the list tab draws these panels over those eleven,
+ * and that is a property of there being no second matcher rather than of two
+ * matchers currently agreeing. Nothing in this function had to change to accept
+ * it, which is the point `appId` already made: a filter the list understood was
+ * already understood here.
+ *
+ * NINE STATEMENTS IN ONE WAVE. Each is its own round trip to the team database
  * (~150ms, measured 25 Aug 2026) and none depends on another's answer, so they
- * are one `Promise.all` rather than eight consecutive lines — the same reasoning
- * `createTicket`'s waves are built on. */
+ * are one `Promise.all` rather than nine consecutive lines — the same reasoning
+ * `createTicket`'s waves are built on. The ninth is `matched`, the population
+ * the other eight were grouped over; see the field's own note on the type. */
 export async function readTicketDashboard(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1072,7 +1104,10 @@ export async function readTicketDashboard(
   // ways of asking it would eventually be two answers.
   const unopenedCutoff = workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS).toISOString()
 
-  const [openByType, byAccountType, closure, trend, matrix, notRecorded, byApp, unopened] = await Promise.all([
+  // NINE STATEMENTS NOW, and the ninth is the population the other eight were
+  // grouped over — see `matched` on the type above for why it is counted rather
+  // than inferred from whether the eight came back empty.
+  const [openByType, byAccountType, closure, trend, matrix, notRecorded, byApp, unopened, matched] = await Promise.all([
     // 1B. Bounded by GROUPING: at most (kinds × stages) rows, and both sets are
     // collections that cannot run away.
     d1Query<{ help_type: string; status: string; n: number }>(
@@ -1330,6 +1365,17 @@ export async function readTicketDashboard(
         WHERE ${fenced} AND status = 'new' AND created_at < ? LIMIT 1`,
       [...where.params, unopenedCutoff]
     ),
+    // …AND HOW MANY TICKETS THE QUESTION FOUND AT ALL — the denominator under
+    // every picture above, over the identical `fenced` clause and the identical
+    // parameters, so it can never describe a different population from the one
+    // the panels were drawn from.
+    //
+    // THROUGH THE COUNT SEAM AND NEVER A BARE `COUNT(*)` (R16, amended): tickets
+    // grow with ordinary use, and the seam's own header is explicit that a
+    // `COUNT(*)` over a growing table is the one read in this product with no
+    // ceiling at all. `countCollection` wants the collection's own question
+    // selecting one row per member, which is exactly what `fenced` already is.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM help WHERE ${fenced}`, where.params),
   ])
 
   // `Number(...) || 0` on every tally, exactly as `byAccount` above does it: the
@@ -1377,6 +1423,10 @@ export async function readTicketDashboard(
       total: num(r.total_n),
     })),
     unopenedPastLine: num(unopened[0]?.n),
+    // Already a clamped number off the seam, so no `num(...)` — every other
+    // field here is unwrapping a JSON value the REST door handed back, and this
+    // one is not.
+    matched,
   }
 }
 

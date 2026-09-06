@@ -1563,6 +1563,7 @@ export const SEED: Catalogue = {
   "Nothing in Meetings this month.": { de: "Diesen Monat keine Termine.", es: "Nada en Reuniones este mes.", ca: "Res a Reunions aquest mes."},
   "Nothing logged yet": { de: "Noch nichts erfasst", es: "Aún no se ha registrado nada", ca: "Encara no s'ha registrat res"},
   "Nothing matched.": { de: "Nichts gefunden.", es: "Nada coincide.", ca: "Res no coincideix."},
+  "Nothing matched “{term}”.": { de: "Nichts passt zu „{term}“.", es: "Nada coincide con «{term}».", ca: "Res no coincideix amb «{term}»."},
   "Nothing new to bring in.": { de: "Es gibt nichts Neues zu importieren.", es: "No hay nada nuevo que importar.", ca: "No hi ha res nou per importar."},
   "Nothing to read yet.": { de: "Noch nichts zu lesen.", es: "Nada que leer todavía.", ca: "Encara no hi ha res per llegir."},
   "Nothing was deleted, this puts it back in front of the assistant.": { de: "Es wurde nichts gelöscht, damit steht es dem Assistenten wieder zur Verfügung.", es: "No se borró nada, esto vuelve a ponerlo delante del asistente.", ca: "No s'ha esborrat res, això el torna a posar davant de l'assistent."},

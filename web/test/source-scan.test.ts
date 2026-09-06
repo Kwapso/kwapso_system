@@ -22,6 +22,7 @@
 // JSON.parse) is proved to be a different job rather than a straggler.
 
 import { describe, expect, it } from "vitest"
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -96,6 +97,8 @@ describe("the one walker every law reads source through", () => {
 const HAND_ROLLED_STRIPPER_OK: Record<string, string> = {
   "web/test/theme-tokens.test.ts":
     "strips a CSS comment out of a CSS custom property's VALUE, read from tokens.css. Not TypeScript: `//` is not a comment in CSS, it is the middle of a url(), so the shared stripper is the wrong tool here and would silently eat one",
+  "shared/ui/foundations/tokens/build-tokens.mjs":
+    "the same CSS case, one step further away: it is the VENDORED KIT's own token build, reading its own tokens.css, and shared/ui/ is a dependency this repo may not hand-edit at all (web/test/vendored-kit.test.ts recomputes the content hash). It appeared here on 7 Sep 2026 only because this census widened to .mjs — the file has always been there. If a kit sync ever removes it this line goes red and gets deleted, which is the rot check working",
 }
 
 /** Every .ts/.tsx in the repo's own source — both front ends, every worker, and
@@ -107,13 +110,107 @@ const repoSources = () =>
     { extensions: [".ts", ".tsx"], relativeTo: ROOT }
   )
 
+/** EVERYTHING OF OURS THAT COULD HOLD A SECOND STRIPPER — deliberately a wider
+ * net than repoSources(), and the widening IS the fix.
+ *
+ * repoSources() is .ts/.tsx under the two front doors, the workers and shared/,
+ * because that is the source the property tests at the bottom of this file run
+ * the stripper OVER. But "is there a second stripper?" is a different question:
+ * it is not about what the laws read, it is about what any of our own code DOES.
+ *
+ * That census missed the worst copy in the repo for exactly two reasons at once,
+ * until 7 Sep 2026. `scripts/` was not a root, and `.mjs` was not an extension —
+ * so `scripts/smoke-portal.mjs` re-typed both regexes and nothing looked. It is
+ * the LAST step of `deploy:staging`, and it uses them to derive the R24
+ * internal-money door list off disk and then attack every one of those doors on
+ * a live environment. A blind stripper there does not produce a WRONG list of
+ * doors, it produces a SHORT one, and a short list of doors to attack passes —
+ * at deploy time, with a green line printed under it.
+ *
+ * So `scripts/` and `tools/` are roots, and `.mjs` counts. Both directories run
+ * inside `npm run check` (scripts through the suites that spawn them, tools
+ * through its own tsc project), and neither was ever exempt from the rule — only
+ * from the census that reads it. */
+const everySourceOfOurs = () =>
+  sourceFiles(
+    [
+      join(ROOT, "web"),
+      join(ROOT, "web-portal"),
+      join(ROOT, "workers"),
+      join(ROOT, "shared"),
+      join(ROOT, "scripts"),
+      join(ROOT, "tools"),
+    ],
+    { extensions: [".ts", ".tsx", ".mjs"], relativeTo: ROOT }
+  )
+
 describe("there is exactly one comment stripper", () => {
-  it("only shared/rules/source-scan.ts declares one", () => {
-    const declared = repoSources()
+  it("the census can see `scripts/` and `.mjs` — where the last copy hid", () => {
+    // A census that cannot reach the offender reports "all clear" in exactly the
+    // words it uses for "all correct". This asserts the net itself, before any
+    // of the questions asked through it, and it names the two files that made the
+    // hole: the deploy gate, and the tokeniser it now imports.
+    const rels = new Set(everySourceOfOurs().map((f) => f.rel))
+    expect(rels.has("scripts/smoke-portal.mjs"), "the deploy gate must be in the census").toBe(true)
+    expect(rels.has("shared/rules/strip-comments.mjs"), "…and so must the tokeniser").toBe(true)
+    const scripts = [...rels].filter((r) => r.startsWith("scripts/"))
+    expect(scripts.length, "scripts/ is full of .mjs — this must not be a short read").toBeGreaterThan(50)
+    expect(
+      everySourceOfOurs().length,
+      "the wide census must be strictly wider than the .ts/.tsx one"
+    ).toBeGreaterThan(repoSources().length)
+  })
+
+  it("only shared/rules/strip-comments.mjs declares one", () => {
+    // It moved out of source-scan.ts on 7 Sep 2026 and into plain JavaScript, so
+    // that `scripts/*.mjs` — which run under plain node with no build step — can
+    // import the same code the laws do instead of re-typing it. source-scan.ts
+    // re-exports it, so every TypeScript caller is unchanged; a re-export is not
+    // a declaration and must not be counted as one.
+    const declared = everySourceOfOurs()
       .filter((f) => /(?:function|const)\s+stripComments\b/.test(f.source))
       .map((f) => f.rel)
     expect(declared.length, "the scan found no declaration at all — it has gone blind").toBe(1)
-    expect(declared).toEqual(["shared/rules/source-scan.ts"])
+    expect(declared).toEqual(["shared/rules/strip-comments.mjs"])
+  })
+
+  it("and source-scan.ts still hands it to every TypeScript caller", () => {
+    // The compatibility half of the move. Forty-odd suites import the stripper
+    // from "@shared/rules/source-scan" and none of them changed; if this
+    // re-export were dropped the failure would be a compile error in every one of
+    // them, which is loud — but the line is cheap and states the intent.
+    const scan = everySourceOfOurs().find((f) => f.rel === "shared/rules/source-scan.ts")
+    expect(scan, "source-scan.ts must exist").toBeDefined()
+    expect(scan?.source).toContain('export { stripComments, stripJsoncComments } from "./strip-comments.mjs"')
+  })
+
+  it("the deploy gate reads source through the shared tokeniser, not its own", () => {
+    // NAMED, like the mcp gating seam below, because of what it does with the
+    // answer: scripts/smoke-portal.mjs derives the R24 internal-money door list
+    // off disk and then proves each door is refused at BOTH hostnames on a live
+    // environment. It ran the two regexes until 7 Sep 2026 — a deploy gate
+    // deciding which doors to attack from source it could not fully see.
+    const gate = everySourceOfOurs().find((f) => f.rel === "scripts/smoke-portal.mjs")
+    expect(gate, "the portal smoke must exist — it is the last step of deploy:staging").toBeDefined()
+    expect(
+      gate?.source,
+      "it must import the one tokeniser (the .mjs directly: this file runs under plain node)"
+    ).toContain('from "../shared/rules/strip-comments.mjs"')
+  })
+
+  it("the declaration file and the implementation export the same names", () => {
+    // The one seam the move introduced, so the one place it can drift. The
+    // implementation is .mjs with JSDoc; the nine worker tsconfigs have `allowJs`
+    // off and will not open a .mjs at all, so the TypeScript callers read
+    // strip-comments.d.mts instead. Two files, one contract — checked, not
+    // trusted. (Its header carries the measured TS7016 that forced it.)
+    const impl = everySourceOfOurs().find((f) => f.rel === "shared/rules/strip-comments.mjs")
+    const dts = readFileSync(join(ROOT, "shared", "rules", "strip-comments.d.mts"), "utf8")
+    const named = (src: string, re: RegExp) => [...src.matchAll(re)].map((m) => m[1]).sort()
+    const exported = named(stripComments(impl?.source ?? ""), /export\s+function\s+(\w+)/g)
+    const declared = named(dts, /export\s+declare\s+function\s+(\w+)/g)
+    expect(exported, "the implementation must export something — this has gone blind").not.toEqual([])
+    expect(declared, "the declaration file and the implementation have drifted apart").toEqual(exported)
   })
 
   it("nobody re-types its regexes inline instead", () => {
@@ -127,9 +224,15 @@ describe("there is exactly one comment stripper", () => {
     // guarding a real law — the portal's R3/R4/R7/R16 suite among them. Both
     // halves are matched now. The patterns are assembled from pieces so this file
     // does not report itself.
+    //
+    // AND IT RUNS OVER `everySourceOfOurs()` RATHER THAN `repoSources()`, which
+    // is the second widening and the one that took a year: matching both halves
+    // still only ever looked at .ts/.tsx under web/, web-portal/, workers/ and
+    // shared/, so the twelfth copy — `scripts/smoke-portal.mjs`, a DEPLOY GATE —
+    // was outside the net by directory and by extension at the same time.
     const LINE_REGEX = "replace(/(^|[^:])" + "\\/\\/" + "[^\\n]*/gm"
     const BLOCK_REGEX = "/" + "\\/\\*[\\s\\S]*?\\*\\/" + "/g"
-    const offenders = repoSources()
+    const offenders = everySourceOfOurs()
       .filter((f) => f.source.includes(LINE_REGEX) || f.source.includes(BLOCK_REGEX))
       .map((f) => f.rel)
       .filter((rel) => !HAND_ROLLED_STRIPPER_OK[rel])
@@ -150,8 +253,11 @@ describe("there is exactly one comment stripper", () => {
     // that reason is gone; handling the CLOSING token at all is the tell, and
     // there are only two places it may appear.
     const CLOSER = '"' + "*" + '/"'
-    const allowed = new Set(["shared/rules/source-scan.ts", "web/test/source-scan.test.ts"])
-    const offenders = repoSources()
+    // strip-comments.mjs, not source-scan.ts: the tokeniser moved next door into
+    // plain JavaScript on 7 Sep 2026 so the scripts could import it. Same two
+    // places, and the second is still this file's own deliberately dumb oracle.
+    const allowed = new Set(["shared/rules/strip-comments.mjs", "web/test/source-scan.test.ts"])
+    const offenders = everySourceOfOurs()
       .filter((f) => f.source.includes(CLOSER) && !allowed.has(f.rel))
       .map((f) => f.rel)
     expect(
@@ -161,7 +267,7 @@ describe("there is exactly one comment stripper", () => {
     // …and both of the two really do, so this is not passing over an empty set.
     for (const rel of allowed)
       expect(
-        repoSources().some((f) => f.rel === rel && f.source.includes(CLOSER)),
+        everySourceOfOurs().some((f) => f.rel === rel && f.source.includes(CLOSER)),
         `${rel} was the tokeniser (or the guard's own dumb oracle) — it has moved`
       ).toBe(true)
   })
@@ -170,7 +276,7 @@ describe("there is exactly one comment stripper", () => {
     // Rot check, so the list can only shrink.
     const BLOCK_REGEX = "/" + "\\/\\*[\\s\\S]*?\\*\\/" + "/g"
     const present = new Set(
-      repoSources()
+      everySourceOfOurs()
         .filter((f) => f.source.includes(BLOCK_REGEX))
         .map((f) => f.rel)
     )

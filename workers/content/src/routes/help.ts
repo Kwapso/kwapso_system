@@ -665,8 +665,8 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
 /** GET /api/content/help/dashboard — the Tickets screen's Dashboard tab, in one
  * read (help:read).
  *
- * EIGHT GROUPED READS, ONE DOOR, over the everyday list (`EVERYDAY_LIST`) —
- * narrowed by the three filters below and by nothing else.
+ * NINE GROUPED READS, ONE DOOR, over the everyday list (`EVERYDAY_LIST`) —
+ * narrowed by the four filters below and by nothing else.
  *
  * THE FILTERS ARE PARAMETERS OF THIS DOOR, NOT A SIEVE IN THE BROWSER, and
  * that is the whole reason they are parsed here rather than handled on the
@@ -677,7 +677,20 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
  * taking the counts again over a smaller WHERE — a filter that did not reach the
  * door would change nothing at all on screen.
  *
- * `accountId`, `helpType` and `appId`, and NOTHING ELSE. `status` is deliberately
+ * `q` IS THE SEARCH BOX, AND IT IS THE SAME SEARCH THE LIST DOES. Client, 7 Sep
+ * 2026, twice: "on the dashboard, I'm missing the full toolbar", then "still
+ * missing full toolbar!". Sort is absent by her own earlier ruling, so the box
+ * was the one control a sibling ticket tab had that this row did not. It is a
+ * fourth narrowing of exactly the same SHAPE as the three above — a parameter of
+ * this door, checked in the same position, spent in the WHERE clause of all nine
+ * grouped reads through `ticketWhere`'s own `searchClause`, which is the very
+ * function `GET /api/content/help` binds its own `?q=` into. One clause, one
+ * matcher, one answer: a term that finds eleven tickets on the list tab draws
+ * this dashboard over those same eleven. Two different answers to one question
+ * typed into two boxes on one screen is the failure that mattered here, and the
+ * only defence against it is that neither box owns a matcher of its own.
+ *
+ * `accountId`, `helpType`, `appId` and `q`, and NOTHING ELSE. `status` is deliberately
  * not offered and `readTicketDashboard` drops it if anything ever sets it: a
  * dashboard narrowed to one stage would draw a pipeline of one row and a
  * closing-time chart of tickets that have not closed, under headings that all
@@ -688,7 +701,7 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
  * each app, the ticket page … also create another view for the dashboard … like
  * a mini version, a filtered version"). It is the third narrowing and it is the
  * same SHAPE as the other two — a parameter of this door, spent in the WHERE
- * clause of all eight grouped reads through `ticketWhere`'s own `appClause`,
+ * clause of all nine grouped reads through `ticketWhere`'s own `appClause`,
  * which the everyday list and its counts have used since the app record grew a
  * Tickets tab. Nothing in `readTicketDashboard` had to change to accept it,
  * which is the whole reason `TicketFilter` is one declared type (R19): a filter
@@ -702,7 +715,7 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
  * panels a caller intends to draw would be the screen's layout decided in SQL.
  *
  * ITS OWN DOOR, NOT MORE FACETS ON THE LIST: `readTicketDashboard` (lib/help)
- * opens with the measurement — eight extra grouped scans on every ticket page,
+ * opens with the measurement — nine extra grouped scans on every ticket page,
  * for a tab most reads never show.
  *
  * REFUSED TO A CLIENT LOGIN (R21), and this is the clearest case of that rule in
@@ -729,6 +742,12 @@ export async function getHelpDashboard(request: Request, env: Env): Promise<Resp
       // same position as its two neighbours, because a value off a query string
       // is untrusted whether it ends up in a WHERE or in a GROUP BY.
       appId: queryText(params.get("appId"), "App"),
+      // THE SEARCH BOX — see this handler's header. Named `q` because that is
+      // what the LIST door calls it (`ticketFilterFrom`), checked in the same
+      // position as its three neighbours, and handed to `readTicketDashboard`
+      // as an ordinary `TicketFilter` field, so the matching is `searchClause`'s
+      // and cannot be a second idea of the same word.
+      q: queryText(params.get("q"), "Search"),
     })
   )
 }

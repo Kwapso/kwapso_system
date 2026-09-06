@@ -36,6 +36,17 @@
     "**/*.tsx",
     "../shared/**/*.ts",
     "../shared/**/*.tsx",
+    // THE ONE .mjs IN THE PROGRAM, and named one file wide on purpose.
+    // shared/rules/strip-comments.mjs is the comment tokeniser every law reads
+    // source through. It is plain JavaScript because `scripts/*.mjs` run under
+    // plain node with no build step and one of them is the last step of
+    // `deploy:staging` — its own header has the reasoning. It carries full JSDoc
+    // types and a `// @ts-check`, and this line is what puts it in a program so
+    // those types are CHECKED rather than merely written down. A broad
+    // `../shared/**/*.mjs` would drag in the vendored kit's build scripts and
+    // shared/web/postcss.config.mjs, which reach for node APIs this program has
+    // no types for; shared/rules/ is the law machinery and nothing else.
+    "../shared/rules/*.mjs",
     // shared/web/ is the BROWSER half of shared/ — the seams both front doors
     // render (FormShell, formatCount, the cache store, the draft hook). It is
     // .tsx as well as .ts, and it is excluded from every worker's tsconfig,

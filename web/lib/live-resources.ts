@@ -485,13 +485,13 @@ export function triageKey(teamId: string): string {
  * different moments of the same backlog — a chart of open work beside a chart of
  * the same open work counted a minute earlier.
  *
- * …AND ONE KEY PER QUESTION, which is what the three filter parts are for. The
- * tab's toolbar narrows by client and by kind AT THE DOOR (a dashboard has no
- * rows for a browser to sieve), so "all clients" and "Bergmann's" are two
- * different answers and must not share an entry — the same arrangement
- * `helpFacetKey` makes for the ticket list's own sub-tabs. Every part is in the
- * key even when empty, so the unfiltered key is a fixed shape rather than a
- * prefix of every filtered one.
+ * …AND ONE KEY PER QUESTION, which is what the four narrowing parts are for. The
+ * tab's toolbar narrows by client, by kind and by SEARCH TERM, all three AT THE
+ * DOOR (a dashboard has no rows for a browser to sieve), so "all clients" and
+ * "Bergmann's" are two different answers and must not share an entry — the same
+ * arrangement `helpFacetKey` makes for the ticket list's own sub-tabs. Every
+ * part is in the key even when empty, so the unfiltered key is a fixed shape
+ * rather than a prefix of every filtered one.
  *
  * THE THIRD PART IS THE SYSTEM, AND IT IS THE ONE THAT WOULD HAVE BEEN A BUG.
  * The app record's Tickets tab now has a Dashboard view of its own — the same
@@ -503,6 +503,23 @@ export function triageKey(teamId: string): string {
  * defect `sliceKey` was written for one file along ("opening a second app showed
  * the first one's work"), and it is worse here, because a chart carries no row
  * a reader could recognise as belonging to somewhere else.
+ *
+ * THE FOURTH PART IS THE SEARCH TERM, AND IT IS THE SAME BUG THE THIRD ONE WAS
+ * ADDED TO PREVENT. The Dashboard tab grew a search box on 7 Sep 2026 ("still
+ * missing full toolbar!"), and the term is a door parameter like the two facets
+ * beside it, spent in the WHERE clause of every grouped read behind this key.
+ * Left out, two searches would share one entry: typing "invoice", then clearing
+ * it and typing "hosting", would paint the first term's numbers under the second
+ * term's box, instantly, from cache, and only correct itself once the read
+ * landed. That is exactly what `appId` was added for one paragraph up, and it is
+ * worse for a term than for a system, because a term changes on every keystroke
+ * the debounce lets through.
+ *
+ * IT IS LAST BECAUSE IT IS THE ONLY FREE TEXT HERE. The other three parts are
+ * ids and vocabulary words; a person can type a colon. With the term last, the
+ * key stays injective anyway — everything after the fourth colon is the term,
+ * whatever is in it — where a colon in a middle part could make two different
+ * questions spell one key.
  *
  * A DERIVED cache, so it is dropped and re-read rather than patched: there is no
  * row in it to patch. Dropped by PREFIX in `help`'s own `slicePrefix` below
@@ -517,9 +534,10 @@ export function helpDashboardKey(
   teamId: string,
   accountId = "",
   helpType = "",
-  appId = ""
+  appId = "",
+  q = ""
 ): string {
-  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}:${appId}`
+  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}:${appId}:${q}`
 }
 
 /** THE PULSE — Home's big numbers and its two charts, in one cache entry.

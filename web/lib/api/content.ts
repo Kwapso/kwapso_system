@@ -288,6 +288,18 @@ export type TicketDashboard = {
    * same function that queue uses, so the two can never disagree about what
    * "late" means. */
   unopenedPastLine: number
+  /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
+   * above was taken over, counted once by the door through the bounded count
+   * seam (R16).
+   *
+   * The screen reads it as a yes/no — did anything match at all — and never
+   * renders the figure, which is why no `formatCount` badge appears beside it.
+   * It exists so a search that finds nothing can be ONE sentence on the screen
+   * instead of six panels each drawing its own private zero, and it is counted
+   * rather than inferred from the arrays because a ticket with no kind and
+   * nothing closed sits in none of them: "every array is empty" is a fact about
+   * which groupings exclude nulls today, not about whether anything matched. */
+  matched: number
 }
 
 export const content = {
@@ -362,11 +374,19 @@ export const content = {
    * one screen along, and why it rides the same object rather than a second
    * function.
    *
+   * `q` IS THE SEARCH BOX, and it is the SAME `q` `content.help()` sends one
+   * method along — one name, one door-side matcher (`searchClause`, over the
+   * description, the reference and the title), so a term typed on the Dashboard
+   * tab and the same term typed on the list tab describe the same tickets. It is
+   * the third toolbar argument and the same shape as the first two: it reaches
+   * the WHERE clause, because there is nothing on screen for a browser to sieve.
+   *
    * There is no `status` and no sort. A dashboard narrowed to one stage would
    * draw a pipeline of one row under a heading that says backlog, and a
    * dashboard has no row order to offer (R53 — the exemption is on file). */
-  helpDashboard: (opts: { accountId?: string; helpType?: string; appId?: string } = {}) =>
-    api<TicketDashboard>(`/api/content/help/dashboard${listQuery(opts)}`),
+  helpDashboard: (
+    opts: { accountId?: string; helpType?: string; appId?: string; q?: string } = {}
+  ) => api<TicketDashboard>(`/api/content/help/dashboard${listQuery(opts)}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
    * the assistant and then never found again by a person. */

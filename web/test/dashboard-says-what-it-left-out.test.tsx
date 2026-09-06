@@ -66,6 +66,12 @@ const EMPTY: TicketDashboard = {
   raisedAsNotRecorded: 0,
   openByApp: [],
   unopenedPastLine: 0,
+  // NOT ZERO. `EMPTY` is a backlog whose GROUPINGS came back empty, which is
+  // what the panels' own subtractions are tested against; a zero here would
+  // instead be "the question found no tickets at all", which is the separate
+  // narrowed-to-nothing sentence and would swap the whole screen out from under
+  // every assertion below. The two are deliberately different facts.
+  matched: 62,
 }
 
 /** A backlog with something in every panel, so the happy path is exercised as
@@ -110,6 +116,7 @@ const FULL: TicketDashboard = {
     { appId: null, appName: null, helpType: "Issue", open: 2, total: 4 },
   ],
   unopenedPastLine: 7,
+  matched: 245,
 }
 
 function show(view: TicketDashboard | undefined, total: number | undefined = 62) {

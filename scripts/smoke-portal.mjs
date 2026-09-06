@@ -57,6 +57,13 @@ import { fileURLToPath } from "node:url"
 import { makeApi, timedFetch } from "./lib/api.mjs"
 import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
 import { FRONT_DOORS } from "./lib/front-doors.mjs"
+// THE SAME TOKENISER THE LAWS READ SOURCE THROUGH — not a copy of it, and not a
+// pair of regexes. It is plain JavaScript precisely so this file can import it
+// under plain node with no build step; shared/rules/strip-comments.mjs says why
+// at length. This script DERIVES a door list off disk (see internalMoneyDoors
+// below) and then attacks those doors on a live environment, so a stripper that
+// cannot see all of the source is a gate that cannot see all of the doors.
+import { stripComments } from "../shared/rules/strip-comments.mjs"
 
 const BASE = process.env.SMOKE_BASE || FRONT_DOORS.staging.agency
 // The REAL hostname, not the workers.dev alias: the Google sign-in door
@@ -192,9 +199,30 @@ async function allPages(call, path, key, cookie) {
 
 /* ------------------------------ reading the source ---------------------------- */
 
-/** A sentence ABOUT a call is not a call. Rough but sufficient: the `[^:]` guard
- * keeps `https://` intact, which is the only false positive that matters here. */
-const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")
+// A SENTENCE ABOUT A CALL IS NOT A CALL, which is why everything below is read
+// through `stripComments` (imported above) before it is matched.
+//
+// This used to be two regexes written out here — one for block comments, one for
+// line comments with a `[^:]` guard in front of it so that `https://` survived —
+// and it was the LAST copy of that pair in the repo, left behind when the laws
+// moved to the tokeniser on 7 Sep 2026. (They are not spelled out in this
+// comment on purpose: web/test/source-scan.test.ts censuses this file for those
+// exact two patterns now, and a comment quoting one would read as a twelfth
+// copy. That is the census doing its job, not a nuisance.)
+//
+// The regexes are blind in a way that is silent rather than loud, and the shape
+// is worth carrying in your head: `accept="image/*"` in a JSX attribute
+// puts the two characters that open a block comment inside a STRING, and the
+// regex closes that "comment" sixty lines below at the end of some JSDoc.
+// Everything in between is gone before anything reads it.
+//
+// That mattered more here than anywhere else. `internalMoneyDoors()` below
+// derives the R24 door list from `internal-money.ts` and from every tenancy
+// handler that calls into it, and this script then proves each of those doors is
+// refused at both hostnames. A blinded scan does not produce a WRONG list, it
+// produces a SHORT one — and a short list of doors to attack passes, at deploy
+// time, with a green line printed under it. Absence looks exactly like
+// compliance. There is a floor check on the count for the same reason.
 const read = (p) => readFileSync(`${REPO}${p}`, "utf8")
 
 /** THE PORTAL'S SURFACE, read off the gateway's own table — never typed here.
@@ -218,14 +246,14 @@ function portalDoors() {
  * actually DEPLOYED, at both hostnames, which is a different sentence — a
  * gateway can be red-green correct in the repo and stale in the account. */
 function internalMoneyDoors() {
-  const internal = strip(read("workers/tenancy/src/lib/internal-money.ts"))
+  const internal = stripComments(read("workers/tenancy/src/lib/internal-money.ts"))
   const exported = [...internal.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
   if (exported.length < 4) stop("the internal-money scan found no exports", "it has gone blind")
 
   const dir = `${REPO}workers/tenancy/src/routes`
   const fns = new Map()
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const src = strip(readFileSync(`${dir}/${file}`, "utf8"))
+    const src = stripComments(readFileSync(`${dir}/${file}`, "utf8"))
     const starts = [...src.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
     starts.forEach((m, i) => fns.set(m[1], src.slice(m.index, starts[i + 1]?.index ?? src.length)))
   }
@@ -249,7 +277,7 @@ function portalListeners() {
   // scan that stopped at the first `=` never reached the opening brace.
   const table = /export const PORTAL_LISTENERS[\s\S]*?=\s*\{\r?\n([\s\S]*?)\r?\n\}/.exec(src)
   if (!table) stop("PORTAL_LISTENERS not found", "did the registry move?")
-  const names = [...strip(table[1]).matchAll(/^\s*(\w+):\s*\(/gm)].map((m) => m[1])
+  const names = [...stripComments(table[1]).matchAll(/^\s*(\w+):\s*\(/gm)].map((m) => m[1])
   if (names.length < 5) stop("PORTAL_LISTENERS did not parse", `found ${names.length} resources`)
   return names
 }
