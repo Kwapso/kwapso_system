@@ -369,7 +369,13 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       app: m.appName ?? "—",
       where: m.location ?? "—",
       written: m.notes ? "Yes" : "—",
-      reference: m.ref ?? "—",
+      // THE NUMBER, FOR THE CHIP IN FRONT OF THE NAME (the recipe's own
+      // `reference` column, screens.ts). It was `reference: m.ref ?? "—"` and
+      // had no reader at all after the All table's Reference COLUMN was cut —
+      // a row key rendering an em dash into nothing. Raw and nullable now,
+      // because `RecordRef` decides what an absent one looks like, and what it
+      // looks like is nothing.
+      ref: m.ref,
     })),
   }
 }

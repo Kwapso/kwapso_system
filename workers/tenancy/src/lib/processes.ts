@@ -150,17 +150,27 @@ function appsWhere(
   // instead of a string, and invisible because the withheld field never appears
   // in the response. A filter is a read.
   //
-  // `name` and `stage` ride to everyone who sees the row (8.11: everyone SEES
-  // every app), so the name is the whole safe surface — and it is what a person
-  // types anyway.
+  // `name`, `stage` AND `ref` ride to everyone who sees the row (8.11: everyone
+  // SEES every app), so those are the whole safe surface — and the name is what
+  // a person types anyway.
+  //
+  // THE REFERENCE JOINED IT ON 7 Sep 2026, when the app's number went onto the
+  // row itself (the black chip in front of the name, apps-screen.tsx). It sits
+  // in the same "rides to everyone" tier as `name` and `stage` — it is selected
+  // unconditionally and returned on every row — so it is inside the safe
+  // surface this paragraph draws, not outside it. It was absent by omission
+  // rather than by the argument above, and a number a person can read off a
+  // list and then not find is worse than one they never saw. Never null on an
+  // app (shared/workers/refs.ts mints it whether or not a client is named), but
+  // `COALESCE` anyway for the rows that predate the counter.
   //
   // ESCAPED, for the same two reasons the accounts search is: `%` and `_` are
   // LIKE's own wildcards, so an unescaped needle answers a different question
   // than the one typed, and a pattern of alternating `%` costs SQLite
   // exponential time over the whole table for a handful of bytes.
   if (opts.q) {
-    filters.push("name LIKE ? ESCAPE '\\'")
-    params.push(`%${likeLiteral(opts.q)}%`)
+    filters.push("(name LIKE ? ESCAPE '\\' OR COALESCE(ref, '') LIKE ? ESCAPE '\\')")
+    params.push(`%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`)
   }
   return { sql: where(filters), params }
 }

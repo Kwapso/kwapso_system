@@ -583,6 +583,14 @@ const meetingsListRecipe: ScreenRecipe = {
   binding: { module: "meetings" },
   gate: { module: "meetings", right: "read" },
   fields: [field("name", "Meeting"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME, the same black chip every other collection
+  // leads with. `shapeMeetingsList` has carried this column since the Reference
+  // COLUMN was cut from the All table ("`Reference` already rides the record's
+  // own eyebrow (D4)", meetings-screen.tsx) — and that cut left the key with no
+  // reader at all, so a meeting was the one record whose number appeared on its
+  // own screen and nowhere you could find it from. The column ruling stands:
+  // this is not a seventh column, it is the chip in front of the first one.
+  reference: "ref",
   // The record's own face in the leading slot (R35). Every shaper builds a
   // `mark` node — a picture where the record has one, its type's glyph
   // where the type has one, and its initial where it has neither, which
@@ -637,6 +645,11 @@ const storiesListRecipe: ScreenRecipe = {
   binding: { module: "stories" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Story"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The story TYPE's glyph in the leading slot, the same slot tickets and
   // accounts fill (library v0.11.0 `leading`). `shapeStories` builds the node.
   leading: "mark",
@@ -659,6 +672,11 @@ const sprintsListRecipe: ScreenRecipe = {
   binding: { module: "sprints" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Sprint"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The sprint TYPE's glyph, the same one the Overview groups lead with.
   leading: "mark",
   actions: [],
@@ -680,6 +698,11 @@ const appsListRecipe: ScreenRecipe = {
   binding: { module: "apps" },
   gate: { module: "processes", right: "read" },
   fields: [field("name", "App"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The record's own face in the leading slot (R35). Every shaper builds a
   // `mark` node — a picture where the record has one, its type's glyph
   // where the type has one, and its initial where it has neither, which

@@ -100,6 +100,7 @@ import { TicketAttachments } from "@/components/ticket-attachments"
 import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RichText } from "@shared/web/rich-text-view"
 
 /** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
@@ -272,9 +273,18 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * ("Open", "In progress") beside this one, so the same fact appeared twice
        * and half of it was the agency's vocabulary rather than the client's. */}
       <Card className="flex flex-col gap-4 p-4">
-        <Badge variant={status.variant} className="w-fit">
-          {t(status.label)}
-        </Badge>
+        {/* THE NUMBER AND THE STATE, in that order — the number is what a client
+            reads down the phone ("I'm calling about T0412"), so it leads. The
+            chip is `RecordRef`, the same component and the same lozenge the
+            agency's own ticket screen draws, and `ticket-row.tsx`'s header
+            carries the whole argument for why a reference crosses the fence
+            when an assignee does not. */}
+        <span className={`${REF_LEADS_NAME} w-fit flex-wrap`}>
+          <RecordRef value={ticket.ref} />
+          <Badge variant={status.variant} className="w-fit">
+            {t(status.label)}
+          </Badge>
+        </span>
         <RichText html={ticket.description} className="break-words" />
       </Card>
 

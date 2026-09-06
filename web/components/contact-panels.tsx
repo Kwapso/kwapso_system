@@ -38,6 +38,7 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
 import { primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import { richTextPlain } from "@shared/web/rich-text"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 
 /** Every list on this file narrows an already-loaded array in the browser, the
  * same shape `selectable-screen.tsx`'s own toolbar uses — Companies is truly
@@ -353,7 +354,15 @@ export function ContactTicketsPanel({
         {shown.map((ticket) => (
           <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{richTextPlain(ticket.description)}</p>
+              {/* THE TICKET'S NUMBER, in front of what was asked. This row is a
+                  ticket's face on somebody else's screen (R35) and it carried
+                  no reference at all — so a person reading a contact's tickets
+                  could not quote one back without opening it. Same chip, same
+                  position as the ticket collection's own table. */}
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={ticket.ref} />
+                <span className="min-w-0 truncate">{richTextPlain(ticket.description)}</span>
+              </p>
               <p className="text-muted-foreground truncate text-xs">
                 {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
               </p>
@@ -474,7 +483,12 @@ export function ContactMeetingsPanel({
         {shown.map((m) => (
           <Row key={m.id} onClick={() => softNavigate(`${meetingsBase}/${m.id}`)}>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{m.title}</p>
+              {/* The meeting's number, in front of its title — see the tickets
+                  panel above. */}
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={m.ref} />
+                <span className="min-w-0 truncate">{m.title}</span>
+              </p>
               <p className="text-muted-foreground truncate text-xs">
                 {/* The date is the first thing here and it is also the answer to
                     "has it happened?", which is why the status word that used to

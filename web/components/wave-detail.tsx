@@ -63,6 +63,7 @@ import type { Sprint } from "@shared/types"
 import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -457,13 +458,22 @@ export function WaveDetailScreen({
                         {/* R35 — a record row carries its face. */}
                         <RecordMark name={s.name} />
                         <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => softNavigate(`${basePath}/${waveId}/sprints/${s.id}`)}
-                            className="hover:text-foreground block max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
-                          >
-                            {s.name}
-                          </button>
+                          {/* THE SPRINT'S OWN NUMBER, in front of its name — the
+                              same black chip the sprints collection and every
+                              other sprint face draw. A sprint nested here had
+                              no reference at all, so the wave was the one
+                              screen where you could see a sprint and not say
+                              which one out loud. */}
+                          <span className={REF_LEADS_NAME}>
+                            <RecordRef value={s.ref} />
+                            <button
+                              type="button"
+                              onClick={() => softNavigate(`${basePath}/${waveId}/sprints/${s.id}`)}
+                              className="hover:text-foreground block min-w-0 max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
+                            >
+                              {s.name}
+                            </button>
+                          </span>
                           <p className="text-muted-foreground truncate text-xs">
                             {waveDates(s, t, lang)}
                           </p>

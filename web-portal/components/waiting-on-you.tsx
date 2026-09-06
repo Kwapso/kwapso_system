@@ -37,6 +37,7 @@ import { cacheKeys } from "@/lib/live-resources"
 import { usePortalTodos } from "@/lib/todos"
 import { ErrorPanel } from "@/components/error-panel"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RichText } from "@shared/web/rich-text-view"
 
 /** What a browser will turn into a data URL for us. Generous for a logo or a
@@ -123,11 +124,19 @@ export function WaitingOnYou() {
         {open.map((todo) => (
           <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
             <div className="min-w-0">
-              <p className="font-medium">{todo.title}</p>
+              {/* THE NUMBER LEADS THE TITLE, as the black chip. It was a ` ·
+                  I0007` tacked onto the end of the date line below — the same
+                  fact, said in the quietest ink on the row, third, after the
+                  deadline. A reference is what somebody quotes back at us; it
+                  goes where a reference goes on every other surface of this
+                  product now. */}
+              <p className={`${REF_LEADS_NAME} font-medium`}>
+                <RecordRef value={todo.ref} />
+                <span className="min-w-0 truncate">{todo.title}</span>
+              </p>
               {todo.detail && <RichText html={todo.detail} className="text-muted-foreground" />}
               <p className="text-muted-foreground text-sm">
                 {todo.dueOn ? `By ${formatDate(todo.dueOn, lang)}` : t("No date on it")}
-                {todo.ref ? ` · ${todo.ref}` : ""}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">

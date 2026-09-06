@@ -230,6 +230,14 @@ export function TaskFormDialog({
       <Field config={detailField} htmlFor="task-detail" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(detailField.label)}
+          disabled={busy}
           defaultValue={values.detail}
           onChange={(html) => setValues((s) => ({ ...s, detail: html }))}
           className="min-h-32"

@@ -54,6 +54,7 @@ import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activ
 import { InAppLink } from "@/components/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef } from "@shared/web/record-ref"
 import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage, useT } from "@shared/web/language"
@@ -796,8 +797,16 @@ export function RecordScreen({
    */
   /** The reference a person quotes on the phone. Drawn as the charcoal chip,
    * now ABOVE the title (client ruling, 2026-09-01, reversing "below the
-   * title" below): "the black chip is always the ID". */
-  recordNumber?: React.ReactNode
+   * title" below): "the black chip is always the ID".
+   *
+   * A STRING, not a node, and the tightening is the point: this is the number
+   * itself and the chip around it is not the caller's decision. It was
+   * `React.ReactNode` while this file drew the badge inline; every one of the
+   * seven call sites has always passed a plain `record.ref` (or an account's
+   * `code`), and typing it that way is what lets `RecordRef` own the mark here
+   * exactly as it owns it in every list row. Absent/empty draws nothing at all
+   * — the component decides that, not the seven callers. */
+  recordNumber?: string
   /** What kind of record this is, or which collection it belongs to — the chip
    * beside the ID. "add a chip for Padelbase like in the example". Pass a
    * clickable node (an `InAppLink` or a `Button variant="link"` wrapped around
@@ -948,7 +957,15 @@ export function RecordScreen({
   const hasIdentity = recordNumber !== undefined || collectionLabel !== undefined || chips !== undefined
   const identityChips = !hasIdentity ? undefined : (
     <span className={IDENTITY_ROW}>
-      {recordNumber !== undefined ? <Badge variant="inverse">{recordNumber}</Badge> : null}
+      {/* THE ONE COMPONENT THAT DRAWS A REFERENCE (shared/web/record-ref.tsx).
+          This line used to build the badge itself, and three list surfaces
+          built the same lozenge separately — the detail header being the one
+          that did NOT carry `tabular-nums`, so the same number set differently
+          on a record's own screen and in the list you reached it from. It
+          reaches `size="pill"` twice over now: once from the component and once
+          from `IDENTITY_ROW`'s rebind below, which agreed by luck before and
+          agrees by construction since. */}
+      <RecordRef value={recordNumber} />
       {collectionLabel !== undefined ? <Badge>{collectionLabel}</Badge> : null}
       {chips}
     </span>

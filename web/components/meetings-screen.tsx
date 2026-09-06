@@ -604,6 +604,15 @@ export function MeetingsScreen({
                 <RecordTable
                   columns={ALL_COLUMN_HEADERS}
                   rows={data.rows ?? []}
+                  // THE NUMBER IN FRONT OF THE MEETING, not a seventh column.
+                  // The `Reference` column was cut from this table on purpose
+                  // ("already rides the record's own eyebrow (D4)", above) and
+                  // that ruling stands — a column of identical black lozenges
+                  // is furniture. What it left behind was a meeting whose
+                  // number appeared on its own screen and on no list you could
+                  // find it from, which is the client's September instruction
+                  // read the other way round: the ID leads the title.
+                  refColumn="ref"
                   config={tableRecipe.collection as CollectionConfig}
                   order={found.order}
                   actions={visibleActions(tableRecipe, rights, onAction)}

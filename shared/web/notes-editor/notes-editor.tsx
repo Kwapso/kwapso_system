@@ -73,6 +73,52 @@
 // `border`) separates from the text below — "a thin toolbar strip inside the
 // same bordered box", read back verbatim.
 
+// ── THE LABEL ABOVE IT WAS POINTING AT NOTHING, 2026-09-07 ───────────────────
+//
+// Every one of the 16 places this editor is used sits inside a `Field`, and
+// every one of those `Field`s was already passing an `htmlFor`. It reached the
+// kit's `Label` as a `for="…"` attribute and then stopped: `<label for>` binds
+// to a LABELABLE element — input, textarea, select, button, meter, output,
+// progress — and this control's editable node is a `div`. So a sighted person
+// read "About" above the box and a screen-reader user arrived at an edit box
+// with no name at all. Sixteen times, on both front doors, since the day the
+// editor was written. The gap list records that there is no app-side
+// workaround, and it is right: wrapping this in another `<div id>` changes
+// nothing, because the failure is in what a `for` attribute is allowed to
+// point at, not in whether an id exists.
+//
+// So the name arrives the only way it can on a `div`, and all three halves are
+// needed together:
+//
+//   · `role="textbox"` + `aria-multiline="true"` — a bare contentEditable has
+//     no role a screen reader can trust across browsers, and without the
+//     multiline flag the ones that do recognise it announce a single-line
+//     field, so Enter is reported as "submits" rather than "new paragraph".
+//   · `aria-label` / `aria-labelledby` — the accessible NAME. ARIA is what a
+//     `div` has instead of a `<label>`, and it is why every call site now hands
+//     over the words its `Field` is already showing (`t(aboutField.label)`)
+//     rather than inventing a second sentence that could drift from the one on
+//     screen. Where the words are a heading rather than a field label
+//     (meeting-detail's Notes section) it is `aria-labelledby` at that heading,
+//     which is the same binding pointed the other way.
+//   · `id` — so the `htmlFor` the call sites were ALREADY writing lands on the
+//     real editable node. It is what makes `aria-describedby` (the field's help
+//     and error line, which the kit `Field` clones down here) resolve, and it
+//     is the difference between a decorative prop and a wired one.
+//
+// AND `disabled`, asked for in the same breath by the same list, for a reason
+// that is not about screen readers at all: every OTHER control on these forms
+// takes `disabled={busy}`, so while a save is in flight the title, the dates
+// and the pickers all go quiet and the notes body alone stayed editable. Typing
+// into it during those few hundred milliseconds edited a value that had already
+// been posted — the keystrokes land in React state that the in-flight request
+// will never carry, and the dialog closes on success, so they are simply lost
+// with no error and nothing to recover. `contentEditable={!disabled}` is what
+// actually stops the typing (a `disabled` attribute means nothing on a `div`);
+// `aria-disabled` is what says so out loud; and the toolbar's own Toggles go
+// down with it, because a Bold button that still fires while the field cannot
+// be edited is a control lying about its own state.
+
 import * as React from "react"
 import { ListNumbers } from "@shared/ui/foundations/icons"
 import { TextB, PaintBucket, TextItalic, List as ListIcon, Minus, TextAa } from "@shared/ui/foundations/icons"
@@ -87,11 +133,33 @@ function Notes({
   onChange,
   placeholder = "Write something…",
   className,
+  id,
+  disabled = false,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
 }: {
   defaultValue?: string
   onChange?: (html: string) => void
   placeholder?: string
   className?: string
+  /** The id of the EDITABLE node — the one a `Field`'s `htmlFor` names. Taken
+   * as a prop rather than minted here because the kit `Field` already mints one
+   * and clones it onto its single child, so accepting it is what joins this
+   * control to the row it sits in instead of running a second id beside it. */
+  id?: string
+  /** The note cannot be edited — a save in flight, or a gated field. Stops the
+   * typing, not just the styling: see the header note. */
+  disabled?: boolean
+  /** The accessible NAME, when the words live at the call site (a field label). */
+  "aria-label"?: string
+  /** The accessible NAME, when the words are already on screen somewhere with an
+   * id (a section heading). One or the other, never both — `aria-labelledby`
+   * wins in every screen reader, so passing both hides the `aria-label`. */
+  "aria-labelledby"?: string
+  /** The field's help / error line. Cloned in by the kit `Field`; it resolves
+   * only because `id` above is on the same node this points away from. */
+  "aria-describedby"?: string
 }) {
   const t = useT()
   const ref = React.useRef<HTMLDivElement>(null)
@@ -175,21 +243,23 @@ function Notes({
       >
         {showToolbar && (
           <>
-            <Toggle size="sm" aria-label={t("Bold")} onPressedChange={() => run("bold")}>
+            <Toggle size="sm" disabled={disabled} aria-label={t("Bold")} onPressedChange={() => run("bold")}>
               <TextB />
             </Toggle>
             <Toggle
               size="sm"
+              disabled={disabled}
               aria-label={t("Italic")}
               onPressedChange={() => run("italic")}
             >
               <TextItalic />
             </Toggle>
-            <Toggle size="sm" aria-label={t("Highlight")} onPressedChange={highlight}>
+            <Toggle size="sm" disabled={disabled} aria-label={t("Highlight")} onPressedChange={highlight}>
               <PaintBucket />
             </Toggle>
             <Toggle
               size="sm"
+              disabled={disabled}
               aria-label={t("Bullet list")}
               onPressedChange={() => run("insertUnorderedList")}
             >
@@ -197,6 +267,7 @@ function Notes({
             </Toggle>
             <Toggle
               size="sm"
+              disabled={disabled}
               aria-label={t("Numbered list")}
               onPressedChange={() => run("insertOrderedList")}
             >
@@ -204,6 +275,7 @@ function Notes({
             </Toggle>
             <Toggle
               size="sm"
+              disabled={disabled}
               aria-label={t("Separator")}
               onPressedChange={() => run("insertHorizontalRule")}
             >
@@ -215,20 +287,42 @@ function Notes({
           size="sm"
           pressed={showToolbar}
           onPressedChange={setShowToolbar}
+          disabled={disabled}
           aria-label={t("Formatting")}
           className="ml-auto"
         >
           <TextAa />
         </Toggle>
       </div>
+      {/* THE EDITABLE NODE — and the one a screen reader lands on, which is why
+          the id, the role and the name all live HERE rather than on the shell
+          above. A name on the wrapper would be read when the wrapper is
+          reached and never when the edit box is entered, which is the moment a
+          person needs it. */}
       <div
         ref={ref}
-        contentEditable
+        id={id}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
+        aria-disabled={disabled || undefined}
+        // `contentEditable={false}` rather than a `disabled` attribute, which a
+        // `div` does not have: this is what actually takes the caret away, and
+        // it drops the node out of the tab order at the same time.
+        contentEditable={!disabled}
         suppressContentEditableWarning
         data-focus-proxy=""
         data-placeholder={placeholder}
         onInput={emit}
-        className="min-h-24 flex-1 bg-transparent px-3 py-2 text-sm empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_hr]:my-2 [&_hr]:border-border [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+        className={cn(
+          "min-h-24 flex-1 bg-transparent px-3 py-2 text-sm empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_hr]:my-2 [&_hr]:border-border [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_mark]:text-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5",
+          // An ink, never an opacity — the kit's own ruling for a disabled
+          // control, which its Field component states in as many words, so the
+          // words stay legible while reading as unavailable.
+          disabled && "text-ink-disabled"
+        )}
       />
     </div>
   )

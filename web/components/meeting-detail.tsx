@@ -593,7 +593,18 @@ export function MeetingDetailScreen({
                   The AGENDA is never editable here — it is set beforehand, on
                   the edit page, which is the other half of the same rule. */}
               <section className="flex flex-col gap-2">
-                <h2 className="text-muted-foreground text-sm font-medium">{t("Notes")}</h2>
+                {/* The heading IS the editor's label — `aria-labelledby` below
+                    points at this id. The only editor on either front door that
+                    sits outside a `Field`, so it is the only one whose name has
+                    to be borrowed from the words already on the screen rather
+                    than from a field config. A static id is safe here: this
+                    screen resolves ONE meeting (`item` above), never a list. */}
+                <h2
+                  id="meeting-notes-heading"
+                  className="text-muted-foreground text-sm font-medium"
+                >
+                  {t("Notes")}
+                </h2>
                 {canEdit && item.active ? (
                   <>
                     {/* Uncontrolled, and keyed on the ROW so the editor re-seeds
@@ -601,6 +612,14 @@ export function MeetingDetailScreen({
                         into the same meeting) but not on every keystroke. */}
                     <Notes
                       key={item.id}
+                      aria-labelledby="meeting-notes-heading"
+                      // Only while the NOTES are saving. `busy` on this screen
+                      // names which action is in flight, and a rename or a
+                      // status move happening elsewhere is no reason to take
+                      // the caret out of a paragraph somebody is mid-sentence
+                      // in — the loss this guards against is a save that has
+                      // already read the value it is posting.
+                      disabled={busy === "notes"}
                       defaultValue={item.notes ?? ""}
                       onChange={(html) => setNotesDraft(html)}
                       placeholder={t("Type as you go, this is the part worth keeping.")}

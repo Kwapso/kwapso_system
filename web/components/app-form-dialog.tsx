@@ -391,6 +391,14 @@ export function AppFormDialog({
       <Field config={aboutField} htmlFor="app-about" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(aboutField.label)}
+          disabled={busy}
           defaultValue={values.about}
           onChange={(html) => setValues((s) => ({ ...s, about: html }))}
           placeholder={t("What this system does, and for whom.")}
@@ -400,6 +408,14 @@ export function AppFormDialog({
       <Field config={contextField} htmlFor="app-client-context" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(contextField.label)}
+          disabled={busy}
           defaultValue={values.clientContext}
           onChange={(html) => setValues((s) => ({ ...s, clientContext: html }))}
           placeholder={t("How they were working before, and what it was costing them.")}
@@ -409,6 +425,14 @@ export function AppFormDialog({
       <Field config={solutionField} htmlFor="app-solution" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(solutionField.label)}
+          disabled={busy}
           defaultValue={values.solution}
           onChange={(html) => setValues((s) => ({ ...s, solution: html }))}
           placeholder={t("What we built, and the decisions behind it.")}

@@ -288,7 +288,12 @@ export function AppsScreen({
   // this split is counted in the browser does not excuse it from being honest.
   const needle = query.trim().toLowerCase()
   let matching = needle
-    ? loadedApps.filter((a) => a.name.toLowerCase().includes(needle))
+    ? loadedApps.filter(
+        // NAME OR REFERENCE. The reference is on the row now (the black chip
+        // in front of the name), and the first thing a person does with a
+        // number they can see is type it in here.
+        (a) => a.name.toLowerCase().includes(needle) || (a.ref ?? "").toLowerCase().includes(needle)
+      )
     : loadedApps
   // …THEN THE FACETS, same reason: the badges below must count what a facet
   // left too, not just what the search box left.
@@ -365,6 +370,12 @@ export function AppsScreen({
       // `AppMark` this would still render, just doubly boxed.
       mark: <RecordMark picture={app.logoUrl} mark={appStageMark(app.stage)} name={app.name} size="row" />,
       name: app.active ? app.name : `${app.name} (archived)`,
+      // THE NUMBER, drawn as the black chip in front of the name by the engine
+      // (the recipe's `reference` column). An app's reference is the one that
+      // is NEVER null — it is minted whether or not a client is named on the
+      // app (shared/workers/refs.ts), because it never carried "the number a
+      // client quotes" meaning to begin with — so this row always has one.
+      ref: app.ref,
       detail: [client, stage].filter(Boolean).join(" · ") || "—",
     }
   })

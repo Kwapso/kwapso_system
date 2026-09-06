@@ -40,6 +40,7 @@ import { LoadMore } from "@/components/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resources"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
 import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
 import { formatDate } from "@shared/web/format"
@@ -387,10 +388,16 @@ export function StoriesPanel({
       {rows.map((s) => (
         <Row key={s.id} live={s.status !== "done"} mark={<RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? s.title} />}>
           <div className="min-w-0 flex-1">
-            <OpenLink
-              label={s.ref ? `${s.ref} · ${s.title}` : s.title}
-              onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
-            />
+            {/* THE NUMBER IN FRONT OF THE NAME, as the black chip — the same
+                mark and the same order the ticket rows above use, and the
+                client's own instruction for it. It was `B0188 · Redesign the
+                board` glued into the link's own label: one string, so the
+                reference was underlined on hover as if it were part of the
+                name, and it wrapped and truncated with the title. */}
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={s.ref} />
+              <OpenLink label={s.title} onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)} />
+            </span>
             <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind, lang)}</p>
           </div>
           {s.status === "done" && (
@@ -612,10 +619,12 @@ export function SprintsPanel({
             {page.map((s) => (
               <Row key={s.id} live={!s.completedAt} mark={<RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? s.name} />}>
                 <div className="min-w-0 flex-1">
-                  <OpenLink
-                    label={s.ref ? `${s.ref} · ${s.name}` : s.name}
-                    onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)}
-                  />
+                  {/* The number in front of the name, as the black chip —
+                      see the stories panel above for the whole argument. */}
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={s.ref} />
+                    <OpenLink label={s.name} onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)} />
+                  </span>
                   <p className="text-muted-foreground truncate text-xs">{sprintLine(s, lang)}</p>
                 </div>
                 {s.completedAt && (
@@ -710,7 +719,9 @@ export function AppsPanel({
           ],
         }}
         data={q.data}
-        searchKeys={["name", "stage", "url"]}
+        // `ref` because the row shows one now — a number a person can read off
+        // a row is a number they will type into the box above it.
+        searchKeys={["name", "ref", "stage", "url"]}
         renderItems={(page) => (
           <RowList>
             {page.map((a) => (
@@ -721,7 +732,10 @@ export function AppsPanel({
                     and a line of text on the next. */}
                 <AppMark app={a} size="row" />
                 <div className="min-w-0 flex-1">
-                  <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={a.ref} />
+                    <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
+                  </span>
                   <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
                 </div>
                 {!a.active && (
@@ -870,7 +884,10 @@ export function AppMeetingsPanel({
       {rows.map((m) => (
         <Row key={m.id} live={m.active} mark={<RecordMark name={m.accountName ?? m.title} />}>
           <div className="min-w-0 flex-1">
-            <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={m.ref} />
+              <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+            </span>
             <p className="text-muted-foreground truncate text-xs">
               {[formatDate(m.startsAt, lang), m.accountName].filter(Boolean).join(" · ")}
             </p>
@@ -1050,24 +1067,19 @@ export function AppTicketsPanel({
             className="cursor-pointer"
           >
             <TableCell>
-              <span className="flex min-w-0 items-center gap-2">
+              <span className={REF_LEADS_NAME}>
                 <RecordMark
                   mark={marks?.get(ticket.helpType ?? "") ?? null}
                   name={ticket.helpType ?? "?"}
                 />
-                {/* THE NUMBER LEADS THE TITLE, in "the usual black chip design"
-                    — literally the same `variant="inverse"` badge
-                    `TicketChips` draws for the same number, so the one black
-                    lozenge in this product means one thing everywhere. Not
-                    clickable: the row already opens, and a control inside a
-                    clickable row is two destinations decided by pixels.
-                    `shrink-0` so a long title truncates and the reference never
-                    does — an id with its tail cut off is worse than useless. */}
-                {ticket.ref && (
-                  <Badge variant="inverse" size="pill" className="shrink-0 tabular-nums">
-                    {ticket.ref}
-                  </Badge>
-                )}
+                {/* THE NUMBER LEADS THE TITLE, in "the usual black chip design",
+                    through the ONE component that draws one
+                    (shared/web/record-ref.tsx). This cell used to spell the
+                    badge out itself, identically to the ticket collection's own
+                    table one file along — two copies of one mark, agreeing by
+                    copy-paste, which is the arrangement that quietly stops
+                    agreeing. */}
+                <RecordRef value={ticket.ref} />
                 <Button
                   variant="link"
                   onClick={(e) => {
@@ -1470,8 +1482,9 @@ export function TodosPanel({
           // five or six lines apiece (measured against real staging
           // titles) turned the list into something nobody scans.
           label: (
-            <span className="block truncate">
-              {todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={todo.ref} />
+              <span className="min-w-0 truncate">{todo.title}</span>
             </span>
           ),
           owner: todo.accountName,
@@ -1534,7 +1547,10 @@ export function TodosPanel({
             mark={<RecordMark name={todo.title} />}
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={todo.ref} />
+                <span className="min-w-0 truncate">{todo.title}</span>
+              </p>
               <p className="text-muted-foreground truncate text-xs">
                 {meta.filter(Boolean).join(" · ")}
                 {todo.fileName && (

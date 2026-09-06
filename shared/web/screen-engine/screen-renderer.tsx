@@ -70,6 +70,7 @@ import {
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
 import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "../record-heading"
 
@@ -372,6 +373,11 @@ function ScreenForm({
   rights: ScreenRights
   onAction: ScreenRendererProps["onAction"]
 }) {
+  // The reader's language, for the one control in `renderInput` that names
+  // itself: a notes editor is a `div`, so its label cannot come from the
+  // `<label for>` the `Field` below draws and has to be spoken as an aria name
+  // instead. Everything else on this form reads its words through `Field`.
+  const t = useT()
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
   )
@@ -422,6 +428,17 @@ function ScreenForm({
       case "notes":
         return (
           <Notes
+            // The recipe engine's own half of the same fix. Every other branch
+            // here already hands its control an `id` (`f.column`, the same
+            // string the `Field` below writes as its `htmlFor`) and a
+            // `disabled`; the notes branch could hand over neither, because the
+            // editor accepted neither — so a recipe screen's notes field was
+            // the one control in this switch with no name and no gate. The
+            // label comes from the field's own config, translated here the same
+            // way `Field` translates the one it paints above the box.
+            id={f.column}
+            aria-label={f.field.label ? t(f.field.label) : undefined}
+            disabled={disabled}
             defaultValue={String(v ?? "")}
             onChange={(html) => set(f.column, html)}
           />
@@ -747,12 +764,55 @@ function renderList(
   const leadingOf = (row: Row): React.ReactNode =>
     recipe.leading ? asNode(row[recipe.leading]) : undefined
 
+  /** THE ROW'S NAME, WITH ITS REFERENCE IN FRONT OF IT WHEN IT HAS ONE.
+   *
+   * `String(row[title])` is what every list row was, and it is still exactly
+   * that when the recipe declares no `reference` — the same byte-identical
+   * promise `leading` makes one line up, and the reason this is a wrapper
+   * rather than a change to the cast.
+   *
+   * WHY THE ENGINE DRAWS IT AND NOT THE SHAPER. Six of the seven kinds that
+   * carry a reference reach a person through a recipe list, and before this
+   * they said so five different ways: `S0012 · Redesign` glued into the title
+   * on three sprint views, nothing at all on stories, nothing at all on apps,
+   * and a `reference` row key on meetings that no column had read since the
+   * Reference column was removed. Every one of those was a shaper making a
+   * presentation decision the client had already ruled on for tickets, in a
+   * place no rule could see it. The mark is `RecordRef`'s, the position is
+   * `REF_LEADS_NAME`, and a recipe's only say in it is WHICH COLUMN holds the
+   * number. */
+  const titleOf = (row: Row): React.ReactNode => {
+    const name = String(row[fields[0]?.column ?? "id"] ?? "")
+    const ref = recipe.reference ? row[recipe.reference] : null
+    if (typeof ref !== "string" || !ref) return name
+    return (
+      <span className={REF_LEADS_NAME}>
+        <RecordRef value={ref} />
+        {/* `truncate` on the NAME and not on the row: the chip is `shrink-0`,
+            so when a row runs out of width it is the name that gives way and
+            the reference is never clipped. An id with its tail cut off is not
+            a shortened id, it is a different record's. */}
+        <span className="min-w-0 truncate">{name}</span>
+      </span>
+    )
+  }
+
   return (
     <CollectionFrame
       config={recipe.collection ?? { ...defaultCollectionConfig }}
       data={rows}
       memoryKey={recipe.binding.module}
-      searchKeys={fields.map((f) => f.column)}
+      // THE REFERENCE IS SEARCHABLE WHEREVER IT IS VISIBLE. A number on a row
+      // is a number somebody will type into the box above it, and the sprints
+      // list is where that nearly went wrong: its reference used to be glued
+      // into the `name` column (`S0012 · Redesign`), so pulling it out into its
+      // own column for the chip would have silently taken "S0012" out of the
+      // one search that could answer it. A visible id that finds nothing is
+      // worse than a hidden one, so the column the chip reads is a search key
+      // in the same breath. (On a PAGED collection this frame's search is off
+      // entirely — `listCollection(…, { paged: true })` — and the door's own
+      // clause is what has to know about `ref`.)
+      searchKeys={[...fields.map((f) => f.column), ...(recipe.reference ? [recipe.reference] : [])]}
       state={state}
       useKitPanel={useKitPanel}
       band={band}
@@ -839,7 +899,7 @@ function renderList(
             surface={recipe.surface}
             items={page.map((row) => ({
               id: String(row.id ?? ""),
-              title: String(row[fields[0]?.column ?? "id"] ?? ""),
+              title: titleOf(row),
               subtitle: String(row[fields[1]?.column ?? ""] ?? ""),
               leading: leadingOf(row),
             }))}

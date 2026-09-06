@@ -65,9 +65,19 @@ function shapeStories(stories: Story[], lang: Language, marks?: Map<string, stri
       // the slot renders whatever the column holds. A story whose type has no
       // mark falls back to the type's first letter rather than an empty box.
       mark: <RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? "?"} />,
-      // The title alone (K1 / CHECKLIST 11.9). The reference leads the eyebrow on
-      // the story's own screen, where it belongs (D4).
+      // The title alone (K1 / CHECKLIST 11.9) — the NAME is a plain string, and
+      // has to stay one: the collection frame searches and orders on this exact
+      // value.
       name: s.title,
+      // THE NUMBER, DRAWN AS THE BLACK CHIP IN FRONT OF THE NAME by the engine
+      // (the recipe's `reference` column). This row used to carry no reference
+      // at all, on the reasoning that it "leads the eyebrow on the story's own
+      // screen, where it belongs (D4)" — true of a Reference COLUMN, which is
+      // the thing D4 actually cut, and not of the chip: the client's September
+      // ruling is "put the ID before the title to the left, with the usual
+      // black chip design", and a list you cannot quote a number off is a list
+      // you have to open a record to talk about.
+      ref: s.ref,
       // Three facts: where it is, who has it, when it is due. The sprint and the
       // ticket it answers are cross-links on the record, not row noise.
       detail:

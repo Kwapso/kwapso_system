@@ -142,11 +142,13 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "same shape as use-record-activity.ts:139 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute.",
-  "web/components/work-panels.tsx:1479":
+  "web/components/work-panels.tsx:1492":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
-    "text.",
+    "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
+    "from a `ref · title` string into the black reference chip beside the " +
+    "title, which is thirteen lines of JSX where there was one.)",
 }
 
 describe("no screen shows a raw timestamp", () => {

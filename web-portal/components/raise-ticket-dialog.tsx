@@ -168,6 +168,14 @@ export function RaiseTicketDialog({
       <Field config={descField} htmlFor="ticket-desc" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(descField.label)}
+          disabled={busy}
           defaultValue={values.description}
           onChange={(html) => setValues((v) => ({ ...v, description: html }))}
           placeholder={t("For example: the new booking page is showing last month's prices.")}

@@ -271,6 +271,14 @@ export function MeetingFormDialog({
       <Field config={agendaField} htmlFor="meeting-agenda" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(agendaField.label)}
+          disabled={busy}
           defaultValue={values.agenda}
           onChange={(html) => setValues((s) => ({ ...s, agenda: html }))}
           placeholder={t("What we mean to cover.")}
@@ -280,6 +288,14 @@ export function MeetingFormDialog({
       <Field config={notesField} htmlFor="meeting-notes" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(notesField.label)}
+          disabled={busy}
           defaultValue={values.notes}
           onChange={(html) => setValues((s) => ({ ...s, notes: html }))}
           placeholder={t("What was said and decided.")}

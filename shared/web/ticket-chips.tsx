@@ -5,6 +5,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { formatDate } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef } from "@shared/web/record-ref"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
 /** THE CHIP LINE — four facts and nothing else: the number, the type, the
@@ -220,17 +221,15 @@ export function TicketChips({
   const safeAppHref = safeHref(appHref ?? "")
   return (
     <span className="flex flex-wrap items-center gap-2">
-      {ticket.ref && (
-        // NOT A BUTTON. `Badge` takes no `asChild` (the kit's own signature),
-        // and making the number clickable would mean either a hand-rolled
-        // lozenge — a second black chip in the system — or an upstream change
-        // to a vendored file this repo may not edit. The number is a fact
-        // here, which is what the client asked it to be; opening the record
-        // is a control the call site already offers some other way.
-        <Badge variant="inverse" size="pill">
-          {ticket.ref}
-        </Badge>
-      )}
+      {/* THE NUMBER, THROUGH THE ONE COMPONENT THAT DRAWS IT (record-ref.tsx).
+          This file used to spell the black chip out itself, and by 6 Sep 2026
+          three other surfaces spelled the same lozenge out beside it — two of
+          them carrying `shrink-0 tabular-nums` and this one not, which is drift
+          nobody would ever file as a bug. `RecordRef` also owns the absent case
+          ("A TICKET WITH NO NUMBER DRAWS NO CHIP", above): it returns nothing at
+          all for a null, so the guard that used to stand here is inside it now,
+          where every OTHER kind's row gets it for free. */}
+      <RecordRef value={ticket.ref} />
       <Badge variant="secondary" size="pill">
         {typeDot}
         {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. An

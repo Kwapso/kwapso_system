@@ -143,6 +143,7 @@ import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { TicketChips, ticketTitle, type TicketChipFacts } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
@@ -1279,20 +1280,20 @@ function TicketRowsTable<T extends TicketFace>({
               <TableCell>
                 {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
                     title to the left, with the usual black chip design."
-                    `variant="inverse"` IS that chip — literally the same badge
-                    the triage card's eyebrow draws for the same number, so the
-                    one black lozenge in this product means one thing everywhere.
-                    Not a link and not clickable: the row already opens, and a
-                    control inside a clickable row is two destinations decided by
-                    pixels. `shrink-0` so a long title truncates and the number
-                    never does — an id with its tail cut off is worse than
-                    useless, it is wrong. */}
-                <span className="flex min-w-0 items-center gap-2">
-                  {w.ref && (
-                    <Badge variant="inverse" size="pill" className="shrink-0 tabular-nums">
-                      {w.ref}
-                    </Badge>
-                  )}
+                    `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
+                    since 7 Sep 2026 it is the ONLY thing in either front door
+                    that draws one: this cell used to spell the badge out itself
+                    and three other surfaces spelled the identical lozenge out
+                    beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
+                    row that puts it in front — the "before the title to the
+                    left" half of her sentence, held as one string rather than
+                    as a shape each call site remembers. Both the absent case (a
+                    ticket with no number draws nothing) and `shrink-0` (a long
+                    title truncates and the number never does, because an id
+                    with its tail cut off is not useless, it is WRONG) live
+                    inside the component now. */}
+                <span className={REF_LEADS_NAME}>
+                  <RecordRef value={w.ref} />
                   {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
                       TBL-5): the call site puts a `Button variant="link"` in the
                       first cell and that control owns the press. So the mouse
@@ -2623,7 +2624,16 @@ function TriageQueue({
           onSkip={current ? () => skip(current) : undefined}
           upcoming={order.slice(1).map((w) => ({
             id: w.id,
-            label: [w.ref, richTextPlain(w.description)].filter(Boolean).join(" · "),
+            // THE NUMBER IN FRONT, AS THE CHIP — `QueueUpcoming.label` is a
+            // node, so the tail of the queue can carry the same black lozenge
+            // the card above it and the table beside it carry, instead of the
+            // `T0412 · ` prefix it used to glue in front of the description.
+            label: (
+              <span className={REF_LEADS_NAME}>
+                <RecordRef value={w.ref} />
+                <span className="min-w-0 truncate">{richTextPlain(w.description)}</span>
+              </span>
+            ),
           }))}
           eyebrow={current && <TriageChips teamId={teamId} ticket={current} />}
           /* THE TITLE IS THE WAY IN — client, 2026-09-06: "when clicking in

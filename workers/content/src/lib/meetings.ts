@@ -368,11 +368,19 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     // address or a display name inside it is a substring like any other, and a
     // needle is never a pattern (likeLiteral, above). It is the same material
     // the row already hands back in `googleGuests`, so nothing new is exposed.
+    // AND IT SEARCHES THE REFERENCE, since 7 Sep 2026 — because the reference
+    // is now ON the row (the black chip in front of the meeting's name,
+    // meetings-screen.tsx), and a number somebody can read off a list is the
+    // first thing they type into the box above it. It was missing here by
+    // omission rather than by ruling: the paragraph above weighs up the guest
+    // list and never mentions `ref`, which the row has always carried back
+    // (`MEETING_COLS`). A visible id that finds nothing is worse than a hidden
+    // one. `COALESCE` because a meeting with no client mints no reference.
     where.push(
-      "(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\' OR LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')"
+      "(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(m.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\' OR LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')"
     )
     const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
-    params.push(needle, needle, needle, needle)
+    params.push(needle, needle, needle, needle, needle)
   }
   return { sql: where.length ? where.join(" AND ") : "1 = 1", params }
 }

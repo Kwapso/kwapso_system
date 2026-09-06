@@ -3627,4 +3627,30 @@ export const SEED: Catalogue = {
     es: "No se ha enviado nada. Tu texto ha vuelto al campo de respuesta.",
     ca: "No s'ha enviat res. El teu text ha tornat al camp de resposta.",
   },
+
+  /* ── The sign-in code, said out loud (2026-09-07) ──────────────────────────
+   *
+   * Two sentences nobody reading the screen will ever see: both are the
+   * accessible names on `shared/web/code-input.tsx`, the six-box code field on
+   * the way in to both front doors. They are SEEDED rather than left for the
+   * next translation run — the pattern the tickets-dashboard lane set — and the
+   * reason is the same one that makes this control worth fixing at all. Every
+   * other untranslated string in this app sits on a screen made of rows, where
+   * a name and a date are recognisable in any language. These are the only
+   * words a blind reader gets on the sign-in screen, and a person who cannot
+   * get past sign-in cannot reach the language switcher to fix it. Leaving them
+   * English would mean the one screen with no way around it is the one screen
+   * that does not speak the reader's language.
+   *
+   * `{position}` and `{total}` are bare numbers and stay numbers everywhere. */
+  "Verification code": {
+    de: "Bestätigungscode",
+    es: "Código de verificación",
+    ca: "Codi de verificació",
+  },
+  "Digit {position} of {total}": {
+    de: "Ziffer {position} von {total}",
+    es: "Dígito {position} de {total}",
+    ca: "Dígit {position} de {total}",
+  },
 }

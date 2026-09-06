@@ -3,10 +3,41 @@
 // One ticket, as a row — shared by Home (the newest few) and Tickets (all of
 // them), so the same ticket never looks like two different things.
 //
-// What it shows: what you asked, where it stands, and when. What it does NOT
-// show: who at the agency has it. "The portal shows work status but never which
-// staff member is doing it" (SCOPE ch.06) — so there is no assignee here, and
-// there is nowhere for one to be added by accident later.
+// What it shows: its NUMBER, what you asked, where it stands, and when. What it
+// does NOT show: who at the agency has it. "The portal shows work status but
+// never which staff member is doing it" (SCOPE ch.06) — so there is no assignee
+// here, and there is nowhere for one to be added by accident later.
+//
+// ── WHY THE NUMBER IS HERE, ON THE CLIENT'S SIDE (7 Sep 2026) ──────────────
+//
+// It is a change to what a client sees, so it is argued rather than assumed.
+//
+// WHAT CH.06 ACTUALLY WITHHOLDS is STAFF ROUTING AND ATTRIBUTION — the assignee
+// on this row, the activity feed on the ticket screen (`PORTAL_ACTIVITY_EXEMPT`),
+// the creator and editor names on a deliverable. Every one of those answers
+// "who inside the agency is doing this", which is the sentence the chapter
+// writes. A reference answers "WHICH REQUEST ARE WE TALKING ABOUT", and it is
+// the same string on both sides of the fence: `shared/workers/refs.ts` mints it
+// team-wide with no account code in it, so it names no other client and leaks
+// nothing about our routing. It is not the kind of fact ch.06 is about.
+//
+// THE PORTAL ALREADY DOES THIS, and has for as long as Inputs have had numbers:
+// `waiting-on-you.tsx` and `sent-to-us.tsx` both print a to-do's `I####` to the
+// client. So the question was never "may a client see one of our references" —
+// it was already answered yes — but "why can they see the number of the thing WE
+// asked THEM for, and not the number of the thing they asked US for."
+//
+// AND THE SEARCH ALREADY MATCHED IT. The portal's own ticket search goes to the
+// same door the agency's does (`ticketWhere`, workers/content/src/lib/help.ts),
+// whose clause LIKEs `ref` — so a client could always FIND a ticket by its
+// number and could never LEARN one, except by a member of staff quoting it in a
+// reply. A key with no keyhole on the screen is the worst of the three states.
+//
+// WHAT IS STILL NOT HERE, deliberately: the APP the ticket sits on. The agency's
+// own four-chip line carries it (`shared/web/ticket-chips.tsx`) and this row does
+// not, because which internal system a request was routed onto is exactly the
+// kind of fact ch.06 keeps on our side of the fence. The number travels; the
+// routing does not.
 
 import Link from "next/link"
 
@@ -17,6 +48,7 @@ import { CaretRight } from "@shared/ui/foundations/icons"
 import type { HelpTicket } from "@shared/types"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { richTextPlain } from "@shared/web/rich-text"
 
 /** Plain words for each state, and a colour that means the same thing every time.
@@ -67,7 +99,15 @@ export function TicketRow({ ticket }: { ticket: HelpTicket }) {
       className="hover:bg-accent/50 motion-hover flex flex-wrap items-center gap-2 rounded-[var(--radius)] bg-surface-panel p-4"
     >
       <div className="flex min-w-0 flex-1 basis-[12rem] flex-col gap-2">
-        <Clamp lines={2} collapsible={false}>{richTextPlain(ticket.description)}</Clamp>
+        {/* THE NUMBER LEADS WHAT WAS ASKED — the same black chip, from the same
+            component, that the agency app draws for the same ticket. Two
+            renderings of one mark is how the two front doors would start
+            disagreeing about it. A ticket raised without a client reference
+            draws no chip and the row is exactly what it was. */}
+        <span className={REF_LEADS_NAME}>
+          <RecordRef value={ticket.ref} />
+          <Clamp lines={2} collapsible={false}>{richTextPlain(ticket.description)}</Clamp>
+        </span>
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={status.variant}>{t(status.label)}</Badge>
           {/* HOW MUCH WORK IS ON IT, and nothing else about that work

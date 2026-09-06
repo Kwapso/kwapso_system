@@ -65,6 +65,7 @@ import * as React from "react"
 import { ArrowDown, ArrowUp, ArrowsDownUp, DotsThree } from "@shared/ui/foundations/icons"
 
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 import { gateState, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
@@ -305,6 +306,7 @@ export function RecordTable<T extends TableRowData>({
   order,
   actions = [],
   onRowClick,
+  refColumn,
   className,
   useKitPanel,
 }: {
@@ -326,6 +328,16 @@ export function RecordTable<T extends TableRowData>({
    * chrome around it is the frame's decision either way, so this component
    * needs nothing of its own to carry the flag, only a place to pass it. */
   useKitPanel?: boolean
+  /** THE ROW KEY HOLDING THIS RECORD'S REFERENCE — the short code a person
+   * quotes on the phone. Drawn as the black chip in FRONT of the first
+   * column's cell, which is the client's own instruction ("put the ID before
+   * the title to the left, with the usual black chip design") and deliberately
+   * NOT a column of its own: a table's column budget is six (N1), and the same
+   * lozenge repeated down a seventh column is furniture rather than
+   * information. The meetings list already cut a `Reference` COLUMN for that
+   * reason; this puts the number back on the row without putting it back in
+   * the header. Omit it and every cell renders exactly as before. */
+  refColumn?: string
 }) {
   const [own, setOwn] = React.useState<{ by: string; dir: "asc" | "desc" } | null>(null)
   const live: CollectionOrder = order ?? {
@@ -427,7 +439,16 @@ export function RecordTable<T extends TableRowData>({
                   }
                 >
                   {columns.map((c) => (
-                    <TableCell key={c.key}>{row[c.key] as React.ReactNode}</TableCell>
+                    <TableCell key={c.key}>
+                      {refColumn && c === columns[0] ? (
+                        <span className={REF_LEADS_NAME}>
+                          <RecordRef value={row[refColumn] as string | null | undefined} />
+                          <span className="min-w-0 truncate">{row[c.key] as React.ReactNode}</span>
+                        </span>
+                      ) : (
+                        (row[c.key] as React.ReactNode)
+                      )}
+                    </TableCell>
                   ))}
                   {actions.length > 0 && (
                     // Reaching the menu must not also open the record.

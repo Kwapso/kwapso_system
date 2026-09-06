@@ -398,6 +398,14 @@ export function AccountFormDialog({
       <Field config={aboutField} htmlFor="account-about" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(aboutField.label)}
+          disabled={busy}
           defaultValue={values.about}
           onChange={(html) => set({ about: html })}
           placeholder={t("What they do, who they are, anything worth knowing.")}
