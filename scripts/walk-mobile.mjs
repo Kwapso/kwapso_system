@@ -161,7 +161,7 @@ async function liveCookie({ mintAt, verifyAt, email }) {
     body: JSON.stringify({ email, code }),
   })
   const raw = (verified.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!raw.startsWith("kwapso_session=")) {
+  if (!/^(__Host-)?kwapso_session=/.test(raw)) {
     console.error(`verify at ${verifyAt} did not set a session cookie (status ${verified.status})`)
     process.exit(2)
   }

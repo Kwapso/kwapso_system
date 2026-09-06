@@ -57,7 +57,7 @@ const verify = await timedFetch(`${BASE}/api/auth/email/verify`, {
   body: JSON.stringify({ email: EMAIL, code: start.body.code }),
 })
 const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-if (!verify.ok || !cookie.startsWith("kwapso_session=")) {
+if (!verify.ok || !/^(__Host-)?kwapso_session=/.test(cookie)) {
   console.error("login did not produce a session cookie")
   process.exit(1)
 }

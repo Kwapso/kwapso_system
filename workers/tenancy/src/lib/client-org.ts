@@ -31,7 +31,7 @@
 
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { accountScopeClause, type AccountScope } from "@shared/workers/account-scope"
-import { d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
+import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
 import type {
@@ -466,7 +466,15 @@ export async function setRoleDepartments(
          VALUES (${sqlString(ulid())}, ${sqlString(input.id)}, ${sqlString(d)}, ${auditCreateValues(actor, now)});`
     )
     .join("\n")
-  await d1Query(
+  // `d1ExecScript`, NOT `d1Query`: this is a DELETE followed by N INSERTs, and
+  // `d1Query` takes the NATIVE path wherever the deployment holds a binding for
+  // the team's database — where it is `db.prepare(sql)`, which accepts exactly
+  // one statement. This file already says so twice about its own single-statement
+  // writes; these two were the ones that did not get the note. Staging binds
+  // TEAM_DB_0 today, so this was a live 500 there and a 200 in production —
+  // the worst shape a bug can have. `d1ExecScript` splits the script and is what
+  // every other multi-statement write in the base uses.
+  await d1ExecScript(
     cfg,
     guard.databaseId,
     `DELETE FROM client_role_departments WHERE role_id = ${sqlString(input.id)}
@@ -748,7 +756,9 @@ export async function setToolPrice(
   const accountId = await ownerOf(cfg, guard, "client_tools", input.toolId)
   assertAccountInScope(scope, accountId)
   const now = new Date().toISOString()
-  await d1Query(
+  // Two statements — see setRoleDepartments above for why that means
+  // `d1ExecScript` and never `d1Query`.
+  await d1ExecScript(
     cfg,
     guard.databaseId,
     `DELETE FROM client_tool_prices

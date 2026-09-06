@@ -97,6 +97,36 @@
 //   • WHETHER THE MODEL WOULD HAVE COMPLIED AT ALL. Unproven, and deliberately:
 //     nobody has spent an API call to find out. The structural gap was
 //     confirmed by reading; the exploitability was not.
+//
+// ── THE MACHINE SURFACE IS COVERED, BUT NOT BY THIS ──────────────────────────
+//
+// It was not covered at all when this file was written, and the omission was
+// invisible precisely because this section did not mention it: `refusesOutbound
+// Money` had two call sites, both in workers/data-ops, and ZERO in workers/mcp —
+// while `read_margin` and `reply_help_ticket` were both on the machine surface
+// and the injected-ticket chain ran end to end there with nothing in the way.
+//
+// THE AGENT'S FIX COULD NOT BE PORTED, and that is the part worth keeping. An
+// MCP `tools/call` is one HTTP request carrying a bearer token: no turn, no
+// conversation, no prior tool list. `moneyIsInContext` over a single call is
+// ALWAYS false, so this predicate copied onto that surface would have been a
+// check that passed with the hole fully open — a green build over the exact bug
+// it was added for.
+//
+// So MCP refuses a money DOOR outright, at its one forward choke point
+// (`forwardTool`, workers/mcp/src/lib/tools.ts), asked of the door the call will
+// actually open rather than of the tool's name. Same predicate — `readsInternal
+// Money`, from this file — different sentence: not "not in this turn" but "not
+// on this surface at all". The precedent is that surface's own twenty-one Google
+// tools (MCP.md §3): a leaked personal access token's blast radius must not
+// include a mailbox, and it must not include what our own hour costs either. The
+// way through is `agent_chat`, which lands back on the agent, where there is a
+// turn and this file applies.
+//
+// A CONSEQUENCE WORTH SAYING OUT LOUD: the two surfaces now defend the same
+// sentence with two different mechanisms, so a THIRD machine surface would
+// inherit neither by default. Whoever builds one reads this paragraph and picks
+// the shape that fits what that surface can actually see.
 
 import { SHARED_TOOLS } from "./tool-catalog"
 

@@ -167,7 +167,7 @@ async function signIn(email, at) {
     body: JSON.stringify({ email, code }),
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!cookie.startsWith("kwapso_session="))
+  if (!/^(__Host-)?kwapso_session=/.test(cookie))
     stop(`sign-in failed for ${email} at ${at}`, `status ${verify.status}`)
   return cookie
 }

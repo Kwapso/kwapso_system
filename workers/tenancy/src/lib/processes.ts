@@ -821,8 +821,16 @@ function appModulesWhere(
   opts: { id?: string; appId?: string; archived?: string }
 ): { sql: string; params: (string | number)[] } {
   const fence = accountScopeClause(scope, "m.account_id")
-  const parts: (string | undefined)[] = [fence.sql]
-  const params: (string | number)[] = [...fence.params]
+  // AND THE APP FENCE, for the same reason `processesWhere` carries it: a client
+  // login may be narrowed to named apps, and a SECTION belongs to an app. Without
+  // it this door answered with the sections — name, mark, description, benefit —
+  // of systems the contact was explicitly restricted away from, and it is on the
+  // portal's own allow-list, so their browser could ask it directly. An AND
+  // beside the account fence, never instead of it (see appScopeClause); staff and
+  // an unrestricted client both get an empty clause and nothing changes for them.
+  const apps = appScopeClause(scope, "m.app_id")
+  const parts: (string | undefined)[] = [fence.sql, apps.sql || undefined]
+  const params: (string | number)[] = [...fence.params, ...apps.params]
   // ONE ROW BY ID — the live layer's re-pull after a ping, through the same door
   // and therefore the same fence (the shape /api/tenancy/selectable uses).
   if (opts.id) {
@@ -924,6 +932,18 @@ async function moduleOrThrow(
   id: string
 ): Promise<{ id: string; appId: string; name: string; mark: string | null; nameDe: string | null; description: string | null; benefit: string | null }> {
   const fence = accountScopeClause(scope, "account_id")
+  // AND THE APP FENCE — the by-id sibling of `appModulesWhere`, held to the same
+  // clause as the list it came from. FOUND BY THE CENSUS
+  // (test/app-fence-census.test.ts) rather than by anyone reading, which is the
+  // whole argument for having one: the three doors this repair set out to fix
+  // were a hand-list, and a hand-list is exactly one door short of the truth
+  // about as often as not.
+  //
+  // Its two callers are agency-only WRITES that already refuse a portal caller,
+  // so nothing was reachable through it today. It is fenced anyway: "the callers
+  // happen to refuse client logins" is a fact about today's callers, and this is
+  // a property of the read.
+  const apps = appScopeClause(scope, "app_id")
   const rows = await d1Query<{
     id: string
     app_id: string
@@ -935,8 +955,8 @@ async function moduleOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, "id = ?"])}`,
-    [...fence.params, id]
+    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, apps.sql || undefined, "id = ?"])}`,
+    [...fence.params, ...apps.params, id]
   )
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That module doesn't exist.")
@@ -2646,8 +2666,14 @@ export async function listSavings(
 ): Promise<SavingsView> {
   if (opts.accountId) requireAccountInScope(scope, opts.accountId)
   const fence = accountScopeClause(scope, "p.account_id")
+  // AND THE APP FENCE. This door is on the portal's allow-list and answers with
+  // the value drilled App -> Process -> Step; without it a restricted contact
+  // read the app names, process names, step names and hours of every system on
+  // their company, which is the widest of the three reads that were missing it.
+  const appFence = appScopeClause(scope, "p.app_id")
   const sql = where([
     fence.sql,
+    appFence.sql || undefined,
     opts.accountId ? "p.account_id = ?" : undefined,
     opts.appId ? "p.app_id = ?" : undefined,
     // ONE MAP'S OWN SUBTRACTION, for the map's own screen. It narrows the same
@@ -2662,7 +2688,7 @@ export async function listSavings(
     "p.deactivated_at IS NULL",
     "a.deactivated_at IS NULL",
   ])
-  const params = [...fence.params]
+  const params = [...fence.params, ...appFence.params]
   if (opts.accountId) params.push(opts.accountId)
   if (opts.appId) params.push(opts.appId)
   if (opts.processId) params.push(opts.processId)
@@ -2906,6 +2932,13 @@ async function processOrThrow(
   id: string
 ): Promise<ProcessSummary> {
   const fence = accountScopeClause(scope, "p.account_id")
+  // AND THE APP FENCE — the LIST/DETAIL asymmetry, which is the classic shape of
+  // this bug and the one it had here: `processesWhere` has carried the app fence
+  // since 19 Aug 2026 and this by-id read never did, so a restricted contact who
+  // could not SEE a map in the list could still open it by id and read every
+  // version, every step, its seconds and its role name. A detail read is held to
+  // the same clause as the list it came from, or the list is decoration.
+  const apps = appScopeClause(scope, "p.app_id")
   const rows = await d1Query<{
     id: string
     app_id: string
@@ -2929,8 +2962,8 @@ async function processOrThrow(
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
                AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
                                     ORDER BY v2.version_no DESC LIMIT 1)) AS step_count
-       FROM processes p JOIN apps a ON a.id = p.app_id${where([fence.sql, "p.id = ?"])} LIMIT 1`,
-    [...fence.params, id]
+       FROM processes p JOIN apps a ON a.id = p.app_id${where([fence.sql, apps.sql || undefined, "p.id = ?"])} LIMIT 1`,
+    [...fence.params, ...apps.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That process doesn't exist.")
   const r = rows[0]

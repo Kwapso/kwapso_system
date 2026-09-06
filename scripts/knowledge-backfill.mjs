@@ -68,7 +68,7 @@ async function signIn() {
     body: JSON.stringify({ email: EMAIL, code: start.body.code }),
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!cookie.startsWith("kwapso_session=")) {
+  if (!/^(__Host-)?kwapso_session=/.test(cookie)) {
     console.error("Sign-in did not return a session cookie.")
     process.exit(1)
   }
