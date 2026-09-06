@@ -20,10 +20,14 @@ import { api, post } from "@shared/web/api"
  * machines with a Bearer token, not this session client). */
 export const mcp = {
   tokens: () => api<{ tokens: McpTokenSummary[] }>("/api/mcp/tokens"),
+  /** Both writes answer with the LIST as it now stands, so the screen never has
+   * to ask for what the door just did. */
   createToken: (label: string) =>
     api<{
       token: { id: string; label: string; teamId: string; createdAt: string; expiresAt: string }
       secret: string
+      tokens: McpTokenSummary[]
     }>("/api/mcp/tokens", post({ label })),
-  revokeToken: (id: string) => api<{ ok: true }>("/api/mcp/tokens/revoke", post({ id })),
+  revokeToken: (id: string) =>
+    api<{ ok: true; tokens: McpTokenSummary[] }>("/api/mcp/tokens/revoke", post({ id })),
 }

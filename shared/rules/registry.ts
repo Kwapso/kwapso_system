@@ -469,6 +469,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "aside-collapse",
     status: "enforced",
   },
+  {
+    id: "R52",
+    dimension: "arch",
+    law: "A COMPONENT ASKS A DOOR ONCE. Every `useCached(key, fetcher)` read across `web/` and `web-portal/` is censused off the disk, grouped by the COMPONENT it sits in (not the file, which can hold seven panels each with its own local `key`) and by the DOOR its fetcher calls (`tenancy.selectable`, `listFetch.apps` — the receiver and method, since the arguments say which rows and not which question). A component holding two reads of one door is a finding, and the two shapes are graded differently because they cost differently. SAME KEY TWICE is an outright defect with no exemption available: the store dedupes by key (`inFlight` in shared/web/store.ts), so the second read buys nothing and exists only as a second place to change one question. TWO DIFFERENT KEYS on one door is a REAL second request the store cannot dedupe, and is sometimes right — those are named in `TWO_READS_ONE_DOOR` with the reason, rot-checked, so the list can only shrink. Identifiers are resolved to what they were assigned and a `cond ? KEY : null` gate normalises to KEY, because a read gated on a permission is the same question as an ungated one — which is exactly the shape that shipped.",
+    why: "round_trip_review's criterion 2 is called \"no question is asked twice\". On 5 Sep 2026 it scored 100 out of 100 at weight 13, and on 6 Sep the same lane found `app-detail.tsx` reading `selectable:<team>` twice — once unconditionally and once gated on `canRaiseTicket`, so the gated one could never be the read that warmed the cache. The criterion was scored by a human reading a probe's hits, and the probe HAD reported it; it was dismissed as a false positive on the correct but incomplete grounds that the store dedupes the request. That is true and it is not the whole property: the reviewer was right about the network and wrong about the score, and a criterion whose 100 depends on a judgement call made in a hurry is a criterion that says nothing. The owner asked, a month apart, whether the duplicate reads those reviews found were sorted and whether any review still watches for them — the honest answer was that a review watched and nothing checked. This is the check. It found the property is otherwise held: 183 fetching read sites across both front doors, zero same-key duplicates, and four components asking one door under two keys, every one of them a genuinely different question (a week of meetings versus all of them; four versions of one process map; a record's time versus a person's; and the open task list beside the all list, which use-screen-data.ts keeps apart on purpose because ticking a task off the OPEN list would make a detail screen sourced from it answer \"that record no longer exists\").",
+    checkId: "one-door-per-unit",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -1284,6 +1292,24 @@ export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
  * Rot-checked in both directions, the same shape `TOOLBAR_EXEMPT` above
  * uses: an entry whose call site now derives the prop from real data fails
  * the build, so a screen that gets fixed cannot leave its pin behind. */
+/** R52 — the components that ask ONE door under TWO keys on purpose.
+ *
+ * Only this shape is exemptible. Reading one KEY twice has no entry here and
+ * never will: the store dedupes it, so the second read buys nothing at all.
+ *
+ * Keyed `file::Component::door`, because the unit is the component and one file
+ * can hold several. */
+export const TWO_READS_ONE_DOOR: Record<string, string> = {
+  "web/components/meetings-screen.tsx::MeetingsScreen::listFetch.meetings":
+    "the month and the WEEK are two questions, not one asked twice — `meetingsKey(teamId)` is the collection and `meetingsKey(teamId, weekView)` is the strip above it, which narrows to a week the door itself resolves. Deriving the week client-side would mean the strip could only ever show what page one happened to contain.",
+  "web/components/process-detail.tsx::ProcessDetailScreen::tenancy.processDetail":
+    "four reads of one door because a process map can be COMPARED with itself: the current version, a named older version, the map as it stood on a date, and the one being diffed against. Three of the four are null-keyed unless a comparison is open, so an ordinary open costs one. They are four different records that happen to share a door.",
+  "web/components/work-logs-panel.tsx::WorkLogsPanel::contentApi.workLogs":
+    "one record's own time and one PERSON's time are different fences, not the same list filtered — `recordTimeKey(targetTable, targetId)` is what this record cost, and the person-filtered read is a different question the door answers with a different total. Filtering the first client-side would give a number that disagrees with the badge.",
+  "web/lib/use-screen-data.ts::useScreenData::listFetch.tasks":
+    "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
+}
+
 export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
   "web/components/account-detail-panels.tsx":
     "ContactsPanel's <ToolbarRow> carries `empty={false}` — the one collection in the app with TWO first-adds rather than one (\"Add contact\", linking a person already on the books, and \"New contact\", making one), and `CollectionEmptyState` only ever carries a single labelled `onCreate` — it cannot offer both, so the row's own two icon buttons have to stay reachable on an empty contacts list exactly as they do on a populated one.",

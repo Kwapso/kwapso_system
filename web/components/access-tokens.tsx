@@ -105,10 +105,12 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
     if (!label.trim() || busy) return
     setBusy(true)
     try {
+      // ONE round trip. The door answers with the list the new token is now on,
+      // so this used to be a create followed by a read of what the create knew.
       const r = await mcp.createToken(label.trim())
       setSecret(r.secret)
       setLabel("")
-      primeCache("mcp-tokens", await mcp.tokens().then((x) => x.tokens))
+      primeCache("mcp-tokens", r.tokens)
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't create the token."))
     } finally {
@@ -120,8 +122,8 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
     if (!revoking || busy) return
     setBusy(true)
     try {
-      await mcp.revokeToken(revoking.id)
-      primeCache("mcp-tokens", await mcp.tokens().then((x) => x.tokens))
+      const { tokens } = await mcp.revokeToken(revoking.id)
+      primeCache("mcp-tokens", tokens)
       toast.success(t("Token revoked."))
       setRevoking(null)
     } catch (err) {
