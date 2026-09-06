@@ -168,28 +168,52 @@ export const MAX_TAB_LABEL_CHARS = 80
  * a sign-out was killed rather than clicked. */
 let scope: string | null = null
 
-/** The set, most recently activated LAST.
+/** The set, in the ORDER EACH TAB WAS FIRST OPENED — FIXED, and it does not
+ * move when a tab is merely activated. See `activePath` and `recency` below
+ * for the two facts that used to be smuggled into this one array's order.
  *
- * THE ORDER IS THE ONE THING HERE THAT IS A COMPROMISE WITH THE KIT, AND IT IS
- * WORTH BEING PLAIN ABOUT. Chrome's tabs never move: the active one is
- * highlighted wherever it happens to sit. `BreadcrumbFolders` cannot draw that
- * — it paints the LAST item as the live tab (the card's own paper, `aria-
- * current="page"`, and, since the tabs overlap, the one that paints over its
- * neighbours by being later in DOM order). There is no `activeIndex`.
- *
- * Faking it app-side would mean hand-drawing the folder strip, which is exactly
- * what this codebase does not do with kit shapes. So the set is ordered
- * MOST-RECENTLY-ACTIVATED LAST, and the tab you are looking at is always the
- * front folder — which is what a folder metaphor actually does: you pull the
- * one you are reading to the front of the drawer. Everything the client asked
- * for holds (nothing closes on its own; clicking the collection keeps the
- * record open; the strip only ever grows by opening and shrinks by closing);
- * what is missing is that a tab stays put on screen.
- *
- * When the kit grows `activeIndex`, `activate()` below stops re-ordering and
- * the strip becomes fixed-position and Chrome-exact. That is the only line that
- * changes. */
+ * THIS WAS A COMPROMISE WITH THE KIT UNTIL KIT v1.2.59, AND IT NO LONGER IS.
+ * Chrome's tabs never move: the active one is highlighted wherever it happens
+ * to sit. `BreadcrumbFolders` used to be unable to draw that — it painted the
+ * LAST item as the live tab (the card's own paper, `aria-current="page"`, the
+ * z-lift) with no `activeIndex` to say otherwise — so this array had to stay
+ * ordered most-recently-activated-last and the strip re-ordered itself under
+ * the reader's own cursor on every switch, which is the opposite of the thing
+ * being copied. `BreadcrumbFoldersProps.activeIndex` is the kit's fix — WHICH
+ * tab is live, decoupled from WHERE it sits — and this array is what taking it
+ * looks like: growth only. A tab's position is a fact about when it was
+ * OPENED, never about when it was last looked at. */
 let tabs: OpenTab[] = []
+
+/** WHICH TAB IS BEING LOOKED AT — the fact `activeIndex` asks for, sent to the
+ * strip as a POSITION the caller computes (`tabs.findIndex` against this),
+ * never by moving anything in `tabs` itself. `null` mirrors `tabs`'s own
+ * "nothing open" state, and the two are always either both real or both empty
+ * — see `touch`, `visitTrail` and `closeTab`. */
+let activePath: string | null = null
+
+/** RECENCY, KEPT APART FROM POSITION NOW THAT POSITION IS FIXED. Eviction
+ * still wants "the LEAST RECENTLY ACTIVATED tab closes to make room" (see
+ * `MAX_OPEN_TABS`), and that fact no longer lives in `tabs`'s own order — so
+ * it is tracked here instead, oldest-activated first, most-recent last. It is
+ * NOT persisted as its own key: a fresh document seeds it from the PERSISTED
+ * POSITION order in `setWorkspaceScope`, which is not a guess. A set written
+ * before today is ordered most-recently-activated-last, because until today
+ * that was the only order this store had — so the array already on disk IS a
+ * recency ranking, and taking it as one costs an already-open set nothing. */
+let recency: string[] = []
+
+/** Move `path` to the fresh end of `recency` and mark it the tab being looked
+ * at. Called for a tab that is genuinely being ACTIVATED — never for an
+ * ancestor merely opened on the way to one (see `put`, in `visitTrail`) —
+ * which is what keeps walking back through an already-open trail from
+ * refreshing every ancestor's own eviction clock. */
+function touch(path: string): void {
+  activePath = path
+  const at = recency.indexOf(path)
+  if (at >= 0) recency.splice(at, 1)
+  recency.push(path)
+}
 
 /** The snapshot handed to React when nothing is open. A module constant rather
  * than a fresh `[]`, because `useSyncExternalStore` compares snapshots by
@@ -258,6 +282,18 @@ export function setWorkspaceScope(next: string | null): void {
   if (scope === next) return
   scope = next
   tabs = next ? readPersisted() : NOTHING
+  // SEED RECENCY AND THE ACTIVE TAB FROM THE ORDER ALREADY ON DISK — see
+  // `recency`'s own comment for why that order is not a guess. The persisted
+  // array becomes the first recency ranking, oldest to newest, and its last
+  // tab becomes the one the reader was looking at — which is exactly the
+  // reading "last position is the active tab" always had, for every set
+  // written before `activeIndex` existed. From here on position and recency
+  // are two separate facts; a set already sitting in someone's browser opens
+  // exactly where it left off, on the exact tab it was showing, and loses
+  // nothing by the change — only the reader's first re-activation of an
+  // ancestor stops moving it.
+  recency = tabs.map((tab) => tab.path)
+  activePath = tabs.length > 0 ? tabs[tabs.length - 1].path : null
   announce()
 }
 
@@ -288,8 +324,9 @@ function trim(label: string): string {
  * owner asked for on 24 Aug 2026 and that `buildCrumbs` already honours.
  *
  * An ancestor that is ALREADY open keeps its position — only the deepest level
- * is activated (moved to the front folder). That is what stops a strip from
- * reshuffling itself twice on one click.
+ * is ACTIVATED, which since kit v1.2.59 means marked as the tab being looked
+ * at rather than moved anywhere. That is what stops a strip from reshuffling
+ * itself twice on one click, and — now — from reshuffling at all.
  *
  * A level with no path (the current page's own crumb carries no `href`) is
  * given the current address by the caller, so every entry here has one. */
@@ -307,35 +344,46 @@ export function visitTrail(trail: OpenTab[]): void {
     const label = trim(entry.label)
     const at = next.findIndex((tab) => tab.path === entry.path)
     if (at >= 0) {
-      // Already open. Its NAME is refreshed either way — this is the only
-      // moment the app knows a record's current name for free, and a tab
-      // showing last week's title is the one staleness a visit can fix.
-      const found = { path: entry.path, label: label || next[at].label }
-      if (!activate) {
-        next[at] = found
-        return
-      }
-      next.splice(at, 1)
-      next.push(found)
+      // Already open — POSITION NEVER MOVES, full stop. Its NAME is refreshed
+      // either way, which is the only moment the app knows a record's current
+      // name for free and a tab showing last week's title is the one
+      // staleness a visit can fix. RECENCY is refreshed only when this is the
+      // tab being activated: an ancestor merely walked through on the way to
+      // one does not itself count as "just looked at" — same rule as before
+      // `activeIndex` existed, just read off `recency` instead of off `next`.
+      next[at] = { path: entry.path, label: label || next[at].label }
+      if (activate) touch(entry.path)
       return
     }
-    // New. An ancestor goes in BEFORE the tab that is about to become active,
-    // so a freshly-seeded strip reads outermost-first exactly like the trail it
-    // was built from.
+    // New — appended at the END of the fixed-position array, which is the
+    // only thing position ever does now: grow. `recency` is touched
+    // regardless of `activate`, because cold-opening a whole trail means
+    // every level just opened is fresh, not just the deepest one — an
+    // ancestor seeded this way is exactly as protected from the next
+    // eviction as the tab it leads to.
     next.push({ path: entry.path, label })
+    touch(entry.path)
   }
 
   for (let i = 0; i < trail.length - 1; i++) put(trail[i], false)
   put(trail[trail.length - 1], true)
 
-  // THE CEILING, ENFORCED FROM THE OLD END. The active tab is last and every
-  // ancestor of the address we just arrived at is behind it, so dropping from
-  // the front takes the least recently activated thing every time — and can
-  // never take the tab somebody is looking at, because that one is at the other
-  // end of the array. A trail deeper than the ceiling would eat its own
-  // ancestors, which is correct: the deepest levels are the ones that were
-  // asked for.
-  while (next.length > MAX_OPEN_TABS) next.shift()
+  // THE CEILING, ENFORCED BY RECENCY NOW, NOT BY POSITION. Position stopped
+  // doubling as "how long ago" the moment it became fixed, so this reads
+  // `recency`'s own front instead of the array's — the same rule, LEAST
+  // RECENTLY ACTIVATED GOES, asked of the fact that actually tracks it now.
+  // `touch()` above guarantees the tab just opened or activated sits at
+  // `recency`'s tail, so neither one is ever this loop's victim — the same
+  // guarantee the old position-based version made, kept by a different
+  // mechanism.
+  while (next.length > MAX_OPEN_TABS) {
+    const victim = recency.find((path) => next.some((tab) => tab.path === path)) ?? next[0]?.path
+    if (victim === undefined) break // next is empty; cannot happen at length > 0, kept total
+    const at = next.findIndex((tab) => tab.path === victim)
+    next.splice(at, 1)
+    const ri = recency.indexOf(victim)
+    if (ri >= 0) recency.splice(ri, 1)
+  }
 
   tabs = next
   persist()
@@ -347,23 +395,44 @@ export function visitTrail(trail: OpenTab[]): void {
  * Returns the address the caller should navigate to when the tab that closed
  * was the one being looked at, or `null` when nothing is left and the caller
  * should fall back to the section's own top. Closing a BACKGROUND tab returns
- * the still-active tab's own address, so the caller's "did the active tab
- * change?" test is one string comparison and there is no second entry point.
+ * the still-active tab's own address, UNCHANGED, so the caller's "did the
+ * active tab change?" test is one string comparison and there is no second
+ * entry point.
  *
- * THE NEIGHBOUR RULE IS THE ONE EVERY TABBED THING USES: the tab to the LEFT,
- * because in a strip ordered oldest-first that is the place you were before
- * this one, and it is the one still on screen under the pointer that just
- * clicked. Falling right only when there is nothing to the left. */
+ * THAT SPLIT IS EXPLICIT NOW, AND IT WAS ONLY IMPLICIT BEFORE. While position
+ * doubled as recency, closing anything but the LAST tab was, by construction,
+ * closing a background tab, and the neighbour computed below happened to
+ * never be read except in that one case. `activeIndex` broke the coincidence
+ * — a background tab can sit anywhere, including to either side of the active
+ * one — so this function now asks the real question, `path === activePath`,
+ * instead of inferring it from array position.
+ *
+ * THE NEIGHBOUR RULE IS THE ONE EVERY TABBED THING USES, and it still reads
+ * off POSITION, which is exactly right: position is where the reader's eye
+ * and pointer already are, recency or no. The tab to the LEFT, because that
+ * is the one still on screen under the pointer that just clicked; falling
+ * right only when there is nothing to the left. */
 export function closeTab(path: string): string | null {
   const at = tabs.findIndex((tab) => tab.path === path)
-  if (at < 0) return tabs[tabs.length - 1]?.path ?? null
+  if (at < 0) return activePath
+  const wasActive = path === activePath
   const next = [...tabs.slice(0, at), ...tabs.slice(at + 1)]
   tabs = next.length === 0 ? NOTHING : next
+  const ri = recency.indexOf(path)
+  if (ri >= 0) recency.splice(ri, 1)
   persist()
+  const landing = next.length === 0
+    ? null
+    // The one that took its place, else the one before it — only computed
+    // when the closed tab WAS the active one; a background close leaves the
+    // active tab exactly where it was, by path, regardless of where it now
+    // sits after the array shifted under it.
+    : wasActive
+      ? (next[at] ?? next[at - 1] ?? next[next.length - 1]).path
+      : activePath
+  activePath = landing
   announce()
-  if (next.length === 0) return null
-  // The one that took its place, else the one before it.
-  return (next[at] ?? next[at - 1] ?? next[next.length - 1]).path
+  return landing
 }
 
 /** Drop everything, for every scope. Sign-out only: these are one person's
@@ -377,6 +446,8 @@ export function closeTab(path: string): string | null {
  * is loaded. */
 export function forgetOpenTabs(): void {
   tabs = NOTHING
+  recency = []
+  activePath = null
   scope = null
   try {
     const doomed: string[] = []
@@ -413,4 +484,59 @@ export function useOpenTabs(): OpenTab[] {
  * comment on `MAX_OPEN_TABS` on trust. */
 export function openTabsSnapshot(): OpenTab[] {
   return tabs
+}
+
+/** WHICH TAB IS BEING LOOKED AT, for the caller that builds the kit's
+ * `activeIndex` — its own position in `useOpenTabs()`'s array, found by path
+ * (`tabs.findIndex((t) => t.path === path)`) rather than handed out as a raw
+ * number, because the index is only ever meaningful paired with the exact
+ * array it indexes into and this store is not the one holding that pairing.
+ * The SSR snapshot is `null`, matching `useOpenTabs`'s own empty one — the
+ * server does not know what a person last looked at any more than it knows
+ * what they have open. */
+export function useActiveTabPath(): string | null {
+  return useSyncExternalStore(
+    (cb) => {
+      subscribers.add(cb)
+      return () => subscribers.delete(cb)
+    },
+    () => activePath,
+    () => null
+  )
+}
+
+/** What the store believes is active right now — the `activePath` counterpart
+ * to `openTabsSnapshot`, for the same reason: a test proving the fixed-
+ * position/real-closing behaviour needs to read the fact directly rather than
+ * infer it from array order, which is precisely the inference this change
+ * retires. */
+export function activeTabPathSnapshot(): string | null {
+  return activePath
+}
+
+/** WHAT THE STRIP SHOULD DRAW, as one decision instead of two.
+ *
+ * The shell has to answer two questions that must agree: is this a tab SET or
+ * an ordinary trail, and which tab is live. They were separate expressions in
+ * `deep-link-screen.tsx` and they disagreed the day the store stopped
+ * re-ordering — the "is it a set" half still asked whether the LAST tab was the
+ * address, which had been the same thing as "the active tab" only while
+ * activating one moved it to the end. Step back to an earlier tab and the set
+ * silently became a trail: the feature vanishing precisely when it was working.
+ *
+ * Each half was right on its own, which is why nothing caught it. So they are
+ * one function now, returning a pair that cannot contradict itself, and it is
+ * pure so the case that broke can be a test rather than a click.
+ */
+export function tabStripState(
+  tabs: readonly OpenTab[],
+  currentPath: string,
+  roomForTabs: boolean
+): { showTabSet: boolean; activeIndex: number } {
+  const activeIndex = tabs.findIndex((tab) => tab.path === currentPath)
+  // `roomForTabs` is the phone gate and it is checked HERE rather than by the
+  // caller, so there is one place where "no set" is decided. An address that is
+  // not in the set is the ordinary fallback, not an error: it is the first
+  // paint, a phone, or Welcome, which has no crumb and so no tab.
+  return { showTabSet: roomForTabs && activeIndex >= 0, activeIndex }
 }

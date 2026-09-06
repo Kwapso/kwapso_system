@@ -59,6 +59,7 @@ import {
   closeTab,
   setWorkspaceScope,
   useOpenTabs,
+  tabStripState,
   visitTrail,
   type OpenTab,
 } from "@/lib/workspace-tabs"
@@ -438,19 +439,35 @@ export function DeepLinkScreen() {
     visitTrail(entriesRef.current)
   }, [roomForTabs, workspaceScope, routeReady, tabsKey])
   const openTabs = useOpenTabs()
-  // THE STRIP DRAWS THE SET ONLY WHEN THE SET AGREES WITH THE ADDRESS.
+  // THE STRIP DRAWS THE SET ONLY WHEN THE SET CONTAINS THE ADDRESS.
   //
-  // `BreadcrumbFolders` paints the LAST tab as the live one — that is the whole
-  // folder joint, the tab that IS the card. So a set whose last entry is not
-  // the screen underneath it would draw a lie, and there are three ordinary
-  // moments when that is briefly true: the very first paint (the store is empty
-  // until the effect above runs), a phone (nothing is ever recorded), and
-  // Welcome, which has no crumb and therefore no tab. In every one of them the
-  // strip falls back to the ordinary trail — which is what this product drew
-  // before tabs existed, so the fallback is never a degraded state, just the
-  // previous one.
-  const showTabSet =
-    roomForTabs && openTabs.length > 0 && openTabs[openTabs.length - 1].path === currentPath
+  // THIS USED TO ASK WHETHER THE LAST TAB WAS THE CURRENT ONE, and that was
+  // right for exactly as long as the store re-ordered: while activating a tab
+  // moved it to the end, "last" and "active" were one fact, and the kit's own
+  // rule — the LAST tab is painted live, because that is the folder joint, the
+  // tab that IS the card — held for free.
+  //
+  // Both halves of that changed on the same day, in opposite directions. The
+  // store stopped re-ordering, so a tab holds the position it was opened in
+  // (Chrome's behaviour, which is what was asked for); and the kit gained
+  // `activeIndex`, so liveness no longer has to mean last. Between the two this
+  // line became a trapdoor: step BACK to an earlier tab and the last entry is no
+  // longer the address, so the whole set vanished and the strip silently became
+  // an ordinary trail — the feature disappearing exactly when it was doing its
+  // job. Nothing caught it, because each half was correct alone and no test
+  // crossed the seam.
+  //
+  // So the question is now the one always meant: is the address IN the set. The
+  // three ordinary moments where it is not are unchanged and still fall back to
+  // the trail — the first paint (the store is empty until the effect above
+  // runs), a phone (nothing is ever recorded), and Welcome, which has no crumb
+  // and therefore no tab. That fallback is not a degraded state; it is what this
+  // product drew before tabs existed.
+  const { showTabSet, activeIndex: activeTabIndex } = tabStripState(
+    openTabs,
+    currentPath,
+    roomForTabs
+  )
   const stripCrumbs: Crumb[] = showTabSet
     ? openTabs.map((tab, index) => ({
         label: tab.label,
@@ -591,6 +608,7 @@ export function DeepLinkScreen() {
         active={active}
         breadcrumbs={stripCrumbs}
         onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+        activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
         onNavigate={go}
         activePath={currentPath}
       >
@@ -711,6 +729,7 @@ export function DeepLinkScreen() {
       active={active}
       breadcrumbs={stripCrumbs}
       onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+      activeCrumbIndex={showTabSet ? activeTabIndex : undefined}
       onNavigate={go}
       activePath={currentPath}
     >

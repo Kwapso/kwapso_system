@@ -98,6 +98,25 @@ export interface BreadcrumbsProps
    * trail is too long for a layout it cannot see.
    */
   maxItems?: number;
+  /**
+   * WHICH crumb is the current page. Defaults to the LAST, which is what a
+   * trail means and is exactly what this component did before the prop
+   * existed.
+   *
+   * ADDED 2026-09-06, AND IT IS NOT THIS DRAWING'S OWN IDEA. The folder strip
+   * one file away gained `activeIndex` so a workspace tab set could mark the
+   * tab the reader activated without MOVING it to the end of the strip — see
+   * that file. Below `md` the strip is `display: none` and THIS component is
+   * the trail, from the identical array; without the same prop the phone
+   * would announce a different crumb as `aria-current="page"` than the
+   * desktop does, which this file's own header names as the exact class of
+   * bug to refuse: "a crumb that reads differently here than it does there is
+   * now a difference a single user can hear by rotating a tablet."
+   *
+   * An index outside the array marks no crumb as current — deliberate, and
+   * argued in full at the strip's own copy of this prop.
+   */
+  activeIndex?: number;
   /** What the elision announces. Defaults to `BreadcrumbEllipsis`'s own English. */
   ellipsisLabel?: string;
   /** Classes for the `<ol>`, for a call site that needs to change the wrap. */
@@ -147,8 +166,10 @@ export function collapse(items: BreadcrumbsItem[], maxItems?: number): Rendered[
  *  7. empty          — `items: []` renders `null`. Not an empty `<nav>`, not a
  *                      lone chevron, not a dash.
  *  8. error          — does not apply. A trail reports nothing.
- *  9. selected       — the last crumb, always: `BreadcrumbPage`, primary ink
- *                      plus `aria-current="page"`.
+ *  9. selected       — exactly one crumb: `BreadcrumbPage`, primary ink plus
+ *                      `aria-current="page"`. The LAST one unless
+ *                      `activeIndex` names another, and none at all when that
+ *                      index falls outside the array.
  * 10. read-only      — always.
  *
  * THREE BREAKPOINTS
@@ -169,6 +190,7 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       label = "Breadcrumb",
       separator,
       maxItems,
+      activeIndex,
       ellipsisLabel,
       className,
       listClassName,
@@ -179,7 +201,9 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
     if (items.length === 0) return null;
 
     const rendered = collapse(items, maxItems);
-    const lastIndex = items.length - 1;
+    /* The LAST crumb unless the caller names another. `-1` on an empty array
+       never runs — the guard above returned. */
+    const currentIndex = activeIndex ?? items.length - 1;
 
     return (
       <Breadcrumb
@@ -204,7 +228,7 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
                 <BreadcrumbItem>
                   {entry.kind === "gap" ? (
                     <BreadcrumbEllipsis label={ellipsisLabel} />
-                  ) : entry.index === lastIndex ? (
+                  ) : entry.index === currentIndex ? (
                     <BreadcrumbPage>{entry.item.label}</BreadcrumbPage>
                   ) : entry.item.href === undefined ? (
                     /* AN ANCESTOR WITH NO ROUTE — THE PAGE ELEMENT FOR ITS

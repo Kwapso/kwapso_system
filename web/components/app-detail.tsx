@@ -37,7 +37,7 @@ import { createSprintFrom } from "@/components/sprints-screen"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import {
   AppMeetingsPanel,
-  AppTicketsPanel,
+  AppTicketsTab,
   ProcessesPanel,
   SprintsPanel,
   StoriesPanel,
@@ -675,8 +675,14 @@ export function AppDetailScreen({
               />
             )
           if (panel.value === "tickets")
+            // TWO VIEWS ON ONE TAB (client, 6 Sep 2026) — the list she asked to
+            // be put in, and this system's own dashboard beside it. The switch,
+            // the memory and the choice of which panels survive one app all
+            // live in `AppTicketsTab`; this record hands over only what it
+            // alone knows.
             return (
-              <AppTicketsPanel
+              <AppTicketsTab
+                teamId={teamId}
                 marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
                 // The same vocabulary the create dialog below already fetches
                 // (gated the same way, on `canRaiseTicket`) — a reader who may
@@ -686,6 +692,11 @@ export function AppDetailScreen({
                 appId={appId}
                 host={host}
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
+                // R50's own question, asked of the WHOLE collection: the exact
+                // server COUNT(*) this record's own tab badge is already
+                // showing (R16), read from the same sidecar rather than counted
+                // a second way.
+                ticketTotal={ticketsTotal}
               />
             )
           if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />

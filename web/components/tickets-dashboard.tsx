@@ -12,6 +12,17 @@
 // and why this component fetches one object and draws it rather than reducing
 // arrays of tickets.
 //
+// …AND THE SAME SCREEN NARROWED TO ONE SYSTEM (2026-09-06). The app record's
+// Tickets tab has two views now — a list and this — and the dashboard view is
+// this component with an `appId`: the same door, the same panels, one more
+// clause in the WHERE. Two of the five panels stand down there because one app
+// empties them of MEANING (the reasons are at their own call sites, in the
+// screen at the foot of this file), and that is the only thing the narrowing
+// changes. It is not a second dashboard and there is no second copy of any
+// panel — the client asked for "a mini version, a filtered version", and a
+// filtered version of a screen is that screen with a filter on it, never a
+// smaller one built beside it.
+//
 // ── WHY THE PICTURES ARE DRAWN HERE AND NOT BY THE KIT ──────────────────────
 //
 // The kit's `Chart` (Recharts, reached through `pulse-charts.tsx`'s one lazy
@@ -60,7 +71,7 @@ import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
-import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { ToolbarRow, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
 import type { TicketDashboard } from "@/lib/api/content"
@@ -776,6 +787,8 @@ export function TicketsDashboard({
   teamId,
   helpTypeOptions,
   ticketTotal,
+  appId,
+  viewSlot,
 }: {
   teamId: string
   /** the team's live `Ticket type` values — the order the pipelines, the legend
@@ -788,6 +801,34 @@ export function TicketsDashboard({
    * none. `undefined` while the count is still in flight — which is not empty,
    * for the reason the loading branch below gives. */
   ticketTotal: number | undefined
+  /** ONE SYSTEM'S OWN DASHBOARD — the app record's Tickets tab, in its Dashboard
+   * view (client, 6 Sep 2026: "make the dashboard a view inside the Tickets tab
+   * inside the app, and include whatever you think is relevant from the main
+   * dashboard for tickets, like a mini version, a filtered version").
+   *
+   * IT IS THE SAME SCREEN AND NEVER A SECOND ONE. Absent, this is the Tickets
+   * screen's own Dashboard tab and every panel below draws. Present, it is a
+   * WHERE clause on all eight of the door's grouped reads (`appId` rides
+   * `content.helpDashboard` and the cache key, exactly as the two toolbar
+   * filters do), and TWO of the five panels stand down because the narrowing
+   * empties them of meaning rather than of rows — each says why at its own call
+   * site below.
+   *
+   * A FACT ABOUT WHERE THE READER IS STANDING, NOT A QUESTION. It never becomes
+   * a facet: the app is the record whose page this is, and offering a control to
+   * change it would be offering to navigate. */
+  appId?: string
+  /** THE OTHER BODY THIS COLLECTION HAS, when it has one (R53's `view` slot,
+   * passed straight through to `<ToolbarRow>`).
+   *
+   * The Tickets SCREEN has no such switch — its Dashboard is a folder tab beside
+   * Triage and the list, and a screen does not offer two ways to leave one tab.
+   * Inside an app RECORD there is no strip to add to (the client's own ruling:
+   * "there can never be 2 rows of tabs"), so the list and this dashboard are two
+   * VIEWS of one tab and the switch belongs in the toolbar — the same slot the
+   * list view's own `<PagedFind>` draws it in, from the same config, so one
+   * control appears in one place whichever body is on screen. */
+  viewSlot?: ToolbarViewSlot
 }) {
   const t = useT()
   // THE TWO FILTERS, HELD HERE AND SPENT AT THE DOOR. They are not remembered
@@ -798,22 +839,31 @@ export function TicketsDashboard({
   const accountId = facetValues.accountId ?? ""
   const helpType = facetValues.helpType ?? ""
 
-  // ONE CACHE ENTRY PER QUESTION (`helpDashboardKey` carries both filters), so
-  // switching client does not overwrite the unfiltered answer and switching back
-  // paints instantly from the cache — CACHING.md's cache-first rule, applied to
-  // a picture instead of a list.
-  const dashQ = useCached<TicketDashboard>(helpDashboardKey(teamId, accountId, helpType), () =>
-    contentApi.helpDashboard({
-      accountId: accountId || undefined,
-      helpType: helpType || undefined,
-    })
+  // ONE CACHE ENTRY PER QUESTION (`helpDashboardKey` carries every narrowing —
+  // both filters AND the system, when there is one), so switching client does
+  // not overwrite the unfiltered answer, one app's dashboard can never be served
+  // another's, and switching back paints instantly from the cache —
+  // CACHING.md's cache-first rule, applied to a picture instead of a list.
+  const dashQ = useCached<TicketDashboard>(
+    helpDashboardKey(teamId, accountId, helpType, appId ?? ""),
+    () =>
+      contentApi.helpDashboard({
+        accountId: accountId || undefined,
+        helpType: helpType || undefined,
+        appId,
+      })
   )
   // THE CLIENT FACET'S OPTIONS. `tenancy.accounts()` is page ONE of a growing
   // list (R14) — the same known limitation the ticket list's own Client facet
   // accepts and writes down (tickets-collection.tsx says why: a searched,
   // door-backed facet option list is a capability no facet control in this app
   // has yet). Filed here too rather than silently inherited.
-  const accountsQ = useCached<Account[]>(accountsKey(teamId), () =>
+  //
+  // NOT READ AT ALL INSIDE AN APP, because there is no Client facet there to
+  // fill (see `facets` below) — a `null` key is `useCached`'s own way of saying
+  // "do not ask", so the app record's Tickets tab pays for no accounts page it
+  // would never draw.
+  const accountsQ = useCached<Account[]>(appId ? null : accountsKey(teamId), () =>
     tenancy.accounts().then((r) => r.accounts)
   )
 
@@ -841,15 +891,25 @@ export function TicketsDashboard({
   }, [data, helpTypeOptions])
 
   const facets: FilterFacet[] = [
-    {
-      field: "accountId",
-      label: t("Client"),
-      control: "select",
-      options: (accountsQ.data ?? [])
-        .filter((a) => a.active)
-        .map((a) => ({ value: a.id, label: a.name }))
-        .sort((a, b) => a.label.localeCompare(b.label)),
-    },
+    // THE CLIENT FACET IS ABSENT INSIDE AN APP, and this is the same subtraction
+    // the "Who has more" panel makes below, made at the toolbar. An app row
+    // carries ONE `accountId` — it is built for one client, or it is ours — so
+    // inside one system the choice is between that client's tickets and nothing.
+    // A control whose only meaningful setting is the one already in force is not
+    // a filter, it is a fact wearing a control's clothes.
+    ...(appId
+      ? []
+      : [
+          {
+            field: "accountId",
+            label: t("Client"),
+            control: "select" as const,
+            options: (accountsQ.data ?? [])
+              .filter((a) => a.active)
+              .map((a) => ({ value: a.id, label: a.name }))
+              .sort((a, b) => a.label.localeCompare(b.label)),
+          },
+        ]),
     {
       field: "helpType",
       label: t("Type"),
@@ -913,6 +973,13 @@ export function TicketsDashboard({
         empty={ticketTotal === 0}
         filters={filterPill}
         toolbarPanel={filterPanel}
+        // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
+        // record's Tickets tab, which is this dashboard and a list. `undefined`
+        // on the Tickets screen's own Dashboard TAB, where the strip above it
+        // already is the way out; `ViewSwitch` draws nothing for fewer than two
+        // views, so the absence needs no exemption (R53 says so about this exact
+        // prop).
+        view={viewSlot}
       />
       {loading ? (
         <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
@@ -947,19 +1014,39 @@ export function TicketsDashboard({
             <OpenWork rows={data?.openByTypeAndStatus ?? []} types={types} t={t} />
           </Panel>
 
-          <div className="grid min-w-0 gap-4 lg:grid-cols-3">
-            {/* 6A — the reading the client picked. See `AppsStackedByType` for
-                the two she did not, and for why swapping one in is a change at
-                this line rather than a rewrite of the panel. */}
-            <Panel title={t("Which app")} sub={t("Open tickets against the thing you built.")}>
-              <AppsStackedByType rows={data?.openByApp ?? []} types={types} t={t} />
-            </Panel>
-            <Panel
-              title={t("Who has more")}
-              sub={t("Open work by client, for the kinds that wait for a client to confirm.")}
-            >
-              <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} t={t} />
-            </Panel>
+          {/* ── THE ROW OF THREE, AND THE TWO THAT DO NOT SURVIVE ONE APP ──
+              The client asked for "whatever you think is relevant … like a mini
+              version, a filtered version", which is a judgement rather than a
+              shrink. A panel is DROPPED when the narrowing empties it of
+              MEANING, never when it merely has fewer rows — a chart with less in
+              it is still a chart, and a chart that can only ever draw one mark
+              is furniture.
+
+              6A · WHICH APP — dropped. It is one bar per system, ranked; inside
+              one system it is one bar at 100% of a scale it sets itself, under a
+              heading naming the record the reader is already standing on. The
+              kind SPLIT it carries is the only information left in it, and that
+              is the pipeline panel above, drawn properly against the lifecycle.
+
+              2B · WHO HAS MORE, BY CLIENT — dropped, and this one was checked
+              rather than assumed. `AppRow` carries a single `accountId` (an app
+              is built for one client, or it is ours), so "which client asks for
+              the most" inside one app is a ranking of one — the same reason the
+              Client FACET is absent from this toolbar. It is NOT structurally
+              impossible for a second client to appear: `help.account_id` and
+              `help.app_id` are independent columns, and the raise dialog on this
+              very record deliberately leaves the client as a question ("a ticket
+              about one of our systems may be raised on behalf of a client or be
+              our own housekeeping"). So the honest sentence is that the panel
+              would draw one bar in the ordinary case and two in an odd one —
+              which is a comparison nobody came to this page to make, and it is
+              one screen away on the Tickets dashboard where it is the question.
+
+              WHAT IS KEPT ANSWERS A QUESTION SOMEBODY STANDING ON THIS APP ASKS:
+              where its open work is stuck (the pipeline), whether what arrives
+              about it is what it turns out to be (the matrix), and how long it
+              takes us to close things on it (the spread and the trend). */}
+          {appId ? (
             <Panel
               title={t("Raised as, then triaged as")}
               sub={t("What your morning is actually spent on.")}
@@ -971,7 +1058,33 @@ export function TicketsDashboard({
                 t={t}
               />
             </Panel>
-          </div>
+          ) : (
+            <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+              {/* 6A — the reading the client picked. See `AppsStackedByType` for
+                  the two she did not, and for why swapping one in is a change at
+                  this line rather than a rewrite of the panel. */}
+              <Panel title={t("Which app")} sub={t("Open tickets against the thing you built.")}>
+                <AppsStackedByType rows={data?.openByApp ?? []} types={types} t={t} />
+              </Panel>
+              <Panel
+                title={t("Who has more")}
+                sub={t("Open work by client, for the kinds that wait for a client to confirm.")}
+              >
+                <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} t={t} />
+              </Panel>
+              <Panel
+                title={t("Raised as, then triaged as")}
+                sub={t("What your morning is actually spent on.")}
+              >
+                <RaisedAsMatrix
+                  rows={data?.raisedVsCurrent ?? []}
+                  notRecorded={data?.raisedAsNotRecorded ?? 0}
+                  types={types}
+                  t={t}
+                />
+              </Panel>
+            </div>
+          )}
 
           <Panel
             title={t("How long a ticket takes to close")}

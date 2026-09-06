@@ -9,6 +9,13 @@
 // the set, the set survives a reload, it is bounded, a background tab is two
 // strings, the phone never builds one, and closing lands somewhere real.
 //
+// SINCE KIT v1.2.59 (`BreadcrumbFoldersProps.activeIndex`) THERE ARE TWO
+// SEPARATE FACTS RATHER THAN ONE ARRAY ORDER DOING BOTH JOBS: `openTabsSnapshot()`
+// is POSITION — fixed, growth-only, the order each tab was first opened — and
+// `activeTabPathSnapshot()` is WHICH ONE the reader is looking at, which moves
+// freely without ever touching position. Every test below that used to read
+// "the active tab is the last one" now reads the two apart.
+//
 // The store is a MODULE — one per document, exactly as `nav-memory.ts` is — so
 // each test re-scopes it rather than re-importing it, which is also the
 // mechanism a team switch uses in the app.
@@ -18,16 +25,19 @@ import { beforeEach, describe, expect, it } from "vitest"
 import {
   MAX_OPEN_TABS,
   MAX_TAB_LABEL_CHARS,
+  activeTabPathSnapshot,
   closeTab,
   forgetOpenTabs,
   openTabsSnapshot,
   setWorkspaceScope,
   visitTrail,
+  tabStripState,
 } from "@/lib/workspace-tabs"
 
 const ME = "user1:team1"
 
-/** The strip, as the reader sees it: names, oldest first, active last. */
+/** The strip, as the reader sees it: names, in the FIXED order each was
+ * opened — no longer "active last", see the file header. */
 const strip = () => openTabsSnapshot().map((tab) => tab.label)
 const paths = () => openTabsSnapshot().map((tab) => tab.path)
 
@@ -63,19 +73,24 @@ describe("a tab set is seeded by the trail, so nothing looks different on arriva
 })
 
 describe("the client's own sentence: the detail stays open", () => {
-  it("clicking the collection keeps the record open, and only moves the front folder", () => {
+  it("clicking the collection keeps the record open, and moves nothing — position holds", () => {
     visitTrail(at(["/apps", "Apps"]))
     visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
     expect(strip()).toEqual(["Apps", "APP-1"])
 
     // …and now she clicks the first tab. Before this feature the record's crumb
-    // simply vanished, because the trail is derived from the address.
+    // simply vanished, because the trail is derived from the address. Before
+    // `activeIndex` existed (kit v1.2.59) the strip had no other way to mark a
+    // tab live than to drag it to the last position, so this same click used
+    // to reorder the set to ["APP-1", "Apps"]. It no longer does: the kit's
+    // `activeIndex` marks liveness without moving anything, so this store
+    // stopped re-ordering to match — Chrome-exact, which was the whole point.
     visitTrail(at(["/apps", "Apps"]))
-    expect(strip()).toContain("APP-1")
-    // The tab she is looking at is the LAST one — the folder joined to the card
-    // (breadcrumb-folders.tsx paints the last item live and has no
-    // `activeIndex`), so activating one pulls it to the front of the drawer.
-    expect(strip()).toEqual(["APP-1", "Apps"])
+    expect(strip()).toEqual(["Apps", "APP-1"])
+    expect(paths()).toEqual(["/apps", "/apps/A1"])
+    // She IS looking at "Apps" now — that fact still exists, it just lives
+    // apart from position.
+    expect(activeTabPathSnapshot()).toBe("/apps")
   })
 
   it("a second record joins the set rather than replacing the first", () => {
@@ -161,8 +176,13 @@ describe("it is bounded — this is not Chrome's ninety tabs", () => {
     expect(strip()[0]).toBe("APP-0")
     visitTrail(at(["/apps/NEW", "NEW"]))
     expect(strip()).not.toContain("APP-0")
-    // The active tab is the last one, always — the one just opened.
+    // NEW is the one just opened, so it is both the newest POSITION (appended
+    // at the end — the only thing position ever does now) and the active tab
+    // (`touch()` runs for every new entry) — the two facts happen to agree
+    // here because nothing in this walk ever re-activates an old tab out of
+    // position order.
     expect(strip()[strip().length - 1]).toBe("NEW")
+    expect(activeTabPathSnapshot()).toBe("/apps/NEW")
     expect(openTabsSnapshot()).toHaveLength(MAX_OPEN_TABS)
   })
 
@@ -180,29 +200,69 @@ describe("it is bounded — this is not Chrome's ninety tabs", () => {
   })
 })
 
+describe("a tab holds the position it was opened in — Chrome parity, kit v1.2.59", () => {
+  it("activating an already-open tab marks it active and moves nothing", () => {
+    visitTrail(at(["/apps/A0", "APP-0"]))
+    visitTrail(at(["/apps/A1", "APP-1"]))
+    visitTrail(at(["/apps/A2", "APP-2"]))
+    expect(paths()).toEqual(["/apps/A0", "/apps/A1", "/apps/A2"])
+    expect(activeTabPathSnapshot()).toBe("/apps/A2")
+
+    // She clicks the FIRST tab. Before `activeIndex` existed this would have
+    // dragged it to the end; now the array is untouched and only the active
+    // fact changes.
+    visitTrail(at(["/apps/A0", "APP-0"]))
+    expect(paths()).toEqual(["/apps/A0", "/apps/A1", "/apps/A2"])
+    expect(activeTabPathSnapshot()).toBe("/apps/A0")
+
+    // …and the MIDDLE one, same story.
+    visitTrail(at(["/apps/A1", "APP-1"]))
+    expect(paths()).toEqual(["/apps/A0", "/apps/A1", "/apps/A2"])
+    expect(activeTabPathSnapshot()).toBe("/apps/A1")
+  })
+
+  it("closing a background tab that neighbours nothing active leaves the active tab exactly where it was", () => {
+    visitTrail(at(["/apps/A0", "APP-0"]))
+    visitTrail(at(["/apps/A1", "APP-1"]))
+    visitTrail(at(["/apps/A2", "APP-2"]))
+    visitTrail(at(["/apps/A0", "APP-0"])) // A0 is active; A1 sits between it and A2
+
+    // A1 is a true background tab here — not adjacent to the active one by
+    // recency, only by position — which `activeIndex` makes possible for the
+    // first time. Closing it must not disturb A0.
+    expect(closeTab("/apps/A1")).toBe("/apps/A0")
+    expect(paths()).toEqual(["/apps/A0", "/apps/A2"])
+    expect(activeTabPathSnapshot()).toBe("/apps/A0")
+  })
+})
+
 describe("closing lands somewhere real", () => {
   it("closing the active tab falls to the neighbour on its left", () => {
     visitTrail(at(["/apps", "Apps"]))
     visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
     expect(closeTab("/apps/A1")).toBe("/apps")
     expect(strip()).toEqual(["Apps"])
+    expect(activeTabPathSnapshot()).toBe("/apps")
   })
 
   it("closing the FIRST tab falls to the one that took its place", () => {
     visitTrail(at(["/apps", "Apps"], ["/apps/A1", "APP-1"]))
     expect(closeTab("/apps")).toBe("/apps/A1")
+    expect(activeTabPathSnapshot()).toBe("/apps/A1")
   })
 
   it("closing the last tab standing says so, and the caller falls back", () => {
     visitTrail(at(["/apps/A1", "APP-1"]))
     expect(closeTab("/apps/A1")).toBeNull()
     expect(strip()).toEqual([])
+    expect(activeTabPathSnapshot()).toBeNull()
   })
 
   it("closing something that is not open moves nobody", () => {
     visitTrail(at(["/apps", "Apps"]))
     expect(closeTab("/apps/GONE")).toBe("/apps")
     expect(strip()).toEqual(["Apps"])
+    expect(activeTabPathSnapshot()).toBe("/apps")
   })
 
   it("a closed tab stays closed across a reload", () => {
@@ -223,5 +283,51 @@ describe("nothing is recorded unless somebody asks", () => {
     // if it did — so a phone session accumulates nothing rather than filling a
     // set up invisibly behind a strip that never draws it.
     expect(strip()).toEqual([])
+  })
+})
+
+/* THE SEAM THAT BROKE, and the case no test crossed.
+ *
+ * The store stopped re-ordering (a tab holds the position it was opened in) on
+ * the same day the kit learned `activeIndex` (liveness stopped meaning last).
+ * Each change was correct alone. Together they left the shell asking whether
+ * the LAST tab was the address in order to decide whether to draw a set at all
+ * — so stepping BACK to an earlier tab made the whole strip fall back to an
+ * ordinary trail, the feature disappearing exactly when it was doing its job.
+ */
+describe("what the strip draws", () => {
+  const tabs = [
+    { path: "/apps/A0", label: "APP-0" },
+    { path: "/apps/A1", label: "APP-1" },
+    { path: "/apps/A2", label: "APP-2" },
+  ]
+
+  it("still draws the set when the address is not the last tab", () => {
+    const state = tabStripState(tabs, "/apps/A0", true)
+    expect(state.showTabSet, "stepping back to the first tab must not lose the set").toBe(true)
+    expect(state.activeIndex, "and the FIRST tab is the live one, not the last").toBe(0)
+  })
+
+  it("names the middle tab live when that is where she is standing", () => {
+    expect(tabStripState(tabs, "/apps/A1", true)).toEqual({ showTabSet: true, activeIndex: 1 })
+  })
+
+  it("falls back to the trail when the address is not in the set", () => {
+    // The first paint, before the effect has recorded anything, and Welcome,
+    // which has no crumb and so no tab.
+    expect(tabStripState(tabs, "/home", true)).toEqual({ showTabSet: false, activeIndex: -1 })
+    expect(tabStripState([], "/apps/A0", true)).toEqual({ showTabSet: false, activeIndex: -1 })
+  })
+
+  it("falls back to the trail on a phone even with a full set", () => {
+    expect(tabStripState(tabs, "/apps/A1", false).showTabSet).toBe(false)
+  })
+
+  it("never reports a set without a live tab to paint", () => {
+    // The pair cannot contradict itself — that was the whole bug.
+    for (const path of ["/apps/A0", "/apps/A1", "/apps/A2", "/home", ""]) {
+      const { showTabSet, activeIndex } = tabStripState(tabs, path, true)
+      if (showTabSet) expect(activeIndex).toBeGreaterThanOrEqual(0)
+    }
   })
 })

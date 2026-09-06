@@ -23,7 +23,7 @@
 //   POST /api/content/help/archive        -> archive / restore a ticket (any state)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
-//   GET  /api/content/help/dashboard      -> the Dashboard tab's five grouped reads (agency only)
+//   GET  /api/content/help/dashboard      -> the Dashboard tab's grouped reads, ?accountId/?helpType/?appId (agency only)
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
 //   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)

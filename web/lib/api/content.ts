@@ -346,7 +346,7 @@ export const content = {
    * database. Agency only: the door refuses a client login, because every chart
    * on it compares one client against the rest.
    *
-   * THE TWO ARGUMENTS ARE THE TAB'S TOOLBAR, and they are arguments rather than
+   * THE ARGUMENTS ARE THE TAB'S TOOLBAR, and they are arguments rather than
    * something the screen does to the answer. Everywhere else in this app a
    * toolbar facet narrows rows the browser already holds; this tab has no rows —
    * every number on it is a COUNT(*) the database took — so a filter that did
@@ -354,10 +354,18 @@ export const content = {
    * `listQuery` for the reason every list read is: a parameter spelled out one
    * `if` at a time is a parameter somebody can leave out.
    *
+   * `appId` IS NOT A TOOLBAR FACET AND NEVER APPEARS AS ONE. It is where the
+   * reader is STANDING — the app record's own Tickets tab, whose Dashboard view
+   * is this same screen narrowed to one system (client, 6 Sep 2026: "a mini
+   * version, a filtered version"). A fact about the address rather than a
+   * question, which is exactly how `content.help({ appId })` already treats it
+   * one screen along, and why it rides the same object rather than a second
+   * function.
+   *
    * There is no `status` and no sort. A dashboard narrowed to one stage would
    * draw a pipeline of one row under a heading that says backlog, and a
    * dashboard has no row order to offer (R53 — the exemption is on file). */
-  helpDashboard: (opts: { accountId?: string; helpType?: string } = {}) =>
+  helpDashboard: (opts: { accountId?: string; helpType?: string; appId?: string } = {}) =>
     api<TicketDashboard>(`/api/content/help/dashboard${listQuery(opts)}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by

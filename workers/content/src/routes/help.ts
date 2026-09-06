@@ -643,9 +643,9 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
  * read (help:read).
  *
  * EIGHT GROUPED READS, ONE DOOR, over the everyday list (`EVERYDAY_LIST`) —
- * narrowed by the tab's own two filters and by nothing else.
+ * narrowed by the three filters below and by nothing else.
  *
- * THE TWO FILTERS ARE PARAMETERS OF THIS DOOR, NOT A SIEVE IN THE BROWSER, and
+ * THE FILTERS ARE PARAMETERS OF THIS DOOR, NOT A SIEVE IN THE BROWSER, and
  * that is the whole reason they are parsed here rather than handled on the
  * screen. The client's ruling, 6 Sep 2026: "dashboard should also have toolbar /
  * filter by client and type / no sort." Everywhere else in the app a toolbar
@@ -654,12 +654,29 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
  * taking the counts again over a smaller WHERE — a filter that did not reach the
  * door would change nothing at all on screen.
  *
- * `accountId` and `helpType` and NOTHING ELSE. `status` is deliberately not
- * offered and `readTicketDashboard` drops it if anything ever sets it: a
+ * `accountId`, `helpType` and `appId`, and NOTHING ELSE. `status` is deliberately
+ * not offered and `readTicketDashboard` drops it if anything ever sets it: a
  * dashboard narrowed to one stage would draw a pipeline of one row and a
  * closing-time chart of tickets that have not closed, under headings that all
  * say backlog. A kind is a different sentence — every chart still answers its
  * own heading with the kind held constant.
+ *
+ * `appId` IS THE APP RECORD'S OWN DASHBOARD (client, 6 Sep 2026: "create me, in
+ * each app, the ticket page … also create another view for the dashboard … like
+ * a mini version, a filtered version"). It is the third narrowing and it is the
+ * same SHAPE as the other two — a parameter of this door, spent in the WHERE
+ * clause of all eight grouped reads through `ticketWhere`'s own `appClause`,
+ * which the everyday list and its counts have used since the app record grew a
+ * Tickets tab. Nothing in `readTicketDashboard` had to change to accept it,
+ * which is the whole reason `TicketFilter` is one declared type (R19): a filter
+ * the list already understood was already understood here.
+ *
+ * TWO OF THE FIVE PANELS DO NOT SURVIVE THE NARROWING and the SCREEN drops them
+ * rather than this door — "which app" is one bar inside one app, and "who has
+ * more, by client" is a comparison across clients that an app row's single
+ * `account_id` collapses. The door keeps answering both because the reads are
+ * grouped statements a screen chooses among, not a layout; teaching it which
+ * panels a caller intends to draw would be the screen's layout decided in SQL.
  *
  * ITS OWN DOOR, NOT MORE FACETS ON THE LIST: `readTicketDashboard` (lib/help)
  * opens with the measurement — eight extra grouped scans on every ticket page,
@@ -675,9 +692,9 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
 export async function getHelpDashboard(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "help", "read")
   const scope = await refusePortalCaller(cfg, guard)
-  // R20: both narrowings sit in a checking position — `queryText`'s first
-  // argument — exactly as the list door's own `accountId`/`helpType` do a few
-  // hundred lines up, and for the same reason: a value off a query string is
+  // R20: every narrowing sits in a checking position — `queryText`'s first
+  // argument — exactly as the list door's own `accountId`/`helpType`/`appId` do
+  // a few hundred lines up, and for the same reason: a value off a query string is
   // untrusted whether it ends up in a WHERE or in a GROUP BY.
   const params = new URL(request.url).searchParams
   return json(
@@ -685,6 +702,10 @@ export async function getHelpDashboard(request: Request, env: Env): Promise<Resp
       ...EVERYDAY_LIST,
       accountId: queryText(params.get("accountId"), "Client"),
       helpType: queryText(params.get("helpType"), "Type"),
+      // ONE SYSTEM'S OWN DASHBOARD — see this handler's header. Checked in the
+      // same position as its two neighbours, because a value off a query string
+      // is untrusted whether it ends up in a WHERE or in a GROUP BY.
+      appId: queryText(params.get("appId"), "App"),
     })
   )
 }

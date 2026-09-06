@@ -118,6 +118,30 @@ function show(view: TicketDashboard | undefined, total: number | undefined = 62)
   )
 }
 
+/** THE SAME SCREEN, STANDING INSIDE ONE APP — the app record's Tickets tab in
+ * its Dashboard view. Same component, same payload, one extra prop, which is
+ * the whole claim being tested: it is a filtered version of this dashboard and
+ * not a second one. */
+function showForApp(view: TicketDashboard | undefined, total: number | undefined = 62) {
+  holder.view = view
+  return render(
+    <TicketsDashboard
+      teamId="T1"
+      appId="AP_1"
+      helpTypeOptions={TYPES}
+      ticketTotal={total}
+      viewSlot={{
+        views: [
+          { value: "list", label: "List" },
+          { value: "dashboard", label: "Dashboard" },
+        ],
+        value: "dashboard",
+        onValueChange: () => {},
+      }}
+    />
+  )
+}
+
 describe("the tickets dashboard says what it left out", () => {
   it("names the floor under the trend, so two missing kinds are not read as perfect", () => {
     show(FULL)
@@ -195,5 +219,75 @@ describe("the tickets dashboard says what it left out", () => {
     // themselves into a corner is the one thing that traps them there.
     show(EMPTY, 62)
     expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
+  })
+})
+
+// ── THE SAME DASHBOARD, INSIDE ONE APP ──────────────────────────────────────
+//
+// The app record's Tickets tab is a list and this (client, 6 Sep 2026: "make
+// the dashboard a view inside the Tickets tab inside the app … like a mini
+// version, a filtered version"). Two of the five panels stand down there, and
+// that judgement is the part worth locking: it is invisible to every other
+// check in this repo, and both directions of getting it wrong are silent.
+//
+// Drawing "Which app" inside one app is a bar chart of one bar under a heading
+// naming the record you are standing on — furniture, not information. Drawing
+// "Who has more, by client" is a ranking of one, because an app row carries a
+// single `accountId`. And DROPPING a panel that still says something would be
+// the same failure the other way round: a reader on this tab believing they had
+// seen the whole picture of their system.
+describe("the app's own tickets dashboard is the same one, narrowed", () => {
+  it("drops the two panels one app empties of meaning", () => {
+    showForApp(FULL)
+    expect(
+      screen.queryByText("Which app"),
+      "a per-system chart drew inside one system — one bar at 100% of its own scale"
+    ).toBeNull()
+    expect(
+      screen.queryByText("Who has more"),
+      "a by-client ranking drew inside one app, which has one client by construction"
+    ).toBeNull()
+  })
+
+  it("keeps the three that still answer a question about this system", () => {
+    showForApp(FULL)
+    for (const heading of [
+      // where this app's open work is stuck
+      "The open work",
+      // whether what arrives about it is what it turns out to be
+      "Raised as, then triaged as",
+      // how long we take to close things on it
+      "How long a ticket takes to close",
+    ])
+      expect(screen.getByText(heading), `the ${heading} panel is missing from the app's dashboard`).toBeTruthy()
+    // The subtractions the panels have to keep announcing — the same three the
+    // suite above proves for the whole-team screen. A "mini version" that
+    // stopped saying what it left out would be the worse half of this feature.
+    expect(screen.getByText(/788 older tickets have no record/i)).toBeTruthy()
+    expect(screen.getByText(/Saturday and Sunday do not count/i)).toBeTruthy()
+  })
+
+  it("offers no Client filter, because an app is built for one client", () => {
+    // The same subtraction the "Who has more" panel makes, made at the toolbar:
+    // a control whose only meaningful setting is the one already in force is a
+    // fact wearing a control's clothes. The Kind filter stays — a system's
+    // Issues and its Requests are a real question inside one app.
+    showForApp(FULL)
+    expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
+    expect(screen.queryByText("Client"), "a Client facet drew inside one app").toBeNull()
+  })
+
+  it("draws the view switch, so the list is one press away", () => {
+    // R50 takes the WHOLE row away on an empty collection, this switch
+    // included — which is correct and is why the list leads: a reader only ever
+    // reaches this view from a tab that had rows.
+    showForApp(FULL)
+    // A `SelectTrigger` under the hood (the kit's `ViewSwitch`), so the role is
+    // a combobox and the accessible name is the `aria-label` the row passes —
+    // the pill draws no visible label, its own text is the current view.
+    expect(
+      screen.getByRole("combobox", { name: "View" }),
+      "the dashboard view drew no way back to the list"
+    ).toBeTruthy()
   })
 })

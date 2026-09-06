@@ -130,6 +130,12 @@ export const SEED: Catalogue = {
   Search: { de: "Suchen", es: "Buscar", ca: "Cercar" },
   Filter: { de: "Filtern", es: "Filtrar", ca: "Filtrar" },
   Close: { de: "Schließen", es: "Cerrar", ca: "Tancar" },
+  /* THE WORKSPACE TAB SET'S OWN CLOSE VERB (2026-09-06, kit v1.2.59's
+   * `BreadcrumbFoldersProps.closeLabel`). Not just "Close": the kit joins this
+   * with the crumb's own label to announce WHICH tab a button shuts ("Close
+   * tab: Halloway"), so the verb itself has to say "tab" rather than leave the
+   * join to carry that word alone — see `app-shell.tsx`'s `closeLabel` prop. */
+  "Close tab": { de: "Tab schließen", es: "Cerrar pestaña", ca: "Tancar pestanya" },
   Back: { de: "Zurück", es: "Atrás", ca: "Enrere" },
   "Start timer": {
     de: "Zeit starten",

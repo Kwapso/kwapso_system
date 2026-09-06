@@ -37,6 +37,43 @@
    `breadcrumbs.tsx`'s own component rather than a second text renderer living
    here.
 
+   THE STRIP IS ALSO A WORKSPACE TAB SET, 2026-09-06, AND THAT IS TWO PROPS
+   RATHER THAN A SECOND COMPONENT. The client, on the live product: "all tabs
+   i open stay open unless i close them", with "a x icon on the tabs to close
+   them" — Chrome, in other words. The app had already built its half of it
+   against this component, and two things this file could not express were
+   blocking it. Both are now here, both are opt-in, and a call site that
+   passes neither renders the identical DOM it rendered yesterday:
+
+     · `onClose` — a REAL `<button>`, a SIBLING of the crumb's own link
+       inside the `<li>`, never a descendant of it. The app's stopgap had to
+       ride the × inside `label` as a `<span data-tab-close>` caught by an
+       `onClickCapture`, because interactive content inside `BreadcrumbLink`'s
+       `<a>` is invalid HTML — and the cost of that workaround was the whole
+       reason this prop exists: the span was `aria-hidden`, so A KEYBOARD OR
+       SCREEN-READER USER COULD NOT CLOSE A TAB AT ALL. An affordance
+       assistive technology cannot operate must not be promised to it, so the
+       app was right to hide it and wrong to have to. See `TAB_CLOSE`.
+     · `activeIndex` — WHICH tab is live, decoupled from WHERE it sits. Until
+       today the live paper, `aria-current="page"` and the z-order that lifts
+       the live tab were all wired to the LAST item, which forced the app to
+       keep its tab set ordered most-recently-activated-last. Tabs therefore
+       re-ordered themselves under the reader's cursor on every switch, which
+       is the opposite of the thing being copied: in Chrome a tab stays where
+       it was opened. Defaulting to the last item is exactly today's
+       behaviour, so a trail never notices.
+
+   A TRAIL AND A TAB SET ARE THE SAME DRAWING AND NOT THE SAME THING, and
+   where they disagree this file follows the ONE that is being asked for. A
+   trail is a path: its crumbs are ancestors, its middle is foldable because
+   nobody reads the middle of a path, and its last crumb is where you are. A
+   tab set is a set of peers: every member was opened on purpose, none of them
+   is an ancestor of any other, and the reader must be able to shut each one.
+   `onClose` is what tells the two apart — it is the only prop that could,
+   because it is the only one a trail can never want — and it is read as that
+   signal in exactly three places, each argued at its own site: the fold
+   (`fold()`), the phone gate (`textTrail`), and nothing else.
+
    WHY IT LIVES IN `breadcrumbs/` AND NOT IN `breadcrumb/`
    `breadcrumb/` is the COMPOSABLE form and its own header states its job in a
    sentence this component fails: "It elides nothing — it renders exactly the
@@ -145,6 +182,7 @@ import {
   DropdownMenuTrigger,
 } from "../dropdown-menu/dropdown-menu";
 import { FolderShape } from "../folder/folder";
+import { X } from "../../foundations/icons";
 import { cn } from "../../lib/utils";
 import { Breadcrumbs, collapse, type BreadcrumbsItem } from "./breadcrumbs";
 
@@ -425,13 +463,41 @@ const TAB = cn(
    the tab covering the card's head produce the IDENTICAL join, and only one
    of them can hide content.
 
-   The live tab still paints above its neighbours, and not by a number: tabs
-   overlap along the strip, the current location is the LAST crumb, and at
-   equal `z-index` the later element in DOM order wins. That is the same
-   relationship the two numbers used to buy, held by the order the trail
-   already has. */
+   THE LIVE TAB STILL PAINTS ABOVE ITS NEIGHBOURS, AND SINCE 2026-09-06 IT
+   DOES SO BY A NUMBER AGAIN — ONE STEP, NOT TWO. Until `activeIndex` existed
+   both tabs sat at `z-[1]` and the lift was held by DOM order alone: "the
+   current location is the LAST crumb, and at equal `z-index` the later
+   element in DOM order wins." That sentence was true only while live and
+   last were the same thing. They are not any more — a workspace tab set
+   activates the tab the reader clicked, wherever it sits — so a live tab in
+   the middle of the strip would have been painted over by every tab after
+   it, which is the lift running backwards.
+
+   SO THE REST TABS DROP TO `z-0` AND THE LIVE TAB KEEPS THE `z-[1]` THE
+   2026-09-03 FIX GAVE IT. That fix is the constraint here and it is not
+   disturbed: the live tab is still ONE, still strictly below a card drawn at
+   `z-[2]`, and the tab's foot is still painted over by the card rather than
+   over it. There is no integer between 1 and 2 to promote the live tab into,
+   so the lift is bought by lowering the others instead — which costs
+   nothing, because `z-0` and `z-[1]` are both above the un-positioned page
+   and both below the card, and rest tabs are still ordered among THEMSELVES
+   by DOM order exactly as before.
+
+   IT IS A NO-OP FOR EVERY CALLER THAT EXISTS TODAY. With the live tab last —
+   the default — DOM order already put it on top, so 0/1 and 1/1 paint
+   identically; the strip's `gap-1` seam means neighbouring tabs do not even
+   share pixels to fight over. The number is here for the case DOM order
+   cannot answer, and it is written down rather than left to be re-derived
+   the next time somebody reads `z-[1]` and wonders why it is not `z-[3]`.
+
+   `z-0` IS STILL A STACKING CONTEXT, WHICH `CrumbShape` DEPENDS ON. A
+   positioned element with `z-index: 0` establishes one exactly as `z-index:
+   1` does — only `auto` does not — so the silhouette's `-z-10` stays inside
+   its own tab and cannot fall behind whatever the strip was dropped onto.
+   That is the promise `CrumbShape`'s own comment makes, and it survives the
+   change unaltered. */
 const TAB_REST = cn(
-  "z-[1]",
+  "z-0",
   "text-ink-secondary font-[var(--font-weight-light)]",
   "hover:text-ink-secondary hover:font-[var(--font-weight-medium)]",
   "hover:no-underline",
@@ -452,6 +518,88 @@ const TAB_LIVE = "z-[1] cursor-default";
 /** The two papers, as `color` for the shape's `currentColor`. */
 const FILL_REST = "text-[var(--kw-crumb-rest)]";
 const FILL_LIVE = "text-[var(--kw-crumb-live)]";
+
+/* ----------------------------------------------------------------------------
+   THE CLOSE CONTROL — THE ROOM IT NEEDS, AND THE CONTROL ITSELF.
+
+   IT IS A SIBLING OF THE LINK, POSITIONED OVER THE TAB. That is the whole
+   shape of this and it is forced, not chosen. `BreadcrumbLink` renders an
+   `<a>`, and an `<a>` may not contain a `<button>` — interactive content
+   inside interactive content is invalid HTML, and browsers repair it in ways
+   nobody can rely on. So the button is the `<li>`'s SECOND child, beside the
+   link rather than inside it, and the `<li>` becomes the positioning parent
+   (`relative`, added only on a closable tab) so the button can be laid over
+   the tab it belongs to. The two DOM facts that follow are the point of the
+   exercise: the button has its own accessible name, and it is its own focus
+   target. Neither is true of a `<span>` inside the anchor, however many
+   capture-phase handlers are pointed at it.
+
+   THE TAB PAYS FOR THE ROOM RATHER THAN THE BUTTON TAKING IT. `TAB_CLOSABLE`
+   is a wider inline-end padding, merged AFTER `TAB`'s own so tailwind-merge
+   drops the narrower one: `--folder-shoulder` (the curve the label already
+   had to clear) + the control + `--space-2` between the two. Without it the
+   button would be laid over the END OF THE LABEL, which is a control sitting
+   on top of the text it is named after.
+
+   WHY `--control-height-pill` (26) AND NOT `--control-height-dense` (32).
+   The kit's five control heights are 26 / 32 / 38 / 40 / 44 and this is the
+   ONLY one that fits. A tab is `--folder-tab-height` (47.5) tall with
+   `--folder-tab-overlap` (17.02) of that spent as the foot the card rides
+   over, so the box a control may occupy is the difference — `--folder-lip`,
+   30.48 — and a 32 control breaks the silhouette's own top edge by three
+   quarters of a pixel at each end. 26 fits with 2.24 of air above and below.
+   The dialog's own close chip is the 32 (`.kw-drawer__close`), and it is the
+   drawing this one follows in every respect EXCEPT the height, because it
+   sits on a panel with room rather than inside a shape with none.
+
+   AND 26 IS NOT THE 44 TOUCH ROW, WHICH IS STATED RATHER THAN QUIETLY
+   MISSED. `--control-height-input` is "also the touch row" and no control
+   inside a 30.48 lip can be it; the lip is chapter 14's, client-ruled, and
+   "reuse the existing folder tabs without changing anything on the shape"
+   forbids growing the tab to make room. What the strip has instead is that
+   the TAB is the large target — 128 wide minimum by 47.5 — and the close is
+   the small one inside it, which is the same bargain every browser tab strip
+   makes. The strip is also `md` and up (see `STRIP_ONLY`), so the phone,
+   where a mis-tap costs most, never draws this control at all.
+
+   NO RESTING FILL, AND THAT IS NOT THE BORDERLESS-BUTTON RULE BEING DODGED.
+   The rule is that a button never carries an EDGE and that its fill is what
+   makes it a button; here the button is drawn ON a fill already — the tab's
+   own paper, which is the box it lives in — and a second disc repeated on
+   every tab in a strip of six would compete with the labels those tabs
+   exist to show. So the mark is the affordance at rest and the fill arrives
+   on hover, as `bg-accent`: the kit's neutral item wash, a named token and a
+   NAMED utility (the arbitrary form would not match the token rebinds), and
+   never `--primary` — mango is a brand fill and not a hover.
+
+   THE INK IS ONE STEP QUIETER THAN THE LABEL IT SITS BESIDE (`--ink-tertiary`
+   against the tab's `--ink-secondary`) and moves to `--foreground` on hover,
+   which is `BreadcrumbLink`'s own hover ink. A close control is subordinate
+   to the name of the thing it closes until you reach for it.
+
+   FOCUS: NOTHING WRITTEN. tokens.css §8 rings every control at its own
+   radius, and the strip's `pt-1` already holds the room open for a ring at
+   the top of a tab — this control sits 2.24 further down than the tab does,
+   so it is strictly better off than the thing that room was measured for.
+   -------------------------------------------------------------------------- */
+const TAB_CLOSABLE = cn(
+  "pe-[calc(var(--folder-shoulder)_+_var(--control-height-pill)_+_var(--space-2))]",
+);
+
+const TAB_CLOSE = cn(
+  // Over the tab's lip, clear of the shoulder curve. Both insets are logical,
+  // so the day `FolderShape` gets its RTL ruling this follows it for free.
+  "absolute z-[1] end-[var(--folder-shoulder)]",
+  "top-[calc((var(--folder-lip)_-_var(--control-height-pill))_/_2)]",
+  // ABOVE THE LIVE TAB, WHICH IS WHY THE NUMBER IS 1 AND NOT `auto`. The tab
+  // is a stacking context at `z-[1]`; a `z-index: auto` sibling would paint
+  // in a lower layer and the silhouette would cover the ×. At an equal 1 the
+  // later element in DOM order wins, and the button is written second.
+  "inline-grid size-[var(--control-height-pill)] place-content-center",
+  "cursor-pointer appearance-none rounded-pill border-0 bg-transparent",
+  "text-ink-tertiary hover:bg-accent hover:text-foreground",
+  "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+);
 
 /* ----------------------------------------------------------------------------
    The silhouette behind one tab.
@@ -512,14 +660,154 @@ const FOLD_KEEP_TAIL = 2;
  * `undefined` below `foldAfter` is that function's own "show every crumb", and
  * passing 3 above it is its own "head, gap, last two". Nothing about which
  * crumbs survive, in what order, is decided twice.
+ *
+ * THE ACTIVE CRUMB IS NEVER FOLDED AWAY — ADDED 2026-09-06 WITH `activeIndex`,
+ * AND IT IS A HOLE THAT WAS ONLY EVER PLUGGED BY LUCK. The fold keeps the head
+ * and the last two, and until today the live crumb WAS the last one, so the
+ * one crumb that answers "where am I" could not be in the part that
+ * disappears. Point `activeIndex` at the middle of a six-level trail and it
+ * can be: the strip would then draw a `···` where the current location is and
+ * mark nothing as current, which is worse than a strip that is too long. So
+ * when the active crumb falls inside the span the fold would hide, nothing
+ * folds. Not "fold differently" — `collapse()`'s shape is the trail's own rule
+ * and this file does not get to invent a second one — just not this time.
  */
-const fold = (items: BreadcrumbsItem[], foldAfter: number) =>
-  collapse(items, items.length > foldAfter ? FOLD_KEEP_TAIL + 1 : undefined);
+const fold = (items: BreadcrumbsItem[], foldAfter: number, active: number) => {
+  if (items.length <= foldAfter) return collapse(items, undefined);
+  // What survives a fold: the head, and the last `FOLD_KEEP_TAIL`.
+  const keptFromIndex = items.length - FOLD_KEEP_TAIL;
+  const activeSurvives = active === 0 || active >= keptFromIndex;
+  return collapse(items, activeSurvives ? FOLD_KEEP_TAIL + 1 : undefined);
+};
+
+/**
+ * A crumb, plus the two things only the TAB drawing can honour.
+ *
+ * IT EXTENDS `BreadcrumbsItem` RATHER THAN WIDENING IT, AND THAT IS THE WHOLE
+ * DESIGN OF IT. `BreadcrumbsItem` is the trail's shared shape: `breadcrumbs.tsx`
+ * renders it as text — including on the phone, where it IS this component's
+ * drawing — and `ScreenRenderer` carries it in a screen recipe, where it is
+ * plain data. A field that only the desktop tab strip can act on does not
+ * belong in a type two other renderers must silently ignore; a reader who
+ * finds `closable` on the shared item would reasonably expect a closable
+ * crumb everywhere it is drawn, and would be wrong two thirds of the time.
+ *
+ * Nothing existing has to change to use it: every `BreadcrumbsItem` already
+ * IS one of these, structurally, because both added fields are optional. An
+ * existing `items` array keeps type-checking untouched.
+ */
+export interface BreadcrumbFoldersItem extends BreadcrumbsItem {
+  /**
+   * Draw this tab's close control. Defaults to `true`, so `onClose` alone
+   * makes every tab closable — which is the ordinary tab set, and Chrome's
+   * own behaviour.
+   *
+   * Set `false` for the tab that must not be shut: a workspace's home, a
+   * pinned record, the one tab a set is not allowed to be emptied below. It
+   * is expressed per ITEM and not as a count or a rule, because which tab is
+   * privileged is the application's knowledge and not a shape the kit can
+   * infer. Ignored entirely when `onClose` is not given.
+   */
+  closable?: boolean;
+  /**
+   * This tab's own close label, when the generic join will not do — and
+   * ALWAYS when `label` is a node rather than a string, because a name cannot
+   * be read out of arbitrary markup and the join falls back to the bare verb
+   * rather than guessing. See `formatCloseLabel`.
+   */
+  closeLabel?: string;
+}
 
 export interface BreadcrumbFoldersProps
   extends Omit<React.ComponentPropsWithoutRef<"nav">, "children"> {
   /** The trail, root first. An empty array renders `null`. */
-  items: BreadcrumbsItem[];
+  items: BreadcrumbFoldersItem[];
+  /**
+   * WHICH crumb is the live one. Defaults to the LAST, which is what a trail
+   * always means and is byte-for-byte what this component did before the prop
+   * existed — the live paper, `aria-current="page"`, the z-lift and the
+   * scroll-into-view all followed `items.length - 1` and still do when this
+   * is omitted.
+   *
+   * IT EXISTS BECAUSE A TAB SET IS NOT A PATH. The app's workspace tabs are
+   * peers: the reader activates one by clicking it, and the client's ruling
+   * is that the set stays as it is — "all tabs i open stay open unless i
+   * close them". With liveness pinned to the last position, the only way to
+   * mark a tab live was to MOVE it to the end, so every switch re-ordered the
+   * strip under the reader's own cursor and the tab they meant to click next
+   * had shifted. Position and liveness are two facts and this prop is the
+   * second one.
+   *
+   * AN INDEX OUTSIDE THE ARRAY MEANS NO CRUMB IS CURRENT, and that is
+   * deliberate rather than an unguarded edge. It is a real state for a tab
+   * set — the strip is open and the reader is looking at something that is
+   * not one of these tabs — and the alternative, clamping into range, would
+   * announce a crumb as "you are here" that the caller never said was, and
+   * would hide the off-by-one that produced it. A trail simply never passes
+   * this, and a trail always has its current page.
+   */
+  activeIndex?: number;
+  /**
+   * Close the tab this crumb draws. Given, every item that has not opted out
+   * with `closable: false` grows a real `<button>` — a SIBLING of the crumb's
+   * link inside the `<li>`, with its own accessible name and its own place in
+   * the tab order. Omitted, nothing is drawn and the DOM is exactly the DOM a
+   * breadcrumb trail has always produced.
+   *
+   * THE HANDLER IS ON THE COMPONENT AND THE OPT-OUT IS ON THE ITEM, WHICH IS
+   * NOT AN ARBITRARY SPLIT. Closing is the STRIP's behaviour — a tab does not
+   * close itself, the thing that owns the set removes a member from it — and
+   * `(item, index)` is the shape the reducer on the other side already wants.
+   * Putting the callback on `BreadcrumbsItem` instead would have pushed a
+   * FUNCTION into the shared, otherwise-plain-data item type that
+   * `breadcrumbs.tsx` and `ScreenRenderer` also read, where nothing can
+   * invoke it — a promise two of the three renderers cannot keep, which is
+   * the same class of half-affordance this prop exists to remove. Whether a
+   * PARTICULAR tab may be closed is a property of that tab, so it lives on
+   * the item; see `BreadcrumbFoldersItem.closable`.
+   *
+   * TWO THINGS ABOUT THE STRIP CHANGE WHEN THIS IS GIVEN, both because it is
+   * the one prop that can only mean "these crumbs are a tab set, not a path":
+   *
+   *   · THE MIDDLE NO LONGER FOLDS. A folded tab can be re-opened from the
+   *     `···` menu and CANNOT be closed from it — a `DropdownMenuItem` is a
+   *     `role="menuitem"` in a menu that moves focus with the arrow keys, so
+   *     a second control inside a row is not reachable by keyboard at all,
+   *     and a menu of "open" rows with no way to shut any of them is exactly
+   *     the half-affordance this prop was added to delete. The alternative to
+   *     folding already exists and is already the strip's own answer to
+   *     running out of room: it SCROLLS, and the effect below keeps the live
+   *     tab in view. It is also the behaviour being copied — no browser hides
+   *     an open tab behind a menu. `foldAfter` is therefore ignored while
+   *     this is given; it is a trail's lever and this is not a trail.
+   *   · THE PHONE KEEPS THE TABS. The 2026-09-04 mobile ruling — "in monile,
+   *     lets use normal breadcrumbs (like they ware before, jhust teh text)"
+   *     — is about the breadcrumb TRAIL, and a set of closable peers is not
+   *     one. Swapping it for text below `md` would take the close control
+   *     away at the width where an open tab costs most, which is the same
+   *     argument `onCurrentActivate` already made for its own tab and the
+   *     same conclusion. See `textTrail`.
+   */
+  onClose?: (item: BreadcrumbFoldersItem, index: number) => void;
+  /**
+   * The verb in every close control's accessible name. A prop with a default
+   * because it is announced, and anything announced must be translatable.
+   *
+   * IT IS NEVER THE WHOLE NAME. A row of six controls all announced "Close"
+   * tells a reader that six things can be closed and nothing about which; the
+   * name is joined with the crumb's own label so each one says what it shuts
+   * — "Close: Halloway". `formatCloseLabel` replaces the join, and an item's
+   * own `closeLabel` replaces the result.
+   */
+  closeLabel?: string;
+  /**
+   * Replace the whole close-label join — the escape hatch for a language the
+   * "verb: name" shape does not fit. Receives the crumb's label as text (empty
+   * when the label is a node) and `closeLabel`. `filter-bar.tsx` carries the
+   * identical pair for its chips' remove controls; this is that, not a second
+   * idea.
+   */
+  formatCloseLabel?: (itemLabel: string, closeLabel: string) => string;
   /**
    * The landmark's accessible name. A prop with a default because it is
    * announced, and anything announced must be translatable.
@@ -540,8 +828,9 @@ export interface BreadcrumbFoldersProps
   /** Classes for the `<ol>`, for a call site that needs to change the strip. */
   listClassName?: string;
   /**
-   * Turns the LAST crumb into a real control instead of the read-only
-   * "you are here" page — for the one call site where the tab IS the
+   * Turns the LIVE crumb — the last one, or `activeIndex` where that is
+   * given — into a real control instead of the read-only
+   * "you are here" page: for the one call site where the tab IS the
    * interactive element (the assistant column's own close button,
    * `screen-shell.tsx`) and not a location in a navigational trail.
    *
@@ -581,17 +870,25 @@ export interface BreadcrumbFoldersProps
  * is the card below it.
  *
  * TEN STATES
- *  1. default        — one tab per level: every tab but the last on the rest
- *                      paper, the last on the card's own. A single-level
- *                      location is ONE tab with nothing to its left, which is
- *                      correct and is not an empty state.
- *  2. hover          — per tab, and only on the ones that are links: an ink
- *                      move to `--foreground` plus a preview of the active
- *                      weight. No fill move and no opacity, which is the tab's
- *                      own hover unchanged. The current tab has none.
+ *  1. default        — one tab per level: every tab but the live one on the
+ *                      rest paper, the live one on the card's own. The live
+ *                      tab is the LAST unless `activeIndex` says otherwise. A
+ *                      single-level location is ONE tab with nothing to its
+ *                      left, which is correct and is not an empty state.
+ *  2. hover          — per tab, and only on the ones that are links: a preview
+ *                      of the active weight at a fixed ink. No fill move and
+ *                      no opacity, which is the tab's own hover unchanged. The
+ *                      live tab has none. A close control (`onClose`) carries
+ *                      its own, and it is the only hover in this file that
+ *                      moves a FILL: `bg-accent`, the kit's neutral item wash,
+ *                      because the control has no resting fill of its own —
+ *                      see `TAB_CLOSE`.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once.
  *                      The strip holds four pixels of block-start padding open
- *                      so its own `overflow` cannot clip the ring.
+ *                      so its own `overflow` cannot clip the ring. A close
+ *                      control is a real `<button>` and is rung by that one
+ *                      rule like everything else; it sits in the tab order
+ *                      immediately after the tab it closes.
  *  4. active/pressed — does not apply. A crumb navigates; the acknowledgement
  *                      is the next screen, which is louder than a 1px drop.
  *  5. disabled       — an item with no `href` renders as the non-link crumb on
@@ -604,17 +901,26 @@ export interface BreadcrumbFoldersProps
  *  7. empty          — `items: []` renders `null`. Not an empty landmark, not
  *                      one bare tab.
  *  8. error          — does not apply. A trail reports nothing.
- *  9. selected       — the last tab, always: the card's fill, primary ink at
+ *  9. selected       — exactly one tab: the card's fill, primary ink at
  *                      `--font-weight-medium`, and `aria-current="page"` — so
- *                      the meaning survives without colour. UNLESS the call
- *                      site passed `onCurrentActivate`, in which case this
- *                      tab is a control, not a location, and renders as a
- *                      real `<button>` with the caller's own label and
- *                      `aria-expanded` in place of `aria-current` — see that
- *                      prop's own doc. Every other call site is untouched.
- * 10. read-only      — always, UNLESS `onCurrentActivate` is given, in which
- *                      case the live tab alone becomes a real control; every
- *                      tab before it stays read-only regardless.
+ *                      the meaning survives without colour. It is the LAST tab
+ *                      unless `activeIndex` names another, and it is no tab at
+ *                      all when `activeIndex` points outside the array, which
+ *                      is a real state for a tab set and not an unguarded
+ *                      edge. UNLESS the call site passed `onCurrentActivate`,
+ *                      in which case this tab is a control, not a location,
+ *                      and renders as a real `<button>` with the caller's own
+ *                      label and `aria-expanded` in place of `aria-current` —
+ *                      see that prop's own doc.
+ * 10. read-only      — always, and it is the trail's default answer. TWO props
+ *                      each add a real control without changing it for anyone
+ *                      who does not pass them: `onCurrentActivate` makes the
+ *                      live tab itself a `<button>`, and `onClose` adds a
+ *                      second `<button>` BESIDE each tab's link — a sibling
+ *                      inside the `<li>`, never nested in the anchor, which is
+ *                      invalid markup and is what made the app's own stopgap
+ *                      unreachable to a keyboard. Every tab a call site does
+ *                      not opt in stays read-only.
  *
  * THREE BREAKPOINTS
  *  mobile — NOT TABS AT ALL since 2026-09-04. The client: "in monile, lets use
@@ -623,15 +929,20 @@ export interface BreadcrumbFoldersProps
  *  form — same items, same parts, same landmark name — wrapping rather than
  *  scrolling, with every crumb shown and every ancestor still a link. See
  *  `TEXT_TRAIL` for the whole mechanism and for why the fold does not follow
- *  it down there. THE ONE EXCEPTION IS `onCurrentActivate`: that call site is
- *  a control wearing the tab shape, not a location in a trail, so it keeps its
- *  tab at every width — see that prop.
+ *  it down there. THE TWO EXCEPTIONS ARE `onCurrentActivate` AND `onClose`:
+ *  both mark a call site whose crumbs are CONTROLS rather than a location in a
+ *  trail — one tab that acts, or a set of peers that can be shut — and the
+ *  mobile ruling is about the trail. Either one keeps the tab strip at every
+ *  width, because swapping it for words would delete the affordance at the
+ *  width where it is needed most; see those props.
  *  tablet / desktop — the strip, and the geometry is UNCHANGED at every width
  *  from `md` up; what changes is what it does when it runs out of room, and
  *  that changes continuously rather than at a breakpoint. The strip scrolls on
  *  the inline axis; a trail deeper than `foldAfter` has already folded its
  *  middle before width is consulted, because the fold is a CONTENT rule and
- *  the client set its number.
+ *  the client set its number. A TAB SET (`onClose`) never folds at any width
+ *  and scrolls instead — see that prop for why a folded tab could be opened
+ *  but not closed.
  *
  * RTL — LTR only, inherited from `FolderShape`. See the file header.
  */
@@ -644,6 +955,10 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
       ellipsisLabel,
       className,
       listClassName,
+      activeIndex,
+      onClose,
+      closeLabel = "Close",
+      formatCloseLabel,
       onCurrentActivate,
       currentActivateLabel,
       currentActivateExpanded,
@@ -672,10 +987,28 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
        off-screen until the reader scrolled it into view by hand. */
     const listRef = React.useRef<HTMLOListElement>(null);
 
+    /* THE LIVE TAB'S OWN NODE, BECAUSE "THE LAST ONE" STOPPED BEING AN ANSWER
+       ON 2026-09-06. Everything above is about keeping the crumb that answers
+       "where am I" in view, and that crumb is the LIVE one — which was the
+       last one until `activeIndex` existed and is wherever the caller says
+       now. Reading `lastElementChild` would scroll a workspace tab set to a
+       tab the reader is not on. `BreadcrumbItem` forwards a ref to its `<li>`,
+       so this is the same "already wired" the strip's own ref is; exactly one
+       item in the map is handed it. It stays null when `activeIndex` points
+       outside the array — a tab set with nothing live — and the fallback
+       below is then the behaviour this file has always had. */
+    const liveRef = React.useRef<HTMLLIElement>(null);
+
+    /* Hoisted above the effect because hooks may not sit behind the empty
+       guard, and because the effect depends on it. `-1` on an empty array is
+       harmless: the effect returns before reading it. */
+    const activeCrumb = activeIndex ?? items.length - 1;
+
     React.useEffect(() => {
       if (items.length === 0) return;
       const strip = listRef.current;
-      const lastTab = strip?.lastElementChild;
+      if (!strip) return;
+      const lastTab: Element | null = liveRef.current ?? strip.lastElementChild;
       if (!lastTab) return;
 
       /* `inline: "end"`, NOT A COMPUTED `scrollLeft`. A hand-rolled "scroll
@@ -713,14 +1046,26 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
          that jumps straight to its end on load reads as "this is where the
          page already was", which is the correct read for the very first
          paint. */
-      lastTab.scrollIntoView({ inline: "end", block: "nearest" });
-      // Depends on `items` itself (not `rendered` or `foldAfter`) because the
-      // LAST tab is always `items[items.length - 1]` — the fold only ever
-      // hides the MIDDLE of the trail, so the one thing this effect cares
-      // about changes exactly when the trail itself does, and never
-      // rescrolls a screen whose depth crossed `foldAfter` with the same
-      // destination.
-    }, [items]);
+      /* `"end"` ONLY WHERE "END" IS WHAT THE ELEMENT IS. Aligning the LAST
+         tab to the strip's trailing edge is the same thing as scrolling the
+         strip to its end, which is the measured behaviour above and what
+         `verify/breadcrumb-folder/`'s `lastTabEndAligned` asserts. Aligning a
+         MIDDLE tab to that edge is a different and worse thing: it would
+         shove every tab after the live one out of sight to satisfy a word,
+         when the live tab may well already be perfectly visible. `"nearest"`
+         is defined to do nothing at all when the element is in view and the
+         smallest scroll that brings it in when it is not, which is the whole
+         of what a tab switch wants. The test is the ELEMENT'S POSITION, not
+         the prop — so every caller that exists today takes the `"end"` branch
+         it has always taken, whether or not it passes `activeIndex`. */
+      const inline = lastTab === strip.lastElementChild ? "end" : "nearest";
+      lastTab.scrollIntoView({ inline, block: "nearest" });
+      // Depends on `items` and on WHICH crumb is live (not on `rendered` or
+      // `foldAfter`): the fold only ever hides the MIDDLE of the trail, so the
+      // destination changes exactly when the trail or the active tab does, and
+      // a screen whose depth crossed `foldAfter` never rescrolls to the same
+      // place twice.
+    }, [items, activeCrumb]);
 
     if (items.length === 0) return null;
 
@@ -738,16 +1083,58 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
        width, which also keeps the promise this prop's own doc makes: it adds
        a second path through the tab shape and changes nothing about the
        first.
+
+       `onClose` IS THE SECOND SUCH MARK, ADDED 2026-09-06, AND THE ARGUMENT
+       IS THE SAME ONE RUNNING A SECOND TIME. A set of tabs the reader may
+       shut is not "normal breadcrumbs… just the text" either: text has
+       nowhere to put a close control, so the phone would show a trail of
+       words and the tabs the reader opened could only be closed by finding a
+       tablet. Deleting the affordance at the width where an open tab is most
+       in the way is the same loss the sentence above refuses. So a tab set
+       keeps its strip at every width, which is also what makes the close
+       control's own answer to the 44 touch row honest — see `TAB_CLOSE`.
+
        `Breadcrumbs` returns `null` on an empty array too, so the guard above
        covers both drawings and neither can render a bare landmark. */
-    const textTrail = onCurrentActivate === undefined;
+    const textTrail = onCurrentActivate === undefined && onClose === undefined;
 
-    const rendered = fold(items, foldAfter);
-    const lastIndex = items.length - 1;
+    /* A TAB SET DOES NOT FOLD. `onClose`'s own doc carries the argument: the
+       `···` menu can re-open a hidden crumb and cannot close one — a
+       `role="menuitem"` row moves focus with the arrow keys, so a second
+       control inside it is not keyboard-reachable at all — and a fold that
+       can only half-serve a tab is the very half-affordance this prop was
+       added to remove. `collapse(items, undefined)` is `breadcrumbs.tsx`'s own
+       "show every crumb"; the strip's `overflow-x-auto` and the effect above
+       are what handle a set too wide for its slot, which is also what a
+       browser does with a tab strip. */
+    const rendered =
+      onClose === undefined
+        ? fold(items, foldAfter, activeCrumb)
+        : collapse(items, undefined);
     const hidden = items.filter(
       (_, index) =>
         !rendered.some((entry) => entry.kind === "item" && entry.index === index),
     );
+
+    /**
+     * One close control's accessible name.
+     *
+     * "Close" alone, repeated down a strip of six, tells a reader that six
+     * things can be closed and nothing about which — so the verb is joined
+     * with the crumb's own label. The item's own `closeLabel` wins outright;
+     * `formatCloseLabel` replaces the join for a language "verb: name" does
+     * not fit; and a label that is a NODE rather than a string yields the bare
+     * verb, because an accessible name cannot be read out of arbitrary markup
+     * and a guess here is a wrong announcement rather than a missing one.
+     * That last case is exactly what the item's own `closeLabel` is for, and
+     * it is the same trio `filter-bar.tsx` already runs for its chips.
+     */
+    const joinCloseLabel = (item: BreadcrumbFoldersItem): string => {
+      if (item.closeLabel !== undefined) return item.closeLabel;
+      const asText = typeof item.label === "string" ? item.label : "";
+      if (formatCloseLabel) return formatCloseLabel(asText, closeLabel);
+      return asText ? `${closeLabel}: ${asText}` : closeLabel;
+    };
 
     return (
       <>
@@ -808,6 +1195,14 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
           <Breadcrumbs
             items={items}
             label={label}
+            /* PASSED, AND IT IS THE ONE THING THE TWO DRAWINGS MUST NOT
+               DISAGREE ABOUT. `Breadcrumbs` gained the identical prop on the
+               same day for exactly this: with liveness pinned to the last
+               crumb there, a caller who moved it here would have a phone
+               announcing one `aria-current="page"` and a desktop announcing
+               another, from one array. `undefined` is the same default on
+               both sides, so nothing that does not pass it can drift. */
+            activeIndex={activeIndex}
             className={cn(className, TEXT_TRAIL)}
             listClassName={TEXT_TRAIL_LIST}
           />
@@ -952,11 +1347,35 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                 );
               }
 
-              const live = entry.index === lastIndex;
+              const live = entry.index === activeCrumb;
               const key = entry.item.key ?? `breadcrumb-folders-${String(entry.index)}`;
 
+              /* READ THE CLOSE FIELDS OFF `items`, NOT OFF `entry.item`.
+                 `collapse()` is the TRAIL's fold rule and it hands back
+                 `BreadcrumbsItem` — the shared shape, which deliberately does
+                 not carry `closable` or a per-item `closeLabel` (see
+                 `BreadcrumbFoldersItem` for why those two live only on this
+                 drawing's item). `entry.index` is the index into the array
+                 the caller passed, so this is the same object with its own
+                 type intact, not a second lookup. */
+              const item = items[entry.index];
+              const closable = onClose !== undefined && (item.closable ?? true);
+
               return (
-                <BreadcrumbItem key={key} className="shrink-0">
+                <BreadcrumbItem
+                  key={key}
+                  /* THE `<li>` IS THE POSITIONING PARENT, AND ONLY WHEN THERE
+                     IS SOMETHING TO POSITION. `relative` is what lets the
+                     close button be laid over the tab while remaining the
+                     link's SIBLING rather than its child; a trail adds no
+                     class it did not have yesterday.
+
+                     THE REF GOES ON THE LIVE ITEM ONLY — one of them, or none
+                     when `activeIndex` points outside the array — and it is
+                     what the scroll effect above brings into view. */
+                  ref={live ? liveRef : undefined}
+                  className={cn("shrink-0", closable && "group relative")}
+                >
                   {live ? (
                     onCurrentActivate ? (
                       /* THE ONE CALL SITE WHERE THE LIVE TAB IS A CONTROL. A
@@ -987,13 +1406,20 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                            rather than "Assistant"), not to rescue it. */
                         aria-label={currentActivateLabel}
                         onClick={onCurrentActivate}
-                        className={cn(TAB, TAB_LIVE, "cursor-pointer")}
+                        className={cn(
+                          TAB,
+                          TAB_LIVE,
+                          "cursor-pointer",
+                          closable && TAB_CLOSABLE,
+                        )}
                       >
                         <CrumbShape fill={FILL_LIVE} />
                         {entry.item.label}
                       </button>
                     ) : (
-                      <BreadcrumbPage className={cn(TAB, TAB_LIVE)}>
+                      <BreadcrumbPage
+                        className={cn(TAB, TAB_LIVE, closable && TAB_CLOSABLE)}
+                      >
                         <CrumbShape fill={FILL_LIVE} />
                         {entry.item.label}
                       </BreadcrumbPage>
@@ -1005,10 +1431,10 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                        paper is what says "you are here". So it takes the page
                        element for its semantics and the REST fill for its
                        drawing, and `aria-current` is dropped: there is exactly
-                       one current location and it is the last tab. */
+                       one current location and it is the live tab. */
                     <BreadcrumbPage
                       aria-current={undefined}
-                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary")}
+                      className={cn(TAB, TAB_REST, "cursor-default hover:font-[var(--font-weight-light)] hover:text-ink-secondary", closable && TAB_CLOSABLE)}
                     >
                       <CrumbShape fill={FILL_REST} />
                       {entry.item.label}
@@ -1016,12 +1442,82 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
                   ) : (
                     <BreadcrumbLink
                       href={entry.item.href}
-                      className={cn(TAB, TAB_REST)}
+                      className={cn(
+                        TAB,
+                        TAB_REST,
+                        closable && TAB_CLOSABLE,
+                        /* THE WEIGHT PREVIEW SURVIVES REACHING FOR THE ×.
+                           `TAB_REST`'s hover is written on the link, and the
+                           close button is laid OVER the link rather than
+                           inside it — so the moment the pointer crosses onto
+                           the ×, the link stops being the hovered element and
+                           the tab drops back to light mid-gesture. The `group`
+                           is the `<li>`, which contains both, so the tab reads
+                           as hovered for the whole of it. Added only on a
+                           closable tab: with no button there is nothing to
+                           cross onto and nothing to fix. */
+                        closable && "group-hover:font-[var(--font-weight-medium)]",
+                      )}
                     >
                       <CrumbShape fill={FILL_REST} />
                       {entry.item.label}
                     </BreadcrumbLink>
                   )}
+
+                  {/* ── THE CLOSE CONTROL. A SIBLING OF THE CRUMB, NEVER A
+                      CHILD OF IT, and that is the entire reason this exists:
+                      `BreadcrumbLink` renders an `<a>`, interactive content
+                      inside an `<a>` is invalid HTML, and the app's own
+                      stopgap therefore had to be an `aria-hidden` `<span>`
+                      caught by a capture-phase handler — a close affordance a
+                      keyboard could not reach and a screen reader was not told
+                      about. As a sibling it is a real `<button>`: it has an
+                      accessible name that says WHICH tab it closes, it takes
+                      focus, `Enter` and `Space` fire it natively, and
+                      tokens.css §8 rings it like every other control.
+
+                      IN THE TAB ORDER, IMMEDIATELY AFTER ITS OWN TAB, WHICH IS
+                      A DECISION AND NOT A DEFAULT. The alternative was to keep
+                      it out of the sequence and reach it some other way — a
+                      roving `tabindex`, a `Delete` key on the focused crumb —
+                      and both were rejected. This strip is an `<ol>` of links
+                      and not a `role="tablist"`, so it has no keyboard model
+                      to hang a roving index on and inventing one would make
+                      the arrow keys mean something here that they mean nowhere
+                      else in the kit; a bare key binding is undiscoverable,
+                      which for the one user this whole change is FOR is the
+                      same as not existing. `filter-bar.tsx` settled the
+                      identical shape — a label and a remove control inside one
+                      chip — in the same words: "A REMOVABLE CHIP HAS TWO FOCUS
+                      TARGETS… and both are in the tab order."
+
+                      THE COST IS BOUNDED AND WORTH NAMING: it doubles the
+                      stops in the strip. `TAB`'s own `min-w` (128) is what
+                      bounds it in practice — a strip wide enough to be worth
+                      tabbing through is a strip the reader can see — and the
+                      alternative is a set of tabs that can only be closed with
+                      a mouse. */}
+                  {closable ? (
+                    <button
+                      type="button"
+                      data-slot="breadcrumb-folders-close"
+                      aria-label={joinCloseLabel(item)}
+                      /* Optional call, though `closable` above already proved
+                         the handler is there: `onClose` is a parameter and
+                         TypeScript does not carry a narrowing on one into a
+                         closure, so the alternative is an assertion — a claim
+                         the compiler is wrong — for a call this guard has
+                         already made safe. */
+                      onClick={() => { onClose?.(item, entry.index); }}
+                      className={cn(TAB_CLOSE)}
+                    >
+                      {/* Phosphor's `X`, by Phosphor's own name, at the kit's
+                          own icon-in-a-button size. `aria-hidden` because the
+                          button is named above: an icon that announced itself
+                          too would be read twice. */}
+                      <X size={16} aria-hidden="true" />
+                    </button>
+                  ) : null}
                 </BreadcrumbItem>
               );
             })}
@@ -1034,4 +1530,43 @@ const BreadcrumbFolders = React.forwardRef<HTMLElement, BreadcrumbFoldersProps>(
 
 BreadcrumbFolders.displayName = "BreadcrumbFolders";
 
+/* ----------------------------------------------------------------------------
+   `TAB`, `TAB_REST` AND `TAB_LIVE` ARE NOT EXPORTED, AND THAT WAS ASKED AND
+   ANSWERED RATHER THAN OVERLOOKED — 2026-09-06.
+
+   THE ASK IS REAL. An application building anything beside this strip that
+   must WEAR the tab skin — a "+" slot at the end of a tab set is the obvious
+   one — cannot match it today without transcribing a dozen utilities, and a
+   transcription is a copy that drifts the first time this file is touched.
+
+   IT IS STILL A NO, AND THE REASON IS WHAT THE EXPORT WOULD PROMISE. A class
+   string is not an interface; it is this component's private working-out,
+   and exporting it makes every value in it public API:
+
+     · Everything in the list becomes a breaking change. The z-index moved in
+       this very commit, `--folder-shoulder` is inside a `calc` a closable tab
+       overrides, and the resting ink was a `[color:…]` workaround until
+       `lib/utils.ts` learned that `text-caption` is a font size. All three
+       were free to change because nothing outside this folder could see
+       them. An export freezes them.
+     · tailwind-merge makes it worse rather than better. A consumer writing
+       `cn(TAB, TAB_REST, "…")` can silently DELETE any class in the skin by
+       naming one in the same group, and the failure is a tab that looks
+       nearly right — which is precisely the class of bug this repo's own
+       house rules exist to catch, and it would be arriving from outside where
+       no check here can see it.
+     · The papers are already exported, and they are the part that matters.
+       `--kw-crumb-rest` / `--kw-crumb-live` are declared on the `<nav>` as
+       custom properties exactly so a caller can reach them (TAB-C1), and
+       `data-slot` names every part of the strip for anyone who needs to
+       target one. That is a contract this file can keep.
+
+   WHAT TO DO INSTEAD, WHEN THE NEED IS CONCRETE: ship the THING, not the
+   string. If the app needs a tab-shaped control that is not a crumb, that is
+   a component this folder should export — it can then be drawn once, measured
+   in `verify/`, and changed here without a second copy to chase. `FolderShape`
+   is already exported and is the half of the skin that is genuinely shared.
+   Nothing is logged as owed until a call site names the control it wants;
+   guessing at one would be the silent invention the house rules forbid.
+   -------------------------------------------------------------------------- */
 export { BreadcrumbFolders };

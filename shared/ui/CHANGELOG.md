@@ -2,6 +2,138 @@
 
 ## Unreleased
 
+### Added — a breadcrumb strip can be a workspace tab set, and its tabs can be closed with a keyboard
+
+Client, 2026-09-06, on the live product: "all tabs i open stay open unless i
+close them", with "a x icon on the tabs to close them". The app had built its
+half of that against `BreadcrumbFolders` and two things this kit could not
+express were in the way. Both are now props on
+`components/breadcrumbs/breadcrumb-folders.tsx`, both are opt-in, and a call
+site that passes neither renders the DOM it rendered yesterday.
+
+**`onClose?: (item, index) => void` — the × is a REAL CONTROL.** It renders a
+`<button>` as a SIBLING of the crumb's link inside the `<li>`, never inside the
+anchor: interactive content inside an `<a>` is invalid HTML, which is why the
+app's own stopgap had to be an `aria-hidden` `<span data-tab-close>` caught by
+an `onClickCapture`. The cost of that workaround is the whole reason this
+exists — **a keyboard or screen-reader user could not close a tab at all**, and
+the span was rightly hidden rather than promise an affordance assistive
+technology cannot operate. As a sibling it takes focus, `Enter` and `Space` fire
+it natively, and tokens.css §8 rings it like every other control.
+
+It sits IN THE TAB ORDER, immediately after the tab it closes. A roving
+`tabindex` and a bare key binding were both considered and rejected: this strip
+is an `<ol>` of links and not a `role="tablist"`, so it has no keyboard model to
+hang an arrow-key scheme on, and an undiscoverable shortcut is — for the one
+user this change is for — the same as nothing. `filter-bar.tsx` settled the
+identical shape in its own words: "A REMOVABLE CHIP HAS TWO FOCUS TARGETS… and
+both are in the tab order." The cost is that a strip has twice the stops.
+
+Each control is announced with the tab it shuts — "Close tab: Halloway", not a
+row of five identical "Close"es. `closeLabel` is the verb, `formatCloseLabel`
+replaces the join for a language "verb: name" does not fit, and an item's own
+`closeLabel` replaces the result — which is the answer when a crumb's `label` is
+a node rather than a string, because an accessible name cannot be read out of
+arbitrary markup and this file does not guess at one. The same trio
+`filter-bar.tsx` already runs.
+
+`BreadcrumbFoldersItem` is exported: `BreadcrumbsItem` plus `closable` (default
+`true`; `false` pins the tab a set may not be emptied below) and the per-item
+`closeLabel`. It EXTENDS the shared item rather than widening it — `BreadcrumbsItem`
+is also the phone's text trail and `ScreenRenderer`'s recipe data, and a field
+only the desktop strip can honour does not belong in a type two other renderers
+must silently ignore. Every existing `BreadcrumbsItem` already is one,
+structurally, so nothing has to change to adopt it.
+
+**`activeIndex?: number` — WHICH tab is live, decoupled from WHERE it sits.**
+The live paper, `aria-current="page"`, the z-lift and the scroll-into-view were
+all wired to `items.length - 1`; the only way to mark a tab live was to move it
+to the end, so every switch re-ordered the strip under the reader's cursor —
+the opposite of the thing being copied, where a tab stays where it was opened.
+Defaults to the last item, so a trail is untouched. An index outside the array
+marks no crumb as current, deliberately: that is a real state for a tab set, and
+clamping would announce a crumb the caller never named while hiding the
+off-by-one that produced it.
+
+`Breadcrumbs` gained the identical prop on the same day. Below `md` the strip is
+`display: none` and that component IS the trail, from the same array — without
+it a phone would announce a different `aria-current="page"` than the desktop
+does, which `breadcrumbs.tsx`'s own header names as the class of bug to refuse.
+
+**Three consequences, each argued at its own site in the source:**
+
+- **A tab set does not fold.** A folded tab can be re-opened from the `···`
+  menu and cannot be closed from it: a `DropdownMenuItem` is a `role="menuitem"`
+  in a menu that moves focus with the arrow keys, so a second control inside a
+  row is not keyboard-reachable at all. A menu of tabs you can open and not shut
+  is exactly the half-affordance this change deletes. The strip already scrolls,
+  and that is also what a browser does with a tab strip. `foldAfter` is a
+  trail's lever and is ignored while `onClose` is given.
+- **A tab set keeps its tabs on a phone.** The 2026-09-04 ruling — "in monile,
+  lets use normal breadcrumbs (like they ware before, jhust teh text)" — is
+  about the breadcrumb TRAIL, and text has nowhere to put a close control.
+  `onCurrentActivate` already made and won this argument for its own tab.
+- **The fold can no longer hide the current location.** It keeps the head and
+  the last two, which was safe only while live meant last. With `activeIndex`
+  pointing into the middle, nothing folds.
+
+**The z-order moved by one step and paints identically today.** `TAB_REST` drops
+from `z-[1]` to `z-0`; `TAB_LIVE` keeps the `z-[1]` the 2026-09-03 fix gave it,
+so the live tab is still strictly below a card at `z-[2]` and still cannot paint
+over content. The lift used to be held by DOM order — true only while live was
+last. There is no integer between 1 and 2, so it is bought by lowering the
+others. `z-index: 0` still establishes a stacking context, so `CrumbShape`'s
+`-z-10` stays inside its tab.
+
+**Sizing: `--control-height-pill` (26), and the reason is measured.** A tab is
+`--folder-tab-height` (47.5) with `--folder-tab-overlap` (17.02) of it spent as
+the foot the card rides over, so a control may occupy `--folder-lip` — 30.48.
+The dialog's own close chip is `--control-height-dense` (32) and would break the
+silhouette's top edge; 26 is the only one of the kit's five control heights that
+fits, with 2.24 of air at each end. It is NOT the 44 touch row and cannot be:
+the lip is chapter 14's, client-ruled, and "reuse the existing folder tabs
+without changing anything on the shape" forbids growing the tab. The TAB stays
+the large target (128 x 47.5) and the strip is `md` and up.
+
+No resting fill — the control is drawn on the tab's own paper and six discs down
+a strip would compete with the labels the tabs exist to show. The mark is the
+affordance at rest; `bg-accent` arrives on hover, a named utility, never mango.
+The glyph is Phosphor's `X` at `--icon-16`.
+
+**`TAB` / `TAB_REST` / `TAB_LIVE` are still not exported, and that was decided
+rather than skipped** — the argument is written at the bottom of the file. A
+class string is not an interface: exporting it freezes every value in it (the
+z-index moved in this very change), and tailwind-merge lets a consumer silently
+delete any class in the skin by naming one in the same group. The papers are
+already reachable as `--kw-crumb-rest` / `--kw-crumb-live` on the `<nav>`, and
+every part carries a `data-slot`. If an app needs a tab-shaped control that is
+not a crumb — a "+" slot — that is a component this folder should ship, not a
+string it should leak.
+
+Measured in `verify/breadcrumb-folder/`, which gains three five-level hosts
+(trail / set / pinned) asserting: every close control's parent is the `<li>` and
+`closest("a")` is null; each one's `aria-label` names its own tab; the tab order
+alternates tab, its close, tab, its close, taken by focusing each candidate and
+asking `document.activeElement` who took it; the control's box sits inside the
+lip (2.09 above, 24.38 tall, 2.11 below, at the 15px root); and the z-order
+reads live 1 · rest 0 · close 1 · card 2. A trail in the same harness still
+folds at five, marks the last tab current and draws zero close controls.
+
+Also **fixed in that harness, a wrong reading it has printed since the mobile
+split landed on 2026-09-04**: every structural query started at the case host,
+and an ordinary trail renders the hidden text trail FIRST — so the strip's own
+rect came back all zeros (`overlapPx` was measuring the card's distance from the
+viewport origin) and the weights block reported the text trail's 400 /
+`--ink-tertiary` where a rest tab is 300 / `--ink-secondary`. A `display: none`
+element answers every query without erroring, which is how it survived. Scoped
+to the strip, the numbers return: `overlapPx` 15.95 against
+`--folder-tab-overlap` 15.96, rest 300 on `--ink-secondary`, live 500 on
+`--foreground`. Nothing about the component was ever wrong.
+
+The demo gains a live tab set under `breadcrumbs` — five tabs, the second live,
+the head pinned — because a still picture cannot show that closing one leaves
+the others where they were.
+
 ### Changed — the asterisk is the regular weight, not the filled disc
 
 Client, 2026-09-06: "everywhere there's asterisk, use the regular version

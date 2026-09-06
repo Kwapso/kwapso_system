@@ -72,11 +72,13 @@ import { cn } from "@shared/ui/lib/utils"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
+import type { ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -157,6 +159,7 @@ export function PagedFind<T>({
   tabs,
   wrap,
   actions,
+  view,
   restingEmpty,
   restingLoading = false,
   children,
@@ -256,6 +259,24 @@ export function PagedFind<T>({
    * default, which is every existing call site's markup, unchanged.
    */
   actions?: (ctx: { queryString: string }) => React.ReactNode
+  /** THE VIEW SWITCH, between the sort control and `actions` — R53's own fixed
+   * slot order (search → filters → sort → view → actions), which this row keeps
+   * because it IS one of the app's two toolbars rather than an exception to
+   * them (`TOOLBAR_CONTROL_OWNERS` names this file for exactly that reason).
+   *
+   * A CONFIG AND NEVER A NODE, the same type `<ToolbarRow>` takes, so the
+   * placement, the wrapper and the accessible name are this row's and there is
+   * nothing a call site could put in the wrong slot. It exists because the app
+   * record's Tickets tab grew a second body (a list and a dashboard, client
+   * ruling 6 Sep 2026) and there is no tab strip inside a record's tab to add
+   * one to — "there can never be 2 rows of tabs", her own words — so the switch
+   * has to live on the toolbar, and BOTH bodies have to draw the same control in
+   * the same place or it moves as you use it.
+   *
+   * `undefined` is every other call site, unchanged, and needs no exemption
+   * entry: `ViewSwitch` renders nothing for fewer than two views, so a
+   * single-body collection is self-exempting (R53 says so about this prop). */
+  view?: ToolbarViewSlot | false | null
   /** R50 — "never toolbar on empty collection", the same rule `ToolbarRow`
    * (screen-bits.tsx) enforces for the app's other, bounded toolbar, now
    * required here too. This file drew its own search/filters/sort/actions
@@ -569,6 +590,23 @@ export function PagedFind<T>({
               onDirectionChange={(dir) => setSortDir(dir)}
               hideLabel
             />
+          )}
+          {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT AND THE
+              ACTIONS — R53's fixed order, the same one `<ToolbarRow>` draws, so
+              a reader who learns the row on one screen has learned it on all of
+              them. Built HERE from the config rather than by the call site, for
+              the reason that law is a change of TYPE: a node slot accepts the
+              right control, no control, or the control belonging in a different
+              slot, and no census can tell which. */}
+          {view && (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ViewSwitch
+                views={view.views}
+                value={view.value}
+                onValueChange={view.onValueChange}
+                label={t("View")}
+              />
+            </div>
           )}
           {/* THE FILTERED TOTAL — the exact server count of the question being
               asked, through the one seam allowed to end in a "+" (the collection's

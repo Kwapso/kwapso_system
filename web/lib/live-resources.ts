@@ -481,13 +481,24 @@ export function triageKey(teamId: string): string {
  * different moments of the same backlog — a chart of open work beside a chart of
  * the same open work counted a minute earlier.
  *
- * …AND ONE KEY PER QUESTION, which is what the two filter parts are for. The
+ * …AND ONE KEY PER QUESTION, which is what the three filter parts are for. The
  * tab's toolbar narrows by client and by kind AT THE DOOR (a dashboard has no
  * rows for a browser to sieve), so "all clients" and "Bergmann's" are two
  * different answers and must not share an entry — the same arrangement
- * `helpFacetKey` makes for the ticket list's own sub-tabs. Both parts are in the
+ * `helpFacetKey` makes for the ticket list's own sub-tabs. Every part is in the
  * key even when empty, so the unfiltered key is a fixed shape rather than a
  * prefix of every filtered one.
+ *
+ * THE THIRD PART IS THE SYSTEM, AND IT IS THE ONE THAT WOULD HAVE BEEN A BUG.
+ * The app record's Tickets tab now has a Dashboard view of its own — the same
+ * screen narrowed to one app (client, 6 Sep 2026: "a mini version, a filtered
+ * version") — and every panel on it is a tally over THAT system's tickets. Left
+ * out of the key, two apps' dashboards would share one entry: opening the second
+ * would paint the first one's numbers under the second one's heading, instantly,
+ * from cache, and only correct itself once the read landed. That is the same
+ * defect `sliceKey` was written for one file along ("opening a second app showed
+ * the first one's work"), and it is worse here, because a chart carries no row
+ * a reader could recognise as belonging to somewhere else.
  *
  * A DERIVED cache, so it is dropped and re-read rather than patched: there is no
  * row in it to patch. Dropped by PREFIX in `help`'s own `slicePrefix` below
@@ -498,8 +509,13 @@ export function triageKey(teamId: string): string {
  * key nobody is subscribed to fetches nothing at all, so a team who never opens
  * the tab pays nothing for it. */
 export const HELP_DASHBOARD_PREFIX = "help-dashboard:"
-export function helpDashboardKey(teamId: string, accountId = "", helpType = ""): string {
-  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}`
+export function helpDashboardKey(
+  teamId: string,
+  accountId = "",
+  helpType = "",
+  appId = ""
+): string {
+  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}:${appId}`
 }
 
 /** THE PULSE — Home's big numbers and its two charts, in one cache entry.
