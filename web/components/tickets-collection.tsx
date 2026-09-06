@@ -992,6 +992,11 @@ function TriageQueue({
      which is why it is written beside it rather than folded into the accept
      handler and forgotten on the way back. */
   const [assigned, setAssigned] = React.useState<string[]>([])
+  /* WHICH LIST ROW IS MID-DECISION — the client chose L3, the strip that opens
+     beneath the row, over a panel or a dialog. One id, not a set: two open
+     strips would be two half-made decisions on screen at once, and the row
+     leaves as soon as one is finished anyway. */
+  const [rowPicker, setRowPicker] = React.useState<string | null>(null)
   /** Which one-row picker is open, if either. One value rather than two
    * booleans: they are alternatives (the type row and the people row cannot
    * both be the answer to what Accept is waiting for), and two booleans is two
@@ -1173,11 +1178,28 @@ function TriageQueue({
    * cannot proceed without somebody to pick, so an empty list would be a dead
    * end on exactly the apps whose staffing has not been filled in yet. */
   const appStaff = new Map((appsQ.data ?? []).map((a) => [a.id, a.staff.map((p) => p.userId)]))
-  const peopleOptions: PickerOption[] = staffedOn(
-    assignableMembers(membersQ.data),
-    appStaff,
-    current?.appId
-  ).map((m) => ({ value: m.id, label: m.name, picture: m.photo, shape: "round" as const }))
+  /* WHO MAY TAKE A TICKET ON ONE APP — a function now, not a value, because the
+     LIST asks it once per row. The card only ever asks about the ticket in hand,
+     so this was `current?.appId` baked in; a table has a different app on every
+     line, and narrowing all of them against the card's app would have offered
+     the wrong colleagues on every row but one. Same rule, same fail-open
+     (`staffedOn` returns everybody when an app has no staff, so Assign is never
+     a dead button), asked per ticket.
+
+     A PLAIN FUNCTION, NOT `useCallback`. It was wrapped for a moment and the
+     lint was right to refuse it: `appStaff` is a `new Map(...)` built on every
+     render, so a callback depending on it is rebuilt every render too — the
+     memo would have been theatre, and theatre that costs a dependency array to
+     keep honest. The work is a filter and a map over a team's members, done a
+     handful of times per render. */
+  const peopleFor = (appId: string | null | undefined): PickerOption[] =>
+    staffedOn(assignableMembers(membersQ.data), appStaff, appId).map((m) => ({
+      value: m.id,
+      label: m.name,
+      picture: m.photo,
+      shape: "round" as const,
+    }))
+  const peopleOptions: PickerOption[] = peopleFor(current?.appId)
 
   /** The fresh page + facet counts every ticket write hands back. Merged rather
    * than thrown away and refetched — the door's response IS the new first page,
@@ -1754,10 +1776,22 @@ function TriageQueue({
               <TableHead>{t("Type")}</TableHead>
               <TableHead>{t("App")}</TableHead>
               <TableHead>{t("Date")}</TableHead>
+              {/* NO HEADER OVER THE ACTIONS — client, asked directly: "no
+                  header". It is also what her own reference screenshot does,
+                  and the reason holds up: every other header names what the
+                  cells beneath it CONTAIN, and this column's cells do not
+                  contain a fact, they contain a move. "Action" would be a label
+                  for the reader's benefit that tells them nothing they cannot
+                  see. `sr-only` text keeps the column announced to a screen
+                  reader, which reads headers to say which cell it is in. */}
+              <TableHead>
+                <span className="sr-only">{t("Decide")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {inOrder.map((w) => (
+              <React.Fragment key={w.id}>
               <TableRow
                 key={w.id}
                 onClick={() => onOpen(w.id)}
@@ -1860,7 +1894,71 @@ function TriageQueue({
                       views of one collection. */}
                   {formatDate(w.createdAt, lang)}
                 </TableCell>
+                {/* THE DECISION, IN THE ROW — client: "in table view, lets also
+                    add the accept (whatever verb) column". It is the SAME verb
+                    the card's primary button wears, from the same `triageAct`,
+                    so a ticket's fate is one word wherever she meets it — and
+                    because the word follows the row's own type, the column is
+                    not one repeated label: it says what kind of decision each
+                    line is waiting for before she has read anything.
+
+                    `stopPropagation` because the row itself opens the ticket.
+                    Without it, deciding would also navigate away from the list
+                    the decision was made in. */}
+                <TableCell className="text-end whitespace-nowrap">
+                  {canTriage && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={busy || w.missing.length > 0}
+                      title={w.missing.length > 0 ? gapsSentence(w) : undefined}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const a = triageAct(w.helpType, t)
+                        if (a.assigns) setRowPicker((r) => (r === w.id ? null : w.id))
+                        else void accept(w)
+                      }}
+                    >
+                      {triageAct(w.helpType, t).label}
+                    </Button>
+                  )}
+                </TableCell>
               </TableRow>
+              {/* THE STRIP, BENEATH ITS OWN ROW — the client picked L3 over a
+                  panel and a dialog, knowing it pushes the rows below it down:
+                  "L3". It is the same one-line-of-chips shape she chose for the
+                  card, so the two views speak one vocabulary rather than each
+                  inventing a way to name a colleague.
+
+                  A ROW OF THE TABLE, not a floating box over it: a `colSpan`
+                  cell keeps it inside the grid, so it cannot drift out of
+                  alignment with the row it belongs to, and a screen reader
+                  meets it in the reading order immediately after that row
+                  rather than somewhere else in the document.
+
+                  Only ever under an Issue or a Request — the two verbs that
+                  need a person. Accept and Store never open anything, which is
+                  why half a list of tickets is pressed straight through. */}
+              {rowPicker === w.id && (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={5} className="bg-surface-quiet">
+                    <RecordPicker
+                      layout="row"
+                      ariaLabel={t("Who is picking this up?")}
+                      value=""
+                      onChange={(v) => {
+                        setRowPicker(null)
+                        void accept(w, v)
+                      }}
+                      options={peopleFor(w.appId)}
+                      searchPlaceholder={t("Who is picking this up?")}
+                      emptyText={t("Nobody on this team can be given work yet.")}
+                      disabled={busy}
+                    />
+                  </TableCell>
+                </TableRow>
+              )}
+              </React.Fragment>
             ))}
           </TableBody>
         </Table>

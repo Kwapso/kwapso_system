@@ -911,9 +911,14 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // given to somebody", the undo control's own words, and E1's two-branch
   // on-duty line. Not translated here for the standing reason below — the
   // translate script spends the owner's own key and a run is his to authorise.
-  de: 243,
-  es: 243,
-  ca: 243,
+  // RAISED 243 -> 244, the list's action column: one new sentence, the
+  // screen-reader name for the header the client asked to leave visually blank
+  // ("no header"). Every verb it draws — Accept, Assign, Plan, Store — and the
+  // picker's own strings were already catalogued by the card, which is what
+  // sharing `triageAct` and `RecordPicker` between the two views buys.
+  de: 244,
+  es: 244,
+  ca: 244,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
