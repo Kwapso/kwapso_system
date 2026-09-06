@@ -432,7 +432,26 @@ export function TicketsCollection({
   const t = useT()
   // Which type of ticket she was looking at, remembered with the rest of the
   // screen — the sub-tab is as much "where she was" as the search box under it.
-  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", ALL)
+  /* THE DEFAULT TAB IS THE FIRST TAB, NOT A NAMED ONE — client, 2026-09-06:
+     "by default, each time I load the page, if there's no selected tab in
+     memory, the tab that is loaded is the one to the left. I'm saying this
+     because now every time I refresh the ticket, I go to All, but actually I
+     should go to Triage."
+
+     It said `ALL`, written when All WAS the first tab. Triage moved to the
+     front earlier today and the default stayed where it was, so a refresh
+     landed two tabs away from the one she had just asked to lead.
+
+     `TRIAGE` IS SPELLED HERE BUT THE RULE IS POSITIONAL, and the two must not
+     drift again: the strip below is a literal array and its first entry is
+     Triage, so this constant and that position are one fact written twice.
+     Deriving it from the array is not available — the strip is built further
+     down this component, out of data this line runs before — so the array's
+     own comment now carries the other half of the pair. If the order changes
+     again, this line changes with it, and the test that would have caught it
+     is worth more than the comment: filed as a follow-up rather than pretended
+     to be solved here. */
+  const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", TRIAGE)
   // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
   // above it has to answer "is the queue empty" to know whether to draw
   // itself at all, and only `TriageQueue` — which fetches the queue — ever
@@ -538,6 +557,10 @@ export function TicketsCollection({
       // UI-CONVENTIONS §5 refuses. No badge, and that is R16 rather than an
       // omission: this tab is not a narrower slice of the collection counted
       // above it, so a number here would be the same collection counted twice.
+      /* FIRST, AND THAT POSITION IS LOAD-BEARING: `useRemembered`'s default
+         above names this tab because it is the leading one, on the client's
+         rule that a page with nothing remembered opens the tab on the left.
+         Move this entry and that default moves with it. */
       { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: "", badgeVariant: "" as const },
       { value: READY, label: t("Ready"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
       // THE TEAM'S OWN MARK, at last. `TabItem.icon` took a lucide NAME until
