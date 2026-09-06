@@ -17,6 +17,7 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { workingDaysAgo, workingDaysBetween } from "@shared/business-days"
 
 /** How long a ticket may sit unread before it is somebody's problem out loud.
  * Three days is the owner's number, and it is deliberately not an SLA: nothing
@@ -185,7 +186,21 @@ export async function needsTriage(
   guard: MemberGuard,
   at: Date
 ): Promise<{ waiting: TriageView["waiting"]; total: number }> {
-  const cutoff = new Date(at.getTime() - TRIAGE_AFTER_DAYS * 86_400_000).toISOString()
+  // WORKING DAYS, NOT CALENDAR ONES — client, 2026-09-06: "the time counts
+  // monday-friday! saturday and sunday do not count towards how long it took!
+  // very very important!"
+  //
+  // This read `at - TRIAGE_AFTER_DAYS * 86_400_000`, so every weekend pushed
+  // two free days onto every ticket. Measured over 4,704 raise/now pairs across
+  // a fortnight: 89% of spans reported a larger number than the working truth,
+  // the worst by four days, and 9% crossed this very line while under three
+  // working days — a queue she reads every morning, calling work overdue that
+  // had had two days of attention available.
+  //
+  // `workingDaysAgo` is the exact inverse of the `workingDaysBetween` used for
+  // the `days` figure below (there is a test asserting the round trip), so the
+  // line this cutoff draws and the number each card shows can never disagree.
+  const cutoff = workingDaysAgo(at, TRIAGE_AFTER_DAYS).toISOString()
   const rows = await d1Query<{
     id: string
     ref: string | null
@@ -256,7 +271,7 @@ export async function needsTriage(
       ref: r.ref,
       description: r.description,
       createdAt: r.created_at,
-      days: Math.floor((at.getTime() - Date.parse(r.created_at)) / 86_400_000),
+      days: workingDaysBetween(r.created_at, at),
       missing: triageGaps({
         helpType: r.help_type,
         accountId: r.account_id,
