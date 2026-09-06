@@ -898,9 +898,15 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // count, so the pin follows. Third fall in one day and every one of them a
   // deletion rather than a translation run — the ceiling is doing exactly what
   // it was written to do, which is refuse to sit above the truth.
-  de: 236,
-  es: 236,
-  ca: 236,
+  // RAISED 236 -> 237, the view-switch pass: "Queue" and "List" are the two
+  // view names the switch offers, and the retired one is the picker note the
+  // client had deleted a pass earlier. Two new English sentences, one already
+  // counted as removed — net +1. The ceiling has fallen three times today and
+  // risen once; it moves either way, and the arithmetic is written down each
+  // time so it can never move quietly.
+  de: 237,
+  es: 237,
+  ca: 237,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

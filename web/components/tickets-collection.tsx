@@ -114,6 +114,8 @@ import { Card } from "@shared/ui/components/card/card"
 import { Queue } from "@shared/ui/components/queue/queue"
 import {
   ArrowCounterClockwise,
+  Cards,
+  ListBullets,
   ArrowUpRight,
   Check,
   Paperclip,
@@ -893,12 +895,15 @@ function TriageQueue({
   onCreate: () => void
   onOpen: (id: string) => void
 }) {
-  // `useT` rather than `useLanguage`: the reader's LANGUAGE is no longer needed
-  // in this component. It was, for one line — `formatDate(current.createdAt,
-  // lang)` under the description — and that line moved into the chip line on
-  // the client's 2026-09-06 ruling, so `TriageChips` is where the date is
-  // formatted and where the language is now read.
-  const t = useT()
+  // `useLanguage` AGAIN, and the note above it is worth keeping as history.
+  // This component dropped to `useT` when the date moved out of it into
+  // `TriageChips`, on the reasoning that the reader's LANGUAGE was no longer
+  // needed here. True until the list view arrived: its rows carry a date of
+  // their own, so `lang` is read here once more. Recorded rather than quietly
+  // reverted — the earlier line was right when it was written, and a reader
+  // finding `useLanguage` here should know it left and came back rather than
+  // assume nobody thought about it.
+  const { t, lang } = useLanguage()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState(false)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
@@ -945,6 +950,21 @@ function TriageQueue({
    * clause of 27.41, so a skip leaves no trace anywhere but here, and here only
    * until the tab is left. */
   const [skipped, setSkipped] = React.useState<string[]>([])
+  /* WHICH BODY THE SITTING DRAWS — client: "add view selector - the current one
+     and list (so far only add the selector and a raw version of list, we will
+     work on the details for list next)".
+
+     `useRemembered` rather than plain state, which is `ViewSwitch`'s own stated
+     contract: a view is a PERSON'S preference and is remembered per person, not
+     per screen and never in a store a colleague shares. The key is scoped to
+     triage so choosing a list here does not decide anything on another
+     collection.
+
+     RAW ON PURPOSE, and named so nobody mistakes it for finished: the list is
+     the queue's own rows with nothing added — no columns, no sort headers, no
+     selection. She asked for the SELECTOR to exist and a body behind it to
+     prove the switch works; the details are the next conversation. */
+  const [triageView, setTriageView] = useRemembered<"queue" | "list">("triage-view", "queue")
   /** Tickets settled in this sitting. They leave the front of the order the
    * instant Accept returns, rather than when the door's next answer lands —
    * without this the card would sit on a ticket it had just triaged for as long
@@ -1423,6 +1443,20 @@ function TriageQueue({
           direction: sortDir,
           onDirectionChange: setSortDir,
         }}
+        /* THE VIEW SWITCH, and it can exist now because there are two bodies.
+           R53's own sentence is that `view` needs no registry — `ViewSwitch`
+           draws nothing below two views, so a single-body collection exempts
+           itself. Triage had exactly one until this pass, which is why the slot
+           was deliberately absent; adding the list is what earns the control,
+           not a decision to show one. */
+        view={{
+          views: [
+            { value: "queue", label: t("Queue"), icon: <Cards className="size-4" /> },
+            { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+          ],
+          value: triageView,
+          onValueChange: (v) => setTriageView(v === "list" ? "list" : "queue"),
+        }}
         /* UNDO RIDES THE TOOLBAR NOW, TO THE LEFT OF THE CREATE BUTTON —
            client, 2026-09-06: "undo button on top in toolbar, left to +".
            `actions` is the row's own trailing slot and it renders its children
@@ -1442,7 +1476,28 @@ function TriageQueue({
             <>
               {lastAct && (
                 <Button
-                  variant="secondary"
+                  /* CHARCOAL, NOT A BORDER — client: "undo does need a border
+                     (to differentiate from sort, filter, etc)". A border is the
+                     one thing a button here may not have: tokens.css states it
+                     outright — "Buttons carry NO border in any state — no
+                     outline, no hairline, no stroke. A secondary button is a
+                     filled button in the other paper tone", and the fill IS the
+                     affordance. So the differentiation is a TONE.
+
+                     Why it read flat: its neighbours are not buttons. Filter
+                     and sort are pills wearing `shadow-[var(--hairline-strong)]`
+                     on the page ground, so they have a crisp edge; Undo was a
+                     soft-paper fill on off-beige, a true tone step but a quiet
+                     one, and it sat among three sharper things looking like the
+                     odd one out rather than the distinct one.
+
+                     `inverse` is the loudest tone that is NOT the brand: mango
+                     is spoken for by the create button beside it and by Accept
+                     on the card, and the kit rules one brand fill per view. It
+                     also suits what the control does — it appears only after a
+                     decision, and it takes that decision back. If it reads too
+                     heavy in use, `secondary` is one word away. */
+                  variant="inverse"
                   size="sm"
                   disabled={busy}
                   onClick={() => void undo()}
@@ -1469,6 +1524,44 @@ function TriageQueue({
         // told her search matched nothing — a true-sounding sentence pointing
         // at the wrong control, which is the most expensive kind.
         <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
+      ) : triageView === "list" ? (
+        /* THE LIST, RAW AND SAID TO BE RAW — client: "so far only add the
+           selector and a raw version of list, we will work on the details for
+           list next."
+
+           It is the same narrowed, sorted rows the sitting draws, one per line,
+           and nothing else: no columns, no per-row decisions, no selection, no
+           paging. Deliberately NOT built on `PagedFind` or a table yet — either
+           would be a shape to argue with next round, and the point of this pass
+           is that the SWITCH works and has somewhere to land.
+
+           It shares `inOrder` with the queue, so the two views are the same
+           question answered twice rather than two reads that can disagree. Each
+           row opens the ticket, which is the one thing a list of tickets must
+           do whatever else it grows. */
+        <ul data-slot="triage-list" className="flex min-w-0 flex-col">
+          {inOrder.map((w) => (
+            <li key={w.id} className="min-w-0">
+              <button
+                type="button"
+                onClick={() => onOpen(w.id)}
+                className="hover:bg-surface-quiet flex w-full min-w-0 items-center gap-3 rounded-[var(--radius)] px-3 py-2 text-start"
+              >
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">{w.ref}</span>
+                <Swatch colour={ticketTypeColour(w.helpType)} />
+                <span className="min-w-0 flex-1 truncate text-sm">{ticketTitle(w)}</span>
+                {w.appName && (
+                  <span className="text-muted-foreground hidden shrink-0 text-xs sm:inline">
+                    {w.appName}
+                  </span>
+                )}
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {formatDate(w.createdAt, lang)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : (
         <Queue
           /* OPEN AND SKIP, SIDE BY SIDE — client, twice: "open button next to
