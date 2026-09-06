@@ -137,6 +137,39 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
   return json({ report })
 }
 
+/** POST /api/data-ops/import/batch/continue — pick up a run that did not finish.
+ *
+ * THE SAME DOOR AS CONFIRM, in every way that matters, and deliberately so: the
+ * work it starts is the same work, so it gates the same (a `create` right per
+ * module the plan touches, and no client login), validates the same, and
+ * publishes the same coarse ping per module. `confirmBatch` itself decides
+ * whether this is a first run or a resume — it reads the cursor off the batch
+ * row — so there is exactly one place that knows how an import runs, and this
+ * door is only the second way in.
+ *
+ * WHY IT IS A SEPARATE ROUTE rather than confirm being made re-enterable: a
+ * confirm that quietly resumed would mean the button a person presses to start
+ * an import is also the button that continues one, and the 409 that today
+ * protects a batch from being run twice would have to be softened to allow it.
+ * A distinct door keeps "start" refusing exactly as it always has. */
+export async function postBatchContinue(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard } = await teamContext(request, env)
+  await refusePortalCaller(cfg, guard)
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
+  const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
+  const view = await getBatchView(cfg, guard, batchId)
+  if (!view.plan) return fail(409, "no_plan", "Plan the import before running it.")
+  // NOTHING TO CONTINUE is its own answer, not a restart. A batch with no cursor
+  // never reached a checkpoint, so there is no honest place to pick it up from —
+  // resuming from the top would rewrite whatever the dead run had managed.
+  if (view.status !== "running" || !view.progress)
+    return fail(409, "nothing_to_continue", "There's no unfinished run to pick up on this import.")
+  for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
+  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId)
+  for (const m of modules) await publishChange(env, guard.teamId, m)
+  return json({ report })
+}
+
 /** GET /api/data-ops/import/batches — the team's import history (newest first).
  * Summaries only (who, when, files → tables, totals); row contents and rejection
  * reasons stay on the creator-scoped batch.

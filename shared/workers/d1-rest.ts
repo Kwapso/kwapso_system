@@ -46,6 +46,19 @@ export type D1Rest = {
    * handler had to change to be measured. Absent = nobody asked, and the door
    * pays nothing. */
   stats?: { op: string; ms: number; rows?: number }[]
+  /** THIS REQUEST'S DEFERRER — how `logActivity` stops being something the person
+   * who clicked Save waits for (owner's ruling, 6 Sep 2026; the reasoning and its
+   * provenance are in shared/workers/parallel.ts).
+   *
+   * It rides on the config for the same reason `stats` above and `core` below do,
+   * and the reason is the same one stated there: the config is the one thing
+   * already threaded to every call site, and `logActivity` has ~140 of them. A
+   * fifth argument on each would be ~140 chances to forget it, and a
+   * half-deferred audit trail is worse than an awaited one.
+   *
+   * Absent = await, exactly as before. Crons, tests and libs called directly have
+   * no request to hang work on and are unchanged. */
+  defer?: (work: Promise<unknown>) => void
   /** WHERE A FAILURE ON THIS DOOR IS RECORDED — the global core database, so the
    * one seam that swallows by contract (`logActivity`) can still leave a row.
    *

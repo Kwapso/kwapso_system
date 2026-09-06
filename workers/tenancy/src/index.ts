@@ -118,7 +118,7 @@ import { configReport, healthBody } from "@shared/workers/config-health"
 const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
-import { afterResponse, canDefer } from "@shared/workers/parallel"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { readOpsDigest, sendOpsDigest } from "./lib/ops-alert"
 import { identityFor } from "@shared/workers/gating"
@@ -464,10 +464,17 @@ export default {
       // Measured on the way out (timing.ts): the browser's network panel reads
       // `Server-Timing` with no tooling, and a door slow for everybody prints a
       // line nobody has to be watching for.
-      const res = await def.handler(request, env)
+      // A PER-REQUEST COPY OF `env`, carrying this request's deferrer — the only way
+      // the ping can stop holding the response (owner's ruling, 6 Sep 2026;
+      // parallel.ts carries the reasoning and the provenance). `env` itself is
+      // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
+      // on it would attach one caller's work to another caller's request. The
+      // copy is shallow: every binding travels by reference, and only this field
+      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
-      logIfSlow(request, route, def.kind)
+      logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {
       // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are

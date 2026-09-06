@@ -20,7 +20,7 @@ import { brand } from "@shared/brand"
 import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
-import { afterResponse, canDefer } from "@shared/workers/parallel"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
@@ -31,6 +31,7 @@ import {
   getImportSample,
   getImportTargets,
   postBatchConfirm,
+  postBatchContinue,
   postBatchFile,
   postBatchPlan,
   postBatchStart,
@@ -73,6 +74,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/data-ops/import/batch/file": { handler: postBatchFile, kind: "housekeeping" },
   "POST /api/data-ops/import/batch/plan": { handler: postBatchPlan, kind: "housekeeping" },
   "POST /api/data-ops/import/batch/confirm": { handler: postBatchConfirm, kind: "mutation" },
+  // The second way into `confirmBatch` — picking up a run that died half way.
+  "POST /api/data-ops/import/batch/continue": { handler: postBatchContinue, kind: "mutation" },
   "GET /api/data-ops/import/batch": { handler: getBatch, kind: "read" },
   "GET /api/data-ops/import/batches": { handler: getBatches, kind: "read" },
   "POST /api/data-ops/admin/seed-targets": { handler: postSeedTargets, kind: "housekeeping" },
@@ -122,10 +125,17 @@ export default {
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such data-ops action.")
       // Measured on the way out — see timing.ts.
-      const res = await def.handler(request, env)
+      // A PER-REQUEST COPY OF `env`, carrying this request's deferrer — the only way
+      // the ping can stop holding the response (owner's ruling, 6 Sep 2026;
+      // parallel.ts carries the reasoning and the provenance). `env` itself is
+      // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
+      // on it would attach one caller's work to another caller's request. The
+      // copy is shallow: every binding travels by reference, and only this field
+      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
-      logIfSlow(request, route, def.kind)
+      logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {
       // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are

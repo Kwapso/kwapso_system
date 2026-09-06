@@ -143,7 +143,21 @@ export async function postRolePerms(request: Request, env: Env): Promise<Respons
     return fail(400, "invalid_input", "roleId and value are required.")
   await setRolePermissions(cfg, guard, actor, roleId, body.value)
   await publishChange(env, guard.teamId, "member_roles", roleId)
-  return json({ ok: true })
+  // THE SAVED MATRIX COMES BACK, in the SAME shape `getRolePerms` answers with.
+  //
+  // This door used to answer `{ ok: true }`, so the screen could not trust what
+  // it had in hand — `setRolePermissions` auto-enables `read` wherever
+  // create/edit/delete was switched on, so what was saved is not always what was
+  // sent. The screen's only recourse was to ask again, and role-detail.tsx did
+  // exactly that: a POST and then a GET, two sequential round trips to learn the
+  // answer the first one already knew (~1.5-3s at the door timings recorded in
+  // shared/workers/timing.ts).
+  //
+  // Re-read rather than echoing `body.value` back, because the auto-flip happens
+  // in the database write and the point of this is that the screen sees what was
+  // STORED. It is one extra read on the write path, which the caller was making
+  // anyway, and it replaces a whole second request.
+  return json(await getRolePermissions(cfg, guard, roleId))
 }
 
 export async function postCreateRole(request: Request, env: Env): Promise<Response> {

@@ -111,8 +111,11 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     if (!draft) return
     setSaving(true)
     try {
-      await tenancy.saveRolePermissions(roleId, draft)
-      const fresh = await tenancy.rolePermissions(roleId)
+      // ONE round trip, not two. The door answers with the saved matrix (the
+      // server auto-enables `read` alongside create/edit/delete, so the saved
+      // value is not always the sent one) — this used to POST and then GET to
+      // learn what the POST already knew.
+      const fresh = await tenancy.saveRolePermissions(roleId, draft)
       primeCache(`role-perms:${roleId}`, fresh)
       serverRef.current = { roleId, value: fresh.value }
       setDraft(fresh.value)

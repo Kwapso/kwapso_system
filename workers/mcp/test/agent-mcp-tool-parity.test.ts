@@ -158,6 +158,7 @@ const MCP_ONLY_TOOLS: Record<string, string> = {
   add_import_file: IMPORT_BATCH_REASON,
   plan_import: IMPORT_BATCH_REASON,
   run_import: IMPORT_BATCH_REASON,
+  continue_import: IMPORT_BATCH_REASON,
   list_imports: IMPORT_BATCH_REASON,
   get_import: IMPORT_BATCH_REASON,
   get_ai_allowance: ASSISTANT_BRIDGE_REASON,
@@ -247,7 +248,7 @@ describe("R43 — agent/mcp tool-set parity: a name on one surface is on both, o
   it("the agent-only count matches the reasoned table exactly (25, 29 Aug 2026 — set_record_active wired onto MCP, not reasoned away)", () => {
     expect(agentOnly.length).toBe(Object.keys(AGENT_ONLY_TOOLS).length)
   })
-  it("the mcp-only count matches the reasoned table exactly (53, 29 Aug 2026 — +30 from the record-toggle collapse and the query grammar)", () => {
+  it("the mcp-only count matches the reasoned table exactly (54, 6 Sep 2026 — +1 for continue_import, the resume half of the import pipeline)", () => {
     expect(mcpOnly.length).toBe(Object.keys(MCP_ONLY_TOOLS).length)
   })
 })

@@ -222,6 +222,21 @@ const MCP_ONLY: McpTool[] = [
     buildBody: (i) => ({ batchId: i.batchId }),
   },
   {
+    name: "continue_import",
+    // R27 keeps this honest: a backticked name here must be this tool's own
+    // argument, a field ITS door reads or answers with, or another tool's name.
+    // The place a dead run stopped is real but it is `get_import`'s field, not
+    // this door's — so it is described in words and named by the tool that
+    // actually carries it.
+    description:
+      "Pick up an import that did not finish. A run that dies part way leaves its batch marked running, remembering which table it was inside and how many of that table's rows were done — get_import shows that. This continues from there instead of starting again, which is what re-running the file would do and would write every finished row a second time. It takes the same `batchId` as run_import and answers with the same `report`, covering the whole import rather than this leg. Refused when there is nothing to pick up. Up to eleven rows either side of the interruption may be written twice; the report says where it resumed.",
+    inputSchema: obj({ batchId: S }, ["batchId"]),
+    binding: "DATAOPS",
+    method: "POST",
+    path: "/api/data-ops/import/batch/continue",
+    buildBody: (i) => ({ batchId: i.batchId }),
+  },
+  {
     name: "list_imports",
     description: "The team's import history (who ran what, when, totals).",
     inputSchema: obj({}),
@@ -434,7 +449,7 @@ const MAX_RESULT_CHARS = 400_000
  * those out at 30 seconds would break the thing working correctly. */
 const DOOR_TIMEOUT_MS = 30_000
 const LONG_DOOR_TIMEOUT_MS = 120_000
-const LONG_RUNNING = new Set(["run_import", "plan_import", "agent_chat", "agent_confirm"])
+const LONG_RUNNING = new Set(["run_import", "continue_import", "plan_import", "agent_chat", "agent_confirm"])
 
 /** Forward one tool call to its gated door with the bridged session cookie.
  *

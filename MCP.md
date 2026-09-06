@@ -237,7 +237,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **272 doors, 217 with a tool, 55 with a written reason**, the
+  red build. Today: **273 doors, 218 with a tool, 55 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE upload pairs, two media doors and the knowledge base, each a
@@ -258,7 +258,7 @@ Today it covers:
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 217, **193 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 218, **194 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -520,8 +520,13 @@ Today it covers:
   building an answer out of it should quote the source titles; an answer with no
   citation is the exact failure that law exists to prevent.
 - **Bulk create:** the import pipeline, `start_import` → `add_import_file` →
-  `plan_import` → `run_import`. Accounts are importable AND exportable (they were
-  importable only, which made the customer spine a one-way street).
+  `plan_import` → `run_import`, and `continue_import` when a run does not come
+  home. An import of any size is minutes long, so a dropped connection part way
+  through used to leave the batch unfinishable: its written rows stayed written,
+  and the only way on was to send the file again, which wrote every one of them
+  a second time. `continue_import` picks up from the last checkpoint instead —
+  `get_import` shows where that is. Accounts are importable AND exportable (they
+  were importable only, which made the customer spine a one-way street).
 - **The in-app assistant:** `agent_chat`, `agent_confirm`.
 
 **Intentionally NOT on the machine surface, reasoned exclusions, not gaps.**

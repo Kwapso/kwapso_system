@@ -141,9 +141,11 @@ export const tenancy = {
       `/api/tenancy/roles/permissions?roleId=${encodeURIComponent(roleId)}`
     ),
 
-  /** Save a role's permission matrix (server re-applies auto-flip-read). */
+  /** Save a role's permission matrix and get the SAVED one back — the server
+   * re-applies auto-flip-read, so what comes back is what was stored, and the
+   * screen never has to ask a second time. Same shape as `rolePermissions`. */
   saveRolePermissions: (roleId: string, value: PermissionValue) =>
-    api<{ ok: true }>("/api/tenancy/roles/permissions", {
+    api<RolePermissions>("/api/tenancy/roles/permissions", {
       method: "POST",
       body: JSON.stringify({ roleId, value }),
     }),

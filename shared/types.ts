@@ -605,6 +605,12 @@ export type ImportBatchView = {
   files: { fileId: string; name: string; headers: string[]; rowCount: number }[]
   plan: ImportPlan | null
   report: ImportBatchReport | null
+  /** WHERE A RUN HAS GOT TO, while it is still going — the table it is inside
+   * and how many of that table's rows are done. Null before a run starts and
+   * again once it finishes, so `status === "running"` with a null progress is a
+   * run that has not reached its first checkpoint (or one that died before it
+   * did, which is the case the Continue button exists for). */
+  progress: { targetKey: string; rowsDone: number } | null
   createdAt: string
 }
 

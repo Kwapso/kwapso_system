@@ -19,7 +19,7 @@ import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } fr
 import { logError, recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
-import { afterResponse, canDefer } from "@shared/workers/parallel"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { sha256Hex } from "./lib/crypto"
 import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
@@ -71,8 +71,12 @@ export default {
       // ~190ms of every request in the app was session work with no shape to it.
       // There is no ROUTES table here to read a kind off, so the method decides:
       // a GET answers to the read budget, everything else to the write budget.
-      const res = await handle(route, request, env)
-      logIfSlow(request, route)
+      // A per-request copy carrying this request's deferrer, exactly as the
+      // sibling workers do — auth publishes on the USER channel (a profile edit,
+      // an email change, a forced sign-out), and those pings held the response
+      // for the same reason every other one did.
+      const res = await handle(route, request, { ...env, DEFER: deferrerFor(request) })
+      logIfSlow(request, route, undefined, env.DB)
       return withTiming(request, res)
     } catch (e) {
       // A refusal is an ANSWER, not a crash. Every sibling worker maps this
