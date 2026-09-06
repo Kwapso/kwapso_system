@@ -203,9 +203,9 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
   // never fire-and-forget: the ping still goes, the failure is still recorded by
   // `note` below, and the fetch still LEAVES at the same instant it left before.
   // The only thing that moved is who waits for it. (That answer reached this file
-  // relayed through the planner session rather than typed into it — parallel.ts
-  // carries the full provenance note, and this branch is unmerged and undeployed
-  // so the owner sees it once more in review.)
+  // relayed rather than typed into it, and has since been confirmed first-hand —
+  // his own one-word reply against the numbered item. parallel.ts carries the
+  // full provenance note; the chain is kept rather than collapsed.)
   //
   // THE ONE BEHAVIOUR THAT CHANGES, and it is BOUNDED rather than "usually":
   // for a moment the person who saved sees it done before a colleague's screen

@@ -31,6 +31,7 @@ import {
   PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
+  TWO_READS_ONE_DOOR,
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
   EMPTY_TOOLBAR_EXEMPT,
@@ -518,6 +519,141 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
     // Tripwire: a scan that matched no paged read passes exactly like a clean one.
     expect(scanned, "the paged-detail census found no screens — it has gone blind").toBeGreaterThan(2)
+  })
+
+  // A COMPONENT ASKS A DOOR ONCE (R52).
+  //
+  // round_trip_review's criterion 2 is "no question is asked twice". It scored
+  // 100/100 on 5 Sep 2026 — and the day after, the same lane found `app-detail`
+  // reading `selectable:<team>` twice, once plainly and once gated on
+  // `canRaiseTicket` so the gate could never be the read that warmed the cache.
+  // The probe had REPORTED it; a human dismissed it as a false positive because
+  // the store dedupes the request, which is true about the network and is not
+  // the whole property. A criterion whose full marks rest on a judgement call
+  // made in a hurry is a criterion that says nothing, so this is the check.
+  //
+  // TWO SHAPES, GRADED APART, because they cost differently:
+  //   • SAME KEY twice in one component — no exemption exists or ever will. The
+  //     store's `inFlight` map dedupes by key, so the second read buys nothing
+  //     and is only a second place to change one question.
+  //   • TWO KEYS on one door — a real second request the store cannot dedupe,
+  //     and sometimes right. Those are DATA in `TWO_READS_ONE_DOOR`.
+  //
+  // GROUPED BY COMPONENT, not by file: `work-panels.tsx` holds seven exported
+  // panels, each with its own local `key`, and grouping by file called all seven
+  // a duplicate. IDENTIFIERS ARE RESOLVED to what they were assigned, because
+  // two components in `contact-panels.tsx` both read a `listKey` that is
+  // `sliceKey(TICKETS_…)` in one and `sliceKey(MEETINGS_…)` in the other. Both
+  // refinements were earned by a false positive, in that order.
+  it("one-door-per-unit: no component asks one door twice without a reason", () => {
+    const files = [
+      ...sourceFiles([join(WEB, "components"), join(WEB, "lib"), join(WEB, "app")], {
+        extensions: [".ts", ".tsx"],
+        relativeTo: ROOT,
+      }),
+      ...sourceFiles(["lib", "components", "app"].map((d) => join(ROOT, "web-portal", d)), {
+        extensions: [".ts", ".tsx"],
+        relativeTo: ROOT,
+      }),
+    ]
+    expect(files.length, "the read census walked nothing — it has gone blind").toBeGreaterThan(50)
+
+    /** `cond ? KEY : null` is the same question as KEY; a bare identifier is
+     * whatever it was assigned. */
+    const keyOf = (expr: string, src: string): string => {
+      let k = expr.trim()
+      for (let n = 0; n < 4; n++) {
+        const m = /^[\s\S]*?\?\s*([\s\S]+?)\s*:\s*null\s*$/.exec(k)
+        if (!m) break
+        k = m[1].trim()
+      }
+      for (let n = 0; n < 3 && /^[A-Za-z_$][\w$]*$/.test(k); n++) {
+        const a = new RegExp(`\\bconst\\s+${k}\\s*(?::[^=]+)?=\\s*([^\\n]+?)\\s*$`, "m").exec(src)
+        if (!a) break
+        k = a[1].replace(/,$/, "").trim()
+      }
+      return k.replace(/\s+/g, "")
+    }
+
+    const offenders: string[] = []
+    let reads = 0
+    for (const f of files) {
+      const src = f.source
+      if (!src.includes("useCached")) continue
+      // Component boundaries, so a read can be attributed to one.
+      const marks = [...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)|^(?:export\s+)?const\s+(\w+)\s*[:=][^=]*?=>/gm)]
+        .map((m) => ({ at: m.index as number, name: m[1] || m[2] }))
+      const unitAt = (i: number): string => {
+        let cur = { at: -1, name: "<module>" }
+        for (const m of marks) if (m.at <= i && m.at > cur.at) cur = m
+        return cur.name
+      }
+      const seen = new Map<string, { keys: Set<string>; lines: number[] }>()
+      for (const m of src.matchAll(/(?<![A-Za-z])useCached\s*(?:<[\s\S]*?>)?\s*\(/g)) {
+        // Balanced walk, so a key expression holding its own calls or a template
+        // literal cannot fool the argument split.
+        let i = (m.index as number) + m[0].length
+        let depth = 1
+        let splitAt = -1
+        while (i < src.length && depth > 0) {
+          const c = src[i]
+          if (c === "(" || c === "[" || c === "{") depth++
+          else if (c === ")" || c === "]" || c === "}") depth--
+          else if (c === "," && depth === 1 && splitAt === -1) splitAt = i
+          else if (c === "`") {
+            i++
+            let td = 0
+            while (i < src.length) {
+              if (src[i] === "\\") { i += 2; continue }
+              if (src[i] === "`" && td === 0) break
+              if (src[i] === "$" && src[i + 1] === "{") { td++; i += 2; continue }
+              if (src[i] === "}" && td > 0) td--
+              i++
+            }
+          }
+          i++
+        }
+        if (splitAt === -1) continue // a sidecar read: one argument, no fetcher
+        reads++
+        const unit = unitAt(m.index as number)
+        const key = keyOf(src.slice((m.index as number) + m[0].length, splitAt), src)
+        // The DOOR: the receiver and method the fetcher calls. The arguments say
+        // which rows; the receiver and method say which question.
+        const door = /(\w+)\s*\.\s*(\w+)\s*\(/.exec(src.slice(splitAt + 1, i - 1))
+        if (!door) continue
+        const id = `${f.rel}::${unit}::${door[1]}.${door[2]}`
+        const at = seen.get(id) ?? { keys: new Set<string>(), lines: [] }
+        at.keys.add(key)
+        at.lines.push(src.slice(0, m.index as number).split("\n").length)
+        seen.set(id, at)
+      }
+      for (const [id, at] of seen) {
+        if (at.lines.length < 2) continue
+        if (at.keys.size === 1) {
+          // Same key. No exemption exists for this shape.
+          offenders.push(`${id} reads ONE key ${at.lines.length}× (lines ${at.lines.join(", ")}) — the store already dedupes it`)
+        } else if (!TWO_READS_ONE_DOOR[id]) {
+          offenders.push(`${id} asks one door under ${at.keys.size} keys (lines ${at.lines.join(", ")}) — a second request`)
+        }
+      }
+    }
+    expect(
+      offenders,
+      `a component may ask a door once — collapse the read, or add a reasoned TWO_READS_ONE_DOOR line ` +
+        `(same-key reads are never exemptible): ${offenders.join("; ")}`
+    ).toEqual([])
+    // Tripwire: a census that matched no reads passes exactly like a clean one.
+    expect(reads, "the read census found no useCached reads — it has gone blind").toBeGreaterThan(100)
+    // …and the exemptions can only shrink: one whose component no longer asks
+    // twice is a record of an argument nobody is having.
+    const live = new Set<string>()
+    for (const f of files) {
+      const src = f.source
+      for (const id of Object.keys(TWO_READS_ONE_DOOR)) if (id.startsWith(`${f.rel}::`)) live.add(id)
+      void src
+    }
+    const stale = Object.keys(TWO_READS_ONE_DOOR).filter((id) => !live.has(id))
+    expect(stale, `TWO_READS_ONE_DOOR names files that no longer exist: ${stale.join(", ")}`).toEqual([])
   })
 
   // …AND THE WORD IT CARRIES IS AN ADDRESS, NOT A PERMISSION.
@@ -3291,6 +3427,7 @@ describe("RULES — the laws of the base", () => {
       "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
+      "one-door-per-unit", // R52: the read census below, over both front doors, grouped by component and by door
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

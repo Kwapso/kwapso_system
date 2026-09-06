@@ -817,6 +817,11 @@ again, which is the only property that matters here.
   draws nothing at all, create button included. **R51 `aside-collapse`** — a
   panel that minimises collapses; it is never unmounted on the state that
   animates it.
+- **R52 `one-door-per-unit`** — a component asks a door once. Two reads of ONE
+  key is a defect with no exemption (the store dedupes it, so the second buys
+  nothing); two different keys on one door is a real second request and needs a
+  reasoned `TWO_READS_ONE_DOOR` line. A read gated on a permission is the same
+  question as an ungated one, so gating it is not a way out.
 - **R25 `savings-caption`** — a screen that shows a saving renders
   `SAVINGS_CAPTION` word for word.
 
