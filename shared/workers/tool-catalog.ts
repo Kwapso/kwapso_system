@@ -741,14 +741,32 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
     summary:
-      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue.",
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue. GIVE IT A TITLE: `titleDe` and `titleEn` are the two titles a ticket carries, and neither is derived from the other — write the one you have in the language it was asked in, and the other when you have it. A ticket with neither is what a person sees at the top of their list with no name on it.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
-    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["description"]),
+    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["description"]),
     // accountId is read in lib/help.ts, not in the handler, so R22's source scan
     // cannot derive it (see its own note on fields forwarded wholesale to a lib).
     // Exposed by hand, deliberately: without it a machine can only raise tickets
     // that no client will ever see.
-    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    //
+    // AND THE SAME IS TRUE OF THE TITLES, which is how they were missed. Both are
+    // read in lib/help.ts and written straight into `title_de` / `title_en`, so
+    // R22 never saw them and never asked for them — and every ticket a machine
+    // created was TITLELESS, from the day this door shipped. The detail screen
+    // renders `titleDe` as "Title" and `titleEn` as "Title (English)", so what a
+    // person opened was a ticket with no name on it. Neither is derived from the
+    // other on purpose (lib/help.ts's own note: 788 legacy requests exist only in
+    // German), so both are offered and either may be left out.
+    //
+    // WHAT IS STILL DELIBERATELY ABSENT: `sourceScreen`, `sourceRelatedTable` and
+    // `sourceRelatedRowId`. The door reads all three, and they record WHICH SCREEN
+    // a person was looking at when they raised this. A machine has no screen, so a
+    // value here could only be invented — and an invented provenance is worse than
+    // an empty one, because it is indistinguishable from a real one afterwards.
+    // They are absent rather than exempted because R22 cannot see them either:
+    // a NARROWED_BODY_FIELDS line naming a field the census does not report would
+    // fail that law's own rot check. This comment is where the decision lives.
+    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn") }),
     // CONFIRM, because `accountId` decides WHO CAN READ THIS TICKET. Naming a
     // client puts the conversation in their portal — the same order of decision
     // as a permission grant, reached by a model that has been reading ticket text
@@ -759,12 +777,17 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_help_ticket",
     summary:
-      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries.",
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries. `titleDe` and `titleEn` are the ticket's two titles and are corrected the same way — this is how a title is added to a ticket that has none, and how a translated one is filled in beside the original. Leaving one out keeps what is already there, so writing `titleEn` never blanks `titleDe`.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["id", "description"]),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["id", "description"]),
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
-    // derive it. Exposed by hand.
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    // derive it. Exposed by hand — the titles included, and they are the reason
+    // this tool now matters twice over. `translate-ticket` is kept off the machine
+    // surface on the stated grounds that a chat turn can translate a title and
+    // then call THIS tool with `titleEn`; that sentence was written before the
+    // field existed here, so the exclusion rested on a call nobody could make.
+    // The three `source*` fields stay out for the reason create_help_ticket gives.
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn") }),
     // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
     // ticket that had none, and a ticket carries its whole reply history — so one
     // silent call could hand an internal agency conversation to a client's portal.
