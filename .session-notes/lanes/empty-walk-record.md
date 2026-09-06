@@ -34,6 +34,47 @@ is likely several were its doing — but "likely" is not a record, and writing a
 finding list inferred from a git log would be inventing the causal link this
 review exists to catch. If the original message is ever recovered, paste it here.
 
+**One thing does survive, and it is worth exactly what it is worth.** The staging
+account still carries the team that walk stood up: "Empty Walk Team", created
+2026-08-29T12:05:25Z by `empty-walk-1788005117614@resend.dev`, database
+`ef25a6a9-f41e-47b4-b68a-abc63a198eef`, still active. That is not a finding list
+and it must not be read as one — a team name says nothing about what any screen
+showed. What it does do is corroborate, independently of the commit message, that
+the run happened on that date and went through the app's own doors rather than a
+D1 seed. Until it was noticed on 2026-09-06 that claim rested entirely on one
+commit body.
+
+**AND IT SHOWS THE INSTRUMENT LITTERS EVERY TIME IT RUNS.** Found while cleaning
+up after the 2026-09-06 run, which is the only reason anybody looked at the
+account:
+
+```
+2026-08-13  ON   Kwapso                        727537f7-653d-4114-af23-332d1aae0f90
+2026-08-24  ON   Smoke team                    14efdb40-a2c3-4bf9-b4a7-7f9dc84e3465
+2026-08-27  ON   Smoke team                    (no database_id at all)
+2026-08-29  ON   Empty Walk Team               ef25a6a9-f41e-47b4-b68a-abc63a198eef
+2026-09-06  OFF  Empty walk probe 2026-09-06   40135839-ac1a-4ef2-9dd4-d2e77429dd5c
+```
+
+Every walk mints a team, and `createTeam` calls `d1CreateDatabase` — so each run
+leaves a durable database on a Cloudflare account this deployment SHARES with
+other companies. Nothing in the script registers what it created and nothing
+cleans it up; both prior runs were still active when this was written. The
+27 August row is a separate shape again: a team with no `database_id`, i.e. a
+half-created team the smoke suite's own "doesn't litter team databases" promise
+did not cover either.
+
+**So this is a habit of the tool, not a mistake of one run** — which is the whole
+reason it went unnoticed for a week. The fix belongs in the script rather than in
+a line of this runbook asking somebody to remember, for exactly the reason the
+report path taught: an instruction a person has to follow is not a fix. Deferred
+to the next round by the planner, deliberately, rather than bolted on here.
+
+**If you run this walk: it will create a team and a database. Deactivate the team
+and the user afterwards** (`teams.deactivated_at`, `users.deactivated_at`,
+scoped by primary key), and hand the database to the owner — dropping one is
+irreversible and on shared infrastructure, so it is not a session's call.
+
 ## The 2026-09-06 walk — what it found
 
 Run to prove the tracked-report path actually writes, not for a score. **It
