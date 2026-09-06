@@ -36,7 +36,7 @@ import {
   postBatchPlan,
   postBatchStart,
 } from "./routes/import"
-import { getErrors, postResolveError, postSeedTargets } from "./routes/admin"
+import { getErrors, postResolveError, postResolveErrorSignature, postSeedTargets } from "./routes/admin"
 import {
   getAgentThread,
   getAgentThreads,
@@ -83,6 +83,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // private maintainer bookkeeping in the core DB — broadcasts nothing (rule 4).
   "GET /api/data-ops/admin/errors": { handler: getErrors, kind: "read" },
   "POST /api/data-ops/admin/errors/resolve": { handler: postResolveError, kind: "housekeeping" },
+  // Closes a whole CLASS of failure at once, grouped the way the nightly digest
+  // already groups it. Housekeeping like its single-row sibling: the error store
+  // is core-database ops material with no team row to patch and no listener.
+  "POST /api/data-ops/admin/errors/resolve-signature": { handler: postResolveErrorSignature, kind: "housekeeping" },
   "GET /api/data-ops/agent/usage": { handler: getAgentUsage, kind: "read" },
   "GET /api/data-ops/agent/usage-log": { handler: getAgentUsageLog, kind: "read" },
   "POST /api/data-ops/admin/grant-credits": { handler: postGrantCredits, kind: "mutation" },

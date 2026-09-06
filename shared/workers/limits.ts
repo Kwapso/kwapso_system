@@ -474,6 +474,62 @@ export const KNOWLEDGE_EXTRACT_MAX_BYTES = KNOWLEDGE_FILE_MAX_BYTES
  * open. Far deeper than any real org chart. */
 export const MAX_ACCOUNT_DEPTH = 64
 
+/** HOW LONG A PROPOSED DANGEROUS ACT STAYS APPROVABLE.
+ *
+ * The confirm panel exists because some acts are grave enough to stop and ask
+ * about — remove a member, revoke an invite, deactivate a record, set a rate.
+ * The proposal is stored on the assistant's message and the confirm path runs
+ * exactly what was proposed, never what the client sends, which is the half that
+ * was already right.
+ *
+ * What had no bound was TIME. `getPendingProposal` read the most recent
+ * assistant message carrying a proposal, `ORDER BY created_at DESC LIMIT 1`,
+ * with no floor under it — so "remove Jane Doe", proposed on a Tuesday and never
+ * answered, was still one click from running three weeks later. The person
+ * clicking would be answering a question they could not see, in a conversation
+ * they had forgotten, about a team that had moved on. Nothing was broken; it
+ * simply never expired.
+ *
+ * Thirty minutes: far longer than the 150-second turn deadline, so an ordinary
+ * "hang on, let me check" is never punished, and far shorter than a working day,
+ * so a proposal cannot outlive the context that produced it. Past it the panel
+ * finds nothing to run and says so, which is the same answer it already gives
+ * for a proposal somebody else already spent. */
+export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
+
+/** HOW MANY TIMES A SOURCE IS RE-EMBEDDED BEFORE THE SWEEP GIVES UP ON IT.
+ *
+ * `embed` is best-effort on purpose: an embedding failure must not lose the
+ * material, so a failed batch stores NULL vectors, `indexSource` blanks the
+ * content hash, and the next sweep picks the source up again. That self-healing
+ * is right and it had no floor — a source that fails REPEATABLY was re-read and
+ * re-sent to the model every fifteen minutes for ever, writing the same error
+ * row each time, until somebody happened to look.
+ *
+ * Five, and it is per TEXT rather than per source: the counter resets the moment
+ * a source's title or body changes (the upsert in knowledge-ingest.ts does it),
+ * so a document somebody fixes is tried again immediately and a document nobody
+ * touches stops costing a model call every quarter of an hour. Five ticks is
+ * seventy-five minutes of a transient Workers AI wobble, which is far longer
+ * than any outage this has actually seen.
+ *
+ * The same shape and the same reasoning as TRANSCRIPT_ATTEMPT_CAP next door. */
+export const EMBED_ATTEMPT_CAP = 5
+
+/** Open error rows one "resolve this whole failure" call will look at.
+ *
+ * The scan cannot be a WHERE clause — the volatile reference inside a message is
+ * normalised by a JavaScript regex and SQLite has no REGEXP — so the rows come
+ * back and are folded in the worker. 500 is comfortably more than any real
+ * signature's open tail (the live store held 5,086 rows across 109 distinct
+ * messages on 2026-09-05, and its single largest signature was 1,728 over three
+ * weeks, of which the OPEN ones are a fraction), and it is small enough that the
+ * read stays one indexed page.
+ *
+ * Past it the door says `capped: true` and the caller runs it again, rather than
+ * reporting a number that reads as "finished". */
+export const RESOLVE_SCAN_CAP = 500
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing

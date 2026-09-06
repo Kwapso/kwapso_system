@@ -69,11 +69,19 @@
   "ratelimits": [
     { "name": "CALLER_LIMIT", "namespace_id": "1102", "simple": { "limit": 600, "period": 60 } }
   ],
-  // AGENT_FREE_DAILY / AGENT_NO_DAILY_CAP are the TEAM'S ONE AI allowance, and they
-  // are here because this worker spends it too — writing out the answer a question
-  // found (R23). They must match data-ops' values exactly; credits-invariant.test.ts
-  // compares the two files, because one allowance enforced at two different heights
+  // AGENT_FREE_DAILY is the TEAM'S ONE AI allowance, and it is here because this
+  // worker spends it too — writing out the answer a question found (R23). It must
+  // match data-ops' and tenancy's values exactly; credits-invariant.test.ts
+  // compares all three, because one allowance enforced at three different heights
   // is a bug nobody sees until somebody runs out twice.
+  //
+  // AGENT_NO_DAILY_CAP IS GONE FROM STAGING (2026-09-06). It did not raise the
+  // ceiling, it removed it, and staging is no longer one person trying a screen —
+  // so a looping client could have spent the account to zero with the meter
+  // measuring happily and nothing able to say no. Staging now carries a real
+  // number that is simply high: 2,000 a team a day, about forty times a heavy
+  // testing day and about $69 at COSTS.md's per-step price. The reasoning, the
+  // arithmetic and what would change our mind are in credits-invariant.test.ts.
   //
   // THE TWO FRONT DOORS, AS CONFIGURATION. This worker's emails link a staff
   // member into the agency app and a CLIENT into the portal, and neither hostname
@@ -147,8 +155,7 @@
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
         "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
         "PUBLIC_PORTAL_URL": "https://staging-client.kwapso.app",
-        "AGENT_FREE_DAILY": "50",
-        "AGENT_NO_DAILY_CAP": "true",
+        "AGENT_FREE_DAILY": "2000",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
       }
     }

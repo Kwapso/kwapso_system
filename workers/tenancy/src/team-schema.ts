@@ -4045,6 +4045,31 @@ CREATE INDEX IF NOT EXISTS idx_activity_actor_feed ON activity (creator_id, crea
 ALTER TABLE data_import_batches ADD COLUMN cursor_json TEXT;
 `,
   },
+  {
+    // A SOURCE THAT CANNOT BE EMBEDDED STOPS BEING RETRIED FOR EVER.
+    //
+    // `embed` is best-effort by design and rightly so: an embedding failure must
+    // not lose the material, so a failed batch stores NULL vectors and leaves
+    // `content_hash` un-stamped. The sweep's skip is "hash matches AND indexing
+    // finished", so an un-stamped source is picked up again — every fifteen
+    // minutes, for ever, with no counter anywhere and nothing that could ever
+    // say "this one is not going to work".
+    //
+    // For a transient Workers AI wobble that is exactly right, and it is why the
+    // retry exists. For a source that fails REPEATABLY — text the model refuses,
+    // a size that always times out — it is a billed call every tick until
+    // somebody notices, and the error row it writes says the same thing each
+    // time, so the ninety-day log fills with one sentence.
+    //
+    // `transcript_attempts` on meetings is the same shape and the precedent
+    // (TRANSCRIPT_ATTEMPT_CAP): count the tries, stop at a cap, leave the row and
+    // its words alone. NOT NULL DEFAULT 0 so every existing row starts with a
+    // clean slate — the honest value, since nothing before today counted.
+    version: "0064_an_unembeddable_source_stops_being_retried",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN embed_attempts INTEGER NOT NULL DEFAULT 0;
+`,
+  },
 ]
 
 export type Actor = { id: string; email: string; name: string }

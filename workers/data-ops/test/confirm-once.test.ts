@@ -42,6 +42,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import { confirmAndRun } from "../src/lib/agent"
 import { appendMessage, createThread, getPendingProposal } from "../src/lib/threads"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { AGENT_PROPOSAL_TTL_MS } from "@shared/workers/limits"
 
 const lib = (name: string) => readFileSync(join(__dirname, "..", "src", "lib", name), "utf8")
 const threads = lib("threads.ts")
@@ -240,5 +241,60 @@ describe('a declined proposal is spent — "no" is durable', () => {
       "There's nothing waiting for your approval."
     )
     expect(storedStatuses(threadId)).toEqual(["done"])
+  })
+})
+
+/* ------------------------ …and a proposal that went stale ------------------ */
+//
+// The gate had one more hole and it was TIME. `getPendingProposal` read the most
+// recent assistant row carrying a proposal, `ORDER BY created_at DESC LIMIT 1`,
+// with no floor under it — so a dangerous call proposed on a Tuesday and never
+// answered stayed one click from running for ever. The person clicking would be
+// answering a question they could not see, about a team that had moved on.
+//
+// BEHAVIOURAL, against the real schema, for the same reason the decline half is:
+// the bound lives inside a SQL string, and a source-reading test that greps for
+// `created_at >` would pass just as happily on a statement that compared it to
+// the wrong thing.
+
+describe("a proposal expires — an unanswered yes/no cannot run for ever", () => {
+  /** Age the proposing row by hand. `AGENT_PROPOSAL_TTL_MS` is what the code
+   * uses, so the test moves with the constant instead of pinning a number. */
+  function ageProposal(threadId: string, byMs: number): void {
+    const at = new Date(Date.now() - byMs).toISOString()
+    db()
+      .prepare(
+        "UPDATE agent_messages SET created_at = ? WHERE thread_id = ? AND role = 'assistant' AND tool_calls_json IS NOT NULL"
+      )
+      .run(at, threadId)
+  }
+
+  it("one minute inside the window is still approvable", async () => {
+    const threadId = await threadAwaitingAnswer()
+    ageProposal(threadId, AGENT_PROPOSAL_TTL_MS - 60_000)
+    expect(
+      (await getPendingProposal(cfg, guard, threadId)).map((p) => p.name),
+      "a proposal inside the window must survive — the fix must not deafen an ordinary pause"
+    ).toEqual(["grant_portal_access"])
+  })
+
+  it("one minute past it is gone", async () => {
+    const threadId = await threadAwaitingAnswer()
+    ageProposal(threadId, AGENT_PROPOSAL_TTL_MS + 60_000)
+    expect(
+      await getPendingProposal(cfg, guard, threadId),
+      "a stale proposal must read as nothing pending"
+    ).toEqual([])
+  })
+
+  it("and approving a stale one reaches no door at all", async () => {
+    const threadId = await threadAwaitingAnswer()
+    ageProposal(threadId, AGENT_PROPOSAL_TTL_MS + 60_000)
+    await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })
+    // The claim is the empty door log, not the wording: a stale "yes" must not
+    // grant a portal login.
+    expect(doorCalls, "a stale approval must execute nothing").toEqual([])
+    // …and the row is left as it was, so nothing pretends this was carried out.
+    expect(storedStatuses(threadId)).toEqual(["proposed"])
   })
 })

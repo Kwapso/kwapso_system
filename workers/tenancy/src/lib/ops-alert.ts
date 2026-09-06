@@ -50,6 +50,7 @@ import {
   OPS_QUOTA_TEAM_CAP,
   OPS_SIGNATURE_CAP,
 } from "@shared/workers/limits"
+import { foldSignature, SIGNATURE_SQL } from "@shared/workers/error-signature"
 import { sendBrandedEmail } from "@shared/workers/notify"
 import { aiCostUsd, usd } from "@shared/workers/pricing"
 import { brand } from "@shared/brand"
@@ -72,46 +73,13 @@ const SPIKE_FLOOR = 10
  * their head. */
 const QUOTA_WARN_AT = 0.8
 
-/** HOW A FAILURE IS IDENTIFIED ACROSS TWO NIGHTS.
- *
- * A signature is the worker plus the first 80 characters of the message. Not the
- * `place`, which carries record ids on the cron rows and would make every team's
- * copy of one outage a different failure; not the whole message, for the same
- * reason. Measured against the live store: 5,086 rows collapse to 109 distinct
- * messages, so the prefix is already doing the discriminating and 80 characters
- * is comfortably inside the shortest of them.
- *
- * Computed in SQL so the grouping happens in the database rather than over five
- * thousand rows in a worker. */
-const SIGNATURE_SQL = `source || ' · ' || substr(message, 1, 80)`
-
-/** …AND THE HALF SQLITE CANNOT DO.
- *
- * Grouping on the message prefix is right and it is not enough, because plenty
- * of failures carry an ID INSIDE the first eighty characters. Measured against
- * the live store on 2026-09-05, the day before this shipped:
- *
- *     content · Error: D1_ERROR: internal error; reference = vf4c1
- *     content · Error: D1_ERROR: internal error; reference = p333t
- *     content · Error: D1_ERROR: internal error; reference = oa3pj
- *     …three more
- *
- * One fault. Six "new signatures", six lines in the mail, every night it
- * recurred — which is the noise this digest exists NOT to be. SQLite has no
- * REGEXP, so the grouping stays in the database (it is what bounds the rows
- * read) and the FOLDING happens here, over the handful of groups that came back.
- *
- * The rule is narrow on purpose: a run of four or more characters that mixes
- * LETTERS AND DIGITS is an identifier, not a word — no English word looks like
- * that — and a run of two or more digits is a count or an id. Ordinary prose
- * survives untouched, which is what keeps two genuinely different failures from
- * collapsing into one. */
-export function foldSignature(sig: string): string {
-  return sig
-    .replace(/\b(?=[a-z]*\d)(?=\d*[a-z])[a-z0-9]{4,}\b/gi, "#")
-    .replace(/\d{2,}/g, "#")
-    .replace(/#(?:[\s:_-]*#)+/g, "#")
-}
+/** HOW A FAILURE IS IDENTIFIED — both halves, and now in shared/ because a
+ * second worker needs the identical answer. data-ops' error store resolves a
+ * whole class of failure at once and has to group rows exactly the way this mail
+ * groups them, or the digest reports a signature the resolve door cannot find.
+ * `shared/workers/error-signature.ts` carries the reasoning and the measurement;
+ * re-exported here because this is still where the grouping is SPENT. */
+export { foldSignature, SIGNATURE_SQL } from "@shared/workers/error-signature"
 
 export type Signature = { sig: string; n: number }
 

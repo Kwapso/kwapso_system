@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest"
 
 import { getTool, requiresConfirm, toolSpecs, TOOL_CATALOG } from "../src/lib/tools"
-import { isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
+import { isMoneyWrite, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
 
 describe("step/confirm summaries resolve ids to human names", () => {
   const names = { "01ROLE": "Sub Admin", "01USER": "Jane Doe" }
@@ -91,6 +91,46 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
     // …and the derivation must not sweep up ordinary content writes.
     for (const name of RUNS_FREELY)
       expect(isPrivilegeWrite(getTool(name)!), `${name} is not a privilege write`).toBe(false)
+  })
+
+  // THE SAME DERIVATION, ONE STEP ALONG. A privilege write decides who may act;
+  // a RATE CARD write decides what an hour is worth. Both are wrong quietly —
+  // and a wrong rate is the quieter of the two, because it returns success and
+  // re-prices every margin computed after it.
+  //
+  // Derived, never a name list, for the reason the test above it gives. It was
+  // worth it: six of the seven `commercials` writes declared confirm:true and
+  // `set_role_rate` — the third rate card, added after the other two — declared
+  // false, with nothing to catch that it had been added differently.
+  it("confirms every write that sets a rate — derived from the catalog", () => {
+    const money = TOOL_CATALOG.filter((t) => isMoneyWrite(t))
+    expect(money.length, "the derivation must actually find the rate writes").toBeGreaterThanOrEqual(5)
+    for (const t of money) {
+      expect(
+        t.confirm,
+        `${t.name} writes a rate card (${TOOL_GATES[t.name]}) — it must DECLARE confirm: true, not a predicate and not false`
+      ).toBe(true)
+      expect(requiresConfirm(t, { active: true }), `${t.name} must confirm whatever its input`).toBe(true)
+      expect(requiresConfirm(t, { active: false }), `${t.name} must confirm whatever its input`).toBe(true)
+    }
+    // …and it must not sweep up a price that is NOT a rate card. A client tool's
+    // price is `processes`, deliberately — a fact about one client's setup, not
+    // a card the whole book is costed from. If that line ever moves, this fails
+    // and somebody decides on purpose.
+    expect(isMoneyWrite(getTool("set_client_tool_price")!), "a tool price is processes, not commercials").toBe(false)
+    expect(isMoneyWrite(getTool("update_team")!), "the derivation must not sweep up ordinary writes").toBe(false)
+  })
+
+  // The other half of the same slip, and the one that cost money rather than a
+  // panel: a missing `centsPerHour` used to coerce to 0, which is a VALID rate.
+  // The call succeeded and priced the role at nothing.
+  it("a rate write with no number sends undefined, so the door can refuse it", () => {
+    const build = getTool("set_role_rate")!.buildBody!
+    expect(build({ roleName: "Bookkeeper", active: true }).centsPerHour).toBeUndefined()
+    expect(build({ roleName: "Bookkeeper", centsPerHour: 4500, active: true }).centsPerHour).toBe(4500)
+    // Zero is still sendable when it is MEANT — the fix must not make a free
+    // role unpriceable.
+    expect(build({ roleName: "Volunteer", centsPerHour: 0, active: true }).centsPerHour).toBe(0)
   })
 
   it("every OTHER constructive write still runs freely (the friction stays gone)", () => {

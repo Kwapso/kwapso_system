@@ -325,6 +325,7 @@ Start with **[README.md](README.md)** (the doc map), then:
 - **[CACHING.md](documents/CACHING.md)**, cache-first + row-level live-sync (every screen follows it).
 - **[CONCURRENCY.md](documents/CONCURRENCY.md)**, race-safety (atomic writes, unique indexes, when a Durable Object is the lock).
 - **[ERROR-HANDLING.md](documents/ERROR-HANDLING.md)**, the one logging seam, the error boundary, never-swallow.
+- **[COSTS.md](documents/COSTS.md)**, what this app costs to run: every surface that bills, what one agent reply / signup / import actually costs with the arithmetic shown, and the prices with their sources and the date each was read. Prices live in `shared/workers/pricing.ts`, never in a comment. Read it before adding anything that spends — a model call, an email, a cron, or a stored file.
 - **[DATA-MODEL.md](documents/DATA-MODEL.md)**, every table (global core + per-team).
 - **[SEARCH.md](documents/SEARCH.md)**, the layered search / filter model.
 - **[ROADMAP.md](documents/ROADMAP.md)**. HISTORY, not a plan: the build record of the Phase-C round (closed 2026-07-02) and the contracts its phases plugged into. Don't read it for current state, that's README.md → BASE-MANUAL.md. Open work lives beside the thing it's open on (UI-GAPS.md, EDGE-CASES.md, AGENT-MODULES-PLAN.md, BASE-IMPROVEMENTS.md).

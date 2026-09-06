@@ -218,16 +218,36 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
    *
    * `toolSpecs(held)` keeps a tool with no declared gate, fail-open and
    * deliberately (tools.ts says why). So an UNGATED tool is sent to every caller
-   * whatever their role, and the ungated set is the floor the trim can never go
-   * below. Measured the same day: 52 of 165, which is 63,659 characters — half
-   * the preamble, paid for by a caller holding no rights at all.
+   * whatever their role, and the ungated set is the floor the RIGHTS trim can
+   * never go below. Measured the same day: 52 of 165, which is 63,659 characters
+   * — half the preamble, paid for by a caller holding no rights at all.
+   *
+   * THAT FLOOR IS NO LONGER THE BILL, and the distinction matters when reading
+   * this number. Since the two-stage catalogue (2026-09-06) a step sends the
+   * CORE tools plus an index of names, so the ungated count is what a caller may
+   * reach rather than what is re-sent every step. It is still worth ratcheting:
+   * an ungated tool is one nobody has classified, and the rights trim is what
+   * keeps a caller from being shown a door that would refuse them.
    *
    * A ratchet DOWNWARD. R36's `offered-rights` is already pushing this number
    * down by making an unoffered right a build failure; this stops it climbing
    * back while nobody is looking, which is the only way it ever moved. */
   it("the ungated set — sent to everybody, whatever their rights — does not grow", () => {
     const ungated = toolSpecs(new Set<string>())
-    const UNGATED_CEILING = 52
+    // 52 → 53 on 2026-09-06, and this is the one kind of increase the ratchet is
+    // meant to allow: `load_tools` carries no gate because it touches no door.
+    // It reads this repo's own catalogue and returns DESCRIPTIONS — no row, no
+    // record, nothing belonging to a team — and every tool it hands over still
+    // runs through its own gated door as the caller. There is no right it could
+    // sensibly demand.
+    //
+    // It also pays for itself several hundred times over, which is why raising
+    // the ceiling for it is not the failure the ceiling exists to catch: it is
+    // the tool that stops the other 159 being sent at all. Same day, same
+    // script (`node scripts/measure-preamble.mjs`): a step went from 133,505
+    // characters to 40,334 — 34,928 tokens to 10,552, a 69.8% cut — and the
+    // number this ceiling guards is the one that got 677 characters bigger.
+    const UNGATED_CEILING = 53
     expect(
       ungated.map((t) => t.name).sort(),
       `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +

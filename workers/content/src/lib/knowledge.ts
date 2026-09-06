@@ -1415,7 +1415,7 @@ export async function indexSource(
   sourceId: string,
   opts: { force?: boolean; slices?: number } = {}
 ): Promise<IndexProgress> {
-  const rows = await d1Query<SourceRow & { content_hash: string | null }>(
+  const rows = await d1Query<SourceRow & { content_hash: string | null; embed_attempts: number }>(
     cfg,
     guard.databaseId,
     // `file_url` rides along because `indexableText` needs it: a file with no
@@ -1423,7 +1423,7 @@ export async function indexSource(
     // with no body" is the difference between a note somebody left blank and a
     // document we could not read.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
-            owner_user_id, content_hash, chunk_count, indexed_chunks, deactivated_at, created_at
+            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1560,8 +1560,27 @@ export async function indexSource(
     "SELECT COUNT(*) AS n FROM knowledge_chunks WHERE source_id = ? AND embedding IS NOT NULL",
     [sourceId]
   )
+  // …AND THE ATTEMPT IS COUNTED HERE, in the same branch, because this is the
+  // one place that knows the difference between "indexed" and "indexed with no
+  // vectors". Blanking the hash is what makes the next sweep retry; the counter
+  // is what stops that retry being for ever (EMBED_ATTEMPT_CAP — a source that
+  // fails repeatably was costing a model call every fifteen minutes and writing
+  // the same error row each time). One statement either way, on the path that
+  // already writes one.
   if (!(embedded[0]?.n ?? 0))
-    await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET content_hash = NULL WHERE id = ?", [sourceId])
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      "UPDATE knowledge_sources SET content_hash = NULL, embed_attempts = embed_attempts + 1 WHERE id = ?",
+      [sourceId]
+    )
+  // A source that DID embed starts again from zero, so a run of transient
+  // failures followed by a success cannot leave a source one wobble away from
+  // being given up on months later.
+  else if (source.embed_attempts > 0)
+    await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET embed_attempts = 0 WHERE id = ?", [
+      sourceId,
+    ])
 
   return { total, indexed: from, done: from >= total }
 }
