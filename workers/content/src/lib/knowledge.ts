@@ -2038,7 +2038,7 @@ const EXACT_TERM_MAX_CHUNKS = 100
  * and the words inside a quoted phrase are ordinary words: letting `forms` out of
  * "gravity forms" waive the floor would reinstate the coincidence the floor
  * exists to refuse. */
-export function exactTerms(question: string): string[] {
+function exactTerms(question: string): string[] {
   return questionTerms(question, MAX_QUESTION_TERMS).filter((t) => /\d/.test(t))
 }
 

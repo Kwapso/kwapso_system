@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+
+import { doorSource } from "./doors"
 
 import { stripComments } from "@shared/rules/source-scan"
 
@@ -22,7 +22,10 @@ import { stripComments } from "@shared/rules/source-scan"
 // straight to 500. So adding validation WITHOUT that branch would have turned
 // each intended 400 into exactly the 500 the validation existed to prevent.
 
-const SRC = readFileSync(join(__dirname, "../src/index.ts"), "utf8")
+// The whole DOOR SURFACE, not one file: the handlers live under routes/ since
+// 6 Sep 2026 and this assertion is about where a body field is validated, not
+// about which module holds the handler. See test/doors.ts.
+const SRC = doorSource()
 
 /** Comment-stripped source: a rule satisfied by prose is not satisfied. The ONE
  * stripper (shared/rules/source-scan.ts) — this file used to carry its own, a

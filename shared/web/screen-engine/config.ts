@@ -117,7 +117,7 @@ export interface FieldValidation {
   pattern: string
 }
 
-export const defaultFieldValidation: FieldValidation = {
+const defaultFieldValidation: FieldValidation = {
   min: null,
   max: null,
   minLength: null,

@@ -146,7 +146,7 @@ const NOBODY = "__none__"
  * as the fallback while that read is in flight or a team has retired the lot.
  * The mark rides the label, never the stored value — a stage is its WORD, and
  * the pictograph is a mark in an icon slot (UI-CONVENTIONS §5). */
-export function useAppStages(teamId: string): { value: string; mark: string }[] {
+function useAppStages(teamId: string): { value: string; mark: string }[] {
   const valuesQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () => listFetch.selectable(teamId))
   const rows = (valuesQ.data ?? [])
     .filter((v) => v.active && v.type === SELECTABLE_GROUPS.appStage)

@@ -55,7 +55,7 @@ export const KNOWLEDGE_ASK_TOOL = "ask_knowledge"
 /** A citation mark in a reply: `[[src:<sourceId>]]`. The id is a ULID the door
  * handed back, so the character class is deliberately narrow — anything else is
  * left in the text as the model wrote it rather than being half-recognised. */
-export const CITE_MARK = /\[\[src:([A-Za-z0-9_-]{1,64})\]\]/g
+const CITE_MARK = /\[\[src:([A-Za-z0-9_-]{1,64})\]\]/g
 
 /** One run of a reply: prose, or a mark naming the source it stands on. */
 export type CiteSegment = { t: "text"; text: string } | { t: "cite"; sourceId: string }

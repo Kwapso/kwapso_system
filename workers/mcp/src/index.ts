@@ -22,165 +22,55 @@
 // settings screen refetches synchronously after each action; no other member can
 // see it), the same reviewed class as auth's session rows. Tool calls themselves
 // mutate nothing here — the REAL doors they forward to publish their own pings.
+//
+// WHY THERE IS A ROUTES TABLE HERE NOW (6 Sep 2026). This worker used to route
+// with a `switch (route)` and keep its handlers in this file. Nothing was wrong
+// with the routing; what was wrong is that the two laws every other worker is
+// held to — R1 (every mutation publishes) and R10 (every write gates) — are
+// enforced by a scanner that walks a ROUTES table and a routes/ directory, so
+// this surface could only be checked by a private regex that parsed its own
+// switch. A private copy of a security check is one check and one thing that
+// looks like it. Same doors, same order, same behaviour; the shape is now the
+// one the seam suites can read.
 
 import { fail, json } from "@shared/workers/http"
 import { healthBody } from "@shared/workers/config-health"
-import { GuardError, whoAmI } from "@shared/workers/gating"
-import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
-import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
+import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer } from "@shared/workers/parallel"
 import type { Env } from "./env"
-import { createToken, listTokens, revokeToken, verifyToken } from "./lib/tokens"
-import { dropCachedSession, sessionCookieFor } from "./lib/bridge"
-import { requireStaff } from "./lib/staff"
-import { forwardTool, getMcpTool, MCP_TOOLS } from "./lib/tools"
-import { brand } from "@shared/brand"
+import { handleMcp } from "./routes/mcp"
+import { getTokens, postToken, postRevoke } from "./routes/tokens"
 
-const PROTOCOL_VERSION = "2025-06-18"
-
-/* ------------------------------- JSON-RPC bits ------------------------------- */
-
-type RpcRequest = { jsonrpc?: string; id?: number | string | null; method?: string; params?: Record<string, unknown> }
-
-const rpcResult = (id: number | string | null, result: unknown) =>
-  json({ jsonrpc: "2.0", id, result })
-const rpcError = (id: number | string | null, code: number, message: string) =>
-  json({ jsonrpc: "2.0", id, error: { code, message } })
-
-/** One MCP request: verify the bearer token, dispatch the method. Stateless —
- * no server-held MCP session; every request re-verifies the token (so a revoke
- * bites immediately) and rides a cached-or-fresh team-pinned session cookie. */
-async function handleMcp(request: Request, env: Env): Promise<Response> {
-  const bearer = (request.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "")
-  if (!bearer)
-    return fail(401, "no_token", "Send a personal access token: Authorization: Bearer <token>.")
-  const token = await verifyToken(env, bearer)
-
-  // THE MACHINE SURFACE'S OWN CEILING, spent per TOKEN OWNER and separately from
-  // their budget inside the app (rate-limit.ts). It sits here because this is where
-  // the caller becomes known, exactly as `teamContext` is that point for the app —
-  // and it is worth having on top of the per-worker budgets behind it, because one
-  // JSON-RPC call can become several forwarded door calls: refusing the loop at the
-  // front is cheaper than refusing each of its consequences.
-  if (!(await callerHasBudget(env, token.user_id, "machine")))
-    throw new GuardError(429, "too_many_requests", TOO_FAST)
-
-  const rpc = (await request.json().catch(() => null)) as RpcRequest | null
-  if (!rpc || rpc.jsonrpc !== "2.0" || typeof rpc.method !== "string")
-    return rpcError(null, -32600, "Expected a JSON-RPC 2.0 request.")
-  const id = rpc.id ?? null
-
-  switch (rpc.method) {
-    case "initialize":
-      return rpcResult(id, {
-        protocolVersion: PROTOCOL_VERSION,
-        capabilities: { tools: {} },
-        serverInfo: { name: `${brand.name}-mcp`, version: "1.0.0" }, // brand-derived; kwapso's value unchanged
-        instructions:
-          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
-      })
-    case "notifications/initialized":
-      return new Response(null, { status: 202 })
-    case "ping":
-      return rpcResult(id, {})
-    case "tools/list":
-      return rpcResult(id, {
-        tools: MCP_TOOLS.map((t) => ({
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema,
-        })),
-      })
-    case "tools/call": {
-      const name = String(rpc.params?.name ?? "")
-      const tool = getMcpTool(name)
-      if (!tool) return rpcError(id, -32602, `No such tool: ${name}.`)
-      const input = (rpc.params?.arguments ?? {}) as Record<string, unknown>
-      const trace = requestId(request)
-      const cookie = await sessionCookieFor(env, token, trace)
-      const out = await forwardTool(env, tool, input, cookie, trace)
-      return rpcResult(id, {
-        content: [{ type: "text", text: out.text }],
-        isError: !out.ok,
-      })
-    }
-    default:
-      return rpcError(id, -32601, `Unknown method: ${rpc.method}.`)
-  }
+/**
+ * Every door on this worker, tagged with the class it answers to.
+ *
+ *   • "read"        — a GET; changes nothing, broadcasts nothing.
+ *   • "mutation"    — a write other clients can see, so it MUST broadcast a ping.
+ *   • "housekeeping" — the reviewed deny-list: a write that intentionally
+ *                      broadcasts NOTHING.
+ *
+ * THIS WORKER HAS NO MUTATIONS, and that is a statement rather than an
+ * oversight. `POST /mcp` writes nothing here at all: it forwards a tool call to
+ * a REAL door on content or tenancy, and that door gates, writes and publishes
+ * its own ping on the way through. The two token writes change a row only the
+ * caller can ever see, in the core DB, on a screen that refetches synchronously
+ * — the same reviewed class as auth's session rows (CLAUDE.md, R1's exceptions).
+ */
+type RouteKind = "read" | "mutation" | "housekeeping"
+type Handler = (request: Request, env: Env) => Promise<Response>
+export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
+  // The machine surface itself. Housekeeping: it publishes nothing because it
+  // writes nothing — every write it causes happens behind a gated door that
+  // publishes for itself.
+  "POST /mcp": { handler: handleMcp, kind: "housekeeping" },
+  "GET /api/mcp/tokens": { handler: getTokens, kind: "read" },
+  // Caller-private token rows: see the note on this table.
+  "POST /api/mcp/tokens": { handler: postToken, kind: "housekeeping" },
+  "POST /api/mcp/tokens/revoke": { handler: postRevoke, kind: "housekeeping" },
 }
-
-/* ----------------------------- token management ----------------------------- */
-
-/** The signed-in caller (session cookie via the gateway) — token management is a
- * HUMAN action from the app, never available to a bearer token itself. */
-async function requireUser(request: Request, env: Env) {
-  const user = await whoAmI(request, env)
-  if (!user) throw new GuardError(401, "signed_out", "Not signed in.")
-  return user
-}
-
-async function getTokens(request: Request, env: Env): Promise<Response> {
-  const user = await requireUser(request, env)
-  const rows = await listTokens(env, user.id)
-  return json({
-    tokens: rows.map((t) => ({
-      id: t.id,
-      label: t.label,
-      teamId: t.team_id,
-      createdAt: t.created_at,
-      // A token expires (0016). The screen shows the deadline, so "active" on
-      // this list means usable — not merely un-revoked.
-      expiresAt: t.expires_at,
-      lastUsedAt: t.last_used_at,
-      revokedAt: t.revoked_at,
-    })),
-  })
-}
-
-async function postToken(request: Request, env: Env): Promise<Response> {
-  const user = await requireUser(request, env)
-  if (!user.currentTeamId)
-    return fail(409, "no_team", "Pick a team first, a token is pinned to one team.")
-  // A CLIENT LOGIN MINTS NOTHING. They are a team member by construction, so
-  // "signed in" was never the question — see lib/staff.ts. Asked with the
-  // caller's OWN cookie, before the label is even read.
-  await requireStaff(env, request.headers.get("Cookie") ?? "", requestId(request))
-  const body = (await request.json().catch(() => ({}))) as { label?: unknown }
-  const label = requireText(body.label, "Name", TEXT_LIMITS.short)
-  const { row, secret } = await createToken(env, user.id, user.currentTeamId, label)
-  // The ONE time the secret leaves the server.
-  return json({
-    token: {
-      id: row.id,
-      label: row.label,
-      teamId: row.team_id,
-      createdAt: row.created_at,
-      expiresAt: row.expires_at,
-    },
-    secret,
-  })
-}
-
-async function postRevoke(request: Request, env: Env): Promise<Response> {
-  const user = await requireUser(request, env)
-  // R20, properly. This used to be a cast plus `if (!body.id)` — the two shapes
-  // the law names as NOT checks. A truthiness guard passes `{}`, `[]` and `1`,
-  // and an object then reaches D1's `.bind()` in revokeToken, which raises a type
-  // error: a 500 and a global error_logs row, per request, from any session. The
-  // RAW_BODY_EXEMPT line that covered this said "an unrecognised value refuses
-  // rather than reaching anything", which was true of a wrong STRING and false of
-  // a wrong TYPE — the distinction the law exists for.
-  const body = (await request.json().catch(() => ({}))) as { id?: unknown }
-  const id = requireText(body.id, "Token", TEXT_LIMITS.short)
-  await revokeToken(env, user.id, id)
-  dropCachedSession(id)
-  return json({ ok: true })
-}
-
-/* --------------------------------- switchboard -------------------------------- */
 
 export default {
   async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
@@ -194,12 +84,21 @@ export default {
     // outlive the answer instead of delaying it (shared/workers/parallel.ts).
     canDefer(request, ctx)
     try {
-      const res = await handle(route, request, env)
-      // No ROUTES table here either, so the method decides the class: `POST /mcp`
-      // carries a whole tool call and answers to the write budget, the token
-      // reads to the read budget.
-      logIfSlow(request, route, undefined, env.DB)
-      return withTiming(request, res)
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      // Outside the table for the same reason data-ops keeps its health door
+      // outside: a probe that must answer while a binding is missing cannot be
+      // dispatched through machinery that depends on those bindings.
+      if (route === "GET /api/mcp/health")
+        return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
+      const def = ROUTES[route]
+      if (!def) return fail(404, "not_found", "No such MCP action.")
+      const res = await def.handler(request, env)
+      // The route's OWN tag decides which budget it answers to (limits.ts) —
+      // one place a route's class is declared, and the measurement follows it.
+      // Before the table, the METHOD decided, which put `POST /mcp` and a token
+      // revoke on the same budget though one carries a whole tool call.
+      logIfSlow(request, route, def.kind, env.DB)
+      return withTiming(request, res, def.kind)
     } catch (e) {
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
@@ -215,24 +114,3 @@ export default {
     }
   },
 } satisfies ExportedHandler<Env>
-
-/** The routing switch, lifted out of `fetch` so the dispatcher can hold the
- * answer for a moment and measure it (timing.ts) — the same shape auth uses,
- * for the same reason. */
-async function handle(route: string, request: Request, env: Env): Promise<Response> {
-  switch (route) {
-    case "POST /mcp":
-      return await handleMcp(request, env)
-    case "GET /api/mcp/tokens":
-      return await getTokens(request, env)
-    case "POST /api/mcp/tokens":
-      return await postToken(request, env)
-    case "POST /api/mcp/tokens/revoke":
-      return await postRevoke(request, env)
-    case "GET /api/mcp/health":
-      // What this worker cannot work without, answered by NAME (config-health.ts).
-      return json(healthBody("mcp", env, ["DB", "AUTH", "CONTENT", "TENANCY", "INTERNAL_KEY"]))
-    default:
-      return fail(404, "not_found", "No such MCP action.")
-  }
-}

@@ -212,7 +212,7 @@ export function waveTimelineWindow(
 /** Page one of the team's waves, priming the exact server total the heading
  * badges (R16). One fetcher, so the badge and the rows always came from the same
  * round trip. */
-export function fetchWaves(teamId: string): Promise<Wave[]> {
+function fetchWaves(teamId: string): Promise<Wave[]> {
   return wavesApi.list().then((r) => {
     primeCache(totalKey("waves", teamId), r.total)
     return r.waves

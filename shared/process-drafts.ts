@@ -34,7 +34,7 @@ import type { FrequencyPeriod } from "./workers/savings"
  * dispatch clerk rather than the adjuster, or in the spreadsheet rather than the
  * inbox, is an inference — the same sentence supports several readings, and the
  * one the model picked is the one worth doubting on its own. */
-export const DRAFT_KINDS = ["steps", "roles", "tools"] as const
+const DRAFT_KINDS = ["steps", "roles", "tools"] as const
 export type DraftKind = (typeof DRAFT_KINDS)[number]
 
 /** ONE PROPOSED STEP.

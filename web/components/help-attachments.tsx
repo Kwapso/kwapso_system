@@ -51,6 +51,8 @@ import { ApiFailure, content as contentApi } from "@/lib/api"
 import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { safeHref } from "@shared/web/rich-text"
+
+import { isFollowable, MAX_SIZE_LABEL, spellSize } from "@/lib/attachments"
 import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import { helpAttachmentsKey } from "@/lib/live-resources"
@@ -58,36 +60,6 @@ import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import { useLanguage } from "@shared/web/language"
 import { useConfirm } from "@shared/web/use-confirm"
 
-/** WILL WE PUT THIS IN AN `href`? (The seam that answers it is `safeHref`; this
- * says which of ITS answers this screen also accepts.)
- *
- * The door refuses anything but http(s) on a link, and stores a file as our own
- * `/media/<key>` path — so this should never be false. It is checked anyway, and
- * the reason is the shape of the failure rather than its likelihood: an
- * attachment can be put on a ticket by a CLIENT login, it renders on a page a
- * staff member already trusts, and `javascript:` in an `href` there is stored
- * XSS. A row written before the door was tightened, or by a future door somebody
- * adds, must not become one. Anything unrecognised is printed as text.
- *
- * Same rule the client portal applies to the same rows — two front doors, one
- * sentence. */
-function isFollowable(url: string): boolean {
-  return safeHref(url) !== undefined
-}
-
-/** Bytes, said the way a person says them. BINARY (1024), because that is the
- * base `TICKET_FILE_MAX_BYTES` itself is defined in — so a file's listed size
- * and the number the refusal below quotes, both read off this one function,
- * can never disagree the way a decimal KB and a binary "10MB" typed into copy
- * once did. */
-function spellSize(bytes: number | null): string {
-  if (!bytes) return ""
-  return bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-/** The cap itself, said the same way — `TICKET_FILE_MAX_BYTES` is an exact
- * binary multiple, so this is always a whole number ("10 MB"), never "10.0". */
-const MAX_SIZE_LABEL = `${Math.round(TICKET_FILE_MAX_BYTES / 1024 / 1024)} MB`
 
 export function HelpAttachmentsPanel({
   ticketId,

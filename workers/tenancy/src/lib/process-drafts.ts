@@ -178,7 +178,7 @@ function draftsWhere(scope: AccountScope, opts: DraftFilters): { sql: string; pa
 
 /** THE EXACT SERVER COUNT of the drafts this caller may see (R16), through the
  * one bounded seam, over the SAME WHERE the page below uses. */
-export async function countDrafts(
+async function countDrafts(
   cfg: D1Rest,
   guard: MemberGuard,
   scope: AccountScope,

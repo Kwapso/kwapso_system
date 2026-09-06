@@ -37,7 +37,7 @@
 //
 // Both halves are DERIVED and neither is typed here:
 //
-//   • the LATEST version is parsed out of `workers/tenancy/src/team-schema.ts`
+//   • the LATEST version is parsed out of `workers/tenancy/src/team-schema/migrations.ts`
 //     itself, off the syntax tree, not matched with a regex and never copied.
 //     A copied version number in this file would be a gate that goes green
 //     while the estate is behind — the exact failure it exists to catch, wearing
@@ -232,7 +232,11 @@ const read = (relPath) => readFileSync(join(ROOT, relPath), "utf8")
  * correctly did not see.) Anything unexpected in the shape throws; there is no
  * fallback, because a fallback is how a gate goes quietly green. */
 export function latestTeamMigration() {
-  return latestMigrationIn(read("workers/tenancy/src/team-schema.ts"))
+  // The ledger moved out of team-schema.ts into team-schema/migrations.ts on
+  // 6 Sep 2026 (a pure file split, proved identical by SHA-256). The parse
+  // below THROWS when it cannot find the array literal, so this path being
+  // wrong is loud rather than a gate that goes quietly green.
+  return latestMigrationIn(read("workers/tenancy/src/team-schema/migrations.ts"))
 }
 
 /** @see latestTeamMigration — the same derivation, over source you hand it. */
@@ -251,7 +255,7 @@ export function latestMigrationIn(source) {
   })
   if (!array || array.elements.length === 0) {
     throw new Error(
-      "Could not read TEAM_MIGRATIONS as an array literal in workers/tenancy/src/team-schema.ts."
+      "Could not read TEAM_MIGRATIONS as an array literal in workers/tenancy/src/team-schema/migrations.ts."
     )
   }
   const last = array.elements[array.elements.length - 1]
@@ -381,7 +385,7 @@ export function verdict({ envName, origin, db, latest, teams, waivers, today }) 
         `TEAM DATABASES ARE BEHIND (${envName}). The workers about to be deployed\n` +
         `may expect tables and columns these teams do not have yet.\n\n` +
         `  latest team-schema migration (this working tree): ${latest}\n` +
-        `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n\n` +
+        `  (workers/tenancy/src/team-schema/migrations.ts, last entry in TEAM_MIGRATIONS)\n\n` +
         blocking
           .map((t) => `  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
           .join("\n") +

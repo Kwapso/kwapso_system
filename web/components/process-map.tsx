@@ -57,7 +57,7 @@ export type MapLine = {
  * person is usually reading — and steps that exist only on the left are appended
  * in their own order rather than dropped, because a step that was removed is
  * exactly what somebody comparing versions came to see. */
-export function alignVersions(left: ProcessStep[], right: ProcessStep[]): MapLine[] {
+function alignVersions(left: ProcessStep[], right: ProcessStep[]): MapLine[] {
   const byKeyLeft = new Map(left.map((s) => [s.stepKey, s]))
   const lines: MapLine[] = right.map((s) => ({
     stepKey: s.stepKey,

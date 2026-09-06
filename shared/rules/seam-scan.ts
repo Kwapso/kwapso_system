@@ -74,6 +74,41 @@ type Worker = {
   /** The floor the route table must clear — a scan over an empty table passes
    * every assertion below and proves nothing. */
   minRoutes: number
+  /** THE TRIPWIRE'S SECOND HALF, and why it is a dial rather than a constant.
+   *
+   * "At least one route says `mutation`" was written as a proxy for "this table
+   * is really populated", and on the five domain workers the two are the same
+   * sentence. They come apart on the two surfaces that hold NO mutation by
+   * construction: mcp's writes are caller-private token rows and auth's are the
+   * caller's own identity, both reviewed R1 exceptions (CLAUDE.md), so every
+   * non-GET route on them is `housekeeping` and the proxy would refuse a table
+   * that is entirely correct.
+   *
+   * Default `true`, so the five workers that had the tripwire keep it exactly.
+   * A worker that turns it off still has to clear `minRoutes` AND still has to
+   * carry at least one non-GET route — a table of nothing but reads cannot
+   * dodge the seam by declaring itself mutation-free. */
+  requiresMutation?: boolean
+}
+
+/** The tripwire both seams open with: the table is really populated, and it
+ * really carries the class of route this seam is about. Shared so the two
+ * suites cannot drift into asking different questions about the same table. */
+function assertTableFound(worker: Worker) {
+  const { routes, minRoutes } = worker
+  const requiresMutation = worker.requiresMutation ?? true
+  it("finds the route table (the scan itself must not go blind)", () => {
+    expect(Object.keys(routes).length).toBeGreaterThanOrEqual(minRoutes)
+    if (requiresMutation) expect(Object.values(routes).some((r) => r.kind === "mutation")).toBe(true)
+    // A worker with no mutations must still have something to gate and
+    // something to classify, or this scan is reading a wall of GETs and
+    // reporting a clean bill of health for a surface it never looked at.
+    else
+      expect(
+        Object.keys(routes).some((r) => !r.startsWith("GET ")),
+        "a mutation-free worker must still carry a non-GET route, or there is nothing here for the seam to check"
+      ).toBe(true)
+  })
 }
 
 /**
@@ -93,17 +128,14 @@ export function publishSeam(worker: Worker & {
   housekeeping: string[]
   indirectPublishers?: string[]
 }) {
-  const { name, routes, src, minRoutes, housekeeping } = worker
+  const { name, routes, src, housekeeping } = worker
   const indirect = worker.indirectPublishers ?? []
 
   describe(`live-sync seam (${name}): every mutation publishes`, () => {
     const routeFns = indexFunctions(join(src, "routes"))
     const libFns = indexFunctions(join(src, "lib"))
 
-    it("finds the route table (the scan itself must not go blind)", () => {
-      expect(Object.keys(routes).length).toBeGreaterThanOrEqual(minRoutes)
-      expect(Object.values(routes).some((r) => r.kind === "mutation")).toBe(true)
-    })
+    assertTableFound(worker)
 
     it("classifies every non-GET route as mutation or housekeeping (never silently read)", () => {
       for (const [route, def] of Object.entries(routes)) {
@@ -155,22 +187,42 @@ export function publishSeam(worker: Worker & {
  * `identityGated` maps route → the reason. Adding a line is a conscious decision
  * — that is the point: you cannot dodge the gate by quietly listing a route as
  * an exception without saying why.
+ *
+ * `gates` overrides the permission vocabulary for a surface whose gates are a
+ * different KIND of question. The five domain workers ask "does your role allow
+ * this?" (requireRight and friends). The two surfaces in front of them ask "who
+ * are you?" and nothing else — mcp verifies a bearer token or the session user,
+ * auth verifies a session, an internal key or a throttle bucket, because on the
+ * sign-in doors there is no caller yet to have a role. Overriding the WORDS
+ * keeps the SCAN shared, which is the half that matters: mcp used to hand-roll
+ * its own switch parser and its own regex, and a private copy of a security
+ * check is one that quietly stops being the check.
+ *
+ * `openRoutes` are the doors that verify NOTHING, each with the reason — a
+ * health probe, a sign-in door that is the front of the building. They are held
+ * to the same standard as every other register here: the route must exist, the
+ * reason must be real, and (the ratchet) a route that has since GAINED a gate
+ * must lose its line, so the list can only shrink.
  */
-export function gatingSeam(worker: Worker & { identityGated?: Record<string, string> }) {
-  const { name, routes, src, minRoutes } = worker
+export function gatingSeam(worker: Worker & {
+  identityGated?: Record<string, string>
+  gates?: RegExp
+  openRoutes?: Record<string, string>
+}) {
+  const { name, routes, src } = worker
   const identityGated = worker.identityGated ?? {}
+  const openRoutes = worker.openRoutes ?? {}
+  const gateRe = worker.gates ?? GATE_RE
 
   describe(`gating-seam (${name}): no ungated door can ship`, () => {
     const routeFns = indexFunctions(join(src, "routes"))
 
-    it("finds the route table (the scan itself must not go blind)", () => {
-      expect(Object.keys(routes).length).toBeGreaterThanOrEqual(minRoutes)
-      expect(Object.values(routes).some((r) => r.kind === "mutation")).toBe(true)
-    })
+    assertTableFound(worker)
 
     it("every non-GET route opens with a permission gate", () => {
       for (const [route, def] of Object.entries(routes)) {
         if (route.startsWith("GET ")) continue
+        if (openRoutes[route]) continue
         const handler = def.handler.name
         const body = routeFns.get(handler)
         expect(body, `handler ${handler} (${route}) must be an exported async function in routes/`).toBeDefined()
@@ -183,10 +235,36 @@ export function gatingSeam(worker: Worker & { identityGated?: Record<string, str
           continue
         }
         expect(
-          GATE_RE.test(code),
-          `${route} (${handler}) changes state with no permission gate. Open it with requireRight / gated / gatedBody / requireAnyImportRight / adminGuard, or add it to identityGated with a reason`
+          gateRe.test(code),
+          `${route} (${handler}) changes state with no permission gate. Open it with one of ${gateRe.source}, or add it to identityGated / openRoutes with a reason`
         ).toBe(true)
       }
+    })
+
+    it("every open door names a route that exists, and states a real reason", () => {
+      for (const [route, why] of Object.entries(openRoutes)) {
+        expect(routes[route], `openRoutes lists ${route}, which is not a route`).toBeDefined()
+        expect(why.length, `${route} verifies nothing — that needs a real reason`).toBeGreaterThan(20)
+      }
+    })
+
+    // THE RATCHET. An excuse in front of a door that now verifies its caller is
+    // a line nobody reread. Gate one and its line must go, so this list can only
+    // shrink — the same shape as NO_CONTROL's ratchet in reachable-screens.
+    it("no open door has quietly gained a gate", () => {
+      const routeFns2 = indexFunctions(join(src, "routes"))
+      const stale = Object.keys(openRoutes).filter((route) => {
+        const def = routes[route]
+        if (!def) return false
+        const body = routeFns2.get(def.handler.name)
+        if (!body) return false
+        const code = stripComments(body)
+        return gateRe.test(code) || WHOAMI_RE.test(code)
+      })
+      expect(
+        stale,
+        `openRoutes names doors that verify their caller now — delete these lines: ${stale.join(", ")}`
+      ).toEqual([])
     })
 
     it("every identity-gated exception still names a route that exists", () => {

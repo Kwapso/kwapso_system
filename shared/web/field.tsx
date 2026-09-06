@@ -65,7 +65,7 @@ import { useT } from "./language"
  *
  * An empty label is left empty: the kit Field reads it as "no label at all" and
  * skips the label row, and "" is not a sentence anybody translates. */
-export function translateFieldConfig(
+function translateFieldConfig(
   config: FieldConfig,
   t: (english: string) => string
 ): FieldConfig {

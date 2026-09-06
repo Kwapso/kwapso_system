@@ -6,7 +6,7 @@ import { TopLoadingBar } from "@shared/web/top-loading-bar"
 import { appMetadata, appViewport } from "@shared/web/pwa"
 
 import { ErrorBoundary } from "@/components/error-boundary"
-import { ErrorReporter } from "@/components/error-reporter"
+import { ErrorReporter } from "@shared/web/error-reporter"
 import "./globals.css"
 
 // The portal's identity is the AGENCY's brand — a client is visiting kwapso, not

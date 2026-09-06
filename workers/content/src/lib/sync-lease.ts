@@ -14,7 +14,7 @@ import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 /** Long enough to cover one bounded tick's Google reads and D1 writes with
  * margin; short enough that a crashed holder's lease clears itself well inside
  * the time a person would notice and press the button again. */
-export const SYNC_LEASE_TTL_MS = 3 * 60 * 1000
+const SYNC_LEASE_TTL_MS = 3 * 60 * 1000
 
 /**
  * Run `work` under `key`, but only if no other caller holds the lease right

@@ -642,11 +642,11 @@ export function staffCertificatesKey(teamId: string): string {
 /** The drafts list. TEAM-WIDE on purpose, like the client-organisation lists: a
  * draft is one call about one process, the read is bounded (R14), and a
  * per-process key is one a listener handed only a team could not name. */
-export function processDraftsKey(teamId: string): string {
+function processDraftsKey(teamId: string): string {
   return `process_drafts:${teamId}`
 }
 /** One opened proposal — read on its own review screen, so its own key. */
-export function processDraftKey(draftId: string): string {
+function processDraftKey(draftId: string): string {
   return `process-draft:${draftId}`
 }
 export function processesKey(teamId: string): string {

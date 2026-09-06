@@ -15,10 +15,11 @@
 //
 // The last two tests are the OTHER half of the promise: one person, two ways in.
 
-import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { beforeAll, describe, expect, it } from "vitest"
+
+import { doorSource } from "./doors"
 
 import { GuardError } from "@shared/workers/gating"
 import { sourceFiles } from "@shared/rules/source-scan"
@@ -311,7 +312,9 @@ describe("one person, two ways in", () => {
    * to Google, so the seam is pinned where every other law in this repo pins
    * one: read the handler's own source off disk. */
   it("the callback resolves its user through the ONE identity seam", () => {
-    const src = readFileSync(join(__dirname, "../src/index.ts"), "utf8")
+    // The whole door surface — googleCallback moved to routes/google.ts on
+    // 6 Sep 2026. The `at` tripwire below is what makes that move safe.
+    const src = doorSource()
     const at = src.indexOf("async function googleCallback(")
     expect(at, "googleCallback moved — this seam check is now checking nothing").toBeGreaterThan(-1)
     const handler = src.slice(at, src.indexOf("\n}", src.indexOf("catch (e)", at)))
