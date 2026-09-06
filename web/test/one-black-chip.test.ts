@@ -132,35 +132,18 @@ const REF_AS_STRING_OK: Record<string, string> = {
 }
 
 
-/** THE FILE'S LINES WITH EVERY COMMENT BLANKED AND NOT ONE LINE REMOVED, so a
- * `path:line` pin means what it says. `stripComments` (shared/rules/source-scan)
- * is the repo's one comment stripper and is right for every caller that asks
- * "does this file contain X" — it closes the file up, which is fine when the
- * answer is a boolean and useless when it is an address. */
+/** THE FILE'S LINES WITH EVERY COMMENT REMOVED AND NOT ONE LINE LOST, so a
+ * `path:line` pin means what it says.
+ *
+ * This used to be a hand-rolled stripper right here, because the shared one
+ * closed the file up — a block comment became a single space and every line
+ * under it moved, which is fine when the answer is a boolean and useless when it
+ * is an address. It is not true any more: `stripComments` keeps every newline a
+ * comment spanned. The hand-roll went with the reason for it, and its own
+ * blindness with that — it read `accept="image/*"` as a comment opener and
+ * blanked the sixty lines below, exactly as the regexes it replaced did. */
 function codeLines(source: string): string[] {
-  let inBlock = false
-  return source.split("\n").map((raw) => {
-    let out = ""
-    let i = 0
-    while (i < raw.length) {
-      if (inBlock) {
-        const end = raw.indexOf("*/", i)
-        if (end === -1) return out
-        inBlock = false
-        i = end + 2
-        continue
-      }
-      if (raw.startsWith("//", i)) return out
-      if (raw.startsWith("/*", i)) {
-        inBlock = true
-        i += 2
-        continue
-      }
-      out += raw[i]
-      i += 1
-    }
-    return out
-  })
+  return stripComments(source).split("\n")
 }
 
 describe("one black chip, one reference", () => {

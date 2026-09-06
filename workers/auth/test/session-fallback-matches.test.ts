@@ -37,6 +37,8 @@ import { describe, expect, it } from "vitest"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..", "..")
 const MASTER = join(ROOT, "workers", "auth", "src", "lib", "sessions.ts")
 const FALLBACK = join(ROOT, "shared", "workers", "session-fallback.ts")
@@ -128,9 +130,7 @@ describe("the session fallback agrees with auth, its master", () => {
     // Comments are stripped first, or this file's own prose about auth's writes
     // would be read as writes (the same strip R20's census does, for the same
     // reason).
-    const code = fallback
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "")
+    const code = stripComments(fallback)
     for (const verb of [/\bINSERT\s+INTO\b/i, /\bUPDATE\s+\w+\s+SET\b/i, /\bDELETE\s+FROM\b/i])
       expect(
         verb.test(code),
@@ -140,7 +140,7 @@ describe("the session fallback agrees with auth, its master", () => {
 
     // And the master really does write, so this test is comparing against
     // something rather than asserting a property of an empty set.
-    const masterCode = master.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+    const masterCode = stripComments(master)
     expect(
       /\bUPDATE\s+sessions\s+SET\b/i.test(masterCode) || /\bDELETE\s+FROM\s+sessions\b/i.test(masterCode),
       "auth no longer writes while resolving a session — if that is deliberate, this canary " +

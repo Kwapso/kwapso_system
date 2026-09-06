@@ -987,7 +987,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // is unchanged — which is the evidence rather than the claim — so no other
 // textVersion moves, and bumping one here would re-read every row of every kind
 // to fix nothing.
-const SHARED_DIGEST = "b48e7dd881a362b2"
+// 7 Sep 2026: THE RULER MOVED, NOT THE FILE. `stripComments`
+// (shared/rules/source-scan.ts) stopped being two regexes and became a real
+// tokeniser, and it now leaves a block comment's NEWLINES behind instead of
+// closing the file up onto one line — so every line below a `/* … */` keeps its
+// number. `knowledge-ingest.ts` was not one of the files the old stripper was
+// mis-reading (its stripped text is identical word for word, whitespace aside),
+// so nothing this digest is ABOUT has changed: no reader says anything new, no
+// per-kind digest above moved, and no textVersion moves. Re-pinned at the new
+// measurement, exactly as the 20 Aug note above records doing.
+const SHARED_DIGEST = "46eeadd4beadc252"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

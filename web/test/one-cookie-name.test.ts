@@ -51,7 +51,7 @@
 import { describe, expect, it } from "vitest"
 import { join } from "node:path"
 
-import { sourceFiles } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
 
@@ -146,7 +146,7 @@ describe("the session cookie's name lives in one file", () => {
         relativeTo: ROOT,
       })) {
         if (f.rel === HOME) continue // the seam IS the ordering
-        const src = f.source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+        const src = stripComments(f.source)
         src.split("\n").forEach((line, i) => {
           if (!/readCookie\s*\([^,)]+,\s*SESSION_COOKIE\s*\)/.test(line)) return
           if (/readCookie\s*\([^,)]+,\s*LEGACY_SESSION_COOKIE\s*\)/.test(line)) return

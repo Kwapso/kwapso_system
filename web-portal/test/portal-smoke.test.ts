@@ -35,6 +35,8 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..")
 const read = (...p: string[]) => readFileSync(join(ROOT, ...p), "utf8")
 
@@ -56,9 +58,7 @@ function portalListeners(): string[] {
   // scan that stopped at the first `=` never reached the opening brace.
   const table = /export const PORTAL_LISTENERS[\s\S]*?=\s*\{\r?\n([\s\S]*?)\r?\n\}/.exec(src)
   expect(table, "PORTAL_LISTENERS not found — did the registry move?").toBeTruthy()
-  const body = (table as RegExpExecArray)[1]
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+  const body = stripComments((table as RegExpExecArray)[1])
   return [...body.matchAll(/^\s*(\w+):\s*\(/gm)].map((m) => m[1])
 }
 

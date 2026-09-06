@@ -28,6 +28,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
+import { stripComments } from "@shared/rules/source-scan"
 import { AGENT_CHAT_MAX_BYTES, AGENT_FILE_MAX_BYTES, AGENT_MAX_FILES } from "@shared/workers/limits"
 import { listMessages, requireOwnThread } from "../src/lib/threads"
 import { buildSpineDb, IDS } from "../../tenancy/test/spine-harness"
@@ -40,9 +41,7 @@ describe("the chat door's ceiling sits in front of the parse", () => {
   // COMMENTS STRIPPED FIRST, or explaining the rule would break it: the comment
   // above the guard names `request.json()`, and an ordering test that reads prose
   // measured the sentence instead of the statement.
-  const src = readFileSync(join(__dirname, "..", "src/routes/agent.ts"), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+  const src = stripComments(readFileSync(join(__dirname, "..", "src/routes/agent.ts"), "utf8"))
   const handler = src.slice(
     src.indexOf("export async function postAgentChat"),
     src.indexOf("export async function postAgentConfirm")

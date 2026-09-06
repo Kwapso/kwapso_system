@@ -24,6 +24,7 @@ import {
   TRANSLATE_MAX_CHARS,
   TRANSLATE_MAX_TEXTS,
 } from "@shared/workers/limits"
+import { stripComments } from "@shared/rules/source-scan"
 import { PROVIDER_DEFAULT_MAX_TOKENS } from "@shared/workers/model-text"
 import { answerCeiling, readTranslations, translateBatches } from "../src/routes/agent"
 
@@ -144,9 +145,7 @@ describe("the answer that actually came back, on 21 Aug 2026", () => {
 })
 
 describe("the door itself", () => {
-  const src = readFileSync(join(__dirname, "..", "src/routes/agent.ts"), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/(^|[^:])\/\/.*$/gm, "$1")
+  const src = stripComments(readFileSync(join(__dirname, "..", "src/routes/agent.ts"), "utf8"))
   const handler = src.slice(
     src.indexOf("export async function postTranslateText"),
     src.indexOf("export function readTranslations")

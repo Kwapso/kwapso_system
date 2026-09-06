@@ -20,7 +20,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
-import { sourceFiles } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const WEB = join(HERE, "..")
@@ -36,15 +36,17 @@ function scannedFiles(): string[] {
 /** Strip strings/template literals/comments so braces inside them don't skew the
  * depth walk (heuristic, good enough for house-style code).
  *
- * NOT the shared stripComments: this one is LENGTH-PRESERVING — it blanks each
- * comment and string with the same number of characters, because every index the
- * brace walk below computes has to keep pointing at the same place in the
- * original text. The shared one deletes, which would shift every offset. Two
- * different jobs, so two functions, and this is the reason. */
+ * LENGTH-PRESERVING — every index the brace walk below computes has to keep
+ * pointing at the same place in the original text, which is why the comments come
+ * out through the shared stripper's `keepLength` mode rather than being deleted.
+ *
+ * It used to re-type the comment regexes here to get that, and inherited their
+ * blindness: `accept="image/*"` in a JSX attribute opened a "comment" that ran to
+ * the next `*​/`, and the braces in between were blanked out of the depth walk.
+ * The strings are still blanked here, because a `{` inside one is not a block —
+ * that half is this suite's own job and nobody else's. */
 function stripNoise(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length))
+  return stripComments(src, { keepLength: true })
     .replace(/`(?:\\.|[^`\\])*`/g, (m) => `"${" ".repeat(Math.max(0, m.length - 2))}"`)
     .replace(/"(?:\\.|[^"\\])*"/g, (m) => `"${" ".repeat(Math.max(0, m.length - 2))}"`)
     .replace(/'(?:\\.|[^'\\])*'/g, (m) => `'${" ".repeat(Math.max(0, m.length - 2))}'`)

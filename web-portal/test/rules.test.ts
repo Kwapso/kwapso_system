@@ -292,7 +292,7 @@ describe("portal rules the agency app doesn't have", () => {
       expect(at, `${needle.trim()} is where names are decided — did it move?`).toBeGreaterThan(-1)
       // Comments stripped, or the prose ABOVE the seam explaining the rule would
       // satisfy the assertion in place of the code that implements it.
-      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+      return stripComments(lib.slice(at, lib.indexOf("\n}", at)))
     }
     expect(
       seamBody("export async function listReplies("),
@@ -325,10 +325,7 @@ describe("portal rules the agency app doesn't have", () => {
     const commentSeam = (() => {
       const at = processes.indexOf("export async function listProcessComments(")
       expect(at, "listProcessComments is where a comment's author is decided — did it move?").toBeGreaterThan(-1)
-      return processes
-        .slice(at, processes.indexOf("\n}", at))
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\/\/.*$/gm, "")
+      return stripComments(processes.slice(at, processes.indexOf("\n}", at)))
     })()
     expect(
       commentSeam,
@@ -365,7 +362,7 @@ describe("portal rules the agency app doesn't have", () => {
       expect(at, `${needle.trim()} is where an account's fields are decided — did it move?`).toBeGreaterThan(-1)
       // Comments stripped, or the prose explaining the rule would satisfy the
       // assertion in place of the code that implements it.
-      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+      return stripComments(lib.slice(at, lib.indexOf("\n}", at)))
     }
     const account = seamBody("function toAccount(")
     expect(account, "toAccount must decide about a client login at all").toContain('scope.kind === "portal"')
@@ -431,9 +428,7 @@ describe("the portal does not compile out of the agency app's tree", () => {
     for (const file of portalFiles()) {
       // Comments are not imports: this file explains the rule, and so do several
       // portal headers, so the prose must not read as a violation of itself.
-      const code = read(file)
-        .replace(/\/\*[\s\S]*?\*\//g, " ")
-        .replace(/^\s*\/\/.*$/gm, "")
+      const code = stripComments(read(file))
       for (const m of code.matchAll(/from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']/g)) {
         const spec = m[1] ?? m[2]
         if (/^@web\//.test(spec) || /(^|\/)\.\.\/web\//.test(spec))
