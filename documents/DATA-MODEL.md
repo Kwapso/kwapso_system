@@ -84,6 +84,35 @@ in Glide = our `deactivated_at` (non-null = archived/deactivated).
 ## GLOBAL core (the card catalog, `kwapso-core`)
 
 ### users . KEEP (built)
+
+> **USER, MEMBER, PERSON — three words, three different things, and this is the
+> one place that says so.** They are not synonyms and none of them is drift:
+>
+> - a **user** is an IDENTITY — one row here, one email, one human who has signed
+>   in. It belongs to no team, one team, or several. This is engineering
+>   vocabulary and the screens never say it (see below).
+> - a **member** is that identity ON A TEAM — a `team_members` row joining a user
+>   to a team with a role. It is the glossary term ("A member is a person on your
+>   team") and it is the word both front doors use.
+> - a **person** is anybody at all, including people who are neither: the contact
+>   who raised a ticket, the name on an account. It is ordinary English, and it is
+>   the word inside the glossary's own definition of Member.
+>
+> The distinction is load-bearing rather than stylistic. `portal_users.user_id`
+> below points at the GLOBAL users row for a client contact who is deliberately
+> NOT a member of the agency's team; the whole account fence rests on those being
+> two different things. And **the screens say `user` zero times on purpose**: R34
+> bans it in favour of Member (`GLOSSARY_SYNONYMS` in `shared/rules/registry.ts`),
+> which is why "user" is safe to use freely in these documents and nowhere a
+> person can read it.
+>
+> *Written 2026-09-06, after a terminology audit counted `user` 264 times,
+> `member` 226 and `person` 231 across the documents and read it as drift. It was
+> not: the audit had counted DOCUMENT PROSE, and the corpus that governs product
+> language is `shared/i18n-strings.json`, where `user` appears in none of the
+> 1,955 sentences. The three words were already being used correctly by everyone;
+> what was missing was a sentence saying which is which.*
+
 Real data: `id`, `email`, `image_url`, `first_name`, `last_name`,
 `onboarding_completed_at`, `current_team_id`. Glide `Row owners/Team keys
 string` (the teams a user belongs to) = our **team_members** table.
