@@ -35,14 +35,43 @@ one question, *who is this?*, and there is exactly one master that can answer
 
 ### The worst case, stated
 
-> **If `kwapso-auth` is down, seven of the eight workers stop serving anything
-> gated.** Both front doors still answer, the screens load from static assets,
-> and cached screens still paint, but every API call behind them returns
-> `503 auth_unavailable`, and the user sees an app that renders and cannot do
-> anything. Sign-in is also unavailable, so nobody can get in behind them.
+> **If `kwapso-auth` is down, somebody already signed in keeps working, and
+> nobody new can get in.** Every gated request still begins by asking who the
+> caller is — and since 6 Sep 2026 the gating seam answers that itself when auth
+> cannot, by reading the session row out of the core database (§ "The
+> recommendation, now taken" below). So the app keeps serving: the screens load,
+> the reads answer, the writes land, and every permission decision is made from
+> the same rows it always was. What is lost is everything auth alone can do —
+> **signing in, signing out, changing an email, editing a profile, and minting a
+> session for the machine surface** — every one of those is a door on auth itself
+> (`workers/auth/src/index.ts`'s ROUTES table is the list). So nobody new gets
+> in, and a session that expires mid-outage is not renewed: the fallback is
+> READ-ONLY, so it never slides an expiry forward, which is exactly the property
+> that keeps auth the only master.
+>
+> **If the CORE DATABASE is down, that is the outage this section used to
+> describe.** Nothing can say who is asking, every gated call returns
+> `503 auth_unavailable`, and the user sees an app that renders and can do
+> nothing. Core is the real single point of failure; auth was only ever the
+> visible one.
 
-This is a deliberate consequence of "one session system, one master", not an
-oversight. It is written here so it is a known cost rather than a discovery.
+**WHAT THIS SECTION SAID UNTIL 6 SEP 2026, and why the correction is recorded
+rather than quietly made.** It read: *"If `kwapso-auth` is down, seven of the
+eight workers stop serving anything gated … every API call behind them returns
+`503 auth_unavailable`, and the user sees an app that renders and cannot do
+anything."* Beside it, a row in the table below promised **"No fallback identity,
+on purpose."**
+
+Both were true when written. The fallback landed three paragraphs further down
+this same file and NEITHER was corrected in that commit, so for a day this
+document told a reader that an auth outage takes the app down while the code it
+describes did the opposite. A stated consequence that has gone false is worse
+than none, because it is read as current — which is the argument this whole
+law-book rests on, and it was broken inside the file that makes it.
+
+It is written here rather than deleted because the failure is the useful part:
+nothing in the repository could have caught it. The fan-in is unchanged and still
+worth knowing; what changed is what the fan-in COSTS.
 
 ### What softens it, and what does not
 
@@ -50,7 +79,7 @@ oversight. It is written here so it is a known cost rather than a discovery.
 |---|---|
 | **A ceiling on the wait** | `AUTH_UNAVAILABLE_MS` (5s) in `shared/workers/gating.ts`. A slow auth degrades the request that hit it, not the worker behind it. Without a ceiling one unwell worker fills five others' queues, and the outage spreads by waiting. |
 | **An honest code** | An auth outage throws `503 auth_unavailable`, never `null`. `null` means "not signed in", and callers turn that into a 401 that signs somebody out, so an outage that returned `null` would log every signed-in person out of a healthy app and send them all back to the door that is already struggling. |
-| **No fallback identity, on purpose** | There is no cached session, no "assume signed in". Guessing on the identity read is guessing on the gate, and the permission spine is the product. Availability is not bought with a weaker fence. |
+| **A fallback identity, and it is not a cache** | `whoAmI` resolves the caller from the session row itself when auth is unreachable (`sessionFromCore`, called at `shared/workers/gating.ts`'s one catch). There is still no CACHED session and no "assume signed in" — the original sentence here was right about that and it is why the fallback reads live rows instead. An expired session, a deactivated member and a sign-out are all still refused, because the fallback asks the same database the same questions. Availability is still not bought with a weaker fence; it is bought by asking the fence directly. |
 | **Realtime degrades, it does not fail** | `kwapso-realtime` has fan-in 6 and is the one dependency that is genuinely optional. `publishChange` is wrapped, capped at 2s, and swallows its own failure: a live-layer outage costs a screen its instant refresh and nothing else, because the write already committed and the client is cache-first ([CACHING.md](CACHING.md)). Same for member-notification email (`sendBrandedEmail`, 15s cap). ARCHITECTURE §5 already locks the state change as the authority. |
 
 ### The recommendation, now taken — and it is NOT a cache
