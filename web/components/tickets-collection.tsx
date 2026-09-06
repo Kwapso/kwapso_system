@@ -1471,6 +1471,24 @@ function TriageQueue({
         <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
       ) : (
         <Queue
+          /* OPEN AND SKIP, SIDE BY SIDE — client, twice: "open button next to
+             skip!!". Being last in `decisions` was not enough and neither was
+             `ms-auto` on Open, which is the version she saw the second time.
+
+             The kit draws Skip AFTER `decisions` with an `ms-auto` of its own.
+             Two auto margins in one flex row do not stack — they SPLIT the free
+             space between them, which I measured at 139.6px of daylight between
+             Open and Skip in a 600px row. So Open keeps its `ms-auto` (it
+             claims the space and travels to the end) and Skip's is zeroed here,
+             leaving it nothing to claim and landing it directly after Open —
+             measured at 8px apart, which is the row's own gap and nothing more.
+
+             Spelled as a descendant variant on the Queue rather than fixed
+             upstream because Skip's margin is the KIT's decision for its own
+             screen, and this app is the caller with a fifth control to place.
+             `> *:last-child` is Skip precisely because the kit appends it after
+             whatever `decisions` renders. */
+          className="[&_[data-slot=queue-decisions]>*:last-child]:ms-0"
           label={t("Triage queue")}
           position={position}
           total={total}
@@ -1571,7 +1589,21 @@ function TriageQueue({
                   variant="ghost"
                   size="sm"
                   onClick={() => onOpen(current.id)}
-                  className="gap-1"
+                  /* `ms-auto` IS THE WHOLE FIX, and being last in the row was
+                     not enough. The kit draws Skip AFTER `decisions` and gives
+                     it `ms-auto` of its own, so Skip is thrown to the far end of
+                     the row while everything in `decisions` stays clustered at
+                     the reading start — Open sat with Accept and Change
+                     category with the entire width between it and Skip, which
+                     is exactly what the client saw and reported twice.
+
+                     Putting `ms-auto` HERE consumes the free space one item
+                     earlier: Open goes to the end, and Skip's own `ms-auto`
+                     then has nothing left to consume, so the two land side by
+                     side. That is the arrangement she asked for — the two ways
+                     OUT of the sitting together at one end, the decisions
+                     together at the other. */
+                  className="ms-auto gap-1"
                 >
                   <ArrowUpRight className="size-3.5" />
                   {t("Open")}
