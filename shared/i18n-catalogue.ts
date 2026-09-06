@@ -21,7 +21,7 @@
 // bug — so an incomplete catalogue is a partly-translated app, never a broken
 // one.
 //
-// 1027 strings · 3 languages · 587 of the entries below are hand-written seed.
+// 1028 strings · 3 languages · 587 of the entries below are hand-written seed.
 // and 13 more were hand-written directly here on 19 Aug 2026 (the handover shelf
 // on the client portal) because the generator could not be run for them.
 
@@ -384,6 +384,7 @@ export const CATALOGUE: Catalogue = {
   "Load more meetings": { de: "Weitere Meetings laden", es: "Cargar más reuniones", ca: "Carrega més reunions" },
   "Load more processes": { de: "Weitere Prozesse laden", es: "Cargar más procesos", ca: "Carrega més processos" },
   "Load more sources": { de: "Weitere Quellen laden", es: "Cargar más fuentes", ca: "Carrega més fonts" },
+  "Load more tasks": { de: "Weitere Aufgaben laden", es: "Cargar más tareas", ca: "Carrega més tasques" },
   "Load more tickets": { de: "Weitere Tickets laden", es: "Cargar más tickets", ca: "Carrega més tiquets" },
   "Load more time": { de: "Weitere Zeit laden", es: "Cargar más tiempo", ca: "Carrega més temps" },
   "Load more work": { de: "Weitere Arbeiten laden", es: "Cargar más trabajo", ca: "Carrega més treball" },

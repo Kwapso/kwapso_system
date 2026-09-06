@@ -124,6 +124,11 @@ export type StoryWrite = {
 export type TaskListResponse = {
   tasks: Task[]
   total: number
+  /** R14: the total stopped at TOTAL_COUNT_CAP and reads "at least" past it. */
+  totalCapped: boolean
+  hasMore: boolean
+  /** the opaque position of the last row on this page, or null on the last page */
+  nextCursor: string | null
   openTotal: number
   allTotal: number
   overdueTotal: number
@@ -536,10 +541,25 @@ export const content = {
    * one was asked for (R16) — the badge on a tab you are not looking at cannot be
    * derived from the rows on the one you are. `total` is the count over what was
    * listed. */
-  tasks: (view?: TaskViewName) =>
-    api<TaskListResponse>(`/api/content/tasks${view ? `?view=${view}` : ""}`),
+  tasks: (view?: TaskViewName, cursor?: string) =>
+    api<TaskListResponse>(
+      `/api/content/tasks?${new URLSearchParams({
+        ...(view ? { view } : {}),
+        ...(cursor ? { cursor } : {}),
+      })}`
+    ),
+  /** ONE TASK, FROM THE DOOR (R38) — never a `find` over the loaded page.
+   *
+   * This used to fetch `?view=all` and search the rows, which was only ever
+   * right while the list was capped and a team had fewer rows than the cap. It
+   * pages now, so "all" is the newest fifty: every task past the cursor would
+   * have been unreachable by direct link and — because the live registry uses
+   * this as its `fetchOne` — silently frozen on screen after somebody else
+   * changed it. */
   taskOne: (id: string) =>
-    api<{ tasks: Task[] }>("/api/content/tasks?view=all").then((r) => r.tasks.find((t) => t.id === id) ?? null),
+    api<TaskListResponse>(`/api/content/tasks?id=${encodeURIComponent(id)}`).then(
+      (r) => r.tasks[0] ?? null
+    ),
   /** `fileDataUrl` is a base64 data URL — the door caps it, parses it and puts
    * the bytes in the agency's own bucket, exactly as a to-do's attachment is. */
   createTask: (input: {

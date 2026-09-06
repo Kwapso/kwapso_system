@@ -241,6 +241,13 @@ export const listFetch = {
       primeCache(totalKey("tasks-calendar", teamId), r.calendarTotal)
       primeCache(totalKey("tasks-due-today", teamId), r.dueTodayTotal)
       primeCache(totalKey("tasks-due-today-done", teamId), r.dueTodayDone)
+      // R14/R15: page one's rows live under the view's own key and its next
+      // cursor in the sidecar beside it, so <LoadMore> can reach page two and
+      // the row-level registry keeps the whole thing live without a second
+      // listener. Per VIEW, because each of the six is its own paged read with
+      // its own position — a cursor minted on `completed` means nothing to
+      // `overdue`, and the door refuses it rather than skipping a slice.
+      primeCache(cursorKey(tasksKey(teamId, view)), r.nextCursor)
       return r.tasks
     }),
   // R14: meetings are PAGED — an event is never curated away, so the door answers

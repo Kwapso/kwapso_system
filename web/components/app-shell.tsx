@@ -88,7 +88,7 @@ import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 import { SIMPLE_INVALIDATIONS, TEAM_RESOURCES, liveCoveredKeys, totalKey } from "@/lib/live-resources"
 import { invalidate, invalidatePrefix, patchRow, primeCache, readCache, reconcile, registerLiveCoverage } from "@shared/web/store"
 import { NAV, NAV_GROUP_LABELS, NAV_GROUP_ORDER, TEAM_SECTIONS, bottomNavItems, overflowNavItems, isNavActive, type Crumb, type NavGroup } from "@/lib/pages"
-import { usePermissions } from "@/lib/perms"
+import { revalidateRights, usePermissions } from "@/lib/perms"
 import { useTeamPrewarm } from "@/lib/use-team-prewarm"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import { useT } from "@shared/web/language"
@@ -679,7 +679,19 @@ export function AppShell({
       // If MY membership row changed (e.g. an admin swapped my role), my own
       // effective rights may differ now — refresh the permission gate so my
       // nav/buttons reflect it live, not just how others see my row.
-      if (event.resource === "members" && id === userId) invalidate(`my-perms:${teamId}`)
+      //
+      // AND THE ROWS, NOT JUST THE BUTTONS. Invalidating `my-perms` re-hid the
+      // actions and dropped the nav section, and left every cached collection
+      // exactly where it was: somebody whose `accounts:read` had just been taken
+      // away went on reading the accounts list from memory until the ten-minute
+      // age ceiling. `revalidateRights` asks the door what they may do now and
+      // clears the cache only if the answer actually moved, so an admin renaming
+      // a role does not empty every open tab in the team.
+      if (
+        (event.resource === "members" && id === userId) ||
+        event.resource === "member_roles"
+      )
+        void revalidateRights(teamId)
       if (r.refreshCtx) void active.refresh()
     },
     () => {
