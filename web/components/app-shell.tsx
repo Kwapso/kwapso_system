@@ -25,6 +25,11 @@ import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/
 // the strip: NAVIGATION TEXT ONLY, no controls on the ground.
 import { Button } from "@shared/ui/components/button/button"
 import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
+// The strip's own item shape. Imported rather than restated because this file
+// now BUILDS the items (a crumb's label can carry a close mark — see
+// `crumbItems` in `AppShell`) instead of handing the kit an array it already
+// had; the app's own `Crumb` is a narrower, string-only thing on purpose.
+import { type BreadcrumbsItem } from "@shared/ui/components/breadcrumbs/breadcrumbs"
 // The rule between the phone sheet's own named blocks (`railBlocks.map`,
 // below). Used to be a hand-rolled `<div className="bg-border h-px w-full"
 // role="separator" />`, the kit's own default weight spelled out by hand and
@@ -44,7 +49,7 @@ import {
   TooltipTrigger,
 } from "@shared/ui/components/tooltip/tooltip"
 import { Text } from "@shared/ui/components/typography/typography"
-import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree } from "@shared/ui/foundations/icons"
+import { AppWindow, SealCheck, Briefcase, Chat, CalendarDots, PuzzlePiece, House, HardDrives, CheckSquare, Palette, AddressBook, GitFork, Gear, Tray, Timer, DotsThree, X } from "@shared/ui/foundations/icons"
 // `Waves` is the audit module's mark and the kit's 96 have no glyph of that
 // name yet, so it borrows the kit's own glyph for the concept (ATTRIBUTION).
 import { Waves } from "@shared/ui/foundations/icons"
@@ -113,6 +118,10 @@ import { toSpine, type Spine } from "@shared/spine"
 import { ScreenShell } from "@shared/ui/compositions/templates/screen-shell"
 import { AgentDockSlot } from "@/lib/agent-dock"
 import { useAgentOpen, setAgentOpen } from "@/lib/agent-open"
+// The tab set's own ceiling, read here for ONE reason: the strip must not fold
+// a set of open tabs into a `···` menu the way it folds a deep trail. See the
+// `foldAfter` prop in the `breadcrumb` slot below.
+import { MAX_OPEN_TABS } from "@/lib/workspace-tabs"
 
 /** A list with at least one thing in it, said in the type.
  *
@@ -349,11 +358,18 @@ export function AppShell({
   children,
   breadcrumbs,
   onNavigate,
+  onCloseCrumb,
   activePath,
 }: {
   active: ActiveTeam
   children: React.ReactNode
   breadcrumbs?: Crumb[]
+  /** CLOSE THE TAB THIS CRUMB IS. Given only when the strip is drawing the
+   * WORKSPACE TAB SET rather than the address's own trail — see `Crumb.closeKey`
+   * in lib/pages.ts, and the `breadcrumb` slot below for how the × rides in the
+   * tab's own label. Absent on the phone and on any screen whose set is still
+   * empty, where the strip is the ordinary trail and there is nothing to close. */
+  onCloseCrumb?: (closeKey: string) => void
   /** How a breadcrumb / nav link navigates. The deep-link host passes its
    * History-API `go` so in-team moves don't trigger a full reload; other pages
    * fall back to the router. */
@@ -485,6 +501,76 @@ export function AppShell({
   const trail = breadcrumbs ?? []
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
+
+  // ── THE CLOSE AFFORDANCE ON A TAB, AND WHY IT IS A HIT REGION AND NOT A
+  //    BUTTON ────────────────────────────────────────────────────────────────
+  //
+  // The client, 2026-09-06: "then we'll need a x icon on the tabs to close
+  // them". `BreadcrumbsItem.label` is a `React.ReactNode` and the kit says why
+  // in as many words — "A node, so an icon may ride along with the text" — so
+  // the glyph below is the kit's own documented way to put a mark in a tab, not
+  // a way around the kit.
+  //
+  // WHAT IT CANNOT BE, TODAY, IS A `<button>`. The kit draws a resting tab as
+  // `<BreadcrumbLink>` → a real `<a href>`, and interactive content inside an
+  // anchor is invalid HTML: the browser's own parser is entitled to move it out
+  // of the link, and a screen reader is entitled to announce either one. So
+  // this is a plain `<span>` — not focusable, not in the accessibility tree —
+  // and the strip's own `onClickCapture` (see the `breadcrumb` slot below,
+  // which already intercepts clicks for R37) routes a press on it to
+  // `onCloseCrumb` instead of to a navigation.
+  //
+  // THAT LEAVES ONE REAL GAP AND IT IS NAMED RATHER THAN PAPERED OVER: a
+  // keyboard or screen-reader user cannot close a tab. The fix is a kit change
+  // — `BreadcrumbFolders` growing a per-item `onClose`, so the × is a real
+  // sibling `<button>` inside the `<li>` with its own accessible name — and
+  // this file is written so that landing it is a swap of this one node, not a
+  // rewrite. Until then the set is still BOUNDED (MAX_OPEN_TABS evicts the
+  // oldest), so nobody is ever stuck with a strip they cannot shorten; they
+  // simply cannot choose WHICH one goes without a pointer.
+  //
+  // `aria-hidden` is deliberate and is the honest half of that: an affordance
+  // that cannot be operated by assistive technology must not be ANNOUNCED to
+  // it either, or the announcement is a promise the markup cannot keep. The
+  // tab's accessible name stays exactly the record's name, as it was before.
+  //
+  // THE GLYPH SIZES ITSELF. `TAB` in breadcrumb-folders.tsx already states
+  // `[&_svg:not([data-slot=folder-shape])]:size-[var(--icon-button)]` (16px)
+  // and `pointer-events-none` for any icon a call site puts in a crumb — which
+  // is also what makes the SPAN the click target rather than the SVG, so
+  // `closest("[data-tab-close]")` below always finds it.
+  //
+  // `motion-hover` and nothing else: the ink step is the kit's own fill/ink
+  // transition (motion.css §13), never a hand-rolled `transition-colors`
+  // (web/test/motion-is-the-kits.test.ts). It rests at the quiet ink a tab's
+  // own label rests at and steps to full ink under the pointer, which is the
+  // same two-tier move `record-chrome.tsx` uses for exactly this kind of
+  // secondary control.
+  const crumbItems: BreadcrumbsItem[] = trail.map((crumb, index) => ({
+    // A STABLE KEY, WHICH THE TAB SET NEEDS AND THE TRAIL NEVER DID. Crumbs
+    // used to be keyed by position, and position is stable in a trail because
+    // the trail is rebuilt whole on every address change. A tab set is not: a
+    // close removes one item from the middle and React must move the survivors
+    // rather than relabel them, or the tab under the pointer inherits the
+    // closed one's identity. The address is that identity.
+    key: crumb.closeKey ?? `crumb-${String(index)}`,
+    href: crumb.href,
+    label:
+      crumb.closeKey && onCloseCrumb ? (
+        <>
+          {crumb.label}
+          <span
+            data-tab-close={crumb.closeKey}
+            aria-hidden="true"
+            className="motion-hover text-ink-tertiary hover:text-foreground -me-1 inline-flex cursor-pointer items-center"
+          >
+            <X aria-hidden="true" />
+          </span>
+        </>
+      ) : (
+        crumb.label
+      ),
+  }))
 
   /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
    * one control in the app that names a section rather than a destination, so
@@ -1402,14 +1488,75 @@ export function AppShell({
              inline form the law names. */
           trail.length === 0 ? undefined : (
             <BreadcrumbFolders
-              items={trail}
+              items={crumbItems}
+              /* A TAB SET DOES NOT FOLD; A TRAIL STILL DOES.
+
+                 The kit's default is the client's own 2026-09-02 ruling about
+                 the TRAIL — "Four levels render in full. At five or more,
+                 everything between the first and the parent collapses into one
+                 `···` tab" — and it is left exactly as it is whenever this
+                 strip is drawing one (`onCloseCrumb` absent).
+
+                 It is the wrong rule for a set of OPEN TABS, and for two
+                 separate reasons. A trail's middle is the least interesting
+                 part of it (the head and the page you are on are what a reader
+                 is looking for); a tab set has no middle in that sense — every
+                 tab is there because somebody deliberately put it there, and
+                 hiding five of eight inside a menu is the opposite of "all tabs
+                 i open stay open". And the fold's own menu is a `DropdownMenu`,
+                 which PORTALS its items outside this `<nav>` — so the close
+                 interception below, which is on the nav, cannot see a click on
+                 a folded tab's × at all. A tab that could be opened and not
+                 closed would be the worst of the three states.
+
+                 `foldAfter` is the kit's own prop for exactly this — "a call
+                 site with a genuinely narrower slot may say fewer" — read the
+                 other way: this slot holds a different KIND of thing. At the
+                 set's own ceiling nothing can ever exceed it, so the strip
+                 scrolls instead, which is what Chrome's own tab strip does and
+                 what `BreadcrumbFolders` is already built for (`STRIP` is
+                 `overflow-x-auto`, and it scrolls the last tab into view on
+                 every change — and the last tab is the active one). */
+              foldAfter={onCloseCrumb ? MAX_OPEN_TABS : undefined}
               onClickCapture={(e) => {
+                // THE × FIRST, AND IT MUST BE FIRST. A close mark sits INSIDE
+                // the anchor (see `crumbItems` for why it cannot be a sibling
+                // button today), so the anchor lookup below would otherwise
+                // find it and navigate to the tab the person just asked to
+                // shut. Capture phase + `stopPropagation` also keeps the
+                // browser's own activation of the link from running.
+                const closer = (e.target as HTMLElement).closest("[data-tab-close]")
+                const closeKey = closer?.getAttribute("data-tab-close")
+                if (closeKey && onCloseCrumb) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onCloseCrumb(closeKey)
+                  return
+                }
                 const a = (e.target as HTMLElement).closest("a")
                 if (!a) return
                 const href = a.getAttribute("href")
                 if (!href || !href.startsWith("/")) return
                 e.preventDefault()
                 ;(onNavigate ?? softNavigate)(href)
+              }}
+              // MIDDLE-CLICK CLOSES A TAB, which is the gesture the client is
+              // already asking us to replicate ("the tab behaviour of chrome")
+              // and the one place where matching Chrome costs a single handler.
+              // `onAuxClick` fires for button 1 only after the browser's own
+              // auxiliary action would have opened a new window, so it is
+              // cancelled here for a tab that is ours to close; a middle-click
+              // anywhere else in the strip is left alone.
+              onAuxClick={(e) => {
+                if (e.button !== 1 || !onCloseCrumb) return
+                const href = (e.target as HTMLElement).closest("a")?.getAttribute("href")
+                // Only a tab, and only one this strip is actually holding — the
+                // handler is on the whole `<nav>`, so it must not act on an
+                // href it does not recognise.
+                const tab = trail.find((crumb) => crumb.href === href && crumb.closeKey)
+                if (!tab?.closeKey) return
+                e.preventDefault()
+                onCloseCrumb(tab.closeKey)
               }}
             />
           )

@@ -55,6 +55,13 @@ import { ApiFailure } from "@/lib/api"
 import type { TaskView } from "@/lib/live-resources"
 import { registerHostGo } from "@/lib/nav"
 import { readSlot, rememberPath, writeSlot } from "@/lib/nav-memory"
+import {
+  closeTab,
+  setWorkspaceScope,
+  useOpenTabs,
+  visitTrail,
+  type OpenTab,
+} from "@/lib/workspace-tabs"
 import { RememberedScreen } from "@shared/web/remembered"
 import { usePermissions } from "@/lib/perms"
 import { useScreenData } from "@/lib/use-screen-data"
@@ -62,6 +69,66 @@ import { useScreenActions } from "@/lib/use-screen-actions"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { TEAM_SECTIONS, type Crumb } from "@/lib/pages"
 import { useLanguage } from "@shared/web/language"
+
+/** THE ACCOUNT SCREENS' OWN NAMES, so they can be tabs like everything else.
+ *
+ * `buildCrumbs` (deep-link/crumbs.ts) reads `TEAM_SECTIONS` and knows nothing
+ * about /settings or /profile — those five screens render straight in the shell
+ * and have always built their one crumb by hand, in the branch below. The words
+ * are lifted from that branch unchanged, so nothing new is said to anybody:
+ * every one of them is already in the catalogue, and `t(…)` is applied at the
+ * READ (below) exactly as it is for `sectionTitle`'s own words.
+ *
+ * WELCOME IS DELIBERATELY ABSENT. It has never carried a crumb — it is the
+ * app's front door, the thing the brand mark goes to — so it has no tab either,
+ * and standing on it leaves the tab set untouched rather than adding a rung
+ * saying "you are at the beginning". */
+const ACCOUNT_TAB_TITLE: Record<string, string> = {
+  settings: "Settings",
+  kwapso: "Kwapso",
+  invitations: "Invites",
+  profile: "Your profile",
+}
+
+/** IS THERE ROOM FOR A TAB STRIP — the whole of the workspace tabs' mobile
+ * ruling, as one boolean.
+ *
+ * There is no room on a phone, and the kit has already said so about this exact
+ * strip: below `md`, `BreadcrumbFolders` stops drawing tabs entirely and draws
+ * the plain text trail instead (client, 2026-09-04, "in monile, lets use normal
+ * breadcrumbs… jhust teh text"). A set of OPEN TABS rendered as a run of words
+ * separated by dots is not a smaller tab strip, it is a lie about what those
+ * words are — they would read as a path and be a workspace.
+ *
+ * So the model is OFF below `md`, and off means off: the shell draws the
+ * ordinary trail, and nothing calls `visitTrail`, so a phone session
+ * accumulates no set at all rather than filling one up invisibly behind a strip
+ * that never shows it. A tablet or a rotated phone crossing the breakpoint
+ * picks the model up from that moment, with whatever this device had stored.
+ *
+ * `48rem` IS THE KIT'S OWN `md` AND NOT A SECOND NUMBER — the width where
+ * `ScreenShell` puts the rail away and where the strip swaps for the text
+ * trail. A media query resolves font-relative units against the INITIAL font
+ * size (16px), never the app's own root, so this and the CSS gate flip at the
+ * same 768 CSS px and cannot drift.
+ *
+ * IT STARTS FALSE AND IS ANSWERED IN AN EFFECT, which is the safe direction of
+ * that guess: the server renders no tabs, the first client render matches it,
+ * and the shell falls back to the ordinary trail — the same thing a phone gets
+ * and the same thing this product drew before tabs existed. A wide screen then
+ * has one extra render. The opposite default would flash a tab strip onto a
+ * phone. */
+function useRoomForTabs(): boolean {
+  const [wide, setWide] = React.useState(false)
+  React.useEffect(() => {
+    const query = window.matchMedia("(min-width: 48rem)")
+    const read = () => setWide(query.matches)
+    read()
+    query.addEventListener("change", read)
+    return () => query.removeEventListener("change", read)
+  }, [])
+  return wide
+}
 
 export function DeepLinkScreen() {
   const active = useActiveTeam()
@@ -278,6 +345,137 @@ export function DeepLinkScreen() {
   // invite inbox) navigate through the History API instead of router.push — no reload.
   React.useEffect(() => registerHostGo(go), [go])
 
+  // ── WHAT SHE HAS OPEN ──────────────────────────────────────────────────────
+  //
+  // THE CLIENT, 2026-09-06: "i am in a detail app, but i click the first tab
+  // 'apps' see all the apps but the detail where i was stays open… all tabs i
+  // open stay open unless i close them."
+  //
+  // The whole model lives in `web/lib/workspace-tabs.ts` — the six decisions
+  // (the URL, persistence, the ceiling, what a background tab costs, the phone,
+  // and where closing lands) are argued there rather than here. This block is
+  // the WIRING, and it is deliberately three facts and two effects:
+  //
+  //   · the trail, as tabs — one entry per crumb, so a cold deep link seeds a
+  //     set identical to the trail this product already drew and the screen a
+  //     person lands on looks exactly as it did yesterday;
+  //   · the set, read back out of the store;
+  //   · whether the strip is drawing the SET or the TRAIL.
+  //
+  // IT IS COMPUTED UP HERE, ABOVE THE EARLY RETURNS, because these are hooks
+  // and the account screens return their own shell further down — the tab set
+  // has to be the same one on both sides of that branch or /settings would
+  // silently keep a second workspace.
+  const roomForTabs = useRoomForTabs()
+  // The crumbs, for BOTH branches. The account screens' one hand-built crumb
+  // used to be computed inside their own branch; it is lifted here so the trail
+  // and the tab set are built from one array rather than two.
+  const teamName = active.ctx?.team?.name ?? "Team"
+  const accountModule = ACCOUNT_MODULES.includes(module ?? "")
+  const accountTitle = ACCOUNT_TAB_TITLE[module ?? ""]
+  // THE GATE IS STILL GONE (Aurora, 2026-09-03 — the long note further down
+  // this file, and web/test/nested-routes.test.ts, which reads these two lines
+  // off the disk). Every module screen asks `buildCrumbs` for its trail, with
+  // nothing in front of the ask; what moved on 2026-09-06 is only WHERE the ask
+  // happens — up here with the hooks, because the workspace tab set is built
+  // from the same array and the account screens return before the old position.
+  const showCrumbs = true
+  const crumbs = showCrumbs
+    ? buildCrumbs({
+        levels: trail,
+        t,
+        topLevel,
+        module,
+        recordId,
+        teamName,
+        teamPath,
+        sectionPath,
+        records: crumbRecords,
+        resolved: resolvedNames,
+      })
+    : []
+  // …and the five account screens' own single crumb, which `buildCrumbs` has
+  // never known about (it reads `TEAM_SECTIONS`, and /settings is not one).
+  // Lifted out of their branch below so the trail and the tab set are built
+  // from ONE array on both sides of that early return.
+  const screenCrumbs: Crumb[] = accountModule
+    ? accountTitle
+      ? [{ label: t(accountTitle) }]
+      : []
+    : crumbs
+  // EVERY CRUMB IS A PLACE, AND ITS `href` IS THAT PLACE'S ADDRESS — except the
+  // last, which is the page you are on and carries none by design (a crumb for
+  // where you already are is not a link). So the current address fills that one
+  // in, and the result is the trail expressed as tabs, outermost first.
+  const tabEntries: OpenTab[] = screenCrumbs.map((crumb) => ({
+    path: crumb.href ?? currentPath,
+    label: crumb.label,
+  }))
+  // WHOSE TABS, IN WHICH TEAM. Both halves are in the key — see the store.
+  const workspaceScope =
+    active.user?.id && teamId ? `${active.user.id}:${teamId}` : null
+  React.useEffect(() => {
+    setWorkspaceScope(workspaceScope)
+  }, [workspaceScope])
+  // THE ENTRIES RIDE A REF AND THE EFFECT WATCHES A STRING. `tabEntries` is a
+  // fresh array on every render, so naming it as a dependency would re-run this
+  // on every render (and re-order the strip under somebody's pointer). What
+  // actually changed is the ADDRESS and the NAMES along it — the names matter
+  // because a crumb's label arrives late, after the by-id read in
+  // `useTrailNames` lands, and that second pass is exactly when a tab's
+  // remembered name gets corrected from "Account" to the client's own name.
+  const entriesRef = React.useRef(tabEntries)
+  entriesRef.current = tabEntries
+  const tabsKey = tabEntries.map((entry) => `${entry.path} ${entry.label}`).join("")
+  // NOT WHILE THE URL IS STILL UNREAD. `route` is null until the client has
+  // read `window.location` (a static export cannot prerender an id), and until
+  // then `buildCrumbs` answers the only question an empty trail allows — the
+  // team overview. Opening a tab for that would put a place nobody asked for at
+  // the front of the strip on every cold boot.
+  const routeReady = !!route
+  React.useEffect(() => {
+    if (!roomForTabs || !workspaceScope || !routeReady) return
+    visitTrail(entriesRef.current)
+  }, [roomForTabs, workspaceScope, routeReady, tabsKey])
+  const openTabs = useOpenTabs()
+  // THE STRIP DRAWS THE SET ONLY WHEN THE SET AGREES WITH THE ADDRESS.
+  //
+  // `BreadcrumbFolders` paints the LAST tab as the live one — that is the whole
+  // folder joint, the tab that IS the card. So a set whose last entry is not
+  // the screen underneath it would draw a lie, and there are three ordinary
+  // moments when that is briefly true: the very first paint (the store is empty
+  // until the effect above runs), a phone (nothing is ever recorded), and
+  // Welcome, which has no crumb and therefore no tab. In every one of them the
+  // strip falls back to the ordinary trail — which is what this product drew
+  // before tabs existed, so the fallback is never a degraded state, just the
+  // previous one.
+  const showTabSet =
+    roomForTabs && openTabs.length > 0 && openTabs[openTabs.length - 1].path === currentPath
+  const stripCrumbs: Crumb[] = showTabSet
+    ? openTabs.map((tab, index) => ({
+        label: tab.label,
+        // The live tab is the page you are on and carries no href, exactly as
+        // the last crumb of a trail does; every other tab is a real link, so
+        // middle-click and copy-address keep working on a workspace tab the way
+        // they already do on a crumb (R37 — the shell intercepts the plain left
+        // click and nothing else).
+        href: index === openTabs.length - 1 ? undefined : tab.path,
+        closeKey: tab.path,
+      }))
+    : screenCrumbs
+  // CLOSING ONE. The store decides where the survivors leave you; this only
+  // MOVES when the tab that closed was the one being looked at — closing a
+  // background tab must not navigate, which is the entire point of a background
+  // tab.
+  const closeWorkspaceTab = React.useCallback(
+    (path: string) => {
+      const landing = closeTab(path)
+      if (path !== currentPath) return
+      go(landing ?? sectionPath)
+    },
+    [currentPath, go, sectionPath]
+  )
+
   // A CSS selector the agent asked us to ring briefly (the traced control).
   const traceHighlight = useTraceRing({ teamId, onTeam, go })
 
@@ -383,19 +581,19 @@ export function DeepLinkScreen() {
   // aren't team-scoped module content, so they skip the team tabs / queries / membership
   // gate below. Because they live inside this one never-unmounting shell, moving in and
   // out of them (and into /t) is soft History-API nav — no reload anywhere.
-  if (ACCOUNT_MODULES.includes(module ?? "")) {
-    const accountCrumbs: Crumb[] =
-      module === "settings"
-        ? [{ label: t("Settings") }]
-        : module === "kwapso"
-          ? [{ label: t("Kwapso") }]
-          : module === "invitations"
-          ? [{ label: t("Invites") }]
-          : module === "profile"
-            ? [{ label: t("Your profile") }]
-            : []
+  if (accountModule) {
+    // The one crumb these screens carry is built with everything else, above
+    // (`ACCOUNT_TAB_TITLE` → `crumbs`), so an account screen is an ordinary tab
+    // rather than a hole in the strip: standing on Settings with three records
+    // open keeps all three, and Settings joins them.
     return (
-      <AppShell active={active} breadcrumbs={accountCrumbs} onNavigate={go} activePath={currentPath}>
+      <AppShell
+        active={active}
+        breadcrumbs={stripCrumbs}
+        onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+        onNavigate={go}
+        activePath={currentPath}
+      >
         {/* The account screens get a memory too — the Kwapso page is a record
             with tabs, and it is a rail destination like any other. */}
         <RememberedScreen memory={screenMemory}>
@@ -423,7 +621,6 @@ export function DeepLinkScreen() {
   // wrong team's name/logo in the header/breadcrumb during the hop.
   if (teamId && !isMemberOfUrlTeam && teamCount > 0) return <ShellLoading />
 
-  const teamName = active.ctx.team?.name ?? "Team"
   const myUserId = active.user?.id ?? null
   // Import has no read-right of its own — it's gated per-target. You can reach it
   // if you can CREATE into any supported target (member roles, dropdown values,
@@ -489,21 +686,13 @@ export function DeepLinkScreen() {
   // with it. Its author's objection — that a crumb repeated what the sidebar
   // already said — is recorded rather than deleted, because it still applies
   // to any future attempt to put a second, textual trail back on a screen.
-  const showCrumbs = true
-  const crumbs = showCrumbs
-    ? buildCrumbs({
-        levels: route.levels,
-        t,
-        topLevel,
-        module,
-        recordId,
-        teamName,
-        teamPath,
-        sectionPath,
-        records: crumbRecords,
-        resolved: resolvedNames,
-      })
-    : []
+  //
+  // AND SINCE 2026-09-06 THE STRIP CAN BE DRAWING A SECOND THING — the set of
+  // places she has OPEN rather than the one she is at. `crumbs` (built with the
+  // hooks, far above, because the account screens return before this point) is
+  // still exactly the trail this paragraph describes, and it is still what the
+  // strip draws on a phone and on the first paint; `stripCrumbs` is the tab set
+  // when there is one. See the "what she has open" block above.
   //
   // THIS RULING IS ADDITIVE, NOT A REVERSAL: a trail whose only job is the
   // path BACK to the parent collection ("Tickets" → this record) names no
@@ -518,7 +707,13 @@ export function DeepLinkScreen() {
   // top-level address (`/stories`, `/sprints`, `/accounts`…).
 
   return (
-    <AppShell active={active} breadcrumbs={crumbs} onNavigate={go} activePath={currentPath}>
+    <AppShell
+      active={active}
+      breadcrumbs={stripCrumbs}
+      onCloseCrumb={showTabSet ? closeWorkspaceTab : undefined}
+      onNavigate={go}
+      activePath={currentPath}
+    >
       {/* data-trace marks the screen the agent just drove; the ring is a short-lived
        * glance cue (auto-cleared) so the user sees WHERE a traced change landed. It
        * rings the content region — a just-opened dialog draws the eye on its own. */}
@@ -629,7 +824,20 @@ export function DeepLinkScreen() {
         saveInternalRecord={saveInternalRecord}
         setInternalActive={setInternalActive}
         closePanel={closePanel}
-        onRecordGone={() => replace(sectionPath)}
+        /* THE RECORD IS GONE, AND SO IS ITS TAB. Archiving or removing the
+           record you are looking at used to just replace the address with its
+           collection; with a tab set that would have left a tab pointing at a
+           record nobody can open — the one thing a persistent strip must never
+           accumulate, because unlike a trail it does not rebuild itself.
+           `closeTab` returns the survivor to land on, which is the neighbour
+           tab rather than the collection whenever there is one: closing a dead
+           record should leave you where you were before you opened it, not at
+           the top of a list. `replace`, not `go`, is unchanged — the dead
+           address must not stay in the history for Back to return to. */
+        onRecordGone={() => {
+          const landing = showTabSet ? closeTab(currentPath) : null
+          replace(landing ?? sectionPath)
+        }}
       />
     </AppShell>
   )

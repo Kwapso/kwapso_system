@@ -521,8 +521,18 @@ export const CONCEPT_ICON = {
 } as const
 
 
-/** A breadcrumb step. `href` omitted = the current (non-link) page. */
-export type Crumb = { label: string; href?: string }
+/** A breadcrumb step. `href` omitted = the current (non-link) page.
+ *
+ * `closeKey` IS THE WORKSPACE-TAB HALF, and it is optional because the two
+ * things this strip can be drawing are genuinely different facts. A TRAIL step
+ * (`buildCrumbs`, deep-link/crumbs.ts) is derived from the address and cannot
+ * be closed — there is nothing to close, it is just where you are. An OPEN TAB
+ * (web/lib/workspace-tabs.ts) is a place somebody is holding, and holding it is
+ * a decision they must be able to reverse; the key is that tab's own address,
+ * which is what `onCloseCrumb` is handed back. A crumb with no `closeKey` draws
+ * exactly as it always has — which is what the phone, and every screen while
+ * the tab set is still empty, gets. */
+export type Crumb = { label: string; href?: string; closeKey?: string }
 
 /** Is `path` the active nav destination for the current `pathname`? */
 export function isNavActive(path: string, pathname: string): boolean {

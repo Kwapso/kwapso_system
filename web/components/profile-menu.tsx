@@ -35,6 +35,7 @@ import { personName, personInitials } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { forgetEverything } from "@/lib/nav-memory"
+import { forgetOpenTabs } from "@/lib/workspace-tabs"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 
@@ -167,6 +168,13 @@ export function ProfileMenu({
               // in this document when the next person signs in and would hand
               // them somebody else's trail. Same sentence as the line above it.
               forgetEverything()
+              // …AND THE TABS SHE HAD OPEN, which is the one of the three that
+              // outlives the document: the nav memory and the form drafts are
+              // in-memory/session, and the workspace tab set is `localStorage`
+              // so it would still be here tomorrow for whoever signs in next.
+              // Every scope is dropped, not just the team that happens to be
+              // loaded (web/lib/workspace-tabs.ts).
+              forgetOpenTabs()
               router.replace("/login")
             })
           }
