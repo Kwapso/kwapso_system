@@ -515,6 +515,34 @@
    toward, exactly as the bar did, with a caret now saying the same thing a
    second way for the one edge (the rail) that already had a glyph for it.
 
+   ═══ AND THE RAIL'S HANDLE LEFT THAT RULE ON 2026-09-06 ══════════════════
+   THE TWO SENTENCES ABOVE ARE NOW THE ASIDE'S ALONE. The client moved the
+   rail's handle off the mid-edge and down to the foot, verbatim: *"bring the
+   ocntract sidebra button next to the avtara card in sidebar, aligned
+   horizontally but 50% inside the navbar and 50% outside"* and *"when
+   contracted place he button avobe the avatra round image"*. So the rail's
+   handle is a FOOT control now — beside the member chip and straddling the
+   card's leading edge when the rail is open, above the bare avatar and
+   centred in the icon rail when it is shut — and its position says WHOSE
+   sidebar this is rather than which way the column travels. The caret is
+   what carries the direction there, which is why the rail was the edge that
+   had one all along. The whole argument, including which x counts as "the
+   boundary" and what was rejected, is at the rail dock's own `placement`.
+
+   THE ASIDE'S HANDLE IS UNTOUCHED and still reads exactly as written above:
+   outer rim open, inner edge shut, mid-edge in both.
+
+   ONE MORE LINE IN THIS SECTION IS OLDER THAN THE CODE, and it is flagged
+   rather than rewritten because it is not this pass's ruling to redo: "WHY
+   32, NOT `Button`'s OWN 40", below, argues for a literal 32px, and
+   `HANDLE_HIT` has since been changed to `size-[var(--control-height-button)]`
+   on a later client instruction ("make the button same size as the + button
+   on collections, needs to be bigger") — see that constant, which states its
+   own reason. The rail's new placement derives its offsets from
+   `--control-height-button` because that is what the button MEASURES today;
+   anyone reviving the 32px argument has to move the placement with it, and
+   it will move correctly on its own if the token is what changes.
+
    THE FILL IS `--btn-primary-fill` / `--btn-primary-label`, NOT `--spine-ink`.
    The bar's whole colour argument was about staying legible while being
    nearly INVISIBLE — a hairline that had to hold contrast against six
@@ -552,7 +580,9 @@
    LITERAL 32px, in both dimensions, that does not move with the scale.  32
    over 44 (the bar's old hit-height) because the circle is now the visible
    mark and not a hit area wrapping one: the rail's own `--rail-inset`
-   padding is 18.75–24px depending on density, and a 44px circle flush to the
+   padding is 18.75px at both densities since 2026-09-06 (it was 18.75–24px
+   when this paragraph was written; see `DENSITY_RAIL`), and a 44px circle
+   flush to the
    column's outer rim would print mango over the leading edge of whatever
    nav row sits at the vertical centre — the exact "never covers a row"
    guarantee the bar section stated for its own 20px width. 32 keeps that
@@ -1790,9 +1820,59 @@ const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
 const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
 const ASIDE_BODY = cn("pb-[var(--aside-inset)]");
 
-/** How much air each door spends. Structure is identical; only the inset moves. */
+/* How much air each door spends. Structure is identical; only the inset moves.
+
+   THE RAIL'S INSET IS NOW `--shell-gutter`'s OWN VALUE AT BOTH DENSITIES, AND
+   THAT IS THE SECOND HALF OF A CHANGE THAT WAS LEFT HALF-DONE ON 2026-09-03.
+
+   CLIENT, 2026-09-06, VERBATIM: *"there's too much margin from sidebar to
+   content, make it slimmer, same as weverywhere else"*. The operative clause
+   is the last one. "Everywhere else" is not a mood, it is a NUMBER: the air
+   between the card and the window on its other three sides, between the card
+   and the assistant, between the assistant and the window — all of it is one
+   token, `--shell-gutter`, and all of it measures 18.75 at the kit's own 15px
+   root. Whatever the sidebar's edge ends up being, if it is not 18.75 it is
+   not "the same as everywhere else".
+
+   MEASURED BEFORE THIS CHANGE, at 1440 x 900, comfortable, expanded rail: the
+   rail's own items ended at x 172.5 and the card began at x 213.75 — 41.25 of
+   air, made of TWO numbers doing one job. `--rail-inset` (22.5) held the rail's
+   items off the column's trailing edge, and then the dock spent
+   `--shell-gutter` (18.75) again getting from that same edge to the card. The
+   viewer cannot see the seam between them, because the rail column paints
+   NOTHING at all (`background-color: rgba(0, 0, 0, 0)`, measured) — the mango
+   a reader sees behind the rail is the SPINE, on the screen, which runs under
+   both. So the two insets read as one 41.25 margin against an 18.75 one
+   everywhere else, which is exactly the complaint.
+
+   THE DOCK'S TRAILING GUTTER IS THE ONE THAT GOES (see the rail dock, below)
+   AND THIS LINE IS WHY THAT ALONE WAS NOT ENOUGH. Dropping the dock's gutter
+   leaves the gap at whatever `--rail-inset` is, and `--rail-inset` was 22.5 —
+   slimmer, but still not the number the second half of the sentence names. Two
+   values that are nearly the same, one of them 20% larger, is the condition
+   that produced the complaint in the first place.
+
+   AND IT IS NOT A NEW NUMBER OR A NEW TOKEN — IT IS THE STEP `DENSITY_GUTTER`
+   ALREADY TOOK AND THE RAIL WAS LEFT OUT OF. Read that block below: on
+   2026-09-03 the gutter moved from `--space-6` to `--space-5` on the owner's
+   "same margins everywhere", and its own comment still asserts the rail's
+   inset "IS the same `--space-6` / `--space-5` pair". That sentence stopped
+   being true the moment the gutter stepped and the rail did not — the two had
+   been one rhythm and the step split them, which is precisely the 22.5-against-
+   18.75 mismatch measured above. So this is the same one-rung step, on the
+   same scale already in `tokens.css`, applied to the value that was missed.
+
+   COMFORTABLE NOW EQUALS CALM ON THIS PROPERTY TOO, exactly as it already does
+   on the gutter, and for the same reason: whether the two densities should
+   diverge again lower down the scale is a separate call the owner has not
+   made, so calm is untouched and both read `--space-5`.
+
+   WHAT THE RAIL LOSES BY IT, honestly: its content box grows from 150 to 157.5
+   wide in a 195 column, so a truncating destination label gets 7.5px more room
+   — a gain, not a loss. Nothing in `rail.tsx` writes a width, and its rows all
+   fill the column's content box, so there is nothing to re-derive there. */
 const DENSITY_RAIL: Record<ScreenDensity, string> = {
-  comfortable: "[--rail-inset:var(--space-6)]",
+  comfortable: "[--rail-inset:var(--space-5)]",
   calm: "[--rail-inset:var(--space-5)]",
 };
 
@@ -3185,22 +3265,70 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             positioned box, and that pairing is what makes the handle's rule
             expressible in two classes.
 
-            OPEN, the handle takes `start-0`: the dock's leading edge IS the
-            rail's outer rim, flush to the window, which is where the client's
-            spine screenshots have always put that edge.
-            SHUT, it takes `end-[var(--shell-gutter)]`: one gutter in from the
-            dock's trailing edge is exactly the COLUMN's inner edge, whatever
-            width the icon rail happens to be.
+            ═══ THE DOCK'S TRAILING GUTTER IS GONE, 2026-09-06 ═══════════════
+            CLIENT, VERBATIM: *"there's too much margin from sidebar to
+            content, make it slimmer, same as weverywhere else"*.
 
-            Either way the 32px circle lands mostly inside the column's own
-            `--rail-inset` padding (18.75–24px depending on density), close
-            enough to it that it never reaches a row's own icon or label —
-            see "WHY 32, NOT `Button`'s OWN 40" in the file header for the
-            arithmetic and the honest edge case it does not fully clear. */}
+            The whole arithmetic and the ruling on which of the two numbers to
+            drop is written out at `DENSITY_RAIL` above; what happens HERE is
+            the removal of `pe-[var(--shell-gutter)]` from this line. The dock
+            is now exactly its column: 195 wide expanded, the icon rail's own
+            width collapsed, and the card begins at its trailing edge.
+
+            WHY THIS GUTTER AND NOT THE RAIL'S OWN INSET, ARGUED RATHER THAN
+            ASSUMED — because either one, deleted, would have produced a
+            slimmer edge and only one of them is the redundant one.
+
+              · THE RAIL'S INSET IS LOAD-BEARING ON FOUR SIDES. `--rail-inset`
+                is the padding on `RAIL_COLUMN`, so it holds the rail's items
+                off the window at the LEADING edge and off the top and bottom
+                as well. Delete it and the rail's rows run into the window's
+                own edge, which is the one thing every screenshot of this
+                product has never shown. Delete only its trailing half and the
+                rail is inset by one number on three sides and a different
+                number on the fourth, which is the asymmetry this pass exists
+                to remove. It also does real work the gutter cannot do: it is
+                the padding the member chip's own pill sits inside, so the
+                chip's leading and trailing air are the same measure.
+              · THIS GUTTER WAS ONLY EVER THE SEAM. It separated the dock from
+                the content column, and the dock's trailing edge is not a
+                thing a reader can see: the rail column paints nothing
+                (measured `rgba(0, 0, 0, 0)`), so the "sidebar" a viewer
+                perceives is the spine running under everything, and the seam
+                lands in the middle of an unbroken ground. It was air between
+                two invisible edges, spent on top of air that was already
+                there.
+
+            SO THE GAP IS NOW MADE BY EXACTLY ONE NUMBER, the rail column's own
+            trailing `--rail-inset`, which since `DENSITY_RAIL` above resolves
+            to the same `--space-5` `--shell-gutter` does. MEASURED at 1440 x
+            900, comfortable, expanded: sidebar items end at 176.25, the card
+            begins at 195, gap 18.75 — the same 18.75 the card keeps against
+            the window on its other three sides. Collapsed: avatar ends at
+            48.75, card begins at 67.5, gap 18.75. Before this change both
+            measured 41.25.
+
+            THE CONTENT COLUMN'S `md:ps-0` IS STILL RIGHT AND IS DELIBERATELY
+            NOT TOUCHED. Its rule is "the inline gutters are paid by whoever is
+            there to pay them", and the dock is still there paying this one —
+            it is simply paying it out of the rail's inset now instead of out
+            of a second inset of its own. Adding `md:ps-[var(--shell-gutter)]`
+            back would restore the doubled 37.5 under a different name.
+
+            ═══ WHERE THE HANDLE STANDS ═════════════════════════════════════
+            NO LONGER A MID-EDGE GRAB IN EITHER STATE — see the `placement`
+            below, which quotes the two client instructions that moved it and
+            argues the boundary it is centred on. What is worth saying at THIS
+            level is why the pairing described at the top of this block still
+            matters after the gutter went: the dock is the handle's containing
+            block, and now that the dock's trailing edge IS the card's leading
+            edge, "the boundary a viewer sees" and "this box's end" are the
+            same coordinate. The straddle is therefore expressible as an inset
+            on this box, with no measurement and no second element. */}
         {railNode ? (
           <div
             data-slot="screen-shell-rail-dock"
-            className="relative hidden flex-none pe-[var(--shell-gutter)] md:flex"
+            className="relative hidden flex-none md:flex"
           >
             <div
               data-slot="screen-shell-rail"
@@ -3235,9 +3363,164 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 )
               }
               onToggle={toggleRail}
+              /* ═══ THE HANDLE COMES DOWN TO THE FOOT, 2026-09-06 ══════════
+                 TWO CLIENT INSTRUCTIONS, VERBATIM, AND THEY ARE ONE CONTROL
+                 IN TWO STATES:
+
+                   (2) "bring the ocntract sidebra button next to the avtara
+                        card in sidebar, aligned horizontally but 50% inside
+                        the navbar and 50% outside"
+                   (3) "when contracted place he button avobe the avatra round
+                        image"
+
+                 So: EXPANDED it stands beside the member chip, on the seam
+                 between the sidebar and the content, half over each.
+                 COLLAPSED it stands above the bare round avatar, centred in
+                 the icon rail's column. Both axes of both states are in this
+                 one `placement` string, which is exactly what that prop was
+                 made caller-owned for (see `EdgeHandle.placement`: "One
+                 `placement` string, both axes, chosen by the caller from its
+                 own state") — no second prop, no boolean meaning "but not
+                 centred", no class fixed inside `HANDLE_HIT`.
+
+                 WHAT THIS REPLACES. Until today both states were a MID-EDGE
+                 GRAB: `top-1/2 -translate-y-1/2`, with `start-0` expanded and
+                 `end-[var(--shell-gutter)]` collapsed — measured at 1440 x
+                 900 with its centre at y 450, the viewport's exact middle,
+                 beside a nav row and nowhere near the person's own face. That
+                 placement said which way the column was about to travel and
+                 nothing else. The client has asked for it to say WHOSE
+                 sidebar it is instead, by putting it at the foot with the
+                 member.
+
+                 ───────────────────────────────────────────────────────────
+                 WHICH x IS "THE BOUNDARY" FOR THE 50/50 STRADDLE
+                 ───────────────────────────────────────────────────────────
+                 The card's LEADING EDGE, and there is only one honest
+                 candidate. "50% inside the navbar and 50% outside" is a claim
+                 about what a reader SEES, and what a reader sees is not the
+                 rail's box: `screen-shell-rail` paints nothing at all
+                 (`background-color: rgba(0, 0, 0, 0)`, measured), so there is
+                 no painted sidebar edge anywhere. The mango a viewer calls
+                 "the navbar" is the SPINE, on `screen-shell-card`, and the
+                 spine runs edge to edge under the whole window — under the
+                 rail, under the gutter, and behind the card. The ONLY visible
+                 line between "sidebar" and "content" on the entire screen is
+                 where the card's own off-beige begins. So that is the line
+                 the button is centred on, and half of it lies on the spine
+                 and half of it lies on the card, which is what a reader will
+                 read as half in and half out.
+
+                 AND IT IS THE SAME COORDINATE AS THIS DOCK'S TRAILING EDGE,
+                 which is what makes it expressible without measuring
+                 anything. Since the dock's own trailing gutter came off (see
+                 above), the dock ends exactly where the card starts — 195 at
+                 1440 expanded, 67.5 collapsed. The dock is this button's
+                 containing block, so `-end-[calc(--control-height-button/2)]`
+                 pushes the button's trailing edge half its own width past that
+                 line and lands its CENTRE on it. HALF THE BUTTON'S OWN SIZE
+                 TOKEN, never a literal 18.75: `HANDLE_HIT` sizes the circle
+                 with `--control-height-button`, so if that token ever moves
+                 the straddle stays 50/50 by derivation instead of by two
+                 numbers that agree today.
+
+                 AND THE HALF THAT LIES ON THE CARD COVERS NOTHING THE CARD
+                 DRAWS, which is the other half of "50% outside" and the half
+                 that could have been a defect. The overhang is half the
+                 button, 18.75; the card body's own leading padding is 30 at
+                 this width (`DENSITY_BODY`'s `lg:p-[var(--space-7)]`), so the
+                 button's trailing edge stops 11.25 short of the first pixel of
+                 content — measured, and hit-tested at that content edge, which
+                 returns the body and not the handle. The button is over the
+                 card's own margin, never its content. It DOES lie over the
+                 card's rounded bottom-leading corner, which is exactly the
+                 effect asked for, and it paints above it: `HANDLE_HIT` is
+                 `z-10` inside a `z-auto` dock, so it competes directly with
+                 `CARD`'s `z-[2]` in the SCREEN's stacking context and wins.
+                 `document.elementFromPoint` returns the handle at its centre
+                 and at all four of its quarter-points, in every state.
+
+                 REJECTED, AND WHY. (a) Centring on the rail COLUMN's trailing
+                 edge — identical coordinate today, but only by accident: it
+                 stops being the card's edge the moment anything is put back
+                 between the two columns, and it is an edge nobody can see. (b)
+                 Centring on the rail's CONTENT edge (where the chip's pill
+                 actually ends, 176.25) — that is a real visible line, but it
+                 is the line the client called "too much margin" one sentence
+                 earlier, and straddling it would put the whole button inside
+                 the gutter she had just asked to shrink. (c) Measuring the
+                 card in an effect and positioning off it — forbidden outright,
+                 and unnecessary: the two edges are the same box's edge.
+
+                 ───────────────────────────────────────────────────────────
+                 THE VERTICAL, EXPANDED — "aligned horizontally" WITH THE CHIP
+                 ───────────────────────────────────────────────────────────
+                 Her "aligned horizontally" means the two objects sit on one
+                 horizontal line, i.e. their vertical CENTRES match. The chip
+                 is the last child of a rail that fills this dock, so its
+                 centre's distance from the dock's own bottom is arithmetic on
+                 tokens and needs no measurement:
+
+                     rail column's bottom padding          --rail-inset
+                   + half the chip's height        --space-1 + --avatar-md / 2
+
+                 `rail.tsx` states that height explicitly and states why —
+                 "THE AVATAR NOW SETS THE HEIGHT and the `--space-1` padding
+                 around it becomes real: 4 + 32 + 4 = 40" — so the chip is
+                 `--space-1` twice plus `--avatar-md`, with no type in the
+                 measurement since the client removed the role line. Take off
+                 half the button's own height and that is its `bottom`.
+
+                 IT IS WRITTEN AS THE WHOLE CALC EVEN THOUGH IT CANCELS TODAY.
+                 At today's tokens the chip's height (3.75 + 30 + 3.75 = 37.5)
+                 IS `--control-height-button` (37.5), so the two halves cancel
+                 and the expression collapses to plain `--rail-inset`. Writing
+                 `bottom-[var(--rail-inset)]` instead would be a third pair of
+                 numbers that happen to agree — it would silently misalign the
+                 day the avatar rung or the button rung moves, and the reader
+                 who found it would have no way to know it had ever been a
+                 derivation. The calc costs one long line and states the
+                 relationship it is standing on.
+
+                 ───────────────────────────────────────────────────────────
+                 THE COLLAPSED STATE — ABOVE THE FACE, AND THE LANE IT NEEDS
+                 ───────────────────────────────────────────────────────────
+                 Horizontally the icon rail is a symmetric column and the
+                 avatar is centred in it, so the button is centred in it too:
+                 `start-0 end-0` plus `mx-auto`, which centres a
+                 fixed-width absolute box in its containing block. NOT
+                 `start-1/2 -translate-x-1/2` — that pairs a LOGICAL inset with
+                 a PHYSICAL translate, so it centres in LTR and throws the
+                 button a full width off in RTL, and this file names no
+                 physical side anywhere. `mx-auto` is symmetric, so it is
+                 direction-blind by construction.
+
+                 Vertically it sits `--space-3` above the avatar's top edge:
+                 `--rail-inset` (the column's bottom padding) + `--avatar-md`
+                 (the face) + `--space-3` (the air between them) is the
+                 button's own `bottom`. `--space-3` because that is the gap
+                 the COLLAPSED rail already sets between its own circles
+                 (`rail.tsx`'s nav takes `gap-[var(--space-3)]` when
+                 collapsed), so the button joins the ladder that is already
+                 there instead of introducing a spacing of its own.
+
+                 AND THE ROW ABOVE HAD TO BE GIVEN THE ROOM — see
+                 `MEMBER_HANDLE_LANE` in `rail.tsx`. A 37.5 circle dropped into
+                 the collapsed rail's `--space-6` foot gap would have covered
+                 26.25px of the last nav row, and a destination under an opaque
+                 mango circle is a destination nobody can press. Measured with
+                 a deliberately over-full rail (40 entries) on
+                 `verify/rail-foot/`, in both cases, before and after. */
               placement={cn(
-                "top-1/2 -translate-y-1/2",
-                isRailCollapsed ? "end-[var(--shell-gutter)]" : "start-0",
+                isRailCollapsed
+                  ? cn(
+                      "start-0 end-0 mx-auto",
+                      "bottom-[calc(var(--rail-inset)_+_var(--avatar-md)_+_var(--space-3))]",
+                    )
+                  : cn(
+                      "-end-[calc(var(--control-height-button)/2)]",
+                      "bottom-[calc(var(--rail-inset)_+_var(--space-1)_+_var(--avatar-md)/2_-_var(--control-height-button)/2)]",
+                    ),
               )}
             />
           </div>
@@ -3722,11 +4005,17 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
             would still have landed at the window regardless of the new
             padding) — so the placement has to move in step with it, from
             the window's edge to the ASIDE COLUMN's own outer edge, one
-            gutter in. This is the identical formula the rail's own SHUT
-            state already uses to find ITS column's edge past a `pe-gutter`
-            (`placement={isRailCollapsed ? "end-[var(--shell-gutter)]" : ...}`
-            above) — read here for the open case instead of the collapsed
-            one, because this dock's extra padding is on the open case.
+            gutter in. This USED TO BE the identical formula the rail's own
+            SHUT state read to find ITS column's edge past a `pe-gutter`, and
+            THAT CROSS-REFERENCE IS RETIRED AS OF 2026-09-06: the rail dock no
+            longer HAS a trailing gutter (the client's "make it slimmer, same
+            as weverywhere else" — see `DENSITY_RAIL` and the rail dock above),
+            so its column's edge and its dock's edge are now one coordinate and
+            it needs no formula to step past anything. This aside dock still
+            pays a `pe-` when it is open and so still needs one, which is why
+            the line below stays exactly as it was — the two docks have simply
+            stopped being the same shape, and a note claiming they still are
+            would be the next reader's wrong lead.
             SHUT, the column is not rendered at all — zero width, no strip, no
             icons, client verbatim — so the dock IS the gutter, ONLY
             `--shell-gutter` (18.75–20px) wide with no buffer past it to the

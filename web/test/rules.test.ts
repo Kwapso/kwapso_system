@@ -2960,6 +2960,100 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.
+   *
+   * THE SUBJECT IS DERIVED, never listed. A record detail is drawn by rendering
+   * the kit's `<RecordDetail>` (components/record-detail) or its `<RecordChrome>`
+   * template, and this app has exactly two files that do — `RecordScreen`
+   * (web/components/record-chrome.tsx, the thirteen hand-composed screens) and
+   * `renderDetail` (shared/web/screen-engine/screen-renderer.tsx, the five
+   * recipe-driven ones, on BOTH front doors). A third would be caught by the
+   * same census the day it is written, which is the entire point: the defect
+   * this law closes is a class that was correct on the path it was written for
+   * and invisible to the path that came after.
+   *
+   * SCOPED TO THE THREE APP ROOTS. `tools/screen-builder/samples/` also renders
+   * `<RecordDetail>` and is deliberately outside: it is the kit's own component
+   * gallery, whose job is to draw each vendored export RAW with dummy content.
+   * A record title there is not a record title, it is a specimen — so it is out
+   * by scope rather than by an exemption entry that would have to be maintained.
+   *
+   * COMMENTS STRIPPED FIRST (CONVENTIONS.md). record-chrome.tsx now carries a
+   * long comment naming `RECORD_TITLE_TREATMENT` where the constant used to be
+   * defined, and record-heading-clamps.test.tsx mentions `<RecordChrome>` in
+   * prose — on raw text the first would keep this check green after the
+   * className was deleted, and the second would report a test file as an
+   * unwired detail screen. */
+  function detailCallSites(): { rel: string; props: string; source: string }[] {
+    return sourceFiles(
+      [join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")],
+      { extensions: [".tsx"], relativeTo: ROOT }
+    ).flatMap((f) => {
+      const source = stripComments(f.source)
+      return [...source.matchAll(/<Record(?:Chrome|Detail)[\s\n]/g)].map((m) => {
+        // The props window runs to the tag's own self-closing line — a line
+        // that is nothing but `/>` — rather than a fixed character count, so a
+        // call site cannot pass by having the constant mentioned somewhere
+        // BELOW it, and a long one cannot fall out of the window and vanish.
+        const rest = source.slice(m.index)
+        const close = rest.search(/\n\s*\/>/)
+        return { rel: f.rel, props: close === -1 ? rest : rest.slice(0, close), source }
+      })
+    })
+  }
+
+  it("record-title-treatment: both detail paths set the record title the same way (R52)", () => {
+    const sites = detailCallSites()
+
+    // i · THE TRIPWIRE. A census that finds nothing agrees with itself. Two is
+    // the real number today and the law is about there being MORE than one.
+    expect(
+      sites.length,
+      "R52 — the detail-screen census found fewer than two `<RecordDetail>`/`<RecordChrome>` call sites in web/, web-portal/ and shared/web/. Either the scan went blind (a renamed tag, a moved file) or a detail path was deleted — fix the scan before trusting the result"
+    ).toBeGreaterThan(1)
+
+    // ii · EVERY ONE OF THEM APPLIES THE ONE CONSTANT, and imports it rather
+    // than declaring a same-named local — a private copy is the exact fault
+    // this law exists to stop, and it would satisfy a name-only assertion.
+    const unwired = sites.filter((s) => !s.props.includes("RECORD_TITLE_TREATMENT"))
+    expect(
+      unwired.map((s) => s.rel),
+      "R52 — these draw a record detail without `RECORD_TITLE_TREATMENT` in their className, so their record titles fall back to the kit's own `titleSize = \"h3\"` (24px) while every other detail screen is at 44px. Apply the constant from shared/web/record-heading.tsx — do NOT retype the class"
+    ).toEqual([])
+
+    const unimported = sites.filter(
+      (s) => !/import\s*\{[^}]*\bRECORD_TITLE_TREATMENT\b[^}]*\}\s*from\s*"[^"]*record-heading"/.test(s.source)
+    )
+    expect(
+      unimported.map((s) => s.rel),
+      "R52 — these name `RECORD_TITLE_TREATMENT` without importing it from shared/web/record-heading: a local constant of the same name is a second copy of the decision, which is the drift this law closes"
+    ).toEqual([])
+
+    // iii · AND NONE OF THEM ARGUES WITH IT. `titleSize` is the kit's own prop
+    // for this exact question; a call site passing one is a second answer.
+    const competing = sites.filter((s) => /\btitleSize\s*=/.test(s.props))
+    expect(
+      competing.map((s) => s.rel),
+      "R52 — these pass their own `titleSize` to a detail component. That is the kit's own answer to the same question `RECORD_TITLE_TREATMENT` answers, and two answers is how the two paths drifted apart in the first place. If the kit's `Title` has finally grown an h1 rung, change the CONSTANT and both paths follow"
+    ).toEqual([])
+
+    // iv · THE CONSTANT ITSELF IS STILL THE THING. Every assertion above is
+    // satisfied by an identifier; this is the one that says what the identifier
+    // has to BE. Matched as the whole declaration, not as a substring search
+    // for "text-4xl" — that string appears in this repo's prose and in other
+    // components, so a bare `includes` would stay green over an emptied
+    // constant.
+    const heading = readFileSync(join(ROOT, "shared/web/record-heading.tsx"), "utf8")
+    expect(
+      /export const RECORD_TITLE_SIZE\s*=\s*"\[&_\[data-slot=title-heading\]\]:text-4xl"/.test(heading),
+      "R52 — `RECORD_TITLE_SIZE` must stay the h1/44 step reached through the kit's OWN `data-slot=title-heading` hook: `[&_[data-slot=title-heading]]:text-4xl`. The kit's `Title` has no h1 rung (h2/32, h3/24, h4/20 only), so this descendant selector is the only way to the step the design kit names \"Record heading\" without hand-editing the vendored file (R39)"
+    ).toBe(true)
+    expect(
+      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{RECORD_TITLE_SIZE\}\s\$\{TITLE_ACTIONS_SPLIT\}`/.test(heading),
+      "R52 — `RECORD_TITLE_TREATMENT` must still be built from `RECORD_TITLE_SIZE` and `TITLE_ACTIONS_SPLIT`. The two travel as ONE string on purpose: they are one decision about one row (how big the record's name is set, and how much of its row it may claim before the buttons wrap under it), and a call site that could apply one without the other is a call site that will"
+    ).toBe(true)
+  })
+
   it("aside-collapse: the assistant minimises rather than vanishing, and is inert when shut (R51)", () => {
     const shell = stripComments(
       readFileSync(join(ROOT, "shared/ui/compositions/templates/screen-shell.tsx"), "utf8")
@@ -3090,6 +3184,7 @@ describe("RULES — the laws of the base", () => {
       "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
+      "record-title-treatment", // R52: the both-detail-paths title census above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

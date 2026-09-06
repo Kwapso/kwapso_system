@@ -211,6 +211,12 @@ demo/          THE BOOK — five parts and thirty pages, navigated one page at a
                time: foundations · components · charts · data views · screens.
                Live at https://kwapso-ui-ux.kwapso.workers.dev
                demo/book.ts is the map; demo/check-book.mjs guards it.
+               `npm run deploy` publishes it. DO THIS WHEN YOU CUT A TAG —
+               the book is a static build and is only as current as its last
+               deploy. It went eight kit commits stale in two days, and the
+               only thing that caught it was somebody recognising a component.
+               The header now prints the tag it was built from, so the next
+               time it drifts the page says so.
 verify/        decision artefacts and a smoke build — NOT delivered
 KWAPSO-SPEC.md the artifact, verbatim. The king. Its OVERRIDE REGISTER lists
                every place a client decision beats the artifact text — read it

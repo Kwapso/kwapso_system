@@ -586,6 +586,72 @@ const ROW_BLOCKED = "cursor-not-allowed text-[var(--spine-ink-disabled)]";
 const ROW_PRESSABLE = "cursor-pointer active:translate-y-[0.0625rem]";
 
 /* ----------------------------------------------------------------------------
+   THE LANE ABOVE THE COLLAPSED FACE — SPACE THIS FILE RESERVES FOR A CONTROL
+   IT DOES NOT DRAW, AND THAT SENTENCE IS THE WHOLE OBJECTION TO IT. Answered
+   rather than dodged, because the alternative is worse and was tried.
+
+   CLIENT, 2026-09-06, VERBATIM: *"when contracted place he button avobe the
+   avatra round image"*. The button is `ScreenShell`'s edge handle — the one
+   that replaced this file's own foot toggle on the 2026-09-02 approval (see
+   `RailProps.collapsible`, still typed, still off, still never to be turned
+   on) — and the shell positions it absolutely inside the rail DOCK, which is
+   this component's own containing box.
+
+   THE COLLISION, MEASURED BEFORE ANYTHING WAS BUILT. Collapsed, this rail's
+   foot gap is the root's `gap-[var(--space-6)]` — 22.5px between the last nav
+   row and the face. The handle is `--control-height-button` (37.5) and sits
+   `--space-3` (11.25) above the face, so it wants 48.75 of that 22.5 and
+   covers 26.25px of the LAST NAV ROW. The nav is a scroller and its last row
+   is a real destination sitting at the bottom of its box whenever the register
+   is longer than the column — which on a product rail it always is. A
+   destination under an opaque mango circle is a destination nobody can press,
+   and this file has shipped a visible-but-unpressable control once already.
+
+   WHY THE RESERVATION LIVES HERE AND NOT IN THE SHELL. Three ways were open:
+
+     · PAD THE RAIL COLUMN FROM THE SHELL. The shell can add padding to the
+       column, but the column's padding is OUTSIDE this component — everything
+       in the rail moves up together, the face included, and the strip that
+       opens up is BELOW the face, which is the one place the client did not
+       ask for the button. It cannot put air between two of this file's own
+       children.
+     · REACH INTO THIS FILE FROM THE SHELL with an arbitrary descendant
+       variant (`[&_[data-slot=rail-member]]:mt-…`). That works and is the
+       worst of the three: the shell would be writing this component's
+       internal layout from outside, through a selector that breaks silently
+       the day a `data-slot` moves, with no comment on this side to warn the
+       next reader why their margin has a value they did not write.
+     · PUT IT ON THE `<nav>` AS `mb-…`. One place instead of two, but that
+       element already carries the negative `-m-[…]` focus-ring gutter, so a
+       `mb-` would REPLACE the bottom half of it (tailwind-merge resolves `mb`
+       over `m`) and slice the focus ring off the last row — trading a
+       covered row for an invisible focus state. Expressible only by folding
+       `--focus-offset` and `--focus-width` into this calc as well, which
+       makes a spacing decision unreadable to protect a line width.
+
+   So it is a margin on the FACE, declared and explained on the side that owns
+   the layout. It is `--control-height-button + --space-3` — the button's own
+   height plus the same gap the shell places it at — and it is ADDITIVE to the
+   root's `--space-6`, so what a reader sees above the button is that same
+   `--space-6` the collapsed foot always had, with the button sitting in the
+   new lane below it. Every term is a token the two files already share; no
+   number is written down in either.
+
+   IT IS SCOPED TO THE COLLAPSED STATE ONLY. Expanded, the handle straddles the
+   dock's trailing edge beside the chip and is not in this column's flow at
+   all, so there is nothing to reserve and nothing is reserved.
+
+   AND A `Rail` MOUNTED WITHOUT A SHELL KEEPS THE LANE. Accepted knowingly: the
+   collapsed rail gains 48.75px of air above its face and nothing stands in it.
+   The alternative is a prop — `handleLane`, or worse a `hasEdgeHandle` — which
+   would make forty call sites responsible for a fact that is true of every one
+   of them, and would be the second source of truth for a state this repo has
+   twice now reduced to one. `Rail` is documented throughout as the shell's
+   navbar; a standalone mount is a specimen page, and a specimen page with
+   slightly airy feet is not a defect anyone can see. */
+const MEMBER_HANDLE_LANE = "mt-[calc(var(--control-height-button)_+_var(--space-3))]";
+
+/* ----------------------------------------------------------------------------
    Public shapes.
    -------------------------------------------------------------------------- */
 
@@ -1462,9 +1528,17 @@ function MemberChip({
     /* Collapsed, the chip is the face alone — "at the same circular size as
        the avatar" is the size every collapsed entry took, so the column reads
        as one ladder. No pill: a container around a circle is two boxes. */
+    /* BOTH BRANCHES TAKE `MEMBER_HANDLE_LANE`, and it is applied twice rather
+       than hoisted into a wrapper for a reason: `data-slot="rail-member"` is
+       what every harness and both applications query for the foot, and wrapping
+       it in a spacing div would make that slot's rect a box the reader cannot
+       see the edges of. The margin belongs to the face itself. */
     if (member.href === undefined && member.onSelect === undefined) {
       return (
-        <div data-slot="rail-member" className="flex justify-center">
+        <div
+          data-slot="rail-member"
+          className={cn("flex justify-center", MEMBER_HANDLE_LANE)}
+        >
           {face}
         </div>
       );
@@ -1472,7 +1546,7 @@ function MemberChip({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <MemberControl member={member} className="rounded-pill">
+          <MemberControl member={member} className={cn("rounded-pill", MEMBER_HANDLE_LANE)}>
             {face}
           </MemberControl>
         </TooltipTrigger>

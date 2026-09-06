@@ -71,7 +71,7 @@ import {
 import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
 import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
-import { clampRecordHeading } from "../record-heading"
+import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "../record-heading"
 
 /* ------------------------- host-injected contracts ------------------------- */
 
@@ -964,7 +964,32 @@ function renderDetail(
       tabs={detailTabs}
       onTabChange={(v) => onIntent?.({ kind: "tab", tab: v })}
       panel={panelBody}
-      className="w-full"
+      /* THE SAME TITLE TREATMENT THE BESPOKE DETAILS WEAR — R52, added
+         2026-09-06. `RECORD_TITLE_TREATMENT` (shared/web/record-heading.tsx)
+         is the h1/44 step and the 80% title/actions split as ONE string, and
+         `web/components/record-chrome.tsx` applies exactly this same constant
+         to the thirteen hand-composed detail screens.
+
+         WITHOUT IT THIS PATH DREW A DIFFERENT SCREEN FROM THE SAME MODEL.
+         Both constants used to be private to record-chrome.tsx, so nothing
+         here applied either: `RecordDetail` fell through to the kit's own
+         `titleSize = "h3"` default and set every recipe record's name at 24px
+         where the bespoke path set it at 44px — five screens, `team.detail`
+         (the app's own landing screen) among them, disagreeing with thirteen
+         for no reason anybody chose. Nobody could see it in review either,
+         because the difference is a DEFAULT on one path and a class on the
+         other, and neither file mentions the other.
+
+         IT LANDS ON THE SAME ELEMENT FROM A DIFFERENT ROOT. `RecordChrome`
+         (the kit template the bespoke path goes through) puts its className on
+         a wrapper ABOVE `[data-slot=record-detail]`; this puts it ON that node.
+         Both selectors inside the constant are descendant selectors under
+         `[data-slot=title]` / `[data-slot=title-heading]`, which are inside
+         `RecordDetail` either way.
+
+         `cn` rather than a template string so tailwind-merge sees `w-full` and
+         the arbitrary-variant classes as the separate groups they are. */
+      className={cn("w-full", RECORD_TITLE_TREATMENT)}
     />
   )
 }

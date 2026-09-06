@@ -54,7 +54,7 @@ import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activ
 import { InAppLink } from "@/components/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
-import { clampRecordHeading } from "@shared/web/record-heading"
+import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -596,41 +596,30 @@ const FOOTER_TO_BOTTOM =
   "[&_[data-slot=record-detail]]:flex-1 [&_[data-slot=record-detail]]:min-h-0 " +
   "[&_[data-record-region=footer]]:mt-auto"
 
-/** THE RECORD'S OWN TITLE STEP — CLIENT CORRECTION, 2026-08-31, verbatim:
- * "title on main screens still way too small! it's currently smaller than in
- * detail screens. makes no sense." True, and the reference "Kwapso UI Kit.dc.html"
- * scale says exactly why: display-m/56 is named "Page title" (a main screen's
- * own heading, collection-heading.tsx's own note) and h1/44 is named "Record
- * heading" — a MAIN screen's title is meant to be the LARGER of the two.
- *
- * THIS IS A VENDORED KIT BUG, NOT AN APP CHOICE, AND IT GOES DEEPER THAN
- * `SHAPE_HEADING_SIZE` (states.tsx). `RecordChrome` (the vendored template,
- * compositions/templates/record-chrome.tsx) feeds `RecordDetail` a
- * `titleSize` capped at `SHAPE_HEADING_SIZE`'s own "h2" | "h3" union — but the
- * REAL ceiling is one layer down: `RecordDetail` renders the title through the
- * kit's `Title` primitive (components/title/title.tsx), and `Title`'s own
- * `size` ladder has ONLY THREE RUNGS — h2 (32), h3 (24), h4 (20) — with no h1
- * (44) and no display-m (56) rung AT ALL. `Headline` (components/typography/
- * typography.tsx), the OTHER kit primitive this app already uses for every
- * main-screen title, has both — so the same 44/56 steps exist in the token
- * system and in one kit component, and are simply unreachable from the other.
- * Filed upstream (kwapso-design / kwapso-ui-ux): `Title` needs an `h1` (and
- * ideally `display-m`) rung added to its own `size` variant, matching
- * `Headline`'s ladder exactly, so `RecordDetail` can ask for one directly.
- *
- * `shared/ui/` is vendored and pinned (CLAUDE.md, R39) and cannot be
- * hand-edited here, so this reaches the kit's OWN rendered heading from
- * outside — `[data-slot=title-heading]` is `Title`'s own stable hook — the
- * exact precedent `auth-card.tsx` sets for the sign-in screen's centring: a
- * descendant selector targeting the kit's own data-slot, never a class edited
- * into the vendored file. `text-4xl` is the h1 step's OWN Tailwind utility —
- * tokens.css's `@theme inline` block bridges its font-size, line-height AND
- * letter-spacing together (the same bridge `text-3xl` already gets), so one
- * class is the whole step, not a raw `text-[length:…]` that would silently
- * drop the other two (typography.tsx's own warning). No `!` needed: the
- * attribute-selector descendant this compiles to already outweighs `Title`'s
- * own bare `.text-3xl`/`.text-2xl` class on specificity alone. */
-const RECORD_TITLE_SIZE = "[&_[data-slot=title-heading]]:text-4xl"
+/* THE RECORD'S OWN TITLE STEP (h1/44) AND THE TITLE/ACTIONS SPLIT (80%) BOTH
+   MOVED OUT OF THIS FILE, 2026-09-06 — they are `RECORD_TITLE_TREATMENT` in
+   `shared/web/record-heading.tsx` now, which carries the whole reasoning for
+   each (the kit's `Title` has no h1 rung; the client's "reserve a % on the
+   left for the buttons") verbatim.
+
+   WHY THEY LEFT. Both were PRIVATE constants here, and this file is only ONE
+   of the two ways this app draws a record detail. The other —
+   `renderDetail` in `shared/web/screen-engine/screen-renderer.tsx`, which
+   draws `team.detail`, `members.detail`, `invites.detail`, `brand.detail` and
+   `purposes.detail` on both front doors — could not see either of them, so it
+   fell through to the kit's own `titleSize = "h3"` and drew record names at
+   24px where the thirteen screens below drew them at 44px. `team.detail` is
+   the app's own landing screen. R52 is the law that now censuses both paths
+   against the one constant, so the next patch to a record's title line cannot
+   land on one path and miss the other.
+
+   NOTHING ELSE IN THIS FILE MOVED. `FOOTER_TO_BOTTOM`, `PANEL_BELOW_TABS`,
+   `RECORD_TABS_GEOMETRY` and `STICKY_TABS` stay private on purpose: they
+   correct where THIS path puts its tab strip (inside the panel card, because
+   this app hands its whole `TabsView` down through `panel`), and the recipe
+   path has no such correction to make — the kit draws its strip as region 2,
+   already a sibling above the card. See `RECORD_TITLE_TREATMENT`'s own note
+   for the full reasoning. */
 
 /** THE IDENTITY ROW'S OWN GEOMETRY — see `RecordScreen`'s own note at its
  * `identityChips`, below, for why this exists (a bigger, better-spaced pill
@@ -947,7 +936,7 @@ export function RecordScreen({
   // width in the first place, and `break-words` is what it shrinks INTO instead
   // of pushing `actions` past the edge of the row. A LONG but BREAKABLE title
   // needed a second fix on top of this one — see `TITLE_ACTIONS_SPLIT`'s own
-  // comment, below the component, for why `actions` could still end up wrapping
+  // comment (shared/web/record-heading.tsx) for why `actions` could still end up wrapping
   // onto a second line under a long multi-word title even with `min-w-0` here.
   //
   // THE PILLS ROW — the title block below needs `identityChips` as its own
@@ -1080,7 +1069,7 @@ export function RecordScreen({
           rendered; the file that drew it is deleted, and the tab strip below
           is now the only thing a scrolled record screen pins. */}
       <RecordChrome
-        className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS} ${TITLE_ACTIONS_SPLIT}`}
+        className={`${FOOTER_TO_BOTTOM} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
            HEADER TOO", this file's header comment. `headerMark` (the local
            variable that used to fold `leading`/`mark` together) is deleted;
@@ -1115,55 +1104,6 @@ export function RecordScreen({
   )
 }
 
-/** THE TITLE COLUMN NEVER YIELDS THE WHOLE ROW TO A LONG NAME — CLIENT
- * RULING, 2026-09-01, verbatim: "i want that the space in screen for title
- * is, f.e. 80% of the width. that we always reserve a % on the left for the
- * buttons (so the current behaviour when long titles that the buttons go
- * under is wrong)." `actions` sharing the title's own row (override 73) is
- * what put Edit "aligned with the title" in the first place; a title long
- * enough could still push it onto a SECOND line underneath, which is the
- * defect this fixes.
- *
- * WHY A DESCENDANT SELECTOR. `title`/`actions` are threaded into the kit's
- * `Title` primitive (shared/ui/components/title/title.tsx), one layer below
- * `RecordDetail` — vendored and pinned (R39), so this file cannot hand-edit
- * it the way `RECORD_TITLE_SIZE` above already explains for the same
- * component. `Title`'s own row is a plain `flex flex-wrap items-end gap-4`:
- * the eyebrow+heading wrapper is a bare `<div className="min-w-0">` with no
- * `data-slot` of its own, and `actions` renders as `[data-slot=title-actions]`
- * only when given. `[&_[data-slot=title]>div:not([data-slot=title-actions])]`
- * reaches the FIRST kind of child by ruling OUT the one child that DOES carry
- * a name, rather than by counting on it being first — `Title`'s own source
- * always renders the heading wrapper before `actions` today, but "not the
- * actions div" describes the same element without leaning on that order.
- *
- * THE MECHANICS. A wrapping flex row decides whether its items fit on ONE
- * line using each item's flex-basis, not its post-shrink width — an item
- * whose basis is `auto` (content) gets its own unbroken text width as that
- * basis, so a long single-line title (its max-content width, before
- * `break-words` ever gets a chance to run) can by itself already exceed the
- * row, and `actions` — the sibling with nowhere else to go — is what wraps to
- * a second line UNDER the title, exactly the client's complaint (the title's
- * own `min-w-0` this file already sets, above, only lets it SHRINK once
- * placed on a line; it does nothing to the placement decision itself).
- * Setting the heading wrapper's basis to a real, definite value — `0%`, not
- * `auto` — takes it out of that decision entirely (its hypothetical size for
- * the fit test is now zero, so it never causes a wrap by itself); Tailwind's
- * `flex-1` (`flex: 1 1 0%`) is both of those in one utility — grow, shrink,
- * and the zero basis — so it lets the wrapper grow back to fill whatever room
- * `actions` doesn't need, and `max-w-[80%]` is the ceiling the client asked
- * for — even where `actions` is a single small button, the title is never
- * handed the WHOLE row. `actions` keeps its own natural width — `shrink-0`
- * guards it from ever losing the argument the title used to win by growing
- * straight through it. Long text still wraps/clamps WITHIN the title's own
- * shrunk column, via `min-w-0` + `break-words` (this component's own title
- * span) and `clampRecordHeading` — this class only changes how much of the
- * ROW that column may claim. */
-const TITLE_ACTIONS_SPLIT =
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:min-w-0 " +
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:max-w-[80%] " +
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:flex-1 " +
-  "[&_[data-slot=title-actions]]:shrink-0"
 
 /** THE TWO NUMBERS BOTH RULES BELOW SHARE, AS CUSTOM PROPERTIES RATHER THAN
  * LITERALS. Round two (below) escaped the tab strip with a flat `-mt-[170px]`
