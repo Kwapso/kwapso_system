@@ -3461,11 +3461,13 @@ export const SEED: Catalogue = {
     es: "Cuánto tarda un ticket en cerrarse",
     ca: "Quant triga un tiquet a tancar-se",
   },
-  "Working days only — Saturday and Sunday do not count towards how long it took.": {
-    de: "Nur Werktage — Samstag und Sonntag zählen nicht dazu, wie lange es gedauert hat.",
-    es: "Solo días laborables: el sábado y el domingo no cuentan para lo que tardó.",
-    ca: "Només dies laborables: el dissabte i el diumenge no compten per al que va trigar.",
-  },
+  /* THE "WORKING DAYS ONLY" CAPTION WAS RETIRED HERE, 6 Sep 2026 — client:
+     "remove the subtitle 'working days only.' It's not needed. We already know
+     it." The SENTENCE is gone; the arithmetic it described has not moved an
+     inch (`shared/business-days.ts` is still under both reads on that panel).
+     Its seed entry goes with it rather than being left behind to be translated
+     on every build for a screen that no longer says it — R28's ORPHAN clause,
+     applied on this side of the pipeline. */
   "What it is now": {
     de: "Wie es jetzt ist",
     es: "Cómo está ahora",
@@ -3480,6 +3482,20 @@ export const SEED: Catalogue = {
     de: "{count} abgeschlossen",
     es: "{count} cerrados",
     ca: "{count} tancats",
+  },
+  /* ONE MONTH OF THE TREND, said twice from one string — inside the hover card
+     the client asked for ("when I hover over the graphic on a specific day, it
+     has a little modal that gives me the info for this date") and, joined with
+     the month and the kind, as the accessible NAME of the hit area that opens
+     it. Seeded in all three rather than left to the next translation run, for
+     the reason the block above this one gives: this screen has no rows, so its
+     sentences are the whole of what a reader gets, and the count a median was
+     taken over is precisely the half that stops the median being misread.
+     {median} and {count} must survive intact and keep their names. */
+  "{median} days, from {count} closed": {
+    de: "{median} Tage, aus {count} abgeschlossenen",
+    es: "{median} días, de {count} cerrados",
+    ca: "{median} dies, de {count} tancats",
   },
   "Middle ticket {median} days · middle half {low} to {high} · longest {max}": {
     de: "Mittleres Ticket {median} Tage · mittlere Hälfte {low} bis {high} · längstes {max}",

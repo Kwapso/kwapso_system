@@ -255,8 +255,10 @@ function PagedPanelBody<T>({
    * Only the app record's Tickets tab passes one today — its list and its
    * dashboard are two views of one tab, because a record's tab cannot grow a
    * strip of its own ("there can never be 2 rows of tabs"). Every other panel
-   * here has one body and passes nothing, which draws nothing: `ViewSwitch`
-   * renders below two views, so the absence is self-enforcing. */
+   * here has one body and PASSES NOTHING, which draws nothing. Note the
+   * distinction since kit v1.2.60: passing NO slot is still silent, but
+   * passing a single view now draws a static label naming it — so "one body"
+   * and "no switch" stopped being the same statement. */
   view?: ToolbarViewSlot
 }) {
   const t = useT()
@@ -1297,6 +1299,14 @@ export function AppTicketsTab({
         helpTypeOptions={helpTypeOptions ?? []}
         ticketTotal={ticketTotal ?? undefined}
         viewSlot={viewSlot}
+        // "RAISE A TICKET", ON BOTH VIEWS OF THIS TAB. The list view gets it
+        // from `PagedPanelBody`'s own `onNew`, which builds exactly this
+        // `<AddButton>` into `<PagedFind>`'s `actions` slot; the dashboard's own
+        // `<ToolbarRow>` had no actions at all until 6 Sep 2026 ("on the
+        // dashboard, I'm missing the full toolbar"). Same label, same glyph,
+        // same slot in the same fixed order, so pressing the view switch does
+        // not move the button that sits beside it.
+        actions={onNew ? <AddButton label={t("Raise a ticket")} onClick={onNew} /> : null}
       />
     )
 

@@ -182,7 +182,19 @@ export function TicketChips({
           // stylesheet and nothing focusable may restate it or suppress the
           // outline. The radius is here only so the shared ring follows the
           // lozenge it wraps instead of drawing a rectangle around it.
-          className="rounded-pill"
+          //
+          // `inline-flex items-center` IS AN ALIGNMENT FIX, and worth naming.
+          // `AppLink` is a BARE `<a>` — `in-app-link.tsx` forwards `className`
+          // onto the anchor and adds nothing — so with only `rounded-pill` it
+          // stayed an INLINE box. An inline anchor's height is its LINE BOX,
+          // not its content, so it stood taller than the badge inside it, and
+          // the row's own `items-center` dutifully centred that taller box —
+          // leaving this one chip sitting low while the three beside it sat
+          // true. Client: "what's wrong with alignment chips??"
+          //
+          // Making the anchor a flex box collapses it onto the badge it wraps,
+          // so what gets centred is the chip rather than a line box around it.
+          className="inline-flex items-center rounded-pill"
         >
           <Badge variant="secondary" size="pill">
             {ticket.appName}

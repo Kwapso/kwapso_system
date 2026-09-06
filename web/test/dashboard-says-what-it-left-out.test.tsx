@@ -27,6 +27,7 @@
 // off-by-one walking the trend's runs is a blank panel in production and a
 // green build everywhere else.
 
+import * as React from "react"
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -168,12 +169,46 @@ describe("the tickets dashboard says what it left out", () => {
     ).toBeTruthy()
   })
 
-  it("says the weekend does not count, on the panel that counts durations", () => {
-    // The client's ruling is invisible in a number — 4 days and 4 days look
-    // identical whichever clock produced them — so the panel that reports one
-    // has to say which clock it used.
+  it("no longer says the weekend does not count — she already knows (6 Sep 2026)", () => {
+    // THE SENTENCE WENT; THE ARITHMETIC DID NOT. Her words: "remove the subtitle
+    // 'working days only.' It's not needed. We already know it." The panel's
+    // durations are still counted Monday to Friday by the one shared seam
+    // (`shared/business-days.ts`, under both of the door's reads) — the caption
+    // was a description of that, never the thing itself. Asserted as an ABSENCE
+    // rather than deleted, because the previous version of this test asserted
+    // its presence and a removed test proves nothing: the caption coming back on
+    // somebody's next pass at this panel is exactly the regression to catch.
     show(FULL)
-    expect(screen.getByText(/Saturday and Sunday do not count/i)).toBeTruthy()
+    expect(
+      screen.queryByText(/Saturday and Sunday do not count/i),
+      "the retired 'working days only' subtitle is back on the closing-time panel"
+    ).toBeNull()
+    // …and the panel it belonged to still draws, so this is a removed line and
+    // not a removed panel.
+    expect(screen.getByText("How long a ticket takes to close")).toBeTruthy()
+  })
+
+  it("shows the middle ticket, the middle half and the longest AT REST, never behind a hover", () => {
+    // CLIENT, 6 Sep 2026: "it brings me a lot of value (the subtitle of, for
+    // example, 'middle ticket 0 days,' blah blah blah), but I wonder: this
+    // information only appears when I hover over the type."
+    //
+    // The three figures are drawn as a paragraph under each type's own bar and
+    // always have been — there is no hover affordance anywhere on this panel.
+    // Locked here so that stays true: this is the one panel on the screen whose
+    // value is a SENTENCE rather than a shape, and hiding it behind an
+    // interaction is a one-line change nothing else in this repo would notice.
+    show(FULL)
+    // Both kinds that closed anything, each with its own figures, in the DOM at
+    // rest — no pointer, no focus, no `title` attribute standing in for text.
+    expect(
+      screen.getByText(/Middle ticket 4 days · middle half 2 to 9 · longest 31/i),
+      "Issue's closing-time summary is not rendered at rest"
+    ).toBeTruthy()
+    expect(
+      screen.getByText(/Middle ticket 18 days · middle half 9 to 34 · longest 96/i),
+      "Request's closing-time summary is not rendered at rest"
+    ).toBeTruthy()
   })
 
   it("draws the whole screen over a full answer without falling over", () => {
@@ -196,7 +231,10 @@ describe("the tickets dashboard says what it left out", () => {
     // that keeps it out of the plot's arithmetic while keeping it visible
     // beside its own name in the legend.
     expect(document.querySelectorAll("polyline").length, "the areas joined across a dropped month").toBe(1)
-    expect(document.querySelectorAll("line").length, "a lone month vanished off the plot").toBe(2)
+    expect(
+      document.querySelectorAll('[data-slot="trend-point"]').length,
+      "a lone month vanished off the plot"
+    ).toBe(2)
   })
 
   it("says the matrix has nothing to compare yet, rather than drawing an empty grid", () => {
@@ -264,7 +302,12 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
     // suite above proves for the whole-team screen. A "mini version" that
     // stopped saying what it left out would be the worse half of this feature.
     expect(screen.getByText(/788 older tickets have no record/i)).toBeTruthy()
-    expect(screen.getByText(/Saturday and Sunday do not count/i)).toBeTruthy()
+    expect(
+      screen.getByText(
+        new RegExp(`at least ${CLOSURE_TREND_MIN_CLOSURES} of a kind closed`, "i")
+      ),
+      "the app's own dashboard drew the trend without naming the floor under it"
+    ).toBeTruthy()
   })
 
   it("offers no Client filter, because an app is built for one client", () => {
@@ -289,5 +332,195 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
       screen.getByRole("combobox", { name: "View" }),
       "the dashboard view drew no way back to the list"
     ).toBeTruthy()
+  })
+})
+
+// ── THE CLIENT'S SEVEN, 6 SEPTEMBER 2026 ────────────────────────────────────
+//
+// She reviewed the shipped screen and sent one list. Four of the seven are
+// invisible to every other check in this repo — an ORDER, a ROW COUNT, a
+// PRESENT BUTTON and a REACHABLE FIGURE all render the same words as their
+// broken twins, so nothing but a test that reads the DOM can tell them apart.
+// The other three (the taller plot, the month rules, the retired caption) are
+// covered above or are pure geometry.
+
+/** The vocabulary as a team might really hold it: NOT in the client's order (the
+ * seed's own order starts with Question), and FIVE words rather than four — the
+ * base seeds Requirements alongside the four the client named. Both facts are
+ * load-bearing below, and both are true of a real team today. */
+const SCRAMBLED = ["Question", "Extra", "Requirements", "Request", "Issue"]
+
+function showWith(
+  types: string[],
+  props: Partial<React.ComponentProps<typeof TicketsDashboard>> = {}
+) {
+  holder.view = FULL
+  return render(
+    <TicketsDashboard teamId="T1" helpTypeOptions={types} ticketTotal={62} {...props} />
+  )
+}
+
+describe("the open work is one row per stage, with the kinds named on top", () => {
+  it("draws ONE grid row per stage, however many kinds the team uses", () => {
+    // THE DEFECT, IN ONE SENTENCE. This panel used to draw each stage as a label
+    // line plus its own `lg:grid-cols-4` of bars, and 4 is a constant while the
+    // number of `Ticket type` values is not — the base SEEDS FIVE. So every
+    // stage wrapped onto a second line ("each status should have only one row.
+    // I don't know why some of them have two"), and which ones looked doubled
+    // depended on whether the wrapped fifth cell held a bar or an em dash.
+    //
+    // The fix is that the column count is DERIVED from the vocabulary, so the
+    // assertion is about the structure and not about the words: one heading row
+    // plus one row per open stage, each of (1 stage name + 1 cell per kind).
+    showWith(SCRAMBLED)
+    const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
+    expect(grid, "the open work no longer draws its one grid").toBeTruthy()
+    // FULL has something open at four of the six stages.
+    const stages = 4
+    expect(
+      grid.style.gridTemplateColumns,
+      "the kind columns are not counted off the vocabulary"
+    ).toContain(`repeat(${SCRAMBLED.length},`)
+    expect(
+      grid.childElementCount,
+      "the stage rows and the kind columns disagree — a stage is wrapping again"
+    ).toBe((stages + 1) * (SCRAMBLED.length + 1))
+  })
+
+  it("names every kind on top of its own column, and only once", () => {
+    // "on top of each column, put the name of the legend like you did in your
+    // artifact". The separate legend strip this panel used to carry above the
+    // bars is gone with it: a key written twice is a key a reader has to check
+    // for agreement.
+    showWith(SCRAMBLED)
+    const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
+    const heading = [...grid.children].slice(1, SCRAMBLED.length + 1)
+    expect(heading.map((c) => c.textContent)).toEqual([
+      "Issue",
+      "Question",
+      "Request",
+      "Extra",
+      "Requirements",
+    ])
+  })
+})
+
+describe("every graph reads the kinds in the client's one order", () => {
+  // "the order: for all the graphs, it's always: 1. issue 2. question
+  // 3. request 4. extra." Held in ONE place (`orderTicketTypes`,
+  // web/lib/type-colours.ts, beside the colours and keyed the same way), so a
+  // fifth kind is one decision rather than five panels to remember.
+  const order = (within: Element, words: string[]) => {
+    const text = within.textContent ?? ""
+    const seen = words.map((w) => ({ w, at: text.indexOf(w) }))
+    expect(
+      seen.filter((s) => s.at === -1).map((s) => s.w),
+      "a kind vanished from a panel that still counts it"
+    ).toEqual([])
+    expect(
+      [...seen].sort((a, b) => a.at - b.at).map((s) => s.w),
+      "this panel is not reading the kinds in the client's order"
+    ).toEqual(words)
+  }
+
+  // THE OPEN WORK'S own columns are proved one describe up, by the heading test
+  // — it reads the heading cells themselves, which is stricter than a text
+  // search can be here (a stage name could otherwise be mistaken for a kind).
+
+  it("orders the matrix's two axes the same way", () => {
+    showWith(SCRAMBLED)
+    // `Became` heads the matrix's own column strip, so the grid it sits in is
+    // the one to read. Its axes are `types` — the same array the pipeline above
+    // takes — which is the whole point of sorting once in the screen.
+    const matrix = screen.getByText("Became").parentElement as HTMLElement
+    order(matrix, ["Issue", "Question", "Request", "Extra"])
+  })
+
+  it("orders the per-system legend the same way", () => {
+    showWith(SCRAMBLED)
+    // WHICH APP — its stacked segments and its legend are both built from
+    // `types`, so one read of the panel proves both. Only the two kinds the
+    // fixture actually has open against a system appear in it; the legend draws
+    // every kind, so reading the whole card is the honest scope.
+    const panel = screen.getByText("Which app").closest('[data-slot="card"]') as HTMLElement
+    order(panel, ["Issue", "Question", "Request", "Extra", "Requirements"])
+  })
+
+  it("keeps a kind the order has never heard of, after the four it has", () => {
+    // The retiring "Requirements", a word a team typed itself, a kind that only
+    // exists on imported tickets: it sorts to the END and still draws. A type
+    // that vanished from a chart because nobody had ranked it is exactly the
+    // silent subtraction this whole screen exists to avoid.
+    // The vocabulary leads with the unknown word AND the fixture's rows carry
+    // three more kinds the vocabulary has dropped — both routes into `types`,
+    // exercised at once. Every one of them still draws; the four the client
+    // named lead, and the word nobody ranked is last rather than absent.
+    showWith(["Requirements", "Issue"])
+    const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
+    const heading = [...grid.children].slice(1, 6).map((c) => c.textContent)
+    expect(heading).toEqual(["Issue", "Question", "Request", "Extra", "Requirements"])
+  })
+})
+
+describe("the trend is as tall as the panel beside it, ruled by month, and answers a hover", () => {
+  it("draws one vertical rule per month, behind the areas", () => {
+    // "add me some vertical lines that show the months". Named marks, because
+    // the lone-month DOT is also an SVG `<line>` — see the component.
+    showWith(TYPES)
+    const months = new Set(FULL.closureTrend.map((r) => r.month))
+    expect(
+      document.querySelectorAll('[data-slot="trend-month-rule"]').length,
+      "the month rules do not match the months on the plot"
+    ).toBe(months.size)
+  })
+
+  it("gives every month a focusable hit area naming that month's real figures", () => {
+    // "I want that when I hover over the graphic on a specific day, it has a
+    // little modal that gives me the info for this date." The x-axis is MONTHS,
+    // so a point is a month — and the affordance is a real `<button>`, so it is
+    // in the tab order and the kit's hover card opens on focus as well as on
+    // hover. The figures ride the button's own accessible NAME, so a screen
+    // reader hears them whether or not the floating panel ever opens.
+    showWith(TYPES)
+    // 2026-09 has both kinds, in the client's order rather than the paint order
+    // (Request's median is the larger, so it is painted FIRST and read LAST).
+    expect(
+      screen.getByRole("button", {
+        name: "2026-09 · Issue: 3 days, from 41 closed · Request: 15 days, from 11 closed",
+      })
+    ).toBeTruthy()
+    // AUGUST DROPPED REQUEST at the door, so August's card says nothing about
+    // Request rather than writing it as nought days — printing a zero here is
+    // exactly the lie `CLOSURE_TREND_MIN_CLOSURES` exists to prevent.
+    const august = screen.getByRole("button", { name: /^2026-08/ })
+    expect(august.getAttribute("aria-label")).toBe("2026-08 · Issue: 4 days, from 38 closed")
+  })
+})
+
+describe("the toolbar carries the same create button every other ticket tab has", () => {
+  // CLIENT: "On the dashboard, I'm missing the full toolbar, so go ahead and
+  // implement that." The row passed `filters` and `view` and nothing else, so
+  // its right-hand end was empty while every sibling tab had a create button
+  // there. The node comes from the HOST — the identical one its list body draws
+  // — which is what makes "the same button" a fact rather than a claim.
+  it("draws the host's raise-ticket action in the row", () => {
+    showWith(TYPES, { actions: <button type="button">Raise ticket</button> })
+    expect(screen.getByRole("button", { name: "Raise ticket" })).toBeTruthy()
+  })
+
+  it("…and loses it with the rest of the row on a team with no tickets at all (R50)", () => {
+    holder.view = EMPTY
+    render(
+      <TicketsDashboard
+        teamId="T1"
+        helpTypeOptions={TYPES}
+        ticketTotal={0}
+        actions={<button type="button">Raise ticket</button>}
+      />
+    )
+    expect(
+      screen.queryByRole("button", { name: "Raise ticket" }),
+      "R50 — the create button outlived the row it sits in, again"
+    ).toBeNull()
   })
 })

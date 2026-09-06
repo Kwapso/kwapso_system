@@ -119,17 +119,86 @@
    corrected for. The mechanism is here; the sets belong to the routes.
 
    ─────────────────────────────────────────────────────────────────────────
-   A SWITCHER OFFERING ONE VIEW IS CHROME — SO IT IS NOT DRAWN
+   ONE VIEW IS A LABEL, NOT A CONTROL AND NOT A HOLE — CLIENT, 2026-09-06
    ─────────────────────────────────────────────────────────────────────────
-   Fewer than two options renders `null`. Not a disabled pill, not a pill with
-   nowhere to go.
+   THIS REVERSES WHAT THIS FILE USED TO DO, AND THE REVERSAL IS THE CLIENT'S.
+   Until today, fewer than two views rendered `null` on the argument that "a
+   control that offers no choice is not a control" — `/meetings`'s standing
+   decision (OPEN.md §C21) made general so no route had to remember it. The
+   reasoning was sound about the CONTROL and wrong about the ROW. Verbatim,
+   2026-09-06:
 
-   This is not a new decision, it is the existing one made general. `/meetings`
-   already ships its table body and "draws no view switch at all, because a
-   switcher offering one view is chrome and a calendar option landing nowhere
-   is worse" (OPEN.md §C21). That reasoning was a route's; putting it in the
-   component means no route has to remember it, and the rule cannot be applied
-   on one screen and forgotten on the next.
+     "And then, when there is no other option, so there is only one, include
+      this in the kit. Basically, it looks exactly like if it was selected,
+      only that you cannot click, and there is no dropdown."
+
+   WHY SHE WANTS IT, because the reason governs the edges. She has twice
+   demanded the toolbars stop varying between screens — *"why the fuck i
+   still have different toolbar variations??? unify joder"*. A row that keeps
+   its third zone on one tab and drops it on the next IS that variation, and
+   it is the kind a reader feels without being able to name: the actions slide
+   left, the row's rhythm changes, and two screens of the same product stop
+   looking like the same product. Drawing the pill costs one inert span and
+   buys a toolbar that reads identically everywhere. That trade is hers to
+   make and she has made it.
+
+   SO: EXACTLY ONE VIEW DRAWS THE PILL EXACTLY AS THE SELECTED TRIGGER DRAWS
+   IT — same fill, same 40, same 18 of inline padding, same pill radius, same
+   16 glyph, same 8 of gap, same 14/500 label — AND IS NOT A CONTROL. No
+   dropdown, no caret, no hover, no focus ring, not in the tab order.
+
+   ZERO VIEWS IS UNCHANGED AND STILL RENDERS `null`. There is no view to name,
+   so a pill would have to say something, and the only thing it could say is a
+   word this file invented. A collection that offers no bodies has no third
+   zone; that is not a variation, it is an absence of data.
+
+   WHAT IT IS SEMANTICALLY, AND IT IS NOT A DISABLED BUTTON
+   A disabled control is a PROMISE DEFERRED: it says "this does something, and
+   not right now". Assistive technology says so out loud — "button, dimmed",
+   "unavailable" — and a reader who hears that goes looking for the condition
+   that would switch it on. There is no such condition here and there never
+   will be one: the collection ships one body, and the day it ships two this
+   becomes a real `Select` rather than an enabled version of this. Announcing
+   a permanently-unavailable action is a lie with a to-do list attached, so
+   `aria-disabled`, `disabled`, `role="button"` and `role="combobox"` are all
+   refused. `tabIndex={-1}` is not used either — you cannot remove from the
+   tab order a thing that was never in it, and writing it would imply there
+   was a control to exclude.
+
+   IT IS TEXT. A `<span>` with no role, holding the view's name, with the
+   glyph `aria-hidden` exactly as the trigger's is. The naming context the
+   control got from `aria-label` — the word "View" — is carried by an
+   `sr-only` span instead, so the two drawings tell a screen reader the SAME
+   TWO FACTS and differ only in the third:
+
+       two views   "View, Board, combobox"      ← name, value, and an action
+       one view    "View, Board"                ← name and value, no action
+
+   The colon in the hidden text is a PAUSE, not a word: no screen reader at
+   its default punctuation level speaks ":", and it is there so the two facts
+   do not run together into "Viewboard". `aria-label` on a roleless `<span>`
+   was the shorter route and is not reliable — a generic element is not a
+   naming target and several screen readers ignore it, which would have left
+   this reader with a bare "Board" floating in a toolbar. Hiding the whole
+   pill was the other short route and gives the non-sighted reader LESS than
+   the sighted one gets, which is the reverse of the point: the pill exists to
+   say which view you are in.
+
+   THE CARET COSTS NOTHING TO OMIT, AND THAT IS MEASURED RATHER THAN HOPED.
+   The multi-view trigger has drawn NO caret since 2026-09-02 ("same on views
+   - rmeove the chevron") — `hideChevron` does not hide the glyph, it declines
+   to render it, so the 16 of glyph and the 8 of gap went with it. There is
+   therefore no caret to remove here and no room to reclaim: the one-view pill
+   is not the two-view pill minus something. Both are [glyph, label] inside
+   the same box.
+
+   THE METRICS CANNOT DRIFT BECAUSE THERE IS ONLY ONE COPY OF THEM. Both
+   drawings compose `selectTriggerVariants({ state: "default" })` and the same
+   `VIEW_PILL_SKIN` below; the static one adds `cursor-default` and withholds
+   the hover, and that is the whole of the difference in the class list. A
+   one-view toolbar and a two-view toolbar on the same screen therefore sit on
+   the same baseline with the same pill height by construction, not by two
+   people typing 40 twice. Measured side by side in `verify/toolbar-trio`.
 
    ─────────────────────────────────────────────────────────────────────────
    D7-5 IS RULED: REMEMBERED, PER PERSON. THIS FILE STILL STORES NOTHING.
@@ -189,6 +258,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectTriggerVariants,
 } from "../select/select";
 import { SquaresFour } from "../../foundations/icons";
 
@@ -203,6 +273,92 @@ import { SquaresFour } from "../../foundations/icons";
    board, which is the calendar — and inventing that is a thing this project
    has already been corrected for. See `CollectionViewOption.icon`. */
 const PLACEHOLDER_VIEW_ICON = <SquaresFour size={16} />;
+
+/* ============================================================================
+   THE PILL'S SKIN — ONE COPY, WORN BY BOTH DRAWINGS.
+
+   The client's 2026-09-06 ruling is a statement about SAMENESS: the one-view
+   pill "looks exactly like if it was selected". A claim like that cannot be
+   kept by two class lists that happen to agree today — the last time this
+   toolbar moved, `SortControl` and `ViewSwitch` drifted apart on exactly this
+   list and it took `verify/toolbar-trio` to find it. So there is one list,
+   and "exactly" is true by construction rather than by review.
+
+   What this changes about `SelectTrigger`, and nothing else. Everything
+   unlisted — the pill radius, the 18 of inline padding, the `gap-2`, the 14
+   type step, the truncation rules, the open ink — is `select.tsx`'s and is
+   deliberately not restated.
+
+     · ALIGNMENT. `justify-start`. The base is `justify-between`, which is
+       right for a field holding [value, caret] and wrong for a pill holding
+       [glyph, label]: between would push the two to opposite ends of the pill
+       instead of setting the glyph beside the word. `SortControl`'s field
+       needs no such override — it has one child left, and one child starts at
+       the start.
+     · WIDTH. `w-auto`: the pill is as wide as the view's name, not a form
+       field filling a column. `SortControl` makes the same change for the
+       same reason.
+     · HEIGHT. 40, `--control-height-button` — the standing control height,
+       and what the toolbar's other pills are. The 44 is a FORM field's and
+       this is not one.
+     · FILL AND NO HAIRLINE. CH19 draws the search pill with `inset 0 0 0 1px
+       var(--hair)` and this pill with none, in the same row.
+       `--btn-secondary-fill` is the `Export` pill's fill and the panel
+       re-resolves it to off-beige, which is the chapter's `var(--card)`
+       exactly. `shadow-none` drops only the RESTING edge; `select.tsx`'s
+       focus and open rules are variant-prefixed and survive, so CH09's "the
+       hairline goes to ink" still happens while the list is open — which is
+       the whole of the affordance on a control with no resting edge.
+     · WEIGHT. 500, which is what both drawings of the artifact write on this
+       pill. `SelectTrigger`'s own base is 300, so it has to be said here;
+       `button.tsx` already ships 500, so the neighbouring pills match rather
+       than contrast. See the header.
+
+   THE HOVER IS NOT IN HERE, AND THAT IS THE POINT OF THE SPLIT. It is the one
+   resting-state rule the two drawings must NOT share: a label that lightens
+   under the cursor is a control saying "press me" about nothing. The
+   interactive branch adds it below; the static one does not, and cannot
+   acquire it by accident from a shared string.
+   ========================================================================= */
+const VIEW_PILL_SKIN = [
+  "w-auto min-w-0 h-[var(--control-height-button)] justify-start",
+  "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
+  "font-[var(--font-weight-medium)]",
+];
+
+/**
+ * The view's glyph, leading, inside the pill — client, 2026-09-02.
+ *
+ * ONE COMPONENT FOR BOTH DRAWINGS, for the same reason the skin is one list:
+ * the ruling is about the two pills being indistinguishable, and a glyph box
+ * written twice is a glyph box that can differ once.
+ *
+ * Sized from `--icon-16` on the box AND on whatever the call site passed, so a
+ * mapped icon that forgot its `size` still lands at the kit's 16 rather than
+ * at an SVG's own 24. Ink is the cva's `[&_svg]:text-ink-secondary`, which is
+ * where the caret's colour came from and is why the disabled skin still
+ * reaches it on the interactive pill.
+ *
+ * `aria-hidden` in both cases, and for the same reason in both: the pill's
+ * WORDS already say which view this is. On the trigger the name comes from
+ * `aria-label` plus `SelectValue`; on the static label it comes from the
+ * `sr-only` span plus the label text. Either way the glyph is a third telling
+ * of a fact already told twice, and a screen reader must not read it.
+ */
+function ViewGlyph({ icon }: { icon: React.ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-slot="view-switch-icon"
+      className={cn(
+        "inline-flex size-[var(--icon-16)] shrink-0 items-center justify-center",
+        "[&_svg]:size-[var(--icon-16)]",
+      )}
+    >
+      {icon}
+    </span>
+  );
+}
 
 export interface CollectionViewOption {
   /** Stable key, passed back to `onValueChange`. */
@@ -255,7 +411,12 @@ export interface ViewSwitchProps
   /**
    * The bodies THIS collection offers. Required, and never defaulted:
    * CH27.28 makes the set per-collection data ("Gallery … is never offered
-   * for tickets, accounts or sprints"). Fewer than two and nothing is drawn.
+   * for tickets, accounts or sprints").
+   *
+   * **THE LENGTH CHOOSES THE DRAWING.** Two or more is the dropdown. Exactly
+   * ONE is the same pill drawn as a LABEL — no dropdown, not clickable, not
+   * in the tab order (client, 2026-09-06, so the toolbar reads the same on
+   * every screen). NONE draws nothing at all.
    *
    * **PUT THE TABLE FIRST.** `views[0]` is the first-run view for a reader
    * who has never chosen — ruling D7-5's table-first recommendation — and
@@ -281,9 +442,21 @@ export interface ViewSwitchProps
    * What a screen reader hears. The artifact draws no visible label on this
    * pill — the pill's own text is the current view — so the control's name is
    * given here rather than rendered.
+   *
+   * IT IS SPOKEN IN BOTH DRAWINGS AND CARRIED DIFFERENTLY IN EACH. With two
+   * or more views it is the trigger's `aria-label`. With exactly one it is
+   * `sr-only` TEXT, because `aria-label` on a roleless `<span>` is not a
+   * reliable naming target — see the header. Either way the reading is
+   * "{label}, {the view's name}".
    */
   label?: string;
-  /** The whole control is unavailable. */
+  /**
+   * The whole control is unavailable.
+   *
+   * IGNORED WHEN THERE IS EXACTLY ONE VIEW. That drawing is a label and has
+   * no action to withhold; dimming it would announce the body you are
+   * currently looking at as unavailable, which is not true and not useful.
+   */
   disabled?: boolean;
 }
 
@@ -297,27 +470,40 @@ export interface ViewSwitchProps
  *                      CH19 and CH27.24 draw the same pill otherwise.
  *  2. hover          — the secondary button's own wash,
  *                      `--btn-secondary-hover`. Same as the `Export` pill
- *                      standing beside it, because it is the same skin.
+ *                      standing beside it, because it is the same skin. The
+ *                      ONE-VIEW label has none — nothing responds, so nothing
+ *                      is promised.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once,
- *                      at the control's own radius.
+ *                      at the control's own radius. The one-view label is not
+ *                      focusable and is not in the tab order, so it is never
+ *                      ringed.
  *  4. active/pressed — not drawn. Opening a picker IS the acknowledgement,
  *                      and the pill would nudge out from under the list.
  *  5. disabled       — a fill and an ink, `SelectTrigger`'s own, never an
- *                      opacity. Also per option, via `views[].disabled`.
+ *                      opacity. Also per option, via `views[].disabled`. The
+ *                      ONE-VIEW label ignores `disabled`: there is no action
+ *                      to withhold, and dimming a fact would say the view is
+ *                      unavailable when it is the view you are looking at.
  *  6. loading        — does not apply. The set of views a collection offers
  *                      is a fact about the collection, known before its rows
  *                      arrive; a busy switcher would be a spinner over a
  *                      list that was never in flight.
- *  7. empty          — fewer than two views renders NOTHING. A switcher
- *                      offering one view is chrome; `/meetings` already made
- *                      that call and this generalises it.
+ *  7. empty          — ZERO views renders NOTHING; there is no view to name
+ *                      and the only word a pill could show is one this file
+ *                      invented. ONE view draws the pill exactly as the
+ *                      selected trigger draws it, as a LABEL rather than a
+ *                      control — client, 2026-09-06, so the toolbar reads the
+ *                      same on every screen. See the header.
  *  8. error          — does not apply. Nothing here fetches.
  *  9. selected       — the current view. It is the pill's own label AND the
  *                      pill's own glyph, and `SelectItem` draws the tick on
  *                      the open row.
  * 10. read-only      — a collection whose body may not be swapped is passed
- *                      one view, so state 7 already covers it. Nothing is
- *                      dimmed to say so.
+ *                      one view, so state 7 already covers it — and since
+ *                      2026-09-06 that case DRAWS: the pill names the body
+ *                      you are in and cannot be operated. Nothing is dimmed
+ *                      to say so, because dimming is how this kit says
+ *                      "later" and there is no later here.
  *
  * THREE BREAKPOINTS
  *  The pill is the same control at every width — it is one of the two things
@@ -325,22 +511,99 @@ export interface ViewSwitchProps
  *  or one select", INVENTORY-3; 27.24's narrow board is "a single white
  *  select field"). It shrinks rather than wraps: `min-w-0` on the trigger and
  *  `SelectTrigger`'s own truncation keep a long view name inside the pill
- *  instead of pushing the toolbar past the panel.
+ *  instead of pushing the toolbar past the panel. The one-view LABEL inherits
+ *  both from the same class list, so the narrow toolbar behaves identically
+ *  whichever of the two it is holding — which is the whole point of the
+ *  2026-09-06 ruling and would be lost if the label were laid out by hand.
  *
  * RTL — LTR only by client ruling. Logical properties throughout.
  */
 const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
   ({ className, views, value, onValueChange, label = "View", disabled, ...props }, ref) => {
-    /* STATE 7. A switcher offering one view is chrome — OPEN.md §C21, and
-       `/meetings`'s standing decision made general. Zero is the same case. */
-    if (views.length < 2) return null;
+    /* STATE 7, FIRST HALF. ZERO VIEWS IS STILL NOTHING, and it is the one
+       case the 2026-09-06 ruling does not reach: "when there is no other
+       option, so there is only one" is a sentence about ONE. With none, the
+       pill would have to name a view that does not exist, and the only word
+       available would be one this file invented — which is the thing this
+       file refuses to do everywhere else (see `views`). An absent third zone
+       is not a toolbar variation; it is an absence of data. */
+    if (views.length === 0) return null;
 
-    /* The glyph belongs to the view ON SCREEN, so it is looked up from
-       `value` rather than held in state — the pill has no memory of its own
-       and `value` is the only truth about which body is showing (see the
-       prop). An unmapped view falls back to the placeholder, which is the
-       whole toolbar today. */
-    const currentIcon = views.find((v) => v.value === value)?.icon ?? PLACEHOLDER_VIEW_ICON;
+    /* The view ON SCREEN, looked up from `value` rather than held in state —
+       the pill has no memory of its own and `value` is the only truth about
+       which body is showing (see the prop). An unmapped view falls back to
+       the placeholder glyph, which is the whole toolbar today. */
+    const current = views.find((v) => v.value === value);
+    const currentIcon = current?.icon ?? PLACEHOLDER_VIEW_ICON;
+
+    /* STATE 7, SECOND HALF — ONE VIEW IS A LABEL. Client, 2026-09-06; the
+       argument, the semantics and the screen-reader reading are all in the
+       header and are not repeated here.
+
+       IT FALLS BACK TO `views[0]` WHEN `value` MATCHES NOTHING, where the
+       interactive branch would simply show a placeholder. With one view there
+       is exactly one true answer to "which body am I looking at", so a
+       `value` naming something else is a call site's bug — one that used to
+       be invisible, because this branch drew nothing at all — and a pill left
+       empty by it would be a worse toolbar than a pill naming the only view
+       there is. The interactive branch cannot make the same fallback: there,
+       `value` really is the question.
+
+       `ref` IS NOT FORWARDED HERE, ON PURPOSE. It is typed
+       `HTMLButtonElement` because the two-view drawing is a button, and this
+       one is a `<span>` that can be neither focused nor clicked — a handle on
+       it could only be used to do something this element has just refused to
+       do. A caller who wants to measure the pill can find it by its own
+       `data-slot`.
+
+       `disabled` IS IGNORED HERE, and state 5 says why: there is no action to
+       withhold, and dimming a fact would announce the view you are looking at
+       as unavailable. */
+    if (views.length === 1) {
+      const only = current ?? views[0];
+
+      return (
+        <span
+          data-slot="view-switch-static"
+          className={cn(
+            /* THE SAME GEOMETRY, FROM THE SAME PLACE. Composing the cva is
+               what makes "looks exactly like if it was selected" a fact about
+               one class list rather than a claim about two.
+
+               Its `disabled:`, `enabled:focus:` and `enabled:data-[state=open]:`
+               rules ride along and are INERT, not overlooked: `:enabled` and
+               `:disabled` match form elements only, and a `<span>` is not
+               one, so none of them can ever apply. Hand-stripping them would
+               mean maintaining a second transcription of the height, the
+               padding, the radius, the gap, the type step and the truncation
+               rules — which is the exact drift this shares its way out of.
+
+               `cursor-default` is the one addition, and it is the whole of
+               the pointer's story: the arrow does not become a hand, so a
+               reader with a mouse learns there is nothing here to press
+               before they press it. `cursor-pointer` in the cva's base is
+               replaced rather than fought — same tailwind-merge group. */
+            selectTriggerVariants({ state: "default" }),
+            VIEW_PILL_SKIN,
+            "cursor-default",
+            className,
+          )}
+          {...(props as React.ComponentPropsWithoutRef<"span">)}
+        >
+          {/* THE CONTROL'S NAME, SPOKEN RATHER THAN LABELLED. On the trigger
+              this word is `aria-label`; on a roleless `<span>` `aria-label`
+              is not a reliable naming target, so it is real text that is not
+              painted. The colon is a pause, not a word — see the header. */}
+          <span className="sr-only">{label}: </span>
+          <ViewGlyph icon={only.icon ?? PLACEHOLDER_VIEW_ICON} />
+          {/* The view's name, in the trigger's own place for it, so the cva's
+              `[&>span]:truncate` reaches this the way it reaches
+              `SelectValue`. A long view name shrinks inside the pill here
+              too, rather than pushing the toolbar past the panel. */}
+          <span data-slot="view-switch-label">{only.label}</span>
+        </span>
+      );
+    }
 
     return (
       <Select value={value} onValueChange={onValueChange} disabled={disabled}>
@@ -353,64 +616,23 @@ const ViewSwitch = React.forwardRef<HTMLButtonElement, ViewSwitchProps>(
              `SelectTrigger` and not a class here. */
           hideChevron
           className={cn(
-            /* What this control changes about `SelectTrigger`, and nothing
-               else. Everything unlisted — the pill radius, the open ink, the
-               disabled fill — is `select.tsx`'s and is not restated here.
-
-               · ALIGNMENT. `justify-start`. The base is `justify-between`,
-                 which is right for a field holding [value, caret] and wrong
-                 for a pill holding [glyph, label]: between would push the two
-                 to opposite ends of the pill instead of setting the glyph
-                 beside the word. `SortControl`'s field needs no such override
-                 — it has one child left, and one child starts at the start.
-
-               · WIDTH. `w-auto`: the pill is as wide as the view's name, not
-                 a form field filling a column. `SortControl` makes the same
-                 change for the same reason.
-               · HEIGHT. 40, `--control-height-button` — the standing control
-                 height, and what the toolbar's other pills are. The 44 is a
-                 FORM field's and this is not one.
-               · FILL AND NO HAIRLINE. CH19 draws the search pill with
-                 `inset 0 0 0 1px var(--hair)` and this pill with none, in the
-                 same row. `--btn-secondary-fill` is the `Export` pill's fill
-                 and the panel re-resolves it to off-beige, which is the
-                 chapter's `var(--card)` exactly. The hover comes with it.
-                 `shadow-none` drops only the RESTING edge; `select.tsx`'s
-                 focus and open rules are variant-prefixed and survive, so
-                 CH09's "the hairline goes to ink" still happens while the
-                 list is open — which is the whole of the affordance on a
-                 control with no resting edge.
-               · WEIGHT. 500, which is what both drawings write on this pill.
-                 `SelectTrigger`'s own base is 300, so it has to be said here;
-                 `button.tsx` already ships 500, so the neighbouring pills
-                 match rather than contrast. See the header. */
-            "w-auto min-w-0 h-[var(--control-height-button)] justify-start",
-            "shadow-none bg-[var(--btn-secondary-fill)] text-[var(--btn-secondary-label)]",
+            /* THE SHARED SKIN — see `VIEW_PILL_SKIN` above for what each line
+               changes about `SelectTrigger` and why. It is a constant rather
+               than a literal here because the one-view LABEL has to wear the
+               identical list; the client's 2026-09-06 ruling is a statement
+               about the two being indistinguishable, and one list is the only
+               way to keep it true without a reviewer. */
+            VIEW_PILL_SKIN,
+            /* THE HOVER, AND IT IS THIS BRANCH'S ALONE. `--btn-secondary-hover`
+               is the `Export` pill's own wash, because this is the `Export`
+               pill's own skin. The static label withholds it: it responds to
+               nothing, so it must promise nothing. */
             "enabled:hover:bg-[var(--btn-secondary-hover)]",
-            "font-[var(--font-weight-medium)]",
             className,
           )}
           {...props}
         >
-          {/* THE VIEW'S GLYPH, LEADING, INSIDE THE ONE PILL — client,
-              2026-09-02. Sized from `--icon-16` on the box AND on whatever
-              the call site passed, so a mapped icon that forgot its `size`
-              still lands at the kit's 16 rather than at an SVG's own 24. Ink
-              is the cva's `[&_svg]:text-ink-secondary`, which is where the
-              caret's colour came from and is why the disabled skin still
-              reaches it. `aria-hidden`: `aria-label` names the control and
-              `SelectValue` says which view, so the glyph is decoration and
-              must not be read as a third thing. */}
-          <span
-            aria-hidden="true"
-            data-slot="view-switch-icon"
-            className={cn(
-              "inline-flex size-[var(--icon-16)] shrink-0 items-center justify-center",
-              "[&_svg]:size-[var(--icon-16)]",
-            )}
-          >
-            {currentIcon}
-          </span>
+          <ViewGlyph icon={currentIcon} />
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

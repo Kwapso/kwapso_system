@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.59",
-  "sha": "00a8190e9bd84cd17c1fe0b43e2557ebbed1b065",
+  "tag": "v1.2.60",
+  "sha": "7d9182a1938f497306bfb0338e1a7ec1df320d1f",
   "syncedAt": "2026-09-06"
  },
- "generatedAt": "2026-09-06T18:15:23.093Z",
+ "generatedAt": "2026-09-06T20:28:43.997Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -2517,7 +2517,7 @@
        "name": "disabled",
        "optional": true,
        "kind": "boolean",
-       "note": "The whole control is unavailable."
+       "note": "The whole control is unavailable. IGNORED WHEN THERE IS EXACTLY ONE VIEW. That drawing is a label and has no action to withhold; dimming it would announce the body you are currently looking at as unavailable, which is not true and not useful."
       }
      ]
     }

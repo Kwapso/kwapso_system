@@ -2,6 +2,125 @@
 
 ## Unreleased
 
+### Changed — a view switcher offering ONE view now draws the pill as a label instead of drawing nothing
+
+Client, 2026-09-06, verbatim: "And then, when there is no other option, so
+there is only one, include this in the kit. Basically, it looks exactly like if
+it was selected, only that you cannot click, and there is no dropdown."
+
+**This reverses a decision this kit had written down and argued for, and the
+argument it reverses was right about the wrong thing.** `ViewSwitch` has
+rendered `null` below two views since it was written, on the reasoning that a
+control offering no choice is not a control — `/meetings`'s standing decision
+(OPEN.md §C21) made general so no route had to remember it. That is a correct
+statement about the CONTROL and a wrong one about the ROW. The client has twice
+demanded the toolbars stop varying between screens — *"why the fuck i still have
+different toolbar variations??? unify joder"* — and a third zone that is present
+on one tab and gone on the next **is** that variation: the actions slide left,
+the row's rhythm changes, and two screens of the same product stop looking like
+the same product. Drawing the pill costs one inert `<span>` and buys a toolbar
+that reads identically everywhere.
+
+**Exactly ONE view draws the pill exactly as the selected trigger draws it, and
+"exactly" is enforced by there being one copy of it.** The skin the pill wears —
+`w-auto min-w-0`, `--control-height-button`, `justify-start`, `shadow-none`,
+`--btn-secondary-fill` / `--btn-secondary-label`, `--font-weight-medium` — moved
+out of the trigger's `className` into a `VIEW_PILL_SKIN` constant that both
+drawings compose, on top of the same `selectTriggerVariants({ state: "default" })`
+the interactive one already sat on. A claim of sameness kept by two class lists
+that happen to agree is a claim with a review step in it, and the last time this
+toolbar moved, `SortControl` and `ViewSwitch` drifted apart on exactly this list.
+**Measured: width delta 0.0, height delta 0.0, both palettes.**
+
+**The hover is the one resting rule the two must NOT share**, so it stayed at
+the interactive call site rather than moving into the constant. A label that
+lightens under the cursor is a control saying "press me" about nothing.
+`cursor-default` is the only class the static branch adds, and it is the whole
+of the pointer's story: the arrow does not become a hand, so a reader learns
+there is nothing to press before they press it.
+
+**It is not a disabled button, and that is the load-bearing call.** A disabled
+control is a promise deferred — assistive technology says "dimmed",
+"unavailable", and a reader who hears it goes looking for the condition that
+would switch it on. There is no such condition and there never will be one: the
+collection ships one body, and the day it ships two this becomes a real `Select`
+rather than an enabled version of this. So `disabled`, `aria-disabled`,
+`role="button"` and `role="combobox"` are all refused, and `tabIndex={-1}` with
+them — you cannot remove from the tab order a thing that was never in it, and
+writing it would imply there was a control to exclude. The `disabled` PROP is
+ignored in this drawing for the same reason: dimming a fact would announce the
+body you are currently looking at as unavailable.
+
+**It is text.** A `<span>` with no role, the glyph `aria-hidden` exactly as the
+trigger's is, and the naming context — the word "View" — carried as `sr-only`
+text rather than `aria-label`, because a roleless `<span>` is not a reliable
+naming target and several screen readers ignore a label on one. That would have
+left a non-sighted reader with a bare "Board" floating in a toolbar. The two
+drawings therefore tell a screen reader the same two facts and differ only in
+the third — `"View, Board, combobox"` against `"View, Board"` — and the colon in
+the hidden text is a pause, not a word, so the two do not run together into
+"Viewboard". Hiding the pill entirely was the other short route and gives the
+non-sighted reader less than the sighted one gets, which is the reverse of the
+point: the pill exists to say which view you are in.
+
+**There was no caret to remove.** The trigger has drawn none since 2026-09-02
+("same on views - rmeove the chevron"), and `hideChevron` does not hide the
+glyph — it declines to render it, so the 16 of glyph and the 8 of gap went with
+it then. The one-view pill is therefore not the two-view pill minus something;
+both are `[glyph, label]` in the same box, and the metric question the caret
+would have raised does not arise. Proved by a count rather than by the source:
+one `<svg>` each, and it is the view's.
+
+**`data-slot="view-switch-static"`, a slot of its own rather than a second
+spelling of `view-switch`.** The two differ in tag name and in whether they can
+be operated, and a shared slot would make `[data-slot="view-switch"]` a lie
+about being a button — the app and the harness both need to be able to ask which
+one is on screen. The glyph keeps `data-slot="view-switch-icon"` in both, so
+anything targeting the mark is written once, and the label's word is reachable
+at `data-slot="view-switch-label"`.
+
+**ZERO views is unchanged and still renders nothing.** The ruling is a sentence
+about one. With none there is no view to name, the only word a pill could show
+would be one this kit invented — the thing `views` refuses everywhere else — and
+an absent third zone is not a toolbar variation but an absence of data.
+
+**Consuming apps: a toolbar that used to lose its third zone will now keep it.**
+Nothing in a call site changes and no prop is added; a route already passing one
+view starts drawing a label where it drew a hole. A rule that exempts a
+single-view toolbar from the "every toolbar has a view zone" check on the
+grounds that nothing is drawn is now exempting a case that no longer exists.
+
+Measured in `verify/toolbar-trio`, which gains a one-view pill beside a two-view
+one **carrying the same label** — a width comparison between "Board" and "List
+view" would prove nothing — and diffs every property that could make the two sit
+differently: box, inline padding, radius, resting fill and ink, type step and
+weight, gap, glyph box, and the SVG count. The readout prints the list of keys
+that differ, and the expected content of that list is exactly four — `tag`,
+`cursor`, `spokenText`, `ariaLabel`. **Any fifth key is the bug the page exists
+to catch**; `paintedText` appearing in it would mean the hidden name leaked into
+the paint, and `widthPx` or `heightPx` appearing would mean a one-view toolbar
+sits differently from a two-view one on the same screen. It also asks the DOM
+rather than the source whether the label is a control — role, `aria-disabled`,
+`tabIndex`, and a real `focus()` call followed by "who is `document.activeElement`
+now" — and counts the zero-view host's children to show that case still draws
+nothing. Light and dark: four differing keys, `widthDelta 0.0`, `heightDelta
+0.0`, `tabIndex -1`, `takesFocusOnCall false`.
+
+**One harness bug was found and fixed on the way.** The new probe first sampled
+on mount and read the control 36.9px narrower than the label with an empty
+`paintedText` — Radix renders a `Select`'s chosen value by cloning the selected
+`ItemText`, and the item registers in its own effect, so a trigger measured
+synchronously on mount is a pill with no word in it. It now samples on a
+`setTimeout` rather than the `requestAnimationFrame` the older probe on that page
+uses: a browser runs no animation frames for a tab it is not painting, so in a
+background tab that callback never fires and the readout sits on its placeholder
+while every number on the page is ready. A timer is throttled in the background;
+it is not cancelled.
+
+The demo's `CollectionFrame` page draws the one-view frame directly beneath a
+two-view one so the two toolbars can be compared without a devtools panel, and
+gains a third specimen for the zero-view case.
+
 ### Added — a breadcrumb strip can be a workspace tab set, and its tabs can be closed with a keyboard
 
 Client, 2026-09-06, on the live product: "all tabs i open stay open unless i

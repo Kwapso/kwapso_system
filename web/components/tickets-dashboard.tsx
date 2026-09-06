@@ -65,6 +65,23 @@ import * as React from "react"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Button } from "@shared/ui/components/button/button"
+// THE KIT'S OWN FLOATING PANEL, opened by hover AND by focus (client, 6 Sep
+// 2026: "I want that when I hover over the graphic on a specific day, it has a
+// little modal that gives me the info for this date"). It is the kit's part
+// rather than a panel drawn here, and it is the HOVER CARD rather than the
+// TOOLTIP because the kit rules the difference itself: its tooltip is a
+// charcoal pill holding ONE line (`whitespace-nowrap` "is the design, not a
+// convenience"), and a month's readout is a stack — the month, then one line
+// per kind. The kit's own hover-card header names that exact trade ("putting
+// that on the charcoal pill would either force the pill to grow into a panel …
+// or force the record to shrink into a sentence"). Adopting it retires its
+// `KIT_COMPONENT_EXEMPT` line, which said the app had no candidate; it has one
+// now. Nothing in the kit is changed or needed.
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@shared/ui/components/hover-card/hover-card"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
@@ -76,7 +93,7 @@ import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
 import type { TicketDashboard } from "@/lib/api/content"
 import { accountsKey, helpDashboardKey } from "@/lib/live-resources"
-import { ticketTypeColour } from "@/lib/type-colours"
+import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import type { Account } from "@shared/types"
 import {
   CLOSURE_TREND_MIN_CLOSURES,
@@ -209,7 +226,36 @@ function Panel({
  * reordered itself as the numbers moved would be unreadable week to week, and a
  * stage nobody is in stays on the axis at zero because an empty row is
  * information — the same ruling `TicketStagesCard` already writes for the same
- * data. */
+ * data. The KINDS across the top are the client's fixed order
+ * (`orderTicketTypes`), applied once by the screen below and simply obeyed here.
+ *
+ * ── ONE GRID, AND WHY IT REPLACED A STACK OF FOUR-COLUMN GRIDS ──────────────
+ *
+ * CLIENT, 6 Sep 2026, two sentences of one complaint: "on the open work, on top
+ * of each column, put the name of the legend like you did in your artifact, and
+ * each status should have only one row. I don't know why some of them have two.
+ * Makes no sense."
+ *
+ * THEY WERE ONE BUG. This panel used to draw a stage as a LABEL LINE followed by
+ * its own `grid sm:grid-cols-2 lg:grid-cols-4` of bars, with the legend written
+ * once above the whole panel. That `4` was a constant, and the number of kinds
+ * is not one: `Ticket type` is the team's OWN editable vocabulary and the base
+ * SEEDS FIVE of them (Question, Issue, Request, Extra, Requirements —
+ * `workers/tenancy/src/team-schema/seed.ts`), before the screen's own `types`
+ * memo appends any further kind found only on historical tickets. Five cells in
+ * a four-column grid is two rows, under every stage, for ever — and which
+ * stages LOOKED doubled depended on whether the wrapped fifth cell held a bar or
+ * just the em dash for zero, which is why it read as "some of them". The legend
+ * being a separate strip above is the other half of the same fault: with the
+ * bars wrapping, nothing on screen tied the fifth bar to a word at all.
+ *
+ * SO THE COLUMN COUNT IS DERIVED FROM THE VOCABULARY, never typed, and the
+ * kind's own name heads its column — the treatment the approved artifact used,
+ * and the one `RaisedAsMatrix` below already uses for the same vocabulary on
+ * both of its axes. One grid row per stage now, whatever the team calls its
+ * work and however many words it uses for it. Wide vocabularies SCROLL
+ * sideways rather than wrapping, for the same reason the matrix does: a chart
+ * that reflows into a second line stops being a row anybody can read across. */
 function OpenWork({
   rows,
   types,
@@ -235,27 +281,55 @@ function OpenWork({
     return <p className="text-muted-foreground text-xs">{t("Nothing is open right now.")}</p>
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+    <div className="min-w-0 overflow-x-auto">
+      <div
+        // NAMED FOR THE SUITE THAT PROVES IT IS ONE GRID — the whole defect this
+        // panel was rewritten out of is invisible to a text query: five bars in
+        // a four-column grid say exactly the same words as five bars in a
+        // five-column one. `dashboard-says-what-it-left-out` counts this grid's
+        // cells and reads its column template instead.
+        data-slot="open-work"
+        className="grid min-w-[20rem] items-center gap-x-3 gap-y-2 text-xs"
+        // ONE COLUMN PER KIND, COUNTED OFF THE VOCABULARY. The stage names take
+        // the first, fixed track; every kind takes an equal share of what is
+        // left, with a floor so a bar never collapses to nothing on a narrow
+        // card — past that floor the whole grid scrolls rather than wrapping.
+        style={{ gridTemplateColumns: `7rem repeat(${types.length}, minmax(4.5rem, 1fr))` }}
+      >
+        {/* THE HEADING ROW — the corner is empty because the stage column's own
+            heading is the panel's title, and a word here ("Stage") would be the
+            third place this screen says what the left column is. */}
+        <span aria-hidden="true" />
         {types.map((type) => (
+          // THE LEGEND, ON TOP OF ITS OWN COLUMN (the client's own words). It is
+          // the SAME `TypeKey` the other four panels draw, so the dot beside a
+          // word means one thing everywhere on this screen — and it is why the
+          // separate legend strip this panel used to carry is gone rather than
+          // duplicated: a chart with its key written twice is a chart a reader
+          // has to check for agreement.
           <TypeKey key={type} type={type} />
         ))}
-      </div>
-      <div className="flex min-w-0 flex-col gap-2">
         {openStages.map((status) => (
-          <div key={status} className="flex min-w-0 flex-col gap-1">
-            <p className="text-muted-foreground text-xs">{t(HELP_STATUS[status])}</p>
-            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {types.map((type) => (
-                <div key={type} className="flex min-w-0 items-center gap-2">
-                  <Bar fraction={at(type, status) / scale} colour={ticketTypeColour(type)} title={type} />
-                  <span className="w-6 shrink-0 text-right text-xs tabular-nums">
-                    {at(type, status) || "–"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <React.Fragment key={status}>
+            <span className="text-muted-foreground truncate" title={t(HELP_STATUS[status])}>
+              {t(HELP_STATUS[status])}
+            </span>
+            {types.map((type) => (
+              <div key={type} className="flex min-w-0 items-center gap-2">
+                <Bar
+                  fraction={at(type, status) / scale}
+                  colour={ticketTypeColour(type)}
+                  // BOTH COORDINATES, now that the bar sits in a grid rather
+                  // than under its own stage label: a cell read on its own has
+                  // to say which kind AND which stage it is, or it says neither.
+                  title={`${type} · ${t(HELP_STATUS[status])}`}
+                />
+                <span className="w-6 shrink-0 text-right tabular-nums">
+                  {at(type, status) || "–"}
+                </span>
+              </div>
+            ))}
+          </React.Fragment>
         ))}
       </div>
     </div>
@@ -603,6 +677,17 @@ function ClosureSpread({
                 style={{ left: pct(r.medianDays), backgroundColor: colour }}
               />
             </div>
+            {/* THE THREE FIGURES, AT REST, ON EVERY ROW THAT IS DRAWN — never
+                behind a hover, and checked rather than assumed (client, 6 Sep
+                2026: "it brings me a lot of value … but I wonder: this
+                information only appears when I hover over the type"). It reads
+                as a paragraph under its own bar, and it always has: this panel
+                has never had a hover affordance of any kind. What IS
+                hover-only on this screen is the browser's native `title` on the
+                pipeline bars, the stacked per-system bars and the matrix cells,
+                which is the likeliest thing she was looking at. Locked by a
+                test now (`dashboard-says-what-it-left-out`), so if anybody ever
+                does put it behind an interaction the build says so. */}
             <p className="text-muted-foreground text-xs tabular-nums">
               {t("Middle ticket {median} days · middle half {low} to {high} · longest {max}", {
                 median: r.medianDays.toFixed(r.medianDays % 1 === 0 ? 0 : 1),
@@ -635,7 +720,46 @@ function ClosureSpread({
  *
  * THE SVG HOLDS NO TEXT. Its months and its scale are HTML beside it, at the
  * reader's own size — see this file's header for why a scaled `<svg>` is the
- * wrong home for a label. */
+ * wrong home for a label.
+ *
+ * ── AS TALL AS THE PANEL BESIDE IT (client, 6 Sep 2026) ─────────────────────
+ *
+ * "Regarding the graph, which way it is going, I would need to make it taller.
+ * Make it the same height as how long a ticket takes to close, and add me some
+ * vertical lines that show the months."
+ *
+ * The plot used to be a flat `h-40`, so the two halves of one panel were a
+ * distribution as tall as its own content and a trend as tall as a number
+ * somebody typed — and the two sit in the SAME `lg:grid-cols-2` row, which
+ * already stretches both columns to one height. So the fix is not a bigger
+ * number: the plot CLAIMS the leftover space (`flex-1` down the column, `h-40`
+ * demoted to a floor for the stacked, single-column case). It is the same
+ * height as the distribution because it is measured from it, rather than
+ * agreeing with it until either one changes.
+ *
+ * THE MONTH LINES ARE DRAWN, NOT WRITTEN. One rule per month behind the areas,
+ * at the exact x the month's point sits on — so a reader can see that September
+ * is September rather than inferring it from two labels at the ends. They carry
+ * `vector-effect="non-scaling-stroke"` for the reason every stroke in here does:
+ * `preserveAspectRatio="none"` would otherwise squash a vertical rule to a
+ * hairline at one width and a bar at another.
+ *
+ * ── AND THE FIGURES BEHIND ONE MONTH ────────────────────────────────────────
+ *
+ * "I want that when I hover over the graphic on a specific day, it has a little
+ * modal that gives me the info for this date." The x-axis here is MONTHS (a
+ * median per closing month), so "a specific day" is a month point, and the card
+ * says that month's real numbers per kind — the median it drew, and the count
+ * that median was taken over, which is the number that says how much the point
+ * is standing on.
+ *
+ * IT IS NOT A MOUSE-ONLY AFFORDANCE, and that is two separate things rather
+ * than one. The hit areas are real `<button>`s, so they are in the tab order and
+ * the kit's hover card opens on FOCUS as well as on hover (Radix does both, and
+ * the kit's own header says so). And because a floating panel is a poor place to
+ * put the only copy of a fact — the kit's header says that too — each button
+ * carries the whole month's readout as its accessible NAME, so a screen reader
+ * hears the figures from the button itself whether or not the card ever opens. */
 function ClosureTrend({
   rows,
   t,
@@ -644,11 +768,21 @@ function ClosureTrend({
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
   const months = [...new Set(rows.map((r) => r.month))].sort()
-  const series = [...new Set(rows.map((r) => r.helpType))]
-    // Widest first, so a kind that sits under another is never hidden by it —
-    // the areas are translucent, but a smaller shape drawn behind a larger one
-    // is a shape nobody can find the edge of.
-    .sort((a, b) => median(rows, b) - median(rows, a))
+  // TWO ORDERS OVER ONE SET, and they answer two different questions.
+  //
+  // `paint` is widest first, so a kind that sits under another is never hidden
+  // by it — the areas are translucent, but a smaller shape drawn behind a larger
+  // one is a shape nobody can find the edge of. That is a fact about painting
+  // and it cannot be the client's order.
+  //
+  // `series` is the client's fixed order (issue, question, request, extra), and
+  // it is what a person READS — the legend under the plot and the lines inside
+  // the hover card. So the same four kinds are stacked back-to-front and listed
+  // first-to-last, which is the only arrangement that obeys both.
+  const paint = [...new Set(rows.map((r) => r.helpType))].sort(
+    (a, b) => median(rows, b) - median(rows, a)
+  )
+  const series = orderTicketTypes(paint)
 
   if (months.length < 2 || series.length === 0)
     return (
@@ -666,22 +800,66 @@ function ClosureTrend({
   const x = (i: number) => (i / (months.length - 1)) * 100
   const y = (v: number) => 100 - (v / top) * 100
 
+  /** WHAT ONE MONTH SAYS, as the lines a person reads — in the client's fixed
+   * kind order, and only for the kinds that actually cleared the floor that
+   * month. A kind with no point in a month is ABSENT from its card rather than
+   * written as a zero: the door dropped that bucket because a median of six is
+   * one ticket wearing a statistic, and printing "0 days" would be the chart
+   * telling exactly the lie the floor exists to prevent. */
+  const monthLines = (m: string) =>
+    series
+      .map((type) => ({ type, hit: rows.find((r) => r.helpType === type && r.month === m) }))
+      .filter((l): l is { type: string; hit: TicketDashboard["closureTrend"][number] } =>
+        Boolean(l.hit)
+      )
+
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <div className="flex min-w-0 items-stretch gap-2">
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
+      <div className="flex min-w-0 flex-1 items-stretch gap-2">
         <div className="text-muted-foreground flex w-8 shrink-0 flex-col justify-between text-right text-xs tabular-nums">
           <span>{Math.round(top)}</span>
           <span>0</span>
         </div>
-        <div className="bg-muted min-w-0 flex-1 overflow-hidden rounded">
+        {/* `relative`, because the month hit areas below are HTML laid OVER the
+            plot rather than shapes inside it — the same argument this file's
+            header makes about every other mark here: an element hit area keeps
+            its own geometry under `preserveAspectRatio="none"`, where an SVG
+            `<rect>` would be stretched with everything else. `min-h-40` is the
+            old fixed height, demoted to a FLOOR: it is what the plot falls back
+            to when the panel stacks into one column and there is no sibling to
+            match. */}
+        <div className="bg-muted relative min-h-40 min-w-0 flex-1 overflow-hidden rounded">
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
             aria-label={t("The middle ticket, month by month")}
-            className="block h-40 w-full"
+            className="block size-full"
           >
-            {series.map((type) => {
+            {/* THE MONTHS, AS RULES BEHIND THE WORK. Drawn first so every area
+                and every line sits on top of them — a gridline over a filled
+                area reads as part of the data. `--border` is the app's own
+                hairline token, which flips with the palette, so one value is
+                right on both papers. */}
+            {months.map((m, i) => (
+              <line
+                key={m}
+                // NAMED, because the lone-month DOT below is also a `<line>`
+                // (a zero-length one with a round cap — see its own comment),
+                // and the suite that proves a kind's gap is not joined across
+                // counts those. Two marks of one element name need two names,
+                // or a test about the data ends up counting the furniture.
+                data-slot="trend-month-rule"
+                x1={x(i)}
+                y1={0}
+                x2={x(i)}
+                y2={100}
+                stroke="var(--border)"
+                strokeWidth={1}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {paint.map((type) => {
               const points = months.map((m, i) => {
                 const hit = rows.find((r) => r.helpType === type && r.month === m)
                 return hit ? `${x(i)},${y(hit.medianDays)}` : null
@@ -712,6 +890,7 @@ function ClosureTrend({
                         // ellipse by the same non-uniform scale.
                         <line
                           key={i}
+                          data-slot="trend-point"
                           x1={run[0].split(",")[0]}
                           y1={run[0].split(",")[1]}
                           x2={run[0].split(",")[0]}
@@ -744,6 +923,67 @@ function ClosureTrend({
               )
             })}
           </svg>
+          {/* ── ONE HIT AREA PER MONTH, IN HTML, OVER THE PLOT ───────────────
+              Each band runs from the midpoint of the gap before its month to
+              the midpoint of the gap after it, so the area a pointer has to
+              find is centred on the point it is about rather than on a slice
+              of an evenly-cut row — the first and last months own only their
+              half, which is why this is arithmetic rather than a flex row of
+              equal children.
+
+              A REAL BUTTON, so it is in the tab order and Radix opens the card
+              on focus as well as on hover, and so a press works where hover
+              does not exist at all. It draws nothing at rest; the tint on
+              hover/open is the only mark it makes, because the plot underneath
+              is the picture. */}
+          <div className="absolute inset-0">
+            {months.map((m, i) => {
+              const left = i === 0 ? 0 : (x(i - 1) + x(i)) / 2
+              const right = i === months.length - 1 ? 100 : (x(i) + x(i + 1)) / 2
+              const lines = monthLines(m)
+              // THE WHOLE READOUT AS ONE SENTENCE, for the accessible name. The
+              // month leads, then a kind and its two figures, in the same words
+              // and the same order the card below prints them — one translation,
+              // read twice, so what a screen reader hears and what a sighted
+              // reader sees can never be two different claims.
+              const said = [
+                m,
+                ...lines.map(
+                  (l) =>
+                    `${l.type}: ${t("{median} days, from {count} closed", {
+                      median: l.hit.medianDays.toFixed(l.hit.medianDays % 1 === 0 ? 0 : 1),
+                      count: l.hit.n,
+                    })}`
+                ),
+              ].join(" · ")
+              return (
+                <HoverCard key={m} openDelay={60} closeDelay={60}>
+                  <HoverCardTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={said}
+                      className="absolute inset-y-0 rounded hover:bg-background/50 data-[state=open]:bg-background/50"
+                      style={{ left: `${left}%`, width: `${right - left}%` }}
+                    />
+                  </HoverCardTrigger>
+                  <HoverCardContent className="flex flex-col gap-2">
+                    <p className="text-sm tabular-nums">{m}</p>
+                    {lines.map((l) => (
+                      <div key={l.type} className="flex flex-col gap-0.5">
+                        <TypeKey type={l.type} />
+                        <span className="text-muted-foreground text-xs tabular-nums">
+                          {t("{median} days, from {count} closed", {
+                            median: l.hit.medianDays.toFixed(l.hit.medianDays % 1 === 0 ? 0 : 1),
+                            count: l.hit.n,
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </HoverCardContent>
+                </HoverCard>
+              )
+            })}
+          </div>
         </div>
       </div>
       {/* The month row repeats the scale column's own `w-8` and the same `gap-2`
@@ -789,6 +1029,7 @@ export function TicketsDashboard({
   ticketTotal,
   appId,
   viewSlot,
+  actions,
 }: {
   teamId: string
   /** the team's live `Ticket type` values — the order the pipelines, the legend
@@ -829,6 +1070,28 @@ export function TicketsDashboard({
    * list view's own `<PagedFind>` draws it in, from the same config, so one
    * control appears in one place whichever body is on screen. */
   viewSlot?: ToolbarViewSlot
+  /** THE ROW'S OWN ACTION BUTTONS — "Raise ticket", the same control every other
+   * ticket tab carries, handed down rather than built here.
+   *
+   * CLIENT, 6 Sep 2026: "On the dashboard, I'm missing the full toolbar, so go
+   * ahead and implement that." What was missing was this slot: the row passed
+   * `filters` and `view` and nothing else, so on the one tab of Tickets where
+   * the strip and the toolbar are the whole chrome, the right-hand end of the
+   * row was empty while every sibling tab had a create button there.
+   *
+   * A NODE FROM THE HOST, and never a `canCreate`/`onCreate` pair rebuilt into
+   * an `<AddButton>` here. Both hosts already hold that control for their OTHER
+   * body — `tickets-collection.tsx` hands the identical node to its own
+   * `<PagedFind actions>`, and the app record's Tickets tab draws it through
+   * `PagedPanelBody`'s `onNew` — so passing the node is what makes "the same
+   * button" a fact rather than a claim: one permission check, one label, one
+   * glyph, and no second copy to drift. It is the same shape `viewSlot` above
+   * already uses for the same reason.
+   *
+   * Absent is a legitimate answer (a role that cannot raise a ticket), and R50
+   * still outranks it: on a team with no tickets at all the whole row goes,
+   * this button included. */
+  actions?: React.ReactNode
 }) {
   const t = useT()
   // THE TWO FILTERS, HELD HERE AND SPENT AT THE DOOR. They are not remembered
@@ -869,11 +1132,24 @@ export function TicketsDashboard({
 
   const data = dashQ.data
   const loading = data === undefined
-  // WHICH KINDS TO DRAW, and in the team's own order. The vocabulary leads, so
-  // the four columns are the four words this team uses; a kind that only exists
-  // on historical tickets (a retired word, an imported one) is appended rather
-  // than dropped, because a bar it owns would otherwise vanish from a chart whose
-  // total still counts it.
+  // WHICH KINDS TO DRAW, AND IN WHICH ORDER — one decision, made once, obeyed by
+  // every panel below.
+  //
+  // WHICH: the vocabulary leads, so the columns are the words this team uses; a
+  // kind that only exists on historical tickets (a retired word, an imported
+  // one) is appended rather than dropped, because a bar it owns would otherwise
+  // vanish from a chart whose total still counts it.
+  //
+  // IN WHICH ORDER: the client's, fixed — issue, question, request, extra
+  // (`orderTicketTypes`, web/lib/type-colours.ts, where the ruling and the
+  // unknown-word rule are written down beside the colours they are keyed the
+  // same way as). It used to be the vocabulary's own order, which is the seed's
+  // order, which starts with Question. Sorting HERE rather than in each panel is
+  // the point: `types` is the one array the pipeline, the per-system bars, the
+  // by-client lists, the matrix's two axes and the closing-time spread all read,
+  // so one sort settles five panels and a fifth kind added tomorrow lands in one
+  // decision. The trend is the one panel that does not take this array — its
+  // kinds come from its own rows — and it sorts through the same function.
   const types = React.useMemo(() => {
     const seen = new Set<string>()
     const inData = new Set<string>()
@@ -887,7 +1163,7 @@ export function TicketsDashboard({
       out.push(word)
     }
     for (const word of inData) if (!seen.has(word)) out.push(word)
-    return out
+    return orderTicketTypes(out)
   }, [data, helpTypeOptions])
 
   const facets: FilterFacet[] = [
@@ -956,7 +1232,10 @@ export function TicketsDashboard({
   return (
     <>
       {/* THE TOOLBAR (client ruling, 2026-09-06: "dashboard should also have
-          toolbar / filter by client and type / no sort").
+          toolbar / filter by client and type / no sort", and later the same day
+          "on the dashboard, I'm missing the full toolbar, so go ahead and
+          implement that" — which was this row's `actions` slot standing empty
+          while every sibling ticket tab drew a create button in it).
 
           NO SEARCH BOX and NO SORT CONTROL, both recorded in the registry
           (`TOOLBAR_EXEMPT` and `TOOLBAR_SORT_EXEMPT`) rather than decided here:
@@ -976,10 +1255,14 @@ export function TicketsDashboard({
         // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
         // record's Tickets tab, which is this dashboard and a list. `undefined`
         // on the Tickets screen's own Dashboard TAB, where the strip above it
-        // already is the way out; `ViewSwitch` draws nothing for fewer than two
-        // views, so the absence needs no exemption (R53 says so about this exact
-        // prop).
+        // already is the way out. `undefined` DRAWS NOTHING and needs no
+        // exemption (R53 says so about this exact prop); note that since kit
+        // v1.2.60 passing a single view would draw a static label instead, so
+        // "omit it" and "pass one" are no longer the same thing on screen.
         view={viewSlot}
+        // "RAISE TICKET", at the right of the row — the host's own node, the
+        // identical one its other body draws (see the `actions` prop above).
+        actions={actions}
       />
       {loading ? (
         <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
@@ -1086,10 +1369,21 @@ export function TicketsDashboard({
             </div>
           )}
 
-          <Panel
-            title={t("How long a ticket takes to close")}
-            sub={t("Working days only — Saturday and Sunday do not count towards how long it took.")}
-          >
+          {/* NO SUBTITLE ANY MORE (client, 6 Sep 2026: "remove the subtitle
+              'working days only.' It's not needed. We already know it."). The
+              line said the weekend does not count towards a duration, and it
+              came from the ruling that put `workingDaysSql` under both reads on
+              this panel in the first place. ONLY THE SENTENCE IS GONE: every
+              figure below is still counted Monday to Friday, by the one shared
+              seam (`shared/business-days.ts`), which is where that promise
+              actually lives — a caption is a description of the arithmetic, not
+              the arithmetic, and she is telling us she already knows which one
+              we used. */}
+          <Panel title={t("How long a ticket takes to close")}>
+            {/* `items-stretch` is the default and is what makes the trend
+                beside the distribution the SAME HEIGHT as it (her words) — the
+                trend's plot then claims whatever the taller column leaves,
+                rather than being pinned to a number somebody typed. */}
             <div className="grid min-w-0 gap-6 lg:grid-cols-2">
               <div className="flex min-w-0 flex-col gap-2">
                 <p className="text-muted-foreground text-xs uppercase">

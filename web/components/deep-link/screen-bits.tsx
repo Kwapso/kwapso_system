@@ -295,15 +295,31 @@ export type ToolbarSortSlot = {
 /** THE VIEW SLOT'S OWN SHAPE — the same ruling as `ToolbarSortSlot` above, on
  * the one control beside it, so neither can be smuggled into another slot.
  *
- * `view` NEEDS NO EXEMPTION REGISTRY and that is a property of the control
- * rather than a gap in the law: `ViewSwitch` renders NOTHING for fewer than two
- * views (its own `views` doc says so), so a collection offering one body draws
- * nothing whether or not it passes this — the absence is self-enforcing where
- * `sort`'s was not. That asymmetry is why R53 rules the sort slot by census and
- * leaves this one to the component. */
+ * `view` NEEDS NO EXEMPTION REGISTRY and that is still a property of the
+ * control rather than a gap in the law — but the property CHANGED on
+ * 2026-09-06 and the old sentence here is worth correcting rather than
+ * quietly editing, because it was the whole argument.
+ *
+ * It used to read: `ViewSwitch` renders nothing for fewer than TWO views, so a
+ * collection offering one body draws nothing whether or not it passes this.
+ * Since kit v1.2.60 that is only true of ZERO views. ONE view now draws a
+ * static label wearing the identical pill — the client's ruling, because the
+ * pill was also the only thing telling a reader which body they were looking
+ * at, and a toolbar that loses its right-hand element on some tabs and keeps it
+ * on others is the variation she has twice told us to stop.
+ *
+ * The conclusion survives on a narrower ground. A collection that passes NO
+ * view slot still draws nothing, so the absence is self-enforcing exactly where
+ * it was; and one that passes a single view now SAYS so, which is the outcome
+ * the law would have wanted anyway. What no longer holds is the idea that
+ * passing one view and passing none are the same thing on screen — they are
+ * now different, deliberately. That asymmetry with `sort` is why R53 still
+ * rules the sort slot by census and leaves this one to the component. */
 export type ToolbarViewSlot = {
   /** The bodies THIS collection offers — the kit's own `CollectionViewOption`,
-   * glyph included. Fewer than two draws nothing. */
+   * glyph included. NONE draws nothing; ONE draws a static label naming the
+   * body you are in (kit v1.2.60, not a control — no dropdown, nothing
+   * focusable); two or more draw the switch. */
   views: CollectionViewOption[]
   /** The body on screen. Controlled only, remembered per person by whatever the
    * screen remembers it with (the kit's `ViewSwitch` doc: a store keyed by
@@ -456,9 +472,9 @@ export function ToolbarRow({
   sort?: ToolbarSortSlot | false | null
   /** THE VIEW SWITCH — after `sort` and before the pinned-right `actions`,
    * and a CONFIG for the same reason `sort` is. Omitted wherever a screen
-   * offers only one body; `ViewSwitch` itself renders nothing for fewer than
-   * two views, so the absence needs no exemption entry (see
-   * `ToolbarViewSlot`). */
+   * offers only one body. OMITTING the slot draws nothing and needs no
+   * exemption entry; PASSING a single view now draws a static label naming
+   * that body (kit v1.2.60) — see `ToolbarViewSlot`. */
   view?: ToolbarViewSlot | false | null
   /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), last in the row —
    * client, 2 Sep 2026, correcting the `ml-auto` this slot carried until

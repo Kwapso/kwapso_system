@@ -630,6 +630,21 @@ export function TicketsCollection({
   }
 
   const canCreateTicket = can("help", "create")
+  /** "RAISE TICKET", WRITTEN ONCE FOR EVERY BODY THIS SCREEN HAS.
+   *
+   * The list draws its toolbar through `<PagedFind>` and the Dashboard tab
+   * draws its own `<ToolbarRow>` (`tickets-dashboard.tsx`), and until 6 Sep 2026
+   * only the first of the two had a create button in it — the client's own
+   * report: "on the dashboard, I'm missing the full toolbar." The fix is this
+   * node rather than a second `<AddButton>` on the dashboard: one permission
+   * check, one label, one glyph, so "the same button on every tab" is a fact
+   * about one expression instead of a claim about two. Triage's own row is the
+   * third body and builds its own, one component away, because `TriageQueue`
+   * owns whether it draws at all (R50) and takes `canCreateTicket`/`onCreate`
+   * rather than a node. */
+  const raiseTicket = canCreateTicket ? (
+    <AddButton label={t("Raise ticket")} onClick={onCreate} />
+  ) : null
 
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
@@ -724,6 +739,10 @@ export function TicketsCollection({
               // collection, and its toolbar must stay put so the reader can
               // filter their way back out.
               ticketTotal={totals.help}
+              // THE SAME BUTTON THE LIST TAB DRAWS, in the same slot of the same
+              // row shape — see `raiseTicket` above for why it is one node
+              // rather than two call sites that happen to agree today.
+              actions={raiseTicket}
             />
           ) : scopedQ.error ? (
             <CollectionCard>
@@ -788,7 +807,7 @@ export function TicketsCollection({
               // beside it: unlike Accounts, tickets has no export or import
               // door (a ticket is a raised conversation, not an importable
               // record — AGENTIC-IMPORT.md), so there is nothing else to draw.
-              actions={() => (canCreateTicket ? <AddButton label={t("Raise ticket")} onClick={onCreate} /> : null)}
+              actions={() => raiseTicket}
               // The tab strip's own kind/stage narrowing is NOT `fixed`, and the
               // difference matters: `fixed` makes a find ACTIVE unconditionally,
               // and this strip is already in `listKey` above — passing it here

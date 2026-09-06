@@ -116,3 +116,68 @@ export function ticketTypeColour(value: string | null | undefined): string {
   if (!value) return NEUTRAL_TYPE_COLOUR
   return TYPE_COLOUR[value.trim().toLowerCase()] ?? NEUTRAL_TYPE_COLOUR
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ORDER THE FOUR ARE ALWAYS READ IN.
+   ══════════════════════════════════════════════════════════════════════════
+
+   CLIENT RULING, 2026-09-06, verbatim: "the order: for all the graphs, it's
+   always: 1. issue 2. question 3. request 4. extra. Sort it accordingly in
+   which app. Also put it in this order in the open work, and also put it in
+   this order in how long a ticket takes to close."
+
+   It is not alphabetical, it is not by count, and it is not the order the door
+   happened to return — it is the order she reads her own work in, and a chart
+   whose columns reorder themselves as the numbers move is a chart nobody can
+   compare week to week. Three of the four seeded words are already ordered
+   differently by the seed itself (`Question` leads there), so the vocabulary's
+   own order could not be it either.
+
+   WHY IT LIVES HERE, BESIDE THE COLOURS, AND NOT IN THE DASHBOARD. Every panel
+   that draws a type also draws its colour, so a fifth type added tomorrow is
+   ONE decision in ONE file — a line in `TYPE_COLOUR` and a line here — rather
+   than a colour here and an order in whichever screen happened to need one
+   first. The dashboard's five panels, its legend and its trend all sort
+   through this, so they cannot come to disagree.
+
+   KEYED ON THE SAME IDENTITY THE COLOUR IS. `trim().toLowerCase()`, exactly as
+   `ticketTypeColour` below matches, because the vocabulary is the team's own
+   editable `Ticket type` list — a team that capitalises differently, or types a
+   trailing space, still lands on both its colour and its place. The two must
+   agree by construction: an order keyed one way and a colour keyed another
+   would put a word in the first column wearing the neutral grey.
+
+   AND A WORD THIS LIST HAS NEVER HEARD STILL RENDERS. It sorts to the END, in
+   the order it arrived in — the retiring "Requirements" and "General", a word a
+   team typed itself, a kind that only exists on imported tickets. It is the
+   same ruling `ticketTypeColour` makes one function down (an unknown word gets
+   the neutral rather than being special-cased or refused) and the same one the
+   dashboard's own `types` memo makes (a kind that only exists on historical
+   tickets is APPENDED rather than dropped, because a bar it owns would
+   otherwise vanish from a chart whose total still counts it). A type that
+   disappeared from a chart because nobody had ranked it is exactly the silent
+   subtraction this whole screen is built to avoid. */
+const TYPE_ORDER = ["issue", "question", "request", "extra"] as const
+
+/** Where a ticket type sits in the client's fixed order — 0-based, and the
+ * length of the list (i.e. after all four) for a word the order has never
+ * heard of, including a ticket with no type at all. Never negative: a caller
+ * sorting on this can add nothing and subtract nothing. */
+export function ticketTypeRank(value: string | null | undefined): number {
+  if (!value) return TYPE_ORDER.length
+  const at = (TYPE_ORDER as readonly string[]).indexOf(value.trim().toLowerCase())
+  return at === -1 ? TYPE_ORDER.length : at
+}
+
+/** The client's order, applied to whatever words a caller is holding.
+ *
+ * A COPY, and a STABLE sort. The copy is because callers hand this arrays they
+ * did not build (`helpTypeOptions` is a cache the screen shares with its
+ * siblings, and sorting it in place would reorder the create dialog's picker
+ * from a chart). The stability is what makes the unknown tail honest: every
+ * word this order has never heard of scores the same rank, so they keep the
+ * order they arrived in — the team's own vocabulary order, then anything found
+ * only on historical rows — rather than being shuffled by an engine's tie-break. */
+export function orderTicketTypes(values: readonly string[]): string[] {
+  return [...values].sort((a, b) => ticketTypeRank(a) - ticketTypeRank(b))
+}
