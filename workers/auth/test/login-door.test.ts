@@ -11,11 +11,16 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { doorSource } from "./doors"
+
 import { sourceFiles } from "@shared/rules/source-scan"
 
 const SRC = join(__dirname, "..", "src")
 const ROOT = join(__dirname, "..", "..", "..")
-const index = readFileSync(join(SRC, "index.ts"), "utf8")
+// Every door on the worker, index.ts + routes/, sorted and stable — the
+// handler-boundary slices below read it exactly as they read index.ts when all
+// eighteen handlers lived there. See test/doors.ts.
+const index = doorSource()
 const emailChange = readFileSync(join(SRC, "lib", "email-change.ts"), "utf8")
 const loginCodes = readFileSync(join(SRC, "lib", "login-codes.ts"), "utf8")
 

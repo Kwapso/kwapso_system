@@ -2003,9 +2003,9 @@ export const DEAF_EXEMPT: Record<string, string> = {
  * Every line here today belongs to `workers/mcp/`, which is the EXTERNAL machine
  * surface and owns its own boundary suites. */
 export const RAW_BODY_EXEMPT: Record<string, string> = {
-  "workers/mcp/src/index.ts::rpc.id":
+  "workers/mcp/src/routes/mcp.ts::rpc.id":
     "JSON-RPC 2.0 requires the request id be ECHOED BACK verbatim in the response envelope (`id` may be a string, a number or null by spec). It is never read as a value, never reaches a statement, and normalising it would break the protocol.",
-  "workers/mcp/src/index.ts::rpc.params":
+  "workers/mcp/src/routes/mcp.ts::rpc.params":
     "the params OBJECT itself is only ever indexed (`rpc.params?.name`, coerced with String()) and handed to the tool catalogue, which validates each argument against the tool's own schema before it reaches a door. The field read here is the envelope, not a value.",
 }
 

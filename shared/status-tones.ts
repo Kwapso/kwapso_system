@@ -60,7 +60,7 @@ import type { HelpStatus, StoryStatus } from "./types"
  * own `STATUS_WORDS` is typed this way (ticket-row.tsx): an eighth stage
  * added to `HELP_STATUSES` fails this file's own type check instead of
  * rendering a chip with no dot. */
-export const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
+const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
   // Waiting on the CLIENT to say yes — nothing here moves until they do. The
   // portal draws this exact stage in its one attention-getting colour; this
   // is the agency side reusing that same call rather than re-deciding it.
@@ -87,7 +87,7 @@ export function helpStatusDotTone(status: HelpStatus): DotTone {
 
 /** A STORY'S FOUR STAGES → THE CHIP'S DOT. Same `Record` shape, same reason:
  * a fifth `StoryStatus` fails here rather than rendering silently. */
-export const STORY_STATUS_DOT_TONE: Record<StoryStatus, DotTone> = {
+const STORY_STATUS_DOT_TONE: Record<StoryStatus, DotTone> = {
   // Written down, nobody has started — the "Not started" tier.
   open: "archived",
   // A timer started on it.

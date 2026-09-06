@@ -50,7 +50,7 @@ const DRAW_WIDTH = 460
  * — and the list can only be these two while `open` is a prop a sample sets:
  * every other overlay in the kit is drawn shut and draws nothing until it is
  * pressed, which `pointer-events-none` guarantees it never is. */
-export const OVERLAY_PARTS: Record<string, string> = {
+const OVERLAY_PARTS: Record<string, string> = {
   popover: "drawn open, and the kit portals the panel to the document body — outside this tile",
   tooltip: "drawn open, and the kit portals the bubble to the document body — outside this tile",
 }

@@ -66,7 +66,7 @@ export type ActivityOrigin = (typeof ACTIVITY_ORIGINS)[number]
 /** The one header name. Prefixed with the product, like nothing else here needs
  * to be, because this one travels through a public gateway and a value a client
  * can set must be visibly OURS at the place we overwrite it. */
-export const ORIGIN_HEADER = "x-kwapso-origin"
+const ORIGIN_HEADER = "x-kwapso-origin"
 
 /** What this request says it is, validated against the closed set.
  *

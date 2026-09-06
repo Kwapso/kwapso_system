@@ -116,7 +116,15 @@ describe("every shared-write table is written down", () => {
    * in the paragraph under the table), and a `CREATE TABLE` is not an opinion
    * about a row. One file, named once, rather than a pattern that would also
    * excuse a real handler. */
-  const MIGRATION_RUNNER = "workers/tenancy/src/team-schema.ts"
+  /** THE SCHEMA ITSELF IS NOT A WRITER. Every CREATE TABLE and every seed INSERT
+   * a team is born with lives under this prefix; counting them as a component
+   * with an opinion about a table would make tenancy a second writer of
+   * everything. A PREFIX, not one filename: the ledger and the seed builder were
+   * split out of team-schema.ts into team-schema/ on 6 Sep 2026, and the
+   * single-path version of this line stopped matching them — which this suite
+   * caught by going red with eight new "shared" tables, rather than by going
+   * quietly green. A third file under here is covered without another edit. */
+  const SCHEMA_PREFIX = "workers/tenancy/src/team-schema"
 
   /** Which component a file belongs to. `shared/workers/` is its own answer
    * rather than being attributed to whoever imports it: `logError` is a SEAM, and
@@ -143,7 +151,7 @@ describe("every shared-write table is written down", () => {
       // `activity`, `agent_credits` and `help` as shared writes that do not
       // exist. The subject here is production code, so a test FOLDER is out
       // whatever a file inside it is called.
-      if (f.rel === MIGRATION_RUNNER || /(^|\/)tests?\//.test(f.rel)) continue
+      if (f.rel.startsWith(SCHEMA_PREFIX) || /(^|\/)tests?\//.test(f.rel)) continue
       const text = stripComments(f.source)
       const tables = new Set<string>()
       for (const m of text.matchAll(/INSERT\s+(?:OR\s+\w+\s+)?INTO\s+([A-Za-z_]\w*)/gi))

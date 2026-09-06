@@ -36,7 +36,7 @@
  * `house` → `House`, `chat-teardrop-dots` → `ChatTeardropDots`. The same
  * transform the kit's own generator uses, so a name that resolves here names
  * a real export there. */
-export function pascalCase(kebab: string): string {
+function pascalCase(kebab: string): string {
   return kebab
     .split("-")
     .map((part) => part.replace(/^([0-9]*)([a-z])/, (_, digits, c: string) => digits + c.toUpperCase()))

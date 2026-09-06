@@ -364,7 +364,7 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
 /** The two kinds an account can be, in the words the screens use. ONE source for
  * the list line, the detail header and the create form (SCOPE ch.03: companies
  * and people are one table, told apart by this). */
-export const ACCOUNT_TYPE: Record<Account["accountType"], string> = {
+const ACCOUNT_TYPE: Record<Account["accountType"], string> = {
   entity: "Company",
   individual: "Person",
 }

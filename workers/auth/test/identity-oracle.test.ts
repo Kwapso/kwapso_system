@@ -31,6 +31,8 @@ import { join } from "node:path"
 import { DatabaseSync, type SqlValue } from "node:sqlite"
 import { describe, expect, it } from "vitest"
 
+import { doorSource } from "./doors"
+
 import { sha256Hex } from "../src/lib/crypto"
 import { verifyEmailChange } from "../src/lib/email-change"
 import { updateProfile } from "../src/lib/profile"
@@ -149,7 +151,9 @@ describe("the profile door refuses a wrong-typed field instead of crashing", () 
 // THE DOOR, not just the lib: the fields have to be validated where R20's scanner
 // can see them, which is the half that stops this class coming back. Read off disk.
 describe("the profile door validates at the boundary", () => {
-  const src = readFileSync(join(__dirname, "..", "src", "index.ts"), "utf8")
+  // The whole door surface — the profile handler moved to routes/me.ts on
+  // 6 Sep 2026, and this check is about the boundary, not the filename.
+  const src = doorSource()
 
   it("puts all three profile fields through the validation seam", () => {
     for (const field of ["firstName", "lastName", "imageDataUrl"])

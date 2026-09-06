@@ -212,7 +212,10 @@ describe("the cached staff verdict has no transition to miss", () => {
     // The bridge mints through auth's internal door, which refuses a caller who
     // is no longer an active member — so "reads as a client" and "holds a working
     // token" cannot both be true, whatever the cache remembers.
-    const authSrc = readFileSync(join(__dirname, "../../auth/src/index.ts"), "utf8")
+    // auth's handlers moved out of index.ts into routes/ on 6 Sep 2026 when that
+    // worker took the house shape. The `at` tripwire below is what made the move
+    // safe: this went red rather than slicing an empty string and passing.
+    const authSrc = readFileSync(join(__dirname, "../../auth/src/routes/internal.ts"), "utf8")
     const at = authSrc.indexOf("async function internalMcpSession")
     expect(at, "auth must still own the mint the bridge calls").toBeGreaterThan(-1)
     const mintDoor = authSrc.slice(at, authSrc.indexOf("\n}\n", at))

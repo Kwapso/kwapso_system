@@ -42,7 +42,7 @@
 
 /** How much of one file's text we keep. The same ceiling `driveFileText` has
  * always had, applied after extraction rather than to raw bytes. */
-export const FILE_TEXT_CAP = 100_000
+const FILE_TEXT_CAP = 100_000
 
 /** WHAT KIND OF FILE THIS IS, from the name and the mime together.
  *

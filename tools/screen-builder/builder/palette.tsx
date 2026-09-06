@@ -49,7 +49,7 @@ import type { Catalogue } from "./types"
  * ("two or three columns of preview cards scan far better than 116 rows")
  * and 320 is the narrowest width at which two tiles still show a shape
  * rather than a texture. Read by `builder.tsx` for the canvas arithmetic. */
-export const PALETTE_WIDTH = 320
+const PALETTE_WIDTH = 320
 const TILE_PICTURE = 92
 
 export function Palette({

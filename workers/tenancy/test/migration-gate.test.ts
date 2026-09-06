@@ -284,7 +284,11 @@ describe("where it sits in the pipeline", () => {
   /** WHICH WORKER OWNS THE MIGRATION LIST — derived from the file the gate
    * parses, not typed here. The ordering law below is really a statement about
    * that worker, and it must follow the list if the list ever moves. */
-  const OWNER = source.match(/workers\/([^/"]+)\/src\/team-schema\.ts/)?.[1]
+  // Matched on the DIRECTORY the list lives under, not on one filename: the
+  // ledger moved from src/team-schema.ts to src/team-schema/migrations.ts on
+  // 6 Sep 2026 and a filename-shaped pattern reported `undefined` for the owning
+  // worker, which is how a derivation quietly becomes a hardcode.
+  const OWNER = source.match(/workers\/([^/"]+)\/src\/team-schema/)?.[1]
 
   it("knows which worker bundles TEAM_MIGRATIONS", () => {
     expect(OWNER, "the gate must parse the migration list out of some worker").toBeTruthy()
