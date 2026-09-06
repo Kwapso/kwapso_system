@@ -443,6 +443,10 @@ curl -X POST https://<gateway-url>/api/data-ops/admin/seed-targets -H "x-admin-k
 curl -X POST https://<gateway-url>/api/tenancy/admin/migrate-teams -H "x-admin-key: <ADMIN_KEY>"
 ```
 
+> A `429 too_many_requests` here is the maintenance throttle, not a bad key: these doors
+> take 12 calls a minute per address (OPERATIONS.md § secrets). A whole bootstrap makes two.
+> A `403` IS the key; a `503` means `ADMIN_KEY` is not set on that worker yet.
+
 That robot diffs each team's `_migrations` against `TEAM_MIGRATIONS` and applies the gap.
 
 ---

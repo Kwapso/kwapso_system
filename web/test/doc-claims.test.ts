@@ -152,7 +152,7 @@ const SUBSET_CLAIMS: { doc: string; phrase: string; why: string }[] = [
   {
     doc: "OPERATIONS.md",
     phrase: "four workers",
-    why: "the per-caller rate limiter's roster, not the app's: CALLER_LIMIT is bound on tenancy, content, data-ops and mcp — the four that resolve a caller. The two gateways cannot (they decode no session), realtime holds no doors, and auth's doors have no session to key on by definition and carry their own throttles.",
+    why: "the per-caller rate limiter's roster, not the app's: CALLER_LIMIT is bound on tenancy, content, data-ops and mcp — the four that RESOLVE A CALLER, which is what a per-caller ceiling has to key on. Realtime holds no doors, and auth's doors have no session to key on by definition and carry their own throttles. THE GATEWAYS ARE NOT ON THIS LIST FOR THE SAME REASON, and the sentence used to stop there — 'the two gateways cannot (they decode no session)' — which stopped being the whole truth on 6 Sep 2026: the agency gateway now binds MAINTENANCE_LIMIT, keyed on the ADDRESS, precisely BECAUSE it decodes no session. The maintenance doors carry no session by design, so an IP is the only key there is. So: no gateway can hold a per-CALLER limiter, and one of them holds a per-ADDRESS one. Four is still the right number for the claim this pins; the reason is no longer 'gateways cannot be throttled'.",
   },
   {
     doc: "CONVENTIONS.md",

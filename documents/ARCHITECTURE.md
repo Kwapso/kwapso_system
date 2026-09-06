@@ -152,6 +152,10 @@ sequenceDiagram
   is an owner-level decision, not a patch. The refusal and the flag are held
   together by a census in `workers/tenancy/test/merged-read-guard.test.ts`.
   Maintenance via x-admin-key endpoints.
+  Those endpoints are published by the gateway's PREFIX forward, so they answer on the
+  public internet: `guardMaintenance` throttles them to 12 calls a minute per address and
+  records every refusal (OPERATIONS.md § secrets). The key still fails closed; the throttle
+  fails open, and `MAINTENANCE_LIMIT`'s presence in both environments is machine-checked.
 - Every row: globally-unique, team-stamped IDs (rows can move homes without
   collisions). Every worker reads/writes through ONE data-access layer.
 
