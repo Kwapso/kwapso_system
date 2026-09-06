@@ -98,20 +98,24 @@
 
 import * as React from "react"
 
-import { Text } from "@shared/ui/components/typography/typography"
+import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { defaultTabsConfig, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
-import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useRemembered } from "@shared/web/remembered"
 import { Button } from "@shared/ui/components/button/button"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { ScreenRenderer, type ScreenActionContext, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
-import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import { type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Card } from "@shared/ui/components/card/card"
 import { Queue } from "@shared/ui/components/queue/queue"
+/* THE BOARD AND THE SPLIT — the kit's own, vendored, and both adopted in this
+   pass (their `KIT_COMPONENT_EXEMPT` lines were deleted by the same commit —
+   R46's rot-check refuses an exemption for a part that is reached). Neither is
+   drawn app-side: `OpenBoard` and `ReadySplit` below supply rows and a pane. */
+import { Kanban, type KanbanColumnDot } from "@shared/ui/components/kanban/kanban"
+import { Split } from "@shared/ui/components/split/split"
 /* THE LIST VIEW'S TABLE, composed from the kit's own primitives rather than
    drawn through `RecordTable` — the reason is written out at the `triageView
    === "list"` branch below, and it is R16's: `RecordTable` brings
@@ -128,17 +132,18 @@ import {
 import {
   ArrowCounterClockwise,
   Cards,
+  Kanban as KanbanGlyph,
   ListBullets,
   Check,
   Paperclip,
-  Plus,
+  SquareSplitHorizontal,
   Tag,
 } from "@shared/ui/foundations/icons"
 import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
-import { TicketChips } from "@shared/web/ticket-chips"
+import { TicketChips, ticketTitle, type TicketChipFacts } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { InAppLink } from "@/components/in-app-link"
@@ -146,13 +151,18 @@ import { LoadMore } from "@/components/load-more"
 import { PagedFind } from "@/components/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
-import { AddButton, CollectionCard, EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
+import {
+  AddButton,
+  CollectionCard,
+  EmptyLine,
+  ToolbarRow,
+  type ToolbarViewSlot,
+} from "@/components/deep-link/screen-bits"
 import { TriageStrip } from "@/components/triage-strip"
 import { TicketsDashboard } from "@/components/tickets-dashboard"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api/tenancy"
 import { MARK_GROUP, markMap } from "@/lib/type-marks"
-import { shapeHelpList } from "@/components/deep-link/shape"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
 import { AppMark } from "@/components/app-tiles"
@@ -170,16 +180,18 @@ import {
   helpFacetKey,
   helpKey,
   listFetch,
+  OPEN_FACET,
   totalKey,
   triageKey,
+  WAITING_FACET,
   type HelpFacet,
 } from "@/lib/live-resources"
-import { withDataDrivenCollection } from "@/lib/screens"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
 import { primeCache, invalidate,
   mergePage, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
+import { OPEN_TAB_STATUSES } from "@shared/types"
 import type {
   Account,
   AppModule,
@@ -191,11 +203,63 @@ import type {
 } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
 
-/** The two facets that are STAGES rather than kinds, and the tab each one is.
- * Named here so the strip's shape is readable in one place: Ready first because
- * it is the pile somebody should act on, Closed last because it is the pile
- * nobody should. */
+/* ══════════════════════════════════════════════════════════════════════════
+   THE STRIP, AND THE DEFECT ITS NEW SHAPE EXPOSED — client rulings, 2026-09-06.
+
+   HER WORDS, IN THE ORDER SHE GAVE THEM:
+     "the tab order for tickets: 1. dashboard 2. triage 3. open (status, when
+      triaged but not solved) 4. closed 5. all"
+     "add new tab: waiting (this is when we are waiting sth from the customer)"
+     "add another tab: ready / will do split view and list / between triage and
+      open"
+     "Open → triaged + scheduled + in_progress + waiting"
+
+   SO THE STRIP IS: Dashboard · Triage · Ready · Open · Waiting · Closed · All.
+   It is ODD BY LIFECYCLE and RIGHT BY WORKLOAD, which is worth saying out loud
+   because the next person to read it will want to "fix" the order: `ready` is a
+   LATER stage than the three `open` covers (every story is closed on a Ready
+   ticket; an Open one is still being worked), so a taxonomy would put Ready
+   after Open. A tab strip is not a taxonomy. Ready and Triage are the two piles
+   that need HER personally — one is unread and one is written-but-unsent — and
+   they sit together at the front where the work starts. Open, Waiting and
+   Closed are the piles that are somebody else's move.
+
+   ── THE DEFECT THIS FIXED ────────────────────────────────────────────────
+
+   `READY` — the token `status:ready` — was LABELLED "Open" until today, with a
+   comment saying the token stayed put "because that is the STATUS the door
+   stores and renaming it would be a migration for a label". The token was fine.
+   The LABEL was wrong, and wrong in the most expensive direction: the tab a
+   person read as "Open" showed exactly the tickets that now have a Ready tab of
+   their own — finished work waiting to be sent — and showed NONE of the work
+   actually under way. Every `triaged`, `scheduled` and `in_progress` ticket in
+   the team was reachable only through All. The tab was not empty and not broken,
+   so nothing ever said so.
+
+   Both tabs exist now, each labelled what it is, and `OPEN_FACET` names the
+   three stages that were unreachable.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** WORK THAT IS FINISHED AND UNSENT. One status, and the one tab whose whole
+ * point is that somebody has to do something about it today. */
 const READY: HelpFacet = "status:ready"
+/** WORK UNDER WAY — THREE stages in one tab, and the reason `helpFacetFilter`
+ * grew a set grammar (`web/lib/live-resources.ts`) and the door grew a
+ * `status IN (…)` clause (`workers/content/src/lib/help.ts`). Built from
+ * `OPEN_TAB_STATUSES` rather than spelled here, so the tab, its cache key, its
+ * query and the door's own vocabulary are one fact written once. */
+const OPEN = OPEN_FACET
+/** …AND THE PART OF OPEN THAT IS NOT MOVING. Derived at the door from the
+ * ticket's own conversation, never stored — `waitingClause` in
+ * workers/content/src/lib/help.ts carries the whole derivation, what was
+ * verified about `portal_users`, the ruling on `is_agent` and the known drift.
+ *
+ * A SUBSET OF OPEN, NOT A SIBLING OF IT, and a reader will meet the same ticket
+ * under both tabs. That is the design: Open is "what is under way" and Waiting
+ * is "the part of it where the client owes us an answer", so the overlap is the
+ * information. Nothing is double-counted, because nothing adds these two badges
+ * together — each is its own exact `COUNT(*)` of its own question. */
+const WAITING = WAITING_FACET
 const CLOSED: HelpFacet = "status:resolved"
 const TRIAGE: HelpFacet = "triage"
 const ALL: HelpFacet = "all"
@@ -438,28 +502,49 @@ function triageAct(
   }
 }
 
+/* THE RECIPE, THE RIGHTS AND `onAction` ARE GONE FROM THIS SIGNATURE (2026-09-06),
+   and that is a real subtraction rather than tidying, so it is written down.
+
+   This screen used to draw its rows through the engine — `shapeHelpList` into
+   `withDataDrivenCollection` into `<ScreenRenderer>` — which is why the host
+   handed over `tickets.list`, the caller's rights and the engine's action
+   dispatcher. The client has now ruled that every row tab draws the TABLE the
+   triage list draws ("do the list view exactly the same as we have it in the
+   Triage list"), so the renderer has no body left to render here, and three
+   props whose only consumer was that renderer were being passed for nothing.
+
+   NOTHING WAS DECIDED BY THEM THAT IS NOT DECIDED NOW. `ticketsListRecipe`
+   (web/lib/screens.ts) carries `actions: []` — there has never been a row action
+   on this collection for `onAction` to dispatch — and the gate it declares
+   (`help:read`) is the same gate the DOOR applies to every read this screen
+   makes. The recipe itself stays exactly where it is: it is still the ticket
+   collection's declaration, still what R14's paging census and R48's toolbar
+   census read, and still what the deep-link host resolves when a ticket is
+   opened. It is simply no longer this screen's list renderer.
+
+   WHAT THE ENGINE DID DRAW AND SOMETHING ELSE HAD TO PICK UP: the zero state's
+   sentence and its create button. Both are handled at the branch below, and the
+   comment there says how. */
 export function TicketsCollection({
   teamId,
-  recipe,
-  rights,
   helpTypeOptions,
   totals,
   can,
   onCreate,
-  onAction,
   onIntent,
 }: {
   teamId: string
-  recipe: ScreenRecipe
-  rights: ScreenRights
   /** the team's live `Ticket type` values — the tab strip is built from these */
   helpTypeOptions: string[]
   totals: { help?: number }
   can: (module: string, right: "read" | "create" | "edit" | "delete") => boolean
   onCreate: () => void
-  onAction: (actionId: string, ctx: ScreenActionContext) => void
   onIntent: (intent: ScreenIntent) => void
 }) {
+  // STILL `useT` AND NOT `useLanguage`, which is worth a line because it was
+  // nearly changed: every date on this screen is drawn by a component that reads
+  // the reader's language for itself (`TicketRowsTable`, `ReadySplit`,
+  // `TriageChips`), so the host needs the dictionary and never the locale.
   const t = useT()
   // Which type of ticket she was looking at, remembered with the rest of the
   // screen — the sub-tab is as much "where she was" as the search box under it.
@@ -483,6 +568,26 @@ export function TicketsCollection({
      is worth more than the comment: filed as a follow-up rather than pretended
      to be solved here. */
   const [facet, setFacet] = useRemembered<HelpFacet>("ticket-facet", DASHBOARD)
+  /* WHICH BODY EACH OF THE TWO MULTI-VIEW TABS IS SHOWING.
+   *
+   * TWO PIECES OF STATE, NOT ONE KEYED BY TAB, and that is `useRemembered`'s own
+   * contract rather than a style choice: it reads its slot ONCE, at mount ("the
+   * host owns the address; while this screen is up, the screen owns the value"),
+   * so a key built out of `facet` would be read for whichever tab happened to be
+   * open on the first render and never again. Two hooks, both unconditional,
+   * both remembered under their own name.
+   *
+   * REMEMBERED RATHER THAN PLAIN STATE, which is `ViewSwitch`'s own rule: a view
+   * is a PERSON'S preference, per person and never in a store a colleague
+   * shares. Scoped per tab so choosing the board on Open does not decide
+   * anything on Ready — they are two different questions about two different
+   * piles.
+   *
+   * THE FIVE OTHER ROW TABS HOLD NO STATE AT ALL. They have one body, so there
+   * is nothing to remember; `viewSlot` hands the kit a single view and the kit
+   * draws its name. */
+  const [openView, setOpenView] = useRemembered<"list" | "board">("ticket-open-view", "list")
+  const [readyView, setReadyView] = useRemembered<"list" | "split">("ticket-ready-view", "list")
   // TRIAGE'S OWN SEARCH lives INSIDE `TriageQueue` now (R50): the toolbar
   // above it has to answer "is the queue empty" to know whether to draw
   // itself at all, and only `TriageQueue` — which fetches the queue — ever
@@ -619,11 +724,41 @@ export function TicketsCollection({
          predicate the triage queue itself selects on (`triage.ts`), so the tab
          and the queue cannot disagree about what is pending. */
       { value: TRIAGE, label: t("Triage"), icon: CONCEPT_ICON.triage, badge: formatCount(byStatus?.new), badgeVariant: "" as const },
-      // OPEN, not "Ready" — her word, 2026-09-06: "open (status, when triaged
-      // but not solved)". The facet token stays `status:ready` because that is
-      // the STATUS the door stores and renaming it would be a migration for a
-      // label; only the word a person reads has changed.
-      { value: READY, label: t("Open"), icon: CONCEPT_ICON.open, badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
+      /* READY — "every story closed, nobody has sent it yet", and the tab that
+         used to wear the word "Open". See the block at the top of this file for
+         what that mislabelling cost: this tab was the ONLY way to `status:ready`
+         and there was no way at all to the three stages beside it. */
+      { value: READY, label: t("Ready"), icon: CONCEPT_ICON.ready, badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
+      /* OPEN — THREE stages, and therefore a badge that ADDS UP three of the
+         door's own grouped counts. That sum is still R16-clean and it is worth
+         saying why, because "adding two numbers" is exactly what R16 usually
+         forbids: `byStatus` is one grouped `COUNT(*)` over the WHOLE collection
+         (`countTicketFacets`, counted with the stage facet deliberately turned
+         off), so each term is an exact, disjoint count of one status. A ticket
+         is in exactly one status, so no row is counted twice and none is missed.
+         What R16 forbids is a number taken off a LOADED PAGE, and none of these
+         is. */
+      {
+        value: OPEN,
+        label: t("Open"),
+        icon: CONCEPT_ICON.open,
+        badge: formatCount(OPEN_TAB_STATUSES.reduce((n, st) => n + (byStatus?.[st] ?? 0), 0)),
+        badgeVariant: "" as const,
+      },
+      /* WAITING — NO BADGE, and that is R16 rather than an omission.
+         Every other number on this strip is one of the door's own grouped
+         tallies, primed by whichever ticket read ran last; Waiting is not a
+         status, so `byStatus` has no term for it and there is nothing here to
+         read. The only honest number would be a count the door took under the
+         waiting predicate itself, and the response shape that would carry it
+         (`web/lib/api/content.ts`) belongs to another lane this pass may not
+         edit — so rather than compute a plausible number in the browser, which
+         is precisely the failure R16 exists for, this tab shows none. It is not
+         countless: OPEN the tab and `CollectionHeading` above shows the door's
+         exact total for it, the same way it does for every other narrowing.
+         DELETE THIS COMMENT and badge it the day the ticket read carries a
+         waiting tally. */
+      { value: WAITING, label: t("Waiting"), icon: CONCEPT_ICON.waiting, badge: "", badgeVariant: "" as const },
       { value: CLOSED, label: t("Closed"), icon: CONCEPT_ICON.closed, badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
     ],
@@ -645,6 +780,50 @@ export function TicketsCollection({
   const raiseTicket = canCreateTicket ? (
     <AddButton label={t("Raise ticket")} onClick={onCreate} />
   ) : null
+
+  /** WHICH BODIES THIS TAB OFFERS, AND WHICH ONE IS ON — one function, so the
+   * five single-body tabs are provably identical rather than five call sites
+   * that happen to agree.
+   *
+   * LIST IS ALWAYS FIRST AND ALWAYS THE DEFAULT — client, 2026-09-06: "for all
+   * of them (except dashboard) start with list view, we will add more views
+   * later." So the second body is an addition to the row rather than a
+   * replacement of it, and a person who never touches this control sees the same
+   * table on every tab.
+   *
+   * OPEN GETS THE BOARD — "for the tab open, I want the view list and Kanban -
+   * columns are status" — and READY GETS THE SPLIT — "will do split view and
+   * list". Both are the kit's own components; see `OpenBoard` and `ReadySplit`
+   * below for what each one does and does not do.
+   *
+   * NOT MEMO-ISED. It builds two or three small objects per render and is read
+   * once; a `useMemo` here would cost a dependency array to keep honest and buy
+   * nothing (the same argument `peopleFor` in `TriageQueue` makes about its own
+   * unwrapping). */
+  const viewSlot: ToolbarViewSlot = (() => {
+    const list = { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> }
+    if (facet === OPEN)
+      return {
+        views: [list, { value: "board", label: t("Board"), icon: <KanbanGlyph className="size-4" /> }],
+        value: openView,
+        onValueChange: (v: string) => setOpenView(v === "board" ? "board" : "list"),
+      }
+    if (facet === READY)
+      return {
+        views: [
+          list,
+          { value: "split", label: t("Split"), icon: <SquareSplitHorizontal className="size-4" /> },
+        ],
+        value: readyView,
+        onValueChange: (v: string) => setReadyView(v === "split" ? "split" : "list"),
+      }
+    // ONE VIEW, AND THE KIT SAYS SO RATHER THAN THE ROW LOSING ITS LAST
+    // ELEMENT. The handler is written out as a no-op with its reason rather than
+    // omitted — `ToolbarViewSlot` requires one, the static label is not a
+    // control and can never call it, and a handler that quietly did something
+    // else would be worse than one that plainly does nothing.
+    return { views: [list], value: "list", onValueChange: () => {} }
+  })()
 
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
@@ -802,6 +981,29 @@ export function TicketsCollection({
                   .filter((m) => m.active)
                   .map((m) => ({ value: m.id, label: `${m.appName} · ${m.name}` })),
               })}
+              /* THE VIEW SELECTOR, ON EVERY ROW TAB — client, 2026-09-06:
+                 "For the tabs Open, Closed, and All, do the list view exactly
+                 the same as we have it in the Triage list, and put the view
+                 selector. Even if currently there is only one view, the table
+                 one."
+
+                 SO IT IS PASSED EVEN WHERE THERE IS ONE BODY, and that is a
+                 change of behaviour rather than a decoration. Until kit v1.2.60
+                 `ViewSwitch` drew nothing below TWO views, which is the property
+                 R53 leans on to leave `view` out of its exemption registry; the
+                 kit now draws a single view as a STATIC LABEL wearing the same
+                 pill (`ToolbarViewSlot`'s own doc carries the client ruling and
+                 the date). A toolbar that keeps its right-hand element on some
+                 tabs and loses it on others is the variation she has twice told
+                 us to stop — so Waiting, Closed and All say "List" in the slot
+                 rather than leaving a hole in the row.
+
+                 ONE HELPER RATHER THAN A TERNARY AT THE PROP, because two of the
+                 seven tabs have a second body and the other five must be
+                 provably identical: `viewSlot` below is the only place that
+                 decides, so "every row tab draws this control" is a fact about
+                 one function instead of a claim about five call sites. */
+              view={viewSlot}
               // "RAISE TICKET", AT THE RIGHT OF THE TOOLBAR — PagedFind's own
               // `actions` slot (client ruling, 2026-08-31). No Export/Import
               // beside it: unlike Accounts, tickets has no export or import
@@ -840,45 +1042,60 @@ export function TicketsCollection({
               {(found) => {
                 const rows = found.active ? found.rows : scopedQ.data
                 if (rows === null || rows === undefined) return <Skeleton variant="list" lines={4} />
-                const data = shapeHelpList(rows, ticketMarks)
-                const listRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+                const openTicket = (id: string) => onIntent({ kind: "open", module: "tickets", id })
                 return (
-                  // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
-                  // `SectionWithCreate` does this identically) — the create
-                  // button now lives in the toolbar above; the engine's
-                  // zero-state still needs to name the next act.
-                  <CollectionCreateActionProvider
-                    action={
-                      canCreateTicket
-                        ? { label: t("Raise ticket"), icon: <Plus className="size-4" />, onCreate }
-                        : null
-                    }
-                  >
-                    {/* No `useKitPanel`: `CollectionCard` above (drawn by `wrap`)
-                        is the ONE box now — Accounts dropped it for the same
-                        reason the same day ("the broken combination",
-                        screen-bits.tsx's own doc on `CollectionCard`). */}
-                    <ScreenRenderer
-                      recipe={listRecipe}
-                      data={data}
-                      rights={rights}
-                      onAction={onAction}
-                      onIntent={onIntent}
-                      band={
-                        // ARCHIVED IS A QUESTION NOW, not a screen this
-                        // component sits on — so this band reads the ACTIVE
-                        // question (the same `queryString` the Accounts export
-                        // href narrows by) rather than a second copy of the
-                        // toolbar's own state.
-                        found.queryString.includes("view=archived") ? (
-                          <Text as="p" size="sm" tone="secondary">
-                            {t(
-                              "Archived tickets keep their history and stay searchable. They don't count toward the figures above."
-                            )}
-                          </Text>
-                        ) : undefined
-                      }
-                    />
+                  <div className="flex flex-col gap-4">
+                    {/* ARCHIVED IS A QUESTION NOW, not a screen this component
+                        sits on — so this band reads the ACTIVE question (the same
+                        `queryString` the Accounts export href narrows by) rather
+                        than a second copy of the toolbar's own state.
+
+                        It used to ride `ScreenRenderer`'s `band` slot; the
+                        renderer is gone from this branch (see the table below for
+                        why) and the sentence is not, so it is drawn here, above
+                        the body, exactly where the band was. */}
+                    {found.queryString.includes("view=archived") && (
+                      <Text as="p" size="sm" tone="secondary">
+                        {t(
+                          "Archived tickets keep their history and stay searchable. They don't count toward the figures above."
+                        )}
+                      </Text>
+                    )}
+                    {rows.length === 0 ? (
+                      /* THE ZERO STATE, DRAWN HERE RATHER THAN BY THE ENGINE.
+                         `withDataDrivenCollection` used to hand the recipe an
+                         `emptyText` and `CollectionCreateActionProvider` used to
+                         publish "Raise ticket" down into the renderer's own empty
+                         panel. Neither survives the move to the shared table, and
+                         neither is lost: the SENTENCE is `found.emptyText` when
+                         somebody has asked something and the collection's own
+                         line otherwise, and the BUTTON is already on screen —
+                         `raiseTicket` sits in the toolbar directly above this,
+                         which is where the client ruled it belongs ("that button
+                         belongs in the right of the toolbar, part of the
+                         toolbar"). Publishing a second copy of it into an empty
+                         panel would have been the same act offered twice. */
+                      <EmptyLine concept="tickets">
+                        {found.emptyText ?? t("No tickets here yet.")}
+                      </EmptyLine>
+                    ) : facet === OPEN && openView === "board" ? (
+                      <OpenBoard
+                        teamId={teamId}
+                        rows={rows}
+                        counts={byStatus}
+                        narrowed={found.active}
+                        onOpen={openTicket}
+                      />
+                    ) : facet === READY && readyView === "split" ? (
+                      <ReadySplit teamId={teamId} rows={rows} marks={ticketMarks} onOpen={openTicket} />
+                    ) : (
+                      <TicketRowsTable
+                        rows={rows}
+                        marks={ticketMarks}
+                        onOpen={openTicket}
+                        label={t("Tickets")}
+                      />
+                    )}
                     <LoadMore
                       listKey={
                         found.listKey ??
@@ -887,7 +1104,7 @@ export function TicketsCollection({
                       label={t("Load more tickets")}
                       fetchPage={found.fetchPage}
                     />
-                  </CollectionCreateActionProvider>
+                  </div>
                 )
               }}
             </PagedFind>
@@ -917,6 +1134,524 @@ export function TicketsCollection({
         )}
       </div>
     </CountedAbove>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE SHARED TICKET TABLE, AND THE TWO SECOND BODIES BESIDE IT.
+
+   All three are drawn HERE, in the screen that owns the tab strip, rather than
+   in files of their own: each is a BODY of one collection, they read the same
+   rows and the same four facts, and splitting them across three files is how
+   two of them end up disagreeing about what a ticket is called. That is not
+   hypothetical — it is exactly the split `ticketTitle` was written to close (see
+   `shared/web/ticket-chips.tsx`).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** THE FOUR FACTS A TICKET SHOWS IN A ROW, AND NOTHING ELSE.
+ *
+ * A STRUCTURAL TYPE, ON PURPOSE. The two row shapes this screen holds —
+ * `HelpTicket` (the paged collection) and `TriageWaiting` (the queue's own,
+ * widened door read) — are different objects that happen to answer the same
+ * seven questions, and neither is a subset of the other. Naming the QUESTIONS
+ * rather than either row lets one table serve both without a mapper in between,
+ * and a row shape that stops answering one of them is a compile error at the
+ * call site rather than a hole in a cell. */
+type TicketFace = {
+  id: string
+  ref: string | null
+  helpType: string | null
+  appName: string | null
+  createdAt: string
+  titleDe: string | null
+  titleEn: string | null
+  description: string
+}
+
+/** ONE TABLE FOR EVERY TAB THAT SHOWS ROWS — client, 2026-09-06: "For the tabs
+ * Open, Closed, and All, do the list view exactly the same as we have it in the
+ * Triage list."
+ *
+ * ── WHAT MOVED, AND WHY IT IS A LIFT RATHER THAN A COPY ────────────────────
+ *
+ * This table was written INSIDE the triage branch a few hours before the strip
+ * grew four more row tabs. Copying it five times would have been five chances
+ * for the black id chip, the coloured dot, the em-dash for a missing app and the
+ * date format to drift apart on one screen — and the ticket collection has
+ * already paid that bill once, in the two different names one ticket had on two
+ * of its own tables (`ticketTitle`'s header). So it is a component, and the
+ * triage branch is one of its callers.
+ *
+ * EVERY DESIGN RULING THE TRIAGE TABLE CARRIED IS KEPT WORD FOR WORD, because
+ * they were rulings about a TICKET ROW and not about triage: the four columns in
+ * her order (Title · Type · App · Raised), the black `variant="inverse"` chip
+ * leading the title ("put the ID before the title to the left, with the usual
+ * black chip design"), the coloured dot from `ticketTypeColour` ("Type with the
+ * colors, same as we have with the chips"), plain non-sorting headers, no hover
+ * on the header row ("when I hover over the title row, there should be no
+ * action"), and "Raised" rather than "Date" for the last column ("i choose
+ * raised"). Their full arguments are on the individual cells below.
+ *
+ * ── THE ORDER IS THE CALLER'S, AND THE HEADERS STAY PLAIN ──────────────────
+ *
+ * Not one column header sorts, and that is now true for a second reason as well
+ * as the first. On triage the order comes from the toolbar's own pinned sort;
+ * on every other tab it is the DOOR's (`<PagedFind>`'s `sorts`, spanning the
+ * whole collection rather than the page in hand — R14). Either way a clickable
+ * header would be a second control answering a question something else has
+ * already answered, and on the paged tabs it would be worse than that: it could
+ * only reorder the fifty rows loaded, under a count of them all.
+ *
+ * ── THE DECIDE COLUMN IS OPTIONAL, AND IT IS THE ONLY DIFFERENCE ───────────
+ *
+ * Triage adds a fifth column carrying the verb for that row's kind, and a strip
+ * that opens beneath the row when the verb needs a person. Nothing else does —
+ * a ticket on Open or Closed is not waiting for a decision this screen can make.
+ * Passing the column in rather than branching on a `variant` keeps this file
+ * from knowing what triage is: it draws a header, a cell and an optional strip,
+ * and the caller decides what goes in them. */
+function TicketRowsTable<T extends TicketFace>({
+  rows,
+  marks,
+  onOpen,
+  label,
+  decide,
+}: {
+  rows: readonly T[]
+  /** THE TEAM'S OWN GLYPH PER TICKET KIND (`markMap`, web/lib/type-marks.ts) —
+   * an emoji somebody set on the Dropdown values screen, arriving without a
+   * deploy. Absent for a team that has set none, which is most of them, and the
+   * cell simply has one fewer thing in it. */
+  marks?: Map<string, string>
+  onOpen: (id: string) => void
+  /** The table's own accessible name, for a reader who arrives out of context. */
+  label: string
+  decide?: {
+    /** The column's header. Say what the cells DO, or pass "" to leave it
+     * announced-only — triage passes "" for the reason it always did. */
+    header: string
+    cell: (row: T) => React.ReactNode
+    /** A full-width strip beneath this row, when this row is mid-decision. */
+    strip?: (row: T) => React.ReactNode
+  }
+}) {
+  const { t, lang } = useLanguage()
+  const columns = decide ? 5 : 4
+  return (
+    <Table
+      // The kit's own specimen width for a table that knows its column count.
+      // Below it the container scrolls on the inline axis rather than crushing
+      // the title column — the kit's stated mobile answer, and the reason it
+      // never restacks a table into cards.
+      minWidth="42rem"
+      aria-label={label}
+    >
+      <TableHeader>
+        {/* NO HOVER ON THE HEADER — client: "when I hover over the title row,
+            there should be no action." `TableRow` carries the kit's row wash
+            unconditionally, because on a body row that wash is the affordance
+            saying "this opens". On the header it is a lie: the header does
+            nothing, and these columns deliberately do not sort. A surface that
+            lights under the pointer and then refuses the click is read as broken
+            rather than as inert. */}
+        <TableRow className="hover:bg-transparent">
+          <TableHead>{t("Title")}</TableHead>
+          <TableHead>{t("Type")}</TableHead>
+          <TableHead>{t("App")}</TableHead>
+          <TableHead>{t("Raised")}</TableHead>
+          {decide && (
+            // NO HEADER OVER THE ACTIONS when the caller passes none — client,
+            // asked directly: "no header". Every other header names what the
+            // cells beneath it CONTAIN, and this column's cells do not contain a
+            // fact, they contain a move. `sr-only` text keeps the column
+            // announced to a screen reader, which reads headers to say which
+            // cell it is in.
+            <TableHead>
+              <span className="sr-only">{decide.header || t("Decide")}</span>
+            </TableHead>
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((w) => (
+          <React.Fragment key={w.id}>
+            <TableRow onClick={() => onOpen(w.id)} className="cursor-pointer">
+              <TableCell>
+                {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
+                    title to the left, with the usual black chip design."
+                    `variant="inverse"` IS that chip — literally the same badge
+                    the triage card's eyebrow draws for the same number, so the
+                    one black lozenge in this product means one thing everywhere.
+                    Not a link and not clickable: the row already opens, and a
+                    control inside a clickable row is two destinations decided by
+                    pixels. `shrink-0` so a long title truncates and the number
+                    never does — an id with its tail cut off is worse than
+                    useless, it is wrong. */}
+                <span className="flex min-w-0 items-center gap-2">
+                  {w.ref && (
+                    <Badge variant="inverse" size="pill" className="shrink-0 tabular-nums">
+                      {w.ref}
+                    </Badge>
+                  )}
+                  {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
+                      TBL-5): the call site puts a `Button variant="link"` in the
+                      first cell and that control owns the press. So the mouse
+                      gets the whole row, the keyboard and a screen reader get a
+                      real focusable control with the row's own name as its
+                      label, and neither is a second-class way in. It stops the
+                      click propagating so one press is never two `onOpen` calls.
+
+                      `variant="link"` is not a box (no height, no padding), so
+                      it inherits the cell's own type rather than drawing a
+                      control inside a row; `block` plus a measure is what lets a
+                      long title end in an ellipsis instead of pushing the other
+                      three columns off the screen. */}
+                  <Button
+                    variant="link"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen(w.id)
+                    }}
+                    className="block max-w-[32rem] truncate text-start"
+                  >
+                    {ticketTitle(w)}
+                  </Button>
+                </span>
+              </TableCell>
+              <TableCell>
+                <span className="flex items-center gap-2">
+                  {/* THE TEAM'S OWN GLYPH FOR THE KIND, BESIDE THE PILL RATHER
+                      THAN INSIDE IT. This is the seam `markMap` exists for — an
+                      emoji a team sets on the Dropdown values screen, reaching
+                      every ticket surface without a deploy — and it used to
+                      arrive through `shapeHelpList`'s leading slot on the
+                      recipe-drawn list this table replaced. Keeping it costs one
+                      span; dropping it would have quietly deleted a capability
+                      nobody asked to lose.
+
+                      OUTSIDE the badge, because the badge is the client's own
+                      design (dot, then the word) and a third thing inside it
+                      crowds a cell she has already reviewed twice. `aria-hidden`
+                      because the word beside it is the whole accessible name —
+                      two people who both see "no glyph" is a design that has
+                      already failed for one of them. */}
+                  {marks?.get(w.helpType ?? "") && (
+                    <span aria-hidden className="shrink-0">
+                      {marks.get(w.helpType ?? "")}
+                    </span>
+                  )}
+                  {/* THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
+                      the triage card's chips and the type picker draw — client:
+                      "Type with the colors, same as we have with the chips."
+                      `Swatch` + `ticketTypeColour` rather than a second lozenge
+                      that agrees with them today: the whole reason
+                      `lib/type-colours.ts` is one file is that a type's colour
+                      cannot be decided twice.
+
+                      A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
+                      so with an em dash: a column with a pill on four rows and a
+                      hole on the fifth reads as the broken row rather than the
+                      untyped one. */}
+                  <Badge variant="secondary" size="pill">
+                    <Swatch colour={ticketTypeColour(w.helpType)} />
+                    {w.helpType ?? "—"}
+                  </Badge>
+                </span>
+              </TableCell>
+              {/* THE TWO QUIET COLUMNS, as her reference draws them: the facts,
+                  in secondary ink, so the title and the coloured pill are what
+                  the eye lands on going down the page. An em dash for an absent
+                  app — a blank cell looks like a rendering fault rather than a
+                  missing answer.
+
+                  THE APP IS TEXT, NOT A LINK, AND THAT IS R37-SHAPED: a link
+                  inside a row whose whole job is to open the TICKET gives one
+                  row two destinations, and the one a click lands on becomes a
+                  matter of pixels. Nothing is lost — the app is a FACET in the
+                  toolbar above, and the ticket's own screen is one row-click
+                  away with the app link on it. */}
+              <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
+                    formatter and the reader's own language, so one ticket cannot
+                    carry two spellings of one day across two views of one
+                    collection. */}
+                {formatDate(w.createdAt, lang)}
+              </TableCell>
+              {decide && (
+                <TableCell className="text-end whitespace-nowrap">{decide.cell(w)}</TableCell>
+              )}
+            </TableRow>
+            {/* THE STRIP, BENEATH ITS OWN ROW — the client picked L3 over a panel
+                and a dialog, knowing it pushes the rows below it down: "L3".
+
+                A ROW OF THE TABLE, not a floating box over it: a `colSpan` cell
+                keeps it inside the grid, so it cannot drift out of alignment
+                with the row it belongs to, and a screen reader meets it in the
+                reading order immediately after that row rather than somewhere
+                else in the document. */}
+            {decide?.strip?.(w) && (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={columns} className="bg-surface-quiet">
+                  {decide.strip(w)}
+                </TableCell>
+              </TableRow>
+            )}
+          </React.Fragment>
+        ))}
+      </TableBody>
+    </Table>
+  )
+}
+
+/** THE OPEN TAB'S SECOND BODY — client, 2026-09-06: "for the tab open, I want
+ * the view list and Kanban - columns are status".
+ *
+ * ── IT IS READ-ONLY IN THIS PASS, AND IT LOOKS IT ─────────────────────────
+ *
+ * SAID PLAINLY BECAUSE A BOARD THAT LOOKS DRAGGABLE AND IS NOT IS WORSE THAN NO
+ * BOARD. The kit makes that a property of the API rather than a promise this
+ * file has to keep: `Kanban` is handed no `onMove`, and its own doc states what
+ * that means — "no card is draggable, no card takes the move keys, and no drop
+ * target lights up. A control that silently does nothing is worse than no
+ * control." So there is no lifted card, no drop wash and no keyboard move to
+ * discover; a card OPENS the ticket, which is the one thing this board does.
+ *
+ * WHY NOT WIRE THE DRAG NOW. The door exists — `content.setHelpStatus` is the
+ * same idempotent, publishing write the triage queue's Undo already uses — so
+ * this is a decision rather than a gap, and it turns on two things a pass that
+ * is redrawing a tab strip should not decide by itself:
+ *
+ *   1 · A DROP WOULD BE A LIFECYCLE MOVE MADE BY GEOMETRY. These three stages
+ *       are not free-form columns a person owns: `scheduled` is flipped when
+ *       work lands in a sprint and `in_progress` when a timer starts, by
+ *       `lib/ready-flip` (shared/types.ts's `HELP_STATUSES` says so status by
+ *       status). Dragging a card into "In progress" would assert that a timer is
+ *       running when none is, and the flip that owns that column would move it
+ *       back the next time anything touched the ticket. A board that undoes your
+ *       drag an hour later is a board nobody trusts twice.
+ *   2 · THE BOARD IS A PAGE, NOT THE COLLECTION. The list pages (R14), so the
+ *       cards are the fifty rows in hand while the column counts below are the
+ *       door's exact `COUNT(*)` — honest as a READING (the count says how many
+ *       there really are) and dishonest the moment a drag makes the two disagree
+ *       until a refetch lands.
+ *
+ * Both are answerable; neither is answerable here. Filed as the next pass on
+ * this tab rather than shipped half-done.
+ *
+ * ── WHAT THE COLUMNS AND THE CARDS CARRY ──────────────────────────────────
+ *
+ * THE COLUMNS ARE `OPEN_TAB_STATUSES`, the same closed vocabulary the Open
+ * facet sends to the door — so the board cannot show a column the tab does not
+ * contain, and a stage added to that list appears here without an edit.
+ *
+ * THE COUNT UNDER EACH HEAD IS THE DOOR'S, not `cards.length` — but only while
+ * the toolbar is RESTING, and that condition is the whole R16 argument.
+ *
+ * `byStatus` is one grouped `COUNT(*)` the door takes over the live collection,
+ * so at rest a column showing eight cards and saying 41 is telling the truth
+ * twice rather than contradicting itself: the cards are page one, the number is
+ * how many there are, and the line under the board says which is which. That is
+ * exactly the case the kit's own `count` prop documents ("pass one where the
+ * column is paged and the total is larger than what is on screen").
+ *
+ * THE MOMENT SOMEBODY SEARCHES OR SETS A FACET IT STOPS BEING TRUE. `byStatus`
+ * is primed by the RESTING ticket read and carries none of the toolbar's
+ * narrowing, so a searched board would put an un-narrowed 41 over three matching
+ * cards — a number and a set of rows answering two different questions, which is
+ * R16's founding defect in the quietest form it takes. So when anything is being
+ * asked the column hands the kit no `count` at all and it falls back to the
+ * cards it is holding, which is a smaller claim and a true one. The footnote
+ * changes with it, because a reader has to be told which of the two they are
+ * looking at.
+ *
+ * THE CARDS CARRY THE SHARED CHIPS, `TicketChips` through this screen's own
+ * `TriageChips` wrapper, which is the client's standing ruling about every
+ * ticket surface in the app: "replicate the pills that we have on the view
+ * outside. These are: ID, type, app, date … and everywhere else where tickets
+ * have pills, reuse this." A fifth way of drawing a ticket's four facts is
+ * precisely what that ruling exists to prevent. */
+function OpenBoard({
+  teamId,
+  rows,
+  counts,
+  narrowed,
+  onOpen,
+}: {
+  teamId: string
+  rows: readonly HelpTicket[]
+  /** the door's own grouped tally per status — never `cards.length` */
+  counts: Record<string, number> | undefined
+  /** is the toolbar asking anything? `counts` is the RESTING collection's tally
+   * and answers a different question the moment it is. See the header. */
+  narrowed: boolean
+  onOpen: (id: string) => void
+}) {
+  const t = useT()
+  /** THE THREE STAGES IN THE READER'S OWN LANGUAGE, and the one dot each takes.
+   *
+   * WRITTEN OUT AS LITERALS INSIDE THE COMPONENT rather than read off
+   * `HELP_STATUS` (web/components/deep-link/shape.tsx). That map is a copy TABLE
+   * whose keys are database words, so none of its values is an extracted
+   * position (R28's `property` position only looks at named copy props) — a
+   * `t(HELP_STATUS[s])` here would look up keys the catalogue does not hold and
+   * hand every non-English reader the English word, silently, on a screen that
+   * looks finished. Three `t("…")` literals are three catalogue entries.
+   *
+   * THE DOTS ARE A PROGRESSION, not a decoration: grey while nothing has started
+   * (`archived` is `--ink-disabled`), blue once it is booked into a sprint
+   * (`review` is `--info`), charcoal while somebody is actually on it
+   * (`building`, and the kit's own token comment for it reads "in build / with
+   * us"). The kit rules that the dot never carries the state alone; the column's
+   * name in words is beside it, which is what it is there for. */
+  const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string; dot: KanbanColumnDot }> = {
+    triaged: { title: t("Triaged"), dot: "archived" },
+    scheduled: { title: t("Scheduled"), dot: "review" },
+    in_progress: { title: t("In progress"), dot: "building" },
+  }
+  return (
+    <Kanban
+      columns={OPEN_TAB_STATUSES.map((stage) => ({
+        id: stage,
+        title: COLUMN[stage].title,
+        dot: COLUMN[stage].dot,
+        count: narrowed ? undefined : counts?.[stage],
+        cards: rows
+          .filter((r) => r.status === stage)
+          .map((r) => ({
+            id: r.id,
+            title: ticketTitle(r),
+            badges: <TriageChips teamId={teamId} ticket={r} />,
+          })),
+        emptyLabel: t("Nothing at this stage."),
+      }))}
+      // A CARD OPENS THE TICKET, and that is the board's only act. The kit makes
+      // a card a target only when this is passed, so the affordance and the
+      // behaviour are one decision.
+      onCardSelect={(card) => onOpen(card.id)}
+      // THE LINE UNDER THE BOARD. The kit draws "Dragging a card moves the
+      // record…" there by default and says in its own doc that the words are the
+      // caller's, "because 'writes a log line' is an application promise this
+      // component cannot keep on its own". This board keeps no such promise, so
+      // it says what is true instead: what the numbers mean, and that a card
+      // opens rather than moves.
+      footnote={
+        narrowed
+          ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")
+          : t("Each column counts every open ticket at that stage. Click a card to open the ticket.")
+      }
+      emptyColumnLabel={t("Nothing at this stage.")}
+    />
+  )
+}
+
+/** THE READY TAB'S SECOND BODY — client, 2026-09-06: "add another tab: ready /
+ * will do split view and list / between triage and open".
+ *
+ * ── THE KIT SHIPS THIS, AND IT IS VENDORED ────────────────────────────────
+ *
+ * `shared/ui/components/split/split.tsx`, drawn from CH19 view 12 and CH27.27
+ * ("Split list and preview"): the 300px list on the left, the record filling the
+ * rest, two independent scroll containers, one row always selected, and the
+ * keyboard sentence spelled out under the pane. Nothing about the layout, the
+ * selection or the keys is written here — this file supplies the rows and the
+ * pane, which is the division the kit's own header insists on ("THE PANE IS THE
+ * CALLER'S … passing a node rather than rendering one keeps this file from
+ * having a second opinion about what a record looks like").
+ *
+ * ADOPTING IT DELETED ITS `KIT_COMPONENT_EXEMPT` LINE, and the sentence in that
+ * line was true when it was written: the app's convention is a list navigating
+ * to a full-page deep-link detail, and a persistent two-pane master-detail
+ * contradicts that. The client has now asked for one, on one tab, which is what
+ * R46's rot-check is for — an exemption whose part is reached turns the build
+ * red, so the argument had to be revisited rather than quietly outlived.
+ *
+ * ── WHAT THE PANE IS, AND WHAT IT DELIBERATELY IS NOT ─────────────────────
+ *
+ * IT IS NOT `help-detail.tsx`. That screen is the ticket's whole record — tabs,
+ * activity, the reply composer, the send-hold — and mounting it inside a 1fr
+ * column would put a second set of record tabs inside a collection card, on a
+ * tab whose own toolbar is six inches above it. CH27.27 says the pane is
+ * composition 27.8 "with its breadcrumb removed", not a screen inside a screen.
+ *
+ * So the pane is the ticket's FACE plus its words: the same shared chip line
+ * every other ticket surface draws (`TicketChips`, the client's standing ruling)
+ * and the description underneath, with the kit's own `openLabel` control as the
+ * way out to the full record. That is what a preview pane is for — deciding
+ * which one to open — and it makes the promise it can keep.
+ *
+ * ── WHY READY IS THE TAB THAT EARNS IT ────────────────────────────────────
+ *
+ * CH27.27's own brief names the case: "for collections a person works down one
+ * by one — an inbox of requests, a review queue". Ready is exactly that pile —
+ * every story closed, nobody has sent it — and the act it exists for is reading
+ * each one and deciding what to say. Open and Closed are not worked down one by
+ * one, which is why neither offers this. */
+function ReadySplit({
+  teamId,
+  rows,
+  marks,
+  onOpen,
+}: {
+  teamId: string
+  rows: readonly HelpTicket[]
+  marks?: Map<string, string>
+  onOpen: (id: string) => void
+}) {
+  const { t, lang } = useLanguage()
+  /* WHICH ROW IS BEING READ. Controlled, and held here rather than left to the
+     kit's own uncontrolled default, for one reason: the pane is built from the
+     ROW, so this component has to know which row that is. Plain state rather
+     than `useRemembered` — a selection is where you are in one sitting, not a
+     preference; coming back tomorrow to the fourth ticket you happened to be
+     reading is a surprise rather than a convenience. */
+  const [selected, setSelected] = React.useState<string | null>(null)
+  // ONE ROW IS ALWAYS SELECTED (CH27.27, and the kit refuses to draw an empty
+  // "select a record" pane at all). A selection that no longer names a row —
+  // the page moved, the ticket was resolved — falls back to the first rather
+  // than blanking the pane.
+  const current = rows.find((r) => r.id === selected) ?? rows[0]
+  return (
+    <Split
+      records={rows.map((r) => ({
+        id: r.id,
+        number: r.ref ?? undefined,
+        title: ticketTitle(r),
+        // ONE METADATA LINE, which is all the 300px column has room for and all
+        // CH27.27 draws. The kind and the day it was raised: the two facts that
+        // tell you which of forty finished tickets this one is. The team's own
+        // glyph leads it where they have set one, the same seam the table's Type
+        // cell reads.
+        meta: [marks?.get(r.helpType ?? ""), r.helpType ?? t("No type"), formatDate(r.createdAt, lang)]
+          .filter(Boolean)
+          .join(" · "),
+      }))}
+      selectedId={current?.id}
+      onSelectionChange={(id) => setSelected(id)}
+      onOpen={(record) => onOpen(record.id)}
+      openLabel={t("Open the ticket")}
+      listLabel={t("Ready tickets")}
+      detailLabel={t("The ticket you are reading")}
+      hint={t("Up and down move between tickets. Enter opens the one you are reading.")}
+      detail={
+        current && (
+          <div className="flex flex-col gap-4">
+            <TriageChips teamId={teamId} ticket={current} />
+            <Headline as="h3" size="h4">
+              {ticketTitle(current)}
+            </Headline>
+            {/* THE CLIENT'S OWN WORDS, as they wrote them. `richTextPlain`
+                rather than the stored markup: this pane is a PREVIEW, the full
+                record renders the rich text properly one click away, and a
+                sanitiser is not something a preview pane should be carrying its
+                own copy of. `whitespace-pre-wrap` keeps their paragraphs. */}
+            <Text as="p" size="sm" tone="secondary" className="whitespace-pre-wrap">
+              {richTextPlain(current.description)}
+            </Text>
+          </div>
+        )
+      }
+    />
   )
 }
 
@@ -1007,15 +1742,14 @@ function TriageQueue({
   onCreate: () => void
   onOpen: (id: string) => void
 }) {
-  // `useLanguage` AGAIN, and the note above it is worth keeping as history.
-  // This component dropped to `useT` when the date moved out of it into
-  // `TriageChips`, on the reasoning that the reader's LANGUAGE was no longer
-  // needed here. True until the list view arrived: its rows carry a date of
-  // their own, so `lang` is read here once more. Recorded rather than quietly
-  // reverted — the earlier line was right when it was written, and a reader
-  // finding `useLanguage` here should know it left and came back rather than
-  // assume nobody thought about it.
-  const { t, lang } = useLanguage()
+  // `useT` AGAIN, AND THE HISTORY IS WORTH KEEPING. This component dropped to
+  // `useT` when the date moved out of it into `TriageChips`; it went back to
+  // `useLanguage` when the list view arrived, because those rows carry a date of
+  // their own; and it is back to `useT` now that the list's table has been
+  // lifted into `TicketRowsTable`, which reads the reader's language itself. The
+  // rule underneath all three moves is the same one: whoever DRAWS the date asks
+  // for the locale, and nobody else holds it just in case.
+  const t = useT()
   const triageQ = useCached(triageKey(teamId), () => contentApi.triage())
   const [busy, setBusy] = React.useState(false)
   const [editing, setEditing] = React.useState<TriageWaiting | null>(null)
@@ -1722,351 +2456,86 @@ function TriageQueue({
         /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
            Her whole brief, verbatim: "Now let's build the list view: 1. Title.
            2. Type with the colors, same as we have with the chips. Also include
-           the number, the ID. 3. App. 4. Date." — with a screenshot of the
-           kit's own List pattern beside it (uppercase column headers, one line
-           per row, a coloured pill in its own column, quiet text columns, row
-           hover, the date last).
+           the number, the ID. 3. App. 4. Date." — with a screenshot of the kit's
+           own List pattern beside it.
 
-           This REPLACES the raw `<ul>` of buttons that stood here since the
-           view switch shipped a few hours earlier. That placeholder said of
-           itself "no columns, no per-row decisions, no selection, no paging …
-           either would be a shape to argue with next round" — this is that next
-           round, and the shape she argued for is a table.
+           IT IS `TicketRowsTable` NOW, AND THE TABLE ITSELF NO LONGER LIVES
+           HERE. It was written inside this branch a few hours earlier; the same
+           day, the client asked for the identical table on Open, Closed and All
+           ("do the list view exactly the same as we have it in the Triage
+           list"), so it was LIFTED OUT rather than copied four more times. Every
+           ruling it carried — the column order, the black id chip leading the
+           title, the coloured dot, the plain non-sorting headers, the hoverless
+           header row, "Raised" rather than "Date" — is kept word for word and
+           argued at the cells themselves; see the component's own header.
 
-           IT STILL SHARES `inOrder` WITH THE QUEUE, which is the one sentence
-           from the placeholder that survives unchanged and the one that
-           matters: the search, the two facets and the sort are functions over
-           rows at the top of this file rather than properties of the card
-           (`narrowTriage` / `triageFacets` / `TRIAGE_SORTS`), so the queue and
-           the list are one question answered twice and cannot disagree about
-           what is in the pile or what order it is in. That was the whole reason
-           those three were written up there before either view needed them.
+           WHAT STAYS HERE IS THE ONE THING THAT IS TRIAGE'S: the decision. The
+           verb follows the row's own type through the same `triageAct` the card
+           uses, so a ticket's fate is one word wherever she meets it — and
+           because the word follows the type, the column is not one repeated
+           label: it says what kind of decision each line is waiting for before
+           she has read anything.
 
-           ── WHY THE KIT'S `Table` PRIMITIVES AND NOT `RecordTable` ──────────
-
-           `record-table.tsx` is this app's own table and the default answer for
-           one; it is the wrong answer here, for two reasons that are both about
-           what it BRINGS rather than what it lacks.
-
-             1 · IT REQUIRES A `CollectionConfig` AND WRAPS `CollectionFrame`,
-                 which draws a collection's whole chrome — its own debounced
-                 search box, its own filter bar, a live "Showing X of Y" and a
-                 pager. This screen already has every one of those, drawn one
-                 element up by `<ToolbarRow>` (R53's five slots) and counted
-                 once by `<CollectionHeading>` far above (R16: a count is shown
-                 exactly ONCE, and the heading is where this collection shows
-                 it). Using `RecordTable` would put a second search box under
-                 the first and a second count on the screen — R16's founding
-                 defect, drawn deliberately.
-             2 · ITS REASON FOR EXISTING IS SORT HEADERS, and this table must
-                 not have them — see the next section. A component adopted for
-                 the one feature it must then suppress is not a reuse.
-
-           So it composes the kit's primitives directly, which is the same
-           category of decision `record-table.tsx`'s own header describes about
-           `CollectionFrame`: the CHROME stays the row's, only the rows are
-           drawn here. Nothing is forked and nothing under `shared/ui/` is
-           touched. The rules, the 56 row, the hover wash, the uppercase micro
-           header and the inline-axis scroll are all the primitive's own — which
-           is also how BUILD-A-SCREEN §6.1 is obeyed for free: the kit draws
-           every one of those separations as an INSET SHADOW, and there is no
-           `border` anywhere below.
-
-           ── THE COLUMNS, AND WHERE THE NUMBER WENT ─────────────────────────
-
-           Four, in her order: Title · Type · App · Date. The ID rides the TYPE
-           column beside the dot, which is what her item 2 asks for ("Type with
-           the colors … Also include the number, the ID") rather than a fifth
-           column she did not ask for. It reads well because the two happen to
-           make a phrase a person already says out loud — "Issue 1513",
-           "Question 1204" — so the pill and the number scan as one identifier
-           rather than as two facts crowding one cell. A ticket with no `ref`
-           draws no number (`HelpTicket.ref` is null until the client has a
-           reference code), the same subtraction the card's chip line makes, and
-           the pill is still there to hold the column.
-
-           THE HEADERS ARE THE CLIENT'S OWN WORDS and all four were already in
-           the catalogue, so this view adds no new copy and moves no ceiling —
-           "Type" and "App" are the very words `triageFacets` puts on the two
-           facets in the toolbar above, which is what stops the header and the
-           filter for one column being two different nouns.
-
-           ONE WORD IS WORTH FLAGGING RATHER THAN QUIETLY UNIFYING: the sort
-           chip in the toolbar says "Raised" for this same field and this header
-           says "Date", because that is the word she wrote. Both are defensible
-           (a sort menu names an ORDER, a column names a FIELD) and neither is a
-           glossary term, so nothing here is wrong — but one screen now has two
-           nouns for one date, which is the shape R34 exists to be suspicious
-           of. It is hers to settle; changing it is one word in one place.
-
-           ── THE ORDER IS THE TOOLBAR'S, AND THE HEADERS ARE PLAIN ───────────
-
-           Not one column header sorts, on purpose. `inOrder` arrives already
-           ordered by the toolbar's own sort control — the field pinned to
-           `raised`, the direction live (`TRIAGE_SORTS` says at length why one
-           option is the honest menu here) — so a clickable header would be a
-           SECOND control answering the one question the first is already
-           answering, and `record-table.tsx`'s own header is the record of what
-           that costs: a header that lights up while the rows sit still is
-           read as broken DATA, not a broken button. The two would not even
-           disagree quietly — sorting by Title would silently discard the
-           direction the toolbar's arrow is still pointing.
-
-           A plain header is honest, and `record-table.tsx` says the same
-           sentence about a paged column its door has no name for: "a plain
-           header is honest, and a live-looking one is what this file exists to
-           stop."
-
-           ── OPENING A TICKET: THE ROW AND THE TITLE, BOTH ──────────────────
-
-           The kit's own answer (GAPS-D TBL-5) is that "where a whole row
-           navigates, the call site puts a `Button variant="link"` in the first
-           cell and that control owns the press", and that is what the Title
-           cell is: a real control, focusable, in the tab order, announced, with
-           the row's own name as its label.
-
-           The ROW ALSO opens on click, which is the affordance in her
-           screenshot and which `TableRow` already hints at by hovering. It is
-           NOT `role="button"` + `tabIndex` on the `<tr>` (which is what
-           `record-table.tsx` does): that trades away the table's row semantics
-           for a keyboard path the Title link already provides, and it would
-           nest an interactive control inside an interactive row. So the mouse
-           gets the whole row, the keyboard and a screen reader get the link,
-           and neither is a second-class way in. The link stops the click
-           propagating so one press is never two `onOpen` calls.
-
-           ── THE APP COLUMN IS TEXT, NOT A LINK, AND THAT IS R37-SHAPED ─────
-
-           The card view links the app (`TriageChips`, through `<InAppLink>` as
-           R37 requires), and this column deliberately does not. A link inside a
-           row whose whole job is to open the TICKET gives one row two
-           destinations, and the one a click lands on becomes a matter of
-           pixels. Nothing is lost: the app is a FACET in the toolbar above, so
-           the thing a reader actually wants from this column in a list — "show
-           me only this app's" — is one control away, and the ticket's own
-           screen is one row-click away with the app link on it. If she wants
-           the column to navigate, it becomes an `<InAppLink>` with the cell
-           stopping propagation, exactly as the Title link does. */
-        <Table
-          // Four columns, so the kit's own specimen width is the right pin:
-          // its doc says a call site that knows its column count passes one,
-          // and offers `42rem` as the number its own drawn table uses. Below
-          // that the container scrolls on the inline axis rather than crushing
-          // the title column — the kit's stated mobile answer, and the reason
-          // it never restacks a table into cards.
-          minWidth="42rem"
-          // The table's own name, for a reader who arrives at it out of
-          // context. Reuses the sitting's label rather than inventing a second
-          // phrase for one collection.
-          aria-label={t("Triage queue")}
-        >
-          <TableHeader>
-            {/* NO HOVER ON THE HEADER — client: "when I hover over the title
-                row, there should be no action." `TableRow` carries the kit's
-                row wash unconditionally, because on a body row that wash is the
-                affordance saying "this opens". On the header it is a lie: the
-                header does nothing, and these columns deliberately do not sort
-                (the toolbar owns the order — see the note at the sort control).
-                A surface that lights under the pointer and then refuses the
-                click is read as broken rather than as inert, which is the exact
-                failure `record-table.tsx`'s own header describes. */}
-            <TableRow className="hover:bg-transparent">
-              <TableHead>{t("Title")}</TableHead>
-              <TableHead>{t("Type")}</TableHead>
-              <TableHead>{t("App")}</TableHead>
-              {/* "RAISED", NOT "DATE" — client, 2026-09-06, asked which of the
-                  two words she wanted when the same field wore both on one
-                  screen: "i choose raised". The sort control beside this table
-                  already said Raised; the column header said Date, so the list
-                  offered two names for one fact. Scoped to THIS screen: other
-                  collections say "Date" about their own different fields. */}
-              <TableHead>{t("Raised")}</TableHead>
-              {/* NO HEADER OVER THE ACTIONS — client, asked directly: "no
-                  header". It is also what her own reference screenshot does,
-                  and the reason holds up: every other header names what the
-                  cells beneath it CONTAIN, and this column's cells do not
-                  contain a fact, they contain a move. "Action" would be a label
-                  for the reader's benefit that tells them nothing they cannot
-                  see. `sr-only` text keeps the column announced to a screen
-                  reader, which reads headers to say which cell it is in. */}
-              <TableHead>
-                <span className="sr-only">{t("Decide")}</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {inOrder.map((w) => (
-              <React.Fragment key={w.id}>
-              <TableRow
-                key={w.id}
-                onClick={() => onOpen(w.id)}
-                className="cursor-pointer"
-              >
-                <TableCell>
-                  {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
-                      title to the left, with the usual black chip design." It
-                      rode the Type column for one pass, which was her earlier
-                      instruction ("also include the number, the ID"); seen on
-                      screen beside a coloured pill it read as a second fact
-                      crowding that cell rather than as the row's name. Leading
-                      the title it is what it always was on the card: the thing
-                      you say out loud to identify a ticket.
-
-                      `variant="inverse"` IS "the usual black chip design" —
-                      literally the same badge the card's eyebrow draws for the
-                      same number, so the one black lozenge in this product
-                      means one thing in both places. Not a link and not
-                      clickable, for the reason the card's own chip is not: the
-                      row already opens, and a control inside a clickable row is
-                      two destinations decided by pixels.
-
-                      `shrink-0` so a long title truncates and the number never
-                      does — an id with its tail cut off is worse than useless,
-                      it is wrong. */}
-                  <span className="flex min-w-0 items-center gap-2">
-                    {w.ref && (
-                      <Badge variant="inverse" size="pill" className="shrink-0 tabular-nums">
-                        {w.ref}
-                      </Badge>
-                    )}
-                  <Button
-                    variant="link"
-                    // The row is already opening; without this one press
-                    // would call `onOpen` twice.
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpen(w.id)
-                    }}
-                    // `variant="link"` is not a box (no height, no padding), so
-                    // it inherits the cell's own type and the first cell's
-                    // medium weight rather than drawing a control inside a row.
-                    // `block` + a measure is what lets a long title end in an
-                    // ellipsis instead of pushing the other three columns off
-                    // the screen — the kit's first cell never wraps by design,
-                    // and a title is the one column where that would otherwise
-                    // be a very wide table. `max-w-[16rem] truncate` is the
-                    // spelling the app already uses for this (google-scope-
-                    // dialog.tsx, timer-bar.tsx); this one is wider because a
-                    // ticket title is a sentence, not a filename.
-                    className="block max-w-[32rem] truncate text-start"
-                  >
-                    {ticketTitle(w)}
-                  </Button>
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <span className="flex items-center gap-2">
-                    {/* THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP
-                        as the card's chips and the type picker draw — client:
-                        "Type with the colors, same as we have with the chips."
-                        `Swatch` + `ticketTypeColour` rather than a second
-                        lozenge that agrees with them today: the whole reason
-                        `lib/type-colours.ts` is one file is that a type's
-                        colour cannot be decided twice.
-
-                        A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL,
-                        saying so with an em-dash, for the reason the card gives
-                        one: a column with a pill on four rows and a hole on the
-                        fifth reads as the broken row rather than the untyped
-                        one. The dot goes neutral on its own (`ticketTypeColour`
-                        never returns null, and says why).
-
-                        NO `--badge-quiet-fill` REBIND HERE, unlike the card's
-                        chip line: that row sits ON the soft-paper card and the
-                        client named that paper for it; a table row sits on the
-                        collection card and the badge's own `--surface-quiet` is
-                        a real tone step off it. The row's hover is `--accent`,
-                        a 5% wash that layers over whatever is beneath, so the
-                        pill stays distinct on a hovered row. */}
-                    <Badge variant="secondary" size="pill">
-                      <Swatch colour={ticketTypeColour(w.helpType)} />
-                      {w.helpType ?? "—"}
-                    </Badge>
-                  </span>
-                </TableCell>
-                {/* THE TWO QUIET COLUMNS, as her reference draws them: the
-                    facts, in secondary ink, so the title and the coloured pill
-                    are what the eye lands on going down the page. An em-dash
-                    for an absent app — a ticket raised with no app is one of
-                    the four readiness gaps the queue exists to fill, and a
-                    blank cell would look like a rendering fault rather than a
-                    missing answer. */}
-                <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
-                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-                  {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same
-                      shared formatter and the reader's own language, so one
-                      ticket cannot carry two spellings of one day across two
-                      views of one collection. */}
-                  {formatDate(w.createdAt, lang)}
-                </TableCell>
-                {/* THE DECISION, IN THE ROW — client: "in table view, lets also
-                    add the accept (whatever verb) column". It is the SAME verb
-                    the card's primary button wears, from the same `triageAct`,
-                    so a ticket's fate is one word wherever she meets it — and
-                    because the word follows the row's own type, the column is
-                    not one repeated label: it says what kind of decision each
-                    line is waiting for before she has read anything.
-
-                    `stopPropagation` because the row itself opens the ticket.
-                    Without it, deciding would also navigate away from the list
-                    the decision was made in. */}
-                <TableCell className="text-end whitespace-nowrap">
-                  {canTriage && (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={busy || w.missing.length > 0}
-                      title={w.missing.length > 0 ? gapsSentence(w) : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const a = triageAct(w.helpType, t)
-                        if (a.assigns) setRowPicker((r) => (r === w.id ? null : w.id))
-                        else void accept(w)
-                      }}
-                    >
-                      {triageAct(w.helpType, t).label}
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-              {/* THE STRIP, BENEATH ITS OWN ROW — the client picked L3 over a
-                  panel and a dialog, knowing it pushes the rows below it down:
-                  "L3". It is the same one-line-of-chips shape she chose for the
-                  card, so the two views speak one vocabulary rather than each
-                  inventing a way to name a colleague.
-
-                  A ROW OF THE TABLE, not a floating box over it: a `colSpan`
-                  cell keeps it inside the grid, so it cannot drift out of
-                  alignment with the row it belongs to, and a screen reader
-                  meets it in the reading order immediately after that row
-                  rather than somewhere else in the document.
-
-                  Only ever under an Issue or a Request — the two verbs that
-                  need a person. Accept and Store never open anything, which is
-                  why half a list of tickets is pressed straight through. */}
-              {rowPicker === w.id && (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={5} className="bg-surface-quiet">
-                    <RecordPicker
-                      layout="row"
-                      ariaLabel={t("Who is picking this up?")}
-                      value=""
-                      onChange={(v) => {
-                        setRowPicker(null)
-                        void accept(w, v)
-                      }}
-                      options={peopleFor(w.appId)}
-                      searchPlaceholder={t("Who is picking this up?")}
-                      emptyText={t("Nobody on this team can be given work yet.")}
-                      disabled={busy}
-                    />
-                  </TableCell>
-                </TableRow>
-              )}
-              </React.Fragment>
-            ))}
-          </TableBody>
-        </Table>
+           IT STILL SHARES `inOrder` WITH THE QUEUE, which is the sentence that
+           matters most and the one that has survived every redraw: the search,
+           the two facets and the sort are functions over rows at the top of this
+           file rather than properties of the card (`narrowTriage` /
+           `triageFacets` / `TRIAGE_SORTS`), so the queue and the list are one
+           question answered twice and cannot disagree about what is in the pile
+           or what order it is in. */
+        <TicketRowsTable
+          rows={inOrder}
+          onOpen={onOpen}
+          label={t("Triage queue")}
+          decide={{
+            // "no header" — client, asked directly, and it is what her own
+            // reference screenshot does. The component keeps the column
+            // announced to a screen reader either way.
+            header: "",
+            cell: (w) =>
+              canTriage && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy || w.missing.length > 0}
+                  title={w.missing.length > 0 ? gapsSentence(w) : undefined}
+                  // `stopPropagation` because the row itself opens the ticket.
+                  // Without it, deciding would also navigate away from the list
+                  // the decision was made in.
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const a = triageAct(w.helpType, t)
+                    if (a.assigns) setRowPicker((r) => (r === w.id ? null : w.id))
+                    else void accept(w)
+                  }}
+                >
+                  {triageAct(w.helpType, t).label}
+                </Button>
+              ),
+            // THE PEOPLE ROW, BENEATH ITS OWN ROW — the client picked L3 over a
+            // panel and a dialog, knowing it pushes the rows below it down. Only
+            // ever under an Issue or a Request, the two verbs that need a
+            // person: Accept and Store never open anything, which is why half a
+            // list of tickets is pressed straight through. Returning `null` for
+            // every other row is what tells the table there is no strip to draw.
+            strip: (w) =>
+              rowPicker === w.id ? (
+                <RecordPicker
+                  layout="row"
+                  ariaLabel={t("Who is picking this up?")}
+                  value=""
+                  onChange={(v) => {
+                    setRowPicker(null)
+                    void accept(w, v)
+                  }}
+                  options={peopleFor(w.appId)}
+                  searchPlaceholder={t("Who is picking this up?")}
+                  emptyText={t("Nobody on this team can be given work yet.")}
+                  disabled={busy}
+                />
+              ) : null,
+          }}
+        />
       ) : (
         <Queue
           /* OPEN AND SKIP, SIDE BY SIDE — client, twice: "open button next to
@@ -2390,25 +2859,20 @@ type UndoableTriageAct =
    * a hand-built ticket payload silently dropped `moduleId` for a fortnight. */
   | { kind: "type"; before: { id: string; description: string; helpType: string } }
 
-/** WHAT THE TICKET IS CALLED, on a card that has room for a name.
+/* WHAT THE TICKET IS CALLED — NOT HERE ANY MORE.
  *
- * BOTH TITLES, in one order, with a last resort — the same three-step answer
- * `help-detail.tsx` gives and the ticket LIST has always given, so one ticket
- * cannot be called two things on two screens. English first because the app's
- * own language is English and a translation SETS `titleEn` while leaving the
- * German the person wrote; German second because 788 tickets out of Glide have
- * only that; and the description's first line last, because a ticket raised
- * through this app has no title at all — `shapeHelpList` in `deep-link/shape.tsx`
- * names every row in the ticket collection exactly that way.
+ * `ticketTitle` lived in this file and read `titleEn || titleDe || the first
+ * line of the body`, which was the right answer; the ticket COLLECTION'S own
+ * table, one tab away, named every row by the description alone. One ticket,
+ * two names, on one screen. It moved to `shared/web/ticket-chips.tsx` on
+ * 2026-09-06 — the file the client already ruled owns a ticket's face — and
+ * `shapeHelpList` (web/components/deep-link/shape.tsx) reads the same function
+ * now. Its header carries the three steps and why that order.
  *
- * THAT LAST CASE REPEATS THE FIRST LINE OF THE BODY BELOW IT, and that is the
- * right trade rather than an oversight: the alternative is a card whose biggest
- * text is empty, and the repetition is visibly a truncation of the paragraph
- * under it rather than a second fact. */
-function ticketTitle(w: TriageWaiting): string {
-  const plain = richTextPlain(w.description)
-  return w.titleEn?.trim() || w.titleDe?.trim() || (plain.length > 80 ? `${plain.slice(0, 80)}…` : plain)
-}
+ * The move was forced by the same pass that made it worth making: the triage
+ * table became the table EVERY row tab draws (`TicketRowsTable` above), so one
+ * component over one collection would otherwise have had to pick one of the two
+ * answers silently. */
 
 /** THE CHIP LINE — four facts and nothing else: the number, the type, the
  * app, the date.
@@ -2437,7 +2901,16 @@ function ticketTitle(w: TriageWaiting): string {
  * note on its own type chip, and twice on the sitting's `eyebrow`/`TriageMeta`
  * pairing) — renaming the wrapper would have made every one of those a
  * dangling reference for no reader benefit. */
-function TriageChips({ teamId, ticket }: { teamId: string; ticket: TriageWaiting }) {
+/* IT TAKES `TicketChipFacts` NOW, NOT `TriageWaiting` (2026-09-06). Two more
+   ticket surfaces on this screen draw the same four chips — the Kanban card on
+   the Open tab and the reading pane on Ready — and both hold a `HelpTicket`
+   rather than a queue row. The shared component underneath has always typed its
+   argument by the FACTS it needs (ref, kind, app, date) rather than by any one
+   row shape, so widening this wrapper to the same type is what lets three
+   surfaces share one chip line instead of two of them growing a fourth and a
+   fifth way to draw a ticket's number — which is the exact thing the client's
+   ruling behind `ticket-chips.tsx` forbids. */
+function TriageChips({ teamId, ticket }: { teamId: string; ticket: TicketChipFacts }) {
   return (
     // THE ONE PLACE THIS SCREEN NAMES THE PAPER — see `shared/web/ticket-chips.tsx`'s
     // header for why the fill is a REBIND the call site owns rather than

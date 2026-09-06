@@ -5,7 +5,7 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { formatDate } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
-import { safeHref } from "@shared/web/rich-text"
+import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
 /** THE CHIP LINE — four facts and nothing else: the number, the type, the
  * app, the date.
@@ -109,6 +109,69 @@ import { safeHref } from "@shared/web/rich-text"
  * here assumes which door is asking — a portal ticket surface, should one
  * ever draw these same four facts, hands in its own dot and its own link
  * component and gets the identical chip line for free. */
+/** WHAT A TICKET IS CALLED — ONE FUNCTION, EVERYWHERE, AND THAT IS THE POINT.
+ *
+ * ── THE SPLIT THIS CLOSES ──────────────────────────────────────────────────
+ *
+ * There were two answers in the app, on two tables of the same collection.
+ * `ticketTitle` (web/components/tickets-collection.tsx) read `titleEn ||
+ * titleDe || the first line of the description`, and it was right; the ticket
+ * COLLECTION'S own rows, shaped by `shapeHelpList`
+ * (web/components/deep-link/shape.tsx), named every row by the DESCRIPTION
+ * alone — so a ticket carrying a real title showed it in the triage list and
+ * showed the first sentence of its body in the list beside it. Two names for
+ * one ticket, on one screen, one tab apart.
+ *
+ * That was already a live inconsistency. It became untenable the moment the
+ * triage list's table was lifted out to be the table EVERY row tab draws
+ * (2026-09-06): the same component, over the same collection, would have had to
+ * pick one of the two answers, and picking silently is how the other one rots.
+ * So the answer is written once, here, and both callers read it.
+ *
+ * ── WHY THIS FILE ─────────────────────────────────────────────────────────
+ *
+ * A ticket's NAME is part of its face, exactly as its four chips are (R35), and
+ * this is the file the client already ruled owns that face: "replicate the pills
+ * that we have on the view outside … and everywhere else where tickets have
+ * pills, reuse this." It is `shared/web/`, which both front doors read, so the
+ * portal can name a ticket the same way the day it needs to — and it needs
+ * nothing app-side to do its job, which is what kept it out of `web/lib/`.
+ *
+ * ── THE THREE STEPS, AND WHY THAT ORDER ───────────────────────────────────
+ *
+ * ENGLISH FIRST because the app's own language is English and a translation
+ * SETS `titleEn` while leaving the German the person actually wrote. GERMAN
+ * SECOND because 788 tickets imported from Glide have only that. THE FIRST LINE
+ * OF THE BODY LAST, because a ticket raised through this app has no title at
+ * all — the form does not ask for one.
+ *
+ * THE LAST CASE REPEATS THE PARAGRAPH IT IS TAKEN FROM wherever the body is
+ * shown underneath, and that is the right trade rather than an oversight: the
+ * alternative is a row whose biggest text is empty, and the repetition reads
+ * visibly as a truncation rather than as a second fact.
+ *
+ * IT TAKES PLAIN TEXT, NOT A RENDERER. `richTextPlain` lives one file along in
+ * this same directory and is what both callers already used, so the description
+ * is flattened here rather than at each call site — a title is a string, and a
+ * caller that had to remember to strip the markup first is a caller that will
+ * one day print `<p>` into a table cell. */
+export function ticketTitle(ticket: {
+  titleEn: string | null
+  titleDe: string | null
+  description: string
+}): string {
+  const plain = richTextPlain(ticket.description)
+  return (
+    ticket.titleEn?.trim() ||
+    ticket.titleDe?.trim() ||
+    // EIGHTY, WHICH IS THE NUMBER THE TRIAGE CARD HAS ALWAYS USED. The list's
+    // own cells truncate with an ellipsis in CSS on top of this, so the cap is
+    // not what makes a row fit — it is what stops a whole paragraph reaching an
+    // `aria-label`, a `title` attribute or a Kanban card, none of which clip.
+    (plain.length > 80 ? `${plain.slice(0, 80)}…` : plain)
+  )
+}
+
 export interface TicketChipFacts {
   /** The client's own reference code — the black chip's whole content. `null`
    * on a ticket that has not been given one yet, which draws no chip at all. */

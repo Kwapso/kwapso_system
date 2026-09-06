@@ -76,7 +76,43 @@ const feedRowVariants = cva(
        what the string needs and no more. One answer applied here fixes 27.9,
        27.34 and the record footer at once, which is why it is one component. */
     "grid grid-cols-[var(--avatar-sm)_1fr_auto]",
+
+    /* `items-start`, AND NOT `items-center`. RULED 2026-09-06 — the client's
+       note was "align horizontally avatar + text on activity + footer", read
+       off a ONE-LINE entry where the mark hangs below the sentence. The
+       obvious answer is the wrong one: this same row also carries WRAPPED
+       entries (a note that runs to four lines is ordinary here), and a centred
+       mark on a four-line block floats to the middle of the paragraph instead
+       of sitting beside the sentence it belongs to. Both shapes are drawn side
+       by side in verify/feed-align.
+
+       So the row keeps `items-start` and the MARK takes an offset onto the
+       first line's own centre. The arithmetic is below, on the mark. */
     "items-start gap-[var(--space-3h)]",
+
+    /* --feed-line — THE FIRST LINE'S BOX, AND THE ONE PLACE IT IS WRITTEN.
+       Three things are measured against it: the sentence's own leading, the
+       mark's lift, and the time's drop. They were three separate numbers and
+       two of them were hand-nudged `mt-px`; they are one expression now so
+       they cannot drift apart.
+
+         --feed-line = --text-caption x --leading-normal
+                     = 0.8125rem x 1.45
+                     = 1.178125rem
+                     = 17.672px at the shipped 15px root (ruling 18)
+
+       MEASURED, not derived-and-hoped: verify/feed-align reads
+       `getComputedStyle(...).lineHeight` off the real span at the real root
+       and returns 17.6719px. Note WHICH leading that is — `--leading-normal`
+       (1.45), the one the sentence sets for itself below, NOT
+       `--text-caption--line-height` (1.4), which the step carries by default
+       and which this row overrides. Reading the token's own 1.4 here would be
+       0.6px wrong and would look right.
+
+       It is a product of tokens, so it follows the text-size control: at
+       data-scale small/large the root moves to 13/17px and every number below
+       moves with it. Nothing here is a pixel. */
+    "[--feed-line:calc(var(--text-caption)*var(--leading-normal))]",
     // Same-tone row separation, the blessed hairline. The last row drops it.
     /* Inset shadow, never a border. The artifact draws every rule this
      way; these two survived the border sweep because a row divider
@@ -181,12 +217,51 @@ function FeedRow({
 
   const inner = (
     <>
-      {/* Column 1 — who. 24, `flex: none`, initials or a photograph. */}
+      {/* Column 1 — who. 24, `flex: none`, initials or a photograph.
+
+          THE LIFT. The mark is 22.5 (`--avatar-sm`, 1.5rem at the 15px root)
+          and the first line's box is 17.672. Under `items-start` their TOPS
+          are flush, so the mark's centre lands (22.5 - 17.672) / 2 = 2.414
+          BELOW the line's centre — and the `mt-px` that used to sit here
+          pushed it a further 1px down, for a measured 3.414. That is the
+          "avatar sits low" the client saw, in both hosts, in both shapes.
+
+            margin-top = (--feed-line - --avatar-sm) / 2
+                       = (1.178125rem - 1.5rem) / 2
+                       = -0.1609375rem
+                       = -2.414px at the 15px root
+
+          NEGATIVE, and that is the general form rather than a special case:
+          the subtraction is written line-minus-mark and not the other way
+          round, so the SAME expression pushes the mark DOWN if a future mark
+          is ever shorter than its line. Nothing has to be re-derived, and
+          nothing needs a `max()` to stop it going the wrong way.
+
+          THE EQUAL AND OPPOSITE `margin-bottom` IS NOT DECORATION. A bare
+          negative margin-top shrinks the grid track by the same 2.414 — the
+          track is sized from the MARGIN box — so a one-line row would have
+          quietly lost 2.4 of its height and the mark would have eaten into
+          the 12 of padding chapter 18 draws above it. Cancelling the lift at
+          the bottom keeps the mark's LAYOUT footprint at exactly 24 (ruling
+          30's "24 with flex: none") while its OPTICAL position moves. Measured
+          in verify/feed-align: the one-line row lands at 45.0, which is the
+          drawn geometry with no nudge in it at all; before this change it was
+          46.0, and the extra 1 was the `mt-px`.
+
+          RESIDUE, KNOWN AND DELIBERATELY NOT CHASED. This centres the mark on
+          the LINE BOX. Saans's own content box (ascent+descent, 14px here) is
+          not centred inside that line box — the browser reports 1 of half-
+          leading above and 2.672 below — so the glyphs' own centre is a
+          further 0.836 above where the mark now sits. Chasing that last 0.836
+          would mean hardcoding one font file's vertical metrics, which no
+          token holds and which the fallback face does not share (tokens.css
+          section 5.0 records the same trap for `ch`). The line box is the only
+          centre a stylesheet can hold, so it is the one taken. */}
       <Avatar
         size="sm"
         shape={item.shape ?? "pill"}
         variant={item.variant ?? "default"}
-        className="mt-px"
+        className="mt-[calc((var(--feed-line)_-_var(--avatar-sm))/2)] mb-[calc((var(--avatar-sm)_-_var(--feed-line))/2)]"
       >
         {item.avatarSrc ? <AvatarImage src={item.avatarSrc} alt={item.actor ?? ""} /> : null}
         <AvatarFallback aria-label={item.actor}>{item.initials}</AvatarFallback>
@@ -194,7 +269,12 @@ function FeedRow({
 
       {/* Column 2 — what. Wraps; a history line is prose, not a row cell. */}
       <span data-slot="activity-feed-body" className="flex min-w-0 flex-col gap-1">
-        <span className="text-caption leading-[var(--leading-normal)]">{item.description}</span>
+        {/* The sentence takes `--feed-line` as a LENGTH rather than
+            `--leading-normal` as a ratio. Same computed 17.672 — verified in
+            verify/feed-align — but it means the leading the reader sees and
+            the offsets the mark and the time take are literally the same
+            declaration, so no one can move one and leave the others behind. */}
+        <span className="text-caption leading-[var(--feed-line)]">{item.description}</span>
         {item.meta === undefined || item.meta === null ? null : (
           <span className="text-xs text-ink-tertiary">{item.meta}</span>
         )}
@@ -202,12 +282,32 @@ function FeedRow({
 
       {/* Column 3 — when. Tabular, tertiary, and a real `time` element so the
           instant is machine-readable where the caller knows it. Trailing per
-          ruling R2; `flex-none` so a long sentence never squeezes it, and
-          `mt-px` to sit on the first line of the prose rather than its box. */}
+          ruling R2; `flex-none` so a long sentence never squeezes it.
+
+          THE DROP — and the answer to "is this `mt-px` doing anything?". It
+          was, and it was very nearly right, which is exactly why it survived
+          this long. The time is `text-xs`, a SHORTER line than the sentence
+          beside it (0.75rem x 1.35 = 1.0125rem = 15.188), so to sit on the
+          sentence's first line it has to come DOWN:
+
+            margin-top = (--feed-line - --text-xs x --text-xs--line-height) / 2
+                       = (1.178125rem - 1.0125rem) / 2
+                       = 0.08281rem
+                       = 1.242px at the 15px root
+
+          `mt-px` is 1px. MEASURED in verify/feed-align: it left the time's
+          centre 0.242 ABOVE the sentence's — an eighth of a pixel per side,
+          invisible, and a coincidence of the 15px root rather than a rule. It
+          is kept as a real derivation rather than deleted, because deleting it
+          would be a 1.242 regression, and rather than left at `px`, because at
+          data-scale small the true value is 1.077 and at large it is 1.408 and
+          a hardcoded 1 is wrong in both directions.
+
+          Same shape as the mark's lift, opposite sign, same first line. */}
       <time
         data-slot="activity-feed-time"
         dateTime={item.dateTime}
-        className="mt-px flex-none text-xs tabular-nums text-ink-tertiary"
+        className="mt-[calc((var(--feed-line)_-_var(--text-xs)*var(--text-xs--line-height))/2)] flex-none text-xs tabular-nums text-ink-tertiary"
       >
         {item.time}
       </time>

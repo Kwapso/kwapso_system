@@ -7,8 +7,8 @@ import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
 import { formatDate, formatDateTime, formatRelative } from "@shared/web/format"
 import { nameInitials, personName } from "@/lib/identity"
-import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
+import { ticketTitle } from "@shared/web/ticket-chips"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { translator, type Language } from "@shared/i18n"
 import type {
@@ -179,7 +179,16 @@ export function shapeHelpList(
       // which is why a page of tickets read as a wall of text with no shape. It
       // has not been lost: it leads the eyebrow on the record's own screen (D4),
       // where a person looks when a client rings up saying it out loud.
-      name: truncate(richTextPlain(t.description)),
+      // ONE FUNCTION NAMES A TICKET, EVERYWHERE (2026-09-06). This read
+      // `truncate(richTextPlain(t.description))` — the description and nothing
+      // else — while the triage table one screen along read `titleEn ||
+      // titleDe || the first line of the body`, so a ticket with a real title
+      // was called two different things on two tables of the SAME collection.
+      // `ticketTitle` (shared/web/ticket-chips.tsx) is now the only answer, and
+      // its own header carries the full reasoning and the order of the three
+      // steps. `truncate` still runs on top: this shaper's rows are a list, and
+      // the cap it applies is the LIST's measure rather than the name's.
+      name: truncate(ticketTitle(t)),
       // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
       // the archived flag went with the same edit: a subtitle carrying four
       // facts is table content smuggled into a list (K2).

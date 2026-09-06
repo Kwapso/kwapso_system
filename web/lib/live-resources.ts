@@ -14,7 +14,7 @@ import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { TASK_VIEWS, type HelpTicket, type Meeting, type TaskViewName } from "@shared/types"
+import { OPEN_TAB_STATUSES, TASK_VIEWS, type Meeting, type TaskViewName } from "@shared/types"
 import { RECORD_CHILDREN } from "@shared/record-counts"
 import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
@@ -153,12 +153,16 @@ export const listFetch = {
    * they are counted over the list ignoring the kind and stage facets, so the
    * strip's badges stay right whichever sub-tab is open. */
   helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
-    const f = helpFacetFilter(facet)
     return contentApi
       .help({
         view: scope === "archived" ? "archived" : "live",
-        helpType: f.helpType,
-        status: f.status,
+        // THE WHOLE TOKEN, SPREAD — it used to pick two named fields off the
+        // answer, which meant every new narrowing the grammar learned had to be
+        // remembered here as well, and the day one was not the resting read and
+        // the paged read would have been asking different questions of the same
+        // tab. `helpFacetFilter` returns the door's own query now, so there is
+        // nothing left to forget.
+        ...helpFacetFilter(facet),
       })
       .then((r) => {
         primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
@@ -877,20 +881,70 @@ export type HelpScope = "all" | "archived"
  * encoded into one anyway. */
 export type HelpFacet = string
 
-/** Split a facet token into the two filters the door parses. `triage` and `all`
- * narrow nothing; the caller decides what to render for the first. */
-export function helpFacetFilter(facet: HelpFacet): {
-  helpType?: string
-  status?: HelpTicket["status"]
-} {
+/** THE FACET GRAMMAR — a tab token turned into the DOOR'S OWN QUERY.
+ *
+ * ── THE GRAMMAR, IN FULL ──────────────────────────────────────────────────
+ *
+ *   `type:<word>`          one kind, the team's own `Ticket type` vocabulary
+ *   `status:<a>`           one stage
+ *   `status:<a>,<b>,<c>`   SEVERAL stages — the Open tab, and the reason the
+ *                          separator exists (client, 2026-09-06: "Open →
+ *                          triaged + scheduled + in_progress + waiting")
+ *   `waiting`              the derived subset: those same open stages, AND the
+ *                          last word on the ticket was ours
+ *   `triage` / `dashboard` / `all`   narrow nothing — the first two swap the
+ *                          collection for a different screen wearing the same
+ *                          strip, and the third is the whole list
+ *
+ * ── WHY IT HANDS BACK A QUERY AND NOT TWO NAMED FIELDS ─────────────────────
+ *
+ * It used to return `{ helpType?, status? }` — one typed field per narrowing —
+ * with a comment saying the strip was "genuinely two questions wearing one row
+ * of tabs". The strip has three now (kind, stage-set, and a derived predicate),
+ * and the third is not a column at all, so a shape with one property per COLUMN
+ * had stopped being able to describe it.
+ *
+ * `Record<string, string>` IS THE DOOR'S QUERY, which is what a facet token has
+ * always really been: `content.help()` spreads whatever it is given through
+ * `listQuery`, so a token that produces query keys directly cannot be lost in
+ * translation between here and the wire — and adding a fourth narrowing tomorrow
+ * is one line here rather than a field on three types.
+ *
+ * THE COMMA IS THE DOOR'S SEPARATOR TOO, deliberately: `ticketFilterFrom`
+ * (workers/content/src/routes/help.ts) splits `status` on exactly this, so the
+ * token, the cache key and the query string all spell the set one way. There is
+ * no encode/decode step to get wrong.
+ *
+ * AN UNRECOGNISED TOKEN NARROWS NOTHING, unchanged — that is what lets `triage`
+ * and `dashboard` be tab values at all without this function knowing they are
+ * screens. */
+export function helpFacetFilter(facet: HelpFacet): Record<string, string> {
   if (facet.startsWith("type:")) return { helpType: facet.slice(5) }
-  // The ONE cast, where the value is built. The two stage tabs are named after
-  // real statuses (`status:ready`, `status:resolved`) and a `slice` cannot know
-  // that — so it is asserted here rather than at each call site, which is what
-  // was happening and is how two places came to spell the same fact differently.
-  if (facet.startsWith("status:")) return { status: facet.slice(7) as HelpTicket["status"] }
+  // NO CAST ANY MORE, and that is a real simplification rather than a lost
+  // check. This used to assert the sliced text was a `HelpStatus`, which was a
+  // claim this file could not actually verify — the words come out of a tab
+  // constant. The DOOR checks them now, against `HELP_STATUSES` itself, and
+  // drops what it does not recognise; a browser asserting a server's vocabulary
+  // was always the wrong end to do it from.
+  if (facet.startsWith("status:")) return { status: facet.slice(7) }
+  // WAITING IS OPEN PLUS A PREDICATE, and it is written here as literally that
+  // — the same stage set the Open tab sends, and the flag. Two keys rather than
+  // one word the door has to expand, so the door never has to know what "Open"
+  // means on this screen: it is handed the stages and the predicate, both of
+  // which it already understands on their own.
+  if (facet === WAITING_FACET)
+    return { status: OPEN_TAB_STATUSES.join(","), waiting: "only" }
   return {}
 }
+
+/** THE STAGES THE OPEN TAB MEANS, AS A TOKEN — built from the one list in
+ * `shared/types.ts` rather than typed out, so the tab, the cache key, the query
+ * and the door's own vocabulary cannot drift apart. */
+export const OPEN_FACET: HelpFacet = `status:${OPEN_TAB_STATUSES.join(",")}`
+/** …AND THE ONE TOKEN THAT NAMES NO STATUS AT ALL. A word rather than a
+ * `status:` token because it is not a stage: see `waitingClause`
+ * (workers/content/src/lib/help.ts) for what it actually asks. */
+export const WAITING_FACET: HelpFacet = "waiting"
 
 /** The cache key for one sub-tab of one scope. It carries BOTH, because the two
  * strips compose: "my questions" and "all questions" are different pages, and a

@@ -508,6 +508,30 @@ export const CONCEPT_ICON = {
   // which is the state — triaged, and none of the work done yet. Its own family
   // (high/medium/low) is the reason the kit carries four of them.
   open: "hourglass-high",
+  /* THE TWO TABS THE CLIENT ADDED ON 2026-09-06 — "add new tab: waiting (this is
+     when we are waiting sth from the customer)" and "add another tab: ready /
+     will do split view and list / between triage and open".
+
+     A LINE HERE RATHER THAN A NAME AT THE TAB, the fourth time this file makes
+     the same argument (see `triage`, `dashboard` and the pair above): these are
+     stages of work, not one strip's decoration, and `web/test/icon-vocabulary.
+     test.ts` builds its allow-list from these keys — so a glyph chosen at a call
+     site is not merely untidy, it is unlisted and draws nothing.
+
+     READY IS A PAPER PLANE, and that is the state said exactly: every story on
+     the ticket is closed and NOBODY HAS SENT IT YET. The work is written and
+     waiting to go out. Deliberately not a tick — `closed` below is `check-fat`
+     and `ready` is the pile immediately before it, so two ticks side by side
+     would be the one distinction on this strip that has to be legible.
+
+     WAITING IS A CLOCK WITH A PERSON ON IT, which is the whole of the client's
+     own definition: "waiting means there's a message from us, pending answer
+     from customer". Time is passing and it is passing on SOMEBODY ELSE'S side —
+     which is the fact that separates it from `open`'s hourglass, where the time
+     is ours. A second hourglass would have said "later than open", which is not
+     what this tab means: Waiting is a SUBSET of Open, not a stage after it. */
+  ready: "paper-plane-tilt",
+  waiting: "clock-user",
   // CHECK-FAT rather than the hairline check: this ends a row of stages and has
   // to read at tab size beside a word, where the thin glyph goes to nothing.
   closed: "check-fat",

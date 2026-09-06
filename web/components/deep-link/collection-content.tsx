@@ -732,15 +732,19 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     // (Archived is a toolbar filter now, not lifted host state) — see
     // tickets-collection.tsx's own header comment for 2026-08-31's redesign.
     return (
+      // THE RECIPE, THE RIGHTS AND `onAction` NO LONGER GO WITH IT (2026-09-06).
+      // The screen drew its rows through `<ScreenRenderer>` until the client
+      // ruled every ticket tab draws the triage list's own table; with the
+      // renderer gone there is nothing behind those three props, and the
+      // recipe's `actions: []` means none of them ever decided anything on this
+      // collection. `tickets.list` is untouched and still resolved by this host
+      // everywhere else. See tickets-collection.tsx's own note above its props.
       <TicketsCollection
         teamId={teamId as string}
-        recipe={recipe}
-        rights={rights}
         helpTypeOptions={ctx.helpTypeOptions}
         totals={totals}
         can={can}
         onCreate={() => go(sectionPath, { panel: "add", module: "tickets" })}
-        onAction={onAction}
         onIntent={onIntent}
       />
     )

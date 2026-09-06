@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.60",
-  "sha": "7d9182a1938f497306bfb0338e1a7ec1df320d1f",
+  "tag": "v1.2.62",
+  "sha": "dc71499fed82dbd4cc17553a7e0cc27598c0fba3",
   "syncedAt": "2026-09-06"
  },
- "generatedAt": "2026-09-06T20:28:43.997Z",
+ "generatedAt": "2026-09-06T22:05:07.035Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -15,7 +15,7 @@
   "variantGroups": 75,
   "variantOptions": 244,
   "typedEnumProps": 41,
-  "typedBooleanProps": 305,
+  "typedBooleanProps": 306,
   "compositions": 47,
   "icons": 1512,
   "tokens": 352,
@@ -155,7 +155,7 @@
      "file": "components/activity-feed/activity-feed.tsx",
      "name": "feedRowVariants",
      "line": 62,
-     "base": "grid grid-cols-[var(--avatar-sm)_1fr_auto] items-start gap-[var(--space-3h)] shadow-[var(--hairline-under)] last:shadow-none min-w-0 text-start",
+     "base": "grid grid-cols-[var(--avatar-sm)_1fr_auto] items-start gap-[var(--space-3h)] [--feed-line:calc(var(--text-caption)*var(--leading-normal))] shadow-[var(--hairline-under)] last:shadow-none min-w-0 text-start",
      "groups": [
       {
        "name": "density",
@@ -4860,6 +4860,12 @@
        "optional": true,
        "kind": "boolean",
        "note": "Defer an embedded map until the box is near the viewport. Default `true`."
+      },
+      {
+       "name": "allowSameOrigin",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Add `allow-same-origin` to the sandbox. Default `false`, and it must stay the exception: together with the default's `allow-scripts` it lets a SAME-ORIGIN document reach `window.parent`, rewrite its own `sandbox` attribute and reload itself unsandboxed — which is no sandbox at all. Pass it for a map provider you TRUST and whose embed actually needs its own cookies or `localStorage` for tiles and preferences — a named provider you chose, not a URL that arrived as data. A provider on its own origin is already walled off from ours without this, so it buys a cross-origin embed nothing and gives away the wall. Never pass it for a URL a person pasted. That is the case the default exists for, and it is the only case the type system cannot tell apart from the others on its own. Ignored when the call site passes its own `sandbox`; that string replaces the default wholesale and is the call site's own business."
       },
       {
        "name": "hideWhenEmpty",

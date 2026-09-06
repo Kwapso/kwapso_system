@@ -8331,8 +8331,8 @@ export const Lifebuoy = /*#__PURE__*/ createIcon({
   ),
 });
 
-export const LightBulb = /*#__PURE__*/ createIcon({
-  displayName: "LightBulb",
+export const Lightbulb = /*#__PURE__*/ createIcon({
+  displayName: "Lightbulb",
   viewBox: "0 0 256 256",
   children: (
     <>
@@ -12411,8 +12411,8 @@ export const SneakerMove = /*#__PURE__*/ createIcon({
   ),
 });
 
-export const SnowFlake = /*#__PURE__*/ createIcon({
-  displayName: "SnowFlake",
+export const Snowflake = /*#__PURE__*/ createIcon({
+  displayName: "Snowflake",
   viewBox: "0 0 256 256",
   children: (
     <>
@@ -13501,16 +13501,6 @@ export const TextB = /*#__PURE__*/ createIcon({
   ),
 });
 
-export const TextBox = /*#__PURE__*/ createIcon({
-  displayName: "TextBox",
-  viewBox: "0 0 256 256",
-  children: (
-    <>
-      <path d="M248,80v96a16,16,0,0,1-16,16H140a4,4,0,0,1-4-4V68a4,4,0,0,1,4-4h92A16,16,0,0,1,248,80ZM120,48V208a8,8,0,0,1-16,0V192H24A16,16,0,0,1,8,176V80A16,16,0,0,1,24,64h80V48a8,8,0,0,1,16,0ZM88,112a8,8,0,0,0-8-8H48a8,8,0,0,0,0,16h8v24a8,8,0,0,0,16,0V120h8A8,8,0,0,0,88,112Z" />
-    </>
-  ),
-});
-
 export const TextColumns = /*#__PURE__*/ createIcon({
   displayName: "TextColumns",
   viewBox: "0 0 256 256",
@@ -13677,6 +13667,16 @@ export const TextUnderline = /*#__PURE__*/ createIcon({
   children: (
     <>
       <path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32ZM80,72a8,8,0,0,1,16,0v48a32,32,0,0,0,64,0V72a8,8,0,0,1,16,0v48a48,48,0,0,1-96,0Zm96,128H80a8,8,0,0,1,0-16h96a8,8,0,0,1,0,16Z" />
+    </>
+  ),
+});
+
+export const Textbox = /*#__PURE__*/ createIcon({
+  displayName: "Textbox",
+  viewBox: "0 0 256 256",
+  children: (
+    <>
+      <path d="M248,80v96a16,16,0,0,1-16,16H140a4,4,0,0,1-4-4V68a4,4,0,0,1,4-4h92A16,16,0,0,1,248,80ZM120,48V208a8,8,0,0,1-16,0V192H24A16,16,0,0,1,8,176V80A16,16,0,0,1,24,64h80V48a8,8,0,0,1,16,0ZM88,112a8,8,0,0,0-8-8H48a8,8,0,0,0,0,16h8v24a8,8,0,0,0,16,0V120h8A8,8,0,0,0,88,112Z" />
     </>
   ),
 });

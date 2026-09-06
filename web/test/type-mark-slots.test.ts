@@ -135,18 +135,33 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // rather than a map in the component, which is what makes an emoji edited on
     // the Dropdown values screen arrive without a deploy.
     //
-    // IT USED TO ASSERT `icon: ticketMarks.get(` — the per-type TABS, retired
-    // with the client's 2026-09-06 ordering (dashboard, triage, open, closed,
-    // all), because triage is where a type is decided and a strip of type tabs
-    // beside it offered the same categorisation twice. The seam it was really
-    // guarding is untouched and still has a live consumer, so the assertion
-    // moves to that consumer rather than being deleted: `shapeHelpList` hands
-    // the same `ticketMarks` to every row, which is where a person now sees the
-    // team's own glyph.
+    // THE ASSERTION HAS MOVED TWICE, AND BOTH MOVES ARE THE SAME EVENT: the
+    // SEAM is "the team's own glyph reaches a ticket row without a deploy", and
+    // what draws a ticket row keeps changing under it.
+    //
+    //   1 · It asserted `icon: ticketMarks.get(` — the per-type TABS — until the
+    //       client's 2026-09-06 ordering retired them (triage is where a type is
+    //       decided, so a strip of type tabs beside it offered the same
+    //       categorisation twice).
+    //   2 · It then asserted `shapeHelpList(rows, ticketMarks)`, the recipe-drawn
+    //       list those tabs sat above. Later the same day the client ruled that
+    //       every ticket tab draws the triage list's own TABLE ("do the list view
+    //       exactly the same as we have it in the Triage list"), so the recipe
+    //       renderer left this screen and `shapeHelpList` with it.
+    //
+    // The glyph did NOT leave with either of them, which is the whole point of
+    // moving the assertion rather than deleting it: `TicketRowsTable` reads the
+    // same map and draws the mark beside the type pill, on every row of every
+    // tab. That is what is asserted now — the map reaching the table, and the
+    // table drawing what it finds.
     const strip = readFileSync(join(ROOT, "web", "components", "tickets-collection.tsx"), "utf8")
     expect(
-      /shapeHelpList\(\s*rows\s*,\s*ticketMarks\s*\)/.test(strip),
-      "the ticket rows no longer carry the team's own type mark"
+      /marks=\{ticketMarks\}/.test(strip),
+      "the ticket rows are no longer handed the team's own type marks"
+    ).toBe(true)
+    expect(
+      /marks\?\.get\(w\.helpType/.test(strip),
+      "the ticket table no longer draws the team's own glyph for a row's kind"
     ).toBe(true)
     expect(
       strip.includes("markMap("),

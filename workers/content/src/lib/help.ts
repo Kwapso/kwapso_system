@@ -520,8 +520,115 @@ function refuseKeptForMigration(next: string | null, was: string | null): void {
   )
 }
 
-function statusClause(status: HelpStatus | undefined): { sql: string; params: string[] } {
-  return status ? { sql: "status = ?", params: [status] } : { sql: "", params: [] }
+/** WHICH STAGE(S) — A SET, NOT ONE WORD (client ruling, 2026-09-06).
+ *
+ * IT USED TO TAKE EXACTLY ONE, and the comment above `TicketFilter` said why:
+ * "every tab in the strip that names a stage names exactly one, and a door that
+ * accepted several would be a filter language nobody asked for." That sentence
+ * was true of the strip it described and stopped being true the day she ruled
+ * "Open → triaged + scheduled + in_progress" — a tab that names three.
+ *
+ * THE BROWSER MAY NOT DO THIS INSTEAD, which is the whole reason it is here.
+ * Every badge on that strip is this door's own grouped `COUNT(*)`
+ * (`countTicketFacets`) and the list PAGES (R14), so an Open tab that fetched
+ * `status=triaged` and then sieved two more stages out of the loaded page would
+ * show "the triaged among the newest fifty" under a badge counting all three
+ * — R16's founding defect, drawn deliberately.
+ *
+ * AN EMPTY SET NARROWS NOTHING rather than matching nothing. `IN ()` is not
+ * valid SQL in SQLite and "the caller named no stage" is indistinguishable from
+ * "the caller did not ask", so the empty array is the same answer as
+ * `undefined`. The route below never produces one — an unrecognised word is
+ * dropped, and a parameter that drops to nothing is simply not a filter. */
+function statusClause(statuses: readonly HelpStatus[] | undefined): { sql: string; params: string[] } {
+  if (!statuses || statuses.length === 0) return { sql: "", params: [] }
+  return { sql: `status IN (${statuses.map(() => "?").join(", ")})`, params: [...statuses] }
+}
+
+/** WHO SPOKE LAST — the one subselect the WAITING tab is built out of.
+ *
+ * Written once, interpolated where it is needed, and it takes NO parameter: it
+ * correlates on `help.id` and reads nothing a caller supplied, so there is
+ * nothing here for a value to be bound into. `ORDER BY created_at DESC, id DESC`
+ * rather than `MAX(created_at)`: two replies written in the same millisecond
+ * would both satisfy a MAX and the answer would depend on which row the planner
+ * reached first, which is a filter that gives two answers to one question. The
+ * id is a ULID, so it breaks the tie in the order the rows were actually made. */
+const LAST_REPLY_AUTHOR = `(SELECT th.creator_id FROM help_threads th
+     WHERE th.help_id = help.id ORDER BY th.created_at DESC, th.id DESC LIMIT 1)`
+
+/** THE WAITING TAB — "this is when we are waiting sth from the customer", and,
+ * asked what that meant: "waiting means there's a message from us, pending
+ * answer from customer" (client, 2026-09-06).
+ *
+ * ── IT IS DERIVED, AND THAT IS THE POINT ──────────────────────────────────
+ *
+ * There is no `waiting` status and this adds none. A status would need a column,
+ * a backfill across the ~1,820 tickets already in the database, and — far worse
+ * — a WRITER: something would have to notice every reply from either side and
+ * move the ticket, forever, and the day it missed one the tab would be quietly
+ * wrong with no way to tell. Read-time derivation cannot go stale: it is a
+ * question about the thread, asked of the thread, every time it is asked.
+ *
+ * ── WHICH SIDE WROTE A MESSAGE IS NOT RECORDED ANYWHERE ────────────────────
+ *
+ * `help_threads` (workers/tenancy/src/team-schema/migrations.ts) is id, help_id,
+ * message_body, tagged_user_ids, is_agent, created_at and the three creator_*
+ * columns. NOT ONE OF THEM SAYS WHOSE SIDE THE AUTHOR IS ON. So the side is
+ * COMPUTED, from the one fact that does answer it: a client login is an ordinary
+ * team member whose only distinguishing mark is a `portal_users` row in this
+ * team's own database (workers/tenancy/src/lib/members.ts says exactly this
+ * about the members list, and resolves `isClient` the same way).
+ *
+ * PRESENCE, NOT LIVENESS — `deactivated_at` is deliberately not tested, which is
+ * the convention `members.ts` states in words: "a revoked grant still means
+ * 'this login belongs to a client', and reviving it is one click." Reading only
+ * the live grants would move every message a paused client ever wrote onto the
+ * agency's side of this filter.
+ *
+ * THE KNOWN WEAKNESS, STATED RATHER THAN HIDDEN: the answer is computed from
+ * TODAY'S grant, not from the grant as it stood when the message was written, so
+ * it can DRIFT. Granting portal access to somebody who has been replying as
+ * staff reclassifies their whole history as the client's, and a ticket sitting
+ * on this tab quietly leaves it. (Revocation does NOT drift, because the row
+ * survives it — which is the other half of why presence is the right test.) The
+ * cost is bounded: a tab is briefly wrong about a handful of tickets, and no
+ * record is changed. The alternative — stamping the side onto every reply as it
+ * is written — is a column and a backfill that would have to GUESS the same
+ * answer for every row already in the table, which is the same drift, frozen.
+ *
+ * `is_agent` COUNTS AS A MESSAGE FROM US, and it needs no clause of its own.
+ * The column marks the AI-drafted reply nobody typed (`maybeDraftFirstReply`,
+ * further down this file, is still a no-op hook — no row in any team database
+ * carries a 1 today). When it ships, that reply is POSTED INTO THE THREAD the
+ * client reads and is written under a staff actor's own `creator_id`, so the
+ * portal test above already classifies it as ours. Excluding it would have been
+ * the expensive mistake: a ticket whose only outbound message was drafted rather
+ * than typed is exactly the one nobody has chased, and it would have been the
+ * one this tab hid. The client is waiting on an answer, not on an author.
+ *
+ * A TICKET WITH NO REPLIES AT ALL IS NOT WAITING — the subselect returns NULL
+ * and the first half of the clause fails. Nothing has been said, so nobody is
+ * pending an answer to it, and a ticket nobody has replied to belongs on Open
+ * (where it is) rather than here. A reply whose `creator_id` is NULL (the column
+ * is nullable) falls the same way: an author we cannot identify is not an author
+ * we may claim.
+ *
+ * ── AND WAITING IS A SUBSET OF OPEN, NOT A SIBLING OF IT ──────────────────
+ *
+ * The tab pairs this clause with the SAME `OPEN_TAB_STATUSES` the Open tab
+ * sends, so every ticket on Waiting is also on Open. That is not a bug and it is
+ * not double-counting: Open is "what is under way" and Waiting is "the part of
+ * it that is not moving because we are the ones who spoke last". A reader
+ * clearing Waiting is working through a corner of Open, and the two badges
+ * overlapping is what makes that legible rather than what makes it wrong. */
+function waitingClause(waiting: boolean | undefined): { sql: string; params: string[] } {
+  if (!waiting) return { sql: "", params: [] }
+  return {
+    sql: `(${LAST_REPLY_AUTHOR} IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = ${LAST_REPLY_AUTHOR}))`,
+    params: [],
+  }
 }
 
 function searchClause(q: string | undefined): { sql: string; params: string[] } {
@@ -556,8 +663,13 @@ export type TicketFilter = {
   moduleId?: string
   /** one kind — the sub-tab strip's four type tabs */
   helpType?: string
-  /** one stage — the sub-tab strip's Ready and Closed tabs */
-  status?: HelpStatus
+  /** ONE OR MORE STAGES — the strip's Triage, Ready, Open, Waiting and Closed
+   * tabs. A SET since 2026-09-06, because "Open" names three of them; see
+   * `statusClause` for why the browser may not do this narrowing instead. */
+  statuses?: HelpStatus[]
+  /** WE SPOKE LAST AND NOBODY HAS ANSWERED — derived from the thread rather than
+   * stored, and only ever asked ALONGSIDE `statuses`. See `waitingClause`. */
+  waiting?: boolean
 }
 
 /** Everything except the keyset cursor, written once so the page and its count
@@ -577,7 +689,11 @@ function ticketWhere(
     appClause(filter.appId),
     moduleClause(filter.moduleId),
     typeClause(filter.helpType),
-    statusClause(filter.status),
+    statusClause(filter.statuses),
+    // LAST, because it is the only clause here that reads another table. Every
+    // clause above it is an indexed equality on `help` itself, so a row that
+    // fails one of those never reaches the correlated subselect at all.
+    waitingClause(filter.waiting),
     searchClause(filter.q),
   ].filter((p) => p.sql)
   return {
@@ -694,7 +810,12 @@ export async function countTicketFacets(
     ...filter,
     tab: "all",
     helpType: undefined,
-    status: undefined,
+    statuses: undefined,
+    // …AND THE DERIVED ONE TOO. `waiting` is a narrowing OF the stage facet (the
+    // Waiting tab is Open plus a predicate), so counting the strip's badges
+    // while it was on would have every badge answering "…that we replied to
+    // last", which is the same R16 failure the two lines above it prevent.
+    waiting: undefined,
   })
   const rows = await d1Query<{ help_type: string | null; status: string; n: number }>(
     cfg,
@@ -931,7 +1052,11 @@ export async function readTicketDashboard(
   const where = ticketWhere(guard, scope, {
     ...filter,
     tab: "all",
-    status: undefined,
+    // The stage is what half these panels are ABOUT, so it can never be a
+    // narrowing they inherit — and `waiting` goes with it for the same reason it
+    // does in `countTicketFacets`: it is a narrowing of the stage.
+    statuses: undefined,
+    waiting: undefined,
   })
   const fenced = where.sql.join(" AND ")
   const cap = TICKET_DASHBOARD_GROUP_CAP

@@ -2,6 +2,230 @@
 
 ## Unreleased
 
+### Fixed — the feed's mark sat 3.414 below its sentence, and `items-center` was the wrong way to raise it
+
+Client, 2026-09-06: "align horizontally avatar + text on activity + footer",
+with two screenshots of a one-line entry — an "AT" mark beside "Aurora Thalassa
+added a note". The two places are one component: `ActivityFeed`, which the
+record's Activity tab and the ink footer's "Latest activity" column both
+compose.
+
+Measured on `verify/feed-align`, before anything moved: the mark's centre sat
+**3.414px below the first line's centre**, identically in both hosts and in both
+shapes. It decomposes exactly. The mark is 22.5 (`--avatar-sm`, 1.5rem at the
+shipped 15px root) and the sentence's line box measures **17.672** — so under
+`items-start`, with their TOPS flush, the mark's centre is already
+(22.5 − 17.672) / 2 = 2.414 low. The `mt-px` on the mark then pushed it a
+further 1 the same way. The nudge that was there to fix this was making it
+worse.
+
+**`items-center` is the obvious answer and it is wrong**, which is why this is a
+derivation and not a one-word diff. The same row carries WRAPPED entries — a
+note that runs to four lines is ordinary here — and a centred mark on a
+four-line block floats to the middle of the paragraph instead of sitting beside
+the sentence it belongs to. The row keeps `items-start` and the MARK takes an
+offset onto the first line's own centre:
+
+```
+margin-top = (--feed-line − --avatar-sm) / 2 = (1.178125rem − 1.5rem) / 2 = −0.1609375rem
+```
+
+`--feed-line` is the first line's box and **the one place it is written**:
+`calc(var(--text-caption) * var(--leading-normal))`. Note WHICH leading. The
+caption step carries `--text-caption--line-height: 1.4` by default, but this row
+overrides it to `--leading-normal`, 1.45; deriving from the token's own 1.4
+would have been 0.6px wrong and would have looked right. The sentence now takes
+`--feed-line` as its leading too, so the leading the reader sees and the offsets
+measured against it are literally the same declaration and cannot drift.
+
+**The equal and opposite `margin-bottom` on the mark is not decoration.** A grid
+track is sized from the MARGIN box, so a bare negative `margin-top` would have
+quietly shortened every one-line row by the same 2.414 and let the mark eat into
+the 12 of padding chapter 18 draws above it. Cancelling the lift at the bottom
+keeps the mark's LAYOUT footprint at exactly 24 — ruling 30's "24 with
+`flex: none`" — while only its OPTICAL position moves. The one-line row now
+measures 45.0, which is the drawn geometry with no nudge in it at all; it was
+46.0, and the extra 1 was the `mt-px`.
+
+**The trailing timestamp's `mt-px` was doing something, and it is kept as a
+derivation rather than deleted.** The time is `text-xs`, a SHORTER line
+(0.75rem × 1.35 = 15.188), so it has to come DOWN to meet the sentence:
+(17.672 − 15.188) / 2 = **1.242**. `mt-px` is 1, which left the time 0.242
+high — invisible, and a coincidence of the 15px root rather than a rule.
+Deleting it would have been a 1.242 regression; leaving it at `px` would be
+wrong in both directions at the other two text scales, where the true value is
+1.077 and 1.408.
+
+Every number here is a product of tokens, so all three follow the text-size
+control. Measured at all three: **0.014 / 0.008 / 0.002** residual at 13 / 15 /
+17px root, which is subpixel rounding. A hand-picked pixel would have been right
+at one scale and wrong at two.
+
+One residue is known and deliberately not chased. This centres the mark on the
+LINE BOX. Saans's own content box (ascent+descent, 14 here) is not centred
+inside that line box — the browser reports 1 of half-leading above it and 2.672
+below — so the glyphs' own centre is a further 0.836 above where the mark sits.
+Chasing it would mean hardcoding one font file's vertical metrics, which no
+token holds and which the fallback face does not share; tokens.css §5.0 records
+the same trap for `ch`. **The line box is the only centre a stylesheet can
+hold.**
+
+Fixes all four call sites at once, because none of them redraws the row:
+`RecordDetail`'s footer, `Notifications`, `QuickView` and `CompanyHub`.
+
+`Comments` and `Notes` draw the same 24 mark beside the same caption body and
+**were left alone, on a measurement rather than a shrug.** In both, the line
+beside the mark is a name and a time on a shared baseline and the sentence is a
+line BELOW it; the plain row's header box is 17.063 and the mark reads 2.719
+low, which is the same fault. But that header also holds an unread dot, a
+resolved badge and a mark-read button when the caller sets them, and with those
+present it measures **43.313**. The feed's derivation assumes the first line is
+one type step; there it is whatever the caller put in it. Copying this across
+would be right for the plain row and 10.4 wrong for the full one, so those two
+need their own answer to "which line is the first line".
+
+### Added — `verify/feed-align/`
+
+The one-line entry and the wrapped one, side by side, in both hosts — the
+ordinary panel and a verbatim copy of `RecordDetail`'s ink-footer token rebind,
+because the client saw the fault on both grounds. The left column is a replica
+of the row as it shipped at v1.2.61 so the two states can be looked at together;
+the right column is the real `ActivityFeed`, never redrawn.
+
+`window.__feedAlign()` returns, per row, the mark's centre against the first
+line's centre in page pixels — **0 is the pass** — and reads the line box two
+ways, from `getComputedStyle().lineHeight` and from a `Range` over the first
+text node, so a disagreement between the two methods cannot hide inside one
+number. It is that second reading that surfaced the font-metric residue above.
+`Comments` and `Notes` are drawn underneath with the specimen that disqualifies
+them.
+
+### Added — every glyph is now checked against the art it claims to be, and 1,509 of 1,512 already were
+
+Two glyphs have shipped wrong out of this folder and **both were found by eye**.
+`Check.svg` held Phosphor's `check-square-fill` — a filled rounded rectangle —
+under the name `Check`, and went to ten sites drawing a box wherever the product
+meant a tick. `Asterisk.svg` held the fill weight where the client had asked for
+regular. Neither was a sloppy file: both were well formed, correctly named, and
+passed every guard `generate-icons.mjs` has. That is the whole problem. **The
+generator checks that a glyph is well FORMED and has never checked that it is
+the right PICTURE**, because this folder has no upstream dependency — art
+arrives by hand, one `.svg` per export, and a hand-dropped file is exactly as
+authoritative as whoever dropped it. A name is not evidence.
+
+**So all 1,512 were compared against the authentic upstream art, and the answer
+is better than feared: 1,509 correct at the intended name and weight, zero
+hand-drawn, zero from another set, and no second instance of the `Check`
+defect.** The comparison ran against the WHOLE upstream set — six weights of
+1,512 names, 9,072 files — rather than against the matching name, because a
+same-name diff can only ever say a file is wrong. Searching everything says what
+it actually IS, which is the difference between "Check.svg does not match check"
+and "Check.svg is `check-square-fill`". The three exceptions were all naming;
+they are below, and none of them was a wrong picture.
+
+**`check-icon-art.mjs` is what stops this recurring, and it runs OFFLINE in `npm
+run check` — which is the load-bearing decision in this change, not an
+optimisation.** The obvious design fetches Phosphor at check time and diffs. It
+is worse three ways. A check that needs a CDN goes red on a DNS blip, a rate
+limit or an aeroplane, and the first time it fails for a reason nobody caused,
+somebody adds `|| true` — **and a disabled check looks exactly like the nothing
+that let a filled square ship as a tick.** Second, upstream is not an authority
+on what we decided: when 2.2.0 redraws a glyph, a live diff reports our correct
+file as wrong and invites a "fix" nobody asked for. Third, it would re-derive
+the answer at check time from a source it cannot authenticate, when the control
+that was actually missing is **a human reading a diff**.
+
+So `icon-art.manifest.json` is the authority: every glyph's art as a hash,
+beside the upstream name and weight it was verified against, with the pack
+version pinned at `@phosphor-icons/core@2.1.1`. It goes through review like
+anything else, so changing a picture means showing someone. The network is used
+only to BUILD it — `npm run refresh:icon-art`, one 1.4MB tarball for the whole
+pack rather than 9,072 CDN round trips, printing what moved. Nine thousand
+requests to answer one question is rude enough that somebody would narrow it to
+"just the ones we use", and "just the ones we use" is how a wrong glyph waits in
+the folder for the screen that finally draws it.
+
+The hash is of the ART, not the file: geometry-bearing attributes in document
+order, whitespace collapsed. A reformat, a re-indent or a rewritten root `<svg>`
+compare equal — vendoring is allowed to normalise on the way in and did for the
+Iconoir pack — while a single moved coordinate does not. A check that failed on
+things nobody can see is a check that gets deleted. **Both failure modes are
+proved rather than asserted: dropping `check-square-fill` back over `Check.svg`
+fails with the file's real identity in the message, and an unmanifested `.svg`
+fails as UNVERIFIED** — because a file nobody has compared is precisely the
+state `Check.svg` was in for its entire shipping life.
+
+**Three files were spelled in a way phosphor.dev is not.** `LightBulb.svg`,
+`SnowFlake.svg` and `TextBox.svg` are now `Lightbulb`, `Snowflake` and
+`Textbox`. The art in all three was already perfect — authentic
+`lightbulb-fill`, `snowflake-fill`, `textbox-fill`, byte-for-byte — so this is
+the defect running the other way, and it is the exact one the folder's contract
+exists to prevent: Phosphor spells these as single words, so reading `lightbulb`
+off the website and writing `<Lightbulb />` was a compile error, and the only
+way to find the working spelling was to open this directory. That is the
+translating step the client twice said she did not want. An alias was
+deliberately not the fix — this folder has no alias table on purpose, and adding
+one to paper over a misspelling would reintroduce the layer her ruling deleted
+in order to solve a problem caused by not following it. §9.1's "never rename an
+export" is the rule that ruling overturned for this folder, so the rename is the
+contract being applied, not an exception to it. Zero call sites used the old
+spellings in this repo or in the app; they appeared only in `manifest.json` and
+in generated files, all of which regenerate.
+
+**`ATTRIBUTION.md`'s weight list was two glyphs out of date, and that is worth
+more than the correction.** It said fill about `Asterisk` and `Check` on the day
+both were changed to regular — the edits moved the art and did not move the
+prose. An audit run against the rule AS WRITTEN would have reported both as
+defects and "corrected" them straight back into the bugs they had just come out
+of. The list now names all ten plus the 96 arrows, and the manifest records
+every glyph's verified weight as DATA, because a weight rule that lives only in
+a paragraph drifts silently from the art it describes. Counted: 108 regular,
+1,404 fill.
+
+### Fixed — the map could remove its own sandbox, on a default that argued itself out of being safe
+
+`Map` framed its embed with `allow-scripts allow-same-origin`. The HTML standard
+calls out that exact pair: a SAME-ORIGIN framed document can reach
+`window.parent`, rewrite its own `sandbox` attribute and reload itself out of
+the sandbox entirely — so the component's own header promise, "a provider's
+embed URL, framed and sandboxed", was not true of a first-party `src`.
+
+**`WebEmbed` had already fixed this on 2026-09-02, and `Map`'s comment cited
+that fix and then declined to follow it** — on the grounds that this component's
+`src` is a third party's URL by definition. The comment then wrote down, in its
+own last paragraph, the reason that is not good enough: *"it rests on `src`
+never being first-party, which nothing in the type system enforces."* `src` is a
+`string`. A screen that frames a URL a person pasted, or an application that
+points at its own map surface by URL rather than through `children`, hands this
+component a first-party document while the type checker nods along. **A default
+may not rest on a convention the compiler cannot see** — and a comment that
+states the counter-argument to its own conclusion has already made the decision;
+it just had not been actioned.
+
+The default is now `allow-scripts` alone, and `allowSameOrigin` is an opt-in
+boolean — **the same name, the same shape and the same resolution order
+`WebEmbed` uses, deliberately.** Two components in one kit that both frame
+foreign content must not hold two opinions about what a sandbox is: a reader who
+learns the rule at one has learned it at the other, and a security default that
+varies by component is a default nobody can state. A boolean rather than a
+hand-typed sandbox string keeps the dangerous pair **one greppable word at the
+call site** instead of a token buried in a string nobody re-reads, so the call
+site states its trust rather than inheriting it. A call site's own `sandbox`
+still replaces everything wholesale, tested with `!== undefined` and never for
+truthiness, because the empty string is the maximally restrictive sandbox and a
+real thing to ask for.
+
+**Nothing legitimate pays for this.** A cross-origin provider — Google, Mapbox —
+was already in a different origin and never had access to ours, so an opaque
+origin takes away nothing it had. A provider that genuinely needs its own
+storage for tiles or preferences says so by name, once, at the call site.
+
+`verify/writeback/` gains stage D2: the same three questions already asked of
+`WebEmbed` — default, opted in, own string — asked of `Map`, on the same page
+rather than in a harness of its own, so the two components' defaults are read
+off the DOM side by side. That is the only arrangement under which "they give
+the same answer" stays checkable instead of remembered.
+
 ### Changed — a view switcher offering ONE view now draws the pill as a label instead of drawing nothing
 
 Client, 2026-09-06, verbatim: "And then, when there is no other option, so

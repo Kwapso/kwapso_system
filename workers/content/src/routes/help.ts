@@ -139,6 +139,7 @@ async function ticketPage(
  * query half of the validation seam at the boundary, where the boundary is. */
 function ticketFilterFrom(url: URL): TicketFilter {
   const status = queryText(url.searchParams.get("status"), "Status")
+  const waiting = queryText(url.searchParams.get("waiting"), "Waiting")
   return {
     tab: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
     view: ticketView(queryText(url.searchParams.get("view"), "View")),
@@ -162,9 +163,31 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // it is not checked against a list here — an unknown word narrows to nothing,
     // which is the honest answer for a type nobody uses.
     helpType: queryText(url.searchParams.get("helpType"), "Type"),
-    status: (HELP_STATUSES as readonly string[]).includes(status ?? "")
-      ? (status as HelpStatus)
-      : undefined,
+    // A SET, COMMA-SEPARATED, AND ONE WORD IS A SET OF ONE — the client's Open
+    // tab names three stages ("Open → triaged + scheduled + in_progress"), so
+    // the parameter had to grow a separator rather than the strip growing three
+    // reads. `status=ready` still means exactly what it always did, which is why
+    // the name did not change either: every existing caller (the machine
+    // surface, an app record's Tickets tab, a bookmarked URL) keeps working
+    // untouched.
+    //
+    // AN UNKNOWN WORD IS DROPPED RATHER THAN REFUSED, which is the behaviour
+    // this line has always had for the single value and the same reason: a
+    // mistyped stage is a filter that narrows to nothing, not a 400 that takes
+    // the whole page down with it. A list that drops to empty is a set with no
+    // recognised word left in it, which `statusClause` treats as "no stage was
+    // asked" rather than "no row may match" — see its own note.
+    statuses: (status ?? "")
+      .split(",")
+      .map((w) => w.trim())
+      .filter((w): w is HelpStatus => (HELP_STATUSES as readonly string[]).includes(w))
+      .filter((w, i, all) => all.indexOf(w) === i),
+    // THE DERIVED HALF (`waitingClause` in lib/help.ts carries the whole
+    // reasoning). One word, exact — "only" — rather than a truthiness test on
+    // whatever arrived: this parameter turns a correlated subselect on, and a
+    // door that accepted `waiting=no` as yes would be an expensive read
+    // triggered by a caller who asked for the opposite.
+    waiting: waiting === "only" ? true : undefined,
   }
 }
 

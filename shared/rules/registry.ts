@@ -992,8 +992,6 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "no nested/hierarchical disclosure exists in the app — process branching (web/components/step-form-dialog.tsx) renders as a flowchart DAG through the kit's own Flowchart, not a tree, and the kit's own Comments is explicitly one level deep.",
   "components/notifications":
     "the app relies on the kit's own `sonner` toasts for the moment and `activity-feed` for the history — no bell icon or notification-center composition exists anywhere for this to replace.",
-  "components/kanban":
-    "zero drag-and-drop infrastructure (no dnd-kit or equivalent) exists anywhere in the app. Sprints deliberately track state by date rather than by status column (web/components/sprints-screen.tsx's own comment) — but that reasoning is sprints' alone: stories carry a real `status` (STORY_STATUSES, four values, workers/content/src/lib/stories.ts) plus a drag-`rank`, and are simply rendered as one flat, rank-ordered list (work-panels.tsx's `Row`s) rather than grouped into status columns anywhere. Corrected 2026-09-01 — the original line claimed stories track state by date too, which `stories.status` and `stories.rank` both contradict.",
   "components/spreadsheet":
     "rate cards and time logs (web/components/internal-rate-card.tsx, time-panel.tsx) are list-based with edits through a separate dialog, exactly the \"hours, invoices\" content the kit's own header names — but adopting it means re-architecting a working dialog-based edit flow into inline cell-editing, not a swap.",
   "components/matrix":
@@ -1002,8 +1000,6 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
     "no two-axis grouping (a status column further split by a second axis like assignee) exists anywhere in the app — story and sprint state is shown one dimension at a time.",
   "components/timeline":
     "the app's only history surfaces are the vertical ActivityFeed (already adopted) and Chart-based burndown/line charts — nothing draws a horizontal dated-event spine.",
-  "components/split":
-    "architecturally inconsistent on purpose: the app's convention is a list screen navigating to a full-page deep-link detail (web/components/deep-link-screen.tsx); a persistent, non-URL-addressable two-pane master-detail contradicts that by design, not by oversight.",
   "components/chat":
     "no human-to-human messaging feature exists — the app's two thread UIs (the AI assistant, ticket conversations) are both already-adopted, different kit parts (agent-chat, ticket-thread) solving a different problem.",
   "components/tiles":

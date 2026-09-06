@@ -415,6 +415,33 @@ export function ticketTypeKeptForMigrationExcludedSql(column: string): string {
  * client yet, and that telling is the resolution. */
 export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
 
+/** THE STAGES THE "OPEN" TAB MEANS — the client's own ruling, 2026-09-06,
+ * verbatim: "Open → triaged + scheduled + in_progress + waiting", and "open
+ * (status, when triaged but not solved)".
+ *
+ * IT IS NOT `OPEN_HELP_STATUSES` ABOVE, AND THE TWO MUST NOT BE MERGED. That
+ * one answers "is this ticket still ours to do something about" — everything
+ * that is not `resolved`, `new` and `awaiting_validation` included — and it is
+ * read by the dashboard and by every "how much is open" figure in the product.
+ * THIS one is a TAB: the pile of work that has been sorted and is under way,
+ * which deliberately excludes the two stages that sit on either side of it and
+ * have tabs of their own. `new` is Triage (nobody has read it yet) and `ready`
+ * is Ready (every story is closed and nobody has sent it), so folding either in
+ * here would put the same ticket under two tabs and make each one's badge a
+ * count of the other's pile as well.
+ *
+ * `awaiting_validation` IS ALSO OUT, and that is a decision rather than an
+ * omission: it means "the client has not approved a request yet", which is a
+ * different sentence from the Waiting tab's ("we said something, they have not
+ * answered"). Retiring that status is a separate ruling somebody else is
+ * holding; nothing here touches it, and until it is settled a ticket in it
+ * appears under All and nowhere else.
+ *
+ * DERIVED-CHECKED RATHER THAN RETYPED: every entry is asserted to be a real
+ * `HelpStatus`, so a stage renamed in `HELP_STATUSES` cannot leave a dead word
+ * behind here that would silently narrow the tab to nothing. */
+export const OPEN_TAB_STATUSES = ["triaged", "scheduled", "in_progress"] as const satisfies readonly HelpStatus[]
+
 /** HOW FAR BACK THE CLOSING-TIME DISTRIBUTION LOOKS, on the tickets dashboard.
  * A distribution taken over all time is dominated by tickets closed under a way
  * of working nobody here uses any more, and the question the panel is titled

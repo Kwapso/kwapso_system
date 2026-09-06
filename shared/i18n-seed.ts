@@ -1863,6 +1863,68 @@ export const SEED: Catalogue = {
   "{created} added · {skipped} skipped · {failed} failed": { de: "{created} hinzugefügt · {skipped} übersprungen · {failed} fehlgeschlagen", es: "{created} añadidos · {skipped} omitidos · {failed} fallidos", ca: "{created} afegits · {skipped} omesos · {failed} fallits"},
   "{name} is on triage this week": { de: "{name} macht diese Woche die Triage", es: "{name} está de triaje esta semana", ca: "{name} fa el triatge aquesta setmana"},
   "{title} · current": { de: "{title} · aktuell", es: "{title} · actual", ca: "{title} · actual"},
+
+  /* ── THE TICKET STRIP'S NEW TABS AND THEIR TWO SECOND BODIES (2026-09-06) ──
+     Thirteen sentences, hand-written here in all three languages in the same
+     commit that adds them, so R44's ceiling does not move: a string seeded in
+     German, Spanish and Catalan is ANSWERED, and the count of unanswered
+     strings is what the pin records.
+
+     THE VOCABULARY FOLLOWS THE GERMAN THE AGENCY ALREADY USES with its German
+     clients, per this file's own rule about lifting rather than translating:
+     a ticket stays "Ticket", a stage word stays plain and short, and "Board"
+     is the word German product teams say for a Kanban board — "Tafel" would be
+     a blackboard.
+
+     "Ready" AND "Waiting" ARE STAGES, NOT ADJECTIVES, which is why they are
+     not "Bereit"/"Wartend": the tab names a PILE of tickets, and the German for
+     that pile is what the agency already says about work that is finished and
+     unsent ("Fertig") and work where the ball is with the client
+     ("Wartet auf Kunde" is the sentence; the tab has room for "Wartend" only,
+     and the icon beside it carries the rest). Aurora's Spanish and Catalan
+     follow the same register: short, sentence case, one word per tab. */
+  /* "Ready" AND "Scheduled" ARE NOT REPEATED HERE — both were already seeded in
+     the Statuses block near the top of this file ("Fertig", "Geplant"), which is
+     where a ticket's own stage words belong, and a second entry would be a
+     second answer waiting to disagree. The tab and the Kanban column read those.
+     "Triaged" is genuinely new: the block has "Triage" (the act) and never had
+     the state a ticket is left in by it. */
+  "Triaged": { de: "Gesichtet", es: "Clasificado", ca: "Classificat" },
+  "Waiting": { de: "Wartend", es: "En espera", ca: "En espera" },
+  "Board": { de: "Board", es: "Tablero", ca: "Tauler" },
+  "Split": { de: "Geteilt", es: "Dividido", ca: "Dividit" },
+  "No tickets here yet.": {
+    de: "Hier gibt es noch keine Tickets.",
+    es: "Aquí todavía no hay tickets.",
+    ca: "Aquí encara no hi ha tiquets.",
+  },
+  "Nothing at this stage.": {
+    de: "Nichts in dieser Phase.",
+    es: "Nada en esta fase.",
+    ca: "Res en aquesta fase.",
+  },
+  "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.": {
+    de: "Die Karten sind die Treffer, so weit sie geladen sind. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. Fes clic en una targeta per obrir el tiquet.",
+  },
+  "Each column counts every open ticket at that stage. Click a card to open the ticket.": {
+    de: "Jede Spalte zählt alle offenen Tickets in dieser Phase. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada columna cuenta todos los tickets abiertos en esa fase. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cada columna compta tots els tiquets oberts en aquesta fase. Fes clic en una targeta per obrir el tiquet.",
+  },
+  "Open the ticket": { de: "Ticket öffnen", es: "Abrir el ticket", ca: "Obre el tiquet" },
+  "Ready tickets": { de: "Fertige Tickets", es: "Tickets listos", ca: "Tiquets llestos" },
+  "The ticket you are reading": {
+    de: "Das Ticket, das Sie gerade lesen",
+    es: "El ticket que estás leyendo",
+    ca: "El tiquet que estàs llegint",
+  },
+  "Up and down move between tickets. Enter opens the one you are reading.": {
+    de: "Mit Auf und Ab wechseln Sie zwischen Tickets. Mit Enter öffnen Sie das gerade gelesene.",
+    es: "Arriba y abajo cambian de ticket. Enter abre el que estás leyendo.",
+    ca: "Amunt i avall canvien de tiquet. Enter obre el que estàs llegint.",
+  },
   /* ── The screen engine + notes editor, moved app-side by the design-kit swap
      (2026-08-24). These sentences lived in the old library, exempt from the
      walk; moving the code moved the words into R28's territory, and these are
