@@ -25,6 +25,7 @@ import { act, cleanup, renderHook } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { useRealtime, useTeamLive, type RealtimeEvent } from "@shared/web/realtime"
+import { clearCache, primeCache, readCache, reconcile } from "@shared/web/store"
 
 /* ------------------------------ the transport ------------------------------ */
 
@@ -88,6 +89,7 @@ afterEach(() => {
   // really about the test.
   cleanup()
   vi.useRealTimers()
+  clearCache()
   sockets = []
 })
 
@@ -185,5 +187,123 @@ describe("two clients on one team", () => {
     // collection pings at all.
     const view = renderHook(() => useTeamLive())
     expect(view.result.current, "nothing open ⇒ the server snapshot's optimism is gone").toBe(false)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE HALF THE FIRST VERSION OF THIS FILE LEFT OUT: a reconnected tab must
+// CATCH UP, not merely reconnect.
+//
+// The cases above prove the socket comes back and carries new pings. They say
+// nothing about the changes made WHILE IT WAS DOWN, and that gap is the worse
+// failure of the two: a tab that reconnects and silently shows stale data is
+// worse than one that stays visibly down, because the strip goes away and the
+// person believes the screen again. Nothing about the recovered socket tells
+// them the three rows they are looking at are from before the gap.
+//
+// Two things are asserted, and they are different claims:
+//   1. the SEAM — `onReconnect` fires on a RE-connect and NOT on the first
+//      connect. A host that backfilled on every open would re-read the world on
+//      every page load; one that never fires backfills nothing at all.
+//   2. the BACKFILL — running the real `reconcile` from that callback actually
+//      replaces what the tab missed. This is the pair the app-shell wires
+//      together (`useRealtime`'s third argument → `reconcile` over every
+//      registered collection), driven here without mounting the shell.
+describe("a reconnected tab catches up on what it missed", () => {
+  /** A tab that backfills one collection the way the shells do. */
+  function mountCatchingUp(teamId: string, key: string, server: () => Record<string, unknown>[]) {
+    const reconnects: number[] = []
+    const view = renderHook(() =>
+      useRealtime(
+        teamId,
+        () => {},
+        // The shells pass exactly this shape: re-read what the screens are
+        // showing, because we cannot know what we missed while we were away.
+        () => {
+          reconnects.push(Date.now())
+          void reconcile(key, "id", async () => server())
+        }
+      )
+    )
+    return { reconnects, view }
+  }
+
+  it("does NOT fire on the first connect — only a RE-connect is a gap", () => {
+    const { reconnects } = mountCatchingUp("team-1", "rows:team-1", () => [])
+    act(() => sockets[0].open())
+    expect(
+      reconnects.length,
+      "a first connect is not a recovery — backfilling here would re-read the world on every page load"
+    ).toBe(0)
+  })
+
+  it("backfills a row that changed while the socket was down", async () => {
+    const key = "rows:team-1"
+    // What the tab is showing when the link drops.
+    let server: Record<string, unknown>[] = [
+      { id: "a", title: "before" },
+      { id: "b", title: "steady" },
+    ]
+    primeCache(key, server)
+
+    const { reconnects } = mountCatchingUp("team-1", key, () => server)
+    act(() => sockets[0].open())
+
+    // The link goes. While it is down, somebody else edits row `a` and adds `c`
+    // — two pings raised into a gap that reached nobody.
+    act(() => sockets[0].drop())
+    server = [
+      { id: "a", title: "AFTER" },
+      { id: "b", title: "steady" },
+      { id: "c", title: "arrived while away" },
+    ]
+    expect(
+      (readCache(key) as Record<string, unknown>[])[0].title,
+      "the tab is still showing the pre-gap row, which is the whole problem"
+    ).toBe("before")
+
+    // The client reconnects on its own backoff and the host backfills.
+    act(() => vi.advanceTimersByTime(1000))
+    expect(sockets.length, "the client opened its own second socket").toBe(2)
+    await act(async () => {
+      sockets[1].open()
+      // `reconcile` is async (it fetches); let its promise settle inside act.
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(reconnects.length, "onReconnect must fire on the RE-connect").toBe(1)
+    const after = readCache(key) as Record<string, unknown>[]
+    expect(after.map((r) => r.title), "the tab did not catch up on the gap").toEqual([
+      "AFTER",
+      "steady",
+      "arrived while away",
+    ])
+  })
+
+  it("CANARY — without the backfill the tab stays stale, and nothing says so", async () => {
+    // The assertion above must be able to fail. Same drop, same edit, a host
+    // that reconnects and backfills NOTHING — which is what this app did before
+    // the shells wired the third argument, and what any new front door that
+    // forgets it will do.
+    const key = "rows:team-2"
+    let server: Record<string, unknown>[] = [{ id: "a", title: "before" }]
+    primeCache(key, server)
+    renderHook(() => useRealtime("team-2", () => {}))
+    act(() => sockets[0].open())
+    act(() => sockets[0].drop())
+    server = [{ id: "a", title: "AFTER" }]
+    act(() => vi.advanceTimersByTime(1000))
+    await act(async () => {
+      sockets[1].open()
+      await Promise.resolve()
+    })
+
+    expect(
+      (readCache(key) as Record<string, unknown>[])[0].title,
+      "a tab with no backfill must still be stale — otherwise the test above proves nothing"
+    ).toBe("before")
+    // …and the strip is gone, so the person has been told everything is fine.
+    expect(sockets.length).toBe(2)
   })
 })
