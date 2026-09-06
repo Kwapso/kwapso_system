@@ -348,14 +348,30 @@ export const tenancy = {
     ),
 
   /** The team's activity feed, or one record's (scope = team | user | role |
-   * invite). For invite scope, `id` is the GLOBAL invite id (server maps it).
-   * R14: a PAGE — `cursor` is the opaque one the previous response returned, and
-   * `total` is the exact server count of what this caller may see. */
-  activity: (scope: "team" | "user" | "role" | "invite" = "team", id?: string, cursor?: string | null) =>
+   * invite | actor). For invite scope, `id` is the GLOBAL invite id (server maps
+   * it). R14: a PAGE — `cursor` is the opaque one the previous response returned,
+   * and `total` is the exact server count of what this caller may see.
+   *
+   * THE TWO SCOPES ABOUT A PERSON ANSWER DIFFERENT QUESTIONS, and the names are
+   * the only thing that says so: `user` is what happened TO that member (joined,
+   * role changed, removed); `actor` is what they CHANGED, anywhere in the team.
+   * Both take the same id, so the wrong one is a plausible answer rather than an
+   * error — which is exactly how `read_activity` came to describe one and call
+   * the other for a year.
+   *
+   * `verb` narrows any scope to one of the eight (shared/workers/activity-verbs)
+   * — the row's own stored word, so it finds every archive whatever sentence the
+   * module happened to write. An unrecognised word is a 400 at the door. */
+  activity: (
+    scope: "team" | "user" | "role" | "invite" | "actor" = "team",
+    id?: string,
+    cursor?: string | null,
+    verb?: string | null
+  ) =>
     api<PagedResponse<{ activity: ActivityItem[] }>>(
       `/api/tenancy/activity?scope=${scope}${id ? `&id=${encodeURIComponent(id)}` : ""}${
         cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""
-      }`
+      }${verb ? `&verb=${encodeURIComponent(verb)}` : ""}`
     ),
 
   /** One record's activity slice (generic — any module's rows by table+id; e.g.
