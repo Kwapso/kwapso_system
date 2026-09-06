@@ -279,21 +279,45 @@ resolves.
 > companies and about 125 accounts (§ *What softens it*). Budget the reload, and
 > budget it per team.
 >
-> **AND THE REHEARSAL ITSELF CAUSED A SMALL OUTAGE, which is recorded here
-> because it is the most useful thing that happened.** The export took this
-> staging team database offline for its 28.6 seconds, at about 11:20 on
-> 2026-09-06, while several people were working against staging. Nobody was
-> asked, because nobody realised there was anything to ask: the warning is
-> auto-accepted in a non-interactive shell, and the hazard had been *discovered
-> and written down thirty minutes earlier* during the core export on this very
-> page — and then not applied to the larger database that followed. Knowing a
-> risk and carrying it forward to the next action are two different things, and
-> only the first of them had happened.
+> **AND THE REHEARSAL ITSELF TOOK THE DATABASE OFFLINE. THAT IS THE MOST USEFUL
+> MEASUREMENT ON THIS PAGE, so it is recorded as evidence rather than tucked away
+> as an apology.** Everything above tells you what a restore costs. This tells you
+> what the *export* costs a system that is still running, and nobody had that
+> number before.
 >
-> The operational rule that came out of it now sits where somebody about to run
-> the command will actually meet it: RUNBOOK § *Taking a copy you can hold* and
-> OPERATIONS § *Backing up*. **Announce the window first, on any shared
-> environment, exactly as you would for any other outage.**
+> The export locked this team database for its 28.6 seconds, at 05:49:01Z on
+> 2026-09-06, while several people were working against staging. Exactly two
+> things failed, both cron ticks, both on the 15-minute Google sweep:
+>
+> ```
+> 2026-09-06T05:49:01.939Z  content  cron/google-autopilot (list meetings)
+> 2026-09-06T05:49:01.752Z  content  cron/google-autopilot (google sweep)
+> D1_ERROR: Currently processing a long-running export.
+> ```
+>
+> Two rows in the whole day. **No human-facing request failed**, and the 06:00
+> tick was clean — the sweep is idempotent and recovered on its own, which is the
+> first time that claim has been tested by something other than a unit test.
+>
+> So the cost of an export on a live system, on this estate, at this size, is
+> *the background jobs that land inside the window, and they self-heal*. Scale it
+> before pointing the command at production, where the database is larger and the
+> window is therefore longer.
+>
+> **How it happened, kept because the mechanism matters more than the incident.**
+> Nobody was asked, because nobody realised there was anything to ask: the prompt
+> is auto-accepted in a non-interactive shell. The hazard had been discovered and
+> written onto this very page thirty minutes earlier, during the core export, and
+> was then not applied to the database twenty-six times larger that followed.
+> Knowing a risk and carrying it forward to the next action are two different
+> things, and only the first had happened. The question nobody asked was not
+> *which* database or *keep or discard* — both of those were settled — it was
+> **when**.
+>
+> The rule that came out of it now sits where somebody about to run the command
+> will actually meet it, with these numbers beside it: RUNBOOK § *Taking a copy
+> you can hold* and OPERATIONS § *Backing up*. **On any shared environment,
+> announce the window first, exactly as you would for any other outage.**
 >
 > **The dumps were deleted.** Both the 116 MB SQL and the 127 MB scratch database
 > were written to a session scratchpad outside the repository and removed as soon
