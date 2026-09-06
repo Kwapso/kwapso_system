@@ -1,5 +1,14 @@
 // Everything the tenancy worker is given from outside.
 export type Env = {
+  /** THIS REQUEST'S DEFERRER, set by the dispatcher on a per-request shallow
+   * copy of this env — how `publishChange` stops holding the response (owner's
+   * ruling, 6 Sep 2026). The reasoning, the provenance and why it cannot live on
+   * the shared `env` itself are all in shared/workers/parallel.ts.
+   *
+   * Optional because a cron tick and the test suites have no request to hang
+   * work on; absent means the ping is awaited exactly as it was before. */
+  DEFER?: (work: Promise<unknown>) => void
+
   /** The global core database (users, teams, team_members, invite_index). */
   DB: D1Database
   /** The auth worker — used to answer "who is making this request?". */
@@ -59,5 +68,14 @@ export type Env = {
   /** The free daily AI allowance — MUST match data-ops and content, or one
    *  allowance is enforced at two different heights. */
   AGENT_FREE_DAILY?: string
+  /** WHICH ENGINE THE ASSISTANT RUNS ON — read here only to PRICE what it spent.
+   * Tenancy makes no model call; the nightly ops digest reads the tokens
+   * `agent_usage_log` recorded and turns them into money, and it cannot do that
+   * without knowing which rate card applies. Unset means the digest reports
+   * tokens and says "unpriced" rather than guessing a rate — and
+   * `no-quiet-downgrade.test.ts` reads every wrangler config off disk and fails
+   * the build if any of them names an engine the code does not, so this second
+   * mention can never drift away from data-ops' pin. */
+  AGENT_MODEL?: string
   AGENT_NO_DAILY_CAP?: string
 }

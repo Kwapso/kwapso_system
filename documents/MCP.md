@@ -1,0 +1,958 @@
+# MCP.md, the machine door (how outside tools use Kwapso)
+
+Kwapso has an **external machine surface**: an AI agent, a script, or an automation
+can do the same things a person can, invite/manage members, read and write tickets
+and the work engine, run imports, pull CSV exports, even talk to the in-app assistant, over the
+**Model Context Protocol (MCP)**. This is the `mcp` worker (ARCHITECTURE → the MCP
+front desk). This doc is for the **developer** who wants to connect a tool to it.
+
+The one sentence to remember: **a machine acts AS a real person, in ONE team, capped
+by that person's live role. Never more.** There is no separate "API key with god
+powers." A token is just that person, reached by a machine.
+
+---
+
+## 1 · Who can use it
+
+Anyone on **your team** who holds a role that allows the actions they want. There is no
+separate developer sign-up, the machine borrows a human's rights.
+
+**Your clients cannot.** A client-portal contact is an ordinary team member by
+construction (grant → invite → accept is the only way to make a working portal login),
+so "can they sign in?" was never the right question. See §5. They are refused at both
+doors: they cannot make a token, and a token cannot act for one.
+
+So to give a teammate/contractor machine access:
+
+1. **Invite them to the team** (Settings → Members → Invite, or the app's invite flow).
+   They sign in with **email + a 6-digit code** (no passwords). Hand them the app URL:
+   - Staging: `https://agency-staging.kwapso.app`
+   - Production: `https://agency.kwapso.app`
+2. **Give them the right role.** The token can only do what their role allows (see the
+   cost note in §4, a role *without* the AI-agent right can't spend any AI budget).
+   For a pure "read + import + export" integration, a role with those rights and **no
+   agent access** is the safe, zero-AI-cost choice.
+3. They **make their own token** (next section). You never see or handle their secret.
+
+Prefer a **dedicated service login** for an unattended integration: make one app
+login (e.g. `ci@yourco.com`), invite it with a tightly-scoped role, and let it hold the
+token, so a person leaving doesn't break the automation, and you can revoke it alone.
+
+---
+
+## 2 · Get a token (once, in the app)
+
+1. Sign in → **Settings → Access tokens → New token**.
+2. Give it a name (what will use it. "CI importer", "Zapier", "Claude Desktop").
+3. Copy the secret **immediately**, it's shown **once** and never again (only its hash
+   is stored). It looks like `kwapso_mcp_<64 hex chars>`.
+4. The token is **pinned to the team you were in** when you made it, and **capped by
+   your role at call time** (change the role later and the token's power changes with
+   it). Revoke it any time from the same screen, revocation takes effect on the very
+   next call.
+5. **It expires after 90 days**, and you can hold **10 live tokens at once**. The
+   screen shows each token's "works until" date; past it, calls come back
+   `401 token_expired` and you make a new one (there is no renewal, a new secret is
+   the point). Trying to mint an eleventh live token is a clean refusal: revoke one
+   you no longer use first. Both limits exist for the same reason, a key with no end
+   date is a key forever, and an unbounded pile of them is a pile you stop watching.
+
+Treat the secret like a password. Anyone holding it can act as you, in that team.
+
+---
+
+## 3 · Connect a tool
+
+The endpoint is **`POST https://<app-host>/mcp`** (JSON-RPC 2.0), authenticated with
+`Authorization: Bearer <your token>`. It speaks standard MCP: `initialize`,
+`tools/list`, `tools/call`.
+
+**Quick check with curl:**
+
+```bash
+# List the tools this token can call
+curl -s https://agency.kwapso.app/mcp \
+  -H "Authorization: Bearer kwapso_mcp_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Call one — who am I, and which team is this token pinned to?
+curl -s https://agency.kwapso.app/mcp \
+  -H "Authorization: Bearer kwapso_mcp_XXXX" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
+```
+
+**An MCP client that speaks HTTP + a bearer header** (e.g. an agent framework, or a
+custom client) points at that URL with the header. For clients that only launch a
+local stdio command (e.g. **Claude Desktop**), put a thin MCP-over-HTTP bridge in
+front with the standard `mcp-remote` shim, drop this into the client's MCP config:
+
+```json
+{
+  "mcpServers": {
+    "kwapso": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://agency.kwapso.app/mcp",
+        "--header", "Authorization: Bearer kwapso_mcp_YOUR_TOKEN"
+      ]
+    }
+  }
+}
+```
+
+### Hand it to any AI (Claude / Gemini / GPT), copy-paste prompt
+
+The app does this for you: after you create a token, **Settings → Access tokens** shows
+a **"Copy setup prompt for any AI"** button (and an **Instructions** button on every
+active token) that copies the block below with the live host filled in. Paste it into
+any assistant that can speak MCP:
+
+```
+Connect to my Kwapso workspace over MCP (Model Context Protocol).
+
+Endpoint: https://agency.kwapso.app/mcp
+Auth header: Authorization: Bearer kwapso_mcp_YOUR_TOKEN
+Protocol: MCP over HTTP — JSON-RPC 2.0 (initialize, tools/list, tools/call)
+
+Then call tools/list to see what I can do. You act as me, in one team, capped by my
+role — reads, exports and import writes are free; only the assistant tools
+(agent_chat, agent_confirm, and plan_import — the import step that asks the
+assistant to plan a batch), plus ask_knowledge when you set compose, use the team's
+AI quota.
+```
+
+(Staging is the same, on `https://agency-staging.kwapso.app/mcp`.)
+
+### The tools
+
+Confirm the live list with `tools/list` (it's generated, so it's always current).
+Today it covers:
+
+- **Read** — 65 of the 190 tools (counted from the live catalogue, 26 Aug 2026),
+  grouped the way the app groups them. A few families below keep their everyday
+  writes named beside their reads, because that is how the app itself groups them;
+  the write families proper are under **Write**:
+  - **asking, rather than listing** — `describe_module` and `query_records`. One
+    read tool over every module a caller may read: `describe_module` answers with
+    the fields, their types and an enum's values (including the ones the team
+    edits, read live off its own dropdown list), and `query_records` takes
+    filters, an optional grouped count, an order and a cursor and answers through
+    the same paged shape as every other list. It exists because the list tools
+    enumerate a question's COMBINATIONS and still could not express a DATE RANGE
+    or a GROUPED COUNT: "how many tickets did we resolve in July, per client" was
+    a page-walk of 1,820 rows and is now one call. Same gate as the module's own
+    list door, same rows, better question — and the door builds the SQL, so a
+    caller composes a request and never a statement. Its ops are eq, ne, in,
+    notIn, gt, gte, lt, lte, between, contains, isNull and notNull. The list
+    tools below are unchanged and stay the shortest path to "give me this
+    collection".
+  - identity and rights, `whoami`, `my_permissions`, `get_team`
+  - **what has changed, and who changed it** — `read_activity`, the cross-module
+    history feed. It is the one door whose answer is assembled by SUBTRACTING
+    the caller's denied modules (R18), so a team-scope read is the history for
+    THAT caller and not for the team: the count moves with the role. It arrived
+    on this surface on 1 Sep 2026 under R47, which asks that every module a
+    person can see is one the assistant can answer about — and the reason this
+    door had held out until then, written down at the time, was that the merged
+    stream was "a separate decision for the owner, not a parity default". The
+    owner made it. `scope` is team, record, user, role or invite; the record
+    scope takes the record's own `table` and `id`.
+  - people and access, `list_members`, `list_roles`, `list_invites`,
+    `list_portal_access`
+  - customers, `list_accounts`, `get_account`
+  - vocabulary, `list_dropdown_values`
+  - tickets, `list_help_tickets`, `get_help_thread`, `list_help_stakeholders`
+  - the work engine, `list_stories`, `list_sprints`, `list_todos`, `list_tasks`,
+    `get_triage`, `list_work_logs`, `list_running_timers`, `get_team_pulse`
+  - meetings, `list_meetings`
+  - the sections of an app, `list_app_modules`, `create_app_module`,
+    `update_app_module`, `set_app_module_active`. A MODULE is what a ticket says
+    it is about (Settings, Documents, Tasks), so it is how tickets are grouped —
+    and it is not a process: a process is a way of working and belongs to the
+    account's world, a module is a division of the software we built.
+  - process maps and the money, `list_apps`, `list_processes`, `get_process`,
+    `list_process_comments`, `read_impact`, `list_account_rates`,
+    `list_story_attachments`, `add_story_link`, `update_story_attachment`,
+    `remove_story_attachment`,
+    `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
+  - **the client's own organisation** — who does the work at a client, what an
+    hour of them costs, and what they run on. `list_client_departments`,
+    `create_client_department`, `update_client_department`,
+    `set_client_department_active`; `list_client_roles`, `create_client_role`,
+    `update_client_role`, `set_client_role_person`, `set_client_role_active`;
+    `list_client_tools`, `list_client_tool_prices`, `create_client_tool`,
+    `update_client_tool`, `set_client_tool_price`, `set_client_tool_active`.
+    They are on this surface because a saving is only MONEY once a step's
+    minutes meet a role's hourly cost — an assistant asked "what would
+    automating this save Bergman" has to be able to read and fill these.
+    Three things are worth knowing before you call them. A ROLE can sit in
+    SEVERAL departments, and `departmentIds` on `update_client_role` is the
+    WHOLE set rather than an addition — anything you leave out is removed. A
+    PERSON on a role is a contact you already have, never a new record. And a
+    TOOL's price is DATED: `set_client_tool_price` files an amount under the day
+    it started being true, `list_client_tools` takes `asOf` to read the price in
+    force on a given day, and `list_client_tool_prices` is the whole history —
+    which is what lets a map set to March cost March correctly instead of
+    rewriting it with today's number.
+  - what we hand over on a system, `list_deliverables` (`appId` names the app
+    whose handover shelf you want; `id` narrows to one row). The CLIENT's own
+    view of the same shelf is a separate door on the portal and is deliberately
+    NOT on this surface: it answers with strictly less (their account only, the
+    rows marked visible only, no staff names), and this surface holds a staff
+    token, so `list_deliverables` already gives a machine more
+  - the knowledge base, `ask_knowledge`, `list_knowledge_sources`,
+    `get_knowledge_status`
+  - the agency's own housekeeping, `list_brand_assets`, `list_meeting_purposes`,
+    `list_staff_profiles`, `list_staff_certificates`
+  - importing, `list_import_targets`, `get_import_sample`, `list_imports`,
+    `get_import`
+  - the AI allowance and saved conversations, `get_ai_allowance`, `list_ai_usage`,
+    `list_agent_threads`, `get_agent_thread`
+  - the six CSV exports, listed under **Export** below.
+
+  Each list tool that sits on a door with an
+  `?id=` filter EXPOSES + FORWARDS it (R19 parity). Pass `id` to fetch one record
+  instead of pulling the whole collection (`list_help_tickets` also takes `scope`,
+  `view`, the everyday list or the archive drawer, and `q`; `list_accounts` takes
+  `q`, `type`, `archived` and `parentId`, plus `sort`, `dir` and the paging
+  `cursor`; `list_stories` takes `q` beside its five). On every paged list the `total` counts the SAME filtered question the
+  rows answer, so a narrowed call answers "how many are there?" in one round trip.
+
+  **`my_permissions` is the one to call first.** `whoami` says who the token is and
+  which team it is pinned to; `my_permissions` says what that person may DO there,
+  module by module. Every door re-checks the same rights on every call regardless,
+  this is simply how a client can know before it asks, instead of learning from a 403.
+
+  **R19 now starts at the DOORS, and at ALL of them.** The parity check used to walk
+  the tool catalogue, so a door with no tool wasn't a failure, it was invisible, which
+  is how the whole customer spine sat off this surface with a green build. Moving the
+  scan to the doors fixed that for doors that take a QUERY PARAMETER, and left every
+  parameterless door just as invisible, which is where twenty capabilities were sitting
+  (what may I do here, how much of the app's own daily AI allowance is left, what may I
+  import into, what did that import plan say).
+
+  So the census is now every non-admin door on tenancy, content, data-ops and auth,
+  filtered or not, GET or POST. Each one has a tool on some machine surface or is a
+  named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
+  red build. Today: **274 doors, 218 with a tool, 56 with a written reason**, the
+  reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
+  client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
+  the presign door (permission to PUT a file, which hands back a URL its caller
+  must then make an HTTP request to — what it needs is a browser rather than
+  argument room, and a model emitting a tool call is not that client),
+  the THREE upload pairs, two media doors and the knowledge base, each a
+  buffered door plus a streamed twin: the buffered half cannot be called because a
+  base64 document will not fit in a tool argument, and the streamed half cannot be
+  called because a JSON-RPC request has no body to stream into. Same conclusion,
+  two different reasons, both written down, plus the ONE streamed door with no
+  buffered twin (the bytes behind a deliverable, written after that pair stopped
+  being worth shipping) which is the second of those two reasons on its own, the nine
+  Google doors that are a person's own decision (three consent steps, four
+  sharing decisions, the door that says how much of a mailbox or a calendar
+  kwapso may read at all, and a Drive thumbnail that answers with an image), the timesheet correction, the two doors
+  that spend the team's AI allowance outside a chat turn (translating a ticket's
+  title, and translating a screen's human-typed text for the reader looking at
+  it), one
+  invite's audit trail, the cross-module activity feed, and the two
+  record-counts doors, one per worker, which bundle a record's child totals so a
+  SCREEN can badge its tabs in one round trip: every number in that bundle is
+  already machine-readable, exactly and with narrowing those doors do not take,
+  through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 218, **194 are on THIS surface** and 24 are the in-app assistant's
+  alone: the twenty-one Google doors (the twenty `google_` tools plus the
+  connections list), the two confirm-panel bulk writes and the role
+  permission matrix read, each reasoned in §3.
+
+  **Eight doors left the census on 18 August 2026**, and they are worth naming
+  because they went for a product reason rather than a tidying one: the seven
+  that WROTE to Google Calendar (create an event, change what it says and when,
+  its guests, its location, call it off, push a sprint's dates, push a meeting's)
+  and `POST /api/content/meetings/held`. The calendar is one-way now — kwapso
+  reads a calendar and never writes one — and a meeting's own start time says
+  whether it has happened, so a status somebody had to tick was a second source
+  of truth for a question the clock answers. Those three numbers are asserted
+  against the live census in `workers/mcp/test/filter-parity.test.ts`, so this
+  sentence cannot quietly go stale again, it did, at 87 / 66 / 21, while the app
+  grew to two and a half times the size.
+
+  **One asymmetry worth stating plainly.** The in-app assistant now stops for a yes/no
+  panel before every write that decides who-can-do-what, derived from the gate map,
+  so anything gated on `member_roles:` or `team_members:` is included (EDGE-CASES §5). The MCP
+  surface has **no such panel and cannot have one**: the confirming UI belongs to your
+  client, not to Kwapso. That is not a capability gap, the same door, the same gate, the
+  same audit row, but it means the operator of an MCP client is the one deciding when to
+  confirm. Since 26 Aug 2026 the pause travels as words: every tool the app would
+  stop for says so in its own description — "Destructive or access-widening: confirm
+  with a person before calling this." — so a well-behaved client has the signal even
+  though the panel is yours. If your client drives an LLM that reads team data
+  (tickets, articles), treat those tools the way Kwapso does and put a human in
+  front of them.
+
+  **`list_help_tickets` is PAGED** (R14, tickets are a growing collection). One call
+  returns one page plus `total` (the exact server count, not the page length),
+  `hasMore`, and an opaque `nextCursor`. To read further, call again passing that
+  value as `cursor`; never construct or mutate one, a cursor the server didn't issue
+  is refused with a 400. When `hasMore` is false you have reached the end. A client
+  that ignores the cursor still works: it simply sees the newest page.
+  **A result is whole, or it is an error.** One `tools/call` answer is capped at
+  400,000 characters. Over that the call comes back `isError: true` with a
+  `result_too_large` body telling you to filter, page, or use the export tool, it is
+  never sliced and handed back as a success. (It used to be: half a JSON document,
+  reported `ok`, which a client has no way to notice and no reason to re-ask.)
+
+  **An argument of the wrong type is refused, not coerced.** The type each tool
+  declares in its `inputSchema` is the type enforced, checked before the call is built:
+  `{"name": {}}` comes back a clean `invalid_input` naming the field. It used to be
+  coerced with `String(v)` and arrive at the door as the perfectly valid 17-character
+  string `"[object Object]"`, a browser form cannot produce that, and a JSON-RPC
+  client can send anything.
+
+  **A call has a deadline.** A tool that doesn't answer within 30 seconds (2 minutes
+  for `run_import`, `plan_import`, `agent_chat` and `agent_confirm`, which are supposed
+  to take a while) comes back `door_timeout` rather than holding your call open with
+  nothing to read. A timeout is not a rollback: read before retrying a write.
+- **File uploads are not on this surface, three doors, one reason.**
+  `/api/content/knowledge/upload`, `/api/content/brand-assets/upload` and
+  `/api/content/staff/upload` each take up to 25 MB of base64 data URL, on a
+  surface whose whole ANSWER is capped at 400,000 characters. The RECORD half of
+  each is fully machine-writable, `add_knowledge_source`, `create_brand_asset`,
+  `save_staff_profile` and `create_staff_certificate` all carry the URL field, so a
+  machine writes the row and references a file it already has a URL for. Uploading the bytes is a screen
+  action.
+- **Export (full-field CSV):** `export_roles_csv`, `export_dropdown_values_csv`,
+  `export_accounts_csv`, `export_brand_assets_csv`, `export_meeting_purposes_csv`,
+  `export_certificates_csv`.
+
+  **Staff PROFILES have no export, on purpose.** A credential register is the kind
+  of thing somebody hands an auditor; a one-click spreadsheet of what each of your
+  colleagues is bad at is not a capability anybody asked for, and the write door
+  that fills those fields is confirm-gated for the same reason.
+
+  **An export is ONE WHOLE DOCUMENT. Never a page, and never a short file.** That is
+  the deliberate answer to "why doesn't an export take a cursor?", and it is R14's own
+  answer: all but one of these sit on **bounded** collections (a team's roles, its
+  dropdown vocabulary, its meeting purposes, its brand assets and its staff
+  certificates are all curated by hand and stop growing), and the law says in as
+  many words that a bounded collection doesn't need a cursor to be
+  honest. **Accounts is the one that grows**, every company and every person an agency
+  works with, so `export_accounts_csv` narrows by the same four filters as
+  `list_accounts` (`q`, `type`, `archived`, `parentId`), and past what one
+  file can carry the door
+  answers `export_too_large` rather than handing back the first rows as though they
+  were all of them. The browser's Export CSV button gets exactly the same sentence from
+  exactly the same door: a truncated export re-imported is data loss that looks like a
+  round trip, and the columns lead with the import format precisely so it can be
+  re-imported.
+- **Write, deterministic create / edit / deactivate** (free, no AI; each needs the
+  matching role right, e.g. `member_roles:create`):
+  - **`set_record_active`, the generic form.** Every `set_<record>_active` tool below
+    (roles, accounts, dropdown values, process maps, and the rest — twenty-one in
+    all) is also reachable through this one tool: `record` names which kind
+    (`account`, `role`, `dropdown_value`, …), `id` is that record's id (a role takes
+    `roleId`, a deliverable also needs `appId`), `active` says which way. Both forms
+    stay published side by side — the named ones are the pinned external contract
+    (added first, and a script calling `set_account_active` keeps working forever),
+    the generic one is for an integration that would rather send one shape for
+    every record kind than remember twenty-one names. Same map, same doors, same
+    confirm rule, either way.
+  - the team, `update_team` (rename the team this token is pinned to; needs `teams:edit`)
+  - roles, `create_role`, `update_role`, `set_role_active`, `set_role_permissions`
+  - members, `set_member_role`, `remove_member` (people join via **invite**)
+  - invites, `create_invite`, `revoke_invite`
+  - accounts, `create_account`, `update_account`, `set_account_parent`,
+    `set_account_active`, `link_contact`, `set_contact_link_active`
+  - portal access, `grant_portal_access`, `set_portal_access_active`
+  - dropdown values, `create_dropdown_value`, `update_dropdown_value`, `set_dropdown_value_default`, `set_dropdown_value_active`. A value marked as one of the team's defaults refuses to switch off — `set_dropdown_value_default` is how the mark comes off, and renaming a default is always allowed
+  - process maps, `create_app`, `update_app`, `set_app_active`, `create_process`,
+    `update_process`, `set_process_active`, `add_process_step`, `update_process_step`,
+    `remove_process_step`, `delete_process_step`, `cut_process_version`, `comment_on_process`,
+    `set_audit_date`, `connect_processes`, `disconnect_processes` (all need
+    `processes:*`).
+  - waves, `list_waves`, `get_wave`, `create_wave`, `update_wave`,
+    `set_wave_active`, `set_sprint_wave` (all need `work:*`). A WAVE is what a
+    client bought: several sprints sold together. It carries NO price — what a
+    wave costs is deliberately out of this module's first version — and its dates
+    are DERIVED from the sprints inside it, so `set_sprint_wave` re-dates both the
+    wave a sprint joined and the one it left. Two sprints whose dates overlap are
+    reported and never refused: the overlap is real, and a door that said no would
+    be enforcing a rule nobody agreed to. `set_audit_date` moves the day a map's savings are measured
+    FROM, which changes every figure on it and on the client's own portal while
+    changing not one minute of their work — so it confirms before it writes.
+    `connect_processes` is LOOSE by ruling: the last step of one map is very
+    often the first step of another, and saying so alters no duration and no
+    saving on either side. `read_impact` beside them is the savings drilled App → Process →
+    Step, with the caption that says what the numbers are made of — the times are
+    estimates the agency and the client agreed, the subtraction is arithmetic. A step
+    that got SLOWER is included and counted; nothing filters one out.
+  - rates and margin, `create_account_rate`, `update_account_rate`,
+    `set_account_rate_active` (what a client is charged) and `create_internal_rate`,
+    `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us) and
+    `set_role_rate` (what an hour of a ROLE is worth — one tool for add, re-price and
+    retire, because the role name is the key), all needing `commercials:*`.
+    **`read_margin`, `list_internal_rates`, `list_role_rates` and `get_app_impact` answer with
+    the agency's own figures**: a token acts as its owner, and no client login can hold
+    a token or be acted for at all, but if you are building a client-facing integration
+    on somebody's staff token, these two are the calls not to relay. Law **R24** makes
+    the same statement about the app's own client portal structurally — the file those
+    figures live in cannot be reached from any door the portal opens. (R24, not R23 —
+    R23 is the knowledge base's citation law.)
+  - tickets, `create_help_ticket`, `update_help_ticket`, `set_help_status`,
+    `validate_help_ticket`, `triage_help_ticket`, `resolve_help_ticket`,
+    `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
+    `add_help_stakeholder`, plus the three that carry the files and links on a
+    ticket: `list_help_attachments`, `add_help_link` and
+    `remove_help_attachment`. (The module is Tickets; the tool NAMES carry the old
+    `help` spelling because they are a published contract outside developers
+    already call by name, so the rename of the section a person reads
+    deliberately stopped at them — DATA-MODEL.md says why it never moves.)
+    `rank_help_ticket` is how priority is expressed — the list's ORDER is the
+    priority, and there is no priority field to set. `archive_help_ticket` puts a
+    ticket away without deleting anything; read them back with
+    `list_help_tickets` and `view: 'archived'`.
+
+    **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the seven
+    stages are now reached by something HAPPENING rather than by anybody choosing
+    them: `scheduled` when the work on a request lands in a sprint, `in_progress`
+    when a timer starts on the ticket or on one of its stories, `ready` when the
+    last story closes, `resolved` only through `resolve_help_ticket`, and
+    `awaiting_validation` at birth for the kinds that wait. So `set_help_status`
+    is a CORRECTION rather than the ordinary path, and it **will not accept
+    `resolved`** — nor will either bulk — because answering a client means sending
+    words, and a value in a dropdown carries none. The two stages a person still
+    decides have doors of their own: `validate_help_ticket` (the client confirms
+    an extra, a request or a piece of feedback — a question or an issue never
+    waits) and `triage_help_ticket` (somebody has read it). Both are idempotent by
+    construction: a second call moves nothing.
+  - the work engine, stories and sprints, `create_story`, `update_story`,
+    `set_story_status` (`work:create` / `work:edit`), `create_sprint`,
+    `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
+    PRICE is set or corrected — it is the revenue half of every margin, and until
+    that door existed it could be typed only in the moment the sprint was started.
+    It will not move a sprint to another client or another app: the reference the
+    client quotes was minted against the account, and the maps and figures
+    published against the app were built where it stood, so re-pointing either
+    would rewrite what an already-published figure means. (A process version is
+    cut BY HAND, one door, one caller — the owner's 24 Aug 2026 ruling; migration
+    `0051` purged the never-wired automatic cut on sprint completion.)
+    A story has no priority field and no order to set: it sits in the sprint it
+    was sold inside, and that is what says when it is due. (Ranking one used to be
+    possible and was retired on 17 Aug 2026 — the owner's ruling, and the door
+    went with the tool.) No client login holds `work:*` and the doors refuse a
+    portal caller outright, so unlike the ticket doors the question "what if a
+    contact reaches this?" has a one-word answer.
+  - to-dos and tasks, `raise_todo`, `complete_todo`, `cancel_todo`
+    (`todos:create` / `:edit` / `:delete` — what we need FROM a client), and
+    `create_task`, `update_task`, `set_task_done` (`work:create` / `work:edit` —
+    what we owe ourselves; `update_task` is also how a task is RE-PRIORITISED, since
+    the 1-to-4 score is derived from its `important` and `urgent` ticks).
+  - time, `start_timer`, `stop_timer`, `log_time`, `resolve_runaway_timer`,
+    `set_timer_auto_stop`, all on `work:create`. Logging your OWN hours is a create,
+    not an edit: a person who may do the work may say how long it took them.
+    CORRECTING a row that already exists is `work:edit` and has deliberately no tool
+    at all — see the exclusions below.
+  - the triage rota, `set_triage_duty` (`help:edit`), beside the `get_triage` read.
+  - meetings, `create_meeting`, `update_meeting`, `set_meeting_active`
+    (`meetings:create` / `:edit` / `:delete`; cancelling IS this module's delete
+    and the row survives it). There is no `set_meeting_held` and no
+    `add_meeting_to_calendar`: a meeting's own start time says whether it has
+    happened, and nothing in this product writes to a calendar.
+    `read_meeting_transcript` opens on `meetings:edit`, demands `google:read` at
+    the door, and one call writes a row of time for each
+    of OUR OWN people who was in the room — never the client's, because a client's
+    hour is not our cost. It is idempotent, so a second read does nothing: the
+    claim rides `transcript_captured_at IS NULL`, which is a fact about the JOB
+    rather than about the meeting, so nobody's hours can be doubled.
+    The hunt itself is three, in an order of proof, the file Google attached to the
+    calendar entry, then a document in a shared Drive folder, then a notice from
+    Google in the caller's own mail, and `foundBy` says which one found it.
+    `get_meeting_transcript` and `get_meeting_people` are the two reads beside it,
+    both on `meetings:read`: the WORDS of a call, kept on the record so any
+    colleague who may read meetings can read them, and which of the addresses on
+    the invitation are our own members or contacts on our accounts.
+    `sync_calendar_series` reads the caller's Google Calendar INTO Meetings, one
+    way, always. Over a LIVE window reaching a fortnight back and four weeks
+    forward: every entry with no record becomes one, repeating or not, past or
+    future; every meeting in the window has its Google facts refreshed (the
+    description, the location, the guests and what each answered, the organiser,
+    the join link, the attachments, the link back to the entry); an entry called
+    off in Google is cancelled here; and entries beyond the horizon come back
+    read-only in `ahead`. It ALSO walks one slice of the caller's whole calendar —
+    five years back to a year ahead — resuming from where the last call stopped,
+    so `swept` says how far it has got and `caughtUp` says when it has finished.
+    Call it repeatedly to bring in a history. The backward half of the live window
+    is why a transcript that lands an hour after a call is ever found.
+  - what we hand over, `create_deliverable`, `update_deliverable`,
+    `set_deliverable_active`, `set_deliverable_visibility` (`deliverables:*`). A deliverable is one piece of
+    material on an app — a handover doc, an API reference, a recorded
+    walkthrough, an SOP — so `appId` rides on all three, and the ACCOUNT it was
+    built for is copied off that app rather than sent. Its own module and not
+    `processes`: opening an app and publishing against it are two grants. The
+    BYTES are a screen action, as with every other upload here; `url` carries a
+    link a machine already has, which is what most deliverables are.
+    `set_deliverable_visibility` is the one that hands it over: a deliverable is
+    invisible to the client until `visible` is set true, per row, and the client
+    then reads it in their own portal. It CONFIRMS in that direction only —
+    sharing puts material in somebody else's hands, hiding takes it back — the
+    mirror of `set_deliverable_active`, which confirms on archiving.
+  - the agency's own housekeeping, `create_brand_asset`,
+    `update_brand_asset`, `set_brand_asset_active` (`brand_assets:*`);
+    `create_meeting_purpose`, `update_meeting_purpose`, `set_meeting_purpose_active`
+    (`delivery:*`); `save_staff_profile`, `set_staff_profile_active`,
+    `create_staff_certificate`, `update_staff_certificate`,
+    `set_staff_certificate_active` (`staff_profiles:*`).
+  - the knowledge base, `add_knowledge_source`, `update_knowledge_source`,
+    `set_knowledge_source_active`, `sync_knowledge`, `sync_google_knowledge`. The
+    same acts a person has on the Knowledge base screen, gated by the same
+    `knowledge:create` / `:edit` / `:delete` rights — so a token whose role cannot
+    take a source away cannot ask the assistant to take one away either.
+    `sync_knowledge` brings the base into step with the app's own rows one bounded
+    slice at a time (call it while `caughtUp` is false); the 15-minute sweep does the
+    same unattended. `sync_google_knowledge` does the same for the Google material
+    the CALLER has already connected — their own Drive folders, the mail with a
+    known contact, their calendar — acting as that person and gated `knowledge:create`
+    **and** `google:read`. Read the Google paragraph below before you use it: it is
+    the ONE tool on this surface that touches Google at all.
+
+  **`ask_knowledge` never writes prose.** It answers with the passages it found and
+  the SOURCES they came from, plus the compartment it searched and the sentence
+  explaining why that one. When it finds nothing it says so, `found:false`, no
+  passages, and a line to repeat instead of answering from memory (Law R23). A client
+  building an answer out of it should quote the source titles; an answer with no
+  citation is the exact failure that law exists to prevent.
+- **Bulk create:** the import pipeline, `start_import` → `add_import_file` →
+  `plan_import` → `run_import`, and `continue_import` when a run does not come
+  home. An import of any size is minutes long, so a dropped connection part way
+  through used to leave the batch unfinishable: its written rows stayed written,
+  and the only way on was to send the file again, which wrote every one of them
+  a second time. `continue_import` picks up from the last checkpoint instead —
+  `get_import` shows where that is. Accounts are importable AND exportable (they
+  were importable only, which made the customer spine a one-way street).
+- **The in-app assistant:** `agent_chat`, `agent_confirm`.
+
+**Intentionally NOT on the machine surface, reasoned exclusions, not gaps.**
+
+1. **The multi-row *mutation* tools** the in-app assistant uses,
+   `bulk_set_help_status` and the set-shaped
+   `set_help_status_by_filter`, are agent-only. They're built around the app's yes/no
+   CONFIRM panel (a person approves the true count before a high-blast write runs); a
+   headless MCP client has no such panel, so exposing them would be a blind mass-write.
+   A machine client that needs the same effect composes the single-record writes above
+   (each gated + audited identically). The bulk READ path, filtering a list to one
+   record via `id`. IS on MCP (R19 parity).
+2. **Teams, the PIN, not the word "team".** There is no tool that lists teams,
+   makes one, or switches team, on either machine surface: a token is PINNED to one
+   team by design
+   (§5), and a tool that moved or made one would be the only way to widen that pin,
+   which is the thing the pin exists to prevent. The two received-invitation doors are
+   off for the same reason and more directly, accepting an invite JOINS another team
+   and SWITCHES the session to it.
+
+   RENAMING the pinned team is not that, and `update_team` is on this surface. It was
+   agent-only on a reading of this exclusion that its own reason never supported: a
+   rename moves nothing and reaches nowhere new. The same door, the same `teams:edit`
+   gate, the same audit row.
+3. **The client-portal standing doors**. `GET /api/tenancy/portal/context` and
+   `POST /api/tenancy/portal/switch-account`, are off it too, and the reason is
+   structural rather than a judgement call: they answer "which of *your own* companies
+   are you standing in?", which is a question only a CLIENT login has, and a client
+   login cannot hold a token at all (§5). For staff, both doors are already an honest
+   empty answer. Adding them would be adding tools that no caller who can reach them
+   has any use for.
+4. **One invite's AUDIT trail and the cross-module ACTIVITY feed** are named, reasoned
+   lines in the R19 census's `TOOLLESS_DOORS`, respectively: an invite's own state is
+   already in `list_invites` and the audit is the forensic strip a person reads on its
+   detail; and the activity feed is the one door whose answer is assembled by
+   subtracting the caller's denied modules (R18), so putting the merged stream on this
+   surface is a separate decision for the owner, not a parity default.
+
+   The **role permission MATRIX** read is a surface asymmetry rather than a gap: the
+   in-app assistant has `get_role_permissions`, and this surface reads the same matrix,
+   flattened across every role and module, in `export_roles_csv`. One question, one way
+   to ask it per surface.
+
+5. **Auth's personal doors**, signing in, changing your login address, editing your
+   name and photo, reading that identity history, and logging out, are off this
+   surface. They write who the PERSON is, across every team they belong to; no team
+   role gates any of them, so they sit outside the one-team, role-capped envelope a
+   token promises. `whoami` and `my_permissions` are the machine's read of the same
+   ground, inside it.
+
+6. **The screen-recipe store and the knowledge upload.** A recipe describes what
+   the agency app RENDERS, and the only way to judge one is to look at the screen it
+   draws; the upload is a base64 data URL up to 25 MB, two orders of magnitude past
+   what one call here is built to carry. A machine writes the source record with
+   `add_knowledge_source` and references material it already has a URL for.
+
+7. **Eight BODY FIELDS, across five doors that are otherwise fully here** (the
+   reasoned set is `NARROWED_BODY_FIELDS` in `workers/mcp/test/filter-parity.test.ts`;
+   the counts here are that list's, 26 Aug 2026). A tool
+   may offer a narrower contract than its door accepts, but only in writing, and
+   only for a reason. All of them are the same reason as item 6: **bytes, not
+   prose.**
+   - **`update_team` takes `name`, not `logoDataUrl`.** A logo is a base64 image data
+     URL up to 2.5 MB — around 3.4 million characters of *argument* on a surface whose
+     whole *answer* is capped at 400,000. Renaming is unaffected: the door treats an
+     absent logo as "leave it as it is", so a machine rename can never blank a logo it
+     cannot send. Set the logo in the app, on the Team screen.
+   - **`complete_todo` takes `id`, not `fileDataUrl` or `fileName`.** A to-do's
+     attachment is a base64 data URL up to 10 MB — around 14 million characters of
+     argument on that same 400,000-character surface. And the file is the CLIENT's:
+     "send us the signed contract" is answered by the person who has it, from their
+     own portal. Marking the to-do done from a machine is a legitimate act — the
+     thing arrived by email and somebody is tidying up — so `id` is exposed and
+     forwarded and the capability is whole. `fileName` is read only inside the
+     `if (body.fileDataUrl …)` branch, so offering it alone would be a field that
+     changes nothing, which is worse than an absent one.
+   - **`add_help_link` takes `label` and `url`, not `kind` or `fileDataUrl`.** A
+     ticket holds several files and several links; this surface can send the links.
+     A file is a base64 data URL up to 10 MB — around 14 million characters of
+     argument on that same 400,000-character surface — and it is attached from a
+     screen by the person holding it. `kind` is withheld for the other reason in
+     item 7's family: the tool forwards it as the constant `"link"`, so the door's
+     contract is honoured in full, and an argument that may hold exactly one value
+     is only a way to get it wrong.
+   - **`add_story_link` takes `label` and `url`, not `kind` or `fileDataUrl`.** The
+     ticket door's line, one table along and for the same two reasons: the tool
+     forwards `kind` as the constant `"link"`, so the door's contract is honoured
+     whole, and a story's file — a screenshot of the work — is a base64 data URL up
+     to 10 MB, uploaded from the screen by the person who took it.
+   - **`update_story_attachment` takes `label` and `url`, not `fileDataUrl`.** The
+     door beside `add_story_link`, and the same objection to the same field: it
+     renames anything on a story and repoints a link, both of which are prose, and
+     it cannot send the replacement BYTES for a file, which are a base64 data URL
+     up to 10 MB. A file is swapped from the screen by the person holding the
+     right one.
+   - **`agent_chat` takes `message`, not `files`.** Attaching up to 8 CSVs of 5 MB each
+     is up to 40 MB on the same surface — and the capability is already here in a
+     better machine shape: `start_import` → `add_import_file` → `plan_import` →
+     `run_import` is deterministic, resumable, and re-readable for free through
+     `get_import` when a client loses a plan. Conversational file-drop is the shape a
+     person supervises on a screen.
+
+   Two other narrowings **were** here and are now closed, because neither had a reason
+   that survived being written down: `create_role` takes its `permissions` matrix (the
+   door demands `member_roles:edit` on top of `member_roles:create` when one arrives,
+   its own double gate is the control, and the two-call path via `set_role_permissions`
+   reached the same end state anyway), and `reply_help_ticket` takes `taggedUserIds` (a
+   client login is refused mentions at the door and cannot hold a token at all, so every
+   caller here is staff, inside the envelope the door already reasons about; the ids come
+   from `list_members`, and the door still de-dupes them, strips your own, caps the list
+   at 50 and resolves each through `team_members` so no address outside the team is
+   reachable). **Law R22 keeps this list honest**: every field a write door reads must be
+   in its tool's schema and forwarded by its `buildBody`, or be a named line beside the
+   check, derived from the door's own source, so a fifth narrowing cannot land unseen.
+
+Every tool is a thin forward to the **same gated door the app's own screens use**, so
+input is validated, **your live role is re-checked** (a Viewer's `create_role` is
+refused, exactly as in the UI), and the change gets the same audit trail and live-sync
+as if a person had done it in the UI. The **deactivate-not-delete** model holds (nothing
+is hard-deleted) and the locked guards fire even here (you can't remove yourself or the
+last admin). A test (`workers/mcp/test/catalog.test.ts`) fails the build if the catalog
+ever drifts from those real doors.
+
+There is deliberately **no confirm step on the direct write tools**, calling
+`remove_member` *is* the intent (like clicking through the UI's confirm) — though
+since 26 Aug 2026 every tool the app itself would pause on says so in its
+description, so your client can put a person in front of it first. Route
+genuinely uncertain, natural-language actions through `agent_chat` instead: it proposes,
+you approve with `agent_confirm`.
+
+**Google is almost entirely off this surface, and that is on purpose, but read
+the exception.** The eighteen tools that BROWSE and CHANGE a person's Drive, Gmail
+and Chat (`google_drive_files`, `google_mail_search`, `google_send_mail`,
+`google_chat_post`, `google_mail_trash` and the rest — twenty-one Google tools in
+all, counting the connections list and the two calendar reads) belong to the
+**in-app assistant** and to nothing
+else: no MCP tool forwards to any of those doors. A personal access token is a
+secret pasted into somebody's CI config, and the blast radius of a leaked one
+must not include a mailbox. If you need Google material browsed through a
+machine, ask the assistant, `agent_chat` reaches those tools under the same
+rights, with the same confirm rules (mail always asks), and spends the team's AI
+allowance while doing so.
+
+**The calendar is not on that list in either direction, because nothing writes to
+it any more.** Six calendar tools sat in the assistant's set and a seventh,
+`add_meeting_to_calendar`, was the one write tool on THIS surface. All seven went
+on 18 August 2026 with the doors under them: kwapso reads a calendar and never writes
+one. The open question this section used to hold — whether pushing a meeting from
+a machine was right when pushing a sprint was assistant-only — is answered by
+neither being possible. `google_calendar_events` and `google_meeting_transcript`
+remain, and both are reads, on the assistant's side.
+
+**THREE tools still cross the line into Google, and this paragraph used to name
+only one of them** *(fact updated 26 Aug 2026: the two meeting-side reads below
+were on this surface all along — §3 documents both — while this security section,
+the one a reader consults before handing a token to a third party, said ONE)*.
+Each is gated exactly as its door is and reaches nobody else's account, but they
+belong in front of you rather than in a catalogue you skim:
+
+- **`sync_google_knowledge`** does not browse Google, but it does READ it: gated
+  `knowledge:create` **and** `google:read`, it sweeps the caller's own connected
+  Drive folders, the mail with a known contact and their calendar into the knowledge
+  base, from which `ask_knowledge`, also on this surface, hands the passages back.
+  A leaked token therefore reaches its OWN owner's Google material by that route,
+  which is narrower than the browse tools (nobody else's account, no send, no
+  delete) but is not nothing, and is not what "the MCP catalogue exposes none of
+  them" led a reader to expect.
+- **`sync_calendar_series`** reads the caller's own Google Calendar live, into
+  Meetings — one way, always; nothing here writes to a calendar. Its door demands
+  `google:read` beside the meetings right.
+- **`read_meeting_transcript`** hunts a meeting's transcript through the caller's
+  own Google, in order of proof: the file attached to the calendar entry, then a
+  document in a shared Drive folder, then Google's own notice in the caller's
+  mail. Same shape at the door: `google:read` beside `meetings:edit`.
+
+What a leaked token reaches, then, is its owner's calendar, the transcript
+documents their own Google can see, and whatever the knowledge sweep already
+covers — never a send, never a delete, never anybody else's account.
+
+It is recorded here rather than quietly removed because taking a capability off a
+published surface breaks somebody's script, and that is a decision with an owner.
+The seven calendar tools ARE that decision, made by the owner in words, and a
+script that called one now gets a clean refusal rather than a silent no-op.
+
+**What the assistant can now do there, and what it still cannot.** The module used
+to be able to read all four services and write only three things, a file into a
+named folder, a draft, an event. The event half is gone (the calendar is
+read-only); it can now also rewrite a file, make a folder,
+file a message or a whole conversation into Drive as a readable document, reply
+inside a thread, put a Gmail label on a message or take it off, list every Chat
+space the person can see, and reach a meeting's transcript from the calendar event
+rather than by already knowing which document it is. It could once change an
+event's title, times, guests or location and call one off; it cannot, because the
+calendar is read-only in this product. Two of those tools exist only so the
+others are safe to have: `google_drive_trash` and `google_chat_delete` undo what
+kwapso itself wrote, the bin rather than a delete, and only a message this app
+sent. What it still cannot do is unchanged and is the point: connect an account,
+disconnect one, or widen what it is allowed to see.
+
+Three Google doors have no tool on **either** surface, for a reason that is not
+about caution: connecting an account is a person standing at Google's own consent
+screen, and the credential it produces travels in an HttpOnly cookie no bearer
+caller holds. Four more, disconnecting, and changing which folders and spaces
+are shared, are decisions about **who can read what**, which is the one thing
+this module exists to keep conscious. And one answers with an IMAGE rather than
+data: the Drive thumbnail a screen shows beside a file, which a model cannot read
+about a file it can already open as text. All eight are written down with their
+reasons in `TOOLLESS_DOORS` (`workers/mcp/test/filter-parity.test.ts`), and the
+check fails if one of them quietly grows a tool.
+
+---
+
+## 4 · Who pays? (the cost model. Read this)
+
+**Most tools cost you nothing beyond a normal API request.** Reads, exports, imports,
+and token management are just calls to our Cloudflare Workers + databases, cheap, no
+AI involved. The developer does **not** bring their own AI billing, and does **not**
+pay Anthropic, they're hitting our endpoints.
+
+**Two kinds of tool DO draw the team's AI budget** (because they use the assistant):
+
+| Tool | AI cost | Bounded by |
+|---|---|---|
+| `agent_chat`, `agent_confirm` | Yes, one assistant turn each | The **team's AI quota** (free per day + purchased credits) AND needs the **AI-agent right** |
+| `plan_import` | Yes, one assistant unit per plan | The team's AI quota |
+| `ask_knowledge` **with `compose`** | Yes, one unit per question | The team's AI quota AND needs the **AI-agent create right** |
+| everything else | No |, |
+
+**And "one turn" is one internal model step, not one message** (noted 26 Aug 2026).
+A simple question is one step; a complex message can take up to 12 (`MAX_STEPS` in
+`workers/data-ops/src/lib/agent.ts`), each drawing one unit — so budget a range per
+message, not a constant.
+
+**Where the knowledge tools fall, and the one line in the table that has two sides.**
+`ask_knowledge` is a READ and it is free *as you will normally call it*: finding the
+material spends ONE embedding of the question, a rounding error beside an assistant
+turn, and nothing writes a word. Set `compose` and the app additionally writes the
+answer out of those passages on a cheap model and returns it as `answer` — one unit
+of the team's quota, one model call, gated on the same **AI-agent create right** as
+`agent_chat`, so a token without the assistant gets the passages and spends nothing,
+exactly as it did before the flag existed.
+
+**Leave `compose` off unless you have nothing that can write.** An assistant calling
+this composes its own reply from the passages — that is what Law R23 is for — so
+asking the app to write one as well pays for the same answer twice. The flag exists
+for a caller that has no model of its own; kwapso's own Knowledge tab is one, which
+is why the flag is there at all.
+
+`sync_knowledge` spends one embedding per CHANGED chunk and nothing at all for a row
+whose text has not moved, so filling the base for the first time over an agency's
+entire history measured at roughly a cent, and the steady state at about nothing.
+
+That AI cost lands on **the team's quota** (our Anthropic key), **not** on the
+developer. So two levers keep it under control:
+
+1. **The quota is the ceiling.** All AI use, humans in the app + every machine token
+   on the team, draws the same daily allowance (`AGENT_FREE_DAILY`, plus any
+   top-up). When it's spent, `agent_chat` / `plan_import` return a clean "out of AI
+   requests" (HTTP 429) until it resets or an admin adds credits. A runaway script
+   can't run up an unbounded bill, it hits the quota wall.
+2. **Scope the role.** A token can only call `agent_chat` / `agent_confirm` — or pass
+   `compose` to `ask_knowledge` — if its role holds the **AI-agent create right**. Give
+   a developer a role **without** it and those return 403, their token literally cannot
+   spend agent AI budget. Reads, exports, asking the knowledge base without `compose`,
+   and running a *pre-planned* import all stay available. (`plan_import` is the one
+   import step that uses AI, bounded by the quota like everything else.)
+
+So your instinct is right for the cheap tools ("they're just hitting our endpoints"),
+and for the AI tools, the allowance + the role are how you keep the cost yours-but-bounded,
+or zero, by choice.
+
+**And you can now read the allowance before you spend it.** `get_ai_allowance` returns
+what the team has left of the app's own daily allowance (the free daily amount plus any
+credits an admin has added); `list_ai_usage` shows where it went, one row per turn. Both
+are free reads needing `agent:read`. Until they existed, 429 was the documented failure
+mode of this surface and nothing on it could see 429 coming, a client learned the
+allowance was gone by being refused. (Note what this is *not*: it is the app's own daily
+allowance, set here, shared by everyone on the team. It is not your Anthropic account and
+not a bill anyone outside this app sees.)
+
+**A lost plan is recoverable without re-spending it.** `plan_import` costs one request
+of that allowance; `get_import` re-reads the same plan for free. A client that dropped a
+`plan_import` response should come here rather than plan again.
+
+---
+
+## 5 · Security posture (what a token can't do)
+
+- **It is the agency's surface, not its clients'.** A client-portal login is refused
+  both a new token and a session for an existing one.
+
+  This is worth spelling out, because nothing was ever *bypassed* here. A client
+  contact **is** a team member, that is how the portal works, so they hold a role.
+  When this was found, a client's role held `learning:read` for the ordinary reason
+  that their own doors needed nothing from it, so signing in at the AGENCY address
+  and minting a token let them call the learning list and export tools and receive
+  every internal how-to article, in full, as a CSV. (That module was purged on
+  17 Aug 2026 — team migration `0025` — so those tools no longer exist; the lesson
+  outlived them.) The gate ran and PASSED. What kept those articles
+  private was that the client portal's own gateway refuses that door outright, "the
+  team's how-to articles are INTERNAL and carry no account fence", i.e. the protection
+  was a **door-level** decision, and the machine surface had no door-level opinion at
+  all.
+
+  So it has one, in one sentence, asked in one place. Before minting, and before
+  bridging a token to a session, the `mcp` worker asks **tenancy**, the worker that
+  owns the fence, which kind of caller this is. It cannot answer that itself: the
+  `portal_users` row lives in the per-team database and this worker holds no D1
+  credential, and inventing a second way to decide who is a client is the exact thing
+  interface-parity exists to prevent. The check **fails closed** in both directions: a
+  caller who reads as a client is refused, *and so is one tenancy could not answer for*
+ , a door that assumed "staff" whenever the check itself broke would hand the surface
+  back to precisely the caller it excludes, on precisely the day something is wrong.
+  Revoked grants count as client too: portal-ness is decided by the PRESENCE of the
+  row, never by its absence.
+  **How fresh is that answer?** The bridge mints one short-lived team-pinned session
+  per token and re-uses it for **60 seconds**, so a burst of tool calls in one
+  conversation shares one session instead of writing a session row each time,
+  and nothing is cached until the staff check has passed. For that minute, then,
+  a passed authorization decision stands without being re-asked, which is worth
+  being precise about rather than waving at. The decision has **no transition to
+  miss**: to hold a working token you must be an *active member* of the pinned
+  team (auth's mint refuses anyone else, every time), and to read as a *client*
+  you must have a portal-access row, which the only door that writes one refuses
+  to give an active team member, because a client login would fence a colleague
+  out of the agency app. The two states are mutually exclusive at every instant.
+  That refutation isn't a paragraph to be taken on trust: `staff-only.test.ts`
+  reads tenancy's and auth's own source and turns red if either refusal relaxes,
+  which is the moment the cache goes rather than quietly becoming the hole.
+  (Everything else stays live regardless: the token is re-verified per request, a
+  revoke drops the cached session immediately, and every door re-runs
+  `requireRight`, the account fence and the internal-material refusal on each
+  call.)
+- **Acts AS the owner, capped by their LIVE role**, re-checked on every call. Demote
+  the person and the token weakens the same instant.
+- **One team only.** The token is pinned to the team it was made in; it can never read
+  or write another team's data (isolation by physics, separate databases).
+- **No god mode.** The tool catalog is **opt-in**, only the listed, gated actions are
+  exposed. Internal/maintenance endpoints, other people's device sessions, deleting the
+  team: not in the catalog, structurally unreachable. Every write route gates on a
+  permission (machine-checked. Law R10), so a tool can't skip the gate.
+- **Writes are reversible + audited.** The write tools deactivate, never hard-delete;
+  every change stamps an audit block (who + when) and the locked guards fire even here,
+  you can't remove yourself or the last admin.
+- **An assistant turn records that a MACHINE ran it.** `agent_chat` and `agent_confirm`
+  reach the same handler the in-app assistant does, and that handler used to stamp every
+  turn "in-app", so a token-driven conversation was written into the team's history as
+  if somebody had typed it. It now records the calling surface, derived from the session
+  itself (a token's session is team-pinned; a browser's never is), so it is not something
+  a caller can state about itself in a header. Nothing about rights changed; what changed
+  is that after a leaked token, "did a token do this, or did a person?" has an answer.
+- **Revoke bites immediately.** The token is re-verified on every request, so revoking
+  it stops the next call, even if a session was mid-flight.
+- **It runs out on its own.** Every token carries a deadline (90 days), checked beside
+  the revoke check on every call, so a secret forgotten in an old CI config stops being
+  a key whether or not anyone remembers it. A token row with no deadline is refused
+  rather than trusted.
+- **And it stays reachable.** One person holds at most 10 live tokens, and the settings
+  list shows unrevoked ones first, so a token that still works is always on the
+  screen, and always revocable. (It was previously possible to bury a live token behind
+  more than 1,000 revoked ones and lose the ability to revoke it from the app.)
+- **Hashed at rest.** Only the token's hash is stored; the secret is shown once.
+
+**Two honest limits:**
+
+1. **The rate limit is per token OWNER, not per token** (this item said "no
+   per-token rate limit yet" until 26 Aug 2026, which had stopped being the useful
+   truth). Every `/mcp` request passes `callerHasBudget` — 600 requests a minute,
+   keyed `machine:<user_id>`, checked immediately after the token is verified and
+   before the JSON-RPC body is even parsed (`workers/mcp/src/index.ts`;
+   `CALLER_REQUESTS_PER_MINUTE` in `shared/workers/limits.ts` says why 600) — and
+   the gated doors behind it carry their own per-worker budgets on top. Two honest
+   edges remain: two tokens owned by the same person share one bucket, and the
+   limiter FAILS OPEN where the `CALLER_LIMIT` binding is absent or unwell (a broken
+   safety valve must not become the outage; the fail-open path logs). Every write is
+   still reversible (deactivate-not-delete), audited, and one-team. If you hand a
+   token to a *less*-trusted integration, prefer a tightly-scoped role and watch
+   `last_used_at`.
+2. **`member_roles:edit` is a powerful right.** Anyone who can edit roles can grant
+   permissions, including to their own role, exactly as in the UI (there's no separate
+   admin tier). So give a machine token that right only when the integration genuinely
+   manages roles; a read/import/export integration never needs it.
+
+### An open question, answered by the owner, the calendar tool on this surface
+
+This section used to hold a live question: `add_meeting_to_calendar` was on the
+machine catalogue and its twin `google_sprint_to_calendar` was the in-app
+assistant's alone, the two did the same kind of act behind the same three gates,
+and nothing recorded which placement was intended. The question underneath it was
+*should an outside developer holding a personal access token be able to write into
+a colleague's calendar?*
+
+**Answered on 2026-08-18, and wider than the question asked:** *"disable the
+ability to create, edit, or delete anything in the calendar from the frontend…
+just make it one-way so we only grab and update the information."* Neither tool
+exists now, on either surface, and neither do the doors under them. Removing one
+tool would have meant a new field on the shared type, a filter, and amendments to
+the R9, R19 and R22 parity checks; removing the DOORS meant none of that, because
+a tool with no door is not a narrowing anybody has to describe — the parity checks
+derive their obligations from the doors themselves and simply have fewer.
+
+The lesson worth keeping: an asymmetry nobody can explain is usually two things
+that should both go, or both stay. Six weeks of "one of these placements is wrong
+and it is the owner's call which" ended with the owner deleting the category.
+
+---
+
+## 6 · For maintainers (where it lives)
+
+`workers/mcp/`. `POST /mcp` (JSON-RPC) + session-gated token management under
+`/api/mcp/tokens*`; the staff-only rule is `workers/mcp/src/lib/staff.ts` (called from
+`postToken` and from the session bridge, held by `test/staff-only.test.ts`); the
+human-facing card is `web/components/access-tokens.tsx`
+(Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migrations
+`0013` + `0016`, `expires_at`, backfilled so applying it gives every existing token a
+full term rather than killing it); the TTL and the per-person cap are
+`MCP_TOKEN_TTL_DAYS` / `MAX_ACTIVE_MCP_TOKENS_PER_USER` in
+`shared/workers/limits.ts`, and `workers/mcp/test/tokens.test.ts` runs the real
+migrations against a real SQLite database to hold all three fixes in place.
+A token is bridged to a **short-lived team-pinned session** via auth's
+`/internal/mcp-session` (INTERNAL_KEY, fail-closed). The **agency** gateway routes
+`/mcp` + `/api/mcp/*` to the worker; the mcp worker itself is `workers_dev:false`,
+so that gateway is the only way in. The client portal's gateway does NOT bind the
+mcp worker at all and refuses `/mcp` outright, the machine surface is not on the
+client internet. See ARCHITECTURE.md (the `mcp` row) and DATA-MODEL.md
+(`mcp_tokens` + `sessions.team_pin`).

@@ -10,9 +10,12 @@ import type { SessionUser } from "../types"
 import { d1Query, type D1Rest } from "./d1-rest"
 import { LIST_HARD_CAP } from "./limits"
 import { fail } from "./http"
+import { readOrigin, type ActivityOrigin } from "./origin"
 import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
-import { beginD1Timing } from "./timing"
+import { deferrerFor } from "./parallel"
+import { beginD1Timing, noteTeam } from "./timing"
 import { requestId, traceHeaders } from "./trace"
+import { sessionFromCore } from "./session-fallback"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
  * structurally satisfies this (the AUTH binding + the core DB + the Cloudflare
@@ -46,10 +49,53 @@ export class GuardError extends Error {
   constructor(
     public status: number,
     public code: string,
-    message: string
+    message: string,
+    /** WHAT WE KNEW AND THE CALLER IS NOT TOLD — recorded, never returned.
+     *
+     * A GuardError is a CLEAN refusal, and every central catch answers it before
+     * the recorder on purpose: this table is for the unexpected, and logging
+     * every "you may not do that" would bury the rows that matter under the ones
+     * that do not (error-log.ts's own contract says so).
+     *
+     * That reasoning is right for a permission refusal and it was silently WRONG
+     * for the one class of refusal that carries a diagnosis. When Google answers
+     * 401 because somebody revoked the grant, `googleFetch` turns it into a
+     * GuardError — so the person reads "Google wouldn't allow that any more",
+     * which is the correct sentence, and the STATUS and Google's own reason went
+     * to `console.error` and nowhere else, by design. Measured on staging on
+     * 2026-09-05: 1,900+ of 5,086 rows in the error store record the sentence we
+     * showed somebody rather than the cause, and on the interactive path the
+     * store learned nothing at all. Three weeks later "the Google sync stopped"
+     * has no row that says why.
+     *
+     * So a refusal may now carry the thing the tail had. Setting it does not
+     * change one byte of the caller's answer — `fail(status, code, message)` is
+     * untouched — it only means the central catch has something worth recording.
+     * Absent, which is the case for every permission gate in the codebase, and
+     * nothing is recorded, exactly as before.
+     *
+     * NEVER a token, and never a query string: google-api.ts strips both before
+     * it builds this, because that is where a person's search words live. */
+    public detail?: string
   ) {
     super(message)
   }
+}
+
+/** WHAT TO RECORD ABOUT A THROWN THING — the diagnosis where there is one, the
+ * message where there is not.
+ *
+ * The recording seam wants the sentence a developer can act on; the caller wants
+ * the sentence a person can read. For everything except a diagnosed refusal
+ * those are the same string, which is why this reads as a no-op most of the time
+ * and is worth its own name anyway: `String(e)` at a recording site is exactly
+ * how 327 cron rows came to say "Google couldn't answer that just now. Try
+ * again." — our own words, quoted back at us, about a token Google had revoked.
+ *
+ * Use it at every site that turns a caught error into a row. */
+export function causeOf(e: unknown): string {
+  if (e instanceof GuardError) return e.detail ?? e.message
+  return e instanceof Error ? e.message : String(e)
 }
 
 /** WHICH TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY.
@@ -85,8 +131,16 @@ export function nativeTeamDatabases(env: GatingEnv): Record<string, D1Database> 
  * where this deployment holds a binding for them and over the Cloudflare REST
  * door where it does not (see `natives` in d1-rest.ts). Throws
  * cloud_key_missing if the REST token isn't set yet — still required, because
- * the fall-through path and every database-management call go through it. */
-export function d1ConfigFrom(env: GatingEnv): D1Rest {
+ * the fall-through path and every database-management call go through it.
+ *
+ * `origin` is REQUIRED, and that is the point: every activity row written
+ * through this config carries it, so a config built without deciding which
+ * surface it serves is a config that writes history nobody can attribute. A
+ * caller who may omit it is a caller who will — the same argument `getActivity`
+ * makes for its own fence, held here by the compiler rather than by a comment.
+ * A config assembled OUTSIDE a request — a cron sweep, the morning digest —
+ * says `automation`, which is the truth: nobody clicked. */
+export function d1ConfigFrom(env: GatingEnv, origin: ActivityOrigin): D1Rest {
   if (!env.CF_D1_TOKEN)
     throw new Error(
       "cloud_key_missing: the Cloudflare D1 token isn't set yet, so team databases can't be reached."
@@ -95,6 +149,15 @@ export function d1ConfigFrom(env: GatingEnv): D1Rest {
     accountId: env.CF_ACCOUNT_ID,
     apiToken: env.CF_D1_TOKEN,
     natives: nativeTeamDatabases(env),
+    // WHERE THIS DOOR'S SWALLOWED FAILURES ARE RECORDED (d1-rest.ts says why it
+    // rides on the config). Every worker that builds a data-door config has the
+    // core binding — it is in GatingEnv, because gating reads it on every
+    // request — so the activity writer gets a durable store for free, at every
+    // one of its call sites, without a fifth argument anybody can forget.
+    core: env.DB,
+    // WHICH FRONT DOOR THIS IS (origin.ts). Same reasoning as `core` above and
+    // the same seam: the config is already everywhere the activity writer is.
+    origin,
     // Where a NEW team's database is born. See d1CreateDatabase: measured on
     // staging, a database that landed in APAC while its workers sat in WEUR
     // cost about 150ms a trip, which a native binding does not fix — a binding
@@ -150,13 +213,33 @@ export async function whoAmI(request: Request, env: GatingEnv): Promise<SessionU
     if (!res.ok) return null
     return ((await res.json()) as { user: SessionUser }).user
   } catch {
-    // Includes an unreadable body: auth answering nonsense is auth being
-    // unwell, and it must not read to the caller as "you are signed out".
-    throw new GuardError(
-      503,
-      "auth_unavailable",
-      "We can't check who you are right now. Try again in a moment."
-    )
+    // AUTH IS UNREACHABLE — resolve the caller from the session row instead of
+    // refusing everybody (the owner's ruling, 2026-09-05: keep people working
+    // for a few minutes if the sign-in service goes down).
+    //
+    // Not a cached identity, which is what makes it safe: `sessionFromCore`
+    // reads the same live row auth reads, so an expired session, a sign-out and
+    // a deactivated member are all still refused. It is READ-ONLY, so auth
+    // stays the only thing that mints, slides or destroys a session. And it
+    // changes nothing about RIGHTS — `requireMember` and `requireRight` below
+    // already read core directly and never involved auth at all.
+    // documents/RESILIENCE.md § "The recommendation, now taken" argues it in full.
+    //
+    // A null here still means "not signed in" and still reads as a 401, exactly
+    // as a healthy auth's null does. Only if CORE is unreachable too do we
+    // arrive at the throw below — which is the one sentence this seam has always
+    // said when it genuinely cannot tell who is asking.
+    try {
+      return await sessionFromCore(request, env)
+    } catch {
+      // Includes an unreadable body from auth: auth answering nonsense is auth
+      // being unwell, and it must not read to the caller as "you are signed out".
+      throw new GuardError(
+        503,
+        "auth_unavailable",
+        "We can't check who you are right now. Try again in a moment."
+      )
+    }
   }
 }
 
@@ -217,7 +300,21 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // because this is the one function every team-scoped door passes through
   // exactly once — the same property that makes it the honest place for the
   // per-caller ceiling above makes it the honest place to start the clock.
-  const cfg: D1Rest = { ...d1ConfigFrom(env), stats: beginD1Timing(request) }
+  // …and the SURFACE rides on it from here too (origin.ts). Read off the header
+  // the two gateways stamp and the two act-as-user executors carry, in the one
+  // function every team-scoped door passes through exactly once — the same
+  // property the three paragraphs above already lean on. Nothing gates on it; it
+  // is a label on history, and a header we do not recognise reads as `unknown`
+  // rather than turning a working request into a 400.
+  const cfg: D1Rest = {
+    ...d1ConfigFrom(env, readOrigin(request)),
+    stats: beginD1Timing(request),
+    // …and this request's lifetime, so `logActivity` writes the history entry
+    // just AFTER the person is told "saved" instead of just before it (owner's
+    // ruling, 6 Sep 2026 — shared/workers/parallel.ts carries the reasoning and
+    // the provenance). Per-request for exactly the reason `stats` above is.
+    defer: deferrerFor(request),
+  }
   const guard = await requireMember(env, user.id, user.currentTeamId)
   // WHO WAS ASKING, for the central catch. error_logs has carried team_id and
   // user_id columns since core 0019 and 0 of 200 live rows held either,
@@ -227,6 +324,10 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   // because this is the one function every team-scoped door passes exactly
   // once — the property the two paragraphs above already lean on twice.
   errorIdentity.set(request, { teamId: guard.teamId, userId: guard.userId })
+  // …and to the SLOW-DOOR line, for the same reason and in the same place: a
+  // door that is slow for the one team with ninety thousand rows printed
+  // identically to a door that is slow for everybody (timing.ts).
+  noteTeam(request, guard.teamId)
   return { user, actor: toActor(user), cfg, guard }
 }
 
@@ -374,10 +475,66 @@ export async function requireRight(
     )
 }
 
-/** Shared guard for the maintenance endpoints (x-admin-key header). */
+/** IS THIS ONE OF THE MAINTENANCE DOORS? — asked of the PATH, at the public
+ * gateway, so the answer does not depend on reaching the worker behind it.
+ *
+ * Every `adminGuard` door in the estate lives under `/api/<worker>/admin/`, and
+ * that is the whole shape: tenancy's four (migrate-teams, create-team, db-sizes,
+ * move-module) and data-ops's four (seed-targets, the error log, resolve, and
+ * grant-credits). A new one lands under the same prefix by convention, so it is
+ * throttled the day it ships rather than the day somebody remembers.
+ *
+ * DELIBERATELY NOT a list of the eight paths. A list is a thing that goes stale
+ * in the unsafe direction — the ninth door would be the unthrottled one — and
+ * the prefix is what the gateway can see without importing another worker's
+ * route table. */
+export function isMaintenancePath(pathname: string): boolean {
+  return /^\/api\/[a-z-]+\/admin(\/|$)/.test(pathname)
+}
+
+/** THE CALLER, AS THE ONLY THING A PRE-AUTH DOOR CAN KEY ON.
+ *
+ * The maintenance doors carry no session — a key holder is not a person we have
+ * resolved — so the per-caller ceiling in `teamContext` cannot apply, and the IP
+ * is what is left. Hardened the same way auth's own `clientIp` is, and for the
+ * same reason: this is attacker-shaped input on a pre-auth door, so NULs are
+ * stripped (D1 rejects them, which would turn a record into a 500), it is
+ * trimmed, and it is capped at the longest real IPv6-with-zone. Truncate rather
+ * than refuse — a strange header must not become a way to skip the throttle. */
+export function maintenanceCaller(request: Request): string {
+  const raw = request.headers.get("CF-Connecting-IP") ?? ""
+  const clean = raw.split(String.fromCharCode(0)).join("").trim().slice(0, 45)
+  // A shared "unknown" bucket rather than a free pass: an absent header must be
+  // the WORST bucket to be in, not an exemption from the counter.
+  return clean || "unknown"
+}
+
+/** Shared guard for the maintenance endpoints (x-admin-key header).
+ *
+ * CONSTANT-TIME on the key comparison. Over the internet, against a
+ * high-entropy secret, `!==` is not a measurable oracle and this is not the
+ * reason the door was hardened (that is the throttle at the gateway, and the
+ * record beside it). It is here because it costs one function and removes the
+ * question — a reviewer should not have to reason about network jitter to know
+ * a secret comparison is safe.
+ *
+ * Both fail-closed branches are unchanged: no key configured is a 503, not a
+ * pass, and a wrong key is a 403. */
 export function adminGuard(request: Request, env: GatingEnv): Response | null {
   if (!env.ADMIN_KEY) return fail(503, "admin_key_missing", "Maintenance key not set.")
-  if (request.headers.get("x-admin-key") !== env.ADMIN_KEY)
+  if (!sameSecret(request.headers.get("x-admin-key"), env.ADMIN_KEY))
     return fail(403, "forbidden", "Bad maintenance key.")
   return null
+}
+
+/** Compare two secrets without leaking WHERE they first differ.
+ *
+ * Length is compared first and separately — it is not a secret worth protecting
+ * here (the key's length is a deployment fact, not a character of it), and
+ * padding to hide it would make the loop compare bytes that do not exist. */
+function sameSecret(given: string | null, expected: string): boolean {
+  if (given === null || given.length !== expected.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i)
+  return diff === 0
 }

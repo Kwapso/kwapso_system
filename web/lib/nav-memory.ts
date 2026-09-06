@@ -164,7 +164,7 @@ export function recallPath(teamId: string | null, sectionPath: string): string |
  * half-truth if the collection at the top still had last hour's search in it.
  * It doubles as the manual escape hatch for every corner below — anything the
  * memory gets wrong is one click from being gone. */
-export function forgetSection(teamId: string | null, sectionPath: string): void {
+function forgetSection(teamId: string | null, sectionPath: string): void {
   sections.delete(keyFor(teamId, sectionPath))
 }
 

@@ -104,6 +104,7 @@
 // the same staff readers; narrowing to one is about a better answer, never about
 // permission.
 
+import { recordWorkerError } from "@shared/workers/error-log"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -1336,9 +1337,24 @@ function embeddableText(_source: unknown, chunk: string): string {
  * failure must not fail an ingest, because the alternative is a knowledge base
  * that refuses to accept a note when Workers AI has a bad minute. A null
  * embedding stores as NULL, that chunk gets no vector, and the source's content
- * hash is left un-stamped so the next sweep tries again. */
+ * hash is left un-stamped so the next sweep tries again.
+ *
+ * AND FOR A YEAR THAT WAS THE WHOLE STORY, WHICH MADE AN OUTAGE INVISIBLE. This
+ * swallows, returns nulls, and `indexSource` then completes and counts the
+ * source as indexed — so `r.error` is never set, the sweep's own R12 recording
+ * sees a clean run, and the assistant answers from a corpus that quietly stopped
+ * growing. "Workers AI had a bad hour" and "there was nothing new to index"
+ * produced the identical, cheerful log line, and the sweep re-read the same rows
+ * every fifteen minutes for as long as it lasted.
+ *
+ * ONE ROW PER CALL, not per batch: a bad hour is one fact, and the recorder's
+ * hourly budget (error-log.ts) is a shared resource this must not spend on
+ * repeats of the same sentence. The count of failed batches rides in the message
+ * instead, which is the number that says how big the hole is. */
 async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
   const out: (number[] | null)[] = []
+  let failedBatches = 0
+  let firstFailure = ""
   for (let i = 0; i < texts.length; i += EMBED_BATCH) {
     const batch = texts.slice(i, i + EMBED_BATCH)
     try {
@@ -1354,9 +1370,20 @@ async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
       // never to swallow — the cron's own failure recording (R12) is what makes
       // this visible to somebody, and it records the run, not each chunk.
       console.error("knowledge embed failed:", e)
+      failedBatches++
+      if (!firstFailure) firstFailure = e instanceof Error ? e.message : String(e)
       for (let j = 0; j < batch.length; j++) out.push(null)
     }
   }
+  if (failedBatches)
+    await recordWorkerError(
+      env.DB,
+      "content",
+      "knowledge/embed",
+      new Error(
+        `${failedBatches} embedding batch(es) of ${Math.ceil(texts.length / EMBED_BATCH)} FAILED, so ${failedBatches * EMBED_BATCH} chunk(s) have no vector and are unfindable by search. The ingest reports success either way and the sweep will re-read these on its next tick, and every tick after that, until it works. First failure: ${firstFailure}`
+      )
+    )
   return out
 }
 
@@ -1388,7 +1415,7 @@ export async function indexSource(
   sourceId: string,
   opts: { force?: boolean; slices?: number } = {}
 ): Promise<IndexProgress> {
-  const rows = await d1Query<SourceRow & { content_hash: string | null }>(
+  const rows = await d1Query<SourceRow & { content_hash: string | null; embed_attempts: number }>(
     cfg,
     guard.databaseId,
     // `file_url` rides along because `indexableText` needs it: a file with no
@@ -1396,7 +1423,7 @@ export async function indexSource(
     // with no body" is the difference between a note somebody left blank and a
     // document we could not read.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
-            owner_user_id, content_hash, chunk_count, indexed_chunks, deactivated_at, created_at
+            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1533,8 +1560,27 @@ export async function indexSource(
     "SELECT COUNT(*) AS n FROM knowledge_chunks WHERE source_id = ? AND embedding IS NOT NULL",
     [sourceId]
   )
+  // …AND THE ATTEMPT IS COUNTED HERE, in the same branch, because this is the
+  // one place that knows the difference between "indexed" and "indexed with no
+  // vectors". Blanking the hash is what makes the next sweep retry; the counter
+  // is what stops that retry being for ever (EMBED_ATTEMPT_CAP — a source that
+  // fails repeatably was costing a model call every fifteen minutes and writing
+  // the same error row each time). One statement either way, on the path that
+  // already writes one.
   if (!(embedded[0]?.n ?? 0))
-    await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET content_hash = NULL WHERE id = ?", [sourceId])
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      "UPDATE knowledge_sources SET content_hash = NULL, embed_attempts = embed_attempts + 1 WHERE id = ?",
+      [sourceId]
+    )
+  // A source that DID embed starts again from zero, so a run of transient
+  // failures followed by a success cannot leave a source one wobble away from
+  // being given up on months later.
+  else if (source.embed_attempts > 0)
+    await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET embed_attempts = 0 WHERE id = ?", [
+      sourceId,
+    ])
 
   return { total, indexed: from, done: from >= total }
 }
@@ -1992,7 +2038,7 @@ const EXACT_TERM_MAX_CHUNKS = 100
  * and the words inside a quoted phrase are ordinary words: letting `forms` out of
  * "gravity forms" waive the floor would reinstate the coincidence the floor
  * exists to refuse. */
-export function exactTerms(question: string): string[] {
+function exactTerms(question: string): string[] {
   return questionTerms(question, MAX_QUESTION_TERMS).filter((t) => /\d/.test(t))
 }
 

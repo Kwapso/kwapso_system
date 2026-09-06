@@ -129,8 +129,7 @@
         // Staging shares the production knob so a cost measurement here means
         // something there (test/prompt-cache.test.ts).
         "AGENT_PROMPT_CACHE": "1h",
-        "AGENT_FREE_DAILY": "50",
-        "AGENT_NO_DAILY_CAP": "true",
+        "AGENT_FREE_DAILY": "2000",
         "WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct"
       }
     }

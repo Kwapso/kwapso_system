@@ -91,6 +91,8 @@ const AGENT_ONLY_TOOLS: Record<string, string> = {
     "the ID-list bulk mutation, same reasoning as set_help_status_by_filter one line up (MCP.md §3 item 1): the app's confirm panel is the control on a high-blast write, and MCP has no panel of its own to put in front of it. set_help_status (one ticket at a time) is the machine-shaped equivalent and is fully on this surface. DELETE THIS LINE under the same condition as set_help_status_by_filter — a real MCP confirm mechanism, not a description sentence.",
   run_import_batch:
     "runs a file the person ATTACHED IN THE CHAT UI (binding SELF, no route — it executes inside data-ops rather than forwarding to a door). A headless MCP client has no chat turn to attach a file to, so it is given the machine-shaped equivalent instead: start_import -> add_import_file -> plan_import -> run_import, which is MCP_ONLY below for the mirror reason. Same capability, the shape each surface can actually receive a file through. DELETE THIS LINE (and its MCP_ONLY mirror) only if the two import paths are ever unified into one runner both surfaces call the same way — until then the split is the shape each surface can actually receive a file through, not an oversight.",
+  load_tools:
+    "solves a problem THIS SURFACE DOES NOT HAVE, and adding it here would be a cost with no saving. The agent re-sends its whole preamble on every model step of every turn — 133,505 characters before the two-stage catalogue, up to twelve times a turn — so it now sends the core tools plus an index of names and fetches the rest on demand (CORE_TOOL_NAMES in workers/data-ops/src/lib/tools.ts has the measurement: a 69.8% cut). An MCP client fetches its catalogue ONCE per session over tools/list and is not billed by the token for holding it, so a second round trip to open a definition would buy that client nothing and cost it a call. This is the same asymmetry, and the same sentence, that shared/workers/record-toggles.ts already gives for the twenty-one record toggles the agent collapsed into one tool and MCP still publishes separately: the collapse pays for itself on the surface that is billed by the token, and on the one that is not it would only break things. Same map, two projections. DELETE THIS LINE only if MCP ever grows a per-token cost for its catalogue — until then a machine client should keep being handed the whole thing at once.",
 }
 
 /** The reason all twenty-one Google tools share (MCP.md §3, "Google is almost
@@ -158,6 +160,7 @@ const MCP_ONLY_TOOLS: Record<string, string> = {
   add_import_file: IMPORT_BATCH_REASON,
   plan_import: IMPORT_BATCH_REASON,
   run_import: IMPORT_BATCH_REASON,
+  continue_import: IMPORT_BATCH_REASON,
   list_imports: IMPORT_BATCH_REASON,
   get_import: IMPORT_BATCH_REASON,
   get_ai_allowance: ASSISTANT_BRIDGE_REASON,
@@ -244,10 +247,10 @@ describe("R43 — agent/mcp tool-set parity: a name on one surface is on both, o
   // never fewer (a stale exemption the ratchet test above would already catch,
   // named again here as a direct count so the two numbers this file's own
   // header prose states cannot go stale the way the AGENT_ONLY comment did).
-  it("the agent-only count matches the reasoned table exactly (25, 29 Aug 2026 — set_record_active wired onto MCP, not reasoned away)", () => {
+  it("the agent-only count matches the reasoned table exactly (26, 6 Sep 2026 — +1 for load_tools, which solves a per-token problem MCP does not have)", () => {
     expect(agentOnly.length).toBe(Object.keys(AGENT_ONLY_TOOLS).length)
   })
-  it("the mcp-only count matches the reasoned table exactly (53, 29 Aug 2026 — +30 from the record-toggle collapse and the query grammar)", () => {
+  it("the mcp-only count matches the reasoned table exactly (54, 6 Sep 2026 — +1 for continue_import, the resume half of the import pipeline)", () => {
     expect(mcpOnly.length).toBe(Object.keys(MCP_ONLY_TOOLS).length)
   })
 })

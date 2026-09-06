@@ -140,9 +140,13 @@ describe("acting with a token: staff only, on every session it mints", () => {
     await expect(sessionCookieFor(refused, token("TK_TWICE") as never, "trace-test")).rejects.toMatchObject({ code: "portal_login" })
   })
 
-  it("staff get their bridged cookie", async () => {
+  it("staff get their bridged cookie, under the name auth actually reads", async () => {
+    // `__Host-` is auth's session-fixation defence (sessions.ts). The prefix
+    // constrains what a BROWSER accepts in Set-Cookie and says nothing about a
+    // request header minted worker-to-worker — but the name still has to be the
+    // one auth reads back, so it moves with auth or the bridge stops working.
     await expect(sessionCookieFor(bridgeEnv("staff"), token("TK_STAFF") as never, "trace-test")).resolves.toBe(
-      "kwapso_session=sess"
+      "__Host-kwapso_session=sess"
     )
   })
 })
@@ -208,7 +212,10 @@ describe("the cached staff verdict has no transition to miss", () => {
     // The bridge mints through auth's internal door, which refuses a caller who
     // is no longer an active member — so "reads as a client" and "holds a working
     // token" cannot both be true, whatever the cache remembers.
-    const authSrc = readFileSync(join(__dirname, "../../auth/src/index.ts"), "utf8")
+    // auth's handlers moved out of index.ts into routes/ on 6 Sep 2026 when that
+    // worker took the house shape. The `at` tripwire below is what made the move
+    // safe: this went red rather than slicing an empty string and passing.
+    const authSrc = readFileSync(join(__dirname, "../../auth/src/routes/internal.ts"), "utf8")
     const at = authSrc.indexOf("async function internalMcpSession")
     expect(at, "auth must still own the mint the bridge calls").toBeGreaterThan(-1)
     const mintDoor = authSrc.slice(at, authSrc.indexOf("\n}\n", at))

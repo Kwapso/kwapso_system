@@ -134,6 +134,32 @@ export const CRON_ALERT_CAP = 50
  * no read). */
 export const CRON_GROWTH_CAP = 200
 
+/** Error SIGNATURES one nightly ops digest will name.
+ *
+ * The digest reads yesterday's rows grouped by signature, so this bounds the
+ * lines in an email rather than the work: a night with three hundred distinct
+ * new failures is a night where the first twenty tell you everything and the
+ * mail nobody can read is the one nobody reads. The count of signatures that
+ * did not fit is stated in the message, because a truncated list presented as a
+ * complete one is exactly the fault R14 exists to prevent. */
+export const OPS_SIGNATURE_CAP = 20
+
+/** Teams one nightly ops digest will name as running out of AI allowance. Same
+ * shape and the same reason as OPS_SIGNATURE_CAP, and sized smaller because a
+ * list of teams is a list of people somebody has to contact. */
+export const OPS_QUOTA_TEAM_CAP = 10
+
+/** Rows the digest's "has this signature been seen before?" read may scan.
+ *
+ * The question is answered against a WINDOW rather than the whole table on
+ * purpose: `error_logs` is the one table built to grow, its retention is 90 days
+ * (ERROR_LOG_RETENTION_DAYS), and a comparison against 90 days of history would
+ * make the nightly digest the most expensive read in the estate for no extra
+ * truth — a signature nobody has seen for a month IS news. Thirty days, capped,
+ * and the cap is above what a healthy estate produces so hitting it is itself a
+ * signal. */
+export const OPS_HISTORY_CAP = 5_000
+
 /** Pending invitations one sign-in sweep will accept in a single pass. Each one is
  * three core-DB writes plus two live pings, and the list is keyed on an EMAIL
  * ADDRESS — anyone may invite any address, so the row count is attacker-influenced.
@@ -448,6 +474,62 @@ export const KNOWLEDGE_EXTRACT_MAX_BYTES = KNOWLEDGE_FILE_MAX_BYTES
  * open. Far deeper than any real org chart. */
 export const MAX_ACCOUNT_DEPTH = 64
 
+/** HOW LONG A PROPOSED DANGEROUS ACT STAYS APPROVABLE.
+ *
+ * The confirm panel exists because some acts are grave enough to stop and ask
+ * about — remove a member, revoke an invite, deactivate a record, set a rate.
+ * The proposal is stored on the assistant's message and the confirm path runs
+ * exactly what was proposed, never what the client sends, which is the half that
+ * was already right.
+ *
+ * What had no bound was TIME. `getPendingProposal` read the most recent
+ * assistant message carrying a proposal, `ORDER BY created_at DESC LIMIT 1`,
+ * with no floor under it — so "remove Jane Doe", proposed on a Tuesday and never
+ * answered, was still one click from running three weeks later. The person
+ * clicking would be answering a question they could not see, in a conversation
+ * they had forgotten, about a team that had moved on. Nothing was broken; it
+ * simply never expired.
+ *
+ * Thirty minutes: far longer than the 150-second turn deadline, so an ordinary
+ * "hang on, let me check" is never punished, and far shorter than a working day,
+ * so a proposal cannot outlive the context that produced it. Past it the panel
+ * finds nothing to run and says so, which is the same answer it already gives
+ * for a proposal somebody else already spent. */
+export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
+
+/** HOW MANY TIMES A SOURCE IS RE-EMBEDDED BEFORE THE SWEEP GIVES UP ON IT.
+ *
+ * `embed` is best-effort on purpose: an embedding failure must not lose the
+ * material, so a failed batch stores NULL vectors, `indexSource` blanks the
+ * content hash, and the next sweep picks the source up again. That self-healing
+ * is right and it had no floor — a source that fails REPEATABLY was re-read and
+ * re-sent to the model every fifteen minutes for ever, writing the same error
+ * row each time, until somebody happened to look.
+ *
+ * Five, and it is per TEXT rather than per source: the counter resets the moment
+ * a source's title or body changes (the upsert in knowledge-ingest.ts does it),
+ * so a document somebody fixes is tried again immediately and a document nobody
+ * touches stops costing a model call every quarter of an hour. Five ticks is
+ * seventy-five minutes of a transient Workers AI wobble, which is far longer
+ * than any outage this has actually seen.
+ *
+ * The same shape and the same reasoning as TRANSCRIPT_ATTEMPT_CAP next door. */
+export const EMBED_ATTEMPT_CAP = 5
+
+/** Open error rows one "resolve this whole failure" call will look at.
+ *
+ * The scan cannot be a WHERE clause — the volatile reference inside a message is
+ * normalised by a JavaScript regex and SQLite has no REGEXP — so the rows come
+ * back and are folded in the worker. 500 is comfortably more than any real
+ * signature's open tail (the live store held 5,086 rows across 109 distinct
+ * messages on 2026-09-05, and its single largest signature was 1,728 over three
+ * weeks, of which the OPEN ones are a fraction), and it is small enough that the
+ * read stays one indexed page.
+ *
+ * Past it the door says `capped: true` and the caller runs it again, rather than
+ * reporting a number that reads as "finished". */
+export const RESOLVE_SCAN_CAP = 500
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing
@@ -636,3 +718,123 @@ export function numberVar(raw: string | undefined, fallback: number): number {
  * true.
  */
 export const BULK_CONCURRENCY = 12
+
+// ── WHAT A DOOR IS ALLOWED TO SPEND ──────────────────────────────────────────
+//
+// WHY THIS IS HERE AND NOT IN A DOCUMENT. On 24 Aug 2026 the owner reported that
+// "the first-time loading of collections and details screens is a bit troubling",
+// and the honest answer at the time was a shrug: every list door measured
+// 1,400–2,200ms, and there was no number that made that a FAILURE rather than an
+// opinion. `logIfSlow` had one threshold — 750ms, for every door in the product —
+// so a read that took 700ms passed the same test as a bulk import that took 700ms,
+// which is the same as having no test.
+//
+// So: four numbers, one per class of operation, in the same file as every other
+// ceiling this app keeps. They are the owner's own "snappy" tier, and they are
+// deliberately ambitious — a budget exists to SURFACE what is shaped to be slow,
+// not to hand out passes. Every one of them is missed today (see SLOWEST_OPERATION
+// below); that is the point of writing them down.
+//
+// A budget nobody checks is a wish, so `shared/workers/timing.ts` reads these and
+// each worker's dispatcher hands it the route's own `kind` — the tag already in
+// every ROUTES table — so the door is measured against ITS class rather than
+// against one number shared by all of them.
+
+/** THE FOUR NUMBERS. Milliseconds of wall clock for one request, end to end.
+ *
+ * `delete` is the same figure as `write` and that is a decision, not a copy: this
+ * app deactivates rather than deletes (CONVENTIONS.md), so a "delete" IS a write
+ * — one UPDATE with the current-status predicate on it (R17). Naming it anyway
+ * keeps the four classes the rubric asks about visible, and stops somebody
+ * concluding the removal path was never considered.
+ *
+ * `bulk` is a minute because a bulk job is a thing a person STARTS and comes back
+ * to, not a thing they wait on. A minute is also comfortably under the Workers
+ * wall-clock ceiling, so a job that breaches this budget is a job at risk of not
+ * finishing at all — which is the failure the number is really guarding. */
+export const LATENCY_BUDGET_MS = {
+  read: 100,
+  write: 250,
+  delete: 250,
+  bulk: 60_000,
+} as const
+
+/** The route tag → the budget it is held to. Every ROUTES table already tags each
+ * route `read` / `mutation` / `housekeeping`, so the class is DERIVED from the
+ * table rather than from a second hand-kept list that could disagree with it.
+ *
+ * `housekeeping` takes the bulk budget: those are the batch, sweep and import
+ * doors — the ones that do many rows' work in one request. A housekeeping door
+ * that is slow is a job, not a click. */
+export function budgetForKind(kind: "read" | "mutation" | "housekeeping" | undefined): number {
+  if (kind === "read") return LATENCY_BUDGET_MS.read
+  if (kind === "housekeeping") return LATENCY_BUDGET_MS.bulk
+  // A mutation, or a door whose table does not tag it (auth's switch, the MCP
+  // surface): held to the WRITE budget, which is the stricter of the two it could
+  // be. An untagged door is never quietly given the minute.
+  return LATENCY_BUDGET_MS.write
+}
+
+/** HOW MANY DATABASE TRIPS ONE DOOR MAY MAKE — the hop budget, on the half of
+ * the round trip this side owns.
+ *
+ * A latency budget alone cannot tell "one heavy query" from "fourteen small
+ * ones", and in this app it is always the second: measured 5 Sep 2026, a page of
+ * fifty tickets spends 330ms of wall clock on 4ms of database. So the COUNT is
+ * the cost model (timing.ts's header makes the same argument at length) and it
+ * gets its own ceiling.
+ *
+ * TWELVE. The busiest door in the product today is raising a ticket, at EIGHT
+ * trips — four preflight checks, the reference, the rank, the insert and the
+ * activity row — measured, not counted by eye. Twelve leaves room for a door
+ * with one more fact to check and turns a door that has quietly grown a loop
+ * into a line in the log. A door above it is not necessarily wrong; it is
+ * necessarily worth reading.
+ *
+ * IT IS NOT A CEILING ON TIME. Trips that run TOGETHER cost one wave, so the
+ * repair for a door over this budget is usually `shared/workers/parallel.ts`
+ * rather than fewer statements — the ticket create still makes its eight and
+ * now makes them in five waves. */
+export const MAX_D1_TRIPS_PER_DOOR = 12
+
+/** WHAT THE FOUR CLASSES ACTUALLY COST, MEASURED — the other half of a budget.
+ *
+ * Taken 5 Sep 2026 by `scripts/speed-bench.mjs`, which runs the shipped libs in
+ * Node against staging's own team database ("Kwapso": 2,051 tickets, 3,769
+ * activity rows, 240 work logs, 125 dropdown values). Medians; the transport leg
+ * is laptop → Cloudflare's D1 REST door, which is the same door the workers use
+ * and the same leg that dominates every figure here.
+ *
+ * WHY THESE ARE KEPT IN CODE RATHER THAN IN A DOCUMENT. `speed-bench.mjs` prints
+ * each fresh reading BESIDE the one recorded here, so a re-run is a comparison
+ * rather than a fresh opinion — which is the difference between a trend and a
+ * number somebody once took. Move them when they move, and say when.
+ *
+ * THE SHAPE OF THE FINDING, in one sentence: the query is not the cost. The same
+ * run has D1 reporting single-digit milliseconds for statements whose round trip
+ * takes three hundred, so every one of these numbers is a COUNT OF TRIPS
+ * multiplied by the distance to the database — which is why the repairs that
+ * moved them were all "fewer sequential trips" and none of them was an index. */
+export const MEASURED_MS = {
+  /** One page of 50 tickets, or one page of work logs: ONE trip each. */
+  read: 330,
+  /** Raising a ticket that names a client, an app, a module and a contact: 8
+   * trips in 5 waves. It was 8 trips in 8 waves and ~2,100–2,600ms until the
+   * independent preflight checks were put in waves (shared/workers/parallel.ts);
+   * measured before and after, interleaved, on the same rows the same minute. */
+  write: 1_570,
+  /** Moving a ticket's status — this app deactivates rather than deletes, so
+   * this IS the delete class: read the row, UPDATE with R17's predicate on it,
+   * write the activity row. 3 trips. */
+  delete: 920,
+  /** A 1,000-row CSV import — THE SLOWEST OPERATION IN THE PRODUCT, and the only
+   * one that misses its budget by more than an order of magnitude. It was 30
+   * minutes (1,799ms per row, one row at a time) before the row loop went into
+   * waves of `BULK_CONCURRENCY`; 3.2 minutes after (190ms per row). Still over
+   * the one-minute budget, and what is left is chunking and a resume point
+   * rather than parallelism — see workers/data-ops/src/lib/import-batch.ts. */
+  bulk: 192_000,
+} as const
+
+/** WHEN. A figure with no date is a figure nobody can argue with. */
+export const MEASURED_ON = "2026-09-05"

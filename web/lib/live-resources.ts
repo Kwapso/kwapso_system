@@ -241,6 +241,13 @@ export const listFetch = {
       primeCache(totalKey("tasks-calendar", teamId), r.calendarTotal)
       primeCache(totalKey("tasks-due-today", teamId), r.dueTodayTotal)
       primeCache(totalKey("tasks-due-today-done", teamId), r.dueTodayDone)
+      // R14/R15: page one's rows live under the view's own key and its next
+      // cursor in the sidecar beside it, so <LoadMore> can reach page two and
+      // the row-level registry keeps the whole thing live without a second
+      // listener. Per VIEW, because each of the six is its own paged read with
+      // its own position — a cursor minted on `completed` means nothing to
+      // `overdue`, and the door refuses it rather than skipping a slice.
+      primeCache(cursorKey(tasksKey(teamId, view)), r.nextCursor)
       return r.tasks
     }),
   // R14: meetings are PAGED — an event is never curated away, so the door answers
@@ -642,11 +649,11 @@ export function staffCertificatesKey(teamId: string): string {
 /** The drafts list. TEAM-WIDE on purpose, like the client-organisation lists: a
  * draft is one call about one process, the read is bounded (R14), and a
  * per-process key is one a listener handed only a team could not name. */
-export function processDraftsKey(teamId: string): string {
+function processDraftsKey(teamId: string): string {
   return `process_drafts:${teamId}`
 }
 /** One opened proposal — read on its own review screen, so its own key. */
-export function processDraftKey(draftId: string): string {
+function processDraftKey(draftId: string): string {
   return `process-draft:${draftId}`
 }
 export function processesKey(teamId: string): string {

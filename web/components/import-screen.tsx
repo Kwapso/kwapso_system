@@ -37,7 +37,7 @@
 // recipe. Gated by the caller holding create on at least one import target.
 
 import * as React from "react"
-import { Download, FileXls } from "@shared/ui/foundations/icons"
+import { ArrowClockwise, Download, FileXls } from "@shared/ui/foundations/icons"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
@@ -87,6 +87,12 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   const [step, setStep] = React.useState<ImportWizardStep>("upload")
   const [batch, setBatch] = React.useState<ImportBatchView | null>(null)
   const [report, setReport] = React.useState<ImportBatchReport | null>(null)
+  /** HOW FAR THE WRITE HAS GOT, read off the batch row while it is running.
+   * Null until the run reaches its first checkpoint. */
+  const [done, setDone] = React.useState<number | null>(null)
+  /** Can this batch be picked up where it stopped? Set when a run fails and the
+   * batch turns out to have a checkpoint to resume from. */
+  const [resumable, setResumable] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   // The run step is the ONE place a failure cannot be a toast: `Back` is
   // withdrawn there by the wizard's own law, so a failed write with only a
@@ -145,19 +151,54 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
     }
   }
 
-  async function run() {
+  /** WHAT AN IMPORT IS DOING, WHILE IT DOES IT.
+   *
+   * The confirm call does not answer until the whole ordered graph is written —
+   * minutes, for a real file — so for all that time this screen knew nothing
+   * except that it was waiting. The run now checkpoints after every wave, so the
+   * batch row can be asked; this asks it.
+   *
+   * Every four seconds, not faster: the checkpoint moves once per wave of twelve
+   * rows, so a tighter poll would ask the same question repeatedly and get the
+   * same answer. A failed poll is IGNORED on purpose — it is a progress bar, and
+   * losing one reading of it must never disturb the import it is watching.
+   */
+  async function run(pickUp = false) {
     if (!batch || busy) return
     setBusy(true)
     setRunFailed(null)
+    setResumable(false)
     setStep("run")
+    let polling = true
+    const watch = window.setInterval(async () => {
+      if (!polling) return
+      try {
+        const { batch: fresh } = await dataOps.batchGet(batch.id)
+        if (polling && fresh.progress) setDone(fresh.progress.rowsDone)
+      } catch {
+        /* a lost reading is not an event — the import is unaffected */
+      }
+    }, 4_000)
     try {
-      const r = await dataOps.batchConfirm(batch.id)
+      const r = pickUp ? await dataOps.batchContinue(batch.id) : await dataOps.batchConfirm(batch.id)
       setReport(r.report)
       setStep("report")
       toast.success(t("Imported {count} row(s).", { count: r.report.created }))
     } catch (err) {
       setRunFailed(err instanceof ApiFailure ? err.message : t("The import didn't finish."))
+      // A DEAD RUN IS NOT A DEAD BATCH ANY MORE. If it got far enough to leave a
+      // checkpoint, there is somewhere honest to carry on from — and carrying on
+      // is the only safe move, because sending the file again would write every
+      // row the dead run already made a second time.
+      try {
+        const { batch: fresh } = await dataOps.batchGet(batch.id)
+        setResumable(fresh.status === "running" && fresh.progress !== null)
+      } catch {
+        /* if we cannot tell, offer nothing rather than offer wrongly */
+      }
     } finally {
+      polling = false
+      window.clearInterval(watch)
       setBusy(false)
     }
   }
@@ -166,6 +207,8 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
     setBatch(null)
     setReport(null)
     setRunFailed(null)
+    setDone(null)
+    setResumable(false)
     setStep("upload")
   }
 
@@ -232,11 +275,27 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       error={runFailed !== null}
       errorEyebrow={t("The import stopped")}
       errorTitle={t("The import didn't finish")}
-      errorBody={runFailed ?? undefined}
+      errorBody={
+        resumable
+          ? `${runFailed ?? ""} ${t("It got part of the way through. Carry on from where it stopped — sending the file again would add everything it already wrote a second time.")}`.trim()
+          : (runFailed ?? undefined)
+      }
       errorAction={
-        <Button variant="secondary" onClick={() => { setRunFailed(null); setStep("review") }}>
-          {t("Back to the plan")}
-        </Button>
+        <>
+          {/* CARRY ON, where there is somewhere honest to carry on FROM. Offered
+              only when the batch actually holds a checkpoint, because the other
+              answer — start again — is the one that duplicates every row the
+              dead run already wrote. */}
+          {resumable && (
+            <Button onClick={() => void run(true)}>
+              <ArrowClockwise className="size-3.5" />
+              {t("Carry on from where it stopped")}
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => { setRunFailed(null); setStep("review") }}>
+            {t("Back to the plan")}
+          </Button>
+        </>
       }
       /* ---- 1 · upload ---- */
       files={files.map((f) => ({ id: f.fileId, name: f.name }))}
@@ -247,6 +306,29 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       uploadHint={t("CSV or Excel (.xlsx) files. Add several at once, the assistant sorts out how they connect.")}
       uploadAside={
         <div className="flex flex-col gap-6">
+          {/* THIS IS THE PRODUCT'S ANSWER TO "CAN I SEE EXAMPLE DATA FIRST?",
+              and it is a deliberate one rather than a gap — said here because
+              a first-run reviewer can only see the absence otherwise.
+              A SAMPLE FILE, NOT A DEMO TENANT. Every target hands out a real
+              file with real example rows in this team's own column names
+              (`/api/data-ops/import/sample`, AGENTIC-IMPORT §10) — so a person
+              can see the shape of a good file, fill it in, and import it, which
+              is the same road their real data takes rather than a rehearsal of
+              it. Nothing is ever written into a team that the team did not ask
+              for.
+              WHY THERE IS NO "LOAD DEMO DATA" BUTTON AND NO "REMOVE IT" BESIDE
+              IT. This app deactivates and never deletes (CONVENTIONS.md), so
+              seeded example rows could not be taken away in one act — they
+              would become permanent rows carrying an audit trail, in the same
+              lists, on a real account's real screens, in the client portal's
+              own reach. A sample file has no such afterlife: if it is wrong you
+              close the tab. The route in was the real gap and it is fixed — the
+              landing screen's own "Start here" block links this screen by name
+              (web/components/screens/home-screen.tsx), where before today the
+              only way to reach it was to type the URL.
+              REACHED FROM A COLLECTION'S OWN "Import CSV" BUTTON, this list is
+              narrowed to that one table (`initialTarget`); reached generically
+              it offers all seven. */}
           {samples.length > 0 && (
             <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
               <span>{t("New to this? Download a sample:")}</span>
@@ -269,16 +351,27 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       /* ---- 3 · review (ours: the bottom line + the fix-list) ---- */
       reviewContent={plan ? <PlanReview plan={plan} /> : undefined}
       /* ---- 4 · run ----
-         Indeterminate ON PURPOSE. The kit's rule is "never a spinner where a
-         shape is known", and here it genuinely is not: `batchConfirm` is one
-         POST that returns when the whole ordered graph has been written, with
-         no per-row progress on the wire. A determinate bar would have to invent
-         its own numerator. */
-      runValue={null}
+         DETERMINATE, now that the shape IS known. This was indeterminate on
+         purpose and the reason was true when it was written: confirm was one
+         POST that answered only when the whole ordered graph had been written,
+         so a bar would have had to invent its numerator. The run now checkpoints
+         after every wave and the batch row carries how far it has got, so the
+         numerator is real and read rather than guessed.
+         Still indeterminate until the FIRST checkpoint lands — an invented zero
+         and a real zero must not look alike (the kit's own rule). */
+      runValue={done}
+      runMax={planRows - skipped}
       runLabel={t("Importing your data")}
-      runMeta={t("Writing {count} row(s). Each one is checked exactly as if you typed it in yourself.", {
-        count: planRows - skipped,
-      })}
+      runMeta={
+        done === null
+          ? t("Writing {count} row(s). Each one is checked exactly as if you typed it in yourself.", {
+              count: planRows - skipped,
+            })
+          : t("{done} of {count} row(s) written. Each one is checked exactly as if you typed it in yourself.", {
+              done,
+              count: planRows - skipped,
+            })
+      }
       /* ---- 5 · report (ours) ---- */
       reportContent={report ? <Report report={report} /> : undefined}
       /* ---- the footer ---- */

@@ -18,7 +18,15 @@ import { describeChanges, logActivity, type Actor } from "@shared/workers/activi
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
-import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { boundedInner } from "@shared/workers/count"
+import {
+  decodeCursor,
+  keysetAfter,
+  PAGE_SIZE,
+  toPage,
+  type Page,
+} from "@shared/workers/paging"
+import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { PRIORITY_LABEL, departmentAsks, priorityScore } from "@shared/departments"
 import type { Task, TaskViewName } from "@shared/types"
@@ -149,25 +157,86 @@ function taskWhere(filter: TaskFilter): { sql: string; params: string[] } {
   return { sql: clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "", params }
 }
 
-/** The team's own admin list. BOUNDED (R14): admin is a handful of things at a
- * time and the done ones fall out of the default view, so this is a collection
- * that shrinks as fast as it grows. Most urgent and most overdue first, then by
- * deadline — the order the person reading it is standing in. */
+/** THE PRIORITY ORDER, AS ONE SORTABLE STRING — because a cursor can only carry
+ * one value and this screen sorts on four.
+ *
+ * The visible order has always been: unfinished before finished, then most
+ * important-and-urgent first, then dated before undated, then soonest deadline.
+ * A keyset cursor names a POSITION, and a position in a four-key order needs all
+ * four keys in it — so the four are concatenated into one string whose ordinary
+ * lexicographic order IS that order. Three single digits and then the deadline:
+ *
+ *   status  0 unfinished · 1 done
+ *   need    3 − (important×2 + urgent), so 0 is both ticks and 3 is neither
+ *   dated   0 has a deadline · 1 does not
+ *   due_on  the deadline itself, or empty
+ *
+ * `due_on` is a variable-length ISO moment and that is safe HERE and only here,
+ * because it is LAST: nothing follows it for a shorter string to bleed into. It
+ * is empty only when the digit before it is already 1, so an undated task can
+ * never sort among the dated ones.
+ *
+ * THE TWO HALVES MUST AGREE EXACTLY. `expr` runs in SQLite and `key` runs in
+ * this worker over the row that came back, and a cursor minted from one and
+ * compared against the other does not fail — it silently skips or repeats a
+ * slice of the collection, which is the failure keyset paging exists to avoid.
+ * `workers/content/test/tasks-paging.test.ts` runs both over the same rows and
+ * fails on the first disagreement.
+ *
+ * NOT INDEXABLE, and said out loud rather than papered over with a decorative
+ * index. SQLite will only use an expression index when the query's expression
+ * text matches it exactly, and the four-key sort this replaces was equally
+ * unindexable — so each page costs a sort of the filtered set, which is the same
+ * cost the single capped query paid before. What would make it a range scan is a
+ * stored sort column maintained on every write; that is a cost on every save to
+ * make a read cheaper, and it is named here and not taken. */
+export const TASK_SORTS: SortMenu<Task> = {
+  priority: {
+    expr:
+      `printf('%d%d%d%s', t.status = 'done', 3 - (t.important * 2 + t.urgent), ` +
+      `t.due_on IS NULL, COALESCE(t.due_on, ''))`,
+    dir: "asc",
+    key: (t) =>
+      `${t.status === "done" ? 1 : 0}` +
+      `${3 - ((t.important ? 2 : 0) + (t.urgent ? 1 : 0))}` +
+      `${t.dueOn ? 0 : 1}${t.dueOn ?? ""}`,
+  },
+}
+
+/** The team's own admin list, PAGED (R14).
+ *
+ * It used to be capped at `LIST_HARD_CAP` on the reasoning that "the done ones
+ * fall out of the default view, so this is a collection that shrinks as fast as
+ * it grows". That is true of the default view and false of three of the six this
+ * same file offers: `completed` asks for exactly the rows that fall out, `all`
+ * asks for every row there has ever been, and `calendar` asks for every dated
+ * one. On those three the cap was a list with an invisible end — a thousand rows
+ * and no way to learn there were more, under a badge (R16) reporting the true
+ * number. A cap is an honest refusal to answer; paging is an answer.
+ *
+ * The ORDER BY is the same four keys as before, through `TASK_SORTS` above. One
+ * visible change and it is worth naming: the id tiebreak now follows the sort
+ * direction (`shared/workers/sorting.ts` says why that rule exists), so two rows
+ * with the same status, the same ticks and the same deadline now come back
+ * oldest-first where they used to come back newest-first. */
 export async function listTasks(
   cfg: D1Rest,
   guard: MemberGuard,
-  filter: TaskFilter
-): Promise<Task[]> {
+  filter: TaskFilter,
+  cursor: string | null = null
+): Promise<Page<Task>> {
   const { sql, params } = taskWhere(filter)
+  const ordering = resolveOrdering(TASK_SORTS, "priority", undefined, undefined)
+  const after = keysetAfter(decodeCursor(cursor, ordering.sig), ordering.expr, ordering.dir, "t.id")
+  const where = [sql.replace(/^ WHERE /, ""), after.sql].filter(Boolean).join(" AND ")
   const rows = await d1Query<TaskRow>(
     cfg,
     guard.databaseId,
-    `SELECT ${TASK_COLS} FROM tasks t${sql}
-      ORDER BY (t.status = 'done'), ((t.important * 2) + t.urgent) DESC,
-               t.due_on IS NULL, t.due_on, t.id DESC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
-    params
+    `SELECT ${TASK_COLS} FROM tasks t${where ? ` WHERE ${where}` : ""}
+      ${orderBy(ordering, "t.id")} LIMIT ${PAGE_SIZE + 1}`,
+    [...params, ...after.params]
   )
-  return rows.map(toTask)
+  return toPage(rows.map(toTask), PAGE_SIZE, (task) => [ordering.key(task), task.id], ordering.sig)
 }
 
 /** EVERY BADGE ON THE STRIP, AND THE PROGRESS BAR, IN ONE READ.
@@ -193,6 +262,32 @@ export type TaskCounts = {
   dueTodayDone: number
 }
 
+/** ONE TASK, BY ID — the read a paged collection owes every screen that shows
+ * one of its records (R38).
+ *
+ * Before this existed, `contentApi.taskOne` fetched `?view=all` and ran `find`
+ * over the rows. That worked only because the list was capped at a thousand and
+ * a team had fewer; the moment this collection pages, "all" is the newest fifty
+ * and every task past the cursor becomes unreachable by direct link — and, worse,
+ * silently unpatchable, because the live registry uses that same call as its
+ * `fetchOne`, so a task that changed outside page one would keep showing
+ * yesterday with nothing to say so. That is the ticket bug of 26 Aug 2026, one
+ * collection along, and it is the reason this landed in the same commit as the
+ * paging rather than after it.
+ *
+ * Deliberately ignores the view: opening a DONE task by id has to work, or the
+ * completed tab could show a row nothing could open. */
+export async function getTask(cfg: D1Rest, guard: MemberGuard, id: string): Promise<Task | null> {
+  const rows = await d1Query<TaskRow>(
+    cfg,
+    guard.databaseId,
+    `SELECT ${TASK_COLS} FROM tasks t WHERE t.id = ? LIMIT 1`,
+    [id]
+  )
+  const row = rows[0]
+  return row ? toTask(row) : null
+}
+
 export async function countTasks(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -204,6 +299,14 @@ export async function countTasks(
     clauses.push("t.assignee_id = ?")
     params.push(filter.assigneeId)
   }
+  // BOUNDED, now that this is a collection R14 makes page (R16's amendment).
+  // Eight numbers over ONE scan is still the right shape and none of it changes
+  // below the ceiling — `boundedInner` only stops a scan that previously ran to
+  // the end of the table. The eight stop TOGETHER, which is the property that
+  // matters: they are eight questions about one set of rows, and a `completed`
+  // badge counted over a million rows beside an `open` badge counted over all of
+  // them would be two numbers that cannot be added up. Past the ceiling the door
+  // reports `totalCapped` and every badge reads "at least".
   const rows = await d1Query<Record<string, number>>(
     cfg,
     guard.databaseId,
@@ -216,7 +319,9 @@ export async function countTasks(
        COUNT(*) AS all_n,
        SUM(CASE WHEN t.due_on IS NOT NULL AND t.due_on < ? THEN 1 ELSE 0 END) AS due_today_n,
        SUM(CASE WHEN t.due_on IS NOT NULL AND t.due_on < ? AND t.status = 'done' THEN 1 ELSE 0 END) AS due_today_done_n
-     FROM tasks t${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""}`,
+     FROM ${boundedInner(
+       `SELECT t.status, t.due_on FROM tasks t${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""}`
+     )} t`,
     params
   )
   const r = rows[0] ?? {}

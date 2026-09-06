@@ -57,11 +57,29 @@ describe("the Eisenhower score is derived on every read", () => {
 
   it("the list's SQL ordering agrees with the function, for every combination", () => {
     const src = readFileSync(LIB, "utf8")
-    // The ORDER BY as it is written, so a change to it fails here rather than
+    // The ranking as it is written, so a change to it fails here rather than
     // silently reordering somebody's day.
-    expect(src, "the ORDER BY that ranks tasks has moved — check it still ranks by the two ticks").toContain(
-      "((t.important * 2) + t.urgent) DESC"
+    //
+    // IT MOVED WHEN TASKS LEARNED TO PAGE, and the sentence it is checking did
+    // not. A cursor names ONE position, so the four-key ORDER BY was folded into
+    // one lexicographic string (`TASK_SORTS`) — and `3 - (important*2 + urgent)`
+    // ASCENDING is the same ranking `((important * 2) + urgent) DESC` was, with
+    // the direction turned round so all four keys can share one direction and
+    // one cursor. The complement is what this pins: the two ticks still decide,
+    // still weighted two-to-one, and a change to either half fails here. The
+    // comparison below is unchanged and is the half that actually proves the
+    // ranking agrees with `priorityScore`.
+    expect(src, "the ranking that orders tasks has moved — check it still ranks by the two ticks").toContain(
+      "3 - (t.important * 2 + t.urgent)"
     )
+    // ASCENDING, and it matters: the fold only works because every key in the
+    // string runs the same way. A `DESC` here would sort the whole composite
+    // backwards, not just this one component.
+    expect(src, "the priority sort is no longer ascending — the whole composite key runs one way").toContain(
+      'dir: "asc"'
+    )
+    // The SQL's own weighting, read the way the fold writes it: smaller is more
+    // urgent, so the comparison below is inverted against `priorityScore`.
     const sql = (important: boolean, urgent: boolean) => (important ? 2 : 0) + (urgent ? 1 : 0)
     const combos = [
       [false, false],

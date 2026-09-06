@@ -12,7 +12,9 @@
 //   FRESH_COOKIE=<cookie> FRESH_TEAM=<id> CANARY_COOKIE=<cookie> CANARY_TEAM=<id> \
 //     node scripts/lane-shots/walk-empty-team.mjs
 import { chromium } from "playwright"
-import { mkdirSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const PORT = process.env.VERIFY_PORT ?? "3065"
 const OUT = "/tmp/empty-walk-shots"
@@ -45,7 +47,26 @@ async function probe(page, path, screenshotPath) {
 
   let status = null
   try {
-    const resp = await page.goto(`http://localhost:${PORT}/${path}`, { waitUntil: "domcontentloaded", timeout: 20000 })
+    // THE NAVIGATION BUDGET IS GENEROUS, AND THAT IS THE POINT.
+    //
+    // This was a fixed 20s and it produced two false ERRs on the 2026-09-06
+    // run — /time and /waves, both of which render perfectly. A re-probe of
+    // the SAME routes took 32s each, and the control in that re-probe was
+    // /accounts, a route this very walk had already probed successfully: it
+    // took 99s. So the reading was never about those screens. A dev server
+    // compiling twenty routes under load is simply slower than any fixed
+    // number somebody picks, and a `page.goto` timeout produces exactly the
+    // result a broken screen produces — which is the one thing this probe
+    // exists not to do.
+    //
+    // The 2026-08-29 run fixed this class of error for the wait AFTER load
+    // (polling for the nav and the skeletons instead of a fixed 2.5s sleep)
+    // and left the navigation itself on a fixed timeout. Same bug, one line
+    // higher, and it survived because the earlier fix looked complete.
+    const resp = await page.goto(`http://localhost:${PORT}/${path}`, {
+      waitUntil: "domcontentloaded",
+      timeout: Number(process.env.WALK_NAV_TIMEOUT_MS ?? 120000),
+    })
     status = resp?.status() ?? null
   } catch (e) {
     return { path, ok: false, crash: String(e), status: null }
@@ -145,3 +166,52 @@ console.log(`screenshots saved to ${OUT}`)
 
 await browser.close()
 console.log("\nJSON:", JSON.stringify(results))
+
+// ── AND IT LANDS SOMEWHERE GIT CAN SEE ────────────────────────────────────
+//
+// THE 2026-08-29 WALK IS WHY THIS BLOCK EXISTS. It ran, it was canary-checked,
+// it found real things — and every one of its findings went into a message to
+// another session and nowhere else. This file's own commit says so: "Findings
+// from the actual walk are in the message to kwapso-cpaa-a7, not repeated here
+// — this commit is the instrument, not the result." Eight days later nobody
+// could say what it found, because a message is not a place: the screenshots
+// go to /tmp, the JSON went to a terminal, and .session-notes/ is gitignored
+// except for one re-admitted folder (.gitignore, "!.session-notes/lanes/").
+//
+// So the last walk now writes itself down. Overwritten each run on purpose —
+// this answers "what does the app look like empty TODAY", and the history of
+// that answer is the file's own git log, which is a better record than a
+// folder of dated blobs nobody prunes.
+// RESOLVED AGAINST THE REPO, NOT AGAINST WHEREVER YOU HAPPEN TO BE STANDING.
+//
+// This was a relative path for about an hour and it was wrong in the exact
+// shape this whole file is about. `writeFileSync(".session-notes/lanes/…")`
+// resolves against `process.cwd()`, so running the walk from anywhere but the
+// repo root threw ENOENT — AFTER the browser had closed and after the JSON had
+// already been printed to the terminal. You would have done the expensive
+// thing, seen your results scroll past, and had nothing on disk: which is
+// precisely the 2026-08-29 failure this block was added to prevent, rebuilt by
+// the fix for it.
+//
+// So the default is anchored to this file's own location (the script lives at
+// <repo>/scripts/lane-shots/), and the directory is created before the write.
+// An explicit WALK_REPORT still wins and is taken as given — an override is a
+// deliberate act, and resolving it for somebody would be the surprise.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
+const REPORT = process.env.WALK_REPORT ?? resolve(REPO_ROOT, ".session-notes/lanes/empty-walk.json")
+mkdirSync(dirname(REPORT), { recursive: true })
+writeFileSync(
+  REPORT,
+  JSON.stringify(
+    {
+      walkedAt: new Date().toISOString(),
+      team: FRESH_TEAM,
+      canaryRan: Boolean(CANARY_COOKIE && CANARY_TEAM),
+      destinations: DESTINATIONS.length,
+      results,
+    },
+    null,
+    2
+  ) + "\n"
+)
+console.log(`\nwritten to ${REPORT} — commit it, that is the point`)

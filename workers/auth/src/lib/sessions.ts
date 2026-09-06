@@ -1,9 +1,33 @@
 import type { Env } from "../env"
 import { randomToken, sha256Hex } from "./crypto"
 import { ulid } from "@shared/workers/id"
+import { readCookie, sessionCookieName, LEGACY_SESSION_COOKIE, SESSION_COOKIE, readSessionToken } from "@shared/workers/session-cookie"
 import type { UserRow } from "./users"
 
-export const SESSION_COOKIE = "kwapso_session"
+/** THE COOKIE NAME AND THE TWO PURE FUNCTIONS OVER IT NOW LIVE IN
+ * `shared/workers/session-cookie.ts`, with the whole `__Host-` argument that
+ * used to sit here.
+ *
+ * WHY THEY MOVED: the literal was hand-written in three places (this file's
+ * pair, plus a third copy in workers/mcp/src/lib/bridge.ts) and the gating
+ * seam's sign-in fallback was about to write a fourth — shared code cannot
+ * import from a worker, so it had nothing to reach for. During the legacy
+ * migration below, a copy that is not updated does not break on the day it is
+ * wrong: it keeps working until the estate drains and then stops finding
+ * sessions, green build and nothing to point at.
+ *
+ * RE-EXPORTED so every call site in this worker keeps its habitual import, and
+ * so auth still reads as the place the session is decided. Auth remains the only
+ * thing that MINTS, SLIDES or DESTROYS one — what moved is a name and two pure
+ * functions. `shared/workers/test/session-cookie.test.ts` fails the build if a
+ * fourth copy of the literal appears anywhere. */
+export {
+  LEGACY_SESSION_COOKIE,
+  SESSION_COOKIE,
+  readCookie,
+  readSessionToken,
+} from "@shared/workers/session-cookie"
+
 const SESSION_DAYS = 30
 /** When less than this many days remain, the session quietly extends itself. */
 const SLIDE_THRESHOLD_DAYS = 15
@@ -23,17 +47,11 @@ const days = (n: number) => n * 24 * 60 * 60 * 1000
  * for what it IS good at — keeping the cookie off third-party GET embeds. */
 function buildCookie(env: Env, value: string, maxAgeSeconds: number): string {
   const secure = env.INSECURE_COOKIE === "1" ? "" : "; Secure"
-  return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${maxAgeSeconds}`
-}
-
-export function readCookie(req: Request, name: string): string | null {
-  const header = req.headers.get("Cookie")
-  if (!header) return null
-  for (const part of header.split(";")) {
-    const [k, ...rest] = part.trim().split("=")
-    if (k === name) return rest.join("=")
-  }
-  return null
+  // `Path=/` and no `Domain` are not stylistic here — they are two of the three
+  // things a browser REQUIRES before it will accept a `__Host-` cookie at all
+  // (the third is `Secure`, above). Change any of them and the cookie is
+  // silently rejected, which reads as "sign-in does nothing".
+  return `${sessionCookieName(env.INSECURE_COOKIE === "1")}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${maxAgeSeconds}`
 }
 
 /** Log a user in: store a hashed session row, hand the browser the cookie. */
@@ -94,7 +112,7 @@ export async function getSessionUser(
   env: Env,
   req: Request
 ): Promise<UserRow | null> {
-  const token = readCookie(req, SESSION_COOKIE)
+  const token = readSessionToken(req)
   if (!token) return null
 
   const tokenHash = await sha256Hex(token)
@@ -175,8 +193,20 @@ export async function destroySession(
   env: Env,
   req: Request
 ): Promise<{ setCookie: string }> {
-  const token = readCookie(req, SESSION_COOKIE)
-  if (token) {
+  // EVERY TOKEN THIS BROWSER PRESENTED, not just the one that authenticated it.
+  //
+  // The blanking header below can only clear ONE name, and during the `__Host-`
+  // migration a browser may be carrying two. Clearing the prefixed one and
+  // leaving a LIVE legacy cookie behind is the worst version of this: the next
+  // request falls back to it — and if that cookie was injected by another host
+  // on the site, signing out would hand the person to the attacker rather than
+  // away from them. So logging out destroys the session ROW behind every token
+  // presented, which is what makes the leftover cookie inert whatever the
+  // browser does with it. Deleting by hash means an unknown token costs one
+  // no-op statement and gives nothing away.
+  const tokens = [readCookie(req, SESSION_COOKIE), readCookie(req, LEGACY_SESSION_COOKIE)]
+  for (const token of tokens) {
+    if (!token) continue
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?")
       .bind(await sha256Hex(token))
       .run()

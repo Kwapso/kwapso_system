@@ -7,6 +7,9 @@
 
 import type { D1Database } from "@cloudflare/workers-types"
 
+import type { CoreDb } from "./error-log"
+import type { ActivityOrigin } from "./origin"
+
 export type D1Rest = {
   accountId: string
   apiToken: string
@@ -42,7 +45,49 @@ export type D1Rest = {
    * is the one thing already threaded to every call site in the codebase. No
    * handler had to change to be measured. Absent = nobody asked, and the door
    * pays nothing. */
-  stats?: { op: string; ms: number }[]
+  stats?: { op: string; ms: number; rows?: number }[]
+  /** THIS REQUEST'S DEFERRER — how `logActivity` stops being something the person
+   * who clicked Save waits for (owner's ruling, 6 Sep 2026; the reasoning and its
+   * provenance are in shared/workers/parallel.ts).
+   *
+   * It rides on the config for the same reason `stats` above and `core` below do,
+   * and the reason is the same one stated there: the config is the one thing
+   * already threaded to every call site, and `logActivity` has ~140 of them. A
+   * fifth argument on each would be ~140 chances to forget it, and a
+   * half-deferred audit trail is worse than an awaited one.
+   *
+   * Absent = await, exactly as before. Crons, tests and libs called directly have
+   * no request to hang work on and are unchanged. */
+  defer?: (work: Promise<unknown>) => void
+  /** WHERE A FAILURE ON THIS DOOR IS RECORDED — the global core database, so the
+   * one seam that swallows by contract (`logActivity`) can still leave a row.
+   *
+   * It rides on the config for exactly the reason `stats` does, and the reason is
+   * the whole point: the config is the one thing already threaded to every call
+   * site in the codebase, and `logActivity` has 140 of them. The alternative was a
+   * fifth argument on every one, in five workers, which is the shape that ends
+   * with half the call sites never passing it — and half an audit trail is worse
+   * than none, because it looks complete.
+   *
+   * OPTIONAL, and absent means exactly what it meant before this existed: the
+   * console line and nothing else. A config built by hand in a test does not have
+   * to invent a database, and a caller that has no core binding (neither gateway
+   * has one) is not broken by asking for one. */
+  core?: CoreDb
+  /** WHICH FRONT DOOR THIS REQUEST CAME THROUGH, for the activity row's own
+   * `origin` column (shared/workers/origin.ts says why the column exists).
+   *
+   * It rides here for the third time for the second reason: the config is the
+   * one thing already threaded to every call site in the codebase, and the
+   * writer that needs it has 139 of them. `core` won that argument first and
+   * this is the same shape — a fifth argument on every one, in five workers, is
+   * the shape that ends with half the sites never passing it.
+   *
+   * Set by `d1ConfigFrom`, which REQUIRES it, so a config cannot be built
+   * without somebody deciding. Absent only on a config assembled by hand (a
+   * test, a script), and then the row reads `unknown`, which is the honest
+   * answer rather than a guess. */
+  origin?: ActivityOrigin
   /** WHERE A NEW TEAM DATABASE IS BORN — a Cloudflare primary-location hint.
    * Set from `D1_LOCATION` where a deployment sets it; `weur` otherwise. It is
    * on the config rather than passed at the one call site because a database
@@ -73,17 +118,28 @@ async function cf<T>(
   cfg: D1Rest,
   path: string,
   body?: unknown,
-  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST"
+  method: "GET" | "POST" | "DELETE" = body === undefined ? "GET" : "POST",
+  /** HOW MANY ROWS THIS TRIP CARRIED, read off the answer by the one caller that
+   * has an answer shaped like rows. A count, never a value — the timing seam's
+   * standing rule (timing.ts's header) is that nothing a caller supplied may
+   * ride these numbers, and a cardinality is not data. It is a callback rather
+   * than a second pass over `cfg.stats` because parallel statements interleave:
+   * "annotate the most recent stat" is exact only while nothing else is in
+   * flight, and this file is about to be used with `Promise.all`. */
+  rowsOf?: (result: T) => number
 ): Promise<T> {
   if (!cfg.stats) return cfRaw<T>(cfg, path, body, method)
   const started = Date.now()
   const sql = (body as { sql?: string } | undefined)?.sql
+  let rows: number | undefined
   try {
-    return await cfRaw<T>(cfg, path, body, method)
+    const out = await cfRaw<T>(cfg, path, body, method)
+    rows = rowsOf?.(out)
+    return out
   } finally {
     // In a `finally`, so a statement that THREW is still counted. A failing
     // query is usually the slow one, and leaving it out would hide it.
-    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started })
+    cfg.stats.push({ op: sql ? labelFor(sql) : method, ms: Date.now() - started, rows })
   }
 }
 
@@ -227,6 +283,31 @@ export async function d1DeleteDatabase(
 export async function d1ListDatabases(
   cfg: D1Rest
 ): Promise<{ uuid: string; name: string; file_size: number | null }[]> {
+  return (await d1ListAllDatabases(cfg)).databases
+}
+
+/** THE SAME LISTING, PLUS WHETHER IT IS THE WHOLE OF IT.
+ *
+ * `d1ListDatabases` has always stopped at `D1_LIST_PAGE_CAP` and said so — to the
+ * CONSOLE. That is the right amount of signal for a caller asking "which of these
+ * are over 80%", because a database the listing never reached is simply found on
+ * a later night.
+ *
+ * It is the wrong amount for a caller that SUMS the answer. D1 caps total storage
+ * per ACCOUNT (1 TB), and a truncated listing under-counts that total — silently,
+ * and in the one direction that matters: the number comes back reassuringly small
+ * on exactly the night the estate got big enough to truncate the listing. "We are
+ * at 40% of the account cap" and "we are at 40% of the part of the account we
+ * managed to look at" are different sentences and only one of them is safe to act
+ * on, so the completeness rides back with the rows rather than being left in a
+ * log line nobody joins to the figure.
+ *
+ * Kept as a second export rather than a changed return type: the alarm caller
+ * genuinely does not need it, and widening one function's contract to serve the
+ * other's question is how a value ends up ignored at three call sites. */
+export async function d1ListAllDatabases(
+  cfg: D1Rest
+): Promise<{ databases: { uuid: string; name: string; file_size: number | null }[]; complete: boolean }> {
   const all: { uuid: string; name: string; file_size: number | null }[] = []
   // BOUNDED: the loop used to be `for (;;)` with only "a short page" to stop it —
   // an upstream that keeps answering with a full page (a paging bug, a `page`
@@ -237,12 +318,12 @@ export async function d1ListDatabases(
       { uuid: string; name: string; file_size: number | null }[]
     >(cfg, `/d1/database?page=${page}&per_page=100`)
     all.push(...batch)
-    if (batch.length < 100) return all
+    if (batch.length < 100) return { databases: all, complete: true }
   }
   console.error(
     `d1ListDatabases: stopped at the ${D1_LIST_PAGE_CAP}-page ceiling (${all.length} databases), the list is INCOMPLETE.`
   )
-  return all
+  return { databases: all, complete: false }
 }
 
 /** Run ONE parameterized statement; returns its rows.
@@ -263,7 +344,9 @@ export async function d1Query<Row = Record<string, unknown>>(
   const result = await cf<{ results: Row[] }[]>(
     cfg,
     `/d1/database/${databaseId}/query`,
-    { sql, params }
+    { sql, params },
+    undefined,
+    (r) => r[0]?.results?.length ?? 0
   )
   return result[0]?.results ?? []
 }
@@ -279,10 +362,12 @@ async function nativeQuery<Row>(
 ): Promise<Row[]> {
   if (!cfg.stats) return runNative<Row>(db, sql, params)
   const started = Date.now()
+  let rows: Row[] = []
   try {
-    return await runNative<Row>(db, sql, params)
+    rows = await runNative<Row>(db, sql, params)
+    return rows
   } finally {
-    cfg.stats.push({ op: labelFor(sql), ms: Date.now() - started })
+    cfg.stats.push({ op: labelFor(sql), ms: Date.now() - started, rows: rows.length })
   }
 }
 

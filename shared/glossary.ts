@@ -12,6 +12,23 @@ export interface GlossaryEntry {
 
 export const GLOSSARY = {
   team: { term: "Team", def: "Your shared workspace, the people and data you work on together." },
+  // THERE IS DELIBERATELY NO `user` ENTRY, AND ADDING ONE WOULD BREAK THE BUILD.
+  // A user is an IDENTITY (one row in the global `users` table); a Member is that
+  // identity on a team. The first is engineering vocabulary the screens must never
+  // say — R34 bans "user"/"users" in favour of "member" (GLOSSARY_SYNONYMS), and a
+  // glossary term may not be a banned word, so this omission is enforced rather
+  // than merely intended. DATA-MODEL.md § `users` states the three-way distinction
+  // (user / member / person) in full; this comment exists so the next reader does
+  // not "fix" the gap.
+  //
+  // DELETE THIS COMMENT WHEN: the two front doors legitimately say "user" to a
+  // person — which today they do zero times out of 1,955 catalogued sentences,
+  // and R34 is what keeps it that way. If that ban is ever lifted, this note is
+  // wrong and the entry it forbids may be the right thing to add.
+  //
+  // NOTE ON `person`: it is NOT a banned word and must not become one. It is the
+  // word inside this very definition, and it is the right word for the people who
+  // are not members — the contact who raised a ticket, the name on an account.
   member: { term: "Member", def: "A person on your team." },
   role: { term: "Role", def: "What a member is allowed to see and do." },
   permission: { term: "Access right", def: "A single thing a role can do: read, create, edit, or delete." },

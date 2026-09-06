@@ -17,8 +17,10 @@
 //   GET  /api/data-ops/health
 
 import { brand } from "@shared/brand"
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
-import { logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
@@ -29,11 +31,12 @@ import {
   getImportSample,
   getImportTargets,
   postBatchConfirm,
+  postBatchContinue,
   postBatchFile,
   postBatchPlan,
   postBatchStart,
 } from "./routes/import"
-import { getErrors, postResolveError, postSeedTargets } from "./routes/admin"
+import { getErrors, postResolveError, postResolveErrorSignature, postSeedTargets } from "./routes/admin"
 import {
   getAgentThread,
   getAgentThreads,
@@ -71,6 +74,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/data-ops/import/batch/file": { handler: postBatchFile, kind: "housekeeping" },
   "POST /api/data-ops/import/batch/plan": { handler: postBatchPlan, kind: "housekeeping" },
   "POST /api/data-ops/import/batch/confirm": { handler: postBatchConfirm, kind: "mutation" },
+  // The second way into `confirmBatch` — picking up a run that died half way.
+  "POST /api/data-ops/import/batch/continue": { handler: postBatchContinue, kind: "mutation" },
   "GET /api/data-ops/import/batch": { handler: getBatch, kind: "read" },
   "GET /api/data-ops/import/batches": { handler: getBatches, kind: "read" },
   "POST /api/data-ops/admin/seed-targets": { handler: postSeedTargets, kind: "housekeeping" },
@@ -78,6 +83,10 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // private maintainer bookkeeping in the core DB — broadcasts nothing (rule 4).
   "GET /api/data-ops/admin/errors": { handler: getErrors, kind: "read" },
   "POST /api/data-ops/admin/errors/resolve": { handler: postResolveError, kind: "housekeeping" },
+  // Closes a whole CLASS of failure at once, grouped the way the nightly digest
+  // already groups it. Housekeeping like its single-row sibling: the error store
+  // is core-database ops material with no team row to patch and no listener.
+  "POST /api/data-ops/admin/errors/resolve-signature": { handler: postResolveErrorSignature, kind: "housekeeping" },
   "GET /api/data-ops/agent/usage": { handler: getAgentUsage, kind: "read" },
   "GET /api/data-ops/agent/usage-log": { handler: getAgentUsageLog, kind: "read" },
   "POST /api/data-ops/admin/grant-credits": { handler: postGrantCredits, kind: "mutation" },
@@ -102,24 +111,60 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    // The wall clock starts HERE, not at the first database trip: the budget in
+    // limits.ts is a promise about how long a person waits, and the work above
+    // the database (session verification, gating, JSON) is part of that wait.
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
-      if (route === "GET /api/data-ops/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/data-ops/health")
+        return json(healthBody("data-ops", env, ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"]))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such data-ops action.")
       // Measured on the way out — see timing.ts.
-      const res = await def.handler(request, env)
-      logIfSlow(request, route)
-      return withTiming(request, res)
+      // A PER-REQUEST COPY OF `env`, carrying this request's deferrer — the only way
+      // the ping can stop holding the response (owner's ruling, 6 Sep 2026;
+      // parallel.ts carries the reasoning and the provenance). `env` itself is
+      // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
+      // on it would attach one caller's work to another caller's request. The
+      // copy is shallow: every binding travels by reference, and only this field
+      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // The route's OWN tag decides which budget it answers to (limits.ts) —
+      // one place a route's class is declared, and the measurement follows it.
+      logIfSlow(request, route, def.kind, env.DB)
+      return withTiming(request, res, def.kind)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("data-ops worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`data-ops worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "data-ops", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, imports are paused.`)

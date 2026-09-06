@@ -163,14 +163,17 @@ export function AppDetailScreen({
     canArrangeMeeting ? `purposes:${teamId}` : null,
     () => listFetch.purposes(teamId)
   )
-  const selectableQ = useCached<SelectableValue[]>(
-    canRaiseTicket ? `selectable:${teamId}` : null,
-    () => tenancy.selectable().then((r) => r.values)
-  )
+  // ONE READ OF THE TEAM'S VOCABULARY, not two. This was a second read of
+  // `selectable:<team>` with the same fetcher as `teamVocabulary` above —
+  // and `teamVocabulary` is unconditional, so the conditional key here could
+  // never be the one that warmed the cache. It cost no extra request (the store
+  // dedupes an in-flight key), but it was a second place to change the same
+  // question, and a screen reading one thing twice reads as though it wanted
+  // two. The marks and the ticket types come off one read now.
   // THE TEAM'S OWN `Ticket type` WORDS — one derivation, read by the create
   // dialog below AND by the Tickets tab's own Kind facet, so the two can never
   // offer two different lists of the same vocabulary.
-  const helpTypeOptions = (selectableQ.data ?? [])
+  const helpTypeOptions = (teamVocabulary.data ?? [])
     .filter((v) => v.type === "Ticket type" && v.active)
     .map((v) => v.value)
 

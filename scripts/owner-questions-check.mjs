@@ -95,7 +95,7 @@ const verify = await fetch(`${BASE}/api/auth/email/verify`, {
   body: JSON.stringify({ email: EMAIL, code }),
 })
 const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-if (!cookie.startsWith("kwapso_session=")) {
+if (!/^(__Host-)?kwapso_session=/.test(cookie)) {
   console.error("could not sign in")
   process.exit(1)
 }

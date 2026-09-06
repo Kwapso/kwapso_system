@@ -108,9 +108,19 @@
 //                                             database's retention sweep
 
 import { brand } from "@shared/brand"
+import { configReport, healthBody } from "@shared/workers/config-health"
+
+/** WHAT TENANCY CANNOT WORK WITHOUT, named once so the health answer and the
+ * nightly self-check ask the identical question. `CF_D1_TOKEN` is on it for a
+ * reason: it being refused is 1,848 of the 5,086 rows in the live error store,
+ * every one of them somebody's failed request rather than a check nobody had to
+ * be inconvenienced to run. */
+const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
-import { logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { recordWorkerError } from "@shared/workers/error-log"
+import { readOpsDigest, sendOpsDigest } from "./lib/ops-alert"
 import { identityFor } from "@shared/workers/gating"
 import { requestId } from "@shared/workers/trace"
 import { sweepCoreRetention } from "@shared/workers/retention"
@@ -434,26 +444,62 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    // The wall clock starts HERE, not at the first database trip: the budget in
+    // limits.ts is a promise about how long a person waits, and the work above
+    // the database (session verification, gating, JSON) is part of that wait.
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
-      if (route === "GET /api/tenancy/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/tenancy/health")
+        return json(healthBody("tenancy", env, TENANCY_REQUIRED))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such tenancy action.")
       // Measured on the way out (timing.ts): the browser's network panel reads
       // `Server-Timing` with no tooling, and a door slow for everybody prints a
       // line nobody has to be watching for.
-      const res = await def.handler(request, env)
-      logIfSlow(request, route)
-      return withTiming(request, res)
+      // A PER-REQUEST COPY OF `env`, carrying this request's deferrer — the only way
+      // the ping can stop holding the response (owner's ruling, 6 Sep 2026;
+      // parallel.ts carries the reasoning and the provenance). `env` itself is
+      // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
+      // on it would attach one caller's work to another caller's request. The
+      // copy is shallow: every binding travels by reference, and only this field
+      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // The route's OWN tag decides which budget it answers to (limits.ts) —
+      // one place a route's class is declared, and the measurement follows it.
+      logIfSlow(request, route, def.kind, env.DB)
+      return withTiming(request, res, def.kind)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("tenancy worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`tenancy worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, team creation is paused.`)
@@ -476,7 +522,7 @@ export default {
    * the core binding. Giving auth a cron of its own to run one delete would be a
    * second unattended schedule, a second deploy surface and a second thing to
    * forget — for no more safety than this line. */
-  async scheduled(_controller, env): Promise<void> {
+  async scheduled(controller, env): Promise<void> {
     // Two independent jobs, two try blocks. A failing size check must not cost
     // the estate its sweep, and a failing sweep must not hide an 80% alarm.
     try {
@@ -499,9 +545,9 @@ export default {
       await recordWorkerError(env.DB, "tenancy", "cron/retention", e)
     }
     try {
-      const result = await checkDatabaseSizes(env, d1Config(env))
+      const result = await checkDatabaseSizes(env, d1Config(env, "automation"))
       console.log(
-        `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s)`
+        `size check: ${result.checked} team DBs, ${result.alerted.length} alarm(s); account D1 storage ${result.accountBytes} bytes${result.accountComplete ? "" : " (LOWER BOUND — the listing was truncated)"}, ${result.ourBytes} of them ours`
       )
       // R12 IN SPIRIT: the run has a ceiling, and hitting it means databases over
       // 80% went un-alarmed tonight. That is not a crash, so the catch below
@@ -535,6 +581,45 @@ export default {
       // invisible — record it to the error store, not just the console.
       console.error("nightly size check failed:", e)
       await recordWorkerError(env.DB, "tenancy", "cron/size-check", e)
+    }
+    // BEFORE ANY OF IT: IS THIS WORKER EVEN CONFIGURED? A missing secret has
+    // never been detected until somebody's request failed on it, which on
+    // staging is 1,848 rows of `cloud_key_rejected` — and a cron has no
+    // somebody. Reported by NAME, never by value (config-health.ts), and
+    // RECORDED rather than logged, because "the nightly jobs stopped a fortnight
+    // ago because ALERT_TO was cleared" must not be a thing only the console
+    // knew. It runs last so a broken config cannot cost the estate its sweep.
+    const config = configReport(env, TENANCY_REQUIRED)
+    if (!config.ok)
+      await recordWorkerError(
+        env.DB,
+        "tenancy",
+        "cron/config",
+        new Error(
+          `this worker is missing required configuration and its unattended work is degraded or dead: ${config.missing.join(", ")}. Set it with a wrangler secret (a secret) or in wrangler.jsonc (a var), then redeploy.`
+        )
+      )
+
+    // THE THIRD JOB, AND THE ONE THAT READS WHAT THE OTHER TWO WROTE. Its own
+    // try, like the two above and for the same reason: a digest that cannot be
+    // assembled must not cost the estate its sweep or its size alarm.
+    //
+    // It exists because two finished systems were waiting for somebody to come
+    // and look — the error store, which records every failure in eight workers
+    // and told nobody, and the AI meter, which refuses a turn at the cap and
+    // warns before it never. Nothing is written here; it reads three tables and,
+    // on a night with something to say, sends one email to the same ALERT_TO the
+    // size alarm uses. On a quiet night it sends nothing at all.
+    try {
+      const digest = await readOpsDigest(env, new Date(controller.scheduledTime), env.AGENT_MODEL ?? "")
+      console.log(
+        `ops digest: ${digest.fresh.length} new, ${digest.spiking.length} spiking, ${digest.nearQuota.length} near quota, ${digest.spend.turns} assistant turn(s)`
+      )
+      const sent = await sendOpsDigest(env, digest)
+      if (sent.mailed) console.log(`ops digest emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
+    } catch (e) {
+      console.error("nightly ops digest failed:", e)
+      await recordWorkerError(env.DB, "tenancy", "cron/ops-digest", e)
     }
   },
 } satisfies ExportedHandler<Env>

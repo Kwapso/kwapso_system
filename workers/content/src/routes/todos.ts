@@ -12,6 +12,7 @@
 // PORTAL_VISIBLE_* tables in shared/rules/registry.ts.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
+import { afterResponse } from "@shared/workers/parallel"
 import { optionalMoment, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
@@ -19,7 +20,7 @@ import { accountScope, refusePortalCaller, type AccountScope } from "@shared/wor
 import { gated, gatedBody } from "@shared/workers/route"
 import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
 import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, getTodo, listTodos, todoOrThrow } from "../lib/todos"
-import { countTasks, createTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
+import { countTasks, createTask, getTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
 import { TASK_VIEWS, TODO_VIEWS, type TaskViewName, type TodoViewName } from "@shared/types"
 import type { Env } from "../env"
@@ -169,8 +170,9 @@ export async function postCreateTodo(request: Request, env: Env): Promise<Respon
   })
   await publishChange(env, guard.teamId, "todos", created.id, "add", created.accountId)
   // Best-effort, and after the write: a failed email must never fail the to-do
-  // that triggered it. The row is already saved and already on their screen.
-  await notifyTodoRaised(env, cfg, guard, created.id)
+  // that triggered it. The row is already saved and already on their screen —
+  // and the send no longer sits between the write and the answer (parallel.ts).
+  afterResponse(request, notifyTodoRaised(env, cfg, guard, created.id))
   return todoPage(cfg, guard, scope, { view: "open" }, null)
 }
 
@@ -296,16 +298,27 @@ function taskFilterFrom(url: URL): TaskFilter {
 async function taskPage(
   cfg: Parameters<typeof listTasks>[0],
   guard: Parameters<typeof listTasks>[1],
-  filter: TaskFilter
+  filter: TaskFilter,
+  cursor: string | null = null
 ): Promise<Response> {
-  const [tasks, counts] = await Promise.all([
-    listTasks(cfg, guard, filter),
+  const [page, counts] = await Promise.all([
+    listTasks(cfg, guard, filter, cursor),
     countTasks(cfg, guard, { assigneeId: filter.assigneeId }),
   ])
   const view = filter.view ?? "open"
-  return json({
-    tasks,
-    total: counts[view],
+  // R14: rows + exact total + hasMore + an opaque cursor, through the ONE seam.
+  // `total` is the count for the view being LISTED — the same number the badge
+  // above the list shows — while the eight below are the whole strip, which the
+  // rows on this page could never answer for the five views they are not.
+  // WRITTEN OUT, NOT EXTRACTED — and the duplication with the by-id lookup
+  // below is deliberate, so please do not tidy it away. R27 derives what a
+  // response carries from the `json({…})` LITERALS in this file: it is the check
+  // that stops a tool description promising a field the door does not answer
+  // with. Folding these eight into a shared `taskCountFields()` helper kept the
+  // response byte-identical and made the fields invisible to that derivation, so
+  // `list_tasks`'s description — which names all eight — went red for describing
+  // its own real contract. A law that reads the disk can only see what is on it.
+  return pagedJson("tasks", { ...page, total: counts[view] }, {
     openTotal: counts.open,
     allTotal: counts.all,
     overdueTotal: counts.overdue,
@@ -341,9 +354,43 @@ async function taskPage(
 export async function getTasks(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "work", "read")
   await refusePortalCaller(cfg, guard)
-  const filter = taskFilterFrom(new URL(request.url))
+  const url = new URL(request.url)
+  const filter = taskFilterFrom(url)
   const everyones = await hasRight(cfg, guard, "all_tasks", "read")
-  return taskPage(cfg, guard, everyones ? filter : { ...filter, assigneeId: guard.userId })
+  const narrowed = everyones ? filter : { ...filter, assigneeId: guard.userId }
+  // ONE TASK BY ID IS A LOOKUP, NOT A PAGE — the same shape the tickets door
+  // takes, and for the same reason: once a collection pages, filtering a page
+  // for a record that may legitimately not be on it is how a screen comes to
+  // say a record does not exist. The eight counts still ride the answer, so a
+  // detail screen opened cold still gets the strip.
+  const id = queryText(url.searchParams.get("id"), "Id")
+  if (id) {
+    const [one, counts] = await Promise.all([
+      getTask(cfg, guard, id),
+      countTasks(cfg, guard, { assigneeId: narrowed.assigneeId }),
+    ])
+    // Whose task it is, applied to the lookup as well as to the list: without
+    // the everyone's-tasks right a caller reads their own by id and nobody
+    // else's, rather than the door narrowing the list and leaving the direct
+    // link open beside it.
+    const mine = one && (everyones || one.assigneeId === guard.userId) ? one : null
+    // The same eight, spelled out again — see the note in `taskPage`.
+    return pagedJson(
+      "tasks",
+      { rows: mine ? [mine] : [], total: counts[narrowed.view ?? "open"], hasMore: false, nextCursor: null },
+      {
+        openTotal: counts.open,
+        allTotal: counts.all,
+        overdueTotal: counts.overdue,
+        upcomingTotal: counts.upcoming,
+        completedTotal: counts.completed,
+        calendarTotal: counts.calendar,
+        dueTodayTotal: counts.dueToday,
+        dueTodayDone: counts.dueTodayDone,
+      }
+    )
+  }
+  return taskPage(cfg, guard, narrowed, queryText(url.searchParams.get("cursor"), "Cursor") ?? null)
 }
 
 /** POST /api/content/tasks — write down a piece of admin (work:create).

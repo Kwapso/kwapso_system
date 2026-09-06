@@ -31,8 +31,9 @@
 // It exits non-zero if any check fails or any artefact could not be taken back.
 
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
-const BASE = process.env.SWEEP_BASE ?? "https://agency-staging.kwapso.app"
+const BASE = process.env.SWEEP_BASE ?? FRONT_DOORS.staging.agency
 /** The one Google account this sweep is allowed to touch. Named here so a
  * misconfigured run stops at the door rather than mailing a stranger — the
  * signed-in connection is checked against it before a single write. */
@@ -79,8 +80,8 @@ const verified = await timedFetch(`${BASE}/api/auth/email/verify`, {
   body: JSON.stringify({ email: ONLY_ADDRESS, code: minted.body.code }),
 })
 const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0]
-ok("session cookie set", verified.ok && cookie.startsWith("kwapso_session="))
-if (!cookie.startsWith("kwapso_session=")) process.exit(1)
+ok("session cookie set", verified.ok && /^(__Host-)?kwapso_session=/.test(cookie))
+if (!/^(__Host-)?kwapso_session=/.test(cookie)) process.exit(1)
 
 const active = await api("/api/tenancy/active", {}, cookie)
 ok("standing in a team", active.ok && Boolean(active.body?.team?.id), JSON.stringify(active.body).slice(0, 200))

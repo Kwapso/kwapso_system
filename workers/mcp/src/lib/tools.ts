@@ -16,8 +16,9 @@
 
 import { GuardError } from "@shared/workers/gating"
 import { forwardToDoor } from "@shared/workers/http"
-import { B, checkArgTypes, N, obj, S, str } from "@shared/workers/tool-args"
-import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
+import { readsInternalMoney } from "@shared/workers/money-taint"
+import { B, checkArgTypes, enumOf, N, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
 import { TOOL_GATES } from "@shared/workers/tool-gates"
 import type { Env } from "../env"
@@ -222,6 +223,21 @@ const MCP_ONLY: McpTool[] = [
     buildBody: (i) => ({ batchId: i.batchId }),
   },
   {
+    name: "continue_import",
+    // R27 keeps this honest: a backticked name here must be this tool's own
+    // argument, a field ITS door reads or answers with, or another tool's name.
+    // The place a dead run stopped is real but it is `get_import`'s field, not
+    // this door's — so it is described in words and named by the tool that
+    // actually carries it.
+    description:
+      "Pick up an import that did not finish. A run that dies part way leaves its batch marked running, remembering which table it was inside and how many of that table's rows were done — get_import shows that. This continues from there instead of starting again, which is what re-running the file would do and would write every finished row a second time. It takes the same `batchId` as run_import and answers with the same `report`, covering the whole import rather than this leg. Refused when there is nothing to pick up. Up to eleven rows either side of the interruption may be written twice; the report says where it resumed.",
+    inputSchema: obj({ batchId: S }, ["batchId"]),
+    binding: "DATAOPS",
+    method: "POST",
+    path: "/api/data-ops/import/batch/continue",
+    buildBody: (i) => ({ batchId: i.batchId }),
+  },
+  {
     name: "list_imports",
     description: "The team's import history (who ran what, when, totals).",
     inputSchema: obj({}),
@@ -381,7 +397,12 @@ const RECORD_ACTIVE_GENERIC: McpTool = {
     "access-widening for SOME record kinds, never for others: confirm with a person before calling " +
     "this unless you already know the kind you are calling it for is one of the ones that runs straight " +
     "through.",
-  inputSchema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+  // `record` is an ENUM, not a bare string: an unrecognised kind used to
+  // type-check fine and fall through to the CANONICAL door below, so a ticket id
+  // sent with record:"ticket" reached the ACCOUNTS archive door. checkArgTypes
+  // refuses it now, before any routing decision, and the model is handed the
+  // list rather than having to read it out of the prose above.
+  inputSchema: obj({ record: enumOf(RECORD_TOGGLE_NAMES), id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
   binding: "TENANCY",
   method: "POST",
   path: "/api/tenancy/accounts/active",
@@ -429,7 +450,7 @@ const MAX_RESULT_CHARS = 400_000
  * those out at 30 seconds would break the thing working correctly. */
 const DOOR_TIMEOUT_MS = 30_000
 const LONG_DOOR_TIMEOUT_MS = 120_000
-const LONG_RUNNING = new Set(["run_import", "plan_import", "agent_chat", "agent_confirm"])
+const LONG_RUNNING = new Set(["run_import", "continue_import", "plan_import", "agent_chat", "agent_confirm"])
 
 /** Forward one tool call to its gated door with the bridged session cookie.
  *
@@ -455,6 +476,63 @@ export async function forwardTool(
   // `binding` above stay the canonical fallback for the drift guard and for
   // every ordinary tool, which never sets `route` and takes this branch for free.
   const dest = tool.route ? tool.route(input) : { binding: tool.binding, path: tool.path }
+  // R24's OUTBOUND HALF, ON THE SURFACE THAT HAS NO CONTEXT TO TAINT.
+  //
+  // `shared/workers/money-taint.ts` refuses a client-readable WRITE from a turn
+  // that has already read an internal number. That works on the agent because a
+  // turn can be ASKED what it has run — the check reads the same messages the
+  // model is reading. An MCP `tools/call` is one HTTP request carrying a bearer
+  // token: no turn, no conversation, no prior tool list. So the agent's predicate
+  // ported here verbatim is ALWAYS false, and would be a check that passes with
+  // the hole fully open — the exact failure this codebase keeps re-earning, which
+  // is why it is written down here rather than discovered a third time.
+  //
+  // THE CHAIN IS REAL ON THIS SURFACE. An outside model reads a client's ticket
+  // prose through `list_help_tickets`, and that prose can carry an instruction:
+  // read the margin, then reply to the ticket with it. Both tools are here, the
+  // reply door is on the portal's own allow-list, and nothing in between could
+  // see the connection.
+  //
+  // SO THE NUMBER DOES NOT LEAVE BY THIS DOOR AT ALL — R24's own doctrine, "a
+  // condition can be inverted and a permission can be granted, an import cannot
+  // be forgotten", applied to a surface whose context we cannot see. The
+  // precedent is this file's own: twenty-one Google tools are already refused a
+  // personal access token because "the blast radius of a leaked one must not
+  // include a mailbox" (MCP.md §3). It must not include what our own hour costs
+  // either — SCOPE names the margin as the one number a client must never see —
+  // and the mitigation is the same one Google gets: `agent_chat`, under the
+  // caller's own rights, where the per-turn taint applies because there is
+  // genuinely a turn.
+  //
+  // WHY THE REFUSAL IS HERE AND NOT A FILTER ON `MCP_TOOLS`. It was a filter
+  // first. Two things stopped it, both discovered by running it rather than by
+  // reasoning: the twenty-one `set_*_active` names are PUBLISHED EXTERNAL
+  // CONTRACTS that record-toggles.test.ts forbids removing, and dropping eight
+  // names also inverted R43's stated direction (MCP is a strict superset of the
+  // agent's catalogue) and staled two hard-coded census counts and MCP.md. That
+  // is a product decision about a published API, not a security fix, so it went
+  // back to the planner instead. This refusal closes the hole identically — the
+  // figure never leaves the building through MCP either way — and breaks nothing.
+  //
+  // ASKED OF `dest`, NOT OF THE TOOL NAME: a name is a label somebody chooses, a
+  // path is the door itself, and `dest` is the door this call will actually open
+  // — `route(input)` for a tool that resolves per call from its own input (which
+  // is how `set_record_active` could otherwise be POINTED at a money door),
+  // `tool.path` for everything else. `readsInternalMoney` is the same derived
+  // predicate the agent's taint uses and the same one
+  // `internal-money-never-in-portal` rot-checks against tenancy's own source, so
+  // a new money door is one line in money-taint.ts and this follows it with
+  // nothing edited here.
+  if (readsInternalMoney(dest))
+    return {
+      ok: false,
+      text: JSON.stringify({
+        error: "not_on_this_surface",
+        // Says what to do instead, or an outside developer files it as a bug and
+        // the next person "fixes" it by deleting the guard.
+        message: `${tool.name} reads the agency's own internal figures, which are not available to a personal access token — a leaked token's blast radius must not include what our work costs us. Ask the assistant for it through agent_chat instead: same rights, and it can refuse to repeat the number where a client would read it.`,
+      }),
+    }
   let res: Response
   try {
     checkArgTypes(tool.inputSchema, input)
@@ -463,6 +541,10 @@ export async function forwardTool(
       method: tool.method,
       cookie,
       traceId,
+      // THE MACHINE SURFACE SAYS SO (origin.ts). Every write a personal access
+      // token makes lands on the same doors as a click and used to leave the
+      // same row; from here the row names the token's surface.
+      origin: "mcp",
       query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
       body: tool.buildBody ? tool.buildBody(input) : {},
       timeoutMs,

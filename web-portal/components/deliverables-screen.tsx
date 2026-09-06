@@ -38,10 +38,16 @@ import { RecordMark } from "@shared/web/record-mark"
 import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import type { ClientDeliverable } from "@shared/types"
 
+import { Button } from "@shared/ui/components/button/button"
+import { Plus } from "@shared/ui/foundations/icons"
+import { invalidate } from "@shared/web/store"
+
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
-import { handover } from "@/lib/api"
+import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
+import { handover, support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
+import type { PortalReady } from "@/components/portal-shell"
 
 /** CAN THIS ADDRESS BE OPENED FROM *THIS* HOSTNAME?
  *
@@ -79,8 +85,21 @@ function byApp(rows: ClientDeliverable[]): { app: string | null; rows: ClientDel
   return [...groups.values()]
 }
 
-export function DeliverablesScreen() {
+export function DeliverablesScreen({ ready }: { ready: PortalReady }) {
   const { t, lang } = useLanguage()
+  // THE ONE ACT A CLIENT ALWAYS HAS, and the reason this screen needed a
+  // prop it did not take before. A client cannot hand themselves a
+  // deliverable — we hand it over — so the empty state here can offer only
+  // the act that is genuinely theirs: ask us. Same dialog, same draft key
+  // shape and same words as the home and tickets screens, so this is one
+  // more door onto an act the portal already has rather than a new one.
+  const [raising, setRaising] = React.useState(false)
+
+  async function raise(input: { description: string; appId?: string; moduleId?: string }) {
+    await support.raise(input)
+    invalidate(cacheKeys.tickets)
+    invalidate(cacheKeys.ticketsTotal)
+  }
   const { data, loading, error, refresh } = useCached<ClientDeliverable[]>(cacheKeys.deliverables, () =>
     handover.deliverables().then((r) => {
       // R16: the badge is the DOOR's exact count, parked in its own key beside
@@ -126,11 +145,19 @@ export function DeliverablesScreen() {
         {rows.length === 0 ? (
           // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
           // impact-screen.tsx's own note on this box for the full reasoning.
-          <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
+          // ONE LABELLED BUTTON UNDER THE SENTENCE — the same register the
+          // tickets screen was given on 2026-09-05 and the same one the agency
+          // door's `CollectionEmptyState` has always drawn. A sentence with
+          // nothing to press is where a first-time reader stops.
+          <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
             <p>{t("Nothing here yet.")}</p>
-            <p className="mt-1 text-sm">
+            <p className="text-sm">
               {t("When we hand something over and share it with you, it turns up here.")}
             </p>
+            <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
+              <Plus className="size-3.5" />
+              {t("Ask us something")}
+            </Button>
           </div>
         ) : (
           <div className="flex flex-col gap-8">
@@ -204,6 +231,13 @@ export function DeliverablesScreen() {
           </div>
         )}
       </section>
+
+      <RaiseTicketDialog
+        open={raising}
+        onOpenChange={setRaising}
+        onSubmit={raise}
+        draftKey={`portal:ticket:new:${ready.currentAccountId}`}
+      />
     </div>
   )
 }

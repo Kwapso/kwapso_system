@@ -309,7 +309,7 @@ export type HelpStatus = (typeof HELP_STATUSES)[number]
  * typed "Requests". A question or an issue is somebody stuck; making them ask
  * their own colleague for permission first is the version of this rule that gets
  * the feature switched off. */
-export const VALIDATED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+const VALIDATED_TICKET_TYPES = ["extra", "request", "feedback"] as const
 
 /** Does a ticket of this type wait for the account's main stakeholder? */
 export function ticketTypeWaitsForValidation(helpType: string | null | undefined): boolean {
@@ -605,6 +605,12 @@ export type ImportBatchView = {
   files: { fileId: string; name: string; headers: string[]; rowCount: number }[]
   plan: ImportPlan | null
   report: ImportBatchReport | null
+  /** WHERE A RUN HAS GOT TO, while it is still going — the table it is inside
+   * and how many of that table's rows are done. Null before a run starts and
+   * again once it finishes, so `status === "running"` with a null progress is a
+   * run that has not reached its first checkpoint (or one that died before it
+   * did, which is the case the Continue button exists for). */
+  progress: { targetKey: string; rowsDone: number } | null
   createdAt: string
 }
 
@@ -2045,7 +2051,7 @@ export type GoogleService = (typeof GOOGLE_SERVICES)[number]
  * folders and Chat spaces. Sharing is the act: nothing in a Drive or a Chat is
  * reachable until somebody hands it over, and what they hand over carries a
  * shelf and a client with it. */
-export const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
+const GOOGLE_NAMED_SERVICES = ["drive", "chat"] as const
 export type GoogleNamedService = (typeof GOOGLE_NAMED_SERVICES)[number]
 
 /** The two services that are reached WHOLESALE unless somebody narrows them —
@@ -2148,7 +2154,7 @@ export type GoogleConnection = {
  * A Chat share is always a space, which is why this is one word rather than a
  * boolean on the Drive rows: three shapes, three names, and no row that has to
  * be read together with its service to know what it is. */
-export const GOOGLE_SHARE_KINDS = ["folder", "file", "space"] as const
+const GOOGLE_SHARE_KINDS = ["folder", "file", "space"] as const
 
 /** AND THE TWO A PERSON SCOPES TO rather than shares. A calendar and a Gmail
  * label are containers in the same sense a folder is — a place the read runs

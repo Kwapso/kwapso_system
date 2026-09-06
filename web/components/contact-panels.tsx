@@ -57,8 +57,8 @@ function matchesActive(filter: ActiveFilter, active: boolean): boolean {
  * live registry has to invalidate them by PREFIX when any ticket or meeting
  * moves — a slice nobody drops is a tab that goes stale the moment somebody else
  * writes (R15's other half). */
-export const TICKETS_OF_ACCOUNT = "tickets-account"
-export const MEETINGS_OF_ACCOUNT = "meetings-account"
+const TICKETS_OF_ACCOUNT = "tickets-account"
+const MEETINGS_OF_ACCOUNT = "meetings-account"
 
 /** A tappable row. Inactive rows are faded rather than hidden — nothing here is
  * deleted, so "not a contact there any more" is a state, not an absence. */

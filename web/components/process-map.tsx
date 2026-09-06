@@ -57,7 +57,7 @@ export type MapLine = {
  * person is usually reading — and steps that exist only on the left are appended
  * in their own order rather than dropped, because a step that was removed is
  * exactly what somebody comparing versions came to see. */
-export function alignVersions(left: ProcessStep[], right: ProcessStep[]): MapLine[] {
+function alignVersions(left: ProcessStep[], right: ProcessStep[]): MapLine[] {
   const byKeyLeft = new Map(left.map((s) => [s.stepKey, s]))
   const lines: MapLine[] = right.map((s) => ({
     stepKey: s.stepKey,
@@ -196,6 +196,16 @@ export function ProcessMap({
   const t = useT()
   const lines = left ? alignVersions(left, right) : right.map((s) => ({ stepKey: s.stepKey, left: null, right: s }))
   const comparing = left !== null
+
+  // NOTHING TO DRAW IS SAID HERE, not two files away. Today the only caller
+  // renders this behind `shownSteps.length > 0` (process/steps-panel.tsx), so
+  // this branch is unreachable — which is precisely the shape a first-run
+  // review flags: a component that is safe on zero rows only because somebody
+  // else remembered. An empty `<ol>` inside a legend is a blank box with no
+  // explanation, and the caller that draws the sentence is the one that should
+  // keep drawing it, so this returns nothing at all rather than inventing a
+  // second empty state beside theirs.
+  if (lines.length === 0) return null
 
   return (
     <div className="flex flex-col gap-3">

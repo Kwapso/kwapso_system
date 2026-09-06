@@ -63,7 +63,7 @@ const MAX_SYNC_PASSES = 12
 
 /** The cache key the "last brought in" line reads. One key for the whole app, so
  * pressing the button on Meetings updates the line on the knowledge base. */
-export function googleSyncKey(teamId: string): string {
+function googleSyncKey(teamId: string): string {
   return `google-sync:${teamId}`
 }
 
@@ -74,8 +74,8 @@ export function googleSyncKey(teamId: string): string {
  * calendar button and this component's calendar half are the same act, and a
  * person who presses one then walks to the other must find it already running
  * rather than be offered a second copy (shared/web/running-jobs says why). */
-export const knowledgeJobKey = (teamId: string): string => `google-knowledge:${teamId}`
-export const calendarJobKey = (teamId: string): string => `google-calendar:${teamId}`
+const knowledgeJobKey = (teamId: string): string => `google-knowledge:${teamId}`
+const calendarJobKey = (teamId: string): string => `google-calendar:${teamId}`
 
 type SyncRow = { kind: string; lastRunAt: string | null; lastOkAt: string | null; lastError: string | null }
 

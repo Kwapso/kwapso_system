@@ -7,11 +7,26 @@
 // itself is re-verified on EVERY request, so revocation bites immediately.
 
 import { AUTH_UNAVAILABLE_MS, GuardError } from "@shared/workers/gating"
+import { traceHeaders } from "@shared/workers/trace"
+import { SESSION_COOKIE } from "@shared/workers/session-cookie"
 import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
 
-const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
+/** The cookie name, IMPORTED now rather than restated.
+ *
+ * It used to be written out here, with the true reason that one worker does not
+ * reach into another's source. What was missing was a third option: the name now
+ * lives in `shared/workers/session-cookie.ts`, which both workers may import
+ * without either reaching into the other. Three hand-written copies of a
+ * security-relevant literal — one of them on the legacy migration's thirty-day
+ * clock — is a drift nothing was comparing.
+ *
+ * The `__Host-` prefix is auth's session-fixation defence and belongs to the
+ * BROWSER contract, not this one: prefix rules constrain what a browser accepts
+ * in `Set-Cookie`, while this is a request header minted worker-to-worker. It
+ * matches anyway, because the name has to be the one auth reads — and auth reads
+ * the prefixed name first. */
 
 /** HOW LONG A PASSED STAFF CHECK MAY STAND.
  *
@@ -81,6 +96,18 @@ export async function sessionCookieFor(env: Env, token: McpTokenRow, traceId: st
       headers: {
         "Content-Type": "application/json",
         "x-internal-key": env.INTERNAL_KEY ?? "",
+        // THE ID THIS FUNCTION WAS ALREADY HOLDING. `traceId` arrived as a
+        // parameter, was passed on to `requireStaff` below, and was never put on
+        // the ONE hop that leaves this worker — so a failure inside auth's
+        // mcp-session door landed in `error_logs` under a fresh ULID with nothing
+        // joining it to the tool call that caused it.
+        //
+        // It is the sharpest case of the three seams that dropped it, because an
+        // MCP request is the hardest one to reproduce by hand: there is no
+        // browser to open, no screen to revisit, and the person who saw the
+        // failure is an outside developer's tool. The id was in scope the whole
+        // time; the header was the missing line.
+        ...traceHeaders(traceId),
       },
       body: JSON.stringify({ userId: token.user_id, teamId: token.team_id }),
       // The same ceiling the gating seam puts on the identity read, because this

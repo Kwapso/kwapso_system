@@ -65,7 +65,7 @@ import { useT } from "./language"
  *
  * An empty label is left empty: the kit Field reads it as "no label at all" and
  * skips the label row, and "" is not a sentence anybody translates. */
-export function translateFieldConfig(
+function translateFieldConfig(
   config: FieldConfig,
   t: (english: string) => string
 ): FieldConfig {
@@ -133,21 +133,4 @@ export function Field({
       {children}
     </KitField>
   )
-}
-
-/** Map a FieldConfig to native HTML validation attributes. Spread onto the
- * input inside a Field; the browser ignores attributes that don't apply to its
- * type. The old library exported this beside Field; the kit has no config
- * layer, so the helper lives here now — it reads no words at all. */
-export function fieldProps(config: FieldConfig) {
-  const v = config.validation
-  return {
-    required: config.required || undefined,
-    disabled: config.disabled || undefined,
-    min: v.min ?? undefined,
-    max: v.max ?? undefined,
-    minLength: v.minLength ?? undefined,
-    maxLength: v.maxLength ?? undefined,
-    pattern: v.pattern || undefined,
-  }
 }

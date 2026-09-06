@@ -44,6 +44,7 @@
  */
 
 import { mkdirSync } from "node:fs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const arg = (name, fallback) => {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
@@ -55,7 +56,7 @@ const LIVE = has("live")
 const DOOR = arg("door", "both")
 const SHOTS = arg("shots", "")
 const AGENCY_BASE = arg("base", LIVE ? (process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev") : "http://localhost:3200")
-const PORTAL_BASE = arg("portal-base", LIVE ? (process.env.SMOKE_PORTAL_BASE ?? "https://staging-client.kwapso.app") : "http://localhost:3100")
+const PORTAL_BASE = arg("portal-base", LIVE ? (process.env.SMOKE_PORTAL_BASE ?? FRONT_DOORS.staging.portal) : "http://localhost:3100")
 
 /** The languages the app speaks, and the bottom-bar labels in each. Kept here
  * rather than read from the catalogue because this script runs against a
@@ -160,7 +161,7 @@ async function liveCookie({ mintAt, verifyAt, email }) {
     body: JSON.stringify({ email, code }),
   })
   const raw = (verified.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!raw.startsWith("kwapso_session=")) {
+  if (!/^(__Host-)?kwapso_session=/.test(raw)) {
     console.error(`verify at ${verifyAt} did not set a session cookie (status ${verified.status})`)
     process.exit(2)
   }

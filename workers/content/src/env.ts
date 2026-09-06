@@ -2,6 +2,15 @@
 // satisfies the shared GatingEnv (AUTH + DB + the Cloudflare D1 credentials), so
 // teamContext / requireRight work here exactly as they do in tenancy.
 export type Env = {
+  /** THIS REQUEST'S DEFERRER, set by the dispatcher on a per-request shallow
+   * copy of this env — how `publishChange` stops holding the response (owner's
+   * ruling, 6 Sep 2026). The reasoning, the provenance and why it cannot live on
+   * the shared `env` itself are all in shared/workers/parallel.ts.
+   *
+   * Optional because a cron tick and the test suites have no request to hang
+   * work on; absent means the ping is awaited exactly as it was before. */
+  DEFER?: (work: Promise<unknown>) => void
+
   /** The global core database (users, teams, team_members) — read by gating. */
   DB: D1Database
   /** The auth worker — used to answer "who is making this request?". */
@@ -35,6 +44,19 @@ export type Env = {
 
   /** Cloudflare account id (plain var) — for reaching per-team databases. */
   CF_ACCOUNT_ID: string
+  /** THE BUCKET NAMES, BESIDE THEIR BINDINGS — the pair a presigned upload
+   * needs. A binding cannot be asked its own bucket name at runtime and an S3
+   * presign has to put that name in the signed path, which is the same reason
+   * `TEAM_DB_<n>_ID` rides beside its D1 binding. Optional: an environment
+   * without them takes the byte-through-the-worker path, which is every
+   * environment until the credential below exists. */
+  MEDIA_BUCKET?: string
+  INTERNAL_MEDIA_BUCKET?: string
+  /** The write-only R2 S3 credential, scoped to those two buckets. A SECRET, and
+   * absent everywhere until somebody decides to create it — `presignConfigured`
+   * is false without it and every upload door behaves exactly as it does today. */
+  R2_ACCESS_KEY_ID?: string
+  R2_SECRET_ACCESS_KEY?: string
   /** The AGENCY app's public origin — an email's logo, and the link back to a
    * record for a STAFF recipient. */
   PUBLIC_APP_URL?: string

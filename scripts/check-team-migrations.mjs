@@ -37,7 +37,7 @@
 //
 // Both halves are DERIVED and neither is typed here:
 //
-//   • the LATEST version is parsed out of `workers/tenancy/src/team-schema.ts`
+//   • the LATEST version is parsed out of `workers/tenancy/src/team-schema/migrations.ts`
 //     itself, off the syntax tree, not matched with a regex and never copied.
 //     A copied version number in this file would be a gate that goes green
 //     while the estate is behind — the exact failure it exists to catch, wearing
@@ -166,6 +166,9 @@ import { fileURLToPath } from "node:url"
 
 import ts from "typescript"
 
+import { expectedAccount } from "./check-cloudflare-account.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
 /** The core database + the gateway origin per environment. The database names
@@ -175,8 +178,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
  * remedy line, so a drift here misprints a URL — it can never turn a red run
  * green, which is why this one is a list and the version is not. */
 export const ENVIRONMENTS = {
-  staging: { db: "kwapso-core-staging", origin: "https://agency-staging.kwapso.app" },
-  production: { db: "kwapso-core", origin: "https://agency.kwapso.app" },
+  staging: { db: "kwapso-core-staging", origin: FRONT_DOORS.staging.agency },
+  production: { db: "kwapso-core", origin: FRONT_DOORS.production.agency },
 }
 
 /**
@@ -229,7 +232,11 @@ const read = (relPath) => readFileSync(join(ROOT, relPath), "utf8")
  * correctly did not see.) Anything unexpected in the shape throws; there is no
  * fallback, because a fallback is how a gate goes quietly green. */
 export function latestTeamMigration() {
-  return latestMigrationIn(read("workers/tenancy/src/team-schema.ts"))
+  // The ledger moved out of team-schema.ts into team-schema/migrations.ts on
+  // 6 Sep 2026 (a pure file split, proved identical by SHA-256). The parse
+  // below THROWS when it cannot find the array literal, so this path being
+  // wrong is loud rather than a gate that goes quietly green.
+  return latestMigrationIn(read("workers/tenancy/src/team-schema/migrations.ts"))
 }
 
 /** @see latestTeamMigration — the same derivation, over source you hand it. */
@@ -248,7 +255,7 @@ export function latestMigrationIn(source) {
   })
   if (!array || array.elements.length === 0) {
     throw new Error(
-      "Could not read TEAM_MIGRATIONS as an array literal in workers/tenancy/src/team-schema.ts."
+      "Could not read TEAM_MIGRATIONS as an array literal in workers/tenancy/src/team-schema/migrations.ts."
     )
   }
   const last = array.elements[array.elements.length - 1]
@@ -378,7 +385,7 @@ export function verdict({ envName, origin, db, latest, teams, waivers, today }) 
         `TEAM DATABASES ARE BEHIND (${envName}). The workers about to be deployed\n` +
         `may expect tables and columns these teams do not have yet.\n\n` +
         `  latest team-schema migration (this working tree): ${latest}\n` +
-        `  (workers/tenancy/src/team-schema.ts, last entry in TEAM_MIGRATIONS)\n\n` +
+        `  (workers/tenancy/src/team-schema/migrations.ts, last entry in TEAM_MIGRATIONS)\n\n` +
         blocking
           .map((t) => `  • ${t.name} (${t.id}) is at ${t.schema_version ?? "(no version recorded)"}`)
           .join("\n") +
@@ -418,7 +425,11 @@ function main(argv) {
   // that is a DIFFERENT client's account. It is deliberately hard rather than a
   // warning: every deploy here runs through `cf-exec`, so the correct path is
   // never the one that trips it.
-  const KWAPSO_ACCOUNT_ID = "b5bb3d84a59c029ea5e0fe164dab1cf7"
+  //
+  // The id itself comes from `check-cloudflare-account.mjs`, which derives it
+  // from the workers' own configs — the two guards were always the same
+  // sentence; since 5 Sep 2026 they are the same VALUE too.
+  const KWAPSO_ACCOUNT_ID = expectedAccount()
   if (process.env.CLOUDFLARE_ACCOUNT_ID !== KWAPSO_ACCOUNT_ID) {
     console.error(
       `Refusing to run: CLOUDFLARE_ACCOUNT_ID is ${process.env.CLOUDFLARE_ACCOUNT_ID ?? "unset"},\n` +

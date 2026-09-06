@@ -48,12 +48,13 @@
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
-import { THREAD_HARD_CAP } from "@shared/workers/limits"
+import { EMBED_ATTEMPT_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import type { Env } from "../env"
 import { AGENCY_COMPARTMENT, accountCompartment, indexableText, indexSource } from "./knowledge"
 import { buildSummary } from "./knowledge-summary"
 import { contentHash, plainText } from "./knowledge-text"
 import { logActivity } from "@shared/workers/activity"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { brand } from "@shared/brand"
 
 /** Rows one kind may ingest per tick. The bound on the work a single invocation
@@ -1925,6 +1926,8 @@ async function sweepKind(
   const cursor = parseCursor(state[0]?.cursor ?? null, kind.textVersion)
   let rows = await kind.read(cfg, guard, cursor, limit, env)
   let indexed = 0
+  /** Sources this tick stopped retrying (EMBED_ATTEMPT_CAP), reported once below. */
+  const givenUp: string[] = []
   let last: Cursor | null = cursor
 
   // A WINDOWED KIND THAT HAS CAUGHT UP REWINDS, AND RE-WALKS IN THE SAME TICK.
@@ -1965,6 +1968,7 @@ async function sweepKind(
       deactivator_id: string | null
       chunk_count: number
       indexed_chunks: number
+      embed_attempts: number
     }>(
       cfg,
       guard.databaseId,
@@ -1982,8 +1986,18 @@ async function sweepKind(
                      owner_user_id = excluded.owner_user_id,
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
+                     -- THE GIVE-UP COUNTER IS PER TEXT, NOT PER SOURCE. It resets
+                     -- the moment the words change, so a document somebody FIXED is
+                     -- tried again on the very next tick, and one nobody has touched
+                     -- stops costing a model call every quarter of an hour. Compared
+                     -- with IS rather than = because both sides are nullable and
+                     -- comparing NULL with = yields NULL, which would read as "changed"
+                     -- for every body-less row on every tick, resetting it for ever.
+                     embed_attempts = CASE WHEN knowledge_sources.title IS excluded.title
+                                            AND knowledge_sources.body IS excluded.body
+                                           THEN knowledge_sources.embed_attempts ELSE 0 END,
                      updated_at = ?
-       RETURNING id, content_hash, deactivated_at, deactivator_id, chunk_count, indexed_chunks`,
+       RETURNING id, content_hash, deactivated_at, deactivator_id, chunk_count, indexed_chunks, embed_attempts`,
       [
         ulid(),
         kind.kind,
@@ -2096,9 +2110,37 @@ async function sweepKind(
     // whose hash matches but whose indexing did not FINISH (a big document, a
     // tick that died) has to be picked up and carried on.
     if (source.content_hash === hash && source.indexed_chunks >= source.chunk_count) continue
+    // …AND THE SKIP THAT STOPS THE SWEEP PAYING FOR THE SAME FAILURE FOR EVER.
+    // The blanked hash above is what makes a failed embedding retry, which is
+    // right for a Workers AI wobble and wrong for text the model will never
+    // accept: without a floor that source was re-read and re-sent every fifteen
+    // minutes, writing the same error row each time. The counter is per TEXT —
+    // the upsert clears it when the words change — so a document somebody fixes
+    // is picked up on the next tick and one nobody touches goes quiet.
+    //
+    // NOTHING IS LOST BY GIVING UP. The source, its title and its words are all
+    // still in the database and still readable; what it loses is a VECTOR, so it
+    // ranks by the lexical score alone. That is the same degraded-but-present
+    // state the schema already describes for an un-embedded chunk.
+    if (source.embed_attempts >= EMBED_ATTEMPT_CAP) {
+      givenUp.push(source.id)
+      continue
+    }
     await indexSource(env, cfg, guard, source.id)
     indexed++
   }
+  // ONE ROW FOR THE TICK, not one per source: a kind where forty sources have
+  // been given up on is one fact, and forty error rows would be the flood the
+  // hourly ceiling exists to stop. R12 — unattended work has nobody watching.
+  if (givenUp.length)
+    await recordWorkerError(
+      env.DB,
+      "content",
+      `knowledge/embed-gave-up (${stateKey})`,
+      new Error(
+        `${givenUp.length} source(s) have failed to embed ${EMBED_ATTEMPT_CAP} times and are no longer being retried, so they are searchable by their words but not by meaning. They will be tried again the moment their text changes. Ids: ${givenUp.slice(0, 20).join(", ")}${givenUp.length > 20 ? ` …and ${givenUp.length - 20} more` : ""}`
+      )
+    )
 
   const caughtUp = rows.length < limit
   // A ROLLUP KIND THAT HAS REACHED THE END STARTS AGAIN NEXT TICK. Its text is

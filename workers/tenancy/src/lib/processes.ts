@@ -20,7 +20,8 @@
 // the same one clause the accounts list uses, and an app's account is written once
 // at creation and never edited (there is no move-app door — see the migration).
 
-import { logActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { logActivity, writeActivity, describeChanges, type Actor } from "@shared/workers/activity"
+import { supersededMedia } from "@shared/workers/image"
 import { accountScopeClause, appScopeClause, requireAccountInScope, type AccountScope } from "@shared/workers/account-scope"
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -699,7 +700,7 @@ export async function updateApp(
     solution?: string | null
     keyActors?: string | null
   }
-): Promise<void> {
+): Promise<{ supersededUrls: (string | null)[] }> {
   const before = await appOrThrow(cfg, guard, scope, id)
   const fence = accountScopeClause(scope, "account_id")
   const audit = editedBy(actor, new Date().toISOString())
@@ -755,6 +756,11 @@ export async function updateApp(
     relatedTable: "apps",
     relatedRowId: id,
   })
+  // The old picture, when this write stopped pointing at it. Handed back to the
+  // door rather than deleted here, for the reason updateAccount states at length:
+  // the key was minted at the door and the owners list must be read beside the
+  // mint, or the two drift and the reclaim silently deletes nothing.
+  return { supersededUrls: [supersededMedia(before.logoUrl, keep(input.logoUrl, before.logoUrl))] }
 }
 
 /** Archive / restore an app (never delete — its processes, versions and the
@@ -815,8 +821,16 @@ function appModulesWhere(
   opts: { id?: string; appId?: string; archived?: string }
 ): { sql: string; params: (string | number)[] } {
   const fence = accountScopeClause(scope, "m.account_id")
-  const parts: (string | undefined)[] = [fence.sql]
-  const params: (string | number)[] = [...fence.params]
+  // AND THE APP FENCE, for the same reason `processesWhere` carries it: a client
+  // login may be narrowed to named apps, and a SECTION belongs to an app. Without
+  // it this door answered with the sections — name, mark, description, benefit —
+  // of systems the contact was explicitly restricted away from, and it is on the
+  // portal's own allow-list, so their browser could ask it directly. An AND
+  // beside the account fence, never instead of it (see appScopeClause); staff and
+  // an unrestricted client both get an empty clause and nothing changes for them.
+  const apps = appScopeClause(scope, "m.app_id")
+  const parts: (string | undefined)[] = [fence.sql, apps.sql || undefined]
+  const params: (string | number)[] = [...fence.params, ...apps.params]
   // ONE ROW BY ID — the live layer's re-pull after a ping, through the same door
   // and therefore the same fence (the shape /api/tenancy/selectable uses).
   if (opts.id) {
@@ -918,6 +932,18 @@ async function moduleOrThrow(
   id: string
 ): Promise<{ id: string; appId: string; name: string; mark: string | null; nameDe: string | null; description: string | null; benefit: string | null }> {
   const fence = accountScopeClause(scope, "account_id")
+  // AND THE APP FENCE — the by-id sibling of `appModulesWhere`, held to the same
+  // clause as the list it came from. FOUND BY THE CENSUS
+  // (test/app-fence-census.test.ts) rather than by anyone reading, which is the
+  // whole argument for having one: the three doors this repair set out to fix
+  // were a hand-list, and a hand-list is exactly one door short of the truth
+  // about as often as not.
+  //
+  // Its two callers are agency-only WRITES that already refuse a portal caller,
+  // so nothing was reachable through it today. It is fenced anyway: "the callers
+  // happen to refuse client logins" is a fact about today's callers, and this is
+  // a property of the read.
+  const apps = appScopeClause(scope, "app_id")
   const rows = await d1Query<{
     id: string
     app_id: string
@@ -929,8 +955,8 @@ async function moduleOrThrow(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, "id = ?"])}`,
-    [...fence.params, id]
+    `SELECT id, app_id, name, mark, name_de, description, benefit FROM app_modules${where([fence.sql, apps.sql || undefined, "id = ?"])}`,
+    [...fence.params, ...apps.params, id]
   )
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That module doesn't exist.")
@@ -2395,7 +2421,29 @@ export async function deleteStep(
      ${where([fence.sql, "process_id = ?", "step_key = ?"])}`,
     [...fence.params, before.process_id, before.step_key]
   )
-  await logActivity(cfg, guard.databaseId, actor, {
+  // THE ONE HARD DELETE IN THE APP, AND THE ONE PLACE THE SWALLOWING LOGGER IS
+  // WRONG. Everywhere else `logActivity` is right by contract: it describes a
+  // side effect of a change that already succeeded, the row it changed is still
+  // there, and losing the line costs a sentence nobody can recover but nothing
+  // anybody needs. Here the row is GONE. This line is the only remaining record
+  // that the step ever existed, what it was called, and who removed it — so a
+  // swallowed failure takes the step and its history together, which is the
+  // worst thing an audit trail can do. `writeActivity` throws, exactly as it
+  // does for a user-authored note, and for the same reason: writing the row IS
+  // the point, so a failure has to be a real error rather than a 200 that tells
+  // somebody the trail is complete when it is not.
+  //
+  // WHY IT IS STILL WRITTEN AFTER THE DELETE and not before it. Before would
+  // read better against a rubric and be worse in fact: the statement above
+  // re-checks all three refusals in the same breath as the write, so a
+  // concurrent change makes it move ZERO rows — and a log written first would
+  // then state a deletion that never happened. A trail that says something
+  // happened when it did not is a worse failure than one missing a line, and it
+  // is unfixable, because the table is append-only. The two writes cannot be one
+  // (they are two REST statements; ARCHITECTURE.md's locked D1 decision), so the
+  // order is a choice between a possible LIE and a possible GAP, and this app
+  // takes the gap — now a loud, recorded one instead of a silent one.
+  await writeActivity(cfg, guard.databaseId, actor, {
     type: "Step deleted",
     description: `${actor.name} deleted the step "${before.name}" — added by mistake, never part of an agreed version`,
     relatedTable: "process_steps",
@@ -2618,8 +2666,14 @@ export async function listSavings(
 ): Promise<SavingsView> {
   if (opts.accountId) requireAccountInScope(scope, opts.accountId)
   const fence = accountScopeClause(scope, "p.account_id")
+  // AND THE APP FENCE. This door is on the portal's allow-list and answers with
+  // the value drilled App -> Process -> Step; without it a restricted contact
+  // read the app names, process names, step names and hours of every system on
+  // their company, which is the widest of the three reads that were missing it.
+  const appFence = appScopeClause(scope, "p.app_id")
   const sql = where([
     fence.sql,
+    appFence.sql || undefined,
     opts.accountId ? "p.account_id = ?" : undefined,
     opts.appId ? "p.app_id = ?" : undefined,
     // ONE MAP'S OWN SUBTRACTION, for the map's own screen. It narrows the same
@@ -2634,7 +2688,7 @@ export async function listSavings(
     "p.deactivated_at IS NULL",
     "a.deactivated_at IS NULL",
   ])
-  const params = [...fence.params]
+  const params = [...fence.params, ...appFence.params]
   if (opts.accountId) params.push(opts.accountId)
   if (opts.appId) params.push(opts.appId)
   if (opts.processId) params.push(opts.processId)
@@ -2878,6 +2932,13 @@ async function processOrThrow(
   id: string
 ): Promise<ProcessSummary> {
   const fence = accountScopeClause(scope, "p.account_id")
+  // AND THE APP FENCE — the LIST/DETAIL asymmetry, which is the classic shape of
+  // this bug and the one it had here: `processesWhere` has carried the app fence
+  // since 19 Aug 2026 and this by-id read never did, so a restricted contact who
+  // could not SEE a map in the list could still open it by id and read every
+  // version, every step, its seconds and its role name. A detail read is held to
+  // the same clause as the list it came from, or the list is decoration.
+  const apps = appScopeClause(scope, "p.app_id")
   const rows = await d1Query<{
     id: string
     app_id: string
@@ -2901,8 +2962,8 @@ async function processOrThrow(
             (SELECT COUNT(*) FROM process_steps s WHERE s.process_id = p.id
                AND s.version_id = (SELECT id FROM process_versions v2 WHERE v2.process_id = p.id
                                     ORDER BY v2.version_no DESC LIMIT 1)) AS step_count
-       FROM processes p JOIN apps a ON a.id = p.app_id${where([fence.sql, "p.id = ?"])} LIMIT 1`,
-    [...fence.params, id]
+       FROM processes p JOIN apps a ON a.id = p.app_id${where([fence.sql, apps.sql || undefined, "p.id = ?"])} LIMIT 1`,
+    [...fence.params, ...apps.params, id]
   )
   if (!rows[0]) throw new GuardError(404, "not_found", "That process doesn't exist.")
   const r = rows[0]

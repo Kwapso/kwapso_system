@@ -253,7 +253,7 @@ export const RULES_REGISTRY: Rule[] = [
     // knowledge base's was already written into CLAUDE.md — so this one moved.
     id: "R24",
     dimension: "arch",
-    law: "AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE — structurally, not conditionally. What an hour of our own work costs (internal_rates) and the margin computed from it live in ONE file, workers/tenancy/src/lib/internal-money.ts, and every door that calls into it refuses a portal caller. The check derives the internal doors from that file's own exports and each handler's source, then asserts three things the portal cannot then get around: none of those doors is on the portal gateway's surface, every one of them opens with refusePortalCaller, and no file in web-portal/ names the internal table, the internal doors' paths or a margin field. SCOPE's ruling is absolute — internal rates and margin never render in the portal under any flag, ever: not behind a permission, not behind a feature toggle, not for an admin viewing the portal — and the instruction with it was to make that structurally true rather than a condition somebody can invert later. A condition can be inverted and a permission can be granted; an import cannot be forgotten. The account rate card — what a client IS charged, which they may be shown when their price visibility is on — is a SEPARATE file and a separate table for exactly this reason: two numbers of identical shape and opposite audiences must not share a WHERE clause.",
+    law: "AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE — structurally, not conditionally. What an hour of our own work costs (internal_rates) and the margin computed from it live in ONE file, workers/tenancy/src/lib/internal-money.ts, and every door that calls into it refuses a portal caller. The check derives the internal doors from that file's own exports and each handler's source, then asserts three things the portal cannot then get around: none of those doors is on the portal gateway's surface, every one of them opens with refusePortalCaller, and no file in web-portal/ names the internal table, the internal doors' paths or a margin field. SCOPE's ruling is absolute — internal rates and margin never render in the portal under any flag, ever: not behind a permission, not behind a feature toggle, not for an admin viewing the portal — and the instruction with it was to make that structurally true rather than a condition somebody can invert later. A condition can be inverted and a permission can be granted; an import cannot be forgotten. The account rate card — what a client IS charged, which they may be shown when their price visibility is on — is a SEPARATE file and a separate table for exactly this reason: two numbers of identical shape and opposite audiences must not share a WHERE clause. AND THE OUTBOUND HALF, added 2026-09-05: a conversation that has READ an internal number may not then WRITE to a door the client's own browser opens. The three clauses above are all about the import graph, and the assistant does not need one — it reads the margin through a door R24 fences correctly, as an agency admin holding commercials:read, and then replies into a ticket thread the client reads. Nothing was forgotten and nothing was inverted; every door did its own job and the figure still arrived in the client's inbox, with no confirm panel anywhere on the path, because reply_help_ticket is gated on help:read and confirms only when it @mentions somebody. The instruction that reached the model came from the client themselves: a portal ticket description is 20,000 characters of their prose, read by the assistant the next time anybody here asks a question about tickets. So the fourth clause is a per-turn taint refused at the step, before the door is called, and BOTH ITS SETS ARE DERIVED — the money doors from internal-money.ts's own exports through tenancy's own ROUTES (the same walk clause 1 makes), the client-readable doors from the non-GET half of PORTAL_DOORS, and the TOOLS from those doors off the shipped catalogue at load time, so a money tool added tomorrow on an existing door is covered the moment it exists. It refuses BEFORE it defers: a confirm ends the turn and confirmAndRun resumes from a stored row that remembers nothing, so a proposal is judged at the moment it is made and again as it runs. What stood there before was one sentence of prose in a tool description, which is the least structural defence available and was being asked to hold against prose written by the person it protects the number from.",
     checkId: "internal-money-never-in-portal",
     status: "enforced",
   },
@@ -321,7 +321,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R33",
     dimension: "ui",
-    law: "EVERY EXTRACTED POSITION ASKS FOR ITS TRANSLATION. R28 makes the catalogue match the code; this makes the code READ the catalogue. Every position `scripts/lib/i18n-source.mjs` reports in `web/` or `web-portal/` — the same one definition, so the two laws can never disagree about what a sentence is — must sit inside a `t(...)` call, with exactly two ways out. A `label:` or `helpText:` on an object that spreads a field config is translated ON THE WAY TO THE SCREEN by `shared/web/field.tsx`, which is positional (the object says what it is) and is held shut by the second half of the check: NO file in either front door may import `Field` from the library directly, so the seam cannot be walked around. The ban is matched on the PATH TAIL of the kit's Field — `controls/field/field` since the design-kit swap renamed the tiers (it was `primitives/field/field` before, and the swap is exactly why the tail must move WITH the file: a ban matching a path nothing imports is a ban that passes vacuously, which it silently did for one evening until the story pass caught it). Everything else is a copy TABLE read through `t` somewhere else, and each one is DATA in `TRANSLATED_WHERE_READ` with the seam that reads it, rot-checked both ways — a pin that no longer has an unwrapped position of that kind turns the build red, and so does a `via` that no longer appears in the source, so the list can only shrink.",
+    law: "EVERY EXTRACTED POSITION ASKS FOR ITS TRANSLATION. R28 makes the catalogue match the code; this makes the code READ the catalogue. Every position `scripts/lib/i18n-source.mjs` reports in `web/` or `web-portal/` — the same one definition, so the two laws can never disagree about what a sentence is — must sit inside a `t(...)` call, with exactly two ways out. A `label:` or `helpText:` on an object that spreads a field config is translated ON THE WAY TO THE SCREEN by `shared/web/field.tsx`, which is positional (the object says what it is) and is held shut by the second half of the check: NO file in either front door may import `Field` from the library directly, so the seam cannot be walked around. The ban is matched on the PATH TAIL of the kit's Field — `components/field/field` since the kit's v1.1.0 layout move folded `controls/` and `structures/` into one `components/` on 2026-08-27 (it was `controls/field/field` from the design-kit swap until that move, and `primitives/field/field` before the swap, and each rename is exactly why the tail must move WITH the file: a ban matching a path nothing imports is a ban that passes vacuously, which it silently did for one evening until the story pass caught it). The check no longer takes the literal on trust — it asserts `shared/web/field.tsx` actually imports that tail before judging anybody by it, so a fourth rename fails loudly rather than reporting all clear. That guard was added when the second rename landed; this SENTENCE was not, and named the dead `controls/…` tail until 2026-09-06. Everything else is a copy TABLE read through `t` somewhere else, and each one is DATA in `TRANSLATED_WHERE_READ` with the seam that reads it, rot-checked both ways — a pin that no longer has an unwrapped position of that kind turns the build red, and so does a `via` that no longer appears in the source, so the list can only shrink.",
     why: "R28 could be perfectly satisfied by an app that speaks English to everybody, and on 2026-08-18 it was: 666 of 2,001 extracted positions — every form field label in the app, 119 of the toasts, both error boundaries and every dialog title written as a ternary — were in the catalogue, translated at build time into every language the app speaks, and never asked for. The catalogue was current and the screens were English, because nothing had ever checked that an EXTRACTED position is a WRAPPED one. The field labels are the reason it went unnoticed for so long and the reason the fix is a seam rather than 138 edits: a field config is a module-level constant, `t` is a hook, so `t(...)` genuinely could not be written where those words are declared — the one class of string in this app that a developer could not have wrapped even if they had thought to. `translateRecipe` had already answered the identical question for the screen recipes (declare the English, translate on the way to the screen); this is that answer applied to the other half of the app, plus the import ban that makes it provable.",
     checkId: "wrapped-strings",
     status: "enforced",
@@ -424,7 +424,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R46",
     dimension: "ui",
-    law: "EVERY KIT COMPONENT AND FOUNDATION RESOLVES TO A REACHED ADOPTION OR A REASONED, ROT-CHECKED EXEMPTION. The kit at `shared/ui/` ships 115 components and 3 foundations (icons, tokens, motion) — 118 named parts, the owner's own count, and his own instruction: \"all 118 components should be imported, and if you're not using some, I understand that, but there should be nothing hard-coded.\" A part is REACHED, not merely imported: `computeReachability` (`scripts/kit-coverage.mjs`) seeds from every kit reference either front door or `shared/web/` makes, in EITHER language the kit ships in — a JS/TS `from \"@shared/ui/…\"` or a CSS `@import \"…\"` — then closes over the kit's OWN cross-references (a component that imports another, a stylesheet that imports another) until nothing new appears, so a part reached only through another adopted part, or only through a stylesheet, still counts. Every part the walk does not reach is claimed by a line in `KIT_COMPONENT_EXEMPT` naming the one sentence a non-technical reader can check — no surface in the app has this shape, or adopting it would break another law. Rot-checked BOTH ways: a part the walk NOW reaches loses its exemption, and a part with no exemption and no reach fails the build — so the list can only shrink.",
+    law: "EVERY KIT COMPONENT AND FOUNDATION RESOLVES TO A REACHED ADOPTION OR A REASONED, ROT-CHECKED EXEMPTION. The kit at `shared/ui/` ships every directory under `components/` plus the three foundations (icons, tokens, motion). The number is DERIVED and written down nowhere: `kitInventory()` in `scripts/kit-coverage.mjs` reads it off the pinned tree, so it moves with the pin instead of rotting in four documents. The count came from the owner, with his instruction: \"all 118 components should be imported, and if you're not using some, I understand that, but there should be nothing hard-coded.\" A part is REACHED, not merely imported: `computeReachability` (`scripts/kit-coverage.mjs`) seeds from every kit reference either front door or `shared/web/` makes, in EITHER language the kit ships in — a JS/TS `from \"@shared/ui/…\"` or a CSS `@import \"…\"` — then closes over the kit's OWN cross-references (a component that imports another, a stylesheet that imports another) until nothing new appears, so a part reached only through another adopted part, or only through a stylesheet, still counts. Every part the walk does not reach is claimed by a line in `KIT_COMPONENT_EXEMPT` naming the one sentence a non-technical reader can check — no surface in the app has this shape, or adopting it would break another law. Rot-checked BOTH ways: a part the walk NOW reaches loses its exemption, and a part with no exemption and no reach fails the build — so the list can only shrink.",
     why: "Counting only JS/TS import lines undercounted in the SAME direction seven times in one day, and always by dropping a real adoption rather than inventing a false one: six parts reach the app only through another kit part it has already adopted (`notes` through Comments, `folder` through Tabs, `title` through the kit's own `record-detail`, `progress` through `file-upload`, `gallery` and `checklist` picked up by two other lanes overnight with nobody re-running the census to notice), and `motion` reaches both front doors only through a CSS `@import` in their own `globals.css` — a reference no JS-import grep can see in either direction, because there is no import LINE in that language for it to miss. Canaried both ways: deleting the `@import` from both `globals.css` drops the reached-foundations count from 3/3 to 2/3, and restoring it recovers 3/3. A census that misses seven real adoptions cannot tell an unimported part from a badly-walked one, so the exemption list this law rot-checks is only honest once the walk it is checked against actually follows both languages the kit speaks — the same lesson R39's own deny-list learned about a THIRD dependency (an icon pack) arriving by a route nobody grepped for, applied here to the SECOND language a stylesheet speaks.",
     checkId: "component-coverage",
     status: "enforced",
@@ -767,6 +767,35 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 196 -> 211 in all three on 5 Sep 2026, first-run lane, and the
+  // arithmetic is written down because R44's whole point is that a ceiling
+  // cannot move quietly. SIXTEEN new English sentences and TWO retired ones:
+  //
+  //  · eleven are the empty states a brand-new team actually reads — the two
+  //    shared defaults `CollectionEmptyState` now chooses between, and the
+  //    per-collection sentences on Members, Invites, Tickets, Contacts and the
+  //    knowledge base. They replace ONE sentence that all sixteen recipe
+  //    collections shared and that was true of exactly one of them ("Records
+  //    land here … or when a client raises a request from the portal", right on
+  //    Tickets and false on the other fifteen).
+  //  · four are the landing screen's "Start here" block, which names the first
+  //    act on a team with nothing in it — the screen previously answered "where
+  //    is everything" and never "what do I do".
+  //  · one is the onboarding line, which told everybody "your team gets created
+  //    right after" under a product where team creation is closed.
+  //
+  // TWO OF THE SIXTEEN ARE A REAL LOSS, not just an addition: the retired
+  // sentences WERE translated in all three languages, so a German reader trades
+  // a fluent-but-false sentence for an English-but-true one on those two
+  // screens. That is the right trade and it is still a debt, which is why it is
+  // recorded here rather than absorbed.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, and for the same reason as the entry
+  // below: `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before, so a translation run is his to
+  // authorise and never a lane's to trigger. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 189 -> 196 in all three on 4 Sep 2026, and the reason is recorded
   // because R44's whole point is that a ceiling cannot move quietly. R48's portal
   // search shipped seven new English sentences — the two search fields, their
@@ -779,9 +808,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 196,
-  es: 196,
-  ca: 196,
+  de: 211,
+  es: 211,
+  ca: 211,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -943,13 +972,13 @@ export const TRANSLATED_WHERE_READ: Record<
   },
   "web/components/google-connections.tsx": {
     kinds: ["property"],
-    via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope)"],
-    why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t`. The privacy sentence in particular is the one a person most needs in their own language.",
+    via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope, BRAND)"],
+    why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t` — carrying `BRAND` since 5 Sep 2026, because the calendar sentence names the app and now says `{brand}` rather than spelling it out (shared/brand.ts is the one place that word is decided). The privacy sentence in particular is the one a person most needs in their own language.",
   },
   "web/components/google-scope-dialog.tsx": {
     kinds: ["property"],
-    via: ["t(m.title)", "t(m.description)", "t(EVENT_KINDS[kind].title)"],
-    why: "`MODES` and `EVENT_KINDS` — two closed vocabularies. MODES is keyed by SERVICE on purpose: the same two answers mean opposite things on the two connections (Gmail's 'only' takes mail away; Calendar's can hand more over, because kwapso reads only the primary calendar today), so the sentences cannot be shared and the table is what keeps them apart. EVENT_KINDS' `value` is Google's own event-type word, passed straight to events.list, so the table is a translation of an API constant and never a mapping. Every half is read through `t` in the same file.",
+    via: ["t(m.title)", "t(m.description, BRAND)", "t(EVENT_KINDS[kind].title)"],
+    why: "`MODES` and `EVENT_KINDS` — two closed vocabularies. MODES is keyed by SERVICE on purpose: the same two answers mean opposite things on the two connections (Gmail's 'only' takes mail away; Calendar's can hand more over, because kwapso reads only the primary calendar today), so the sentences cannot be shared and the table is what keeps them apart. EVENT_KINDS' `value` is Google's own event-type word, passed straight to events.list, so the table is a translation of an API constant and never a mapping. Every half is read through `t` in the same file — `m.description` carrying `BRAND`, because the calendar mode names the app through a `{brand}` hole rather than spelling it out.",
   },
   "web/components/google-source-dialog.tsx": {
     kinds: ["property"],
@@ -1939,6 +1968,16 @@ export const GROWING_COLLECTIONS: Record<
     pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
+  tasks: {
+    lib: "workers/content/src/lib/tasks.ts",
+    fn: "listTasks",
+    routes: "workers/content/src/routes/todos.ts",
+    rowsKey: "tasks",
+    webKey: "tasksKey(",
+    pagerFile: "components/tasks-screen.tsx",
+    pagerKey: "tasksKey(",
+    why: "the SAME mistake the to-do below made, in the file next door, and it survived the round that caught that one. `listTasks` carried a hard cap on the reasoning that admin 'shrinks as fast as it grows because the done ones fall out of the default view' — true of the default view, and false of three of the six this door offers: `completed` asks for exactly the rows that fall out, `all` asks for every row there has ever been, and `calendar` asks for every dated one. On those three a thousand rows was a list with an invisible end, under a badge (R16) reporting the true number, so the screen said 'at least a million' above a list of a thousand and offered no way to reach the rest. Not caught by anything, because GROWING_COLLECTIONS is DATA: a growing collection nobody adds is never asked to page, which is the one shape this law cannot detect for itself. The four-key priority sort is folded into one lexicographic string (TASK_SORTS) because a cursor names a position and a position in a four-key order needs all four keys in it",
+  },
   todos: {
     lib: "workers/content/src/lib/todos.ts",
     fn: "listTodos",
@@ -1982,9 +2021,9 @@ export const DEAF_EXEMPT: Record<string, string> = {
  * Every line here today belongs to `workers/mcp/`, which is the EXTERNAL machine
  * surface and owns its own boundary suites. */
 export const RAW_BODY_EXEMPT: Record<string, string> = {
-  "workers/mcp/src/index.ts::rpc.id":
+  "workers/mcp/src/routes/mcp.ts::rpc.id":
     "JSON-RPC 2.0 requires the request id be ECHOED BACK verbatim in the response envelope (`id` may be a string, a number or null by spec). It is never read as a value, never reaches a statement, and normalising it would break the protocol.",
-  "workers/mcp/src/index.ts::rpc.params":
+  "workers/mcp/src/routes/mcp.ts::rpc.params":
     "the params OBJECT itself is only ever indexed (`rpc.params?.name`, coerced with String()) and handed to the tool catalogue, which validates each argument against the tool's own schema before it reaches a door. The field read here is the envelope, not a value.",
 }
 
@@ -2277,6 +2316,11 @@ export const EMAIL_CENSUS: Record<string, EmailClassification> = {
   "workers/tenancy/src/lib/sharding.ts::alertNewAlarms": {
     refersToRecord: false,
     why: "a database crossing 80% is an operational record with no screen on EITHER front door — it lives in the core database's db_growth table, which no app screen reads. Its real destination is the runbook, which the footnote names (OPERATIONS.md, Growth watch), and inventing an admin screen to have somewhere to point at would be building a product out of an email.",
+  },
+
+  "workers/tenancy/src/lib/ops-alert.ts::sendOpsDigest": {
+    refersToRecord: false,
+    why: "the nightly ops digest names error SIGNATURES and teams near their AI allowance — neither is a record with a screen on either front door. `error_logs` is read through an owner-gated curl door (GET /api/data-ops/admin/errors) that no front-end code calls, and a team's allowance is a counter rather than a record. Its real destination is that door and the runbook, which the footnote names, exactly as the sibling growth alarm above points at OPERATIONS.md. Giving it a `ctaUrl` would mean inventing an admin screen so an email had somewhere to point, which is building a product out of a notification.",
   },
 
   /* ── content: the work itself, and the two emails a client ever receives ── */

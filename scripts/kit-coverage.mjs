@@ -337,7 +337,7 @@ function main() {
   out += `**Components + foundations combined (the owner's "118"): ${totalHave}/${totalParts}**\n`
   if (absent) out += ` · ${absent} named-but-absent\n`
 
-  writeFileSync(join(ROOT, "KIT-COVERAGE.md"), out)
+  writeFileSync(join(ROOT, "documents", "KIT-COVERAGE.md"), out)
   console.log(`  reached through another kit part or a CSS @import (invisible to a JS-import grep): ${transitiveCount}`)
   console.log(
     `components ${have}/${components.length}   foundations ${fHave}/${foundations.length}   ` +

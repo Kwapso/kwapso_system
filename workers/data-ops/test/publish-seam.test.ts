@@ -42,6 +42,11 @@ const HOUSEKEEPING = [
   // Resolving an error-log row is private maintainer bookkeeping in the core DB
   // (owner-only, x-admin-key) — no team screen shows it, so nothing to broadcast.
   "POST /api/data-ops/admin/errors/resolve",
+  // …and closing a whole CLASS of them at once is the same bookkeeping, grouped
+  // the way the nightly digest already groups it. Same table, same key, same
+  // absence of anything a team can see: an error row belongs to the estate, not
+  // to a tenant, so there is no channel it could sensibly ping.
+  "POST /api/data-ops/admin/errors/resolve-signature",
 ]
 
 publishSeam({

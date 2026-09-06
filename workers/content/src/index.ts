@@ -82,11 +82,14 @@
 //   GET  /api/content/health
 
 import { brand } from "@shared/brand"
+import { healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
-import { logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
+import { postPresignUpload } from "./routes/uploads"
 import type { Env } from "./env"
 import {
   getHelp,
@@ -305,11 +308,30 @@ export async function teamSlice(
   if (total === 0) return []
   const windows = Math.ceil(total / CRON_TEAM_CAP)
   const window = windows <= 1 ? 0 : Math.floor(scheduledTime / everyMs) % windows
-  if (windows > 1)
-    console.warn(
-      `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. ` +
-        `A team is now visited once every ${windows} ticks; past a few windows this wants a work queue, not a bigger cap.`
-    )
+  if (windows > 1) {
+    const lap = `${job}: ${total} teams needs ${windows} ticks per lap, this tick takes window ${window + 1}/${windows}. A team is now visited once every ${windows} ticks (about ${Math.round((windows * everyMs) / 3_600_000)} hours); past a few windows this wants a work queue, not a bigger cap.`
+    console.warn(lap)
+    // AND RECORDED, ONCE PER LAP. The console line above was the whole of it, and
+    // DATA-MODEL's own sentence about ALERT_TO applies to a log stream as much as
+    // to a table: a warning nobody receives is a warning nobody receives. This is
+    // the shape R12 asks of unattended work — except that here nothing has
+    // FAILED, which is exactly why it was missed: at ~2,000 tenants the sweep
+    // visits a team every two and a half hours and the morning digest lands every
+    // ten DAYS, and every tick still reports success. A promise the product no
+    // longer keeps looks identical to a healthy cron from the outside.
+    //
+    // ONCE PER LAP, not once per tick — `window === 0` is the lap's first tick, so
+    // a four-window sweep records hourly and a ten-window digest records every ten
+    // days. The signal scales with the problem rather than with the clock, which
+    // is what keeps it out of `logError`'s own hourly bucket ceiling.
+    if (window === 0)
+      await recordWorkerError(
+        env.DB,
+        "content",
+        `cron/${job} (lap length)`,
+        new Error(lap)
+      )
+  }
   const rows = await env.DB.prepare(
     `SELECT id, database_id FROM teams WHERE ${READY}
       ORDER BY id LIMIT ${CRON_TEAM_CAP} OFFSET ${window * CRON_TEAM_CAP}`
@@ -430,6 +452,12 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // A file becomes a source: stored whole, read where we can, and honest about
   // it where we cannot. A MUTATION, not housekeeping — unlike the brand-library
   // upload door below, this one writes the record as well as the bytes.
+  // PERMISSION TO PUT A FILE, without the file passing through us. HOUSEKEEPING,
+  // not a mutation: it writes no row, no object and no counter — it decides and
+  // signs. The row is written later by the module's own door, which is where the
+  // publish and the activity line belong. Answers `{ direct: false }` in any
+  // environment with no R2 credential, so it is inert until somebody turns it on.
+  "POST /api/content/uploads/presign": { handler: postPresignUpload, kind: "housekeeping" },
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
@@ -608,24 +636,60 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    // The wall clock starts HERE, not at the first database trip: the budget in
+    // limits.ts is a promise about how long a person waits, and the work above
+    // the database (session verification, gating, JSON) is part of that wait.
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
-      if (route === "GET /api/content/health") return json({ ok: true })
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      if (route === "GET /api/content/health")
+        return json(healthBody("content", env, ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"]))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such content action.")
       // Measured on the way out — see timing.ts.
-      const res = await def.handler(request, env)
-      logIfSlow(request, route)
-      return withTiming(request, res)
+      // A PER-REQUEST COPY OF `env`, carrying this request's deferrer — the only way
+      // the ping can stop holding the response (owner's ruling, 6 Sep 2026;
+      // parallel.ts carries the reasoning and the provenance). `env` itself is
+      // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
+      // on it would attach one caller's work to another caller's request. The
+      // copy is shallow: every binding travels by reference, and only this field
+      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // The route's OWN tag decides which budget it answers to (limits.ts) —
+      // one place a route's class is declared, and the measurement follows it.
+      logIfSlow(request, route, def.kind, env.DB)
+      return withTiming(request, res, def.kind)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("content worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+      // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx. Clean GuardErrors are
+      // answered here and never recorded — that is right for "you may not do
+      // that", and it was wrong for the ones an outside service diagnosed for us
+      // (gating.ts's `detail` says what it cost). The caller's answer is
+      // unchanged; the cause stops being console-only.
+      if (e instanceof GuardError) {
+        if (e.detail)
+          await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`content worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       const message = e instanceof Error ? e.message : ""
       if (message.startsWith("cloud_key_missing:"))
         return fail(503, "cloud_key_missing", `${brand.name}'s cloud key isn't set up yet, content is paused.`)
@@ -682,7 +746,9 @@ export default {
           roleId: "system",
           databaseId: team.database_id,
         }
-        const results = await sweepAll(env, d1ConfigFrom(env), guard)
+        // THE APP ON ITS OWN. Nobody clicked this — the sweep runs on a cron
+        // under a system actor, so every activity row it writes says so.
+        const results = await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
         if (indexed > 0) await publishChange(env, team.id, "knowledge")
 
@@ -695,7 +761,7 @@ export default {
         // writes can happen twice.
         const auto = await googleAutopilot(
           env,
-          d1ConfigFrom(env),
+          d1ConfigFrom(env, "automation"),
           { id: team.id, databaseId: team.database_id },
           new Date(controller.scheduledTime)
         )
@@ -776,7 +842,7 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
   // MONDAY decides whether the weekly half rides along. getUTCDay() is 1 on
   // Monday; the digest is a UTC job, like the cron that fires it.
   const isMonday = now.getUTCDay() === 1
-  const cfg = d1ConfigFrom(env)
+  const cfg = d1ConfigFrom(env, "automation")
 
   for (const team of teams) {
     try {

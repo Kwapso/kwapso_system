@@ -24,7 +24,7 @@
 
 import { describe, expect, it } from "vitest"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
@@ -87,8 +87,27 @@ function skillDocs(): string[] {
   return out
 }
 
-const DOCS = [
+/** THE CANON, WHICH IS NO LONGER ALL AT THE ROOT. On 2026-09-06 forty-two of the
+ * forty-six root documents moved into `documents/`; only README, CLAUDE, RULES and
+ * AGENTS stayed, because those four are opened by name — by a newcomer, by an agent
+ * following CLAUDE.md, by `rules.test.ts`, and by whatever tool reads AGENTS.md out
+ * of habit.
+ *
+ * That move is precisely the shape of failure the `skillDocs()` note above already
+ * records: this line used to be `readdirSync(ROOT)` alone, and on its own it would
+ * have come back with FOUR files and gone green, having quietly stopped reading the
+ * other forty-two. Nothing would have been red. So the two directories are read
+ * together, and the count is asserted below rather than trusted — a canon that
+ * shrinks to a handful is a bug in this file, not a tidy repository. */
+const canonDocs = (): string[] => [
   ...readdirSync(ROOT).filter((f) => f.endsWith(".md")),
+  ...readdirSync(join(ROOT, "documents"))
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => join("documents", f)),
+]
+
+const DOCS = [
+  ...canonDocs(),
   ...skillDocs(),
   join("web", "e2e", "README.md"),
   ...PLANS,
@@ -133,7 +152,7 @@ const SUBSET_CLAIMS: { doc: string; phrase: string; why: string }[] = [
   {
     doc: "OPERATIONS.md",
     phrase: "four workers",
-    why: "the per-caller rate limiter's roster, not the app's: CALLER_LIMIT is bound on tenancy, content, data-ops and mcp — the four that resolve a caller. The two gateways cannot (they decode no session), realtime holds no doors, and auth's doors have no session to key on by definition and carry their own throttles.",
+    why: "the per-caller rate limiter's roster, not the app's: CALLER_LIMIT is bound on tenancy, content, data-ops and mcp — the four that RESOLVE A CALLER, which is what a per-caller ceiling has to key on. Realtime holds no doors, and auth's doors have no session to key on by definition and carry their own throttles. THE GATEWAYS ARE NOT ON THIS LIST FOR THE SAME REASON, and the sentence used to stop there — 'the two gateways cannot (they decode no session)' — which stopped being the whole truth on 6 Sep 2026: the agency gateway now binds MAINTENANCE_LIMIT, keyed on the ADDRESS, precisely BECAUSE it decodes no session. The maintenance doors carry no session by design, so an IP is the only key there is. So: no gateway can hold a per-CALLER limiter, and one of them holds a per-ADDRESS one. Four is still the right number for the claim this pins; the reason is no longer 'gateways cannot be throttled'.",
   },
   {
     doc: "CONVENTIONS.md",
@@ -169,9 +188,39 @@ const SUBSET_CLAIMS: { doc: string; phrase: string; why: string }[] = [
 ]
 
 const allowedSubset = (doc: string, phrase: string) =>
-  SUBSET_CLAIMS.some((s) => s.doc === doc && s.phrase.toLowerCase() === phrase.toLowerCase())
+  // Matched on the BASENAME, not the path. A pin here approves a SENTENCE in a named
+  // document; which folder that document sits in is not part of what was reviewed, and
+  // when the canon moved into `documents/` on 2026-09-06 every one of these six pins
+  // stopped matching at once. That failed loudly, which is the good outcome — but the
+  // fix is to stop encoding the location in the first place, so the next move costs
+  // nothing. Basenames are unique across the canon (the doc map check relies on the
+  // same fact).
+  SUBSET_CLAIMS.some(
+    (s) => s.doc === (doc.split(sep).pop() as string) && s.phrase.toLowerCase() === phrase.toLowerCase()
+  )
 
 describe("docs agree with the roster on disk", () => {
+  it("the canon is actually being read — this check cannot go quiet", () => {
+    // THE TRIPWIRE FOR THE LINE ABOVE. Every assertion in this file is a scan over
+    // DOCS, and a scan over an empty list passes. When the documents moved into
+    // `documents/` on 2026-09-06 a root-only `readdirSync` would have left four
+    // files here and reported all clear over a canon of forty-six — the same
+    // vacuous pass `skillDocs()` was rewritten to stop, and the same one R33's
+    // import ban learned to assert its way out of. So the corpus is proved
+    // non-trivial before anything is concluded from it.
+    expect(
+      canonDocs().length,
+      "the canon collapsed — did documents/ move again, or get renamed? Fix the walk, " +
+        "do not lower this number: every check in this file scans DOCS and an empty " +
+        "scan is indistinguishable from a clean one"
+    ).toBeGreaterThan(30)
+    expect(canonDocs(), "README.md must stay at the root — it is the front door").toContain("README.md")
+    expect(
+      canonDocs().filter((d) => d.startsWith("documents")).length,
+      "documents/ holds the canon; if it is empty the walk is reading the wrong place"
+    ).toBeGreaterThan(20)
+  })
+
   it("the roster itself is readable, and exactly two doors are public", () => {
     // If this fails, the repo changed shape and every expectation below is moot —
     // fix this first. Two public doors is the LAW (one per front end): a third
@@ -341,13 +390,22 @@ describe("README.md states what is true now, not when it became true", () => {
         .filter((l) => l.startsWith("/") && l.endsWith(".md"))
         .map((l) => l.slice(1))
     )
-    const roots = readdirSync(ROOT)
-      .filter((f) => f.endsWith(".md") && f !== "README.md" && !ignoredAtRoot.has(f))
+    // The audit artefacts still land at the ROOT, which is why the ignore list is
+    // read there — but the canon they had to be told apart from now lives in
+    // `documents/`, and nothing in that folder is ever an artefact. Matching on the
+    // BASENAME keeps the map's own spelling free: README may write
+    // `[CACHING.md](documents/CACHING.md)` or name the file in prose, and either
+    // reaches the reader, which is the whole property being checked.
+    const canon = canonDocs()
+      .map((f) => f.split(sep).pop() as string)
+      .filter((f) => f !== "README.md" && !ignoredAtRoot.has(f))
       .sort()
-    const missing = roots.filter((f) => !readme.includes(f))
+    // Same tripwire as above: a map that names nothing passes a scan over nothing.
+    expect(canon.length, "the canon collapsed — see the tripwire above").toBeGreaterThan(30)
+    const missing = canon.filter((f) => !readme.includes(f))
     expect(
       missing,
-      `these root documents are not reachable from README.md's doc map: ${missing.join(", ")}`
+      `these documents are not reachable from README.md's doc map: ${missing.join(", ")}`
     ).toEqual([])
   })
 })

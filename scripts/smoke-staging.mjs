@@ -71,7 +71,7 @@ const verify = await timedFetch(`${BASE}/api/auth/email/verify`, {
   body: JSON.stringify({ email: EMAIL, code }),
 })
 const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-ok("login verified + cookie set", verify.ok && cookie.startsWith("kwapso_session="))
+ok("login verified + cookie set", verify.ok && /^(__Host-)?kwapso_session=/.test(cookie))
 
 // 4 · Onboarding profile (idempotent).
 const profile = await api(

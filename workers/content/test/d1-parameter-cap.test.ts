@@ -85,6 +85,16 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     // and why it is small. A new one turns the build red until somebody says
     // which it is.
     const KNOWN_SMALL: Record<string, string> = {
+      // PROVEN BY CONSTRUCTION, which is the strongest kind here: `batch` is not
+      // a list somebody bounded, it is what `idBatches` HANDS BACK, and that
+      // helper's whole job is to cut a list into pieces of at most
+      // D1_MAX_BOUND_PARAMS minus the reserved parameters. The door passes
+      // `reserved = 2` (the timestamp and the note), so a batch is at most 98 and
+      // the statement binds at most 100. workers/data-ops/test/error-signature.test.ts
+      // asserts the arithmetic against a full RESOLVE_SCAN_CAP scan, and asserts
+      // the door actually calls the helper rather than binding the lot.
+      "data-ops/src/routes/admin.ts: batch":
+        "one page of idBatches(ids, 2) — bounded by the helper itself at D1_MAX_BOUND_PARAMS − 2 (98)",
       "content/src/lib/knowledge.ts: terms":
         "a question's search terms, capped at MAX_QUESTION_TERMS (24)",
       // The digit-bearing SUBSET of that same list, bound a second time so the

@@ -1,5 +1,6 @@
 // kwapso AUTH worker — every login-related action lives here, each as its own
-// small handler (these become MCP-catalogued actions via the gateway later).
+// small handler under routes/ (these become MCP-catalogued actions via the
+// gateway later).
 //
 //   POST /api/auth/email/start          { email }        -> sends a 6-digit code
 //   POST /api/auth/email/verify         { email, code }  -> logs in (sets cookie)
@@ -11,110 +12,132 @@
 //   GET  /api/auth/activity                              -> my account history (name/photo/email)
 //   POST /api/auth/logout                                -> forget me
 //   GET  /api/auth/health                                -> is this worker alive?
+//
+// WHY THERE IS A ROUTES TABLE HERE NOW (6 Sep 2026). This worker routed with a
+// `switch (route)` and kept eighteen handlers in this one file, and its siblings
+// have not for a long time. The cost was not readability — it was that R1 (every
+// mutation publishes) and R10 (every write gates) are enforced by a scanner that
+// walks a ROUTES table and a routes/ directory, so auth was the ONE worker with
+// neither a publish-seam suite nor a gating-seam one. Two load-bearing laws were
+// enforced on six workers out of eight, and the two they missed are the surface
+// every request in the product passes through and the machine surface in front
+// of it. Same doors, same order, same behaviour; the shape is now the one the
+// seam suites can read, and both suites now exist.
+//
+// AUTH'S GATES ARE A DIFFERENT KIND OF QUESTION, which is why its gating-seam
+// suite passes its own vocabulary to the shared scanner rather than the domain
+// workers' `requireRight`. Three classes, each named in that suite with its
+// reason: the sign-in doors, which run BEFORE any caller exists and are held by
+// throttles; the internal doors, which are held by a fail-closed INTERNAL_KEY
+// over a service binding; and everything else, which is identity-gated on the
+// caller's own session.
 
 import { fail, json } from "@shared/workers/http"
+import { healthBody } from "@shared/workers/config-health"
 import { GuardError } from "@shared/workers/gating"
-import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { logError, recordWorkerError } from "@shared/workers/error-log"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
+import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import type { Env } from "./env"
-import { sha256Hex } from "./lib/crypto"
-import { isValidEmail, normalizeEmail, sendEmail, sendLoginCode } from "./lib/email"
-import { clientIp, mintLoginCode, verifyLoginCode } from "./lib/login-codes"
-import { TEST_LOGIN_BUCKET } from "./lib/constants"
-import { startEmailChange, verifyEmailChange } from "./lib/email-change"
-import { createPinnedSession,
-  createSession,
-  destroySession,
-  getSessionUser,
-  readCookie,
-  SESSION_COOKIE,
-} from "./lib/sessions"
+import { internalLogError, internalMcpSession, internalSendEmail } from "./routes/internal"
 import {
-  buildGoogleStart,
-  exchangeGoogleCode,
-  googleCredentials,
-  googleRedirectUri,
-  googleSigningKeys,
-  oauthCookie,
-  OAUTH_COOKIE,
-  resolveFrontDoor,
-  verifyGoogleIdToken,
-} from "./lib/google"
-import { listAccountActivity } from "./lib/account-activity"
-import { setLanguage, setScale, setSpine, updateProfile, type ProfileInput } from "./lib/profile"
-import { isLanguage } from "@shared/i18n"
-import { isScale } from "@shared/scale"
-import { isSpine } from "@shared/spine"
-import {
-  findOrCreateUserByEmail,
-  toSessionUser,
-} from "./lib/users"
+  adminTestLogin,
+  emailChangeStart,
+  emailChangeVerify,
+  emailStart,
+  emailVerify,
+} from "./routes/sign-in"
+import { googleCallback, googleStart } from "./routes/google"
+import { activity, language, logout, me, profile, scale, spine } from "./routes/me"
+
+/**
+ * Every door on this worker, tagged with the class it answers to.
+ *
+ *   • "read"        — a GET; changes nothing, broadcasts nothing.
+ *   • "mutation"    — a write other clients can see, so it MUST broadcast a ping.
+ *   • "housekeeping" — the reviewed deny-list: a write that intentionally
+ *                      broadcasts NOTHING.
+ *
+ * THIS WORKER HAS NO MUTATIONS, and CLAUDE.md has said so for a year without
+ * anything checking it ("auth's user-channel publishes … are the reviewed
+ * exceptions"). Every write here changes the CALLER'S OWN identity — their
+ * session, their address, their display name, their language — and the one
+ * broadcast that matters, a profile change reaching the caller's other tabs,
+ * goes out on the USER channel from lib/profile.ts rather than a team one.
+ * There is no team row here to tell a team about.
+ */
+type RouteKind = "read" | "mutation" | "housekeeping"
+type Handler = (request: Request, env: Env) => Promise<Response>
+export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
+  // ── the front of the building: no caller exists yet ────────────────────────
+  "POST /api/auth/email/start": { handler: emailStart, kind: "housekeeping" },
+  "POST /api/auth/email/verify": { handler: emailVerify, kind: "housekeeping" },
+  // "Continue with Google" — the SECOND way to prove the SAME identity, never a
+  // second identity. Both halves are GET because Google's flow is a browser
+  // redirect: see lib/google.ts.
+  "GET /api/auth/google/start": { handler: googleStart, kind: "read" },
+  "GET /api/auth/google/callback": { handler: googleCallback, kind: "read" },
+  // NON-PRODUCTION test door (its OWN TEST_LOGIN_KEY secret, fails closed, and
+  // refused outright when ENVIRONMENT is "production"): mints a normal login
+  // code and returns it ONCE, so automated tests can sign in without any code
+  // ever being echoed by the real send door.
+  "POST /api/auth/admin/test-login": { handler: adminTestLogin, kind: "housekeeping" },
+
+  // ── the caller's own identity ──────────────────────────────────────────────
+  "POST /api/auth/email/change/start": { handler: emailChangeStart, kind: "housekeeping" },
+  "POST /api/auth/email/change/verify": { handler: emailChangeVerify, kind: "housekeeping" },
+  "GET /api/auth/me": { handler: me, kind: "read" },
+  "GET /api/auth/activity": { handler: activity, kind: "read" },
+  "POST /api/auth/profile": { handler: profile, kind: "housekeeping" },
+  "POST /api/auth/language": { handler: language, kind: "housekeeping" },
+  "POST /api/auth/scale": { handler: scale, kind: "housekeeping" },
+  "POST /api/auth/spine": { handler: spine, kind: "housekeeping" },
+  "POST /api/auth/logout": { handler: logout, kind: "housekeeping" },
+
+  // ── internal: service binding only, never routed publicly ──────────────────
+  // Other workers send branded emails THROUGH auth (it owns the Resend key).
+  "POST /internal/send-email": { handler: internalSendEmail, kind: "housekeeping" },
+  // The gateway forwards CLIENT error beacons here so web errors land in the
+  // same central error_logs table the workers write to.
+  "POST /internal/log-error": { handler: internalLogError, kind: "housekeeping" },
+  // The mcp worker bridges a verified personal access token to a short-lived
+  // session PINNED to the token's team (ARCHITECTURE: the MCP front desk).
+  "POST /internal/mcp-session": { handler: internalMcpSession, kind: "housekeeping" },
+}
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const { pathname } = new URL(request.url)
     const route = `${request.method} ${pathname}`
+    beginRequest(request)
+    // …and this request's own lifetime, so work the caller does not need can
+    // outlive the answer instead of delaying it (shared/workers/parallel.ts).
+    canDefer(request, ctx)
 
     try {
-      switch (route) {
-        case "POST /api/auth/email/start":
-          return await emailStart(request, env)
-        case "POST /api/auth/email/verify":
-          return await emailVerify(request, env)
-        // "Continue with Google" — the SECOND way to prove the SAME identity,
-        // never a second identity. Both halves are GET because Google's flow is
-        // a browser redirect: see lib/google.ts for why the Identity-Services
-        // POST button is the wrong shape behind refuseForeignOrigin.
-        case "GET /api/auth/google/start":
-          return await googleStart(request, env)
-        case "GET /api/auth/google/callback":
-          return await googleCallback(request, env)
-        // NON-PRODUCTION test door (its OWN TEST_LOGIN_KEY secret, fails closed,
-        // and refused outright when ENVIRONMENT is "production"): mints a normal
-        // login code and returns it ONCE, so automated tests can sign in without
-        // any code ever being echoed by the real send door. See adminTestLogin.
-        case "POST /api/auth/admin/test-login":
-          return await adminTestLogin(request, env)
-        case "POST /api/auth/email/change/start":
-          return await emailChangeStart(request, env)
-        case "POST /api/auth/email/change/verify":
-          return await emailChangeVerify(request, env)
-        case "GET /api/auth/me":
-          return await me(request, env)
-        case "GET /api/auth/activity":
-          return await activity(request, env)
-        case "POST /api/auth/profile":
-          return await profile(request, env)
-        case "POST /api/auth/language":
-          return await language(request, env)
-        case "POST /api/auth/scale":
-          return await scale(request, env)
-        case "POST /api/auth/spine":
-          return await spine(request, env)
-        case "POST /api/auth/logout":
-          return await logout(request, env)
-        case "GET /api/auth/health":
-          return json({ ok: true })
-        // Internal: other workers send branded emails THROUGH auth (it owns the
-        // Resend key). NOT under /api/ — the gateway never routes it publicly;
-        // only a service binding (env.AUTH.fetch) can reach it.
-        case "POST /internal/send-email":
-          return await internalSendEmail(request, env)
-        // Internal: the gateway forwards CLIENT error beacons here so web errors
-        // land in the same central error_logs table the workers write to (auth
-        // owns the door because it holds the core DB + the internal-key guard).
-        case "POST /internal/log-error":
-          return await internalLogError(request, env)
-        // Internal: the mcp worker bridges a verified personal access token to a
-        // short-lived session PINNED to the token's team (ARCHITECTURE: the MCP
-        // front desk). Live membership is re-checked here at mint AND by every
-        // downstream door per request.
-        case "POST /internal/mcp-session":
-          return await internalMcpSession(request, env)
-        default:
-          return fail(404, "not_found", "No such auth action.")
-      }
+      // What this worker cannot work without, answered by NAME (config-health.ts).
+      // Outside the table on purpose, like data-ops's and mcp's: a probe that
+      // must answer while a binding is missing cannot be dispatched through
+      // machinery that depends on those bindings.
+      if (route === "GET /api/auth/health")
+        return json(healthBody("auth", env, ["DB", "RESEND_API_KEY", "INTERNAL_KEY"]))
+      const def = ROUTES[route]
+      if (!def) return fail(404, "not_found", "No such auth action.")
+      // Measured on the way out (timing.ts), and this worker in particular:
+      // EVERY request in the product passes through auth to have its session
+      // verified, and until 5 Sep 2026 auth emitted no timing at all. The 24 Aug
+      // reading put `/api/auth/me` at ~280ms against a ~90ms transport floor, so
+      // ~190ms of every request in the app was session work with no shape to it.
+      // The route's OWN tag now decides which budget it answers to; before the
+      // table there was no kind to read, so the METHOD had to stand in for it.
+      // A per-request copy carrying this request's deferrer, exactly as the
+      // sibling workers do — auth publishes on the USER channel (a profile edit,
+      // an email change, a forced sign-out), and those pings held the response
+      // for the same reason every other one did.
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      logIfSlow(request, route, def.kind, env.DB)
+      return withTiming(request, res, def.kind)
     } catch (e) {
       // A refusal is an ANSWER, not a crash. Every sibling worker maps this
       // first; auth did not, so the moment its handlers started validating,
@@ -122,459 +145,20 @@ export default {
       // unauthenticated sign-in door writes a row to the GLOBAL core database
       // per request. The two changes only make sense together.
       if (e instanceof GuardError) return fail(e.status, e.code, e.message)
-      console.error("auth worker error:", e)
-      // Record the crash in the central error log (core DB) — best-effort,
-      // never blocks the response. Clean GuardError refusals never reach here.
-      await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request))
+      // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
+      // `console.*` sites in this codebase and not one of them named a request,
+      // which made the live tail and `error_logs` two stores with no join between
+      // them: `db/core/0020` exists to let one failing click be one query, and the
+      // half a developer actually watches could not be filtered by it. This is the
+      // highest-traffic of those sites — every unexpected crash in the worker
+      // passes through it — so it is the one worth the two extra fields.
+      console.error(`auth worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
+      // Record the crash in the central error log (core DB) — best-effort, and
+      // now literally "never blocks the response": it rides `waitUntil`, so the
+      // 500 goes out while the row is written and the row is still guaranteed to
+      // land. Clean GuardError refusals never reach here.
+      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },
 } satisfies ExportedHandler<Env>
-
-/** Internal (service-binding only): mint a short-lived TEAM-PINNED session for a
- * verified MCP token. The mcp worker has already verified the token hash; this
- * door re-verifies the user is an ACTIVE member of the pinned team, then mints. */
-async function internalMcpSession(request: Request, env: Env): Promise<Response> {
-  // FAIL CLOSED: minting a session is the highest-blast internal door, so unlike
-  // send-email it refuses outright when INTERNAL_KEY isn't configured (a fresh
-  // bootstrap must set the secret BEFORE the MCP bridge can work).
-  if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
-    return fail(403, "forbidden", "Bad internal key.")
-  // Validated even though the caller proved itself with INTERNAL_KEY. This is
-  // the highest-blast internal door in the product — it mints a session — and
-  // "a trusted caller cannot send rubbish" is an assumption, not a guarantee.
-  const body = (await request.json().catch(() => ({}))) as { userId?: unknown; teamId?: unknown }
-  const userId = requireText(body.userId, "User", TEXT_LIMITS.short)
-  const teamId = requireText(body.teamId, "Team", TEXT_LIMITS.short)
-  const member = await env.DB.prepare(
-    "SELECT id FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL"
-  )
-    .bind(teamId, userId)
-    .first()
-  if (!member)
-    return fail(403, "not_a_member", "That account is no longer an active member of the token's team.")
-  const { token } = await createPinnedSession(env, userId, teamId)
-  return json({ token })
-}
-
-/** Internal (service-binding only): send a branded email composed by another
- * worker (e.g. tenancy's invite email). */
-async function internalSendEmail(request: Request, env: Env): Promise<Response> {
-  // FAIL CLOSED: every internal door refuses every caller while its secret is
-  // unset — a half-finished bootstrap must not run with the doors open. (This
-  // used to wave callers through when INTERNAL_KEY was missing.)
-  if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
-    return fail(403, "forbidden", "Bad internal key.")
-  // Validated for the same reason internalMcpSession is (R20): the INTERNAL_KEY
-  // proves the caller is a worker, not that its payload is well-formed — and
-  // this door AIMS AN EMAIL from the product's verified sender.
-  const m = (await request.json().catch(() => ({}))) as {
-    to?: unknown
-    subject?: unknown
-    html?: unknown
-    text?: unknown
-  }
-  const sent = await sendEmail(env, {
-    to: requireText(m.to, "Recipient", TEXT_LIMITS.short),
-    subject: requireText(m.subject, "Subject", TEXT_LIMITS.short),
-    html: optionalText(m.html, "Body", TEXT_LIMITS.long) ?? "",
-    text: optionalText(m.text, "Body", TEXT_LIMITS.long) ?? "",
-  })
-  return json({ sent })
-}
-
-/** Internal (service-binding only): record a CLIENT-side error into the central
- * error_logs table. Same defense-in-depth key as send-email; every field is
- * capped inside logError, and a bad body is simply dropped (a log endpoint must
- * never become an error source itself). */
-async function internalLogError(request: Request, env: Env): Promise<Response> {
-  // FAIL CLOSED (same rule as send-email): no secret configured = no callers.
-  if (!env.INTERNAL_KEY || request.headers.get("x-internal-key") !== env.INTERNAL_KEY)
-    return fail(403, "forbidden", "Bad internal key.")
-  const b = (await request.json().catch(() => ({}))) as {
-    source?: unknown
-    place?: unknown
-    message?: unknown
-    stack?: unknown
-    url?: unknown
-    userId?: unknown
-    teamId?: unknown
-    requestId?: unknown
-  }
-  // Type-checked field by field rather than put through requireText, because
-  // this door DROPS rubbish instead of refusing it (R20 is satisfied by an
-  // explicit runtime check, not only by the text seam). A log endpoint that
-  // answers 400 teaches a broken client to report its breakage as a second
-  // error — it must never become an error source itself. logError caps every
-  // length; this decides every type.
-  const message = typeof b.message === "string" ? b.message : ""
-  if (message)
-    await logError(env.DB, {
-      source: typeof b.source === "string" ? b.source : "web",
-      place: typeof b.place === "string" ? b.place : "unknown",
-      message,
-      stack: typeof b.stack === "string" ? b.stack : undefined,
-      url: typeof b.url === "string" ? b.url : undefined,
-      // WHO the gateway's session check named — the bucket logError's hourly
-      // ceiling charges the row to, and the only reason a client beacon can be
-      // bounded per person at all. It arrives from the gateway, never from the
-      // browser's body; a caller who reached this door already holds INTERNAL_KEY
-      // and could write anything, so there is nothing further to prove here.
-      userId: typeof b.userId === "string" ? b.userId : undefined,
-      // The team, off the same verified /me answer the gateway resolved the
-      // userId from — never off the browser's body (same provenance rule).
-      teamId: typeof b.teamId === "string" ? b.teamId : undefined,
-      // The thread back to the click. Like `userId`, it arrives from the DOOR
-      // (off the `x-request-id` header it stamped) and never from the browser's
-      // body — a beacon that could name its own request id could staple a
-      // client crash onto somebody else's trace. Type-checked here, capped in
-      // logError. See shared/workers/trace.ts.
-      requestId: typeof b.requestId === "string" ? b.requestId : undefined,
-    })
-  return new Response(null, { status: 204 })
-}
-
-/** Step 1 of email login: create + send a 6-digit code. The response NEVER
- * carries the code — a login code appears nowhere but the user's inbox, in any
- * environment (the old staging echo was deleted; tests use adminTestLogin).
- * The ONE unauthenticated door that sends mail and writes rows, so the send is
- * charged to the caller (clientIp) as well as to the address. */
-async function emailStart(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => ({}))) as { email?: unknown }
-  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
-  if (!isValidEmail(email))
-    return fail(400, "invalid_email", "Enter a valid email address.")
-
-  const minted = await mintLoginCode(env, email, clientIp(request))
-  if ("error" in minted) return fail(minted.status, minted.error, minted.message)
-
-  const sent = await sendLoginCode(env, email, minted.code)
-  if (sent) return json({ ok: true })
-  // No email key configured → refuse rather than stranding the user.
-  return fail(503, "email_not_configured", "Email sending isn't set up yet.")
-}
-
-/** NON-PRODUCTION ONLY: mint a login code through the SAME path as the real send
- * door (hashed at rest, same TTL, same per-hour throttle) and return it ONCE
- * instead of emailing — the sign-in door for automated tests now that no code is
- * ever echoed anywhere. Its holder can sign in as ANY account on the
- * environment, so it carries two independent locks (below) and production has
- * neither. See OPERATIONS.md § secrets. */
-async function adminTestLogin(request: Request, env: Env): Promise<Response> {
-  // TWO independent locks, because this door's holder can sign in AS ANYONE:
-  //  1. its OWN secret. It deliberately does NOT reuse ADMIN_KEY — that name is
-  //     the maintenance key OPERATIONS.md tells an operator to set on tenancy and
-  //     data-ops in BOTH environments, so sharing it would turn one mistyped
-  //     `wrangler secret put` directory into universal impersonation.
-  //  2. the environment itself. Even if the secret were somehow set on
-  //     production, the code refuses — the isolation is structural, not a
-  //     sentence in a runbook.
-  if (env.ENVIRONMENT === "production") return fail(403, "forbidden", "Not available.")
-  if (!env.TEST_LOGIN_KEY || request.headers.get("x-admin-key") !== env.TEST_LOGIN_KEY)
-    return fail(403, "forbidden", "Not available.")
-  const body = (await request.json().catch(() => ({}))) as { email?: unknown }
-  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
-  if (!isValidEmail(email))
-    return fail(400, "invalid_email", "Enter a valid email address.")
-  // Charged to the test door's OWN bucket, not to the machine's address. This
-  // door sends no mail, so it is not what the caller budgets are guarding — and
-  // sharing them meant running the smoke suite twice in an hour locked the smoke
-  // suite out of the product it was checking.
-  const minted = await mintLoginCode(env, email, TEST_LOGIN_BUCKET)
-  if ("error" in minted) return fail(minted.status, minted.error, minted.message)
-  // Returned exactly once, to the TEST_LOGIN_KEY holder; the normal verify door
-  // consumes it like any other code (attempt cap + TTL apply unchanged).
-  return json({ ok: true, code: minted.code })
-}
-
-/** Step 2 of email login: check the code, create the session. Unauthenticated and
- * keyed on the address alone — anyone who knows an email can post junk here — so
- * the try is charged to the CALLER (clientIp) as well as to the code, and a
- * stranger's wrong guesses can't spend the tries of the person who asked for it.
- * See verifyLoginCode for the two lanes and why. */
-async function emailVerify(request: Request, env: Env): Promise<Response> {
-  const body = (await request.json().catch(() => ({}))) as {
-    email?: string
-    code?: string
-  }
-  const email = normalizeEmail(requireText(body.email, "Email", TEXT_LIMITS.short))
-  const code = requireText(body.code, "Code", TEXT_LIMITS.short)
-  if (!isValidEmail(email) || !/^\d{6}$/.test(code))
-    return fail(400, "invalid_input", "Enter your email and the 6-digit code.")
-
-  const checked = await verifyLoginCode(env, email, code, clientIp(request))
-  if ("error" in checked) return fail(checked.status, checked.error, checked.message)
-
-  const { user, isNew } = await findOrCreateUserByEmail(env, email)
-  if (user.deactivated_at !== null)
-    return fail(403, "deactivated", "This account is deactivated.")
-
-  const { setCookie } = await createSession(env, user.id)
-  return json({ user: toSessionUser(user), isNew }, 200, { "Set-Cookie": setCookie })
-}
-
-/** "Continue with Google", step 1: bounce the browser to Google's account picker.
- *
- * WHY THIS DOOR IS NOT ON THE SEND LEDGER. The login throttle and the send ledger
- * (lib/login-codes.ts) meter one scarce thing: emails leaving the product. This
- * door sends none, writes no row and makes no outbound call — it mints a cookie
- * and redirects. Charging it to the same buckets would not add a defence; it
- * would let anyone burn a real person's code budget by clicking a button that
- * costs us nothing. The thing this path could actually be walked down — minting
- * sessions — is bounded by Google's own assertion, which is exactly how the code
- * path is bounded by the code. */
-async function googleStart(request: Request, env: Env): Promise<Response> {
-  // The redirect_uri is derived from WHICH FRONT DOOR the person is standing at
-  // (there are two hostnames), then required to be one of ours. Deriving without
-  // checking would make this an open redirect that hands out a session cookie.
-  const origin = resolveFrontDoor(env, request)
-  if (!origin) return fail(400, "unknown_front_door", "Sign in from the app's own address.")
-  // Not configured = say so quietly and let the person use the code instead.
-  // BOTH halves are checked here, not at the callback, so nobody is sent to
-  // Google only to fail on the way back.
-  const creds = googleCredentials(env)
-  if (!creds) return Response.redirect(`${origin}/login?error=google_not_ready`, 302)
-
-  const { url, setCookie } = await buildGoogleStart(env, creds, origin)
-  return new Response(null, { status: 302, headers: { Location: url, "Set-Cookie": setCookie } })
-}
-
-/** "Continue with Google", step 2: Google sends the browser back here. Finish the
- * handshake, VERIFY the assertion, and sign the person in as the same user the
- * email code would have signed in.
- *
- * IDENTITY-GATED, exactly like emailVerify: the gate is not a permission but a
- * proof of who the caller is — Google's signature here, a 6-digit code there.
- * Both then go through the ONE identity seam, findOrCreateUserByEmail, so a
- * person who used a code yesterday and Google today is one row, not two.
- *
- * SIGNING IN IS NOT GETTING IN (SCOPE ch.06). A Google account whose address is
- * not a member gets what a stranger gets from the code door: a user row with no
- * team, and the "nothing here yet" screen. The invite creates access; this
- * doesn't, and there is deliberately no second onboarding branch for it. */
-async function googleCallback(request: Request, env: Env): Promise<Response> {
-  const origin = resolveFrontDoor(env, request)
-  if (!origin) return fail(400, "unknown_front_door", "Sign in from the app's own address.")
-
-  /** Back to the sign-in screen with a reason, and ALWAYS without the one-shot
-   * cookie — a state that survives its round-trip is a replay waiting to happen.
-   * The reason is encoded even though every caller passes a fixed word: the
-   * origin is fixed by the allow-list above, so this is the only part of the
-   * Location a future edit could make writable, and it costs one call. */
-  const back = (reason: string) =>
-    new Response(null, {
-      status: 302,
-      headers: {
-        Location: `${origin}/login?error=${encodeURIComponent(reason)}`,
-        "Set-Cookie": oauthCookie(env, "", 0),
-      },
-    })
-
-  const creds = googleCredentials(env)
-  if (!creds) return back("google_not_ready")
-
-  const url = new URL(request.url)
-  // The QUERY half of the boundary (R20). Google's own values are small, but this
-  // door is unauthenticated and anyone can call it with a multi-megabyte `?code=`
-  // — which without a cap is a 500 and a row in the GLOBAL error log per request.
-  const code = queryText(url.searchParams.get("code"), "Code", TEXT_LIMITS.link)
-  const state = queryText(url.searchParams.get("state"), "State", TEXT_LIMITS.short)
-  const cookie = readCookie(request, OAUTH_COOKIE)
-  if (!code || !state || !cookie) return back("google_failed")
-
-  const [cookieState, verifier] = cookie.split(".")
-  if (!verifier || state !== cookieState) return back("google_failed")
-
-  try {
-    const idToken = await exchangeGoogleCode(creds, code, verifier, googleRedirectUri(origin))
-    const identity = await verifyGoogleIdToken(idToken, {
-      clientId: creds.clientId,
-      keys: await googleSigningKeys(),
-    })
-
-    const { user } = await findOrCreateUserByEmail(env, identity.email)
-    if (user.deactivated_at !== null) return back("deactivated")
-
-    const { setCookie } = await createSession(env, user.id)
-    const headers = new Headers({ Location: `${origin}/` })
-    headers.append("Set-Cookie", setCookie)
-    headers.append("Set-Cookie", oauthCookie(env, "", 0))
-    return new Response(null, { status: 302, headers })
-  } catch (e) {
-    // One sentence to the person, the detail to the log. Which claim failed is
-    // useful to us and is an oracle to anyone probing the door.
-    console.error("google callback failed:", e)
-    return back("google_failed")
-  }
-}
-
-/** Email change, step 1: send a 6-digit code to the NEW email (signed-in only). */
-async function emailChangeStart(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  const body = (await request.json().catch(() => ({}))) as { email?: string }
-  const r = await startEmailChange(env, user, requireText(body.email, "Email", TEXT_LIMITS.short))
-  if ("error" in r) return fail(r.status, r.error, r.message)
-  // Never a code in the response — same law as login (inbox only).
-  return json({ ok: true })
-}
-
-/** Email change, step 2: verify the code, switch the email, log + secure it. */
-async function emailChangeVerify(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  const body = (await request.json().catch(() => ({}))) as {
-    email?: string
-    code?: string
-  }
-  // Keep THIS device signed in when we drop the others.
-  const token = readCookie(request, SESSION_COOKIE)
-  const currentTokenHash = token ? await sha256Hex(token) : ""
-  const r = await verifyEmailChange(
-    env,
-    user,
-    requireText(body.email, "Email", TEXT_LIMITS.short),
-    requireText(body.code, "Code", TEXT_LIMITS.short),
-    currentTokenHash
-  )
-  if ("error" in r) return fail(r.status, r.error, r.message)
-  return json({ user: r.user })
-}
-
-/** Who is the cookie attached to this request? */
-async function me(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-  return json({ user: toSessionUser(user) })
-}
-
-/** The signed-in person's own account history (name / photo / email changes). */
-async function activity(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-  return json({ activity: await listAccountActivity(env, user.id) })
-}
-
-/** Onboarding / profile edit: names + optional photo (stored in R2). */
-async function profile(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  // R20 AT THE DOOR, not one frame down. This handler used to read the body with
-  // a bare cast and hand the WHOLE object to updateProfile, which did
-  // `(input.firstName ?? "").trim()` — and `??` does not catch a number, so
-  // {"firstName": 1} was a TypeError, a 500, and an error_logs row in the GLOBAL
-  // core database, from any signed-in caller, at BOTH front doors (this route is
-  // on the portal's allow-list too).
-  //
-  // It is also the reason the law's own scanner never saw it: `validated-bodies`
-  // follows `<binding>.<field>` reads in the file that bound the body, and this
-  // file read no fields at all — the door contributed ZERO fields to the census
-  // and reported clean. Validating here fixes the crash AND puts the three fields
-  // back in the scanner's field of view, which is the half that stays fixed.
-  const body = (await request.json().catch(() => ({}))) as {
-    firstName?: unknown
-    lastName?: unknown
-    imageDataUrl?: unknown
-  }
-  const input: ProfileInput = {
-    firstName: optionalText(body.firstName, "First name", TEXT_LIMITS.short),
-    lastName: optionalText(body.lastName, "Last name", TEXT_LIMITS.short),
-    // Through the SAME seam, not a `typeof` — auth's own boundary rule
-    // (test/boundary.test.ts) is stricter than R20's and admits only the three
-    // validators, because a cast walked past its first version. And through the
-    // SAME cap as every other picture field: `imageFieldLimit` is DERIVED from
-    // MAX_IMAGE_BYTES, so the two move together. The number here used to be
-    // 4,000,000, written out, generous, and correct — which is exactly what
-    // 20,000 was when it was written. A hand-picked constant beside a byte limit
-    // it does not reference is the shape of the bug this seam was made to end;
-    // raise MAX_IMAGE_BYTES to 3 MB and this door starts refusing every photo.
-    imageDataUrl: optionalText(body.imageDataUrl, "Photo", imageFieldLimit(body.imageDataUrl)),
-  }
-  const result = await updateProfile(env, user, input)
-  if ("error" in result) return fail(400, result.error, result.message)
-  return json(result)
-}
-
-/** The language this person reads kwapso in. Reached from BOTH front doors —
- * this route is on the portal gateway's allow-list, because a client choosing
- * German in their own portal is the whole point of the feature.
- *
- * R20, positionally: `body.language` sits as `isLanguage`'s only argument, and
- * `isLanguage` is a real type check against the LANGUAGES list rather than a
- * truthiness guard. An unknown code is a clean 400 here, never a value that
- * reaches the database and turns somebody's screen into fallback English
- * forever. The body is read field by field and never destructured. */
-async function language(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  // TWO CHECKS, AND THE FIRST ONE IS NOT REDUNDANT. `requireText` is auth's own
-  // boundary rule (test/boundary.test.ts), which is stricter than R20's and
-  // admits only the three shared validators — because a cast walked past its
-  // first version, and the fix for that must not be loosened by the next door
-  // that finds it inconvenient. So the field passes through the seam every other
-  // auth door uses, which also buys the NUL strip and the clean 400 mapping.
-  // `isLanguage` then decides the only question that matters: is this string one
-  // of the four we actually speak. An unrecognised code stops here rather than
-  // living on a user row for ever, matching no catalogue entry, leaving somebody
-  // reading fallback English with no way to explain why.
-  const body = (await request.json().catch(() => ({}))) as { language?: unknown }
-  const chosen = requireText(body.language, "Language", 8)
-  if (!isLanguage(chosen))
-    return fail(400, "bad_language", "That is not a language kwapso speaks.")
-
-  return json(await setLanguage(env, user, chosen))
-}
-
-/** HOW BIG THIS PERSON WANTS THE APP. The same door as `language`, one field
- * along, and deliberately its twin rather than a second preferences endpoint
- * with a shape of its own: both are one word about one reader, both are read off
- * `SessionUser` by both front doors, and both must survive a device change.
- *
- * R20, positionally: `body.scale` sits as `requireText`'s first argument and
- * then as `isScale`'s only argument, and `isScale` is a real check against
- * SCALE_STEPS rather than a truthiness guard. An unknown step is a clean 400
- * here, never a value that lands on a user row and leaves somebody reading the
- * fallback size for ever with no way to explain why. The body is read field by
- * field and never destructured. */
-async function scale(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  const body = (await request.json().catch(() => ({}))) as { scale?: unknown }
-  const chosen = requireText(body.scale, "Size", 16)
-  if (!isScale(chosen)) return fail(400, "bad_scale", "That is not a size kwapso offers.")
-
-  return json(await setScale(env, user, chosen))
-}
-
-/** WHICH SPINE THIS PERSON WANTS THE APP PAINTED IN — the rail, the ground
- * around the floating content card, everything behind the app, not the rail
- * alone (the field reads "Background" now, renamed from "Sidebar"). `scale`'s
- * twin, one field along: both are one word about one reader, both are read
- * off `SessionUser` by `web/components/app-shell.tsx`, and both must survive
- * a device change.
- *
- * R20, positionally: `body.spine` sits as `requireText`'s first argument and
- * then as `isSpine`'s only argument, and `isSpine` is a real check against
- * SPINE_VALUES rather than a truthiness guard. An unknown value is a clean 400
- * here, never a value that lands on a user row. The body is read field by
- * field and never destructured. */
-async function spine(request: Request, env: Env): Promise<Response> {
-  const user = await getSessionUser(env, request)
-  if (!user) return fail(401, "signed_out", "Not signed in.")
-
-  const body = (await request.json().catch(() => ({}))) as { spine?: unknown }
-  const chosen = requireText(body.spine, "Background", 16)
-  if (!isSpine(chosen)) return fail(400, "bad_spine", "That is not a background kwapso offers.")
-
-  return json(await setSpine(env, user, chosen))
-}
-
-async function logout(request: Request, env: Env): Promise<Response> {
-  const { setCookie } = await destroySession(env, request)
-  return json({ ok: true }, 200, { "Set-Cookie": setCookie })
-}

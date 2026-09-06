@@ -36,7 +36,7 @@ import { useCached } from "@shared/web/store"
 
 /** `module:id` — the key a resolved name is filed under, and the same string
  * `recordLabel` looks it up by. One spelling, written once. */
-export const faceKey = (module: string, id: string): string => `${module}:${id}`
+const faceKey = (module: string, id: string): string => `${module}:${id}`
 
 /**
  * Reads the name of every level in `levels` that `alreadyNamed` could not name.

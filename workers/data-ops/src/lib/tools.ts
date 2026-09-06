@@ -27,11 +27,11 @@ import { forwardToDoor } from "@shared/workers/http"
 import { requestId } from "@shared/workers/trace"
 import { BULK_IDS_LIMIT } from "@shared/workers/limits"
 import { publishChange } from "@shared/workers/realtime"
-import { B, checkArgTypes, obj, S, str } from "@shared/workers/tool-args"
-import { RECORD_TOGGLES, recordToggle } from "@shared/workers/record-toggles"
+import { B, checkArgTypes, enumOf, obj, S, str } from "@shared/workers/tool-args"
+import { RECORD_TOGGLES, RECORD_TOGGLE_NAMES, recordToggle } from "@shared/workers/record-toggles"
 import { googleServiceOfPath } from "@shared/knowledge-chips"
 import { roleLabel, SHARED_TOOLS, type SharedTool } from "@shared/workers/tool-catalog"
-import { alwaysConfirms, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
+import { alwaysConfirms, isMoneyWrite, isPrivilegeWrite, TOOL_GATES } from "@shared/workers/tool-gates"
 import { confirmBatch, getBatchView, planModules } from "./import-batch"
 import type { Env } from "../env"
 import type { ToolSpec } from "./model"
@@ -129,7 +129,9 @@ const AGENT_ONLY: AgentTool[] = [
         ? { binding: entry.binding, path: entry.path }
         : { binding: "TENANCY" as const, path: "/api/tenancy/accounts/active" }
     },
-    schema: obj({ record: S, id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
+    // `record` is an ENUM, not a bare string — see the MCP twin. Both surfaces
+    // or neither (R43): the fall-through was symmetric, so the refusal is too.
+    schema: obj({ record: enumOf(RECORD_TOGGLE_NAMES), id: S, roleId: S, active: B, appId: S }, ["record", "active"]),
     buildBody: (i) => {
       const entry = recordToggle(str(i, "record"))
       // The door reads ONE id field and this sends that one. `roleId` is exposed
@@ -240,6 +242,57 @@ const AGENT_ONLY: AgentTool[] = [
     confirm: true, // writing a whole file of rows is high-blast — always confirm
     summarize: (i) => (typeof i.summary === "string" && i.summary ? i.summary : "Run the attached file import"),
     run: (env, request, input) => runImportBatchTool(env, request, input),
+  },
+
+  /* ---------------------- OPENING THE REST OF THE CATALOGUE ------------------
+   *
+   * Stage two of the two-stage catalogue (see CORE_TOOL_NAMES for the whole
+   * reasoning and the measurement). Every step carries the core tools plus an
+   * INDEX of every other tool's name; this is how the model turns a name from
+   * that index into something it can actually call.
+   *
+   * IT RUNS INSIDE data-ops AND TOUCHES NO DOOR. There is nothing to gate: it
+   * reads this file's own catalogue, which is source code, and it returns
+   * DESCRIPTIONS — never a row, never a record, never anything belonging to a
+   * team. The permission that matters is unchanged and unmoved: every tool it
+   * hands over still runs through its own gated door AS the caller, and a tool
+   * the caller's rights already dropped is not in the index to be asked for
+   * (`toolIndex` takes the same `held` set `toolSpecs` does). So loading a
+   * definition grants exactly nothing.
+   */
+  {
+    name: "load_tools",
+    description:
+      "Fetch the full instructions for tools you can see listed but cannot yet call. Every step shows you a short list of tool NAMES; this turns any of them into tools you can use. Pass names, a list of the exact names from that list — ask for every tool you expect to need in ONE call rather than one at a time, because each call costs a step. Names you ask for that do not exist come back named, so you can correct yourself; nothing is granted or changed by asking, and a tool your permissions do not allow was never in the list.",
+    schema: obj({ names: { type: "array", items: S } }, ["names"]),
+    binding: "SELF",
+    method: "POST",
+    path: "(tool catalogue)",
+    write: false,
+    confirm: false,
+    summarize: () => "Look up how to use a tool",
+    run: async (_env, _request, input) => {
+      const asked = Array.isArray(input.names) ? input.names.filter((n): n is string => typeof n === "string") : []
+      const known = new Set(TOOL_CATALOG.map((t) => t.name))
+      const found = asked.filter((n) => known.has(n))
+      const missing = asked.filter((n) => !known.has(n))
+      // The LOOP is what actually widens the tools array — it reads this call's
+      // own input, so what the model may use next step is decided by the same
+      // code that decides everything else it may use, not by a value travelling
+      // back through a tool result. This answer is the model's receipt.
+      return {
+        ok: found.length > 0,
+        status: found.length > 0 ? 200 : 400,
+        data: {
+          loaded: found,
+          unknown: missing,
+          note:
+            found.length > 0
+              ? "Their full instructions are available from your next step onward — call them directly."
+              : "None of those names is a tool. Check the list of names you were shown and try again.",
+        },
+      }
+    },
   },
 
   /* ------------------------------- GOOGLE ---------------------------------- */
@@ -811,15 +864,102 @@ export function getTool(name: string): AgentTool | undefined {
  *     "nobody has classified this", not "nobody may call it", and guessing the
  *     second from the first would silently retire a working tool.
  *
- * The cost of that choice is honest: 33 of the 166 shared tools carry no gate, so
- * they are sent to everybody. R36's `offered-rights` is what keeps that number
- * falling, because it fails when a right is asked for and never offered. */
-export function toolSpecs(held?: ReadonlySet<string>): ToolSpec[] {
+ * The cost of that choice is honest, and it is NOT written down here as a number.
+ * This sentence used to read "33 of the 166 shared tools carry no gate"; the real
+ * figures were 52 of 165, and nothing had said so for weeks — a count in a
+ * comment is a measurement with no way to fail. Two places carry it instead, and
+ * both break when it moves: `UNGATED_CEILING` in test/tool-diet.test.ts (a
+ * ceiling, so the number can only fall) and `node scripts/measure-preamble.mjs`,
+ * which prints today's count and the trim FLOOR beside it — what a caller
+ * holding no rights still receives, which is what the ungated tools cost.
+ * R36's `offered-rights` is what keeps the number falling, because it fails when
+ * a right is asked for and never offered. */
+export function toolSpecs(held?: ReadonlySet<string>, loaded?: ReadonlySet<string>): ToolSpec[] {
   return TOOL_CATALOG.filter((t) => {
-    if (!held) return true
-    const gate = TOOL_GATES[t.name]
-    return !gate || held.has(gate)
+    if (held) {
+      const gate = TOOL_GATES[t.name]
+      if (gate && !held.has(gate)) return false
+    }
+    // `loaded` absent = the whole catalogue, exactly as before this existed. Every
+    // caller that only wants "what may this person reach" — the census tests, the
+    // failure wrap-up, the measurement script — passes nothing and is unaffected.
+    if (!loaded) return true
+    return CORE_TOOL_NAMES.has(t.name) || loaded.has(t.name)
   }).map((t) => ({ name: t.name, description: t.description, schema: t.schema }))
+}
+
+/* ─────────────────────── THE TWO-STAGE CATALOGUE ──────────────────────────── */
+//
+// WHAT WAS WRONG. Every model call re-sent all 165 tool definitions: 132,828
+// characters, ~34,751 tokens, on every step of every turn, up to twelve steps.
+// Measured 2026-09-06 by `node scripts/measure-preamble.mjs`. A one-word question
+// paid for the whole menu before anybody read the first line of it, and at the
+// owner's stated volume that is the largest single line in the product's bill.
+//
+// WHERE THE BYTES ACTUALLY WERE, which is what decided the design: of the 107,364
+// characters of tool JSON, the DESCRIPTIONS are 71,787 (66.9%) and the schemas
+// 26,677 (24.8%). So the obvious build — "send names and schemas, defer the
+// prose" — would have saved a quarter. The prose IS the catalogue.
+//
+// SO THE INDEX IS NAMES. Stage one sends the CORE tools in full plus a flat,
+// sorted list of every other tool's NAME (3,023 characters for 159 of them);
+// stage two is `load_tools`, which hands back the full definitions of the ones
+// the model asks for, and the loop re-sends those on every step after it.
+//
+// Names, rather than a module grouping, for one reason that matters: a module is
+// not a fact this file has. `TOOL_GATES` maps WRITES only — a read carries no
+// line there by design, which is why 52 tools look "ungated" — so grouping by
+// module would have needed a new field on 165 entries or a second map to keep
+// true. The names are already there, already unique, and already descriptive:
+// `list_role_rates` and `set_client_tool_price` say what they are.
+//
+// WHAT IT COSTS. One extra step on a turn that needs a specialist tool, and a
+// prefix cache that re-warms after a load (the tools array changes, so steps
+// after a load share a different prefix from steps before it). Both are small
+// against 70% off every step of every turn.
+//
+// WHAT IS NOT MEASURED, and it is the honest gap: whether the model ROUTES as
+// well from an index of names as it does from 165 full definitions. That is
+// `scripts/agent-routing-bench.mjs`, it makes real model calls, and it costs
+// money — so it is the gate before this is deployed, not before it is committed.
+// The bench's own history says why the question is live: the same question was
+// answered correctly with 10 and 25 tools offered, not at all with 50, and
+// wrongly with 100 (model.ts records it). Fewer tools has never been the thing
+// that hurt; it is the direction the evidence points.
+
+/** The tools EVERY step carries, whatever the question.
+ *
+ * Not "the popular ones" — the ones that are not about any single module, so no
+ * amount of loading makes them unnecessary and every turn would load them first
+ * anyway. `describe_module` says what a module holds, `query_records` asks any
+ * module a question (it is the grammar that already replaced a drawer of list
+ * tools — see REPLACED_BY_QUERY), `ask_knowledge` reaches the corpus,
+ * `read_activity` is the cross-module history, `set_record_active` is already one
+ * tool over twenty-one doors, and `run_import_batch` is the one action an
+ * attached-file plan names by hand — a turn that has just been handed a plan
+ * must not need a round trip to be able to act on it.
+ *
+ * `load_tools` is not listed: it is defined below and always sent, because a
+ * catalogue you cannot open is a shorter catalogue and nothing else. */
+export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "describe_module",
+  "query_records",
+  "ask_knowledge",
+  "read_activity",
+  "set_record_active",
+  "run_import_batch",
+  "load_tools",
+])
+
+/** Every tool name that is NOT core, sorted, as one line. Computed once at module
+ * load from the catalogue itself, so a tool added tomorrow is in the index the
+ * day it exists and nobody has to remember a second list. */
+export function toolIndex(held?: ReadonlySet<string>): string {
+  return toolSpecs(held)
+    .map((t) => t.name)
+    .filter((n) => !CORE_TOOL_NAMES.has(n))
+    .sort()
+    .join(", ")
 }
 
 /** Confirm rule (the ONE place it's decided): a write pauses for the yes/no panel only
@@ -835,6 +975,11 @@ export function requiresConfirm(tool: AgentTool, input: Record<string, unknown> 
   // (The catalog must still DECLARE confirm:true; agent.test.ts asserts that, so
   // the catalog reads honestly instead of relying on this line.)
   if (isPrivilegeWrite(tool)) return true
+  // …and so does a RATE CARD write, derived the same way and for the same
+  // reason. A wrong rate does not fail: it silently re-prices every margin and
+  // every app's saving computed after it, and the first person to notice is
+  // reading a number rather than an error.
+  if (isMoneyWrite(tool)) return true
   return typeof tool.confirm === "function" ? tool.confirm(input) : tool.confirm === true
 }
 
@@ -871,6 +1016,9 @@ export async function executeTool(
     method: tool.method,
     cookie: request.headers.get("Cookie") ?? "",
     traceId: requestId(request),
+    // THE ASSISTANT IS ACTING, as the person who asked it (origin.ts). Same
+    // person, same door, same rights — and now a distinguishable row.
+    origin: "assistant",
     query: tool.method === "GET" && tool.buildQuery ? tool.buildQuery(input) : "",
     body: tool.buildBody ? tool.buildBody(input) : {},
     // The agent's act-as-user hop was the ONE cross-worker call with no

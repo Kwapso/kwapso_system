@@ -311,6 +311,19 @@ export const GATELESS_WRITES: Record<string, string> = {
  * "access"; the other half is the ACCOUNT FENCE below. */
 const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
 
+/** The MODULE whose rows are RATE CARDS — what a client is charged, what our own
+ * hour costs us, and what an hour of a role is worth. `commercials` is the whole
+ * of it: a tool PRICE inside a process map is `processes`, deliberately, because
+ * that is a fact about one client's setup rather than a card the whole book is
+ * costed from.
+ *
+ * Named beside PRIVILEGE_MODULES because it answers the same question one step
+ * along: a privilege write decides who may act, a money write decides what an
+ * hour is worth, and both are wrong quietly. A mis-set rate does not fail — it
+ * re-prices every margin, every app's saving and every invoice computed after
+ * it, and the first person to notice is looking at a number, not an error. */
+const MONEY_MODULES = ["commercials"]
+
 /** A path or a field name, as a bag of lowercase words. */
 const words = (s: string): Set<string> => new Set(s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean))
 
@@ -404,4 +417,28 @@ export function isPrivilegeWrite(tool: {
   const gate = TOOL_GATES[tool.name]
   if (gate) return PRIVILEGE_MODULES.includes(gate.split(":")[0])
   return /\/api\/tenancy\/(roles|members|invites)\b/.test(tool.path)
+}
+
+/** Does this tool write a RATE CARD? DERIVED from the gate it declares, exactly
+ * as `isPrivilegeWrite` derives its own answer, and for the reason that file's
+ * own test writes down: "a name list locks the tools you thought of and waves
+ * through the next one".
+ *
+ * It was worth deriving. Six of the seven `commercials` writes declared
+ * `confirm: true` and `set_role_rate` declared `confirm: false` — the third rate
+ * card, added after the other two, with nothing to catch that it had been added
+ * differently. `record-toggles.ts` states the principle in prose one file away
+ * ("two records nobody should be able to switch off without being asked") and
+ * applies it to two of the three cards. This is that sentence, read by
+ * something.
+ *
+ * There is no path-regex fallback here on purpose. `isPrivilegeWrite` needs one
+ * because a privilege write on an unmapped path is a security hole; a money
+ * write with no gate line cannot exist, because `workers/mcp/test/catalog.test.ts`
+ * already asserts every write resolves in TOOL_GATES or names a reason in
+ * GATELESS_WRITES. A second guess here would be a second thing to keep true. */
+export function isMoneyWrite(tool: { name: string; write?: boolean }): boolean {
+  if (tool.write === false) return false
+  const gate = TOOL_GATES[tool.name]
+  return !!gate && MONEY_MODULES.includes(gate.split(":")[0])
 }

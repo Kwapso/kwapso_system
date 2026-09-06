@@ -41,11 +41,12 @@ import { readFileSync, existsSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { makeApi, timedFetch } from "./lib/api.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const TARGETS = {
-  staging: { base: "https://agency-staging.kwapso.app", label: "staging" },
-  production: { base: "https://agency.kwapso.app", label: "PRODUCTION" },
+  staging: { base: FRONT_DOORS.staging.agency, label: "staging" },
+  production: { base: FRONT_DOORS.production.agency, label: "PRODUCTION" },
 }
 const target = process.argv[2]
 if (!TARGETS[target]) {
@@ -249,7 +250,7 @@ async function signIn(email) {
     body: JSON.stringify({ email, code: start.body.code }),
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!cookie.startsWith("kwapso_session=")) {
+  if (!/^(__Host-)?kwapso_session=/.test(cookie)) {
     console.error(`Stopped: ${email} couldn't sign in (${verify.status}).`)
     process.exit(1)
   }

@@ -1,0 +1,364 @@
+{
+  "walkedAt": "2026-09-06T05:46:16.648Z",
+  "team": "01M1TK6003NMB8KYES7ZCXHNGP",
+  "canaryRan": true,
+  "destinations": 20,
+  "results": [
+    {
+      "path": "home",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 1365,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nE\nEmpty walk probe 2026-09-06\nAdmin\n1 member\nStart here\n\nNothing's on the g",
+      "skeletonsStillPresent": 0,
+      "rowCount": 11,
+      "actionLabelsFound": [
+        "Add your first accountA company or a person you work with. Everything else hangs off one.",
+        "Bring a spreadsheet inImport a CSV instead of typing. Download a sample file first to see what a good one looks like.",
+        "Raise the first ticketSomething someone has asked us for. This is where the work usually starts.",
+        "TeamMembers, roles and invites",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "accounts",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 517,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nAccounts\nAccounts\nCompanies\nAll\nFilter\n0 results\nSort by\nSort direction: De",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Newest first",
+        "Import CSV",
+        "New account",
+        "Add the first",
+        "Import a list"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "apps",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 417,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nApps\nApps\nActive\nInactive\nNo apps yet.\n\nWhatever you add shows up here. The",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "brand",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 454,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nBrand library\nBrand library\nNothing in the brand library yet.\n\nWhatever you",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Import a list",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "invitations",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 360,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nInvites\nINVITES WAITING FOR YOU\nNo invites waiting for you.\nAssistant\nAssis",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "knowledge",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 788,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nKnowledge base\nKnowledge base\nBring it in\nNot brought in yet\nAsk\n\nThe assis",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Import a list",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "kwapso",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 496,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nKwapso\nEmpty walk probe 2026-09-06\n\nWho we are: our material, our team, and",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "meetings",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 619,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nMeetings\nMeetings\nThis week\nCalendar\nAll\nNothing in Meetings this week.\n\nWh",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Import a list",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "members",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 484,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nEmpty walk probe 2026-09-06\nMembers\nOverview\nMembers\n1\nMember roles\n2\nInvit",
+      "skeletonsStillPresent": 0,
+      "rowCount": 1,
+      "actionLabelsFound": [
+        "Invites",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "processes",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 530,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nProcesses\nProcesses\nRecord an app\nNo processes yet.\n\nWhatever gets added sh",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "profile",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 580,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nYour profile\nEW\nEmpty Walk\nEdit profile\ndelivered+emptywalk@resend.dev\nChan",
+      "skeletonsStillPresent": 0,
+      "rowCount": 2,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "purposes",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 451,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nMeeting purposes\nMeeting purposes\nNo meeting purposes yet.\n\nWhatever you ad",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Import a list",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "roles",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 580,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nEmpty walk probe 2026-09-06\nMember roles\nOverview\nMembers\n1\nMember roles\n2\n",
+      "skeletonsStillPresent": 0,
+      "rowCount": 2,
+      "actionLabelsFound": [
+        "Invites",
+        "Import CSV",
+        "New role",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "settings",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [],
+      "bodyTextLength": 1150,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nSettings\nSettings\nAppearance\nMembers & roles\nIntegrations\nChoices\nSize\n\nTex",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "sprints",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 364,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nSprints\nSprints\nOverview\nCalendar\nAll sprints\n\nNo sprints yet.\n\nAssistant\nA",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "stories",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 425,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nStories\nStories\nNo work in hand.\n\nWhatever you add shows up here. The first",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Import a list",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "tasks",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 539,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nTasks\nTasks\nToday's tasks\nNothing due today or before.\nOverdue\nList\nCalenda",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Ask for something",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "tickets",
+      "status": 200,
+      "crash": null,
+      "pageErrors": [],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+        "[google-catch-up] ApiFailure: That request didn't come from this site.\n    at api (webpack-internal:///(app-pages-browser)/../shared/web/api.ts:47:15) {teamId: 01M1TK6003NMB8KYES7ZCXHNGP}",
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ],
+      "bodyTextLength": 592,
+      "bodyTextSample": "MY WORK\nTasks\nMeetings\nKnowledge base\nTickets\nWork logs\nBUILD\nApps\nSprints\nStories\nWaves\nACCOUNTS\nAccounts\nContacts\nEW\nEmpty\nTickets\nTickets\nReady\nExtra\nIssue\nQuestion\nRequest\nRequirements\nClosed\nAll\n",
+      "skeletonsStillPresent": 0,
+      "rowCount": 0,
+      "actionLabelsFound": [
+        "Add the first",
+        "Attach a file to import"
+      ],
+      "hasEmptyRegister": true
+    },
+    {
+      "path": "time",
+      "ok": false,
+      "crash": "TimeoutError: page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:3065/time\", waiting until \"domcontentloaded\"\n",
+      "status": null
+    },
+    {
+      "path": "waves",
+      "ok": false,
+      "crash": "TimeoutError: page.goto: Timeout 20000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:3065/waves\", waiting until \"domcontentloaded\"\n",
+      "status": null
+    }
+  ]
+}
