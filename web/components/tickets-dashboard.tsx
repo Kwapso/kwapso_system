@@ -2,7 +2,7 @@
 
 // THE TICKETS DASHBOARD — the Monday screen.
 //
-// Five panels over one door read (`content.helpDashboard`), which is the whole
+// Six panels over one door read (`content.helpDashboard`), which is the whole
 // architecture of this file: every number here was counted by the database, and
 // nothing on this tab is a list. The backlog is a GROWING collection (R14) the
 // browser only ever holds page one of, so a chart drawn from loaded rows would
@@ -15,7 +15,7 @@
 // …AND THE SAME SCREEN NARROWED TO ONE SYSTEM (2026-09-06). The app record's
 // Tickets tab has two views now — a list and this — and the dashboard view is
 // this component with an `appId`: the same door, the same panels, one more
-// clause in the WHERE. Two of the five panels stand down there because one app
+// clause in the WHERE. Two of the six panels stand down there because one app
 // empties them of MEANING (the reasons are at their own call sites, in the
 // screen at the foot of this file), and that is the only thing the narrowing
 // changes. It is not a second dashboard and there is no second copy of any
@@ -26,10 +26,10 @@
 // ── WHY THE PICTURES ARE DRAWN HERE AND NOT BY THE KIT ──────────────────────
 //
 // The kit's `Chart` (Recharts, reached through `pulse-charts.tsx`'s one lazy
-// boundary) draws a bar, an area and a stacked bar over a category axis. Four of
-// the five panels here are none of those: a pipeline grid, a recategorisation
+// boundary) draws a bar, an area and a stacked bar over a category axis. Five of
+// the six panels here are none of those: a pipeline grid, a recategorisation
 // matrix, and a box-and-whisker of a duration distribution have no Recharts
-// shape in the vendored kit at all, and the fifth — the twelve-month trend — is
+// shape in the vendored kit at all, and the sixth — the twelve-month trend — is
 // an area whose x-axis is months with gaps in it. R39 rules that the kit
 // supplies the UI and nothing else does; it forbids reaching for a SECOND UI
 // PACKAGE, which nothing here does. These are plain elements and one inline
@@ -94,10 +94,10 @@ import { content as contentApi, tenancy } from "@/lib/api"
 import type { TicketDashboard } from "@/lib/api/content"
 import { accountsKey, helpDashboardKey } from "@/lib/live-resources"
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
-import type { Account } from "@shared/types"
+import type { Account, HelpStatus } from "@shared/types"
 import {
   CLOSURE_TREND_MIN_CLOSURES,
-  CLOSURE_WINDOW_DAYS,
+  CLOSURE_WINDOW_MONTHS,
   OPEN_HELP_STATUSES,
   ticketTypeWaitsForValidation,
 } from "@shared/types"
@@ -108,12 +108,33 @@ import {
  * flips with the palette, so one value works on both papers. */
 const TRACK = "var(--muted)"
 
-/** How many systems the "which app" panel names before it stops. The door caps
- * at a hundred (R14) — this is the SECOND, smaller ceiling, and it is about
- * legibility rather than bounds: past about eight bars in a third of a row, a
- * chart has stopped being a chart. What is left over is said as a number rather
- * than silently dropped. */
-const APPS_DRAWN = 8
+/** THE ORDER THE PIPELINE IS READ DOWN, which is not quite the order the
+ * lifecycle is DEFINED in — and the difference is one stage, moved on purpose.
+ *
+ * CLIENT, 6 Sep 2026: "in the open work add waiting before ready".
+ *
+ * `awaiting_validation` ("Waiting on you") leads `OPEN_HELP_STATUSES`, because
+ * that array is `HELP_STATUSES` minus the closed one and `HELP_STATUSES` is
+ * written in the order the STATE MACHINE names its states. Read as a pipeline
+ * top to bottom, that put the stage where a ticket sits waiting for the client
+ * ABOVE "New" — before the ticket has been looked at — and left "Ready" at the
+ * bottom on its own. Down a stage axis a person reads as a journey, waiting on
+ * the client is the step just before a thing can be sent, so it belongs
+ * immediately above Ready.
+ *
+ * IT IS A REORDER OF THE VIEW AND NEVER A RENAME OR A NEW STATE. Nothing about
+ * the lifecycle moves: `OPEN_HELP_STATUSES` is still the source of WHICH stages
+ * exist, this only lifts one out and puts it back in front of `ready`, so a
+ * seventh stage added to the shared list tomorrow appears here in its own
+ * lifecycle place without anybody editing this file. If `ready` ever leaves the
+ * lifecycle the shared order is used unchanged, rather than the waiting stage
+ * being silently dropped or shunted to the end. */
+const PIPELINE_STAGES: HelpStatus[] = (() => {
+  const rest = OPEN_HELP_STATUSES.filter((s) => s !== "awaiting_validation")
+  const beforeReady = rest.indexOf("ready")
+  if (beforeReady === -1) return [...OPEN_HELP_STATUSES]
+  return [...rest.slice(0, beforeReady), "awaiting_validation", ...rest.slice(beforeReady)]
+})()
 
 /* ══════════════════════════════════════════════════════════════════════════
    The small marks every panel is built from.
@@ -184,28 +205,47 @@ function TypeKey({ type }: { type: string }) {
   )
 }
 
-/** A panel: a heading, an optional line under it, an optional chip on the right,
- * and whatever the panel draws. Every panel on this screen is this shape, so the
- * screen reads as one thing rather than five. */
+/** A panel: a heading, an optional chip on the right, and whatever the panel
+ * draws. Every panel on this screen is this shape, so the screen reads as one
+ * thing rather than six.
+ *
+ * ── NO SUBTITLES ANY MORE (client, 6 Sep 2026) ──────────────────────────────
+ *
+ * She listed four of them by their exact words and asked for all four gone:
+ * "Every open ticket, as one pipeline per kind down a shared set of stages",
+ * "Open tickets against the thing you built", "Open work by client, for the
+ * kinds that wait for a client to confirm", "What your morning is actually
+ * spent on". THE PROP WENT WITH THEM rather than being left behind unused: a
+ * `sub?` nothing passes is an invitation to write the fifth one, and this
+ * screen's own argument against them is that every panel here is a picture with
+ * its own axes written on it — a sentence restating the axes is a caption
+ * telling a reader what they can already see. The captions that SURVIVE are the
+ * ones that say what a picture LEFT OUT (the dropped months, the tickets with
+ * no recorded arrival), and those have never been subtitles: they sit under the
+ * marks they are about, where they can be read against them.
+ *
+ * `h-full` because panels sit in grid rows as siblings and a grid stretches its
+ * items to the row's height; the Card is `flex flex-col` and `CardContent` is
+ * `flex-1`, so the height reaches the body and a panel whose body wants to fill
+ * (the trend's plot, the per-system list) can actually claim it. `className` is
+ * the one thing a call site may say about the box itself, and today it says
+ * exactly one thing: which fraction of a row the panel spans. */
 function Panel({
   title,
-  sub,
   chip,
+  className,
   children,
 }: {
   title: string
-  sub?: string
   chip?: React.ReactNode
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <Card className="min-w-0">
+    <Card className={className ? `min-w-0 h-full ${className}` : "min-w-0 h-full"}>
       <CardContent className="flex min-w-0 flex-col gap-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h3 className="text-base font-[var(--font-weight-medium)]">{title}</h3>
-            {sub ? <p className="text-muted-foreground text-xs">{sub}</p> : null}
-          </div>
+          <h3 className="min-w-0 text-base font-[var(--font-weight-medium)]">{title}</h3>
           {chip}
         </div>
         {children}
@@ -271,12 +311,21 @@ function OpenWork({
   // two tickets exactly like a column of twenty, which is the one comparison
   // this layout exists to make.
   const scale = Math.max(1, ...rows.map((r) => r.n))
-  const openStages = OPEN_HELP_STATUSES.filter((s) => types.some((ty) => at(ty, s) > 0))
+  // A ROW OF DASHES IS NOT AN ANSWER (client, 6 Sep 2026: "whe a status is
+  // completely empty do not show it"). COMPLETELY is the whole of the rule and
+  // it is why the test is `some` rather than `every`: a stage drops out only
+  // when EVERY kind is at nothing in it. A stage holding a single ticket still
+  // draws its whole row, dashes and all, because the zeros beside that one bar
+  // are the comparison the row exists to make.
+  //
+  // The axis is `PIPELINE_STAGES`, so the survivors keep the reading order she
+  // asked for — waiting on the client sits above ready — and never the order
+  // the tallies happen to be in.
+  const openStages = PIPELINE_STAGES.filter((s) => types.some((ty) => at(ty, s) > 0))
 
-  // A GRID OF DASHES IS NOT AN ANSWER. The stage axis keeps its empty rows while
-  // there is anything open at all — an empty stage is information — but a
-  // pipeline with nothing anywhere in it is a picture of nothing wearing the
-  // clothes of information, which is `pulse.tsx`'s own second rule.
+  // …and a pipeline with nothing anywhere in it is a picture of nothing wearing
+  // the clothes of information, which is `pulse.tsx`'s own second rule. That is
+  // a sentence rather than an empty grid.
   if (openStages.length === 0)
     return <p className="text-muted-foreground text-xs">{t("Nothing is open right now.")}</p>
 
@@ -359,7 +408,35 @@ function OpenWork({
  *
  * So the shape of this component is the contract: it takes the door's rows and
  * returns a body. Swapping the reading is swapping the component at the one call
- * site in `TicketsDashboard` below — not rewriting the panel around it. */
+ * site in `TicketsDashboard` below — not rewriting the panel around it.
+ *
+ * ── AS LONG AS THE PANEL BESIDE IT, AND NOT ONE ROW LONGER ──────────────────
+ *
+ * CLIENT, 6 Sep 2026: "on which app do not 'and 14 more systems' - make it as
+ * long as the who has more container."
+ *
+ * TWO THINGS WENT, and they were one thing. This panel used to draw the busiest
+ * eight systems and then write the leftovers as a sentence, which is the shape
+ * she is refusing: a chart that stops early and apologises. Both the ceiling and
+ * the apology are gone, so every system the door answered with (its own cap is a
+ * hundred, R14) is in the list and reachable.
+ *
+ * WHAT BOUNDS IT NOW IS THE ROW, MEASURED RATHER THAN TYPED. The list sits in a
+ * `relative` box that this panel's own content does NOT get to make taller: the
+ * rows are `absolute inset-0` inside it, so they contribute no intrinsic height
+ * at all. The panel's natural height is therefore its heading plus its legend,
+ * which is shorter than either sibling — so the grid row's height is set by
+ * "Who has more" and the matrix, and `flex-1` hands every pixel of it to this
+ * list. The two panels match because one is measured FROM the other, which is
+ * the same argument the trend's plot already makes one panel down, and it is
+ * why there is no number here to go stale when either neighbour changes.
+ *
+ * WHAT DOES NOT FIT SCROLLS, and that is the honest half. Clipping would be the
+ * "and 14 more" sentence again with the sentence taken out — a subtraction a
+ * reader cannot see, which is the one thing this screen may never do (see
+ * `dashboard-says-what-it-left-out`). `min-h-40` is the floor for the stacked,
+ * single-column case, where there is no taller sibling to be measured against —
+ * the same floor, for the same reason, that the trend's plot keeps. */
 function AppsStackedByType({
   rows,
   types,
@@ -390,31 +467,37 @@ function AppsStackedByType({
     system.byType.set(row.helpType, (system.byType.get(row.helpType) ?? 0) + row.open)
   }
   const scale = Math.max(1, ...systems.map((s) => s.open))
-  const drawn = systems.slice(0, APPS_DRAWN)
-  const rest = systems.length - drawn.length
 
   if (systems.length === 0)
     return <p className="text-muted-foreground text-xs">{t("Nothing is open right now.")}</p>
 
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      {drawn.map((s) => (
-        <div key={s.appId ?? "none"} className="flex min-w-0 items-center gap-2">
-          <span className="w-28 shrink-0 truncate text-xs" title={s.name}>
-            {s.name}
-          </span>
-          <StackedBar
-            scale={scale}
-            segments={types
-              .map((type) => ({ type, n: s.byType.get(type) ?? 0 }))
-              .filter((seg) => seg.n > 0)}
-          />
-          <span className="w-6 shrink-0 text-right text-xs tabular-nums">{s.open}</span>
+    <div className="flex min-w-0 flex-1 flex-col gap-2">
+      {/* THE BOX THAT TAKES ITS HEIGHT FROM THE ROW — see this component's
+          header. `flex-1` claims what the taller sibling left; `min-h-40` is
+          the floor when the grid has stacked into one column and there is no
+          sibling to claim it from. */}
+      <div className="relative min-h-40 min-w-0 flex-1">
+        <div className="absolute inset-0 flex flex-col gap-2 overflow-y-auto">
+          {systems.map((s) => (
+            <div key={s.appId ?? "none"} className="flex min-w-0 shrink-0 items-center gap-2">
+              <span className="w-28 shrink-0 truncate text-xs" title={s.name}>
+                {s.name}
+              </span>
+              <StackedBar
+                scale={scale}
+                segments={types
+                  .map((type) => ({ type, n: s.byType.get(type) ?? 0 }))
+                  .filter((seg) => seg.n > 0)}
+              />
+              <span className="w-6 shrink-0 text-right text-xs tabular-nums">{s.open}</span>
+            </div>
+          ))}
         </div>
-      ))}
-      {rest > 0 ? (
-        <p className="text-muted-foreground text-xs">{t("And {count} more systems.", { count: rest })}</p>
-      ) : null}
+      </div>
+      {/* THE LEGEND STAYS OUT OF THE SCROLLER, always visible: it is the key to
+          the colours above it, and a key that scrolls away is a chart a reader
+          has to remember. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
         {types.map((type) => (
           <TypeKey key={type} type={type} />
@@ -494,7 +577,27 @@ function WhoHasMore({
  * migration 0065 refused to backfill precisely so this number could be told —
  * folding it into the diagonal would report a rate over a denominator that had
  * quietly changed. It is said under the grid, in words, every time it is not
- * zero. */
+ * zero.
+ *
+ * ── THE GRID DRAWS EVEN WITH NOTHING IN IT (client, 6 Sep 2026) ─────────────
+ *
+ * "in raised as pls display the graphic already even if it's empty."
+ *
+ * The empty answer used to REPLACE the picture with its own paragraph, which
+ * made this the one panel on the screen whose shape a reader could not learn
+ * until the data arrived — and this is the panel whose shape is the whole
+ * point. Rows are what arrived, columns are what you decided, the diagonal is
+ * what nobody moved: none of that is legible from a sentence, and all of it is
+ * legible from an axis of zeros.
+ *
+ * THE SENTENCE STAYED, AND IT MOVED. `raised_as_type` is a new column and
+ * migration 0065 deliberately left the old rows null, so an empty grid here is
+ * a young column rather than a quiet week — a reader who is not told that will
+ * read the zeros as a fact about the work. So the sentence is now written ABOVE
+ * the grid, in the same position the "{moved} of {counted}" line takes when
+ * there is something to count: one slot, holding whichever of the two is true.
+ * The subtraction is announced either way, which is the rule this whole screen
+ * is built on. */
 function RaisedAsMatrix({
   rows,
   notRecorded,
@@ -512,30 +615,24 @@ function RaisedAsMatrix({
   const moved = rows.reduce((n, r) => (r.raisedAsType === r.helpType ? n : n + r.n), 0)
   const heaviest = Math.max(1, ...rows.filter((r) => r.raisedAsType !== r.helpType).map((r) => r.n))
 
-  if (counted === 0)
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="text-muted-foreground text-xs">
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {/* ONE SLOT, TWO SENTENCES, and never neither: what the traffic off the
+          diagonal came to, or why there is none yet. */}
+      {counted === 0 ? (
+        <p className="text-muted-foreground text-sm">
           {t(
             "Nothing has been triaged since we started recording what a ticket arrived as, so there is nothing to compare yet."
           )}
         </p>
-        {notRecorded > 0 ? (
-          <p className="text-muted-foreground text-xs">
-            {t("{count} older tickets have no record of what they arrived as.", { count: notRecorded })}
-          </p>
-        ) : null}
-      </div>
-    )
-
-  return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <p className="text-sm">
-        {t("{moved} of {counted} tickets left triage as a different kind from the one they arrived as.", {
-          moved,
-          counted,
-        })}
-      </p>
+      ) : (
+        <p className="text-sm">
+          {t("{moved} of {counted} tickets left triage as a different kind from the one they arrived as.", {
+            moved,
+            counted,
+          })}
+        </p>
+      )}
       <div className="min-w-0 overflow-x-auto">
         <div
           className="grid min-w-[18rem] gap-1 text-xs"
@@ -598,7 +695,7 @@ function RaisedAsMatrix({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   3A · WHAT IT IS NOW — the middle ticket and the middle half.
+   3A · HOW LONG A TICKET TAKES TO CLOSE — the middle ticket and the middle half.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** A DISTRIBUTION AND NEVER A MEAN. A handful of tickets that sat for a year
@@ -611,7 +708,36 @@ function RaisedAsMatrix({
  * Scaling to the longest would squash every band on the chart into the first few
  * pixels the day one ticket is forgotten for a year — which is the same argument
  * against the mean, made about the axis. Whatever falls off the end is SAID, in
- * words, on the row it belongs to. */
+ * words, on the row it belongs to.
+ *
+ * ── AND THOSE WORDS ARE NOW BEHIND A HOVER ON THE ROW ───────────────────────
+ *
+ * CLIENT, 6 Sep 2026: "the 'Middle ticket 0 days · middle half 0 to 0 · longest
+ * 16' i want to see it when hovering over the row."
+ *
+ * A DELIBERATE REVERSAL, WRITTEN DOWN AS ONE. Earlier the same day she read the
+ * same line and asked the opposite — "this information only appears when I hover
+ * over the type" — and the answer then was that it had never been behind a
+ * hover, plus a test pinning it at rest so it could not drift there. She has now
+ * looked at the shipped screen and asked for exactly the thing that test
+ * forbade. The test was not deleted: it was rewritten to pin the NEW shape, with
+ * the reversal named in it, because a removed test would leave the next reader
+ * unable to tell a decision from a regression.
+ *
+ * IT IS THE KIT'S HOVER CARD ON A REAL BUTTON, which is the pattern the trend
+ * panel below settled this morning and not a second one invented here. Three
+ * things follow from that and all three are the point: the trigger is a
+ * `<button>`, so it is in the tab order and Radix opens the card on FOCUS as
+ * well as on hover, and a press works where hover does not exist at all; the
+ * whole readout rides the button's accessible NAME, so a screen reader hears
+ * the three figures from the row itself whether or not the floating panel ever
+ * opens; and it is not the browser's native `title`, which is mouse-only, has
+ * no keyboard route, and cannot be styled or read reliably.
+ *
+ * THE BAR IS THE BUTTON, rather than a button sitting beside one. The row IS
+ * the mark — she said "hovering over the row" — so the target is the whole
+ * width of the plot, which is also the largest hit area available and the one a
+ * pointer lands on without aiming. */
 function ClosureSpread({
   rows,
   types,
@@ -628,7 +754,7 @@ function ClosureSpread({
   if (drawn.length === 0)
     return (
       <p className="text-muted-foreground text-xs">
-        {t("Nothing has closed in the last {count} days.", { count: CLOSURE_WINDOW_DAYS })}
+        {t("Nothing has closed in the last {count} months.", { count: CLOSURE_WINDOW_MONTHS })}
       </p>
     )
 
@@ -639,6 +765,16 @@ function ClosureSpread({
     <div className="flex min-w-0 flex-col gap-3">
       {drawn.map((r) => {
         const colour = ticketTypeColour(r.helpType)
+        // THE READOUT, WRITTEN ONCE AND SAID TWICE — as the row's accessible
+        // name and as the line inside the card it opens. One translation read
+        // two ways, so what a screen reader hears and what a sighted reader
+        // sees can never become two different claims about one distribution.
+        const said = t("Middle ticket {median} days · middle half {low} to {high} · longest {max}", {
+          median: r.medianDays.toFixed(r.medianDays % 1 === 0 ? 0 : 1),
+          low: r.p25Days,
+          high: r.p75Days,
+          max: r.maxDays,
+        })
         return (
           <div key={r.helpType} className="flex min-w-0 flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2">
@@ -647,55 +783,57 @@ function ClosureSpread({
                 {t("{count} closed", { count: r.n })}
               </span>
             </div>
-            <div className="bg-muted relative h-5 min-w-0 rounded">
-              {/* the tail, quiet, so the middle ticket has a reason */}
-              <span
-                aria-hidden="true"
-                className="absolute top-1/2 h-px -translate-y-1/2"
-                style={{
-                  left: pct(r.p75Days),
-                  width: `calc(${pct(Math.max(r.p75Days, Math.min(r.maxDays, axis)))} - ${pct(r.p75Days)})`,
-                  backgroundColor: colour,
-                  opacity: 0.5,
-                }}
-              />
-              {/* the middle half */}
-              <span
-                aria-hidden="true"
-                className="absolute inset-y-0 rounded"
-                style={{
-                  left: pct(r.p25Days),
-                  width: `calc(${pct(r.p75Days)} - ${pct(r.p25Days)} + 2px)`,
-                  backgroundColor: colour,
-                  opacity: 0.35,
-                }}
-              />
-              {/* the middle ticket */}
-              <span
-                aria-hidden="true"
-                className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-pill"
-                style={{ left: pct(r.medianDays), backgroundColor: colour }}
-              />
-            </div>
-            {/* THE THREE FIGURES, AT REST, ON EVERY ROW THAT IS DRAWN — never
-                behind a hover, and checked rather than assumed (client, 6 Sep
-                2026: "it brings me a lot of value … but I wonder: this
-                information only appears when I hover over the type"). It reads
-                as a paragraph under its own bar, and it always has: this panel
-                has never had a hover affordance of any kind. What IS
-                hover-only on this screen is the browser's native `title` on the
-                pipeline bars, the stacked per-system bars and the matrix cells,
-                which is the likeliest thing she was looking at. Locked by a
-                test now (`dashboard-says-what-it-left-out`), so if anybody ever
-                does put it behind an interaction the build says so. */}
-            <p className="text-muted-foreground text-xs tabular-nums">
-              {t("Middle ticket {median} days · middle half {low} to {high} · longest {max}", {
-                median: r.medianDays.toFixed(r.medianDays % 1 === 0 ? 0 : 1),
-                low: r.p25Days,
-                high: r.p75Days,
-                max: r.maxDays,
-              })}
-            </p>
+            <HoverCard openDelay={60} closeDelay={60}>
+              <HoverCardTrigger asChild>
+                <button
+                  type="button"
+                  // THE WHOLE SENTENCE AS THE NAME. A button whose only content
+                  // is three absolutely-positioned marks has no text of its
+                  // own, so without this it would be an unlabelled control —
+                  // and the figures would exist nowhere but inside a floating
+                  // panel, which is the shape this file's hover card was
+                  // adopted specifically to avoid.
+                  aria-label={said}
+                  className="bg-muted relative block h-5 w-full min-w-0 rounded"
+                >
+                  {/* the tail, quiet, so the middle ticket has a reason */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1/2 h-px -translate-y-1/2"
+                    style={{
+                      left: pct(r.p75Days),
+                      width: `calc(${pct(Math.max(r.p75Days, Math.min(r.maxDays, axis)))} - ${pct(r.p75Days)})`,
+                      backgroundColor: colour,
+                      opacity: 0.5,
+                    }}
+                  />
+                  {/* the middle half */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 rounded"
+                    style={{
+                      left: pct(r.p25Days),
+                      width: `calc(${pct(r.p75Days)} - ${pct(r.p25Days)} + 2px)`,
+                      backgroundColor: colour,
+                      opacity: 0.35,
+                    }}
+                  />
+                  {/* the middle ticket */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-pill"
+                    style={{ left: pct(r.medianDays), backgroundColor: colour }}
+                  />
+                </button>
+              </HoverCardTrigger>
+              {/* THE SAME SENTENCE THE BUTTON IS NAMED WITH. Written from the
+                  one `said` above rather than re-formatted here, so the panel
+                  and the accessible name cannot say two different numbers. */}
+              <HoverCardContent className="flex flex-col gap-2">
+                <TypeKey type={r.helpType} />
+                <span className="text-muted-foreground text-xs tabular-nums">{said}</span>
+              </HoverCardContent>
+            </HoverCard>
           </div>
         )
       })}
@@ -704,7 +842,7 @@ function ClosureSpread({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   3B · WHICH WAY IT IS GOING — the middle ticket, month by month.
+   3B · TENDENCY — the middle ticket, month by month.
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** THE MONTH A TICKET CLOSED IN, filled to the baseline so the height is the
@@ -728,14 +866,20 @@ function ClosureSpread({
  * Make it the same height as how long a ticket takes to close, and add me some
  * vertical lines that show the months."
  *
- * The plot used to be a flat `h-40`, so the two halves of one panel were a
- * distribution as tall as its own content and a trend as tall as a number
- * somebody typed — and the two sit in the SAME `lg:grid-cols-2` row, which
- * already stretches both columns to one height. So the fix is not a bigger
- * number: the plot CLAIMS the leftover space (`flex-1` down the column, `h-40`
- * demoted to a floor for the stacked, single-column case). It is the same
- * height as the distribution because it is measured from it, rather than
- * agreeing with it until either one changes.
+ * The plot used to be a flat `h-40`, so the two halves were a distribution as
+ * tall as its own content and a trend as tall as a number somebody typed — and
+ * the two sit in the SAME grid row, which already stretches both columns to one
+ * height. So the fix is not a bigger number: the plot CLAIMS the leftover space
+ * (`flex-1` down the column, `h-40` demoted to a floor for the stacked,
+ * single-column case). It is the same height as the distribution because it is
+ * measured from it, rather than agreeing with it until either one changes.
+ *
+ * THAT STILL HOLDS NOW THAT THEY ARE TWO PANELS RATHER THAN TWO HALVES OF ONE
+ * (client, 6 Sep 2026: "the how long, split in 2 containers same row" · "the
+ * how long 1/3, the graph 2/3"). Two cards in one `lg:grid-cols-3`, spanning
+ * one track and two, is still one grid row stretching both to a single height —
+ * the measurement this plot takes did not change, only how many boxes it is
+ * taken across.
  *
  * THE MONTH LINES ARE DRAWN, NOT WRITTEN. One rule per month behind the areas,
  * at the exact x the month's point sits on — so a reader can see that September
@@ -1285,7 +1429,6 @@ export function TicketsDashboard({
         <div className="flex min-w-0 flex-col gap-4">
           <Panel
             title={t("The open work")}
-            sub={t("Every open ticket, as one pipeline per kind down a shared set of stages.")}
             chip={
               data && data.unopenedPastLine > 0 ? (
                 <span className="bg-warning text-warning-foreground rounded-pill px-3 py-1 text-xs tabular-nums">
@@ -1330,10 +1473,7 @@ export function TicketsDashboard({
               about it is what it turns out to be (the matrix), and how long it
               takes us to close things on it (the spread and the trend). */}
           {appId ? (
-            <Panel
-              title={t("Raised as, then triaged as")}
-              sub={t("What your morning is actually spent on.")}
-            >
+            <Panel title={t("Raised as, then triaged as")}>
               <RaisedAsMatrix
                 rows={data?.raisedVsCurrent ?? []}
                 notRecorded={data?.raisedAsNotRecorded ?? 0}
@@ -1346,19 +1486,13 @@ export function TicketsDashboard({
               {/* 6A — the reading the client picked. See `AppsStackedByType` for
                   the two she did not, and for why swapping one in is a change at
                   this line rather than a rewrite of the panel. */}
-              <Panel title={t("Which app")} sub={t("Open tickets against the thing you built.")}>
+              <Panel title={t("Which app")}>
                 <AppsStackedByType rows={data?.openByApp ?? []} types={types} t={t} />
               </Panel>
-              <Panel
-                title={t("Who has more")}
-                sub={t("Open work by client, for the kinds that wait for a client to confirm.")}
-              >
+              <Panel title={t("Who has more")}>
                 <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} t={t} />
               </Panel>
-              <Panel
-                title={t("Raised as, then triaged as")}
-                sub={t("What your morning is actually spent on.")}
-              >
+              <Panel title={t("Raised as, then triaged as")}>
                 <RaisedAsMatrix
                   rows={data?.raisedVsCurrent ?? []}
                   notRecorded={data?.raisedAsNotRecorded ?? 0}
@@ -1369,36 +1503,53 @@ export function TicketsDashboard({
             </div>
           )}
 
-          {/* NO SUBTITLE ANY MORE (client, 6 Sep 2026: "remove the subtitle
-              'working days only.' It's not needed. We already know it."). The
-              line said the weekend does not count towards a duration, and it
-              came from the ruling that put `workingDaysSql` under both reads on
-              this panel in the first place. ONLY THE SENTENCE IS GONE: every
-              figure below is still counted Monday to Friday, by the one shared
-              seam (`shared/business-days.ts`), which is where that promise
-              actually lives — a caption is a description of the arithmetic, not
-              the arithmetic, and she is telling us she already knows which one
-              we used. */}
-          <Panel title={t("How long a ticket takes to close")}>
-            {/* `items-stretch` is the default and is what makes the trend
-                beside the distribution the SAME HEIGHT as it (her words) — the
-                trend's plot then claims whatever the taller column leaves,
-                rather than being pinned to a number somebody typed. */}
-            <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-muted-foreground text-xs uppercase">
-                  {t("What it is now")}
-                </p>
-                <ClosureSpread rows={data?.closureDays ?? []} types={types} t={t} />
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-muted-foreground text-xs uppercase">
-                  {t("Which way it is going")}
-                </p>
-                <ClosureTrend rows={data?.closureTrend ?? []} t={t} />
-              </div>
-            </div>
-          </Panel>
+          {/* ── THE CLOSING TIME, IN TWO PANELS ON ONE ROW ─────────────────
+              CLIENT, 6 Sep 2026, three notes that are one layout: "same style
+              as How long a ticket takes to close put text above the mountain
+              graph 'Tendency'" · "the how long, split in 2 containers same
+              row" · "the how long 1/3, the graph 2/3".
+
+              THE TWO SUB-HEADINGS ARE GONE AND THE SPLIT IS WHY. "What it is
+              now" and "Which way it is going" were small grey labels inside one
+              card, doing the job a heading does — which is exactly what she
+              refused ("in the how logn ticket takes to close remove subtitle
+              'What it is now' and 'Which way it is going'"). Promoting the
+              trend to its own titled panel is the same instruction from the
+              other end: "Tendency" is now a heading at the same level as "How
+              long a ticket takes to close", in the same style, because it is
+              the title of a panel and not a label inside one. The distribution
+              keeps the original title, which is the question it answers.
+
+              A THIRD AND TWO THIRDS, WHICH IS THE SHAPE OF THE TWO PICTURES.
+              The distribution is a handful of short rows and reads at any
+              width; the trend is a time axis, and a time axis is the one thing
+              on this screen that genuinely needs room — squeeze twelve months
+              into a third of a row and the months stop being separable at all.
+
+              IT STILL STACKS. One column below `lg:`, in source order, so on a
+              narrow screen the distribution is read first and the trend gets
+              its own full width rather than a third of one — and inside the app
+              record's Tickets tab, which is a narrower column than the Tickets
+              screen, the same rule applies at the same breakpoint. Both panels
+              are grid siblings, so the row stretches them to one height and the
+              trend's plot measures itself from the distribution beside it (see
+              `ClosureTrend`); when it stacks there is no sibling to measure and
+              the plot falls back to its own floor.
+
+              NO "WORKING DAYS ONLY" CAPTION ON EITHER (client, earlier the same
+              day: "remove the subtitle 'working days only.' It's not needed. We
+              already know it."). ONLY THE SENTENCE WENT: every figure in both
+              panels is still counted Monday to Friday by the one shared seam
+              (`shared/business-days.ts`), which is where that promise actually
+              lives. */}
+          <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+            <Panel title={t("How long a ticket takes to close")}>
+              <ClosureSpread rows={data?.closureDays ?? []} types={types} t={t} />
+            </Panel>
+            <Panel title={t("Tendency")} className="lg:col-span-2">
+              <ClosureTrend rows={data?.closureTrend ?? []} t={t} />
+            </Panel>
+          </div>
         </div>
       )}
     </>

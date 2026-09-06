@@ -31,6 +31,7 @@ import {
   workLogsKey,
 } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { ticketTypeKeptForMigration } from "@shared/types"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 
@@ -292,7 +293,22 @@ export function useScreenData({
   const departmentOptions = activeSelectable
     .filter((v) => v.type === SELECTABLE_GROUPS.department)
     .map((v) => v.value)
-  const helpTypeOptions = activeSelectable.filter((v) => v.type === "Ticket type").map((v) => v.value)
+  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. This one list is the whole
+  // tickets screen's idea of what kinds exist: the create form's picker, the
+  // toolbar's Kind facet, the sub-tab strip (CHECKLIST 5.1 derives it from these
+  // words) and the dashboard's legend and pipeline order all read it. The DOOR
+  // already refuses to answer about a requirements ticket and refuses to create
+  // one (`TICKET_TYPE_KEPT_FOR_MIGRATION`, shared/types.ts, carries the client's
+  // ruling in full) — subtracting it here is what stops the word itself
+  // appearing: an option nobody may pick, and a sub-tab that would badge nothing
+  // for ever because the door it counts through has already excluded its rows.
+  //
+  // It is a filter on the TEAM'S OWN vocabulary and never an edit to it: every
+  // team already running still has the row, still sees it on the Dropdown values
+  // screen, and every ticket that carries the word still carries it.
+  const helpTypeOptions = activeSelectable
+    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
+    .map((v) => v.value)
 
   // Activity is one read path over three scopes (team / a member / an invite) — the
   // scope is derived from what's in view, and its cache key mirrors the scope so a

@@ -871,7 +871,13 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // v2: "when we last spoke" is keyed on the CLOCK rather than on a retired
   // `held` status, so a client we saw in April no longer reads as last seen in
   // March. Every account already indexed says the old date until it is re-written.
-  account: { version: 2, digest: "74d4aabd9f470931" },
+  // v3: the two ticket sentences this reader writes — the `open_tickets` count
+  // and the rollup naming a client's recent tickets — now subtract the kind that
+  // is kept but never shown (the client's ruling of 6 Sep 2026;
+  // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts carries it). Same reason
+  // as v2 and the same shape: an account already indexed goes on saying the old
+  // number, out loud, to somebody looking at a screen that disagrees.
+  account: { version: 3, digest: "cd3575a2b7dbd60f" },
   contact: { version: 1, digest: "797da075c7f5ddaa" },
   app: { version: 1, digest: "6b67fb58910c7241" },
   process: { version: 1, digest: "ddbb403661a7013c" },
@@ -973,7 +979,15 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // is unchanged — which is the evidence, not the claim: this pin was the ONLY
 // one that moved. So no textVersion moves, and a bump here would re-read every
 // row of every kind to fix nothing.
-const SHARED_DIGEST = "0a1a388130854c76"
+// 6 Sep 2026, again: ONE IMPORT LINE, and no reader's words moved with it.
+// `ticketTypeKeptForMigrationExcludedSql` (shared/types.ts) is now imported at
+// the top of the file, which sits outside the kinds table and so lands in this
+// digest. The only reader that CALLS it is `account`, whose own pin above moved
+// to v3 in the same change and carries the reason. Every other per-kind digest
+// is unchanged — which is the evidence rather than the claim — so no other
+// textVersion moves, and bumping one here would re-read every row of every kind
+// to fix nothing.
+const SHARED_DIGEST = "b48e7dd881a362b2"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

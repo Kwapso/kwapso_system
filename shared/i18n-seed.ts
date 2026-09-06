@@ -3391,50 +3391,25 @@ export const SEED: Catalogue = {
     es: "El trabajo abierto",
     ca: "La feina oberta",
   },
-  "Every open ticket, as one pipeline per kind down a shared set of stages.": {
-    de: "Jedes offene Ticket, als eine Strecke je Art entlang gemeinsamer Stufen.",
-    es: "Cada ticket abierto, como un recorrido por tipo a lo largo de unas etapas comunes.",
-    ca: "Cada tiquet obert, com un recorregut per tipus al llarg d'unes etapes comunes.",
-  },
   "{count} past the three-day line": {
     de: "{count} über der Drei-Tage-Grenze",
     es: "{count} por encima del límite de tres días",
     ca: "{count} per sobre del límit de tres dies",
-  },
-  "Open tickets against the thing you built.": {
-    de: "Offene Tickets zu dem, was Sie gebaut haben.",
-    es: "Tickets abiertos sobre lo que habéis construido.",
-    ca: "Tiquets oberts sobre el que heu construït.",
   },
   "No system named": {
     de: "Kein System genannt",
     es: "Sin sistema indicado",
     ca: "Sense sistema indicat",
   },
-  "And {count} more systems.": {
-    de: "Und {count} weitere Systeme.",
-    es: "Y {count} sistemas más.",
-    ca: "I {count} sistemes més.",
-  },
   "Who has more": {
     de: "Wer mehr hat",
     es: "Quién tiene más",
     ca: "Qui en té més",
   },
-  "Open work by client, for the kinds that wait for a client to confirm.": {
-    de: "Offene Arbeit je Kunde, für die Arten, die auf die Bestätigung des Kunden warten.",
-    es: "Trabajo abierto por cliente, para los tipos que esperan la confirmación del cliente.",
-    ca: "Feina oberta per client, per als tipus que esperen la confirmació del client.",
-  },
   "Raised as, then triaged as": {
     de: "Eingegangen als, dann eingeordnet als",
     es: "Entró como, y se clasificó como",
     ca: "Va entrar com a, i es va classificar com a",
-  },
-  "What your morning is actually spent on.": {
-    de: "Womit Ihr Vormittag tatsächlich vergeht.",
-    es: "En qué se va realmente vuestra mañana.",
-    ca: "En què se'n va realment el vostre matí.",
   },
   "Became": {
     de: "Wurde zu",
@@ -3461,6 +3436,26 @@ export const SEED: Catalogue = {
     es: "Cuánto tarda un ticket en cerrarse",
     ca: "Quant triga un tiquet a tancar-se",
   },
+  /* THE TREND IS A PANEL OF ITS OWN NOW, so its heading is a heading (client,
+     6 Sep 2026: "same style as How long a ticket takes to close put text above
+     the mountain graph 'Tendency'"). One word, and it is a NOUN in all three —
+     the thing the line shows, not a direction it is going. */
+  "Tendency": {
+    de: "Tendenz",
+    es: "Tendencia",
+    ca: "Tendència",
+  },
+  /* FOUR PANEL SUBTITLES AND TWO SUB-HEADINGS WERE RETIRED HERE, 6 Sep 2026 —
+     client: "rmoeve all subtitles: Every open ticket, as one pipeline per kind
+     down a shared set of stages. Open tickets against the thing you built. Open
+     work by client, for the kinds that wait for a client to confirm. What your
+     morning is actually spent on." and "in the how logn ticket takes to close
+     remove subtitle 'What it is now' and 'Which way it is going'". Their seed
+     entries went with them for the same reason the caption below did: a
+     sentence the app no longer says is a sentence being translated on every
+     build for a screen nobody can read it on. "And {count} more systems." went
+     the same day and for a different reason — the panel stopped dropping rows
+     at all, so there is nothing left for it to confess. */
   /* THE "WORKING DAYS ONLY" CAPTION WAS RETIRED HERE, 6 Sep 2026 — client:
      "remove the subtitle 'working days only.' It's not needed. We already know
      it." The SENTENCE is gone; the arithmetic it described has not moved an
@@ -3468,16 +3463,6 @@ export const SEED: Catalogue = {
      Its seed entry goes with it rather than being left behind to be translated
      on every build for a screen that no longer says it — R28's ORPHAN clause,
      applied on this side of the pipeline. */
-  "What it is now": {
-    de: "Wie es jetzt ist",
-    es: "Cómo está ahora",
-    ca: "Com està ara",
-  },
-  "Which way it is going": {
-    de: "Wohin es sich bewegt",
-    es: "Hacia dónde va",
-    ca: "Cap on va",
-  },
   "{count} closed": {
     de: "{count} abgeschlossen",
     es: "{count} cerrados",
@@ -3502,10 +3487,16 @@ export const SEED: Catalogue = {
     es: "Ticket central {median} días · mitad central {low} a {high} · el más largo {max}",
     ca: "Tiquet central {median} dies · meitat central {low} a {high} · el més llarg {max}",
   },
-  "Nothing has closed in the last {count} days.": {
-    de: "In den letzten {count} Tagen wurde nichts abgeschlossen.",
-    es: "No se ha cerrado nada en los últimos {count} días.",
-    ca: "No s'ha tancat res en els darrers {count} dies.",
+  /* THE WINDOW BECAME SIX MONTHS AND THE SENTENCE MOVED WITH IT (client, 6 Sep
+     2026: "for this how long, only consider the latest 6 months"). The days
+     version was retired rather than left behind: it named a window that no
+     longer exists, and an entry nothing says is translated on every build for a
+     screen that cannot show it — R28's ORPHAN clause, applied on this side of
+     the pipeline. {count} is `CLOSURE_WINDOW_MONTHS` and must keep its name. */
+  "Nothing has closed in the last {count} months.": {
+    de: "In den letzten {count} Monaten wurde nichts abgeschlossen.",
+    es: "No se ha cerrado nada en los últimos {count} meses.",
+    ca: "No s'ha tancat res en els darrers {count} mesos.",
   },
   "The middle ticket, month by month": {
     de: "Das mittlere Ticket, Monat für Monat",
@@ -3535,4 +3526,43 @@ export const SEED: Catalogue = {
      The seed wins at run time (SPOKEN, shared/i18n.ts), so this fixes it on
      screen without a generator run and without spending anything. */
   "Type": { de: "Typ", es: "Tipo", ca: "Tipus" },
+
+  /* ── The ticket composer's two sends, and the five seconds before either of
+     them happens (client ruling, 6 Sep 2026) ─────────────────────────────────
+     Eight sentences, written here in all three languages in the same change
+     that adds them, so R44's ceiling does not move: an untranslated string is
+     debt, and this feature is not the place to take any on. Two of the eight
+     are the accessible NAME of the wordless send — the tooltip and the
+     aria-label say the same two words on purpose (label-in-name), so they are
+     one entry read twice and a translator must keep them one. */
+  "Send reply": { de: "Antwort senden", es: "Enviar respuesta", ca: "Enviar resposta" },
+  "Send and close": { de: "Senden und schließen", es: "Enviar y cerrar", ca: "Enviar i tancar" },
+  "Sending your reply": {
+    de: "Ihre Antwort wird gesendet",
+    es: "Enviando tu respuesta",
+    ca: "Enviant la teva resposta",
+  },
+  "Sending and closing": {
+    de: "Wird gesendet und geschlossen",
+    es: "Enviando y cerrando",
+    ca: "Enviant i tancant",
+  },
+  /* The receipt under the pending bubble, where a timestamp goes once it is
+     real. `{seconds}` is a bare number and stays one in every language. */
+  "Sending in {seconds}": {
+    de: "Wird in {seconds} gesendet",
+    es: "Se envía en {seconds}",
+    ca: "S'envia en {seconds}",
+  },
+  "Sent.": { de: "Gesendet.", es: "Enviado.", ca: "Enviat." },
+  "This ticket is answered. Reply anyway…": {
+    de: "Dieses Ticket ist beantwortet. Trotzdem antworten…",
+    es: "Este ticket está respondido. Responder igualmente…",
+    ca: "Aquest tiquet està respost. Respondre igualment…",
+  },
+  "Nothing was sent. Your words are back in the composer.": {
+    de: "Es wurde nichts gesendet. Ihr Text steht wieder im Eingabefeld.",
+    es: "No se ha enviado nada. Tu texto ha vuelto al campo de respuesta.",
+    ca: "No s'ha enviat res. El teu text ha tornat al camp de resposta.",
+  },
 }

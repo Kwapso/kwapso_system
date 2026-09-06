@@ -74,6 +74,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
+import { ticketTypeKeptForMigration } from "@shared/types"
 import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -173,8 +174,16 @@ export function AppDetailScreen({
   // THE TEAM'S OWN `Ticket type` WORDS — one derivation, read by the create
   // dialog below AND by the Tickets tab's own Kind facet, so the two can never
   // offer two different lists of the same vocabulary.
+  //
+  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. The same subtraction
+  // `use-screen-data.ts` makes on the top-level tickets screen, for the same
+  // reason and out of the same shared test — the client's ruling of 6 Sep 2026
+  // is written up in full beside it (`TICKET_TYPE_KEPT_FOR_MIGRATION`,
+  // shared/types.ts). Both call sites derive the list from the team's own
+  // vocabulary, so both had to subtract, or this tab would offer a kind the
+  // tickets screen does not and the door refuses.
   const helpTypeOptions = (teamVocabulary.data ?? [])
-    .filter((v) => v.type === "Ticket type" && v.active)
+    .filter((v) => v.type === "Ticket type" && v.active && !ticketTypeKeptForMigration(v.value))
     .map((v) => v.value)
 
   // The open tab is remembered per record for as long as this document

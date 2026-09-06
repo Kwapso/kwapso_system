@@ -265,7 +265,7 @@ describe("the dashboard door only counts what it can stand behind", () => {
   }
 
   /** WHERE THE CLOSING-TIME SEEDS SIT, and why they are not fixed dates any
-   * more. The spread is taken over the last `CLOSURE_WINDOW_DAYS`, so a ticket
+   * more. The spread is taken over the last `CLOSURE_WINDOW_MONTHS`, so a ticket
    * seeded at a hard-coded January date drops out of the answer the moment the
    * calendar moves past it — which is a test that passes for a season and then
    * starts failing on a Tuesday for no reason anybody changed. Everything below

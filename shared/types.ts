@@ -318,6 +318,96 @@ export function ticketTypeWaitsForValidation(helpType: string | null | undefined
   return (VALIDATED_TICKET_TYPES as readonly string[]).includes(word)
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE KIND OF TICKET THAT IS KEPT BUT NEVER SHOWN.
+ *
+ * READ THIS BEFORE YOU DELETE ANYTHING. The rows this hides are NOT orphans and
+ * they are NOT waiting to be cleaned up. The client's ruling, 6 Sep 2026, in her
+ * own words: *"keep the existing requirements (we will use that later) but do
+ * not display them in tickets / i just want that you dont lose that data,
+ * because later we're moving them to another database"*.
+ *
+ * So this is a HIDE, not a tombstone, and the distinction is the whole of the
+ * design. Nothing is converted, nothing is deleted, no migration rewrites a
+ * row's `help_type`, and the word stays translated in `shared/i18n-seed.ts`
+ * because tickets on disk still carry it. A requirements ticket is a live row
+ * with live data that a future migration will lift into another database; if it
+ * had been converted to a Question or wiped, that migration would have nothing
+ * to lift. Somebody reading this in six months should conclude "these were kept
+ * deliberately", never "these were forgotten".
+ *
+ * WHY IT IS ALSO NOT A TYPE ANY MORE. She ruled in August that "requirements is
+ * not a type, kill that". It was never removed, and the cost of that showed up
+ * on 6 Sep 2026 as a real defect: the tickets dashboard's open-work panel
+ * hard-coded four columns while the vocabulary was five words long, so every
+ * stage drew two rows. A vocabulary the product has retired but the seed still
+ * plants is a fifth word every screen has to remember to allow for.
+ *
+ * WHERE IT IS ENFORCED — AT THE DOOR, and never in a browser:
+ *   • `ticketWhere` (workers/content/src/lib/help.ts) puts the clause below on
+ *     the ticket list, its `COUNT(*)` badges, the sub-tab facets and the whole
+ *     dashboard, so the rows and every number describing them come off ONE
+ *     WHERE. A client-side filter would have made the badges disagree with the
+ *     rows, which is the exact failure R16 exists to prevent.
+ *   • `needsTriage` (workers/content/src/lib/triage.ts) puts it on the queue AND
+ *     on the queue's own count, for the same reason.
+ *   • `createTicket` / `updateTicket` REFUSE the word, so no new one can be
+ *     raised even on a team whose dropdown still offers it.
+ * A ticket reached BY ID (`getTicket`, the detail screen, the machine surface)
+ * is deliberately untouched: hidden from the collection, still readable on its
+ * own — which is what "do not lose that data" requires.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The one place the word lives. A `Ticket type` dropdown VALUE, not an id —
+ * `help.help_type` stores the team's own word (shared/selectable-homes.ts). */
+export const TICKET_TYPE_KEPT_FOR_MIGRATION = "Requirements"
+
+/** The spellings the test below accepts, lowercased. DERIVED from the word
+ * above so the TypeScript predicate and the SQL clause cannot come to disagree
+ * about what counts — the failure that would show as a row in the list with no
+ * bar on the chart, or the other way round. */
+const KEPT_FOR_MIGRATION_SPELLINGS: readonly string[] = [
+  TICKET_TYPE_KEPT_FOR_MIGRATION.trim().toLowerCase().replace(/s$/, ""),
+  TICKET_TYPE_KEPT_FOR_MIGRATION.trim().toLowerCase(),
+]
+
+/** Is this the kind that is kept but never shown?
+ *
+ * THE SAME IDIOM AS `ticketTypeWaitsForValidation` ABOVE, on purpose and not by
+ * coincidence: trim, lowercase, drop one trailing "s". `help_type` holds a
+ * team's OWN editable word, so a rule that hard-matched the seeded spelling
+ * would start showing these rows again the day somebody retyped the value as
+ * "requirement" or "Requirements ". Two idioms for "is this word that word" in
+ * one file would be one idiom too many. */
+export function ticketTypeKeptForMigration(helpType: string | null | undefined): boolean {
+  if (!helpType) return false
+  const word = helpType.trim().toLowerCase().replace(/s$/, "")
+  return KEPT_FOR_MIGRATION_SPELLINGS.includes(word)
+}
+
+/** The same test, as a SQL predicate that EXCLUDES those rows.
+ *
+ * `column` is written by the caller in its own source and never taken off a
+ * request — the same condition `workingDaysSql` asks for.
+ *
+ * IT DOES NOT REACH FOR `sqlString`, and that is deliberate rather than lazy:
+ * that seam lives in `shared/workers/d1-rest.ts`, which is worker-only code, and
+ * this file is imported by both front doors' browser bundles. The values being
+ * quoted are computed above from a string literal in THIS file, so the only
+ * thing this interpolation can ever contain is a word this file shipped with —
+ * the same argument `OPEN_STATUS_SQL` in lib/help.ts makes about the status
+ * enum. The doubled-quote escape is kept anyway, so the day somebody changes
+ * the word to one with an apostrophe in it nothing breaks quietly.
+ *
+ * `COALESCE` because a ticket with NO kind is not one of these: `NULL NOT IN
+ * (…)` is NULL, which is not true, which would have silently swallowed every
+ * untyped ticket in the app — including every one sitting in the triage queue
+ * precisely BECAUSE nobody has given it a kind yet. */
+export function ticketTypeKeptForMigrationExcludedSql(column: string): string {
+  const list = KEPT_FOR_MIGRATION_SPELLINGS.map((w) => `'${w.replaceAll("'", "''")}'`).join(", ")
+  return `LOWER(TRIM(COALESCE(${column}, ''))) NOT IN (${list})`
+}
+
 /** The states a ticket is NOT yet finished in — "still ours to do something
  * about". Derived from the one list above rather than retyped, so a sixth state
  * cannot be added and silently left out of the sentence that matters most.
@@ -325,13 +415,26 @@ export function ticketTypeWaitsForValidation(helpType: string | null | undefined
  * client yet, and that telling is the resolution. */
 export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
 
-/** HOW FAR BACK "WHAT IT IS NOW" LOOKS, on the tickets dashboard's closing-time
- * spread. Ninety days is the design's own window and it is the shorter of two
- * honest answers: a distribution taken over all time is dominated by tickets
- * closed under a way of working nobody here uses any more, and the question the
- * panel is titled with — how long does a ticket take to close — is a question
- * about now. The twelve-month trend beside it is where the longer view lives. */
-export const CLOSURE_WINDOW_DAYS = 90
+/** HOW FAR BACK THE CLOSING-TIME DISTRIBUTION LOOKS, on the tickets dashboard.
+ * A distribution taken over all time is dominated by tickets closed under a way
+ * of working nobody here uses any more, and the question the panel is titled
+ * with — how long does a ticket take to close — is a question about now.
+ *
+ * SIX MONTHS, AND IT IS COUNTED IN MONTHS (client, 6 Sep 2026: "for this how
+ * long, only consider the latest 6 months"). It was ninety days until then, and
+ * the unit moved with the number rather than being converted into a hundred and
+ * eighty: she said months, the sentence the panel writes when it has nothing to
+ * draw says months, and SQLite's own `'-6 months'` walks the calendar, so a
+ * February does not quietly count as thirty days. One constant, read by the
+ * door's SQL and by that sentence, so the window and its caption cannot drift.
+ *
+ * IT IS THE SHORTER OF TWO WINDOWS ON ONE PANEL ROW, deliberately: the trend
+ * beside it still draws `CLOSURE_TREND_MONTHS`, because six monthly points is
+ * too few to tell a direction from a season. The two answer different
+ * questions — what it is NOW, and which way it is GOING — and each says its own
+ * span on screen, the distribution in its empty-state sentence and the trend in
+ * the months written along its own axis. */
+export const CLOSURE_WINDOW_MONTHS = 6
 
 /** HOW MANY MONTHS OF THE CLOSING-TIME TREND ARE DRAWN. A year, so a season
  * repeats once and a reader can tell a trend from a summer. */

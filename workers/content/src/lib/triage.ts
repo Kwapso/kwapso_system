@@ -12,6 +12,7 @@
 // the person on duty; the list is a screen only staff can open.
 
 import { triageGaps, type TriageGap } from "@shared/triage-readiness"
+import { ticketTypeKeptForMigrationExcludedSql } from "@shared/types"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { ulid } from "@shared/workers/id"
@@ -201,6 +202,31 @@ export async function needsTriage(
   // the `days` figure below (there is a test asserting the round trip), so the
   // line this cutoff draws and the number each card shows can never disagree.
   const cutoff = workingDaysAgo(at, TRIAGE_AFTER_DAYS).toISOString()
+  // …AND THE KIND THAT IS KEPT BUT NEVER SHOWN IS NOT IN THIS QUEUE EITHER.
+  //
+  // The client's ruling of 6 Sep 2026 (kept in full beside the test itself,
+  // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts): the requirements rows
+  // stay in the database for a migration into another one, and stop appearing
+  // anywhere in the Tickets experience. This queue is part of that experience —
+  // it is a list of tickets, with a count beside it, on a screen a person opens
+  // every morning — so a requirements ticket sitting in `new` would have shown
+  // up here as work somebody is being nagged to do on a kind of ticket the
+  // product no longer has.
+  //
+  // BUILT ONCE AND SPENT TWICE, on the rows and on the total, for the reason the
+  // ticket list builds its WHERE once: a queue of four under a badge reading
+  // five is R16's failure in the smallest space it can happen in. The predicate
+  // comes from the one shared definition rather than being spelled here, so this
+  // file and lib/help.ts cannot come to disagree about what the word is — and it
+  // is written this way round, rather than importing lib/help.ts's own clause,
+  // because lib/help.ts already imports `TRIAGE_AFTER_DAYS` from here and a
+  // cycle between the two would be a real one.
+  //
+  // A ticket with NO kind is NOT excluded, and that matters more here than
+  // anywhere: "nobody has said what kind this is" is one of the four readiness
+  // gaps this queue exists to chase. `ticketTypeKeptForMigrationExcludedSql`
+  // COALESCEs for exactly that reason.
+  const notKept = ticketTypeKeptForMigrationExcludedSql("help_type")
   const rows = await d1Query<{
     id: string
     ref: string | null
@@ -255,14 +281,14 @@ export async function needsTriage(
             (SELECT a.name FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_name,
             (SELECT a.logo_url FROM accounts a WHERE a.id = help.raised_by_contact_id) AS raised_by_contact_logo
        FROM help
-      WHERE status = 'new' AND archived_at IS NULL AND created_at < ?
+      WHERE status = 'new' AND archived_at IS NULL AND created_at < ? AND ${notKept}
       ORDER BY created_at ASC LIMIT ${LIST_HARD_CAP}`, // R14 hard cap
     [cutoff]
   )
   const counted = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
-    `SELECT COUNT(*) AS n FROM help WHERE status = 'new' AND archived_at IS NULL AND created_at < ?`,
+    `SELECT COUNT(*) AS n FROM help WHERE status = 'new' AND archived_at IS NULL AND created_at < ? AND ${notKept}`,
     [cutoff]
   )
   return {

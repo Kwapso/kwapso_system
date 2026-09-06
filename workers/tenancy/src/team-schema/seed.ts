@@ -154,7 +154,29 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   { type: "Ticket type", value: "Issue", mark: "IS" },
   { type: "Ticket type", value: "Request", mark: "RQ" },
   { type: "Ticket type", value: "Extra" },
-  { type: "Ticket type", value: "Requirements" },
+  // "REQUIREMENTS" IS NOT PLANTED ANY MORE, and the row is not deleted anywhere
+  // either — those are two different sentences and both are the client's.
+  //
+  // She ruled in August that "requirements is not a type, kill that", and on
+  // 6 Sep 2026 said what to do with the tickets already filed as one: *"keep the
+  // existing requirements (we will use that later) but do not display them in
+  // tickets / i just want that you dont lose that data, because later we're
+  // moving them to another database"*. So the WORD leaves the starting
+  // vocabulary and the ROWS stay exactly as they are.
+  //
+  // THIS LINE ONLY REACHES A TEAM THAT DOES NOT EXIST YET. Every team already
+  // running got the row from migration 0034 and it is still there and still
+  // active — deliberately untouched, because deactivating it is a change to
+  // their data and she asked for none. What stops a person raising a new one on
+  // those teams is the DOOR (`refuseKeptForMigration` in
+  // workers/content/src/lib/help.ts), not this list; what stops the word showing
+  // up on their screens is `ticketTypeKeptForMigration` (shared/types.ts), which
+  // is where the whole ruling is written up.
+  //
+  // Note the shape here is NOT the one 0034 used on "Feedback" and "Bug": those
+  // were retired by DEACTIVATING the row, which is right for a word nobody is
+  // coming back for. These rows are being kept for a migration, so the fifth
+  // word simply stops being seeded and everything already written stays true.
   // THE THREE KINDS OF WORK (CHECKLIST 2.2), same shape and same reason. They
   // reached existing teams through migration 0028 and were never in the seed, so
   // a brand-new team's story form offered an empty picker.

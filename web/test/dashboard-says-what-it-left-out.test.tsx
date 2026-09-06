@@ -14,7 +14,7 @@
 //     which is why two kinds are drawn and two are not;
 //   · the recategorisation matrix EXCLUDES every ticket raised before the
 //     column existed, which is a denominator quietly missing ~800 rows;
-//   · the closing-time spread only looks back ninety days.
+//   · the closing-time spread only looks back six months.
 //
 // This suite mounts the real screen over each of those payloads and reads what
 // a person would actually see. A source scan for the sentences would pass on a
@@ -32,7 +32,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { TicketDashboard } from "@/lib/api/content"
-import { CLOSURE_TREND_MIN_CLOSURES, CLOSURE_WINDOW_DAYS } from "@shared/types"
+import { CLOSURE_TREND_MIN_CLOSURES, CLOSURE_WINDOW_MONTHS } from "@shared/types"
 
 const holder = vi.hoisted(() => ({ view: undefined as TicketDashboard | undefined }))
 
@@ -162,10 +162,14 @@ describe("the tickets dashboard says what it left out", () => {
     expect(screen.getByText(/788 older tickets have no record/i)).toBeTruthy()
   })
 
-  it("says the closing-time spread only looks back ninety days, when there is nothing in it", () => {
+  it("says the closing-time spread only looks back six months, when there is nothing in it", () => {
+    // CLIENT, 6 Sep 2026: "for this how long, only consider the latest 6
+    // months." It was ninety days, and the UNIT moved with the number rather
+    // than being converted — `CLOSURE_WINDOW_MONTHS` is read by the door's SQL
+    // and by this sentence, so the window and its caption cannot drift apart.
     show({ ...FULL, closureDays: [] })
     expect(
-      screen.getByText(new RegExp(`last ${CLOSURE_WINDOW_DAYS} days`, "i"))
+      screen.getByText(new RegExp(`last ${CLOSURE_WINDOW_MONTHS} months`, "i"))
     ).toBeTruthy()
   })
 
@@ -188,27 +192,62 @@ describe("the tickets dashboard says what it left out", () => {
     expect(screen.getByText("How long a ticket takes to close")).toBeTruthy()
   })
 
-  it("shows the middle ticket, the middle half and the longest AT REST, never behind a hover", () => {
-    // CLIENT, 6 Sep 2026: "it brings me a lot of value (the subtitle of, for
-    // example, 'middle ticket 0 days,' blah blah blah), but I wonder: this
-    // information only appears when I hover over the type."
+  it("puts the middle ticket, the middle half and the longest behind the ROW — reachable by keyboard, and by a screen reader without the hover", () => {
+    // A DELIBERATE REVERSAL BY THE CLIENT, NOT A REGRESSION, and it is written
+    // here because that is the only place the difference is visible.
     //
-    // The three figures are drawn as a paragraph under each type's own bar and
-    // always have been — there is no hover affordance anywhere on this panel.
-    // Locked here so that stays true: this is the one panel on the screen whose
-    // value is a SENTENCE rather than a shape, and hiding it behind an
-    // interaction is a one-line change nothing else in this repo would notice.
+    // EARLIER on 6 Sep 2026 she said: "it brings me a lot of value (the
+    // subtitle of, for example, 'middle ticket 0 days,' blah blah blah), but I
+    // wonder: this information only appears when I hover over the type." The
+    // answer then was that it had never been behind a hover, and this test was
+    // written to pin it AT REST so it could not drift there.
+    //
+    // LATER THE SAME DAY, having read the shipped screen: "the 'Middle ticket 0
+    // days · middle half 0 to 0 · longest 16' i want to see it when hovering
+    // over the row." That is exactly what the old assertion forbade. So the
+    // assertion was rewritten rather than deleted — a deleted test would leave
+    // the next reader unable to tell a decision from a regression, and the
+    // coverage that matters did not go away, it changed shape: what is pinned
+    // now is that hiding it behind a POINTER did not hide it from anybody else.
+    //
+    // THREE CLAUSES, and the last two are the ones that make the first
+    // acceptable at all.
     show(FULL)
-    // Both kinds that closed anything, each with its own figures, in the DOM at
-    // rest — no pointer, no focus, no `title` attribute standing in for text.
+
+    // 1 · IT IS NOT WRITTEN OUT AT REST any more. `getByText` reads rendered
+    //     TEXT and never an `aria-label`, so this is the honest test of "she
+    //     no longer sees it until she hovers".
     expect(
-      screen.getByText(/Middle ticket 4 days · middle half 2 to 9 · longest 31/i),
-      "Issue's closing-time summary is not rendered at rest"
-    ).toBeTruthy()
-    expect(
-      screen.getByText(/Middle ticket 18 days · middle half 9 to 34 · longest 96/i),
-      "Request's closing-time summary is not rendered at rest"
-    ).toBeTruthy()
+      screen.queryByText(/Middle ticket 4 days · middle half 2 to 9 · longest 31/i),
+      "the readout is still printed at rest — the client asked for it behind a hover on the row"
+    ).toBeNull()
+
+    // 2 · IT IS A REAL BUTTON CARRYING THE WHOLE READOUT AS ITS ACCESSIBLE
+    //     NAME. `getByRole("button", { name })` is both halves at once: a
+    //     screen reader is told the three figures by the row itself, with no
+    //     pointer anywhere near it, and the control is in the tab order, so the
+    //     kit's `HoverCard` (Radix) opens on FOCUS as well as on hover. The
+    //     same shape the trend panel beside it already uses.
+    const issue = screen.getByRole("button", {
+      name: "Middle ticket 4 days · middle half 2 to 9 · longest 31",
+    })
+    const request = screen.getByRole("button", {
+      name: "Middle ticket 18 days · middle half 9 to 34 · longest 96",
+    })
+
+    // 3 · AND NOT THE BROWSER'S NATIVE `title`, which is mouse-only, has no
+    //     keyboard route at all and is announced inconsistently. The one
+    //     affordance this panel gained had to be the kit's, on a focusable
+    //     control, or the reversal would have cost the keyboard reader the
+    //     figures outright.
+    for (const row of [issue, request]) {
+      expect(row.getAttribute("title"), "the readout fell back to a native title").toBeNull()
+      expect(
+        row.getAttribute("tabindex"),
+        "the row was taken out of the tab order, so the figures are pointer-only"
+      ).toBeNull()
+      expect(row.hasAttribute("disabled")).toBe(false)
+    }
   })
 
   it("draws the whole screen over a full answer without falling over", () => {
@@ -219,6 +258,11 @@ describe("the tickets dashboard says what it left out", () => {
       "Who has more",
       "Raised as, then triaged as",
       "How long a ticket takes to close",
+      // The trend became a titled panel of its own on 6 Sep 2026 — "same style
+      // as How long a ticket takes to close put text above the mountain graph
+      // 'Tendency'" — so it is a heading to find, not a grey label inside
+      // somebody else's card.
+      "Tendency",
     ])
       expect(screen.getByText(heading), `the ${heading} panel did not render`).toBeTruthy()
     // The chip is the one number on this screen that is about US rather than
@@ -237,9 +281,28 @@ describe("the tickets dashboard says what it left out", () => {
     ).toBe(2)
   })
 
-  it("says the matrix has nothing to compare yet, rather than drawing an empty grid", () => {
+  it("draws the matrix's axes even with nothing in it, AND still says why it is empty", () => {
+    // CLIENT, 6 Sep 2026: "in raised as pls display the graphic already even if
+    // it's empty." The empty answer used to REPLACE the picture with its own
+    // paragraph, which made this the one panel whose shape a reader could not
+    // learn until the data arrived — and its shape (arrived down, decided
+    // across, the diagonal for what nobody moved) is the whole point of it.
+    //
+    // BOTH HALVES, because the sentence is not decoration: `raised_as_type` is
+    // a new column and migration 0065 deliberately left the old rows null, so
+    // an empty grid is a YOUNG COLUMN and not a quiet week. Losing that
+    // sentence to make room for the picture would have been the worse trade.
     show({ ...EMPTY, openByTypeAndStatus: FULL.openByTypeAndStatus })
     expect(screen.getByText(/nothing to compare yet/i)).toBeTruthy()
+    const matrix = screen.getByText("Became").parentElement as HTMLElement
+    expect(matrix, "the matrix drew no grid at all on an empty answer").toBeTruthy()
+    // One heading row (the corner + a column per kind) and one row per kind
+    // (its own name + a cell per kind) — the axes and their zeros, exactly the
+    // structure a full answer draws.
+    expect(
+      matrix.childElementCount,
+      "the empty matrix is not the same grid the full one draws"
+    ).toBe((TYPES.length + 1) * (TYPES.length + 1))
   })
 
   it("a team with no tickets at all gets the empty state and NO toolbar (R50)", () => {
@@ -294,8 +357,13 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
       "The open work",
       // whether what arrives about it is what it turns out to be
       "Raised as, then triaged as",
-      // how long we take to close things on it
+      // how long we take to close things on it…
       "How long a ticket takes to close",
+      // …and which way that is going. Two panels since 6 Sep 2026, and BOTH
+      // have to survive the narrowing: the split was a layout decision on the
+      // whole-team screen, and a layout decision that quietly dropped a panel
+      // inside an app record would be a second dashboard by accident.
+      "Tendency",
     ])
       expect(screen.getByText(heading), `the ${heading} panel is missing from the app's dashboard`).toBeTruthy()
     // The subtractions the panels have to keep announcing — the same three the
@@ -402,6 +470,149 @@ describe("the open work is one row per stage, with the kinds named on top", () =
       "Extra",
       "Requirements",
     ])
+  })
+})
+
+describe("the stage axis reads as a journey, and a stage nobody is in is not drawn", () => {
+  it("puts waiting on the client immediately above ready", () => {
+    // CLIENT, 6 Sep 2026: "in the open work add waiting before ready."
+    //
+    // `OPEN_HELP_STATUSES` leads with `awaiting_validation`, because it is
+    // `HELP_STATUSES` minus the closed one and that array is written in the
+    // order the STATE MACHINE names its states. Read top to bottom as a
+    // pipeline, that put "Waiting on you" ABOVE "New" — before the ticket has
+    // been looked at — and left "Ready" alone at the bottom. The view now
+    // reorders (`PIPELINE_STAGES`); nothing about the lifecycle moved, which is
+    // why this is asserted on the SCREEN and not on the shared constant.
+    //
+    // The fixture has something open at four stages, so all four are drawn and
+    // the two the note is about are adjacent and in her order.
+    showWith(TYPES)
+    const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
+    const stride = TYPES.length + 1
+    const stages = [...grid.children]
+      .filter((_, i) => i >= stride && i % stride === 0)
+      .map((c) => c.textContent)
+    expect(stages, "the pipeline is not read in the client's stage order").toEqual([
+      "New",
+      "Triaged",
+      "In progress",
+      "Waiting on you",
+    ])
+  })
+
+  it("drops a stage only when EVERY kind is at nothing in it", () => {
+    // "whe a status is completely empty do not show it." COMPLETELY is the
+    // whole rule, and it is the half a careless fix gets wrong: a stage holding
+    // ONE ticket still draws its full row, because the zeros beside that one
+    // bar are the comparison the row exists for.
+    //
+    // `scheduled` and `ready` are empty across every kind in the fixture, so
+    // they are absent; `in_progress` holds a single kind's three tickets, so it
+    // is present with three dashes beside it.
+    showWith(TYPES)
+    const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
+    const stride = TYPES.length + 1
+    const stages = [...grid.children]
+      .filter((_, i) => i >= stride && i % stride === 0)
+      .map((c) => c.textContent)
+    expect(stages, "an empty stage drew a row of dashes").not.toContain("Scheduled")
+    expect(stages, "an empty stage drew a row of dashes").not.toContain("Ready")
+    expect(
+      stages,
+      "a stage with a single kind in it was dropped — 'completely empty' means every kind"
+    ).toContain("In progress")
+    // …and the row that survives on one kind is a WHOLE row: its stage name
+    // plus a cell for every kind, three of them showing nothing.
+    const at = stages.indexOf("In progress")
+    const row = [...grid.children].slice(stride * (at + 1) + 1, stride * (at + 2))
+    expect(row.filter((c) => c.textContent === "–").length, "the empty cells beside the one bar are missing").toBe(
+      TYPES.length - 1
+    )
+  })
+})
+
+describe("which app is bounded by the row beside it, not by a count it apologises for", () => {
+  it("names every system the door answered with, and never 'and N more'", () => {
+    // CLIENT, 6 Sep 2026: "on which app do not 'and 14 more systems' - make it
+    // as long as the who has more container."
+    //
+    // Both the eight-system ceiling and the sentence that confessed it are
+    // gone. What bounds the list now is the HEIGHT of the grid row, measured
+    // from its siblings rather than typed here: the rows sit `absolute` inside
+    // a `flex-1` box, so this panel contributes no height of its own and takes
+    // whatever "Who has more" and the matrix set. Anything past that scrolls,
+    // which is why nothing has to be dropped or announced.
+    //
+    // Nine systems, one more than the retired ceiling, so a surviving `slice`
+    // would show itself as a missing name and a sentence.
+    holder.view = {
+      ...FULL,
+      openByApp: Array.from({ length: 9 }, (_, i) => ({
+        appId: `p${i}`,
+        appName: `System ${i}`,
+        helpType: "Issue",
+        open: 9 - i,
+        total: 20,
+      })),
+    }
+    render(<TicketsDashboard teamId="T1" helpTypeOptions={TYPES} ticketTotal={62} />)
+    const panel = screen.getByText("Which app").closest('[data-slot="card"]') as HTMLElement
+    expect(panel.textContent, "the overflow sentence is back").not.toMatch(/more systems/i)
+    for (let i = 0; i < 9; i++)
+      expect(
+        screen.getByText(`System ${i}`),
+        `System ${i} was dropped — the panel is capping its rows again instead of being bounded by the row`
+      ).toBeTruthy()
+  })
+})
+
+describe("the panels carry no subtitles any more", () => {
+  it("none of the four the client named by their words is on screen", () => {
+    // "rmoeve all subtitles: Every open ticket, as one pipeline per kind down a
+    // shared set of stages. Open tickets against the thing you built. Open work
+    // by client, for the kinds that wait for a client to confirm. What your
+    // morning is actually spent on."
+    //
+    // Asserted as an ABSENCE with the panels still present beside it, the same
+    // shape as the retired "working days only" caption above: a removed line is
+    // not a removed panel, and the regression to catch is somebody writing the
+    // fifth one on their next pass.
+    showWith(TYPES)
+    for (const gone of [
+      "Every open ticket, as one pipeline per kind down a shared set of stages.",
+      "Open tickets against the thing you built.",
+      "Open work by client, for the kinds that wait for a client to confirm.",
+      "What your morning is actually spent on.",
+      // …and the two grey labels INSIDE the closing-time panel, which the split
+      // below replaced with real headings: "in the how logn ticket takes to
+      // close remove subtitle 'What it is now' and 'Which way it is going'".
+      "What it is now",
+      "Which way it is going",
+    ])
+      expect(screen.queryByText(gone), `a retired subtitle is back: ${gone}`).toBeNull()
+    for (const kept of ["The open work", "Which app", "Who has more", "Raised as, then triaged as"])
+      expect(screen.getByText(kept), `${kept} lost its panel, not just its subtitle`).toBeTruthy()
+  })
+
+  it("the closing time is two panels on one row, a third and two thirds", () => {
+    // "the how long, split in 2 containers same row" · "the how long 1/3, the
+    // graph 2/3". Two CARDS now, so the assertion is about the boxes and their
+    // tracks rather than about the words: a `col-span` written on a card that
+    // is not in a grid, or two headings inside one card, would both pass a text
+    // search and neither is what she asked for.
+    showWith(TYPES)
+    const spread = screen.getByText("How long a ticket takes to close").closest('[data-slot="card"]')
+    const trend = screen.getByText("Tendency").closest('[data-slot="card"]')
+    expect(spread, "the distribution is not its own card").toBeTruthy()
+    expect(trend, "the trend is not its own card").toBeTruthy()
+    expect(spread, "the two closing-time panels are still one container").not.toBe(trend)
+    // SIBLINGS IN ONE GRID ROW, which is also what makes them one height: the
+    // trend's plot measures itself from the distribution beside it.
+    expect(spread!.parentElement, "the two panels are not in the same row").toBe(trend!.parentElement)
+    expect(spread!.parentElement!.className).toContain("lg:grid-cols-3")
+    expect(trend!.className, "the graph does not take two thirds of the row").toContain("lg:col-span-2")
+    expect(spread!.className, "the distribution is not a single track").not.toContain("col-span")
   })
 })
 

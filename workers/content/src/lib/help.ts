@@ -25,9 +25,12 @@ import { ulid } from "@shared/workers/id"
 import {
   CLOSURE_TREND_MIN_CLOSURES,
   CLOSURE_TREND_MONTHS,
-  CLOSURE_WINDOW_DAYS,
+  CLOSURE_WINDOW_MONTHS,
   HELP_STATUSES,
   OPEN_HELP_STATUSES,
+  TICKET_TYPE_KEPT_FOR_MIGRATION,
+  ticketTypeKeptForMigration,
+  ticketTypeKeptForMigrationExcludedSql,
   ticketTypeWaitsForValidation,
   type HelpMessage,
   type HelpStatus,
@@ -462,6 +465,61 @@ function typeClause(helpType: string | undefined): { sql: string; params: string
   return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
 }
 
+/** THE KIND THAT IS KEPT BUT NEVER SHOWN, subtracted here and nowhere else.
+ *
+ * The client's ruling of 6 Sep 2026 — keep the rows, stop displaying them —
+ * written up in full beside the test itself (`shared/types.ts`,
+ * `TICKET_TYPE_KEPT_FOR_MIGRATION`). These rows are being preserved for a
+ * migration into another database. Do not "tidy them up".
+ *
+ * WHY IT IS A CLAUSE ON `ticketWhere` AND NOT A FILTER ON THE ROWS. Everything
+ * that describes this collection to a person is a grouped `COUNT(*)` at this
+ * same door — the sub-tab badges (`countTicketFacets`), the All/My totals
+ * (`countTickets`) and every panel on the dashboard (`readTicketDashboard`).
+ * Sieving the rows in the browser would have left all of those counting a
+ * backlog the list can no longer show, which is R16's failure in its quietest
+ * form: every number true, none of them about the rows on screen. One clause on
+ * the one WHERE the page and its counts already share is the only shape that
+ * cannot drift.
+ *
+ * IT IS NOT PART OF `ticketFence`, deliberately. The fence decides what a caller
+ * MAY see and rides every read AND every write; this decides what the COLLECTION
+ * is and rides only the list, its counts and its charts. Folded into the fence it
+ * would have made a requirements ticket unreadable, unreplyable and
+ * un-unarchivable — you cannot migrate a row you can no longer reach. */
+function keptForMigrationClause(): { sql: string; params: string[] } {
+  return { sql: ticketTypeKeptForMigrationExcludedSql("help_type"), params: [] }
+}
+
+/** …AND THE WRITE HALF, so no new one can be raised.
+ *
+ * REMOVING THE WORD FROM THE SEED ONLY HELPS A TEAM THAT DOES NOT EXIST YET.
+ * Every team already running got the row from team migration 0034, it is still
+ * ACTIVE, and the client's instruction was explicitly not to touch their
+ * vocabulary — so their Dropdown values screen still lists it and their ticket
+ * form's picker still offers it. That is a hole with a person-shaped edge: raise
+ * one and it would vanish the instant it was saved, which reads as data loss
+ * even though nothing is lost. Rather than deactivate a row she asked us to
+ * leave alone, the DOOR refuses the value. A picker cannot be trusted to
+ * withhold anything — the machine surface and the importer reach the same door
+ * with no picker at all.
+ *
+ * IT REFUSES A MOVE INTO THE KIND, NEVER A ROW ALREADY IN IT. `was` is the
+ * ticket's current word, and an edit that leaves the type where it is passes.
+ * That is the difference between hiding a collection and freezing a record: the
+ * existing rows must stay editable and readable right up to the day they are
+ * migrated, which is the whole reason they are still here. On a create there is
+ * no `was`, so any spelling of the word is refused outright. */
+function refuseKeptForMigration(next: string | null, was: string | null): void {
+  if (!ticketTypeKeptForMigration(next)) return
+  if (ticketTypeKeptForMigration(was)) return
+  throw new GuardError(
+    400,
+    "retired_ticket_type",
+    `"${TICKET_TYPE_KEPT_FOR_MIGRATION}" isn't a kind of ticket any more. Pick another one.`
+  )
+}
+
 function statusClause(status: HelpStatus | undefined): { sql: string; params: string[] } {
   return status ? { sql: "status = ?", params: [status] } : { sql: "", params: [] }
 }
@@ -511,6 +569,10 @@ function ticketWhere(
 ): { sql: string[]; params: string[] } {
   const fence = ticketFence(guard, scope, filter.tab)
   const parts = [
+    // FIRST, AND UNCONDITIONALLY — no facet turns it off, because "the tickets"
+    // no longer means these (see `keptForMigrationClause`). It sits with the
+    // filters rather than in the fence for the reason written there.
+    keptForMigrationClause(),
     accountClause(filter.accountId),
     appClause(filter.appId),
     moduleClause(filter.moduleId),
@@ -951,13 +1013,22 @@ export async function readTicketDashboard(
     // so those rows fall out rather than arriving as a negative duration that
     // would drag a quartile below zero.
     //
-    // …AND EVERYTHING CLOSED MORE THAN `CLOSURE_WINDOW_DAYS` AGO, which is new
-    // and is a decision rather than a tidy-up. The panel is titled "what it is
-    // now", and a distribution taken over all time is a distribution over ways
-    // of working the team has already left behind. The trend read below is
-    // where the longer view lives, and it is a better shape for it: a year of
-    // months says WHICH WAY this is going, where one number over a year says
-    // only that a year happened.
+    // …AND EVERYTHING CLOSED MORE THAN `CLOSURE_WINDOW_MONTHS` AGO, which is a
+    // decision rather than a tidy-up. The panel asks how long a ticket takes to
+    // close, which is a question about NOW, and a distribution taken over all
+    // time is a distribution over ways of working the team has already left
+    // behind. The trend read below is where the longer view lives, and it is a
+    // better shape for it: a year of months says WHICH WAY this is going, where
+    // one number over a year says only that a year happened.
+    //
+    // SIX CALENDAR MONTHS, NOT A COUNT OF DAYS (client, 6 Sep 2026: "for this
+    // how long, only consider the latest 6 months"). `julianday('now', '-6
+    // months')` walks the calendar the way she said it, so the window is the
+    // same six months whichever six they are — where a fixed day count would
+    // make a window containing February shorter than one containing July. The
+    // shape of the comparison is unchanged: `julianday` still answers null for
+    // a date it cannot parse, so an unreadable `resolved_at` falls out here
+    // exactly as it falls out of the two comparisons above it.
     //
     // WORKING DAYS, NOT CALENDAR DAYS (`tookDays`). This read used to subtract
     // two `julianday`s, so a ticket raised at five on a Friday and closed at
@@ -979,7 +1050,7 @@ export async function readTicketDashboard(
            FROM help
           WHERE ${fenced} AND status = 'resolved' AND help_type IS NOT NULL
             AND julianday(resolved_at) >= julianday(created_at)
-            AND julianday(resolved_at) >= julianday('now') - ${CLOSURE_WINDOW_DAYS}
+            AND julianday(resolved_at) >= julianday('now', '-${CLOSURE_WINDOW_MONTHS} months')
        ), ranked AS (
          SELECT t, days,
                 ROW_NUMBER() OVER (PARTITION BY t ORDER BY days) AS rn,
@@ -1499,6 +1570,9 @@ export async function createTicket(
     topRank(cfg, guard),
   ])
   const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
+  // NOTHING NEW ARRIVES AS THE KIND WE STOPPED SHOWING. There is no `was` on a
+  // create, so this is the flat refusal (see `refuseKeptForMigration`).
+  refuseKeptForMigration(helpType, null)
   const now = new Date().toISOString()
   // WHERE IT STARTS, and it is a FACT about the kind of thing being asked rather
   // than a choice anybody makes (CHECKLIST 5.13, Aurora's ap2).
@@ -1613,6 +1687,15 @@ export async function updateTicket(
   // deliberate feature with a confirm panel, not a quiet field on an edit form.
   // A portal caller never reaches this: their own ticket already carries their
   // company, so the branch below is unreachable for them by construction.
+  // NOBODY RECATEGORISES A TICKET *INTO* THE KIND WE STOPPED SHOWING. Checked
+  // against what the row already says, so an ordinary edit to one of the
+  // preserved rows (which posts its own unchanged type straight back) still
+  // saves — see `refuseKeptForMigration`. Before the first write, so a refusal
+  // costs no round trips.
+  refuseKeptForMigration(
+    optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
+    before.help_type
+  )
   const namedAccount =
     scope.kind === "portal" ? null : await accountForStaffTicket(cfg, guard, input.accountId)
   if (namedAccount && before.account_id && namedAccount !== before.account_id) {
@@ -2084,6 +2167,16 @@ export async function bulkSetStatusByFilter(
   const authored = ticketFence(guard, scope, "all")
   const extra: string[] = authored.sql ? [authored.sql] : []
   const extraParams: (string | number)[] = [...authored.params]
+  // …AND THE KIND THAT IS KEPT BUT NEVER SHOWN IS NOT IN THE SET EITHER. This is
+  // the one WRITE that takes a FILTER rather than ids, so it is the one write
+  // that inherits the collection's own definition: a set-shaped job says "every
+  // ticket matching this", and these rows are no longer part of "the tickets".
+  // It is also the number a person APPROVES — the count above is what the
+  // confirm panel states — so leaving them in would have told somebody they were
+  // about to move more tickets than the list in front of them holds, and then
+  // quietly moved rows they cannot see. That is the same sentence R16 makes
+  // about a badge, made about a confirmation.
+  extra.push(keptForMigrationClause().sql)
   if (filter.status) {
     extra.push("status = ?")
     extraParams.push(filter.status)
