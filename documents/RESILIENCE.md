@@ -197,6 +197,60 @@ resolves.
 > rehearsal — run one against staging when you can, and record the date HERE
 > rather than in a commit message. That half, and only that half, can still go
 > stale.
+>
+> ---
+>
+> **THE REMOTE HALF, REHEARSED 2026-09-06 AGAINST STAGING. Export and reload:
+> PASS. Time Travel: still not tested.**
+>
+> `cf-exec npx wrangler d1 export kwapso-core-staging --remote` produced a
+> **4,333,058-byte** dump in **9.5 seconds**. Loaded into an empty SQLite with
+> `sqlite3 restored.db < dump.sql`: **zero errors, 21 tables, 25 indexes,
+> 6,340 rows**, in 3.5 seconds.
+>
+> The dump reconciles against itself exactly: 6,341 `INSERT INTO` statements =
+> 6,340 data rows + one `sqlite_sequence` row, which is internal and correctly
+> outside the count.
+>
+> And it reconciles against the LIVE database, which is the half a dump cannot
+> prove on its own. Counted through `wrangler d1 execute --remote` on the seven
+> tables that do not take continuous writes:
+>
+> | table | restored | live | |
+> |---|---|---|---|
+> | `users` | 19 | 19 | exact |
+> | `teams` | 5 | 5 | exact |
+> | `d1_migrations` | 28 | 28 | exact |
+> | `importable_databases` | 10 | 10 | exact |
+> | `invite_index` | 14 | 14 | exact |
+> | `mcp_tokens` | 92 | 92 | exact |
+> | `team_members` | 13 | **14** | live gained one after the export |
+>
+> That last row is the useful one: staging is in use, somebody joined a team
+> between the export and the comparison, and the check noticed. A comparison
+> where everything matches can be a comparison that is not really looking.
+> `sessions` (787) and `error_logs` (5,090) were deliberately not compared for
+> the same reason — they are written continuously, so equality there would mean
+> nothing either way.
+>
+> `d1_migrations` = 28 also settles the thing that started this: the live staging
+> core really is at 28 migrations, the same 28 in `db/core/`, so the schema that
+> round-tripped is the schema that is deployed.
+>
+> **Two cautions, both learned in the doing.** (1) `wrangler d1 export --remote`
+> warns that "your D1 database will be unavailable to serve queries" and, in a
+> NON-INTERACTIVE shell, auto-answers **yes** — it took 9.5 seconds on a 5 MB
+> staging core, but do not let a script run this against production unattended.
+> (2) D1 refuses a compound `SELECT` of even six `UNION ALL` terms
+> ("too many terms in compound SELECT"), so a per-table census has to be one
+> query per table.
+>
+> **STILL NOT DONE, and deliberately not claimed:** Time Travel has not been
+> restored to a bookmark, and the 132 MB **team** database
+> (`team-01kzwxfd86n0k3rzrbhkmkrwys`, `TEAM_DB_0_ID`) has not been exported —
+> only the 5 MB core. A team database holds the customer data, is 26× larger,
+> and is where a real restore would hurt; do not read the pass above as covering
+> it.
 
 **An untested restore is not a restore**, and until 2026-09-05 that rule was
 enforced by nobody — which is how the recorded rehearsal came to be eight
@@ -207,7 +261,18 @@ the build red on the commit that adds it rather than on the day somebody needs a
 restore.
 
 The REMOTE half is still a manual rehearsal, and it is still the half that runs
-on the bad day. When you next have a staging window: export a database with
-`wrangler d1 export --remote`, create a scratch database, load the dump into it,
-and restore a Time Travel bookmark on a third — then write the date and the
-figures into the block above.
+on the bad day. **Export-and-reload was rehearsed on 2026-09-06 and passed** —
+the figures are in the block above. Two pieces of it remain untested, and they
+are the two that matter most:
+
+1. **Time Travel.** Nothing has been restored to a bookmark. This is the path
+   RUNBOOK §2 sends you down for a live database inside 30 days, so it is the
+   one most likely to be used and the only one never tried.
+2. **A team database.** Only the 5 MB core was exported. The customer data lives
+   in the team databases; the staging one is 132 MB, 26× larger, and its export
+   time, dump size and reload behaviour are all unmeasured.
+
+Do those two in the next staging window and extend the block above. Until then
+the honest statement is: *we know the export mechanism works and produces a dump
+that reloads faithfully; we do not know what it costs on a real team database,
+and we have never used Time Travel.*
