@@ -951,6 +951,34 @@ export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "load_tools",
 ])
 
+/** THE SENTENCE THAT TURNS A LIST OF NAMES INTO A CAPABILITY.
+ *
+ * Exported, and the bench imports it, because a second copy of this paragraph is
+ * a second definition of what a step sends — and the whole point of
+ * `agent-routing-bench.mjs` is to measure the shape the assistant really uses.
+ * A bench carrying its own hand-typed preface would drift from the app the first
+ * time either was reworded, and the drift would be invisible: the run would still
+ * produce a number. Same reasoning that keeps the fold in one file for the error
+ * digest and the resolve door. */
+export const MORE_TOOLS_PREFACE =
+  "MORE TOOLS, BY NAME. Beyond the ones you have been given in full, these exist and you can use any of them — call load_tools with the names you need (several at once) and their full instructions arrive for the rest of this conversation. The names say what they do; if none of them fits, answer with what you have rather than guessing at one."
+
+/** THE SYSTEM MESSAGE A STEP ACTUALLY CARRIES: the prompt plus the index of every
+ * tool this caller could reach but has not been handed in full.
+ *
+ * ONE DEFINITION, TWO CALLERS. `runPlanLoop` builds a turn with it and the
+ * routing bench measures with it, so "what the bench sends" and "what the
+ * assistant sends" cannot come apart. Returns the base unchanged when the index
+ * is empty, which is the honest answer for a caller whose rights leave nothing
+ * deferred. */
+export function stageOneSystem(base: string, held?: ReadonlySet<string>): string {
+  const index = toolIndex(held)
+  return index ? `${base}
+
+${MORE_TOOLS_PREFACE}
+${index}` : base
+}
+
 /** Every tool name that is NOT core, sorted, as one line. Computed once at module
  * load from the catalogue itself, so a tool added tomorrow is in the index the
  * day it exists and nobody has to remember a second list. */
