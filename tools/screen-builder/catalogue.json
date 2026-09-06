@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.56",
-  "sha": "a246d3a18c12ec9c0f4da3d9dc518069eeecb69a",
+  "tag": "v1.2.57",
+  "sha": "6f6cd9b18ac1a83960c546ace41aed5b5f4704f3",
   "syncedAt": "2026-09-06"
  },
- "generatedAt": "2026-09-06T15:50:26.286Z",
+ "generatedAt": "2026-09-06T16:58:51.159Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -6596,8 +6596,8 @@
        "options": [
         {
          "name": "true",
-         "classes": "rounded-e-pill rounded-s-none",
-         "note": null
+         "classes": "rounded-e-pill rounded-s-none ps-[var(--space-2)]",
+         "note": "THE SEAM SIDE LOSES THE FIELD'S OWN INSET — client, 2026-09-06: \"sort and view should have same spacing between icon and text. I know sort has the break, keep it, but make it more compact; to the eye it should look the same as the view selector.\" MEASURED, both on verify/toolbar-trio: `ViewSwitch` puts 8 between its glyph and its label. This control put 26 — and none of it was a gap. The two halves are FUSED (no `gap-2` between them at all), so the space is entirely padding: 8 inside the direction square, which centres a 16 glyph in a 32 box, plus the field's own leading `--space-4h` (18). Three times the distance, on a control sitting beside the one it is meant to match. So the LEADING inset drops to `--space-2`, whose own line in the scale reads \"chip padding, ICON TO LABEL\" — the same 8 `ViewSwitch` spends on exactly this, rather than a number chosen to look right. The TRAILING inset keeps its 18: that edge faces the pill's outside, where nothing has changed and the header's arithmetic above still holds. ONLY WHEN FUSED. An unfused field has no seam and no glyph beside it, so it keeps the symmetric inset it always had."
         },
         {
          "name": "false",
@@ -6621,7 +6621,7 @@
     {
      "file": "components/sort-control/sort-control.tsx",
      "name": "directionVariants",
-     "line": 236,
+     "line": 257,
      "base": "grid shrink-0 cursor-pointer place-content-center appearance-none rounded-s-pill rounded-e-none border-0 enabled:active:translate-y-[0.0625rem] enabled:focus-visible:shadow-[inset_0_0_0_0.0625rem_var(--foreground)] transition-[background-color,box-shadow,color,translate] duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {

@@ -623,24 +623,25 @@ export function ToolbarRow({
               onDirectionChange={sort.onDirectionChange}
               label={t("Sort by")}
               hideLabel
-              /* DENSE, NOT THE STANDING HEIGHT — client: "the sort component
-                 everywhere, I feel it's too big. Could we make it a bit more
-                 compact, like the two parts with the arrow and the other one?"
-                 She is describing the control's own two halves, which is what
-                 it already is: a direction button fused to a field.
+              /* THE STANDING HEIGHT, SAME AS FILTER AND VIEW — client,
+                 2026-09-06: "filter sort and view should be same size, since
+                 last iteration sort is smaller, fix that."
 
-                 Nothing is redrawn. `size="sm"` is the kit's own second size
-                 and its doc names this exact place — "32,
-                 `--control-height-dense`, for a table header or A TOOLBAR". The
-                 toolbar had simply never asked for it, so every collection in
-                 the app drew the 40 standing height inside a row of 32s. The
-                 glyph steps 20 -> 16 with it, by the control's own rule rather
-                 than by anything written here.
+                 THIS LINE USED TO PASS `size="sm"`, and that was me reading her
+                 earlier note — "the sort component everywhere, I feel it's too
+                 big, could we make it a bit more compact" — as a question about
+                 HEIGHT. It was not. Measured on verify/toolbar-trio: the pill
+                 was the right height all along and carried 26 between its arrow
+                 and its label where `ViewSwitch` carries 8. She was describing
+                 the INSIDE of the control, and shrinking the whole thing to 32
+                 answered the wrong axis — it left the row of three uneven
+                 without touching what she was actually looking at.
 
-                 One line, every collection screen, because this row builds the
-                 control now (R53) instead of eighteen call sites each passing
-                 their own. */
-              size="sm"
+                 So the height goes back to the 40 its neighbours wear, and the
+                 compactness she asked for is now where it belongs: the kit's
+                 own `sort-control` drops its seam-side inset to `--space-2`,
+                 the same 8 `ViewSwitch` spends between glyph and label. Two
+                 axes, two fixes, neither standing in for the other. */
             />
           </div>
         )}

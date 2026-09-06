@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+### Fixed — the sort control carried three times the gap it looked like it had
+
+Client, 2026-09-06: "sort and view should have same spacing between icon and
+text. I know sort has the break, keep it, but make it more compact; to the eye
+it should look the same as the view selector."
+
+Measured on `verify/toolbar-trio`: `ViewSwitch` puts 8 between its glyph and its
+label. `SortControl` put 26 — and none of it was a gap. The two halves are
+FUSED, with no `gap-2` between them at all, so every one of those 26 pixels was
+padding: 8 inside the direction square (a 16 glyph centred in a 32 box) plus the
+field's own leading `--space-4h`, 18.
+
+So the field's LEADING inset drops to `--space-2` when fused. That token's own
+line in the scale reads "chip padding, icon to label" — it is the same 8
+`ViewSwitch` spends on exactly this relationship, rather than a number picked to
+look right. The TRAILING inset keeps its 18: that edge faces the pill's outside,
+where nothing changed and the component header's width arithmetic still holds.
+Only when FUSED — an unfused field has no seam and no glyph beside it, so it
+keeps the symmetric inset it always had.
+
+The direction square is untouched, as its own header requires. Its 8 (or 10 at
+the standing height) is the glyph's own centring, so the seam now sits between
+two comparable margins instead of one against three.
+
+
 ### Fixed — an icon rename had reached inside the sentences people read
 
 The Iconoir -> Phosphor swap renamed `Search` to `MagnifyingGlass` and `Check`

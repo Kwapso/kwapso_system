@@ -139,6 +139,7 @@ import { AttachmentPreview, hasPreview } from "@shared/web/attachment-preview"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
+import { TicketChips } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/collection-heading"
 import { CountedAbove } from "@/components/counted-tabs"
 import { InAppLink } from "@/components/in-app-link"
@@ -580,8 +581,8 @@ export function TicketsCollection({
       // but not solved)". The facet token stays `status:ready` because that is
       // the STATUS the door stores and renaming it would be a migration for a
       // label; only the word a person reads has changed.
-      { value: READY, label: t("Open"), icon: "", badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
-      { value: CLOSED, label: t("Closed"), icon: "", badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
+      { value: READY, label: t("Open"), icon: CONCEPT_ICON.open, badge: formatCount(byStatus?.ready), badgeVariant: "" as const },
+      { value: CLOSED, label: t("Closed"), icon: CONCEPT_ICON.closed, badge: formatCount(byStatus?.resolved), badgeVariant: "" as const },
       { value: ALL, label: t("All"), icon: "", badge: formatCount(scopeTotal), badgeVariant: "" as const },
     ],
   }
@@ -2324,146 +2325,53 @@ function ticketTitle(w: TriageWaiting): string {
   return w.titleEn?.trim() || w.titleDe?.trim() || (plain.length > 80 ? `${plain.slice(0, 80)}…` : plain)
 }
 
-/** THE CHIP LINE — three facts and nothing else: the number, the type, the date.
+/** THE CHIP LINE — four facts and nothing else: the number, the type, the
+ * app, the date.
  *
- * ── WHAT THE CLIENT MOVED, AND WHY IT IS A RULE RATHER THAN A TIDY-UP ───────
+ * MOVED OUT OF THIS FILE, 2026-09-06, INTO `shared/web/ticket-chips.tsx`
+ * (`TicketChips`) — the client, reading this card next to the ticket DETAIL
+ * screen, verbatim: "replicate the pills that we have on the view outside.
+ * These are: ID, type, app, date. Remove the rest, and everywhere else where
+ * tickets have pills, reuse this." Every design ruling this line has ever
+ * carried — the black `variant="inverse"` chip for the number, why a
+ * numberless ticket draws no chip, the `#F7F2EB`/`--surface-panel` paper and
+ * why it is a rebind rather than a class, the app pill's 2026-09-06 return
+ * ("bring the app back in the chips at the top, without the icon") and why it
+ * stays a link, and the date chip's word-for-word wording — is recorded there
+ * now, in full, rather than duplicated here. This wrapper exists only because
+ * `Swatch`, `ticketTypeColour` and `InAppLink` are `web/`-only (the shared
+ * file's own header says why they cannot be imported from `shared/web/`
+ * itself) and `teamId` is this screen's own routing fact — so this is the one
+ * place that supplies them, and every other ticket surface (the ticket detail
+ * screen, `web/components/help-detail.tsx`, among them) supplies its own the
+ * same way.
  *
- * This line used to carry four chips — number, type, CLIENT, PERSON WHO ASKED —
- * and the date sat on its own line under the description. Round nine of the
- * design review swapped those: "the chips above the title become number, type,
- * date. Nothing else up there", and the client, the app, the module and the
- * author go BELOW the content as links (`TriageMeta`, next).
- *
- * THE CUT IS NOT ARBITRARY AND IT IS WORTH NAMING, because it is the thing that
- * keeps this line from growing back. What is left up here are the ticket's own
- * FACTS — its number, its kind, its age — none of which is a record you could go
- * and open. What went down there is every RECORD the ticket points at, all four
- * of them navigable. A chip is a fact; a link is a record. Once that is the rule,
- * "should the app be a chip?" has an answer instead of a preference.
- *
- * THE NUMBER IS A BLACK CHIP because she asked for one, and `variant="inverse"`
- * is the kit's word for it: charcoal fill, off-beige label, and it FLIPS with
- * the palette — so "black chip" is still the loudest thing on the card in dark
- * mode, where an actual black would disappear into the paper. It KEEPS that fill
- * through this pass, untouched by the paper below. R32 is satisfied by
- * construction: the fill is a token pair the kit owns, and this file names no
- * colour at all.
- *
- * A TICKET WITH NO NUMBER DRAWS NO CHIP. `ref` is null on a ticket whose client
- * has no reference code yet (`HelpTicket.ref` says so), and an empty black
- * lozenge is worse than nothing.
- *
- * ── THE PAPER THE QUIET CHIPS SIT ON (client ruling: `--kw-soft-paper`) ─────
- *
- * She named the colour by its raw pigment — `#F7F2EB`, the kit's
- * `--kw-soft-paper` — and asked for the token rather than the hex. The token
- * this file says is `--surface-panel`, and that is the same colour rather than a
- * substitution: `tokens.css` defines `--surface-panel: var(--kw-soft-paper)`,
- * byte-identical, and its own §L note rules the `--kw-*` ramp "additive
- * tokens … never consumed directly" — they are the pigments the semantic tokens
- * are mixed from, not names a screen says. `type-colours.ts` makes the identical
- * argument at length about the same ramp. The second half is the one that
- * actually matters: the raw pigment has NO DARK HALF, and `--surface-panel`
- * does (`--kw-unlit-panel` on a dark palette), so writing the pigment here would
- * have painted a light-mode-only chip and called it a token.
- *
- * IT IS APPLIED BY REBINDING THE KIT'S OWN HOOK, not by overriding a class.
- * `Badge variant="secondary"` reads `--badge-quiet-fill` with `--surface-quiet`
- * as its fallback, and its own doc names this exact move: "a caller who KNOWS a
- * badge sits on that ground rebinds `--badge-quiet-fill` locally — a FILL shift,
- * never a border or a shadow". Set ONCE on the wrapping span and inherited by
- * every quiet chip inside it, so the three chips cannot end up two colours, and
- * `variant="inverse"` above ignores it entirely because it reads neither
- * property. Nothing in `shared/ui` is edited (it is vendored and hash-pinned)
- * and no class is fought with `!important`.
- *
- * THE DATE CHIP CARRIES WHAT THE OLD LINE UNDER THE DESCRIPTION SAID, word for
- * word — "raised 10 June 2025", the client's own phrasing — and keeps
- * `tabular-nums`, which is what "monospaced" means everywhere else in this app
- * (the kit's own eyebrow uses it for exactly this line). A second font family
- * would be a type decision nobody has taken. */
+ * `TriageChips` KEEPS ITS NAME rather than being inlined at its one call
+ * site below, because this file's own comments refer to it by that name in
+ * four other places (the list view's app-column note, the identical-dot
+ * note on its own type chip, and twice on the sitting's `eyebrow`/`TriageMeta`
+ * pairing) — renaming the wrapper would have made every one of those a
+ * dangling reference for no reader benefit. */
 function TriageChips({ teamId, ticket }: { teamId: string; ticket: TriageWaiting }) {
-  const { t, lang } = useLanguage()
   return (
-    // `flex` inside the kit's own `<span>`: an inline-level parent whose child
-    // is a block-level flex row is legal here because both are spans, and the
-    // kit's line already carries the type treatment these chips override.
-    // THE ONE PLACE THE PAPER IS NAMED — see the header. The custom property is
-    // set on THIS row and inherits into every `variant="secondary"` badge inside
-    // it, so the chips cannot end up two colours. Spelled as a Tailwind
-    // arbitrary-property class rather than a `style` object because that is the
-    // spelling the app already uses for this exact rebind one file over
+    // THE ONE PLACE THIS SCREEN NAMES THE PAPER — see `shared/web/ticket-chips.tsx`'s
+    // header for why the fill is a REBIND the call site owns rather than
+    // something the shared line sets for itself. Spelled as a Tailwind
+    // arbitrary-property class rather than a `style` object because that is
+    // the spelling the app already uses for this exact rebind one file over
     // (`record-chrome.tsx`'s own `[--badge-quiet-fill:var(--surface-quiet)]`,
-    // whose long comment is the history of why the kit built this hatch) — and
-    // because a class survives being moved onto a `Card` or a `Badge` that does
-    // not forward `style`, which a call site should not have to know.
-    <span className="[--badge-quiet-fill:var(--surface-panel)] flex flex-wrap items-center gap-2">
-      {ticket.ref && (
-        // NOT A BUTTON, though it was for about ten minutes. `Badge` takes no
-        // `asChild` (the kit's own signature), and making the number clickable
-        // would have meant either a hand-rolled lozenge — a second black chip in
-        // the system, R32/R31's exact drift — or an upstream change to a
-        // vendored file this repo may not edit. Open is a control of its own on
-        // the card below, so nothing is unreachable; the number is a fact here,
-        // which is what the client asked it to be.
-        <Badge variant="inverse" size="pill">
-          {ticket.ref}
-        </Badge>
-      )}
-      <Badge variant="secondary" size="pill">
-        {/* THE SAME DOT THE PICKER ROW DRAWS, from the same component and the
-            same map — so the colour a person clicks and the colour they read
-            back afterwards cannot be two different objects that happen to
-            agree today. */}
-        <Swatch colour={ticketTypeColour(ticket.helpType)} />
-        {/* A TYPE THE TICKET DOES NOT HAVE STILL GETS A CHIP, saying so. The
-            missing type is one of the four readiness gaps and the card already
-            explains it below; an absent chip here would leave a hole where the
-            other two chips have a fact. */}
-        {ticket.helpType ?? "—"}
-      </Badge>
-      {/* THE APP, BACK IN THE EYEBROW AND WITHOUT ITS LOGO — client,
-          2026-09-06: "bring the app back in the chips at the top, without the
-          icon". It sat in the meta block below for one round; up here it is a
-          FACT about the ticket in the same breath as its number and its type,
-          which is how she reads the card. No `logoUrl`: the row is four chips
-          scanned at speed and a 20px picture in the middle of them is a third
-          kind of mark competing with the type's dot.
-
-          STILL A LINK, because navigating to the app was the whole reason she
-          asked for these to be clickable. `Badge` takes no `asChild`, so the
-          anchor wraps the badge rather than the badge becoming one — which also
-          keeps the black `#ref` chip the only inverse lozenge in the row. */}
-      {ticket.appId && ticket.appName && (
-        <InAppLink
-          href={`/t/${teamId}/apps/${ticket.appId}`}
-          /* NO RING OF ITS OWN — ruling 24: the focus ring is ONE rule in the
-             kit's own stylesheet and nothing focusable may restate it or
-             suppress the outline. The radius is here only so the shared ring
-             follows the lozenge it wraps instead of drawing a rectangle
-             around it. */
-          className="rounded-pill"
-        >
-          <Badge variant="secondary" size="pill">
-            {ticket.appName}
-          </Badge>
-        </InAppLink>
-      )}
-      <Badge
-        variant="secondary"
-        size="pill"
-        className="tabular-nums"
-        aria-label={t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
-      >
-        {/* THE DATE ALONE — client: "in the chip do not say raised on date, but
-            only date." The word was carrying its own weight when this line sat
-            under the description as a sentence; in a row of four facts beside a
-            number and a type, "raised" is the only chip that explains itself,
-            and a chip that needs explaining in a scanned row is one word too
-            many. What it is stays in the accessible name below, so a reader who
-            cannot see the row's shape still hears which date this is. */}
-        {formatDate(ticket.createdAt, lang)}
-      </Badge>
+    // whose long comment is the history of why the kit built this hatch).
+    <span className="[--badge-quiet-fill:var(--surface-panel)]">
+      <TicketChips
+        ticket={ticket}
+        // THE SAME DOT THE PICKER ROW DRAWS, from the same component and the
+        // same map — so the colour a person clicks and the colour they read
+        // back afterwards cannot be two different objects that happen to
+        // agree today.
+        typeDot={<Swatch colour={ticketTypeColour(ticket.helpType)} />}
+        appHref={ticket.appId ? `/t/${teamId}/apps/${ticket.appId}` : undefined}
+        AppLink={InAppLink}
+      />
     </span>
   )
 }

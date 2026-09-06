@@ -11,11 +11,11 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Badge } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
+import { TicketChips } from "@shared/web/ticket-chips"
 
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
@@ -33,7 +33,6 @@ import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
 import type { HelpAccountFacet } from "@/lib/api/content"
 import {
   RecordActionsMenu,
-  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
   RECORD_TABS_CONFIG,
@@ -51,8 +50,9 @@ import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpAttachmentsPanel } from "@/components/help-attachments"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import { HelpStakeholders } from "@/components/help-stakeholders"
-import { HELP_STATUS } from "@/components/deep-link/shape"
-import { helpStatusDotTone } from "@shared/status-tones"
+import { InAppLink } from "@/components/in-app-link"
+import { Swatch } from "@/components/record-picker"
+import { ticketTypeColour } from "@/lib/type-colours"
 import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dialog"
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
@@ -68,11 +68,6 @@ import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
-
-/** The one map every ticket screen reads. Imported rather than retyped here: this
- * file used to keep its own copy, and a copy is how the list and the record end
- * up calling the same fact two different things. */
-const STATUS_LABEL = HELP_STATUS
 
 export function HelpDetailScreen({
   teamId,
@@ -495,8 +490,20 @@ export function HelpDetailScreen({
     { label: t("Raised from"), value: ticket.sourceScreen || "" },
     // The audit rows are NOT here any more: created-by and last-edited-by moved
     // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
-    // stop pushing the ticket's own facts below the fold. The status is on the
-    // header band's own line.
+    // stop pushing the ticket's own facts below the fold.
+    //
+    // THE STATUS ROW USED TO SAY "the status is on the header band's own
+    // line" — true while the header's chips were status/app/archived. Client
+    // ruling, 2026-09-06 (see `RecordScreen`'s own `chips` comment above):
+    // those three are gone, replaced by the same four-fact line the triage
+    // card draws (ID/type/app/date), and status is not one of the four. So as
+    // of this pass the ticket's STAGE is not shown anywhere on this screen —
+    // written down rather than discovered later, because the old comment
+    // would otherwise keep telling the next reader a true sentence about a
+    // screen that no longer exists. Not re-added here on judgement: the
+    // client asked for exactly four facts and nothing else, and where the
+    // status goes next (back here as a row, or somewhere else) is hers to
+    // decide, not a default this screen should reintroduce quietly.
     { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t, lang) : "" },
   ]
 
@@ -697,62 +704,41 @@ export function HelpDetailScreen({
       // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
       // took the eyebrow out of the full header); the breadcrumb above this
       // header is what names the record type now.
-      // D4: THE NUMBER THE CLIENT QUOTES, above the title. The reference had
-      // existed on this record since the work engine landed and appeared on no
-      // screen — the one thing a person needs when a client rings up saying
-      // "about BERG-T0412".
-      // OVERRIDE 73: the ID in the black chip, BELOW the title. This is the
-      // record the client was looking at.
-      recordNumber={ticket.ref || undefined}
-      // NO `collectionLabel` HERE — client re-ruling, 2026-08-31, reading this
-      // exact screenshot back: "why the pill 'issue' as the first one? … the
-      // first one is black and is the id, the second is always the status
-      // (color-coded), the third is the parent item (the app)." This used to
-      // pass `ticket.helpType` ("Issue") as `collectionLabel`, which
-      // `RecordScreen` always renders in PILL TWO — ahead of `chips`, no
-      // matter what `chips` starts with. So the status dot below was really
-      // pill three the whole time, and on any ticket with no `ref` yet
-      // (`recordNumber` renders nothing) the type chip slid all the way to
-      // pill one — exactly the bug in the client's screenshot. app-detail.tsx
-      // hit the same wall for the same reason and answered it the same way:
-      // leave `collectionLabel` unset and put every pill in `chips`, in the
-      // order the client actually wants them.
+      // NO `recordNumber` HERE — client ruling, 2026-09-06, reading this screen
+      // next to the triage card: "replicate the pills that we have on the view
+      // outside. These are: ID, type, app, date. Remove the rest, and
+      // everywhere else where tickets have pills, reuse this." The triage
+      // card's own four-chip line is `TicketChips`
+      // (`shared/web/ticket-chips.tsx`), and it draws the ID chip itself — so
+      // handing the same ticket to BOTH `recordNumber` and `chips` would draw
+      // the black lozenge twice. `chips` below carries the whole line as one
+      // unit instead, ID included, which is also truer to the ask: she asked
+      // to reuse THE LINE, not to keep splitting the ID out of it the way this
+      // screen and `app-detail.tsx` split it for OTHER records that do not
+      // have a client-approved chip line of their own.
       //
-      // The type isn't lost by dropping it here — it's the glyph in the
-      // header square above (`mark`, from the same `Ticket type` vocabulary)
-      // and it's which kind-tab the ticket lives under back on the Tickets
-      // screen (`type:${v}` in tickets-collection.tsx). This row said it a
-      // second time, in the one position that pushed the status pill out of
-      // its ruled spot.
-      //
-      // THE FIRST PILL IN `chips`, WITH A COLOUR (client ruling, 2026-08-31:
-      // "the status scheme is not only for tickets, identify everywhere … and
-      // map colors"). The seven-stage → dot mapping this screen deferred is
-      // now `shared/status-tones.ts`'s `helpStatusDotTone` — reused by nothing
-      // else, because the portal draws this same status in its OWN words for
-      // a client reader (ticket-row.tsx's `STATUS_WORDS`) rather than the
-      // agency's internal stage names.
-      //
-      // THE SECOND PILL IN `chips`, "the most relevant container parent"
-      // (client ruling, 2026-08-31) — a ticket's own example, verbatim:
-      // "second the app f.e. 'Padelbase'. When I click here should take me to
-      // padelbase app."
+      // WHAT THIS REPLACES, so the removal is on the record: the status pill
+      // (`Badge variant="status" dot={helpStatusDotTone(ticket.status)}`,
+      // `STATUS_LABEL[ticket.status]`), the app pill (was `RecordChipLink`,
+      // now folded into `TicketChips`' own app chip, which draws the exact
+      // same fact through `InAppLink` instead), and the archived pill
+      // (`Badge variant="status" dot="archived"`). None of the three is a
+      // fact this line's four are — status and archived are STATE, which
+      // change while everyone is looking at the record and were never part of
+      // what the client asked to keep — and status is not shown anywhere else
+      // on this screen (the Overview list's own comment used to say "the
+      // status is on the header band's own line"; that line is now this one,
+      // narrowed to what she asked for).
       chips={
-        <>
-          <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
-            {STATUS_LABEL[ticket.status]}
-          </Badge>
-          {ticket.appId && ticket.appName && (
-            <RecordChipLink href={`${host.base}/apps/${ticket.appId}`}>
-              {ticket.appName}
-            </RecordChipLink>
-          )}
-          {ticket.archivedAt ? (
-            <Badge variant="status" dot="archived">
-              {t("Archived")}
-            </Badge>
-          ) : null}
-        </>
+        <TicketChips
+          ticket={ticket}
+          // THE SAME DOT THE TYPE PICKER DRAWS, from the same component and
+          // the same map — see `shared/web/ticket-chips.tsx`'s header for why
+          // this is a prop rather than an import.
+          typeDot={<Swatch colour={ticketTypeColour(ticket.helpType)} />}
+          appHref={ticket.appId ? `${host.base}/apps/${ticket.appId}` : undefined}
+          AppLink={InAppLink}
+        />
       }
       // The description is rich text now, and a TITLE is one line: the words,
       // without the markup they were typed with. The body renders formatted in
@@ -869,15 +855,18 @@ export function HelpDetailScreen({
                   way to answer this ticket is the panel on the title); and a
                   mention is now read OUT OF the sent text by name-match against
                   the same members list the autocomplete used to offer —
-                  autocomplete itself needs a kit spec (logged for Aurora). */}
+                  autocomplete itself needs a kit spec (logged for Aurora).
+                  NO TYPE BADGE HERE ANY MORE — client ruling, 2026-09-06 (see
+                  the header pills above): the type is already the first fact
+                  in `TicketChips`, up in the record header, so a second badge
+                  saying the same word again down here is exactly the kind of
+                  duplicate pill she asked removed. `sourceScreen` stays — it is
+                  not a pill, and it says something the chip line does not. */}
               <TicketThread
                 banner={
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <Badge variant="secondary">{ticket.helpType || t("General")}</Badge>
-                    {ticket.sourceScreen && (
-                      <span className="text-muted-foreground">{ticket.sourceScreen}</span>
-                    )}
-                  </div>
+                  ticket.sourceScreen ? (
+                    <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
+                  ) : undefined
                 }
                 messages={[
                   {

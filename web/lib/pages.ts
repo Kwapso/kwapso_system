@@ -493,6 +493,24 @@ export const CONCEPT_ICON = {
   // idea). Distinct from `overview`'s "squares-four" — that one is a
   // RECORD's own summary tab; this is a chart.
   dashboard: "chart-donut",
+  // THE TWO STAGE TABS on the ticket strip — client, 2026-09-06: "open and
+  // closed also need icons: for open the hourglass-high (solid), for closed
+  // check-fat (solid)."
+  //
+  // A LINE HERE RATHER THAN A NAME AT THE TAB, the same argument `triage` and
+  // `dashboard` above make: open work and finished work are ideas, not one
+  // screen's decoration, and the day a second collection grows the same pair of
+  // stages it must reach for these instead of picking a second glyph for one
+  // idea. `web/test/icon-vocabulary.test.ts` builds its allow-list from these
+  // keys, so a name typed at a call site is not merely untidy — it is unlisted.
+  //
+  // HOURGLASS-HIGH, not the plain hourglass: the sand is still at the top,
+  // which is the state — triaged, and none of the work done yet. Its own family
+  // (high/medium/low) is the reason the kit carries four of them.
+  open: "hourglass-high",
+  // CHECK-FAT rather than the hairline check: this ends a row of stages and has
+  // to read at tab size beside a word, where the thin glyph goes to nothing.
+  closed: "check-fat",
   import: "upload-simple",
   activity: "clock-counter-clockwise",
   // The agency's own housekeeping: the material we make our own work with, why
