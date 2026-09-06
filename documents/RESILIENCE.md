@@ -124,7 +124,7 @@ a clean split that nothing had written down until now.
 
 Everything else the probes flag is a false positive worth knowing about: the
 `help` and `knowledge_*` writes attributed to tenancy are
-`TEAM_MIGRATIONS` SQL in `workers/tenancy/src/team-schema.ts`. Tenancy owns
+`TEAM_MIGRATIONS` SQL in `workers/tenancy/src/team-schema/migrations.ts`. Tenancy owns
 rolling team schema forward; that IS its job, and a migration is not a runtime
 writer. (`sprints` used to be on that false-positive list too; the waves module
 made it a REAL second writer on 24 Aug 2026, which is what the row above records.)

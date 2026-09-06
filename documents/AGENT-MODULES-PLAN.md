@@ -47,7 +47,7 @@ docs are being reconciled now. **Still remaining:** ~~the external `mcp` worker~
 ## Phases (in order)
 
 ### Phase 1. Foundation (no new UI). DONE
-- **Team-schema migration `0004_modules`** (per-team, in `team-schema.ts`): `learning`,
+- **Team-schema migration `0004_modules`** (per-team, in `team-schema/migrations.ts`): `learning`,
   `learning_progress` (user×learning), `help`, `help_threads`, `data_import_sessions`,
   `agent_threads`, `agent_messages`. Each with the standard audit block.
 - **Core migrations** (`db/core`): `0008 importable_databases` (GLOBAL

@@ -514,7 +514,7 @@ beyond sprint types: a mark is what a type mark renders, a description is what a
 picker's hint line shows, and a curated foreign label is what an agency writes
 once for a client who reads another language. `standard_days` is the only narrow
 one, and it is a number nobody else has to look at. The starting values live in
-`SPRINT_TYPE_CATALOGUE` (`workers/tenancy/src/team-schema.ts`), a starting
+`SPRINT_TYPE_CATALOGUE` (`workers/tenancy/src/team-schema/seed.ts`), a starting
 vocabulary like the ticket types, editable on the team's own Dropdown values
 screen, and both the seed and the migration are pick-or-create, so a team that
 already has "Implementation" keeps its own row, its own id and its own history
@@ -767,13 +767,22 @@ audit block and is displayed as history where it belongs) and the owner's
 AI-credit grant, which changes no team record and so has no `related_table` to
 hang on. Everything else writes a line.
 
-**READING ONE PERSON'S OR ONE RECORD'S HISTORY ACROSS BOTH TABLES.** There are
-two trails and they are split by DATABASE BOUNDARY, not by feature: identity
-events live in the global `account_activity` (the person's own history, across
-every team) and team events live in each team's `activity`. That is legitimate —
-a per-team table cannot hold "you changed your email", which belongs to the
-person and not to any one team — but it means a full history is two reads, and
-until now nothing said how to do them:
+**READING ONE PERSON'S HISTORY ACROSS BOTH TABLES.** There are two trails and
+they are split by DATABASE BOUNDARY, not by feature: identity events live in the
+global `account_activity` (the person's own history, across every team) and team
+events live in each team's `activity`. That is legitimate — a per-team table
+cannot hold "you changed your email", which belongs to the person and not to any
+one team — but it means a full history is two reads, and until now nothing said
+how to do them:
+
+> **A RECORD's history is NOT two reads, and this heading used to say it was.**
+> `account_activity` has exactly five columns — `id`, `user_id`, `type`,
+> `description`, `created_at` (`db/core/0007`) — and no `related_table` /
+> `related_row_id` pair, so it cannot name a record even in principle; its `type`
+> is one of `name_changed` / `photo_changed` / `email_changed`. **A ticket's or a
+> story's whole life is in the team `activity` table alone**, and step 1 below is
+> the entire recipe for it. Only a PERSON spans both, which is why the join
+> further down is on the person and could not have been on anything else.
 
 1. **The team half** — `GET /api/tenancy/activity?scope=record&table=<t>&id=<id>`
    for one record, `?scope=team` for the whole team (R18 subtracts the caller's
@@ -1812,7 +1821,7 @@ fact, not a record anybody curates.
   themselves, so a database built from the file today never has them, `0025`
   drops them `IF EXISTS`, for the teams that ran the old versions.
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`**, **fifty-five today (26 Aug 2026),
+  `workers/tenancy/src/team-schema/migrations.ts`**, **fifty-five today (26 Aug 2026),
   `0001_team_base` through `0055_transcript_gives_up`** (this line has now
   drifted twice — it said "eleven, through `0011_ticket_work_engine`" while the
   sections above documented `0012` to `0020`, then "twenty-seven, through
