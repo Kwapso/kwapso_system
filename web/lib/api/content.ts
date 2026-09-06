@@ -218,6 +218,55 @@ export type TriageWaiting = {
  * answer to "how much have we done for them", not a row worth hiding. */
 export type HelpAccountFacet = { accountId: string; accountName: string | null; open: number; total: number }
 
+/** THE TICKETS DASHBOARD, exactly as `readTicketDashboard`
+ * (workers/content/src/lib/help.ts) hands it back — five grouped reads about the
+ * whole backlog in one round trip, every one of them counted by the database.
+ *
+ * WHY THE SHAPES ARE THE DOOR'S AND NOT THE CHART'S. Each of these is a list of
+ * GROUPS with their counts, not a series ready to draw. A chart decides how to
+ * stack, order and label; the door decides what is true. The one thing the door
+ * will not do is hand back rows for a screen to tally, because the backlog is a
+ * collection the browser only ever holds page one of. */
+export type TicketDashboard = {
+  /** 1B — one row per (kind, stage) among the OPEN stages, so the stage is
+   * visible inside each kind's bar rather than in a second chart beside it. */
+  openByTypeAndStatus: { helpType: string; status: HelpTicket["status"]; n: number }[]
+  /** 2B — one row per (client, kind), ordered with the most open work first, so
+   * "which client asks for the most extras" is the first matching row. */
+  byAccountAndType: {
+    accountId: string
+    accountName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** 3A — the five-number summary of days-to-close, per kind. A DISTRIBUTION and
+   * never a mean: a handful of tickets that sat for a year drag an average clear
+   * of every ticket anybody experienced. `n` travels with it because a median
+   * over four tickets is arithmetic rather than a measurement. */
+  closureDays: {
+    helpType: string
+    n: number
+    minDays: number
+    p25Days: number
+    medianDays: number
+    p75Days: number
+    maxDays: number
+  }[]
+  /** 5A — raised-as against is-now, the matrix team migration 0065 exists for.
+   * The diagonal is the tickets nobody recategorised. */
+  raisedVsCurrent: { raisedAsType: string; helpType: string | null; n: number }[]
+  /** …and how many tickets the matrix cannot speak for, because nothing recorded
+   * what they arrived as (every ticket raised before 0065, the ~788 imported
+   * from Glide included). It is NOT a zero and it is not part of the diagonal:
+   * a chart that folded it in would be reporting a rate over a denominator it
+   * had quietly changed. Show it as "not recorded". */
+  raisedAsNotRecorded: number
+  /** 6A — open work by system, ordered with the busiest first. `appId: null` is
+   * a real bar: the work nobody has said which system it is about. */
+  openByApp: { appId: string | null; appName: string | null; open: number; total: number }[]
+}
+
 export const content = {
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
    * the previous response to get the next one. `total`/`mineTotal` are exact. */
@@ -270,6 +319,12 @@ export const content = {
         byAccount: HelpAccountFacet[]
       }>
     >(`/api/content/help${listQuery({ scope: "all", view: "live", ...opts })}`),
+  /** THE DASHBOARD TAB'S FIVE CHARTS, in one round trip. No arguments on
+   * purpose: it always answers about the everyday list as a whole, which is what
+   * every one of its charts is titled with. Agency only — the door refuses a
+   * client login, because every chart on it compares one client against the
+   * rest. */
+  helpDashboard: () => api<TicketDashboard>("/api/content/help/dashboard"),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
    * the assistant and then never found again by a person. */

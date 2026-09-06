@@ -25,6 +25,7 @@ import {
   listTickets,
   markTriaged,
   maybeDraftFirstReply,
+  readTicketDashboard,
   refuseDirectResolve,
   setStatus,
   setTicketArchived,
@@ -636,6 +637,33 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
   const { moved, accountId } = await markTriaged(cfg, guard, scope, actor, id)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
   return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+}
+
+/** GET /api/content/help/dashboard — the Tickets screen's Dashboard tab, in one
+ * read (help:read).
+ *
+ * FIVE GROUPED READS, ONE DOOR, and none of them is a filter: it always answers
+ * about the everyday list as a whole (`EVERYDAY_LIST`), because that is the
+ * question every one of its charts is titled with. There is no query string here
+ * on purpose — a dashboard that narrowed would be five charts about a slice
+ * under headings that say backlog, and the charts already carry their own
+ * breakdowns (by kind, by client, by system) inside themselves.
+ *
+ * ITS OWN DOOR, NOT MORE FACETS ON THE LIST: `readTicketDashboard` (lib/help)
+ * opens with the measurement — five extra grouped scans on every ticket page,
+ * for a tab most reads never show.
+ *
+ * REFUSED TO A CLIENT LOGIN (R21), and this is the clearest case of that rule in
+ * the file. Every chart here is a comparison ACROSS clients — which company asks
+ * for the most extras, how long we take to close things — so answering it for a
+ * contact would hand one client the shape of every other client's relationship
+ * with us. The account fence would narrow the rows correctly and still leave a
+ * client reading a chart of themselves against a total they can subtract from;
+ * this is our own material and the honest answer is that the door is not theirs. */
+export async function getHelpDashboard(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await refusePortalCaller(cfg, guard)
+  return json(await readTicketDashboard(cfg, guard, scope, EVERYDAY_LIST))
 }
 
 /** GET /api/content/help/attachments?id=<ticketId> — the files and links on a

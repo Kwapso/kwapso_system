@@ -330,6 +330,18 @@ export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
 export type HelpTicket = {
   id: string
   helpType: string | null
+  /** WHAT IT ARRIVED AS — the type it was created with, stamped once at the
+   * INSERT and never updated afterwards (team migration 0065, which carries the
+   * whole reasoning). `helpType` above is what it IS; this is what it WAS, and
+   * the pair is the only way the app can say how often a ticket comes in as one
+   * kind and is recategorised into another.
+   *
+   * NULL is a real answer and means "this system did not record it": every
+   * ticket raised before the column existed, the ~788 imported from Glide
+   * included. It is deliberately NOT backfilled from anything — read 0065 for
+   * the two candidate sources and why each was refused — so a reader must say
+   * "not recorded" rather than counting those rows as un-recategorised. */
+  raisedAsType: string | null
   description: string
   screenRecordingLink: string | null
   sourceScreen: string | null

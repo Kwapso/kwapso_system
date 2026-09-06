@@ -321,6 +321,13 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "description", column: "description", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: HELP_STATUSES },
       { name: "helpType", column: "help_type", type: "enum", vocabulary: "Ticket type" },
+      {
+        name: "raisedAsType",
+        column: "raised_as_type",
+        type: "enum",
+        vocabulary: "Ticket type",
+        note: "the kind the ticket was RAISED as, stamped when it was created and never changed since — helpType is what it is now, so the two differ exactly on the tickets somebody recategorised. Empty on every ticket raised before this was recorded, the ones imported from the old system included: that is 'we did not record it', never 'it was not changed'",
+      },
       { name: "resolved", column: "resolved", type: "boolean" },
       {
         name: "resolvedAt",

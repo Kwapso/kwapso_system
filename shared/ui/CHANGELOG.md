@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Changed — the asterisk is the regular weight, not the filled disc
+
+Client, 2026-09-06: "everywhere there's asterisk, use the regular version
+instead of solid."
+
+`Asterisk.svg` held Phosphor's FILL weight — verified byte-for-byte against
+`@phosphor-icons/core` `assets/fill/asterisk-fill.svg`, which is a solid 104r
+disc with the star knocked out of it. At tab size that reads as a filled dot
+with some texture, not as an asterisk. The art is now `assets/regular/
+asterisk.svg`, the six strokes alone, fetched from the same package rather than
+drawn here — the icon folder has no upstream dependency, so art arrives by hand
+and the only defence against a wrong glyph is taking it from source. (The Check
+glyph shipped as a filled square under the right name for exactly this reason,
+across ten sites.)
+
+Its one consumer today is the "All" tab (`tabs-view.tsx`, `all: "asterisk"`).
+
+NOT A GENERAL SHIFT. Ninety glyphs in this pack still carry the filled-disc
+shape and are untouched; this is the one she named. If the disc weight is wrong
+elsewhere it is a separate decision, taken by looking, not inferred from here.
+
+
 ### Fixed — the sort control carried three times the gap it looked like it had
 
 Client, 2026-09-06: "sort and view should have same spacing between icon and

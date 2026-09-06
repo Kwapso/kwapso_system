@@ -4004,4 +4004,93 @@ ALTER TABLE data_import_batches ADD COLUMN cursor_json TEXT;
 ALTER TABLE knowledge_sources ADD COLUMN embed_attempts INTEGER NOT NULL DEFAULT 0;
 `,
   },
+  {
+    // A TICKET REMEMBERS WHAT IT ARRIVED AS.
+    //
+    // `help_type` is OVERWRITTEN IN PLACE when a ticket is recategorised
+    // (`updateTicket`, workers/content/src/lib/help.ts). That is right for the
+    // column — the type is what the ticket IS now, and every tab, filter and
+    // badge in the app asks that question. It also means the app has never been
+    // able to answer the other one: what did it arrive as? Somebody raises a
+    // "Question", triage reads it and makes it an "Issue", and the fact that it
+    // came in as a question is gone the instant the UPDATE lands.
+    //
+    // Today the only trace is the activity feed, as FREE PROSE inside a sentence
+    // (… edited T-0412, Type: "Question" → "Issue"). That is a record for a
+    // person reading one ticket's history; it is not a column anything can group
+    // by, and `describeChanges` is free to reword it tomorrow. The owner asked
+    // for the rate at which she recategorises, across the whole backlog, which is
+    // a question about a COLUMN.
+    //
+    // ── WHY IT IS NEVER UPDATED ─────────────────────────────────────────────
+    //
+    // This column's whole value is that it disagrees with `help_type`. The moment
+    // any write path can move it, the pair stops being "arrived as / is now" and
+    // becomes two copies of the same fact — and the chart built on it reads zero
+    // recategorisations for ever, which is a wrong answer wearing a right one's
+    // clothes. So it is stamped ONCE, in the INSERT in `createTicket`, from the
+    // same value `help_type` gets in that same statement, and no UPDATE anywhere
+    // in the codebase names it. That is asserted rather than described:
+    // workers/content/test/raised-as-is-stamped-once.test.ts reads every worker
+    // source off disk and fails if a second writer ever appears.
+    //
+    // THE ONE WRITE THAT IS NOT AN UPDATE OF IT. Renaming a dropdown value
+    // rewrites the word on every record that stored it (`updateSelectable` +
+    // VOCABULARY_HOMES in shared/selectable-homes.ts) — because in this app the
+    // WORD is the join key, not an id. `raised_as_type` is declared as a second
+    // home of the `Ticket type` group and is carried by that rewrite, and that is
+    // not an exception to the paragraph above, it is the same rule read
+    // carefully: a rename changes the SPELLING of a value and never a ticket's
+    // identity. If it were left behind, renaming "Request" to "Ask" would make
+    // every historical request look like a ticket that arrived as one thing and
+    // was recategorised into another — a recategorisation nobody performed,
+    // manufactured by a spelling change — and the column would hold a word the
+    // team's own vocabulary no longer contains, so the chart's axis would have
+    // no label to draw.
+    //
+    // ── THE BACKFILL, AND WHY THERE ISN'T ONE ───────────────────────────────
+    //
+    // EVERY ROW THAT EXISTS TODAY STAYS NULL. Deliberately, and it is the part of
+    // this migration most likely to be "improved" later, so here is what was
+    // considered and refused:
+    //
+    //   1. TAKE THE FIRST `Type: "X" → "Y"` OUT OF THE ACTIVITY FEED. The history
+    //      is genuinely there and it parses. It fills EXACTLY the tickets that
+    //      were recategorised and NONE of the ones that were not — which is the
+    //      numerator of the owner's question with none of its denominator. A
+    //      matrix built on that reads "every ticket gets recategorised", which is
+    //      a number nobody measured. It is also incomplete in a way nothing can
+    //      see: `logActivity` is best-effort and swallows its own failures, and
+    //      the sentence it writes is prose that has been reworded before.
+    //   2. ASSUME AN UNCHANGED TICKET AROSE AS WHAT IT IS NOW (copy `help_type`
+    //      wherever the feed records no change). This is the tempting one, and it
+    //      is the one that would quietly invent the most: it would stamp all ~788
+    //      tickets imported from Glide as "arrived as this, never recategorised",
+    //      when they arrived here carrying whatever they had ENDED at in a system
+    //      that had its own triage. Their creation is not an event that ever
+    //      happened in this app, so there is nothing here to record.
+    //
+    // Both would put INFERRED values in the same column as STAMPED ones with no
+    // way to tell them apart afterwards. 0062 made the same call about `origin`
+    // and `verb` for the same reason, and its sentence is the right one here too:
+    // NULL reads as "this system did not record it", which is TRUE, and is a
+    // different fact from any type we could have guessed at.
+    //
+    // So the honest shape is: the column means one thing, the 5A chart names the
+    // rows it has no record for rather than folding them into a total, and the
+    // series starts today. If the history is ever wanted, it is a DATED ONE-OFF
+    // SCRIPT over the activity feed (the shape scripts/backfill-ticket-raisers.mjs
+    // already has) which can also record what it inferred and how — never a
+    // migration that blends two grades of evidence into one column in silence.
+    //
+    // NO INDEX, on purpose. The one question this column answers is a GROUP BY
+    // over the whole fenced table (the raised-as × current-type matrix); an index
+    // on a handful of repeated words serves no seek and would only be a second
+    // thing every ticket INSERT has to write. 0061 is where the ticket reads that
+    // DO want an index live, and this is not one of them.
+    version: "0065_a_ticket_remembers_what_it_arrived_as",
+    sql: `
+ALTER TABLE help ADD COLUMN raised_as_type TEXT;
+`,
+  },
 ]

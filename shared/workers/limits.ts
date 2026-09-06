@@ -301,6 +301,24 @@ export const APP_MODULE_CAP = 1000
  * the query rather than implied by the shape of the data. */
 export const TICKET_FACET_CAP = 500
 
+/** Rows ONE grouped read on the Tickets dashboard may return (R14).
+ *
+ * SMALLER THAN `TICKET_FACET_CAP` ON PURPOSE, and the difference is what the
+ * numbers are FOR. A facet tally feeds a badge, and a badge nobody can read is
+ * still a correct badge. These five reads feed CHARTS, and every one of them is
+ * a chart a person looks at: a bar per client, a bar per system, a cell per
+ * (arrived-as, is-now) pair. Past a hundred marks a chart has stopped being a
+ * chart, so this is the point at which "bounded" and "legible" are the same
+ * ceiling rather than two different ones.
+ *
+ * FOUR OF THE FIVE GROUP OVER SETS THAT CANNOT RUN AWAY — the team's own ticket
+ * vocabulary, the seven-value status lifecycle, and those two crossed with each
+ * other. The fifth groups by CLIENT, which grows with the business, so its read
+ * is ORDERED (most work first) before it is capped: the first row is the answer
+ * to "who has the most", which is the question, and a hundred clients of tail is
+ * a chart nobody was going to read to the end of anyway. */
+export const TICKET_DASHBOARD_GROUP_CAP = 100
+
 /** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
  * from both front doors; a ceiling turns "several" into something a list can be
  * read to the end of and a count can be trusted. */

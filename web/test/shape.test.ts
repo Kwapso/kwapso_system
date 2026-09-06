@@ -72,6 +72,11 @@ const audit: InviteAudit = {
 const ticket: HelpTicket = {
   id: "h1",
   helpType: "Bug",
+  // WHAT IT ARRIVED AS — stamped at creation and never updated (team migration
+  // 0065). Different from `helpType` above on purpose: this fixture is a ticket
+  // somebody raised as a question and triage recorded as a bug, which is the
+  // only state of the pair worth pinning in a shape test.
+  raisedAsType: "Question",
   description: "The invite button is greyed out and I can't add anyone to the team at all.",
   screenRecordingLink: null,
   sourceScreen: "members",

@@ -23,6 +23,7 @@
 //   POST /api/content/help/archive        -> archive / restore a ticket (any state)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
+//   GET  /api/content/help/dashboard      -> the Dashboard tab's five grouped reads (agency only)
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
 //   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)
@@ -106,6 +107,7 @@ import {
   postBulkHelpStatusByFilter,
   postResolveHelp,
   getHelpAttachments,
+  getHelpDashboard,
   postHelpAttachment,
   postRemoveHelpAttachment,
   postHelpTriageRead,
@@ -375,6 +377,11 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // with their own words rather than values in a dropdown of seven.
   "POST /api/content/help/validate": { handler: postValidateHelp, kind: "mutation" },
   "POST /api/content/help/triage-read": { handler: postHelpTriageRead, kind: "mutation" },
+  // THE DASHBOARD TAB — five grouped reads about the whole backlog, in one
+  // round trip. Its own door rather than more facets on the list, because the
+  // list is read on every page load and this tab is opened deliberately
+  // (lib/help `readTicketDashboard` carries the measurement). Agency only.
+  "GET /api/content/help/dashboard": { handler: getHelpDashboard, kind: "read" },
   // Several files and several links on one ticket, from BOTH front doors.
   "GET /api/content/help/attachments": { handler: getHelpAttachments, kind: "read" },
   "POST /api/content/help/attachments": { handler: postHelpAttachment, kind: "mutation" },
