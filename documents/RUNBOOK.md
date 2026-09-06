@@ -124,6 +124,15 @@ npx wrangler d1 time-travel restore kwapso-core-staging --timestamp 2026-08-14T0
 takes a Unix time or RFC3339 and is easier to reason about. Anything older than
 30 days is gone.
 
+> **HOW LONG WILL THIS TAKE? BUDGET SEVEN MINUTES PER TEAM.** Measured
+> 2026-09-06 against staging, restoring from a dump: a **116 MB** team database
+> exported in 28.6 s and took **7 min 02 s** to reload — 414,401 rows, 64 tables,
+> 120 indexes. The core database is small by comparison: 4.3 MB out in 9.5 s.
+> **The reload is the slow half, and it is per database.** This estate is 20
+> client companies and about 125 accounts; if you are restoring several teams,
+> multiply. Time Travel itself has never been rehearsed here (RESILIENCE.md says
+> so plainly), so treat its timing as unknown rather than fast.
+
 **The trap that makes this dangerous here.** This project keeps identity in ONE
 core database and every team's content in its OWN database. They are separate D1
 databases, so Time Travel restores them separately. Roll the core database back
@@ -142,8 +151,47 @@ against is *losing the account* rather than losing a row, take a file:
 
 ```bash
 cd workers/auth
-npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
+cf-exec npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
 ```
+
+> **THIS TAKES THE DATABASE OFFLINE, AND IN A SCRIPT IT WILL NOT ASK YOU FIRST.**
+> `wrangler d1 export --remote` prints *"This process may take some time, during
+> which your D1 database will be unavailable to serve queries. Ok to proceed?"* —
+> and in a NON-INTERACTIVE shell it answers **yes** on your behalf
+> (`Using fallback value in non-interactive context: yes`). There is no flag in
+> the command above that says so.
+>
+> **Measured 2026-09-06 against staging:** 28.6 s of unavailability for a
+> **116 MB** team database, 9.5 s for the **5 MB** core. Reloading the team dump
+> afterwards took a further **7 min 02 s**, which is the number to plan a real
+> restore around — the export is the fast half.
+>
+> **AND HERE IS WHAT THOSE 28.6 SECONDS ACTUALLY COST, measured rather than
+> imagined.** Two cron ticks failed against the locked database:
+>
+> ```
+> 2026-09-06T05:49:01.939Z  content  cron/google-autopilot (list meetings)
+> 2026-09-06T05:49:01.752Z  content  cron/google-autopilot (google sweep)
+> D1_ERROR: Currently processing a long-running export.
+> ```
+>
+> Two rows in the whole day, both on the 15-minute Google sweep, both on team
+> `01KZWXFD86N0K3RZRBHKMKRWYS`. **No human-facing request failed**, and the next
+> tick at 06:00 was clean — the sweep is idempotent and self-healed exactly as it
+> claims to. The cost of an export on a running system is therefore *known*, not
+> guessed: on this estate, at this size, it is the background jobs that land in
+> the window.
+>
+> Scale that before you point it at production. Production is larger, so the
+> window is longer, and **the command answers "yes" to the outage prompt on its
+> own in a script.** Never in a cron, never in a deploy step, never unattended on
+> production, and not on shared staging while other people are working — this was
+> learned by doing exactly that, briefly, during the rehearsal RESILIENCE.md
+> records. Announce the window first, as you would for any other outage.
+>
+> `cf-exec` is on the front of that command deliberately: a bare `wrangler`
+> resolves to whichever Cloudflare account the machine is signed into, and this
+> one is shared — eleven of its sixteen D1 databases belong to other companies.
 
 There is no scheduled job doing this. **If an off-Cloudflare backup matters to
 this product, that is a decision nobody has made yet**, it is listed in
