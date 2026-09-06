@@ -189,7 +189,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "CORRECTING somebody's hours, which is a different act from logging your own and is gated a step higher (work:edit rather than work:create). The machine surface can start a timer, stop one, write time down and answer for a runaway — everything a person does about their OWN time — but a timesheet correction is the one write in this module that changes a number after the fact, and time is the record here that turns into money. It leaves a trail either way (lib/work-logs editWorkLog writes one); the reason it has no tool is that nobody should be able to say 'make last Tuesday four hours' to an assistant and have it happen. A person opens the row.",
 
   "POST /api/data-ops/agent/translate-ticket":
-    "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`, which is one of the fields R22 makes it expose.",
+    "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`. THAT SENTENCE WAS FALSE FOR AS LONG AS IT STOOD HERE, and it is worth saying so rather than quietly making it true: `update_help_ticket` did not expose `titleDe` or `titleEn` at all until 6 Sep 2026, because both are read in lib/help.ts rather than in the handler and R22's census reads the handler. So this exclusion rested on a call nobody could make, and it was the REASON that made it invisible — a reviewer reads the reason, believes the capability is reachable another way, and moves on. It was also claimed on R22's authority — 'one of the fields R22 makes it expose' — which is the part that should have looked wrong: R22 cannot make a tool expose a field it cannot see.",
   "POST /api/data-ops/agent/translate":
     "the SECOND button in the app that spends the team's AI allowance without going through a chat turn, and it is off this surface for the same reason as the ticket translation above it: MCP.md §6 promises a machine token that only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance, and a fourth silent spender from a headless client that cannot see the balance is a change to the cost model rather than a parity default. It is also a door about READING — it writes nothing, it stores nothing, and what it hands back is one person's own view of one screen for as long as they are looking at it. A machine has no screen and no reader: it already receives every one of these fields, verbatim, in the language they were typed in, from the tools that answer with the record itself — which is the form a machine can actually work with, since a translated value matches no record.",
   "POST /api/content/brand-assets/upload":
@@ -522,5 +522,74 @@ describe("the published catalogue (MCP.md) says what the code does", () => {
         DOC.includes(String(n)),
         `MCP.md should state ${n} ${what} and doesn't — the census sentence in §3 has gone stale. It last read 87 / 66 / 21 while the real numbers were ${DOORS.length} / ${withTool} / ${reasoned}.`
       ).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE FIELDS R22 CANNOT SEE — pinned by hand, because the census above is
+// structurally unable to pin them.
+//
+// R22 derives a door's contract from its own `body.<field>` reads. A handler
+// that validates a few fields positionally and then passes `body` WHOLESALE to a
+// lib declares the rest of its contract in that lib's input TYPE, which is not
+// source this scan follows — `door-census.ts` says so in its own words. So for
+// those fields R22 asks a tool for nothing, and a tool offering a narrower
+// contract than its door passes every check in this file.
+//
+// That is not hypothetical. `POST /api/content/help` reads `titleDe` and
+// `titleEn` inside `lib/help.ts` and writes them straight into `title_de` /
+// `title_en`. Neither tool exposed either one, so EVERY TICKET A MACHINE CREATED
+// WAS TITLELESS — the detail screen renders `titleDe` as "Title" and `titleEn` as
+// "Title (English)", so what a person opened had no name on it. It shipped the
+// day the door did and survived every green build, including four runs of the
+// census above.
+//
+// The forwarding half is proved by RUNNING `buildBody`, never by reading it —
+// the same rule R22 applies to the fields it CAN see, and for the same reason: a
+// builder that delegates forwards perfectly while mentioning no field by name.
+describe("R22's blind spot: fields a door reads through a lib, pinned by hand", () => {
+  /** Both surfaces, both acts. The agent and MCP names differ on create. */
+  const TICKET_TOOLS = ["create_help_ticket", "update_help_ticket", "raise_help_ticket"]
+
+  it("both ticket tools EXPOSE and FORWARD the two titles", () => {
+    const checked: string[] = []
+    for (const name of TICKET_TOOLS) {
+      const tool = ALL_TOOLS.find((t) => t.name === name)
+      if (!tool) continue // `create_help_ticket` is MCP's name, `raise_` the agent's
+      checked.push(name)
+      const props = propsOf(tool)
+      for (const field of ["titleDe", "titleEn"]) {
+        expect(
+          field in props,
+          `${name} does not expose "${field}" — a machine cannot give the ticket a title, and R22 cannot see this because the door reads it in lib/help.ts`
+        ).toBe(true)
+        const sent = tool.buildBody!({ ...probeInput(tool), [field]: "probe-title" })
+        expect(
+          sent[field],
+          `${name} exposes "${field}" but its buildBody drops it — the door would never see the title the caller wrote`
+        ).toBe("probe-title")
+      }
+    }
+    // The tripwire: a rename that made both lookups miss would satisfy every
+    // assertion above by checking nothing at all.
+    expect(checked.length, "no ticket tool was found — this test has gone blind").toBeGreaterThanOrEqual(2)
+  })
+
+  it("…and still withhold the three source* fields, which a machine can only invent", () => {
+    // The door reads `sourceScreen`, `sourceRelatedTable` and `sourceRelatedRowId`
+    // — WHICH SCREEN a person was looking at when they raised this. A machine has
+    // no screen, so a value could only be made up, and an invented provenance is
+    // worse than an empty one because afterwards it is indistinguishable from a
+    // real one. Absent rather than exempted: a NARROWED_BODY_FIELDS line naming a
+    // field the census does not report would fail that list's own rot check.
+    for (const name of TICKET_TOOLS) {
+      const tool = ALL_TOOLS.find((t) => t.name === name)
+      if (!tool) continue
+      for (const field of Object.keys(propsOf(tool)))
+        expect(
+          field.startsWith("source"),
+          `${name} exposes "${field}" — provenance is not a machine's to write; see the note in tool-catalog.ts`
+        ).toBe(false)
+    }
   })
 })
