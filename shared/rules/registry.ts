@@ -904,9 +904,16 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // counted as removed — net +1. The ceiling has fallen three times today and
   // risen once; it moves either way, and the arithmetic is written down each
   // time so it can never move quietly.
-  de: 237,
-  es: 237,
-  ca: 237,
+  // RAISED 237 -> 243, the cleared-queue pass. The client picked D1 for the
+  // finished sitting (a per-type tally) and E1 for the one that was already
+  // clear (plain, no celebration), and between them they add six sentences: the
+  // cleared headline, its count line, the tally's "{count} {type}" and "{count}
+  // given to somebody", the undo control's own words, and E1's two-branch
+  // on-duty line. Not translated here for the standing reason below — the
+  // translate script spends the owner's own key and a run is his to authorise.
+  de: 243,
+  es: 243,
+  ca: 243,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

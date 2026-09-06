@@ -971,6 +971,14 @@ function TriageQueue({
    * as the refetch takes. They stay in `total`, because the denominator is how
    * big the sitting was. */
   const [decided, setDecided] = React.useState<string[]>([])
+  /* WHICH OF THE DECIDED WENT TO A PERSON — the one fact the tally needs that
+     the ticket rows cannot answer. Everything else in the finished register is
+     DERIVED from `decided` against the rows already in hand (an id, and the row
+     it belongs to, gives the type), so this is the only thing worth keeping a
+     second list for. It moves with `decided` in both directions, including undo,
+     which is why it is written beside it rather than folded into the accept
+     handler and forgotten on the way back. */
+  const [assigned, setAssigned] = React.useState<string[]>([])
   /** Which one-row picker is open, if either. One value rather than two
    * booleans: they are alternatives (the type row and the people row cannot
    * both be the answer to what Accept is waiting for), and two booleans is two
@@ -1051,6 +1059,31 @@ function TriageQueue({
   ]
   const current = order[0]
   const total = undecided.length + decided.length
+  /* THE TALLY THE FINISHED REGISTER SHOWS — client's pick D1: the breakdown is
+     the reward, and it is also the next thing to do. "5 questions to answer" is
+     tomorrow's work, named at the moment she still has the context.
+
+     DERIVED, NOT COUNTED AS IT HAPPENS. `decided` holds ids and the rows stay in
+     `matching` — only `undecided` filters them out — so the types can be read
+     back off the rows in hand. A running counter would have been a second
+     source of truth that undo has to remember to unwind, which is exactly the
+     bug `assigned` above is careful about.
+
+     IT COUNTS THIS SITTING, NOT TODAY, and that is a choice worth stating. The
+     client asked whether the strip should say "decided today"; a per-type
+     breakdown of "today" would need a server read of every ticket triaged since
+     midnight, and it would not match the chips beside it the moment somebody
+     else on duty triaged one. The sitting is what she just did, it is free, and
+     it cannot disagree with itself. */
+  const sittingTally = React.useMemo(() => {
+    const rows = matching.filter((w) => decided.includes(w.id))
+    const byType = new Map<string, number>()
+    for (const w of rows) {
+      const k = w.helpType ?? ""
+      if (k) byType.set(k, (byType.get(k) ?? 0) + 1)
+    }
+    return { rows, byType: [...byType.entries()], assignedCount: assigned.length }
+  }, [matching, decided, assigned])
   const position = Math.min(decided.length + 1, total)
 
   /** WHAT THEY ATTACHED — for the ONE ticket in hand, and this is the whole
@@ -1169,6 +1202,7 @@ function TriageQueue({
       if (assignTo) await contentApi.addStakeholder(w.id, assignTo)
       absorb(await contentApi.triageRead(w.id))
       setDecided((d) => [...d, w.id])
+      if (assignTo) setAssigned((a) => [...a, w.id])
       setSkipped((s) => s.filter((id) => id !== w.id))
       setPicker(null)
       setLastAct({ kind: "accept", id: w.id })
@@ -1234,6 +1268,7 @@ function TriageQueue({
         // undo of an undo moves zero rows and pings nobody.
         absorb(await contentApi.setHelpStatus(act.id, "new"))
         setDecided((d) => d.filter((id) => id !== act.id))
+        setAssigned((a) => a.filter((id) => id !== act.id))
       } else {
         // THE WHOLE PAYLOAD, HANDED OVER RATHER THAN RETYPED (the shape
         // `forms-forward-everything.test.ts` exists to hold): the undo record IS
@@ -1298,8 +1333,33 @@ function TriageQueue({
           : t("Nobody is on triage this week.")}
       </p>
     )
+  /* THE QUEUE THAT WAS ALREADY CLEAR — client's pick E1, and the whole point of
+     it is that it is NOT the cleared-queue register. Nobody achieved anything
+     here: she opened Triage and there was nothing in it, either because nothing
+     was raised or because whoever is on duty got there first. Praising that
+     would be applause for a quiet Tuesday.
+
+     So: the fact, then who is on duty, and nothing else. No mark, no count, no
+     action — the tabs above already go everywhere, and a button here would be
+     the app inventing a task to hand her. The trailing space in the old string
+     went with it.
+
+     The on-duty sentence is the same one drawn above when the whole view is
+     empty of a rota, reused rather than reworded, so a reader meets one sentence
+     about duty in this screen and never two that drifted apart. */
   if (view.waiting.length === 0)
-    return <EmptyLine concept="triage">{t("Nothing has been sitting unread. ")}</EmptyLine>
+    return (
+      <div className="flex flex-col gap-1">
+        <EmptyLine concept="triage">{t("Nothing waiting.")}</EmptyLine>
+        <p className="text-muted-foreground text-sm">
+          {view.onDuty?.userName
+            ? t("No new tickets to sort. {name} is on triage this week.", {
+                name: view.onDuty.userName,
+              })
+            : t("No new tickets to sort. Nobody is on triage this week.")}
+        </p>
+      </div>
+    )
 
   // ── THE CARD IN HAND ────────────────────────────────────────────────────
   // Everything below is one ticket's worth, in the order the client drew it:
@@ -1592,8 +1652,57 @@ function TriageQueue({
           formatCount={(at, of) => t("{position} of {total}", { position: at, total: of })}
           progressLabel={t("How far through the queue you are")}
           done={!current}
-          doneLabel={t("Nothing left to sort")}
-          doneBody={t("You have been through everything that was waiting.")}
+          /* THE CLEARED QUEUE — client's pick D1. The count is the
+             congratulation, so the words do not have to be: "That's the queue
+             cleared" states it once and stops, and the chips underneath say what
+             she actually committed herself to.
+
+             NO CELEBRATION FOR AN EMPTY ONE, which is the other half of the same
+             ruling and why `empty` below reads flat. Clearing eighteen tickets
+             is an achievement; opening Triage and finding nothing waiting is a
+             quiet Tuesday, and praising somebody for it is the kind of applause
+             that makes software feel like it is performing. The kit already
+             separates the two registers and says "done beats empty"; this is
+             only the words and the tally for slots that existed.
+
+             THE TALLY RIDES `doneAction`, and that is a stretch of the slot's
+             name worth admitting: `CollectionRegister` offers an eyebrow, a body
+             and actions, with nowhere for a summary between the sentence and the
+             buttons. Passing it here keeps the kit's own register layout rather
+             than replacing the whole thing with `doneState` and re-deciding the
+             spacing by hand. If a third slot is ever added upstream, this moves
+             into it and nothing else changes. */
+          doneLabel={t("That's the queue cleared.")}
+          doneBody={t("{count} sorted. Nothing else is waiting to be read.", {
+            count: decided.length,
+          })}
+          doneAction={
+            <div className="flex flex-col gap-3">
+              {sittingTally.byType.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {sittingTally.byType.map(([type, n]) => (
+                    <Badge key={type} variant="secondary" size="pill">
+                      <Swatch colour={ticketTypeColour(type)} />
+                      {t("{count} {type}", { count: n, type })}
+                    </Badge>
+                  ))}
+                  {sittingTally.assignedCount > 0 && (
+                    <Badge variant="secondary" size="pill">
+                      {t("{count} given to somebody", { count: sittingTally.assignedCount })}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              {lastAct && (
+                <div className="flex">
+                  <Button variant="secondary" size="sm" disabled={busy} onClick={() => void undo()} className="gap-1">
+                    <ArrowCounterClockwise className="size-3.5" />
+                    {t("Undo the last one")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          }
           upcomingLabel={t("Still waiting")}
           nextLabel={t("next")}
           skipLabel={t("Skip")}
