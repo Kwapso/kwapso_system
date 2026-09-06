@@ -20,6 +20,8 @@ type ActivityRow = {
   description: string
   created_at: string
   creator_name: string | null
+  verb: string | null
+  origin: string | null
 }
 
 /** The fixed-table scopes, as what they actually are: the generic (table, id)
@@ -58,11 +60,27 @@ export function activityVisibilityClause(
  *             invite_logs row id (the caller maps invite_index.id → it first)
  *  • record → GENERIC: any module's record, by (`table`, `id`). user/role/invite
  *             are just fixed-`table` aliases of this; `record` lets a NEW module
- *             (help, learning, products…) surface its activity with zero new code. */
+ *             (help, learning, products…) surface its activity with zero new code.
+ *  • actor  → WHAT THIS PERSON DID, which is the other question entirely.
+ *
+ * THE TWO QUESTIONS ABOUT A PERSON, AND WHY `user` IS NOT THIS ONE. `user`
+ * reads `related_table = 'users' AND related_row_id = ?` — events ABOUT that
+ * member: they joined, their role changed, they were removed. `actor` reads
+ * `creator_id = ?` — events they CAUSED, anywhere in the team. For a year the
+ * table could only answer the first, the column for the second was indexed in
+ * September and nothing asked, and the question an owner actually has after a
+ * token leaks is the second one.
+ *
+ * IT IS THE WHOLE-TEAM READ WITH ONE MORE CLAUSE, deliberately: it crosses every
+ * module, so it carries R18's subtraction and the account fence exactly as the
+ * team scope does, and it is built that way — by falling into the same branch —
+ * rather than by remembering to. A per-actor feed that skipped R18 would be the
+ * cleanest possible bypass of it: "show me everything Alex did" answering with
+ * rows from the modules the caller may not read. */
 export async function getActivity(
   cfg: D1Rest,
   guard: MemberGuard,
-  scope: "team" | "user" | "role" | "invite" | "record",
+  scope: "team" | "user" | "role" | "invite" | "record" | "actor",
   // Every argument is STATED at every call site — no optionals, no defaults. The
   // last one is the fence, and TypeScript will not let a required parameter
   // follow an optional one, which is exactly the right trade: a little noise at
@@ -77,7 +95,19 @@ export async function getActivity(
    * theirs, on every scope: the record scope because an id from outside the
    * fence must read as "doesn't exist", and the team scope because a whole-team
    * feed is exactly the leak in convenient form. */
-  accountScope: AccountScope
+  accountScope: AccountScope,
+  /** ONE OF THE EIGHT, or null for all of them (shared/workers/activity-verbs.ts).
+   * Narrows any scope: "what did Alex ARCHIVE", "what was DELETED this week".
+   * The route validates it against the closed set before it arrives, so an
+   * unrecognised word is a clean 400 there rather than an empty feed here —
+   * the same shape `scope` itself takes.
+   *
+   * REQUIRED, with no default, because this file already decided that once: the
+   * fence above says a caller who MAY omit an argument is a caller who will,
+   * and the reasoning is not really about fences — it is that a read with five
+   * ways to be called has five behaviours nobody has enumerated. `null` at four
+   * call sites is cheaper than that. */
+  verb: string | null
 ): Promise<Page<ActivityItem> & { total: number }> {
   // FAIL CLOSED. An id-scope with no id used to match NO branch below, leaving the
   // WHERE empty — so `?scope=user` with no `id` returned the entire team's
@@ -111,7 +141,7 @@ export async function getActivity(
     }
   } else {
     // `else`, not `else if (scope === "team")` — anything that reaches here is
-    // the whole-team read and MUST carry the R18 filter. A scope string the route
+    // a CROSS-MODULE read and MUST carry the R18 filter. A scope string the route
     // didn't recognise must never widen into an unfiltered feed.
     const clause = activityVisibilityClause(allowedTables)
     if (clause.sql) clauses.push(clause.sql.replace(/^\s*WHERE\s*/, ""))
@@ -124,6 +154,25 @@ export async function getActivity(
       clauses.push(fence.sql)
       params.push(...fence.params)
     }
+    // ONE PERSON'S DOINGS, on top of everything above rather than instead of any
+    // of it. The order is the whole point: by the time this clause is added the
+    // read is already narrowed to the modules this caller may see and (for a
+    // client login) to their own company, so naming an actor can only ever make
+    // the answer SMALLER. Putting it in its own branch would have made it a
+    // second cross-module read with its own fence to remember, which is the
+    // mistake the four scopes above were collapsed into one branch to end.
+    if (scope === "actor" && id) {
+      clauses.push("creator_id = ?")
+      params.push(id)
+    }
+  }
+  // WHICH KIND OF THING HAPPENED — orthogonal to every scope, so it sits outside
+  // the branch. `verb` is a closed set of eight (activity-verbs.ts) validated at
+  // the door, so this is an equality on an indexed-adjacent column rather than a
+  // LIKE over prose, which is the entire reason the column exists.
+  if (verb) {
+    clauses.push("verb = ?")
+    params.push(verb)
   }
   const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""
 
@@ -135,7 +184,7 @@ export async function getActivity(
     d1Query<ActivityRow>(
       cfg,
       guard.databaseId,
-      `SELECT id, type, description, created_at, creator_name FROM activity${pageWhere}
+      `SELECT id, type, description, created_at, creator_name, verb, origin FROM activity${pageWhere}
        ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
@@ -154,6 +203,8 @@ export async function getActivity(
       description: r.description,
       actorName: r.creator_name,
       createdAt: r.created_at,
+      verb: r.verb,
+      origin: r.origin,
     })),
     total: counted,
   }

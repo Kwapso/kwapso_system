@@ -128,6 +128,12 @@ const activity: ActivityItem[] = [
     description: "Alaap changed Bo's role to Editor",
     actorName: "Alaap",
     createdAt: "2026-06-14T09:00:00.000Z",
+    // The row says WHICH KIND of thing happened and WHICH DOOR it came through.
+    // Both are nullable on the type because rows written before the columns
+    // landed answer null — a fixture that omitted them would be asserting a
+    // shape the door cannot actually produce.
+    verb: "edited",
+    origin: "web",
   },
 ]
 

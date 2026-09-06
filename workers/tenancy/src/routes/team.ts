@@ -6,6 +6,7 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
 import { logActivity, writeActivity } from "@shared/workers/activity"
+import { ACTIVITY_VERBS } from "@shared/workers/activity-verbs"
 import { getActivity } from "../lib/activity-read"
 import { getMyPermissions } from "../lib/roles"
 import { ACTIVITY_GATE_MAP, ACTIVITY_TABLE_EXEMPT } from "@shared/rules/registry"
@@ -328,7 +329,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   const url = new URL(request.url)
   // VALIDATED, not cast: an unrecognised scope used to fall past every branch
   // here AND in getActivity, leaving an unfiltered whole-feed read behind.
-  const SCOPES = ["team", "user", "role", "invite", "record"] as const
+  const SCOPES = ["team", "user", "role", "invite", "record", "actor"] as const
   const raw = queryText(url.searchParams.get("scope"), "Scope") ?? "team"
   const scope = (SCOPES as readonly string[]).includes(raw)
     ? (raw as (typeof SCOPES)[number])
@@ -340,6 +341,14 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   // The OPAQUE cursor from the previous page (R14) — decoded (and 400-checked)
   // inside getActivity, never parsed here.
   const cursor = queryText(url.searchParams.get("cursor"), "Cursor") ?? null
+  // WHICH KIND OF THING HAPPENED, validated against the closed set the writer
+  // classifies into (ACTIVITY_VERBS) — the same shape `scope` above takes, and
+  // for the same reason: an unrecognised word must be a clean 400, never a
+  // silently empty feed that reads as "nothing happened".
+  const rawVerb = queryText(url.searchParams.get("verb"), "Verb")
+  if (rawVerb && !(ACTIVITY_VERBS as readonly string[]).includes(rawVerb))
+    return fail(400, "invalid_input", "Unknown activity kind.")
+  const verb = rawVerb ?? null
 
   // Generic record scope: any module's activity by (table, id), gated by THAT
   // module's read right (resolved from the SAME registry map the team scope
@@ -356,7 +365,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
       : undefined
     if (!module) return emptyFeed()
     await requireRight(cfg, guard, module, "read")
-    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard))))
+    return feed((await getActivity(cfg, guard, "record", id, table, null, cursor, await accountScope(cfg, guard), verb)))
   }
 
   await requireRight(cfg, guard, scope === "role" ? "member_roles" : "team_members", "read")
@@ -365,9 +374,18 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
   // record — answer with nothing, never with everyone's.
   if (scope !== "team" && !id) return emptyFeed()
 
-  // R18: the team feed carries the caller's module rights — build the allowed
-  // related_table list from their per-module read rights + the pinned exemptions.
-  if (scope === "team") {
+  // R18: a CROSS-MODULE feed carries the caller's module rights — build the
+  // allowed related_table list from their per-module read rights + the pinned
+  // exemptions.
+  //
+  // TWO SCOPES SHARE THIS, and they must. The team feed reads every module; the
+  // ACTOR feed reads every module too and then names one person inside it, so
+  // its answer is a SUBSET of the team feed's and is fenced by exactly the same
+  // sentence. Splitting them would have given the newer one its own copy of R18
+  // to keep in step — which is how a law with two implementations ends up with
+  // one, and it would be the new one that quietly lacked it: "everything Alex
+  // did" is the most convenient possible shape for a cross-module leak.
+  if (scope === "team" || scope === "actor") {
     const perms = await getMyPermissions(cfg, guard)
     const allowed = [
       ...Object.entries(ACTIVITY_GATE_MAP)
@@ -375,7 +393,22 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
         .map(([table]) => table),
       ...Object.keys(ACTIVITY_TABLE_EXEMPT),
     ]
-    return feed((await getActivity(cfg, guard, "team", undefined, undefined, allowed, cursor, await accountScope(cfg, guard))))
+    return feed(
+      (await getActivity(
+        cfg,
+        guard,
+        scope,
+        // The team feed names nobody; the actor feed names exactly one person,
+        // and the `scope !== "team" && !id` guard above has already turned an
+        // actor scope with no id into an empty feed rather than everyone's.
+        scope === "actor" ? id : undefined,
+        undefined,
+        allowed,
+        cursor,
+        await accountScope(cfg, guard),
+        verb
+      ))
+    )
   }
   // Invite scope: the client passes the GLOBAL invite id; map it to the team-local
   // invite_logs row id the activity rows reference. Bail to an empty feed if it
@@ -390,7 +423,7 @@ export async function getActivityFeed(request: Request, env: Env): Promise<Respo
     if (!idx?.invite_row_id) return emptyFeed()
     id = idx.invite_row_id
   }
-  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard))))
+  return feed((await getActivity(cfg, guard, scope, id, undefined, null, cursor, await accountScope(cfg, guard), verb)))
 }
 
 /** POST /api/tenancy/activity/note — add a note to one record's history: the

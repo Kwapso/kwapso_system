@@ -91,5 +91,18 @@ export async function listAccountActivity(
     description: r.description,
     actorName: null, // always you — the feed doesn't show an actor line
     createdAt: r.created_at,
+    // NEITHER COLUMN EXISTS ON THIS TABLE, and that is the two-table split doing
+    // what it is for rather than a gap to fill. `account_activity` lives in the
+    // GLOBAL core database and records identity acts — a name, a photo, an email
+    // address — which belong to the person across every team they are in. The
+    // per-team `activity` table records what happened to a team's RECORDS, and
+    // it is the one that carries `verb` (which of the eight) and `origin` (which
+    // door). Deriving a verb here from the sentence would be free and would be a
+    // lie of a different kind: it would put a value in a column this trail does
+    // not keep, and the next reader would reasonably filter on it and get an
+    // answer assembled at read time from one table and stored at write time from
+    // the other. Null is what "this trail does not record that" looks like.
+    verb: null,
+    origin: null,
   }))
 }
