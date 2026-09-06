@@ -94,7 +94,7 @@ async function signIn(email) {
     body: JSON.stringify({ email, code }),
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!cookie.startsWith("kwapso_session=")) stop(`sign-in failed for ${email}`, `status ${verify.status}`)
+  if (!/^(__Host-)?kwapso_session=/.test(cookie)) stop(`sign-in failed for ${email}`, `status ${verify.status}`)
   // Onboarding is idempotent; a fresh environment needs it before bootstrap.
   await api("/api/auth/profile", { method: "POST", body: JSON.stringify({ firstName: "Smoke", lastName: "Test" }) }, cookie)
   return cookie

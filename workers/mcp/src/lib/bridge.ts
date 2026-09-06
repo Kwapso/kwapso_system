@@ -12,7 +12,15 @@ import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
 
-const SESSION_COOKIE = "kwapso_session" // auth's cookie name (sessions.ts)
+/** Auth's cookie name (workers/auth/src/lib/sessions.ts), restated rather than
+ * imported — one worker does not reach into another's source.
+ *
+ * The `__Host-` prefix is auth's session-fixation defence and belongs to the
+ * BROWSER contract, not this one: prefix rules constrain what a browser accepts
+ * in `Set-Cookie`, while this is a request header minted worker-to-worker. It
+ * matches anyway, because the name has to be the one auth reads — and auth reads
+ * the prefixed name first. */
+const SESSION_COOKIE = "__Host-kwapso_session"
 
 /** HOW LONG A PASSED STAFF CHECK MAY STAND.
  *

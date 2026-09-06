@@ -448,10 +448,66 @@ export async function requireRight(
     )
 }
 
-/** Shared guard for the maintenance endpoints (x-admin-key header). */
+/** IS THIS ONE OF THE MAINTENANCE DOORS? — asked of the PATH, at the public
+ * gateway, so the answer does not depend on reaching the worker behind it.
+ *
+ * Every `adminGuard` door in the estate lives under `/api/<worker>/admin/`, and
+ * that is the whole shape: tenancy's four (migrate-teams, create-team, db-sizes,
+ * move-module) and data-ops's four (seed-targets, the error log, resolve, and
+ * grant-credits). A new one lands under the same prefix by convention, so it is
+ * throttled the day it ships rather than the day somebody remembers.
+ *
+ * DELIBERATELY NOT a list of the eight paths. A list is a thing that goes stale
+ * in the unsafe direction — the ninth door would be the unthrottled one — and
+ * the prefix is what the gateway can see without importing another worker's
+ * route table. */
+export function isMaintenancePath(pathname: string): boolean {
+  return /^\/api\/[a-z-]+\/admin(\/|$)/.test(pathname)
+}
+
+/** THE CALLER, AS THE ONLY THING A PRE-AUTH DOOR CAN KEY ON.
+ *
+ * The maintenance doors carry no session — a key holder is not a person we have
+ * resolved — so the per-caller ceiling in `teamContext` cannot apply, and the IP
+ * is what is left. Hardened the same way auth's own `clientIp` is, and for the
+ * same reason: this is attacker-shaped input on a pre-auth door, so NULs are
+ * stripped (D1 rejects them, which would turn a record into a 500), it is
+ * trimmed, and it is capped at the longest real IPv6-with-zone. Truncate rather
+ * than refuse — a strange header must not become a way to skip the throttle. */
+export function maintenanceCaller(request: Request): string {
+  const raw = request.headers.get("CF-Connecting-IP") ?? ""
+  const clean = raw.split(String.fromCharCode(0)).join("").trim().slice(0, 45)
+  // A shared "unknown" bucket rather than a free pass: an absent header must be
+  // the WORST bucket to be in, not an exemption from the counter.
+  return clean || "unknown"
+}
+
+/** Shared guard for the maintenance endpoints (x-admin-key header).
+ *
+ * CONSTANT-TIME on the key comparison. Over the internet, against a
+ * high-entropy secret, `!==` is not a measurable oracle and this is not the
+ * reason the door was hardened (that is the throttle at the gateway, and the
+ * record beside it). It is here because it costs one function and removes the
+ * question — a reviewer should not have to reason about network jitter to know
+ * a secret comparison is safe.
+ *
+ * Both fail-closed branches are unchanged: no key configured is a 503, not a
+ * pass, and a wrong key is a 403. */
 export function adminGuard(request: Request, env: GatingEnv): Response | null {
   if (!env.ADMIN_KEY) return fail(503, "admin_key_missing", "Maintenance key not set.")
-  if (request.headers.get("x-admin-key") !== env.ADMIN_KEY)
+  if (!sameSecret(request.headers.get("x-admin-key"), env.ADMIN_KEY))
     return fail(403, "forbidden", "Bad maintenance key.")
   return null
+}
+
+/** Compare two secrets without leaking WHERE they first differ.
+ *
+ * Length is compared first and separately — it is not a secret worth protecting
+ * here (the key's length is a deployment fact, not a character of it), and
+ * padding to hide it would make the loop compare bytes that do not exist. */
+function sameSecret(given: string | null, expected: string): boolean {
+  if (given === null || given.length !== expected.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i)
+  return diff === 0
 }

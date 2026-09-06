@@ -31,7 +31,7 @@ import { createPinnedSession,
   destroySession,
   getSessionUser,
   readCookie,
-  SESSION_COOKIE,
+  readSessionToken,
 } from "./lib/sessions"
 import {
   buildGoogleStart,
@@ -464,7 +464,11 @@ async function emailChangeVerify(request: Request, env: Env): Promise<Response> 
     code?: string
   }
   // Keep THIS device signed in when we drop the others.
-  const token = readCookie(request, SESSION_COOKIE)
+  // `readSessionToken`, not `readCookie(SESSION_COOKIE)`: during the `__Host-`
+  // migration a browser may still be presenting the legacy name, and an empty
+  // token here makes `signOutOtherSessions` return 0 without signing anybody out
+  // — turning the security half of an email change into a no-op, silently.
+  const token = readSessionToken(request)
   const currentTokenHash = token ? await sha256Hex(token) : ""
   const r = await verifyEmailChange(
     env,

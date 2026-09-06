@@ -48,6 +48,15 @@
       "/brand/*", "/purposes/*", "/contacts/*"
     ]
   },
+  // THE MAINTENANCE DOORS' SPEED LIMIT (see guardMaintenance in src/index.ts).
+  // Its OWN namespace_id, separate from the six workers' CALLER_LIMIT budgets:
+  // this one counts a different thing (calls from one ADDRESS to /api/*/admin/*,
+  // which carry no session) and must not share a bucket with anybody's ordinary
+  // per-caller ceiling. 1105 continues the estate's own numbering — 1101 tenancy,
+  // 1102 content, 1103 data-ops, 1104 mcp.
+  "ratelimits": [
+    { "name": "MAINTENANCE_LIMIT", "namespace_id": "1105", "simple": { "limit": 12, "period": 60 } }
+  ],
   "services": [
     { "binding": "AUTH", "service": "kwapso-auth" },
     { "binding": "TENANCY", "service": "kwapso-tenancy" },
@@ -89,6 +98,12 @@
           "/brand/*", "/purposes/*", "/contacts/*"
         ]
       },
+      // Staging carries the same limit: a throttle only tested in production is
+      // a throttle nobody has tested. Same namespace_id — the limiter is scoped
+      // per worker, and staging is a different worker.
+      "ratelimits": [
+        { "name": "MAINTENANCE_LIMIT", "namespace_id": "1105", "simple": { "limit": 12, "period": 60 } }
+      ],
       "services": [
         { "binding": "AUTH", "service": "kwapso-auth-staging" },
         { "binding": "TENANCY", "service": "kwapso-tenancy-staging" },

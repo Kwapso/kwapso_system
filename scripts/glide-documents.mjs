@@ -153,7 +153,7 @@ async function signIn(email) {
     body: JSON.stringify({ email, code: start.body.code }),
   })
   const cookie = (verify.headers.get("set-cookie") ?? "").split(";")[0]
-  if (!verify.ok || !cookie.startsWith("kwapso_session=")) {
+  if (!verify.ok || !/^(__Host-)?kwapso_session=/.test(cookie)) {
     console.error(`\nStopped: ${email} couldn't sign in (${verify.status}).`)
     process.exit(1)
   }

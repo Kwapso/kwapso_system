@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { sha256Hex } from "../src/lib/crypto"
 import {
   SESSION_COOKIE,
+  LEGACY_SESSION_COOKIE,
   createPinnedSession,
   createSession,
   destroySession,
@@ -125,7 +126,7 @@ describe("who a request is", () => {
   })
 
   it("a cookie value containing '=' survives the parse (a token is base64url-ish)", () => {
-    expect(readCookie(withCookie("other=1; kwapso_session=a=b=c"), SESSION_COOKIE)).toBe("a=b=c")
+    expect(readCookie(withCookie(`other=1; ${SESSION_COOKIE}=a=b=c`), SESSION_COOKIE)).toBe("a=b=c")
     expect(readCookie(withCookie("other=1"), SESSION_COOKIE)).toBeNull()
   })
 })
@@ -191,5 +192,79 @@ describe("signing out", () => {
     await createSession(env(), "U1")
     expect(await signOutOtherSessions(env(), "U1", "")).toBe(0)
     expect((db.prepare("SELECT COUNT(*) n FROM sessions").get() as { n: number }).n).toBe(1)
+  })
+})
+
+// ── THE `__Host-` PREFIX, AND THE MIGRATION UNDER IT ────────────────────────
+//
+// `SameSite=Lax` is same-SITE, and this product shares kwapso.app with a live
+// third party. `refuseForeignOrigin` stops a page over there making a WRITE ride
+// the cookie; nothing stopped it SETTING one. `readCookie` returns the first
+// match in the header, so an injected `kwapso_session` that predated the
+// victim's own would be the one read and the victim would be signed in as the
+// attacker — session fixation, which is exactly what `__Host-` refuses (a
+// browser will not accept a `__Host-` cookie carrying a `Domain`).
+describe("the session cookie cannot be written by another host on the site", () => {
+  it("is minted under the __Host- name, with the three attributes the prefix requires", async () => {
+    const { setCookie } = await createSession(env(), "U1")
+    expect(setCookie.startsWith("__Host-")).toBe(true)
+    // A browser silently REJECTS a __Host- cookie missing any of these, which
+    // reads as "sign-in does nothing" rather than as an error.
+    expect(setCookie).toContain("; Path=/")
+    expect(setCookie).toContain("; Secure")
+    expect(setCookie).not.toContain("Domain=")
+  })
+
+  it("keeps the bare name on the local-dev hatch, because __Host- requires Secure", async () => {
+    const { setCookie } = await createSession(env({ INSECURE_COOKIE: "1" }), "U1")
+    expect(setCookie.startsWith(`${LEGACY_SESSION_COOKIE}=`)).toBe(true)
+    expect(setCookie).not.toContain("Secure")
+  })
+
+  it("still accepts a legacy cookie, so a deploy does not sign the estate out", async () => {
+    const { setCookie } = await createSession(env(), "U1")
+    const token = tokenOf(setCookie)
+    const legacy = withCookie(`${LEGACY_SESSION_COOKIE}=${token}`)
+    expect((await getSessionUser(env(), legacy))?.id).toBe("U1")
+  })
+
+  it("…but the PREFIXED cookie wins, so an injected legacy one cannot override it", async () => {
+    // A SECOND, REAL PERSON — the attacker whose live session is being tossed
+    // into the victim's browser. Two sessions of one user would prove the
+    // ordering and miss the point, which is WHOSE account you land in.
+    db.exec(
+      `INSERT INTO users (id, email, created_at, updated_at, onboarding_completed_at)
+       VALUES ('U2', 'attacker@x.com', '2026-01-01', '2026-01-01', '2026-01-01');`
+    )
+    const mine = tokenOf((await createSession(env(), "U1")).setCookie)
+    const theirs = tokenOf((await createSession(env(), "U2")).setCookie)
+    // The attacker's cookie is listed FIRST, which is the ordering a tossed
+    // cookie gets (an older creation time sorts ahead at the same path).
+    const both = withCookie(`${LEGACY_SESSION_COOKIE}=${theirs}; ${SESSION_COOKIE}=${mine}`)
+    expect(
+      (await getSessionUser(env(), both))?.id,
+      "the browser's own __Host- cookie must beat one another host wrote"
+    ).toBe("U1")
+  })
+
+  it("signing out destroys EVERY session the browser presented, not just one", async () => {
+    // The nastiest corner of the migration: one blanking header can clear one
+    // name, so clearing the prefixed cookie while leaving a LIVE legacy one
+    // behind would hand the next request to whoever wrote it.
+    // A SECOND, REAL PERSON — the attacker whose live session is being tossed
+    // into the victim's browser. Two sessions of one user would prove the
+    // ordering and miss the point, which is WHOSE account you land in.
+    db.exec(
+      `INSERT INTO users (id, email, created_at, updated_at, onboarding_completed_at)
+       VALUES ('U2', 'attacker@x.com', '2026-01-01', '2026-01-01', '2026-01-01');`
+    )
+    const mine = tokenOf((await createSession(env(), "U1")).setCookie)
+    const theirs = tokenOf((await createSession(env(), "U2")).setCookie)
+    const both = withCookie(`${SESSION_COOKIE}=${mine}; ${LEGACY_SESSION_COOKIE}=${theirs}`)
+    await destroySession(env(), both)
+    expect(
+      (db.prepare("SELECT COUNT(*) n FROM sessions").get() as { n: number }).n,
+      "a leftover cookie must be inert — its row is gone"
+    ).toBe(0)
   })
 })
