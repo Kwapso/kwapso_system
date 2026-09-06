@@ -11,7 +11,7 @@ You are working on **the Kwapso System**, the multi-tenant SaaS base by Kwapso, 
 
 The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to data in **`shared/rules/registry.ts`**. They are enforced by tests that read the source straight off disk, break a law and `npm run check` fails:
 
-- **Every mutation publishes a live change.** Any non-GET route that changes state must call `publishChange` (cache-first + row-level live-sync, patch the changed row, never refetch the list). Enforced by `workers/*/test/publish-seam.test.ts` (tenancy, content, data-ops; auth's user-channel publishes and mcp's caller-private token rows are the reviewed exceptions. CACHING rule 5). See [CACHING.md](CACHING.md).
+- **Every mutation publishes a live change.** Any non-GET route that changes state must call `publishChange` (cache-first + row-level live-sync, patch the changed row, never refetch the list). Enforced by `workers/*/test/publish-seam.test.ts` (tenancy, content, data-ops; auth's user-channel publishes and mcp's caller-private token rows are the reviewed exceptions. CACHING rule 5). See [CACHING.md](documents/CACHING.md).
 - **Every record detail exposes Overview + Activity tabs**, via the library `TabsView` + `ActivityFeed`. Enforced by `web/test/rules.test.ts` (`record-detail-tabs`).
 - **No hand-rolled tab strips / toggles**, collection tabs use the library `TabsView`. (`no-handrolled-toggles`)
 - **Every form renders through the shared `FormShell`.** (`forms-use-formshell`)
@@ -320,27 +320,27 @@ Answer these seven, in order, *before* you write code. It's the thinking that ke
 
 Start with **[README.md](README.md)** (the doc map), then:
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**, the locked decisions (workers, the live layer, the Durable Object code-vs-runtime model). Do not relitigate without the user.
-- **[OPERATIONS.md](OPERATIONS.md)**, how it builds, ships, and resets.
-- **[CACHING.md](CACHING.md)**, cache-first + row-level live-sync (every screen follows it).
-- **[CONCURRENCY.md](CONCURRENCY.md)**, race-safety (atomic writes, unique indexes, when a Durable Object is the lock).
-- **[ERROR-HANDLING.md](ERROR-HANDLING.md)**, the one logging seam, the error boundary, never-swallow.
-- **[DATA-MODEL.md](DATA-MODEL.md)**, every table (global core + per-team).
-- **[SEARCH.md](SEARCH.md)**, the layered search / filter model.
-- **[ROADMAP.md](ROADMAP.md)**. HISTORY, not a plan: the build record of the Phase-C round (closed 2026-07-02) and the contracts its phases plugged into. Don't read it for current state, that's README.md → BASE-MANUAL.md. Open work lives beside the thing it's open on (UI-GAPS.md, EDGE-CASES.md, AGENT-MODULES-PLAN.md, BASE-IMPROVEMENTS.md).
+- **[ARCHITECTURE.md](documents/ARCHITECTURE.md)**, the locked decisions (workers, the live layer, the Durable Object code-vs-runtime model). Do not relitigate without the user.
+- **[OPERATIONS.md](documents/OPERATIONS.md)**, how it builds, ships, and resets.
+- **[CACHING.md](documents/CACHING.md)**, cache-first + row-level live-sync (every screen follows it).
+- **[CONCURRENCY.md](documents/CONCURRENCY.md)**, race-safety (atomic writes, unique indexes, when a Durable Object is the lock).
+- **[ERROR-HANDLING.md](documents/ERROR-HANDLING.md)**, the one logging seam, the error boundary, never-swallow.
+- **[DATA-MODEL.md](documents/DATA-MODEL.md)**, every table (global core + per-team).
+- **[SEARCH.md](documents/SEARCH.md)**, the layered search / filter model.
+- **[ROADMAP.md](documents/ROADMAP.md)**. HISTORY, not a plan: the build record of the Phase-C round (closed 2026-07-02) and the contracts its phases plugged into. Don't read it for current state, that's README.md → BASE-MANUAL.md. Open work lives beside the thing it's open on (UI-GAPS.md, EDGE-CASES.md, AGENT-MODULES-PLAN.md, BASE-IMPROVEMENTS.md).
 
 **The manual, to build on the base, or rebuild it from zero:**
 
-- **[BOOTSTRAP.md](BOOTSTRAP.md)**, the day-zero, command-by-command runbook to stand the WHOLE base up on a fresh Cloudflare account (core DB + migrations → R2 buckets → secrets/vars → realtime-first deploy → seed → first team → verify). The concrete "rebuild from nothing" answer.
-- **[BASE-MANUAL.md](BASE-MANUAL.md)**, how the base works AND *why*: the eight workers, the two-tier database, the permission spine, how a new module and the base influence each other, how to change foundational code + how a change ripples, **how to fork the base for a new product (§5)**, and **how each subsystem scales (§6)**. Read this to understand the whole.
-- **[BUILD-A-MODULE.md](BUILD-A-MODULE.md)**, the end-to-end golden-path checklist to add a team module (table → permissions → worker → web → detail → tests).
-- **[CONVENTIONS.md](CONVENTIONS.md)**, the code + comment house style (handler shape, data doors, gating, validation, deactivate-not-delete).
-- **[UI-CONVENTIONS.md](UI-CONVENTIONS.md)**, how screens are built (library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the voice).
-- **[DURABLE-OBJECTS.md](DURABLE-OBJECTS.md)**, the realtime Durable Object (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs plain atomic D1.
-- **[EDGE-CASES.md](EDGE-CASES.md)**, the non-obvious traps (static-export reload, list-cache-as-detail-source, REST-door round-trips, the confirm model, streaming, and more).
-- **[AGENTIC-IMPORT.md](AGENTIC-IMPORT.md)**, the agent-driven multi-table import (normalize → map → order interdependent tables → resolve foreign keys → reject honestly → write through the gated door). How to declare an import target + references for a new module.
-- **[MCP.md](MCP.md)**, the external machine surface for developers: how an outside tool connects (token → `Bearer` on `/mcp`), the opt-in tool catalogue, the act-as-user/one-team/live-role security posture, and the cost model (reads/exports/import writes = free endpoint hits; only `agent_chat`/`agent_confirm`/`plan_import` — the import's planning step — draw the team's AI quota, a role without the agent right spends zero AI). **[mcp-quickstart.md](mcp-quickstart.md)** is the one-page version to hand an outside developer.
-- **[SCOPE.html](SCOPE.html)**, the product's scope of work, chapter by chapter. Every "SCOPE ch.NN" reference in these docs points here: what kwapso is for, the account fence, the two front doors, what a client may see. Product decisions live here; this file is the book the rules defer to. (**[kwapso-the-system-explained.html](kwapso-the-system-explained.html)** is the plain-language owner walkthrough beside it.)
+- **[BOOTSTRAP.md](documents/BOOTSTRAP.md)**, the day-zero, command-by-command runbook to stand the WHOLE base up on a fresh Cloudflare account (core DB + migrations → R2 buckets → secrets/vars → realtime-first deploy → seed → first team → verify). The concrete "rebuild from nothing" answer.
+- **[BASE-MANUAL.md](documents/BASE-MANUAL.md)**, how the base works AND *why*: the eight workers, the two-tier database, the permission spine, how a new module and the base influence each other, how to change foundational code + how a change ripples, **how to fork the base for a new product (§5)**, and **how each subsystem scales (§6)**. Read this to understand the whole.
+- **[BUILD-A-MODULE.md](documents/BUILD-A-MODULE.md)**, the end-to-end golden-path checklist to add a team module (table → permissions → worker → web → detail → tests).
+- **[CONVENTIONS.md](documents/CONVENTIONS.md)**, the code + comment house style (handler shape, data doors, gating, validation, deactivate-not-delete).
+- **[UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md)**, how screens are built (library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the voice).
+- **[DURABLE-OBJECTS.md](documents/DURABLE-OBJECTS.md)**, the realtime Durable Object (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs plain atomic D1.
+- **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps (static-export reload, list-cache-as-detail-source, REST-door round-trips, the confirm model, streaming, and more).
+- **[AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md)**, the agent-driven multi-table import (normalize → map → order interdependent tables → resolve foreign keys → reject honestly → write through the gated door). How to declare an import target + references for a new module.
+- **[MCP.md](documents/MCP.md)**, the external machine surface for developers: how an outside tool connects (token → `Bearer` on `/mcp`), the opt-in tool catalogue, the act-as-user/one-team/live-role security posture, and the cost model (reads/exports/import writes = free endpoint hits; only `agent_chat`/`agent_confirm`/`plan_import` — the import's planning step — draw the team's AI quota, a role without the agent right spends zero AI). **[mcp-quickstart.md](documents/mcp-quickstart.md)** is the one-page version to hand an outside developer.
+- **[SCOPE.html](documents/SCOPE.html)**, the product's scope of work, chapter by chapter. Every "SCOPE ch.NN" reference in these docs points here: what kwapso is for, the account fence, the two front doors, what a client may see. Product decisions live here; this file is the book the rules defer to. (**[kwapso-the-system-explained.html](documents/kwapso-the-system-explained.html)** is the plain-language owner walkthrough beside it.)
 - **[glide/README.md](glide/README.md)**, the legacy Glide catalogue: the two apps kwapso ran on before this one, how to pull their rows, and the field reconciliation (`glide/RECONCILIATION.md`). `glide/data/` is git-ignored, it is customer data.
 
 **The two front ends.** `web/` is the AGENCY app (served by `workers/gateway`); `web-portal/` is the CLIENT PORTAL (served by `workers/portal-gateway`). They are two permission-gated views of the same rows. Never copies, never synced. The portal has its own workspace and its own suites, including the account-fence test that walks every door it names through to the function behind it.

@@ -205,7 +205,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   // entry silently deleted here would leave the check standing over nothing;
   // an entry marked shipped would leave the check contradicting the document.
   it("UI-GAPS.md agrees with the four checks above — all four slots are closed", () => {
-    const gaps = readFileSync(join(ROOT, "UI-GAPS.md"), "utf8")
+    const gaps = readFileSync(join(ROOT, "documents", "UI-GAPS.md"), "utf8")
     // ALL FOUR ARE NOW SHIPPED — #16, #18 and #20 in library v0.11.0 and #19 in
     // v0.12.0 (19 Aug 2026) — and each is asserted above as WIRED rather than as
     // missing. So this list is the other direction of the same bookkeeping: a

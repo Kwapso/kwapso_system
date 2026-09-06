@@ -69,7 +69,7 @@ by the screen engine rather than living under Settings. A customer's portal
 login is granted separately, through the accounts flow, never through Invites.
 
 *This section says what is true now.* When each piece landed is in
-[BASE-IMPROVEMENTS.md](BASE-IMPROVEMENTS.md) § *When each piece landed*: dated
+[BASE-IMPROVEMENTS.md](documents/BASE-IMPROVEMENTS.md) § *When each piece landed*: dated
 stamps used to accumulate here, in the first thing every reader and every agent
 opens, which is the one place current state should not have to be sifted out of
 history.
@@ -86,20 +86,29 @@ until cutover.)
 
 ## The documents
 
-**Making your FIRST change?** [CONTRIBUTING.md](CONTRIBUTING.md) is the path
+**Where they live.** Four documents sit at the repository root because they are opened
+by NAME rather than found through this map: this file, [CLAUDE.md](CLAUDE.md) (what an
+agent reads first), [RULES.md](RULES.md) (the law-book, which `web/test/rules.test.ts`
+reads off disk beside `shared/rules/registry.ts`), and [AGENTS.md](AGENTS.md) (the
+cross-tool filename a tool opens out of habit). **Every other document is in
+[`documents/`](documents/)** — forty-two of them, moved there on 2026-09-06 because a
+root holding forty-six documents is a root nobody can see the code in. Nothing was
+renamed and nothing was dropped; `git log --follow` still reaches every one of them.
+
+**Making your FIRST change?** [CONTRIBUTING.md](documents/CONTRIBUTING.md) is the path
 through all of this once, in the order the work happens: clone → the planning
 ritual → where the change goes → `npm run check` → the commit convention → ship.
 Start there, then come back to this map when you need a specific document.
 
 **New here, developer or agent? Read in this order:** [CLAUDE.md](CLAUDE.md) (the
-rules) → [BASE-MANUAL.md](BASE-MANUAL.md) (how the base works and *why*, incl. how to
+rules) → [BASE-MANUAL.md](documents/BASE-MANUAL.md) (how the base works and *why*, incl. how to
 **fork it for a new product** and **how each part scales**) →
-[ARCHITECTURE.md](ARCHITECTURE.md) (the locked decisions) →
-[BUILD-A-MODULE.md](BUILD-A-MODULE.md) (add a module end to end) →
-[CONVENTIONS.md](CONVENTIONS.md) + [UI-CONVENTIONS.md](UI-CONVENTIONS.md) (how code
+[ARCHITECTURE.md](documents/ARCHITECTURE.md) (the locked decisions) →
+[BUILD-A-MODULE.md](documents/BUILD-A-MODULE.md) (add a module end to end) →
+[CONVENTIONS.md](documents/CONVENTIONS.md) + [UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md) (how code
 and screens are written) → the reference docs below as you need them →
-[EDGE-CASES.md](EDGE-CASES.md) before touching anything subtle →
-[OPERATIONS.md](OPERATIONS.md) to ship.
+[EDGE-CASES.md](documents/EDGE-CASES.md) before touching anything subtle →
+[OPERATIONS.md](documents/OPERATIONS.md) to ship.
 
 **Already here, and just need to make ONE change?** That order is the whole tour.
 This is the short way in, the minimum that keeps a change in-rule, by the kind of
@@ -108,15 +117,15 @@ ritual in it names the rest:
 
 | You are changing… | Read these, then build |
 |---|---|
-| a screen or a form | [CLAUDE.md](CLAUDE.md) → [UI-CONVENTIONS.md](UI-CONVENTIONS.md) → [CACHING.md](CACHING.md) → [LANGUAGES.md](LANGUAGES.md) if it says a single word to a person |
-| a worker route | [CLAUDE.md](CLAUDE.md) → [CONVENTIONS.md](CONVENTIONS.md) → [DATA-MODEL.md](DATA-MODEL.md) |
-| a whole new module | [BUILD-A-MODULE.md](BUILD-A-MODULE.md) (it lists its own prerequisites) |
-| anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](MCP.md) → [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md) |
-| a table, a column, or a migration | [DATA-MODEL.md](DATA-MODEL.md) → [OPERATIONS.md](OPERATIONS.md) |
+| a screen or a form | [CLAUDE.md](CLAUDE.md) → [UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md) → [CACHING.md](documents/CACHING.md) → [LANGUAGES.md](documents/LANGUAGES.md) if it says a single word to a person |
+| a worker route | [CLAUDE.md](CLAUDE.md) → [CONVENTIONS.md](documents/CONVENTIONS.md) → [DATA-MODEL.md](documents/DATA-MODEL.md) |
+| a whole new module | [BUILD-A-MODULE.md](documents/BUILD-A-MODULE.md) (it lists its own prerequisites) |
+| anything the agent or MCP can reach | [CLAUDE.md](CLAUDE.md) → [MCP.md](documents/MCP.md) → [AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md) |
+| a table, a column, or a migration | [DATA-MODEL.md](documents/DATA-MODEL.md) → [OPERATIONS.md](documents/OPERATIONS.md) |
 | a Law, or anything a Law names | [RULES.md](RULES.md) + `shared/rules/registry.ts` + its check, all three, or the build fails |
-| anything that spends money — a model call, an email, a cron, a stored file | [COSTS.md](COSTS.md) → `shared/workers/pricing.ts` |
+| anything that spends money — a model call, an email, a cron, a stored file | [COSTS.md](documents/COSTS.md) → `shared/workers/pricing.ts` |
 
-Whatever the row, [EDGE-CASES.md](EDGE-CASES.md) is the one to open when something
+Whatever the row, [EDGE-CASES.md](documents/EDGE-CASES.md) is the one to open when something
 behaves oddly rather than wrongly, it is where the non-obvious traps are written
 down, and most of them cost somebody a day before they got there.
 
@@ -131,12 +140,12 @@ right. This table names the owner for the topics where that has actually happene
 
 | Topic | Owner, the mechanism lives here | Everyone else |
 |---|---|---|
-| Which workers exist, what each owns and why | [BASE-MANUAL.md §1](BASE-MANUAL.md) | ARCHITECTURE §2 keeps the *decision* (split by domain, exactly two public doors); OPERATIONS keeps the bindings, crons and hostnames |
-| `teamContext` → `requireRight`, step by step | [CONVENTIONS.md §4](CONVENTIONS.md) | BASE-MANUAL §2 keeps *why* the spine is shaped that way (the tall sheet, the module list) |
-| Worker vs DO class vs DO instance | [DURABLE-OBJECTS.md §1](DURABLE-OBJECTS.md) | ARCHITECTURE §2 keeps the ruling on what gets an instance |
-| Every table and column | [DATA-MODEL.md](DATA-MODEL.md) | everyone links to it; nobody re-lists columns |
+| Which workers exist, what each owns and why | [BASE-MANUAL.md §1](documents/BASE-MANUAL.md) | ARCHITECTURE §2 keeps the *decision* (split by domain, exactly two public doors); OPERATIONS keeps the bindings, crons and hostnames |
+| `teamContext` → `requireRight`, step by step | [CONVENTIONS.md §4](documents/CONVENTIONS.md) | BASE-MANUAL §2 keeps *why* the spine is shaped that way (the tall sheet, the module list) |
+| Worker vs DO class vs DO instance | [DURABLE-OBJECTS.md §1](documents/DURABLE-OBJECTS.md) | ARCHITECTURE §2 keeps the ruling on what gets an instance |
+| Every table and column | [DATA-MODEL.md](documents/DATA-MODEL.md) | everyone links to it; nobody re-lists columns |
 | The Laws themselves | [RULES.md](RULES.md) + `shared/rules/registry.ts` | CLAUDE.md summarises them; BASE-MANUAL §4 explains the safety net |
-| How a sentence gets translated | [LANGUAGES.md](LANGUAGES.md) | RULES.md keeps the four Laws (R28, R33, R34, R44); CONTRIBUTING §3 keeps the commit workflow; UI-CONVENTIONS points here rather than restating it |
+| How a sentence gets translated | [LANGUAGES.md](documents/LANGUAGES.md) | RULES.md keeps the four Laws (R28, R33, R34, R44); CONTRIBUTING §3 keeps the commit workflow; UI-CONVENTIONS points here rather than restating it |
 
 **And a number in prose is a number nothing checks.** ARCHITECTURE described the
 portal's allow-list as "fourteen named doors" long after it had grown to
@@ -148,7 +157,7 @@ are the ones `web/test/doc-claims.test.ts` checks against the code, which is why
 they may be written down at all.
 
 **Rebuilding the whole base from nothing?** Follow
-**[BOOTSTRAP.md](BOOTSTRAP.md)**, the day-zero, command-by-command runbook that takes
+**[BOOTSTRAP.md](documents/BOOTSTRAP.md)**, the day-zero, command-by-command runbook that takes
 a fresh Cloudflare account to a live staging + production Kwapso System. It is the concrete
 answer to "with only these docs and the repo, could I recreate the base?", yes: run
 that list. For the **one-command** version, the `new-app` build skill lives in the operator's
@@ -161,16 +170,16 @@ machine, BOOTSTRAP.md is the same journey by hand.
 modifying, recreating, or building on the Kwapso System lives in one of these, and each is
 concrete + checkable:
 
-- **The global habits every Kwapso build follows**, [SWIFT-STRUCK-WAY.md](SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
+- **The global habits every Kwapso build follows**, [SWIFT-STRUCK-WAY.md](documents/SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
 - **The two prime directives** (stay lean; obey the Laws), [CLAUDE.md](CLAUDE.md), the entry point.
 - **The Laws of the Base** (R1–R51), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: every component under `components/` plus the 3 foundations (icons, tokens, motion) — the count is derived by `kitInventory()` in `scripts/kit-coverage.mjs` and deliberately not written down here — is either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
-- **Code house style**, [CONVENTIONS.md](CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
-- **UI conventions**, [UI-CONVENTIONS.md](UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
-- **How a screen is arranged**, [UI-RULEBOOK.md](UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `shared/ui/` already ships and the tokens the theme already defines, so every rule in it can be applied from `web/`, `web-portal/` and `shared/` without changing a component.
-- **What was asked for, and where each item stands**, [CHECKLIST.md](CHECKLIST.md): every request from the feedback round, with a status word beside it and, where something is not being done, the reason.
-- **Import + export rules**, [AGENTIC-IMPORT.md](AGENTIC-IMPORT.md): audit parity, export-needs-read/import-needs-create, one-confirm, insert-only, and every import place offers a sample file (test-enforced).
-- **Error rules**, [ERROR-HANDLING.md](ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
-- **The bad day**, [RESILIENCE.md](RESILIENCE.md): auth named as the single point of failure and what falls over with it, which worker owns a table a pair of them write, and how the rows come back (backup, restore, and what is deliberately not backed up).
+- **Code house style**, [CONVENTIONS.md](documents/CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
+- **UI conventions**, [UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
+- **How a screen is arranged**, [UI-RULEBOOK.md](documents/UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `shared/ui/` already ships and the tokens the theme already defines, so every rule in it can be applied from `web/`, `web-portal/` and `shared/` without changing a component.
+- **What was asked for, and where each item stands**, [CHECKLIST.md](documents/CHECKLIST.md): every request from the feedback round, with a status word beside it and, where something is not being done, the reason.
+- **Import + export rules**, [AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md): audit parity, export-needs-read/import-needs-create, one-confirm, insert-only, and every import place offers a sample file (test-enforced).
+- **Error rules**, [ERROR-HANDLING.md](documents/ERROR-HANDLING.md): never swallow; one client seam; every worker records to the central store.
+- **The bad day**, [RESILIENCE.md](documents/RESILIENCE.md): auth named as the single point of failure and what falls over with it, which worker owns a table a pair of them write, and how the rows come back (backup, restore, and what is deliberately not backed up).
 - **The single vocabulary**, `shared/glossary.ts` (Law R6, machine-checked): one word per concept, used in all UI copy.
 
 - **The docs themselves are checked too**, `web/test/doc-claims.test.ts` derives the worker roster from `workers/` on disk, reads each `wrangler.jsonc` to see which are public, and reads the Laws' range off `shared/rules/registry.ts`, then fails if any doc (the root canon, the fork skills, or a `.plans/` build plan) states a worker count, a public-door count or a `R1–Rn` range that disagrees. Add a worker or a Law, and every stale sentence goes red the same day.
@@ -196,28 +205,28 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    paragraph pointing here, so an agent that opens it by habit lands in the same
    place. It exists to have exactly that content and no more; anything it
    restated would be a second copy of the rules, drifting.
-1. **[ARCHITECTURE.md](ARCHITECTURE.md)**, the locked decisions (incl. the
+1. **[ARCHITECTURE.md](documents/ARCHITECTURE.md)**, the locked decisions (incl. the
    workers, the live layer, and the Durable Object code-vs-runtime model). Read
    before building anything; do not relitigate without the user.
-2. **[OPERATIONS.md](OPERATIONS.md)**, how it builds and ships.
-   **[RUNBOOK.md](RUNBOOK.md)** is the other direction: rolling a change back out
+2. **[OPERATIONS.md](documents/OPERATIONS.md)**, how it builds and ships.
+   **[RUNBOOK.md](documents/RUNBOOK.md)** is the other direction: rolling a change back out
    (with the named triggers that say when to roll back rather than fix forward),
    getting data back with D1 Time Travel, and what to check when it breaks at two
-   in the morning. **[INVENTORY.md](INVENTORY.md)** is everything the app needs
+   in the morning. **[INVENTORY.md](documents/INVENTORY.md)** is everything the app needs
    that is *not* in this repository, the accounts, the domains, the two Google
    OAuth clients, every credential by name, the cron jobs, and an honest list of
-   what has no backup. **[CHANGELOG.md](CHANGELOG.md)** is the eras this project
+   what has no backup. **[CHANGELOG.md](documents/CHANGELOG.md)** is the eras this project
    moved through, reconstructed from git history so a newcomer can read how it got
    here without reading 350 commits.
-3. **[CACHING.md](CACHING.md)**, the system-wide caching + loading/feedback
+3. **[CACHING.md](documents/CACHING.md)**, the system-wide caching + loading/feedback
    ruleset (cache-first, row-level live-sync, patch the changed row, never
    refetch the list, examples). Follow it for every screen/module.
-4. **[CONCURRENCY.md](CONCURRENCY.md)**, the race-safety ruleset (atomic writes,
+4. **[CONCURRENCY.md](documents/CONCURRENCY.md)**, the race-safety ruleset (atomic writes,
    unique indexes, when a Durable Object is the lock). Follow it for any write
    that protects an invariant (counts, balances, uniqueness).
-5. **[ERROR-HANDLING.md](ERROR-HANDLING.md)**, the error-capture ruleset (the
+5. **[ERROR-HANDLING.md](documents/ERROR-HANDLING.md)**, the error-capture ruleset (the
    one swappable logging seam, the error boundary, never-swallow).
-   **[COSTS.md](COSTS.md)** is the other half of the same question: every surface
+   **[COSTS.md](documents/COSTS.md)** is the other half of the same question: every surface
    that bills, what one signup, one import, one assistant reply and one knowledge
    question actually cost with the arithmetic shown, what the crons and the
    stored files cost, and what still is not measured. Every price carries the
@@ -226,11 +235,11 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    cannot drift apart. Two commands reproduce its headline figures without
    spending anything: `node scripts/measure-preamble.mjs` and
    `node --experimental-transform-types scripts/ai-spend.mjs`.
-6. **[ROADMAP.md](ROADMAP.md)**, **history, not a plan.** The build record of ONE
+6. **[ROADMAP.md](documents/ROADMAP.md)**, **history, not a plan.** The build record of ONE
    round (Phase C: members, roles & settings), closed 2026-07-02, with the
    type/endpoint contracts each of its phases plugged into. Kept so its decisions
    aren't re-argued; it does not describe the eras that shipped after it.
-   **[RESKIN-REPORT.md](RESKIN-REPORT.md)** is history of the same kind, one era
+   **[RESKIN-REPORT.md](documents/RESKIN-REPORT.md)** is history of the same kind, one era
    later: the record of vendoring the component library into `shared/ui/` and
    re-theming both front doors to the kwapso design kit (2026-08-22). Read it for
    why a decision was made — the four token collisions, the four kit gaps decided
@@ -239,17 +248,17 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
    deliberately no single "what's next" file. Open work lives beside the thing
    it's open on: **UI-GAPS.md** (library gaps), **EDGE-CASES.md** (the deferred
    perf wins), **AGENT-MODULES-PLAN.md** (the deferred agent hooks),
-   **[ADVISORIES.md](ADVISORIES.md)** (every dependency advisory, and the proof
+   **[ADVISORIES.md](documents/ADVISORIES.md)** (every dependency advisory, and the proof
    of whether the code we deploy can reach it), and **BASE-IMPROVEMENTS.md**
    (what each audit round changed). For what is true today: this file →
    BASE-MANUAL.md.
-7. **[SEARCH.md](SEARCH.md)**, the search + in-app-filter ruleset (the layered
+7. **[SEARCH.md](documents/SEARCH.md)**, the search + in-app-filter ruleset (the layered
    client-side → server `?q=` → per-team FTS5 model; recipe-declared).
-8. **[DATA-MODEL.md](DATA-MODEL.md)**, every table (global core + per-team), what's
+8. **[DATA-MODEL.md](documents/DATA-MODEL.md)**, every table (global core + per-team), what's
    built vs. to build, and the cross-cutting model resolutions.
-9. **[SCREEN-ENGINE-PLAN.md](SCREEN-ENGINE-PLAN.md)**, the screen-recipe engine and
+9. **[SCREEN-ENGINE-PLAN.md](documents/SCREEN-ENGINE-PLAN.md)**, the screen-recipe engine and
    the `/t/<teamId>/<module>/<id>` deep-link grammar the team area runs on.
-    **[CONTROL-SWAP-LANES.md](CONTROL-SWAP-LANES.md)** is the other transient
+    **[CONTROL-SWAP-LANES.md](documents/CONTROL-SWAP-LANES.md)** is the other transient
     one: the 93 hand-written HTML controls split into **three** non-colliding
     lanes — the document's own § *There is no lane D* shows why the portal's
     share is one conversion rather than a fourth lane — with the ruling on which
@@ -259,7 +268,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     landed: raw `<button|input|select|textarea>` across `web/`, `web-portal/`
     and `shared/web/` is down to 15 from 93, so the delete condition is close.
 
-    **[LAW-RECONCILIATION.md](LAW-RECONCILIATION.md)** sits beside them and is a
+    **[LAW-RECONCILIATION.md](documents/LAW-RECONCILIATION.md)** sits beside them and is a
     PROPOSAL rather than a record: the base's seventeen UI laws read against the
     kit's own rulebook, after the owner ruled on 2026-08-27 that the kit is
     canon. Its finding is that fourteen of them have no kit counterpart at all —
@@ -267,21 +276,21 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     that nothing in the list deserves deleting. Delete the file once its three
     proposed edits have landed and its marks are in.
 
-10. **[UI-GAPS.md](UI-GAPS.md)**, the running list of things the component library
+10. **[UI-GAPS.md](documents/UI-GAPS.md)**, the running list of things the component library
     still cannot do (a gap is fixed in the library, once, not worked around on
     each screen that hits it). Its twin pointing the other way is
-    **[NEEDS-A-SPEC.md](NEEDS-A-SPEC.md)**: what the app RENDERS that the design
+    **[NEEDS-A-SPEC.md](documents/NEEDS-A-SPEC.md)**: what the app RENDERS that the design
     kit does not yet draw, written for the designer rather than for us. UI-GAPS
     is work we owe the library; NEEDS-A-SPEC is work the kit owes the app, and
     everything on it is wearing the new tokens with its old shape untouched,
     because the kit's own rule is to log rather than improvise.
-    **[KIT-COVERAGE.md](KIT-COVERAGE.md)** answers the question those two do
+    **[KIT-COVERAGE.md](documents/KIT-COVERAGE.md)** answers the question those two do
     not: of the parts the kit already ships and the app already has, how many
     has it actually adopted. The owner narrated the whole catalogue and it was
     reconciled against the parts on disk, so every item maps in both
     directions. Regenerate its ticks with `node scripts/kit-coverage.mjs`;
     never edit them by hand. Its companion,
-    **[COMPOSITION-MISMATCHES.md](COMPOSITION-MISMATCHES.md)**, is the other
+    **[COMPOSITION-MISMATCHES.md](documents/COMPOSITION-MISMATCHES.md)**, is the other
     half of that number: every kit composition checked and found NOT to fit,
     with the specific structural reason for each — so a locked mismatch is a
     recorded result nobody re-discovers by trying it again, rather than a
@@ -299,20 +308,20 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 
 ### The manual, build on it, understand it, rebuild it from zero
 
-12. **[BASE-MANUAL.md](BASE-MANUAL.md)**, how the whole base works AND *why*: the
+12. **[BASE-MANUAL.md](documents/BASE-MANUAL.md)**, how the whole base works AND *why*: the
     eight workers, the two-tier database, the permission spine, how a new module and
     the base influence each other, and how to change foundational code + how a
     change ripples. Start here to understand the system.
-13. **[BUILD-A-MODULE.md](BUILD-A-MODULE.md)**, the golden-path checklist to add a
+13. **[BUILD-A-MODULE.md](documents/BUILD-A-MODULE.md)**, the golden-path checklist to add a
     team module end to end (table → permissions → worker → web → detail → tests),
     worked through a real module.
-14. **[CONVENTIONS.md](CONVENTIONS.md)**, the code + comment house style (the
+14. **[CONVENTIONS.md](documents/CONVENTIONS.md)**, the code + comment house style (the
     handler shape, the data doors, gating, validation, deactivate-not-delete, the
     comment convention, how `npm run check` gates everything).
-15. **[UI-CONVENTIONS.md](UI-CONVENTIONS.md)**, how screens are built: the
+15. **[UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md)**, how screens are built: the
     library-is-lego rule, recipe vs. bespoke, the enforced UI Laws, the
     action-icon mapping, and the voice.
-    **[LANGUAGES.md](LANGUAGES.md)** is its sibling and the OWNER of the
+    **[LANGUAGES.md](documents/LANGUAGES.md)** is its sibling and the OWNER of the
     translation capability: the four languages the app speaks, the one shared
     definition of what a person reads, `npm run lang`, the three shapes that go
     wrong (`t("of")` is the classic), and the ceiling that can only fall. Four
@@ -320,37 +329,37 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     the law-book, which is the wrong altitude for a mechanism — so a developer
     adding a screen walked past every document that would have told them a new
     sentence must be wrapped and catalogued.
-16. **[DURABLE-OBJECTS.md](DURABLE-OBJECTS.md)**, the realtime Durable Object
+16. **[DURABLE-OBJECTS.md](documents/DURABLE-OBJECTS.md)**, the realtime Durable Object
     (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs. plain
     atomic D1.
-17. **[EDGE-CASES.md](EDGE-CASES.md)**, the non-obvious traps a maintainer must
+17. **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps a maintainer must
     know (the static-export reload, the list-cache-as-detail-source, the REST-door
     round-trips, the confirm model, streaming, and more).
-18. **[AGENTIC-IMPORT.md](AGENTIC-IMPORT.md)**, the agent-driven, multi-table data
+18. **[AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md)**, the agent-driven, multi-table data
     import: dump old-system CSV exports, the agent normalizes + maps + orders
     interdependent tables + resolves foreign keys + rejects honestly, writing every
     row through the gated door (audit parity). How an app declares an import target
     + references. Read before building an import for a new module.
-19. **[BOOTSTRAP.md](BOOTSTRAP.md)**, the day-zero, command-by-command runbook to
+19. **[BOOTSTRAP.md](documents/BOOTSTRAP.md)**, the day-zero, command-by-command runbook to
     rebuild the whole base from a fresh Cloudflare account (also linked at the top).
-20. **[MCP.md](MCP.md)**, the machine door: how an outside developer/tool connects to
+20. **[MCP.md](documents/MCP.md)**, the machine door: how an outside developer/tool connects to
     the base over MCP (get a token → `Bearer` on `/mcp`), the tool catalogue, and the
     cost model (reads/exports/imports are free endpoint hits; only the assistant tools
     draw the team's AI quota — scope the role to control it).
-21. **[PLATFORMS.md](PLATFORMS.md)**, where the base can run. **Cloudflare is
+21. **[PLATFORMS.md](documents/PLATFORMS.md)**, where the base can run. **Cloudflare is
     recommended** (and `new-app` stands it up turnkey); this maps the base's five seams
     (per-team data · live layer · compute · storage · static web) onto eight other cloud
     providers (AWS, GCP, Azure, Supabase, Fly.io, Render, DigitalOcean, Netlify)
     with an honest effort rating and the porting method (swap ~4 seam files, not the app).
-22. **[mcp-quickstart.md](mcp-quickstart.md)**, the one-page version of MCP.md, meant
+22. **[mcp-quickstart.md](documents/mcp-quickstart.md)**, the one-page version of MCP.md, meant
     to be handed straight to an outside developer. Deliberately a short overlap with
     MCP.md, not a second source: MCP.md is the full detail, this is the page you send.
-23. **[SCOPE.html](SCOPE.html)**, the product's scope of work: what kwapso is for,
+23. **[SCOPE.html](documents/SCOPE.html)**, the product's scope of work: what kwapso is for,
     chapter by chapter. The other docs defer to it by chapter ("SCOPE ch.06") for
     product decisions — the account fence, the two front doors, what the client may
     see — so when a rule here says "because SCOPE says so", this is the book it means.
     Open it in a browser.
-24. **[kwapso-the-system-explained.html](kwapso-the-system-explained.html)**, the
+24. **[kwapso-the-system-explained.html](documents/kwapso-the-system-explained.html)**, the
     owner-facing walkthrough of the whole system in plain language. A companion to
     SCOPE, not a rule source.
 25. **[glide/README.md](glide/README.md)**, the legacy Glide catalogue: the two apps
@@ -372,7 +381,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     29 Aug 2026 in `f17f5501`. It is listed here because two documents still cite it
     and a reader deserves to know why the citation does not open.
 
-    **The DECISION it produced is [ARCHITECTURE.md §7](ARCHITECTURE.md) — 78 accepted,
+    **The DECISION it produced is [ARCHITECTURE.md §7](documents/ARCHITECTURE.md) — 78 accepted,
     LOCKED — and that section is self-sufficient**: the live layer as the first
     ceiling, at roughly 3,000–5,000 concurrent sockets in one team, is written there,
     not only here. Cite §7. Two notes for anyone tidying this up: `.gitignore` still
@@ -385,6 +394,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 
 | Folder | What it is |
 |---|---|
+| `documents/` | the canon — every document except the four opened by name (this file, CLAUDE.md, RULES.md, AGENTS.md). `web/test/doc-claims.test.ts` walks root AND here, and asserts the walk found more than thirty, so a canon that quietly empties fails instead of passing |
 | `web/` | the AGENCY screens (Next.js static export → `web/out`, served by `workers/gateway`) |
 | `web-portal/` | the CLIENT PORTAL screens (static export → `web-portal/out`, served by `workers/portal-gateway`). Its own workspace, its own tests, including the account-fence suite |
 | `workers/` | the eight workers. Six private brains + the two public gateways |
@@ -447,7 +457,7 @@ breaks when a value is missing.
 Ship by saying **"ship to staging"** / **"ship to production"**, the skills
 read OPERATIONS.md and handle GitHub + Cloudflare. To take a change back out
 again, or to work out what is wrong while it is live, read
-[RUNBOOK.md](RUNBOOK.md).
+[RUNBOOK.md](documents/RUNBOOK.md).
 
 ## Licence
 

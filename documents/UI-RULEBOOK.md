@@ -1635,7 +1635,7 @@ questions in order.
 
 | Options | Mutually exclusive | Changes the view | Sets a value |
 |---|---|---|---|
-| 2 to 6 | yes | **tabs** (`TabsView`, [R3](RULES.md)) | **chips** ([F7](#f7-a-short-enumerated-choice-is-a-row-of-chips-not-a-select)), or **radio** when each option needs a sentence of explanation |
+| 2 to 6 | yes | **tabs** (`TabsView`, [R3](../RULES.md)) | **chips** ([F7](#f7-a-short-enumerated-choice-is-a-row-of-chips-not-a-select)), or **radio** when each option needs a sentence of explanation |
 | 7 or more | yes | **a dropdown** that reads as a view switch, with the current view on the trigger | **a `Select`** |
 | any | no | **a filter facet** in the collection toolbar ([K7](#k7-the-collection-toolbar-is-one-row-heading-search-filter-add)) | **checkboxes**, up to 5, all visible; a multi-select popover above that |
 
@@ -1681,7 +1681,7 @@ Here is what is achievable today without touching the library, and what is not.
   Every destination has one; keep it that way, and add the concept there before the screen.
 - A tab strip already takes an icon per tab: `TabsView` is given `icon` on every team
   section (`web/components/team-section-nav.tsx:42-59`), and
-  [R3](RULES.md) is written around "icon + count badge". Any strip that
+  [R3](../RULES.md) is written around "icon + count badge". Any strip that
   is missing icons can have them today.
 - A **collection heading** may carry its concept glyph beside the title.
   `CollectionHeading` is the host's own component

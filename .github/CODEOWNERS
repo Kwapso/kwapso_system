@@ -23,10 +23,10 @@
 /workers/tenancy/src/lib/internal-money.ts  @alaap-kwapso
 
 # Standing the base up, taking a change back out, and what is not in the repo.
-/BOOTSTRAP.md           @alaap-kwapso
-/RUNBOOK.md             @alaap-kwapso
-/INVENTORY.md           @alaap-kwapso
-/OPERATIONS.md          @alaap-kwapso
+/documents/BOOTSTRAP.md           @alaap-kwapso
+/documents/RUNBOOK.md             @alaap-kwapso
+/documents/INVENTORY.md           @alaap-kwapso
+/documents/OPERATIONS.md          @alaap-kwapso
 
 # Real customer data lives behind these — the catalogue is tracked, the data
 # never is.

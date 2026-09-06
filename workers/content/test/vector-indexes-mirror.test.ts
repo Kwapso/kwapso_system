@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest"
 
 import { METADATA_INDEXES } from "../src/lib/knowledge-vectors"
 
-const BOOTSTRAP = readFileSync(join(__dirname, "..", "..", "..", "BOOTSTRAP.md"), "utf8")
+const BOOTSTRAP = readFileSync(join(__dirname, "..", "..", "..", "documents", "BOOTSTRAP.md"), "utf8")
 
 describe("the runbook's Vectorize indexes mirror the code's", () => {
   /** Every `create-metadata-index` line in the runbook, as (property, type). */

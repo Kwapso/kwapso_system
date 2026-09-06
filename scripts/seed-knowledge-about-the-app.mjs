@@ -108,7 +108,7 @@ function blockText(b) {
  * chapter becomes one document, because a chapter is one subject and a document
  * that spans three subjects retrieves badly for all three. */
 function scopeChapters() {
-  const src = readFileSync(resolve(ROOT, "SCOPE.html"), "utf8")
+  const src = readFileSync(resolve(ROOT, "documents", "SCOPE.html"), "utf8")
   const open = src.indexOf("const BLOCKS = [")
   if (open < 0) throw new Error("SCOPE.html no longer carries a BLOCKS array — this script is reading the wrong shape")
   // Walk the brackets rather than regex to the end: the prose contains "]".

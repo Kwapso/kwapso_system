@@ -1,7 +1,7 @@
 # COSTS.md — what this app costs to run
 
 **Written 2026-09-05.** Every price below was read off the vendor's own public page on
-that date and is repeated as data in [`shared/workers/pricing.ts`](shared/workers/pricing.ts),
+that date and is repeated as data in [`shared/workers/pricing.ts`](../shared/workers/pricing.ts),
 which is what the code and the scripts compute from. **Nothing here was measured by
 spending**: no billed model call, no benchmark run, no assistant turn was made to produce
 this file. The measured figures come from tables the app already writes.

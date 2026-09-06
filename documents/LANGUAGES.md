@@ -159,5 +159,5 @@ prunes; run it before you commit.
 | The switcher | `shared/web/language-menu.tsx`, `language-section.tsx` |
 | Extract / prune / gaps | `scripts/i18n-extract.mjs`, `i18n-prune.mjs`, `i18n-gaps.mjs` |
 | The ceiling | `TRANSLATION_CEILING` in `shared/rules/registry.ts` |
-| The laws | [RULES.md](RULES.md) R28, R33, R34, R44 |
+| The laws | [RULES.md](../RULES.md) R28, R33, R34, R44 |
 | The commit workflow | [CONTRIBUTING.md](CONTRIBUTING.md) § 3 |
