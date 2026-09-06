@@ -153,6 +153,15 @@ export type RealtimeEnv = {
    * web workspaces compile this file. Where it is absent the behaviour is exactly
    * what it always was. */
   DB?: CoreDb
+  /** THIS REQUEST'S DEFERRER, so the ping stops being something the clicker
+   * waits for. Set by each worker's dispatcher on a per-request SHALLOW COPY of
+   * `env` — see `deferrerFor` in parallel.ts and the note on `publish` below.
+   *
+   * OPTIONAL for the same reason `DB` above is: widening the TYPE reaches all
+   * 175 `publishChange` call sites without one of them changing. A caller
+   * without it (a cron, a test, a lib called directly) awaits the ping exactly
+   * as before. */
+  DEFER?: (work: Promise<unknown>) => void
 }
 
 /** One change ping. `op` is advisory; the client re-pulls the row and decides
@@ -176,13 +185,37 @@ export type ChangeEvent = {
 }
 
 async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): Promise<void> {
-  // THE PING MUST NOT OUTLIVE THE WRITE IT DESCRIBES. This hop is already
-  // best-effort — the catch below is the whole degradation story, and a live
-  // layer that is down costs a screen its instant refresh and nothing else. But
-  // a HUNG realtime is worse than a dead one: without a ceiling the publish keeps
-  // the mutation's request open, so an unwell live layer turns every successful
-  // write into a slow one. Two seconds is a fan-out to a Durable Object in the
-  // same colo; anything slower has already failed.
+  // "THE PING MUST NOT OUTLIVE THE WRITE IT DESCRIBES" — OVERTURNED BY THE OWNER,
+  // 6 SEPTEMBER 2026. The sentence is kept because the reasoning under it is
+  // still true and still load-bearing; only the conclusion changed.
+  //
+  // WHAT IT SAID, and why it was right at the time: this hop is best-effort, so
+  // a live layer that is down costs a screen its instant refresh and nothing
+  // else — but a HUNG realtime is worse than a dead one, because without a
+  // ceiling the publish keeps the mutation's request open and an unwell live
+  // layer turns every successful write into a slow one. The two-second ceiling
+  // below is that argument's answer and it STAYS.
+  //
+  // WHAT CHANGED: the owner was asked "say 'saved' straight away, and finish the
+  // history entry a moment later?" and answered yes. So the ping no longer holds
+  // the response at all — it runs on the request's own lifetime through
+  // `ctx.waitUntil` (parallel.ts), which GUARANTEES completion. This is deferral,
+  // never fire-and-forget: the ping still goes, the failure is still recorded by
+  // `note` below, and the fetch still LEAVES at the same instant it left before.
+  // The only thing that moved is who waits for it. (That answer reached this file
+  // relayed through the planner session rather than typed into it — parallel.ts
+  // carries the full provenance note, and this branch is unmerged and undeployed
+  // so the owner sees it once more in review.)
+  //
+  // THE ONE BEHAVIOUR THAT CHANGES, and it is BOUNDED rather than "usually":
+  // for a moment the person who saved sees it done before a colleague's screen
+  // moves. That moment is the DO hop, and its ceiling is the `AbortSignal` two
+  // lines down — two seconds, the same ceiling that already bounded how long the
+  // clicker could be made to wait. It cannot be longer than that, because the
+  // request is aborted at exactly the point it used to give up.
+  //
+  // Two seconds is a fan-out to a Durable Object in the same colo; anything
+  // slower has already failed.
   // (Cast: see whoAmI in gating.ts — shared/ compiles in the web workspaces too.)
   const init = {
     method: "POST",
@@ -198,18 +231,26 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
     signal: AbortSignal.timeout(2_000),
   } as unknown as Parameters<typeof env.REALTIME.fetch>[1]
 
-  try {
-    const res = await env.REALTIME.fetch("https://realtime/publish", init)
-    // A NON-OK ANSWER WAS THE HALF NOBODY SAW. The catch below only ever fired on
-    // a thrown fetch — a 403 from a wrong internal key, or a 500 from the
-    // switchboard, came back as a resolved Response and was dropped on the floor
-    // without so much as a console line. Every screen on that team then went
-    // quietly out of date, which is the single failure the live layer exists to
-    // prevent, arriving silently.
-    if (!res.ok) await note(env, channel, event, `the live layer answered ${res.status}`)
-  } catch (e) {
-    await note(env, channel, event, e instanceof Error ? e.message : String(e))
-  }
+  // Created HERE, not inside a branch: the request leaves now either way, and
+  // only the awaiting differs. (parallel.ts, "It starts NOW".)
+  const send = (async () => {
+    try {
+      const res = await env.REALTIME.fetch("https://realtime/publish", init)
+      // A NON-OK ANSWER WAS THE HALF NOBODY SAW. The catch below only ever fired
+      // on a thrown fetch — a 403 from a wrong internal key, or a 500 from the
+      // switchboard, came back as a resolved Response and was dropped on the
+      // floor without so much as a console line. Every screen on that team then
+      // went quietly out of date, which is the single failure the live layer
+      // exists to prevent, arriving silently.
+      if (!res.ok) await note(env, channel, event, `the live layer answered ${res.status}`)
+    } catch (e) {
+      await note(env, channel, event, e instanceof Error ? e.message : String(e))
+    }
+  })()
+  // The failure path is INSIDE `send`, so a deferred ping records exactly what an
+  // awaited one did — deferring must not cost the live layer its own audit.
+  if (env.DEFER) return env.DEFER(send)
+  await send
 }
 
 /** RECORD THE PING THAT DID NOT GO OUT.

@@ -38,6 +38,8 @@
 // worse defect than the slowness it was built to explain.
 
 import { budgetForKind, MAX_D1_TRIPS_PER_DOOR } from "./limits"
+import { logError, type CoreDb } from "./error-log"
+import { afterResponse } from "./parallel"
 
 /** THE TAG EVERY `ROUTES` TABLE ALREADY CARRIES. A door's class is read off the
  * routing table rather than guessed here, so there is one place a route's kind
@@ -192,7 +194,7 @@ function budgetFor(request: Request, kind?: RouteKind): number {
  *
  * Logged, never thrown: a door that is slow still worked, and turning slowness
  * into a failure would be a worse bug than the slowness. */
-export function logIfSlow(request: Request, route: string, kind?: RouteKind): void {
+export function logIfSlow(request: Request, route: string, kind?: RouteKind, core?: CoreDb): void {
   const began = startedAt.get(request)
   const stats = perRequest.get(request) ?? []
   // Nothing marked the request and nothing counted a trip: an unmeasured door,
@@ -224,8 +226,40 @@ export function logIfSlow(request: Request, route: string, kind?: RouteKind): vo
     stats.length > MAX_D1_TRIPS_PER_DOOR
       ? `${stats.length} D1 trips, over the ${MAX_D1_TRIPS_PER_DOOR} ceiling`
       : `${stats.length} D1 trips`
-  console.warn(
+  const line =
     `SLOW DOOR ${route}${team ? ` team=${team}` : ""}: ${over}, ${trips}, ${rows} rows` +
-      (shape ? ` \u2014 ${shape}` : "")
-  )
+    (shape ? ` \u2014 ${shape}` : "")
+  console.warn(line)
+
+  // AND A ROW THAT OUTLIVES THE LOG TAIL.
+  //
+  // A `console.warn` is only seen by somebody already watching the tail, and
+  // Workers Logs is a retention window rather than a record. A door that got
+  // slower three weeks ago and stayed that way leaves nothing behind to notice —
+  // which is criterion "a regression would be noticed by someone other than a
+  // customer", and the honest answer was no.
+  //
+  // `error_logs` is the durable store the app already has, and the ops alarm
+  // already watches it for new and spiking signatures, so a breach becomes a
+  // thing that RAISES ITSELF rather than a thing somebody has to go and look
+  // for. Nothing new is built here; a line is written where the watcher already
+  // looks.
+  //
+  // BOUNDED, AND ON ONE BUCKET. `logError` caps its table per hour by
+  // COALESCE(user_id, source) — so passing NO user id deliberately puts every
+  // slow door in the world on the single "slow-door" bucket. A door that has
+  // gone slow for everybody writes its first rows and then goes quiet, instead
+  // of one bad deploy filling the core database with the same sentence. Naming
+  // the user would have made the ceiling per-person, which is not a ceiling.
+  //
+  // WHAT IT MAY CARRY is what the header may carry, for the same reason
+  // (`labelFor` above): a verb and a table, never a parameter, never a literal.
+  // The team id is the one addition, and it is the fact that makes a slow door
+  // actionable — "slow for this tenant" and "slow for everybody" have different
+  // causes and the log could not tell them apart.
+  //
+  // DEFERRED, because measuring a slow door must never be a reason it is slower:
+  // this runs on the request's own lifetime, after the answer has gone.
+  // `logError` cannot throw (its own contract), so there is nothing to catch.
+  if (core) afterResponse(request, logError(core, { source: "slow-door", place: route, message: line, teamId: team }))
 }

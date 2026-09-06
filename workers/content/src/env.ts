@@ -2,6 +2,15 @@
 // satisfies the shared GatingEnv (AUTH + DB + the Cloudflare D1 credentials), so
 // teamContext / requireRight work here exactly as they do in tenancy.
 export type Env = {
+  /** THIS REQUEST'S DEFERRER, set by the dispatcher on a per-request shallow
+   * copy of this env — how `publishChange` stops holding the response (owner's
+   * ruling, 6 Sep 2026). The reasoning, the provenance and why it cannot live on
+   * the shared `env` itself are all in shared/workers/parallel.ts.
+   *
+   * Optional because a cron tick and the test suites have no request to hang
+   * work on; absent means the ping is awaited exactly as it was before. */
+  DEFER?: (work: Promise<unknown>) => void
+
   /** The global core database (users, teams, team_members) — read by gating. */
   DB: D1Database
   /** The auth worker — used to answer "who is making this request?". */

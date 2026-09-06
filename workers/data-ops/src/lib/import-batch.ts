@@ -32,10 +32,23 @@ type BatchRow = {
   files_json: string | null
   plan_json: string | null
   report_json: string | null
+  cursor_json: string | null
+  updated_at: string | null
   created_at: string
 }
 
-const COLS = "id, overall_status, files_json, plan_json, report_json, created_at"
+const COLS = "id, overall_status, files_json, plan_json, report_json, cursor_json, updated_at, created_at"
+
+/** WHERE A RUN GOT TO — written after every wave, read when one is picked up.
+ *
+ * `targetKey` is the table it was inside and `rowsDone` how many of that table's
+ * scanned rows it had finished; `report` is the tally so far, so a resumed run
+ * carries its predecessor's counts and rejections instead of starting the
+ * arithmetic again. Everything else a run needs is REDERIVED rather than stored:
+ * the plan and the files are already on the batch row, and the id-resolution
+ * maps are re-read out of the database by `buildResolvedMap`, which is the same
+ * call the first run made and cannot go stale. */
+type RunCursor = { targetKey: string; rowsDone: number; report: ImportBatchReport }
 
 async function loadBatch(cfg: D1Rest, guard: MemberGuard, id: string): Promise<BatchRow> {
   // Creator-scoped, like import sessions + agent threads.
@@ -64,6 +77,14 @@ function toView(b: BatchRow): ImportBatchView {
     files,
     plan: planOf(b),
     report: b.report_json ? (JSON.parse(b.report_json) as ImportBatchReport) : null,
+    // Only the place, never the whole cursor: the report it carries is already
+    // on `report` above, and sending it twice is two versions of one number.
+    progress: b.cursor_json
+      ? (() => {
+          const c = JSON.parse(b.cursor_json) as RunCursor
+          return { targetKey: c.targetKey, rowsDone: c.rowsDone }
+        })()
+      : null,
     createdAt: b.created_at,
   }
 }
@@ -198,17 +219,38 @@ export async function confirmBatch(
   if (b.overall_status === "complete") throw new GuardError(409, "already_run", "This import has already been run.")
   const plan = planOf(b)
   if (!plan) throw new GuardError(409, "no_plan", "Plan the import before running it.")
+  const cursor = b.cursor_json ? (JSON.parse(b.cursor_json) as RunCursor) : null
 
   // IDEMPOTENCY (convention · CONCURRENCY.md): atomically CLAIM the batch before writing,
   // so a retried or concurrent confirm can't run the import twice (duplicate rows). Only
   // the request that flips planned→running proceeds; a second finds it already claimed and
-  // is refused. A crashed run stays 'running' (safe — no duplicates); re-create to retry.
+  // is refused.
+  //
+  // AND THE SECOND WAY IN, added 6 Sep 2026: picking up a run that DIED. That
+  // used to be impossible on purpose — the claim is one-way, so a crashed run
+  // sat on `running` for ever and the only route forward was to upload the file
+  // again, which duplicates every row the dead run had already written. For a
+  // job measured in minutes, with a person and a browser at the other end, "it
+  // died half way" is not a rare case, and re-uploading was a worse answer than
+  // resuming.
+  //
+  // IT IS STILL EXACTLY ONE WINNER. A resume claims on `updated_at` — the value
+  // this caller just read — so two people pressing Continue at once means the
+  // first moves the row and the second matches nothing and is refused, which is
+  // the same protection the `planned` claim gives a first run. A run with no
+  // cursor cannot be resumed at all: there is nothing to say where it stopped,
+  // so it is refused rather than restarted from the top.
+  const resuming = b.overall_status === "running" && cursor !== null
   const claimed = await d1Query(
     cfg,
     guard.databaseId,
-    `UPDATE data_import_batches SET overall_status = 'running', updated_at = ${sqlString(
-      new Date().toISOString()
-    )} WHERE id = ${sqlString(batchId)} AND overall_status = 'planned' RETURNING id;`,
+    resuming
+      ? `UPDATE data_import_batches SET updated_at = ${sqlString(new Date().toISOString())}
+           WHERE id = ${sqlString(batchId)} AND overall_status = 'running'
+             AND updated_at IS ${b.updated_at === null ? "NULL" : sqlString(b.updated_at)} RETURNING id;`
+      : `UPDATE data_import_batches SET overall_status = 'running', updated_at = ${sqlString(
+          new Date().toISOString()
+        )} WHERE id = ${sqlString(batchId)} AND overall_status = 'planned' RETURNING id;`,
     []
   )
   if (!claimed.length)
@@ -222,9 +264,24 @@ export async function confirmBatch(
     for (const ref of TARGETS[key]?.references ?? []) if (ref.mode === "id") idParents.add(ref.target)
 
   const resolved = new Map<string, Map<string, string>>()
-  const report: ImportBatchReport = { perTarget: [], created: 0, skipped: 0, failed: 0, rejections: [] }
+  // A resumed run inherits the tally it is continuing, so the numbers a person
+  // is finally shown are the whole import's and not the last leg's.
+  const report: ImportBatchReport = cursor
+    ? cursor.report
+    : { perTarget: [], created: 0, skipped: 0, failed: 0, rejections: [] }
+  // Which targets are already finished, off the report the cursor carried —
+  // derived rather than stored a second time, so the two cannot disagree.
+  const finished = new Set(report.perTarget.map((t) => t.target))
 
   for (const targetKey of plan.order) {
+    // ALREADY DONE ON THE EARLIER LEG. Its rows are written and its tally is in
+    // the report; the only thing still needed from it is the id map a later
+    // target may resolve against, which is re-read from the database below.
+    if (finished.has(targetKey)) {
+      if (idParents.has(targetKey))
+        resolved.set(targetKey, await buildResolvedMap(env, request, TARGETS[targetKey]))
+      continue
+    }
     const def = TARGETS[targetKey]
     const step = plan.steps.find((s) => s.target === targetKey)
     const file = step ? files.get(step.fileId) : undefined
@@ -282,7 +339,28 @@ export async function confirmBatch(
     // without anybody remembering this paragraph.
     const createsVocabulary = (def.references ?? []).some((r) => r.onMissing === "create")
     const wavefront = createsVocabulary ? 1 : BULK_CONCURRENCY
-    for (let i = 0; i < scans.length; i += wavefront) {
+    // WHERE THIS TARGET STARTS. Only the target the cursor names is part-done;
+    // every other unfinished one starts at nothing. `rowsDone` counts SCANNED
+    // rows, which is the same list in the same order every time (`scanRows` is a
+    // synchronous pass over the file stored on the batch), so an index means the
+    // same row on the second leg as it did on the first.
+    //
+    // WHAT THE BOUNDARY DOES AND DOES NOT PROMISE, because this is the one place
+    // a resume can cost something. The cursor advances after a wave has fully
+    // SETTLED, so a run that died mid-wave is picked up at the start of that
+    // wave and up to `wavefront - 1` rows may be written a second time. That is
+    // the honest ceiling and it is stated in the report a person reads. It is
+    // strictly better than what it replaces: with no resume at all the only way
+    // on was to upload the file again, which rewrites every row the dead run had
+    // already made — up to 8,000 of them rather than up to eleven.
+    let startAt = cursor && cursor.targetKey === targetKey ? cursor.rowsDone : 0
+    if (startAt > 0)
+      report.rejections.push({
+        file: file.name,
+        row: startAt,
+        reason: `Resumed here. Up to ${wavefront - 1} rows either side of this point may have been imported twice.`,
+      })
+    for (let i = startAt; i < scans.length; i += wavefront) {
       const wave = scans.slice(i, i + wavefront)
       const results = await Promise.all(
         wave.map(async (scan, n) => {
@@ -312,6 +390,20 @@ export async function confirmBatch(
           report.rejections.push({ file: file.name, row: r.row, reason: r.reason })
         }
       }
+      // THE CHECKPOINT, AFTER THE WAVE HAS SETTLED — never inside the callback,
+      // for the same reason the fold above is not: a cursor written from twelve
+      // concurrent callbacks is a cursor nobody can reason about. Written here
+      // rather than once per target so the work a dead run loses is one wave and
+      // not one table.
+      //
+      // The report goes with it: `report` at this instant already carries this
+      // target's finished waves through `tally`, so the row a resume reads back
+      // is the arithmetic as it stood, not as it stood one table ago.
+      await writeCursor(cfg, guard, batchId, {
+        targetKey,
+        rowsDone: Math.min(i + wavefront, scans.length),
+        report: { ...report, perTarget: [...report.perTarget, tally] },
+      })
     }
 
     // If a later child resolves to THIS target by id, read its rows back now.
@@ -352,7 +444,11 @@ export async function confirmBatch(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `UPDATE data_import_batches SET report_json = ${sqlString(JSON.stringify(report))}, overall_status = 'complete', completed_at = ${sqlString(now)}, updated_at = ${sqlString(now)} WHERE id = ${sqlString(batchId)};`
+    // The cursor is CLEARED here: a finished import has nowhere to be resumed
+    // to, and a leftover cursor beside `complete` is an invitation to run it
+    // twice. `complete` and `cursor_json IS NULL` move in the same statement so
+    // the pair can never be half true.
+    `UPDATE data_import_batches SET report_json = ${sqlString(JSON.stringify(report))}, cursor_json = NULL, overall_status = 'complete', completed_at = ${sqlString(now)}, updated_at = ${sqlString(now)} WHERE id = ${sqlString(batchId)};`
   )
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Data imported",
@@ -361,6 +457,24 @@ export async function confirmBatch(
     relatedRowId: batchId,
   })
   return { view: toView(await loadBatch(cfg, guard, batchId)), report, modules: planModules(plan) }
+}
+
+/** SAVE THE PLACE. One statement, and `updated_at` moves with it so the resume
+ * claim (which matches on that value) always sees the newest leg. */
+async function writeCursor(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  batchId: string,
+  cursor: RunCursor
+): Promise<void> {
+  await d1ExecScript(
+    cfg,
+    guard.databaseId,
+    `UPDATE data_import_batches SET cursor_json = ${sqlString(JSON.stringify(cursor))},
+       report_json = ${sqlString(JSON.stringify(cursor.report))},
+       updated_at = ${sqlString(new Date().toISOString())}
+     WHERE id = ${sqlString(batchId)};`
+  )
 }
 
 export async function getBatchView(cfg: D1Rest, guard: MemberGuard, id: string): Promise<ImportBatchView> {
