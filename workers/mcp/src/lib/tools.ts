@@ -370,9 +370,12 @@ const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([reco
 })
 
 /** THE GENERIC FORM, BESIDE THE TWENTY-ONE NAMED ONES — not instead of them.
- * R43 (workers/mcp/test/agent-mcp-tool-parity.test.ts) makes MCP a STRICT
- * SUPERSET of the agent's own catalog: every capability the agent has, MCP has
- * too, under some name. The agent's `set_record_active` (one tool, twenty-one
+ * R43 (workers/mcp/test/agent-mcp-tool-parity.test.ts) requires every asymmetry
+ * between the two machine catalogues to be a named, reasoned line, in BOTH
+ * directions — an agent-only gap being the dangerous one and an mcp-only one
+ * the harmless one. (It does NOT make MCP a superset: there are 26 agent-only
+ * tools, twenty-one of them the Google block. That sentence stood here, and in
+ * R43's own header, until 6 Sep 2026.) The agent's `set_record_active` (one tool, twenty-one
  * doors, `route`-resolved) had no MCP counterpart at all — not because the
  * capability was missing (all twenty-one doors are individually here), but
  * because nothing published the GENERIC shape. Publishing it costs nothing on
@@ -508,8 +511,9 @@ export async function forwardTool(
   // first. Two things stopped it, both discovered by running it rather than by
   // reasoning: the twenty-one `set_*_active` names are PUBLISHED EXTERNAL
   // CONTRACTS that record-toggles.test.ts forbids removing, and dropping eight
-  // names also inverted R43's stated direction (MCP is a strict superset of the
-  // agent's catalogue) and staled two hard-coded census counts and MCP.md. That
+  // names also inverted R43's direction of travel (an mcp-only asymmetry is the
+  // harmless one; an agent-only gap is not) and staled two hard-coded census
+  // counts and MCP.md. That
   // is a product decision about a published API, not a security fix, so it went
   // back to the planner instead. This refusal closes the hole identically — the
   // figure never leaves the building through MCP either way — and breaks nothing.
