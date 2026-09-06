@@ -142,8 +142,30 @@ against is *losing the account* rather than losing a row, take a file:
 
 ```bash
 cd workers/auth
-npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
+cf-exec npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
 ```
+
+> **THIS TAKES THE DATABASE OFFLINE, AND IN A SCRIPT IT WILL NOT ASK YOU FIRST.**
+> `wrangler d1 export --remote` prints *"This process may take some time, during
+> which your D1 database will be unavailable to serve queries. Ok to proceed?"* —
+> and in a NON-INTERACTIVE shell it answers **yes** on your behalf
+> (`Using fallback value in non-interactive context: yes`). There is no flag in
+> the command above that says so.
+>
+> **Measured 2026-09-06 against staging:** 28.6 s of unavailability for a
+> **116 MB** team database, 9.5 s for the **5 MB** core. Reloading the team dump
+> afterwards took a further **7 min 02 s**, which is the number to plan a real
+> restore around — the export is the fast half.
+>
+> So: never in a cron, never in a deploy script, never unattended on production,
+> and **not on a shared staging environment while other people are working on
+> it** — this was learned by doing exactly that, briefly, during the rehearsal
+> RESILIENCE.md records. Announce the window first, the way you would for any
+> other outage.
+>
+> `cf-exec` is on the front of that command deliberately: a bare `wrangler`
+> resolves to whichever Cloudflare account the machine is signed into, and this
+> one is shared — eleven of its sixteen D1 databases belong to other companies.
 
 There is no scheduled job doing this. **If an off-Cloudflare backup matters to
 this product, that is a decision nobody has made yet**, it is listed in

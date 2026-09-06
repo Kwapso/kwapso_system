@@ -279,6 +279,22 @@ resolves.
 > companies and about 125 accounts (§ *What softens it*). Budget the reload, and
 > budget it per team.
 >
+> **AND THE REHEARSAL ITSELF CAUSED A SMALL OUTAGE, which is recorded here
+> because it is the most useful thing that happened.** The export took this
+> staging team database offline for its 28.6 seconds, at about 11:20 on
+> 2026-09-06, while several people were working against staging. Nobody was
+> asked, because nobody realised there was anything to ask: the warning is
+> auto-accepted in a non-interactive shell, and the hazard had been *discovered
+> and written down thirty minutes earlier* during the core export on this very
+> page — and then not applied to the larger database that followed. Knowing a
+> risk and carrying it forward to the next action are two different things, and
+> only the first of them had happened.
+>
+> The operational rule that came out of it now sits where somebody about to run
+> the command will actually meet it: RUNBOOK § *Taking a copy you can hold* and
+> OPERATIONS § *Backing up*. **Announce the window first, on any shared
+> environment, exactly as you would for any other outage.**
+>
 > **The dumps were deleted.** Both the 116 MB SQL and the 127 MB scratch database
 > were written to a session scratchpad outside the repository and removed as soon
 > as the counts were taken. They hold real customer records; what is written down

@@ -234,6 +234,18 @@ exactly this reason and says `UNPROVEN` rather than `moved`. Roll it out with
 
 ## Backing up, and getting the rows back
 
+> **`wrangler d1 export --remote` IS AN OUTAGE, AND IT WILL NOT ASK YOU IN A
+> SCRIPT.** It warns that the database "will be unavailable to serve queries"
+> and then, in a non-interactive shell, answers **yes** for you
+> (`Using fallback value in non-interactive context: yes`). Measured against
+> staging on 2026-09-06: **28.6 s offline for a 116 MB team database, 9.5 s for
+> the 5 MB core**; the reload afterwards took **7 min 02 s**. Never put it in a
+> cron, a deploy step or any unattended job, never point it at production
+> outside an announced window, and do not run it against staging while other
+> people are working there — RESILIENCE.md § *When the restore was last tested*
+> records the rehearsal where that lesson was collected the hard way.
+> `scripts/backup.mjs` uses the same door, so the same window applies to it.
+
 `node scripts/backup.mjs <staging|production>`, read-only, refuses to run against the wrong Cloudflare account, and dumps the core database plus every team database core points at. **It needs `CLOUDFLARE_ACCOUNT_ID` (must equal kwapso's account id — the script carries it and refuses anything else) and `CLOUDFLARE_API_TOKEN` in the environment, and `scripts/reset-all.mjs` refuses without the same `CLOUDFLARE_ACCOUNT_ID` guard** — both documented commands fail on a clean shell until they are exported (run them through `cf-exec`, which sets both). The restore paths (Time Travel for a live database inside 30 days; a dump for one that is gone), what is deliberately NOT backed up, and the date the restore was last rehearsed all live in **[RESILIENCE.md](RESILIENCE.md)**.
 
 **WARNING, before any usage pull or cleanup that lists D1 databases:** kwapso's per-team databases share the Cloudflare account with another product (rest-o) that uses the SAME `team-<ulid>` naming, one of them live production. Derive the list of kwapso's databases from the core `teams.database_id` column — the way `backup.mjs` and `reset-all.mjs` already do — never from a name-prefix filter, which excludes kwapso's own shards and includes somebody else's.
