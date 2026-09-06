@@ -55,8 +55,26 @@
  * request since the deploy still holds only the legacy name and is still
  * fixable until they do. Sessions slide and every sign-in mints the new name, so
  * it drains on its own. `destroySession` closes the nastiest corner of it —
- * see its own note. DELETE the fallback (and this paragraph) once the estate has
- * been through one full session lifetime, 30 days after this ships. */
+ * see its own note.
+ *
+ * ── DO NOT SIMPLY DELETE THE FALLBACK. The first version of this paragraph said
+ * "delete the fallback 30 days after this ships", and obeying it literally would
+ * BREAK EVERY DEVELOPER MACHINE — quietly, thirty days after the change that
+ * caused it, when nobody is thinking about cookies.
+ *
+ * The reason is one line up: `sessionCookieName(insecure)` returns the LEGACY
+ * name whenever `INSECURE_COOKIE=1`, because a browser will not accept a
+ * `__Host-` cookie without `Secure` and local dev is http. So local dev MINTS
+ * the legacy name permanently — the fallback is not only the migration's
+ * crutch, it is also the only thing that READS the dev cookie, and
+ * `readSessionToken` is the sole session-read path in the product.
+ *
+ * TWO THINGS WERE CONFLATED IN ONE `??`: a temporary migration fallback that
+ * drains in thirty days, and a permanent dev-mode read that does not. Whoever
+ * retires the first must keep the second — the honest end state is a reader
+ * SYMMETRIC WITH THE WRITER, reading `sessionCookieName(insecure)` rather than
+ * a fixed constant, at which point the legacy arm can go and dev keeps working.
+ * Until somebody does that work, this `??` stays. */
 export const LEGACY_SESSION_COOKIE = "kwapso_session"
 export const SESSION_COOKIE = "__Host-kwapso_session"
 

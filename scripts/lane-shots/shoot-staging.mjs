@@ -41,7 +41,13 @@ for (const [name, path] of SCREENS) {
   for (const [wname,[w,h]] of Object.entries(WIDTHS)) {
     for (const theme of ["light","dark"]) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 1 })
-      await ctx.addCookies([{ name: "kwapso_session", value: token, domain: new URL(BASE).hostname, path: "/" }])
+      await ctx.addCookies(
+        // BOTH NAMES — staging mints `__Host-kwapso_session`; the bare one is kept
+        // for anything not yet migrated. See shared/workers/session-cookie.ts.
+        ["__Host-kwapso_session", "kwapso_session"].map((name) => ({
+          name, value: token, domain: new URL(BASE).hostname, path: "/",
+        }))
+      )
       await ctx.addInitScript((t) => { try { localStorage.setItem("theme", t); localStorage.setItem("kwapso:install-prompt-dismissed","1") } catch {} }, theme)
       const page = await ctx.newPage()
       const errs = []
