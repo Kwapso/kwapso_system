@@ -399,9 +399,37 @@ const TAB = cn(
    itself carried no ink hover of its own before today, only the shared
    part's did — so this is a suppression, not a second rule to keep in step.
 
-   `z-[1]` and `z-[3]` are 24.3's own two numbers, kept so a caller that draws
-   its card at `z-[2]` gets ch14's "clipped by the card edge" for the rest tabs
-   and an attached live tab, without this file knowing what the card is. */
+   BOTH TABS SIT AT `z-[1]` — BELOW A CARD DRAWN AT `z-[2]`. This was
+   `z-[1]` for the rest tabs and `z-[3]` for the live one, 24.3's own two
+   numbers, so a caller's card clipped the rest tabs while the live tab was
+   "attached" by painting OVER the card. The client, twice, on what that
+   actually produces — 2026-09-03: "the shape of the folder tab should be
+   behind the body, if not when i scroll down look what happens in my
+   screenshots - its overlapping and cuts the content", and again on
+   2026-09-06 with a screenshot of the join: "the folder tab is still
+   overlapping, thats wrong."
+
+   She is right, and the old arrangement could not be anything else. The
+   strip ends `--folder-tab-overlap` (17.02) ABOVE where it appears to, so
+   the live tab's foot lies over the first 17px of the card — and at `z-[3]`
+   it PAINTS there. Whatever the card puts in that band, the tab covers:
+   the assistant's first line of conversation, a tab row's shoulder, the top
+   of a scrolled list. It is invisible while that band is empty paper, which
+   is exactly why it survived so long.
+
+   Putting the live tab under the card costs nothing and is checkable rather
+   than argued. The card has NO top border (measured `0px`) and its shadow is
+   cast downward (`0 6px 20px -6px` — with the offset and the negative spread
+   there is no ink at the top edge), and the live tab's paper IS the card's
+   paper, the same `--kw-off-beige`. So the card covering the tab's foot and
+   the tab covering the card's head produce the IDENTICAL join, and only one
+   of them can hide content.
+
+   The live tab still paints above its neighbours, and not by a number: tabs
+   overlap along the strip, the current location is the LAST crumb, and at
+   equal `z-index` the later element in DOM order wins. That is the same
+   relationship the two numbers used to buy, held by the order the trail
+   already has. */
 const TAB_REST = cn(
   "z-[1]",
   "text-ink-secondary font-[var(--font-weight-light)]",
@@ -419,7 +447,7 @@ const TAB_REST = cn(
    `w-full` + `justify-start` were added and reversed the same day (see
    `STRIP`'s own note) — the live tab is sized to its own label again, like
    every rest tab, and reads centred under `TAB`'s shared `justify-center`. */
-const TAB_LIVE = "z-[3] cursor-default";
+const TAB_LIVE = "z-[1] cursor-default";
 
 /** The two papers, as `color` for the shape's `currentColor`. */
 const FILL_REST = "text-[var(--kw-crumb-rest)]";
