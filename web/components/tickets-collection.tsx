@@ -1360,7 +1360,6 @@ function TriageQueue({
           value=""
           onChange={(v) => void accept(current, v)}
           options={peopleOptions}
-          note={t("Picking somebody puts them on the ticket and marks it triaged, in one go.")}
           searchPlaceholder={t("Who is picking this up?")}
           emptyText={t("Nobody on this team can be given work yet.")}
           disabled={busy}
@@ -1425,7 +1424,39 @@ function TriageQueue({
           direction: sortDir,
           onDirectionChange: setSortDir,
         }}
-        actions={canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
+        /* UNDO RIDES THE TOOLBAR NOW, TO THE LEFT OF THE CREATE BUTTON —
+           client, 2026-09-06: "undo button on top in toolbar, left to +".
+           `actions` is the row's own trailing slot and it renders its children
+           in order, so a fragment puts Undo first and the `+` last without
+           either of them knowing about the other.
+
+           AND IT IS ABSENT WHEN THERE IS NOTHING TO TAKE BACK, which is the
+           same message's other half. That is safe HERE in a way it was not in
+           the decision row: nothing in the toolbar is a target the hand is
+           already travelling towards mid-sitting, so a control that appears
+           after the first decision moves nothing that matters. In the decision
+           row it would have shifted Accept and Change category under a moving
+           hand, which is why it was drawn-and-disabled there for as long as it
+           lived there. */
+        actions={
+          (lastAct || canCreateTicket) && (
+            <>
+              {lastAct && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void undo()}
+                  className="gap-1"
+                >
+                  <ArrowCounterClockwise className="size-3.5" />
+                  {t("Undo")}
+                </Button>
+              )}
+              {canCreateTicket && <AddButton label={t("Raise ticket")} onClick={onCreate} />}
+            </>
+          )
+        }
       />
       {!current && narrowed && decided.length === 0 ? (
         // The ordinary "nothing matched" case — the toolbar above stays up so it
@@ -1512,20 +1543,18 @@ function TriageQueue({
                     {t("Change category")}
                   </Button>
                 )}
-                {/* UNDO IS ALWAYS DRAWN AND USUALLY DISABLED, rather than
-                    appearing once there is something to take back: a control
-                    that arrives mid-sitting moves the two beside it, which is
-                    the same complaint the picker row above is shaped around. */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy || !lastAct}
-                  onClick={() => void undo()}
-                  className="gap-1"
-                >
-                  <ArrowCounterClockwise className="size-3.5" />
-                  {t("Undo")}
-                </Button>
+                {/* UNDO IS NOT HERE ANY MORE — client, 2026-09-06: "undo button on
+                    top in toolbar, left to +", and "if there is nothing to undo,
+                    do not have this undo button".
+
+                    Both halves of that are one decision. It was drawn always and
+                    disabled most of the time, on the reasoning that a control
+                    appearing mid-sitting shifts the ones beside it — true, and
+                    the wrong trade here: the decision row is the four moves the
+                    sitting exists to make, and a permanently greyed fifth button
+                    sitting among them is noise on every single card. In the
+                    TOOLBAR it can come and go without moving anything the hand
+                    is aiming at, because the toolbar is not where the hand is. */}
                 {/* OPEN, MOVED HERE FROM THE CARD — client, 2026-09-06: "I want
                     to keep the Open function, but not here. I want to have it
                     next to Skip."
@@ -1548,7 +1577,6 @@ function TriageQueue({
                   <ArrowUpRight className="size-3.5" />
                   {t("Open")}
                 </Button>
-                {pickerRow}
               </>
             )
           }
@@ -1578,6 +1606,18 @@ function TriageQueue({
                   date — and everything that is a RECORD is a link down here.
                   See `TriageMeta` for the whole of it. */}
               <TriageMeta teamId={teamId} ticket={current} />
+              {/* THE PICKER OPENS ABOVE THE BUTTONS — client, 2026-09-06: "the
+                  model to assign or recategorise, open it above the buttons
+                  assign / change category."
+
+                  It used to be the last item INSIDE the decision row, which put
+                  it between Open and the kit's own Skip and pushed the two ways
+                  out of the sitting apart. Here it is the last of the card's
+                  CHILDREN, so the kit draws it above the decision row entirely:
+                  the buttons never move, the row that opened stays next to the
+                  button that opened it, and Open and Skip end up adjacent,
+                  which is the other half of the same message. */}
+              {pickerRow}
               {/* THE STRIP THAT USED TO SIT HERE IS GONE — client, 2026-09-06:
                   "the text that's now under the date … above the buttons that
                   say Open, Reply and Edit: remove all of this. However, I want

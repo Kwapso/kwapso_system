@@ -891,9 +891,16 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // follows it down — R44 fails a ceiling left ABOVE the count for exactly this
   // reason: a stale pin would hide the next regression behind an improvement it
   // never recorded. It can fall; it can never rise without the count rising too.
-  de: 237,
-  es: 237,
-  ca: 237,
+  // AND DOWN AGAIN, 237 -> 236, the same lane's third pass: the picker's
+  // explanatory note ("Picking somebody puts them on the ticket and marks it
+  // triaged, in one go.") was deleted at the client's request, and it was one
+  // of the untranslated. Deleting an English-only sentence lowers the true
+  // count, so the pin follows. Third fall in one day and every one of them a
+  // deletion rather than a translation run — the ceiling is doing exactly what
+  // it was written to do, which is refuse to sit above the truth.
+  de: 236,
+  es: 236,
+  ca: 236,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
