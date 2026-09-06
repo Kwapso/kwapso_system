@@ -28,7 +28,6 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
@@ -391,29 +390,34 @@ export function WaveDetailScreen({
                     // sprint has nothing for either control to do.
                     search={
                       sprints.length > 1 && (
-                        <>
-                          <SearchInput
-                            value={sprintQuery}
-                            onChange={(e) => setSprintQuery(e.target.value)}
-                            onClear={() => setSprintQuery("")}
-                            placeholder={t("Search sprints in this wave…")}
-                            className="flex-1"
-                            aria-label={t("Search sprints in this wave")}
-                          />
-                          <SortControl
-                            options={[
-                              { value: "startsOn", label: t("Starts") },
-                              { value: "name", label: t("Name") },
-                            ]}
-                            value={sprintSort.by}
-                            onValueChange={(by) => setSprintSort({ by: by as typeof sprintSort.by, dir: "asc" })}
-                            direction={sprintSort.dir}
-                            onDirectionChange={(dir) => setSprintSort((s) => ({ ...s, dir }))}
-                            label={t("Sort by")}
-                            hideLabel
-                          />
-                        </>
+                        <SearchInput
+                          value={sprintQuery}
+                          onChange={(e) => setSprintQuery(e.target.value)}
+                          onClear={() => setSprintQuery("")}
+                          placeholder={t("Search sprints in this wave…")}
+                          className="flex-1"
+                          aria-label={t("Search sprints in this wave")}
+                        />
                       )
+                    }
+                    // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06)
+                    // — see screen-bits.tsx's `ToolbarSortSlot`. Same two
+                    // columns, same gate (more than one sprint to order), drawn
+                    // by the row now so this tab's toolbar and the Apps screen's
+                    // put the chip in the same place.
+                    sort={
+                      sprints.length > 1 && {
+                        options: [
+                          { value: "startsOn", label: t("Starts") },
+                          { value: "name", label: t("Name") },
+                        ],
+                        value: sprintSort.by,
+                        onValueChange: (by: string) =>
+                          setSprintSort({ by: by as typeof sprintSort.by, dir: "asc" }),
+                        direction: sprintSort.dir,
+                        onDirectionChange: (dir: "asc" | "desc") =>
+                          setSprintSort((s) => ({ ...s, dir })),
+                      }
                     }
                     actions={
                       <>

@@ -34,6 +34,8 @@ import {
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
   EMPTY_TOOLBAR_EXEMPT,
+  TOOLBAR_CONTROL_OWNERS,
+  TOOLBAR_SORT_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -3190,6 +3192,231 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R53 — THE COLLECTION TOOLBAR'S SLOT SET IS THE ROW'S, AND ITS SORT SLOT IS
+  // A DEFAULT.
+  //
+  // The client's own words, 2026-09-06, on two screenshots of her own main
+  // collection screens side by side — Apps (`Search apps…` / Filter / ↑ /
+  // Name / ▦ Tiles / +) and Tasks (`Search 82 tasks…` / Filter / +): "why the
+  // fuck i still have different toolbar variations??? unify joder."
+  //
+  // R48 asks whether a `search` PROP is present. R49 asks about the row's
+  // margin. R50 asks whether an `empty` prop is derived from real data. Not
+  // one of the three can see WHICH CONTROL WENT INTO WHICH SLOT, because
+  // `sort` and `view` were `React.ReactNode` and a node slot's contents are
+  // invisible to a prop census by construction. So eight of the eleven
+  // toolbars that drew a sort control handed it to `search` instead —
+  // `<>{searchInput}{statusSelect}{sortControl}</>` — where it sat inside the
+  // row's ONE GROWING slot at whatever label treatment that screen typed,
+  // while Apps and Deliverables drew the identical chip in the non-growing box
+  // beside `actions`. Same control, same app, two places, green build.
+  //
+  // THE FIX IS A CHANGE OF TYPE, NOT AN EIGHTEENTH CALL-SITE PATCH: `sort` and
+  // `view` are CONFIGS the row renders (`ToolbarSortSlot`/`ToolbarViewSlot`,
+  // screen-bits.tsx), the same move `folderTabs` already made from raw JSX to
+  // a `FolderTabStrip`, so a call site does not construct a `<SortControl>`
+  // and has nothing left to misplace. Three censuses, off the disk:
+  //
+  //   i.   THE CENTRAL GUARD — `ToolbarRow`'s own source declares both slots as
+  //        configs (never `React.ReactNode`) and renders both controls itself.
+  //   ii.  NOBODY ELSE BUILDS EITHER CONTROL — every `.tsx` under `web/`,
+  //        `web-portal/` and `shared/web/` that renders a `<SortControl` or a
+  //        `<ViewSwitch` must be named in `TOOLBAR_CONTROL_OWNERS`. That list
+  //        is where the app's OTHER toolbar-owning components are written
+  //        down, `wave-finder.tsx`'s hand-copy of this very row included.
+  //   iii. SORT IS A DEFAULT — every `<ToolbarRow>` call site passes `sort`,
+  //        or its enclosing component is named in `TOOLBAR_SORT_EXEMPT`.
+  //
+  // `view` gets no clause of its own on purpose: `ViewSwitch` draws nothing for
+  // fewer than two views, so a single-body collection is self-exempting and a
+  // registry of "this screen has one body" would be seventeen lines of noise.
+  it("toolbar-slot-set: the row owns its slots, and sort is a default (R53)", () => {
+    const SORT_TAG = /<SortControl[\s/>]/
+    const VIEW_TAG = /<ViewSwitch[\s/>]/
+
+    // ── i · THE CENTRAL GUARD ────────────────────────────────────────────────
+    const screenBits = stripComments(
+      readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8")
+    )
+    // THE PROP'S TYPE, not merely its name. A `sort?: React.ReactNode` still
+    // has a `sort` prop and would satisfy any assertion that only looked for
+    // the identifier — and it is precisely the type this law replaced, so the
+    // check has to be able to tell the two apart.
+    expect(
+      screenBits,
+      "R53 — ToolbarRow must declare `sort?: ToolbarSortSlot | false | null` (screen-bits.tsx): a config the row renders, never a ReactNode a call site can fill with anything"
+    ).toMatch(/\bsort\?:\s*ToolbarSortSlot\b/)
+    expect(
+      screenBits,
+      "R53 — ToolbarRow must declare `view?: ToolbarViewSlot | false | null` (screen-bits.tsx), for the same reason `sort` is a config"
+    ).toMatch(/\bview\?:\s*ToolbarViewSlot\b/)
+    expect(
+      /\b(?:sort|view)\?:\s*React\.ReactNode/.test(screenBits),
+      "R53 — ToolbarRow's `sort`/`view` are back to `React.ReactNode` (screen-bits.tsx). That is the type this law replaced: a node slot accepts the right control, no control, or the control belonging in a different slot, and no census can tell which"
+    ).toBe(false)
+    // AND IT ACTUALLY DRAWS THEM. A config prop nothing renders is a slot that
+    // silently disappeared — every call site would still type-check.
+    expect(
+      SORT_TAG.test(screenBits),
+      "R53 — ToolbarRow must render the `<SortControl>` itself (screen-bits.tsx), from its own `sort` config — that is what makes the placement and the label treatment the row's rather than each screen's"
+    ).toBe(true)
+    expect(
+      VIEW_TAG.test(screenBits),
+      "R53 — ToolbarRow must render the `<ViewSwitch>` itself (screen-bits.tsx), from its own `view` config"
+    ).toBe(true)
+
+    // ── ii · NOBODY ELSE BUILDS EITHER CONTROL ───────────────────────────────
+    const controlRoots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
+    const controlOffenders: string[] = []
+    const ownerUsed = new Set<string>()
+    let filesScanned = 0
+    for (const f of sourceFiles(controlRoots, {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      // COMMENTS STRIPPED FIRST (CONVENTIONS.md, and R52 learned this the hard
+      // way): every file this law touched now carries a long comment naming
+      // `<SortControl>` as the thing it stopped drawing, and on raw text each
+      // one would report itself as an offender.
+      const src = stripComments(f.source)
+      if (!SORT_TAG.test(src) && !VIEW_TAG.test(src)) continue
+      if (f.rel in TOOLBAR_CONTROL_OWNERS) {
+        ownerUsed.add(f.rel)
+        continue
+      }
+      controlOffenders.push(
+        `${f.rel}: builds its own <SortControl>/<ViewSwitch>. The toolbar row that draws it owns that control — ` +
+          `pass a \`sort\`/\`view\` config to <ToolbarRow> instead, or name this file in TOOLBAR_CONTROL_OWNERS with the reason it is a toolbar of its own`
+      )
+    }
+    // THE TRIPWIRE FOR THIS CENSUS. A scan that matched nothing agrees with
+    // itself: a renamed kit export, a moved folder or a broken `sourceFiles`
+    // root would report "nobody builds a sort control", which is the same
+    // green as "everybody does it correctly".
+    expect(
+      filesScanned,
+      "R53 — the toolbar-control census walked no files at all. The scan is blind (a moved root, a broken sourceFiles call) — fix it before trusting the result"
+    ).toBeGreaterThan(50)
+    expect(
+      ownerUsed.size,
+      "R53 — the toolbar-control census found NO file rendering a <SortControl> or a <ViewSwitch>. Either the kit renamed those exports (so this law now guards nothing) or the app stopped drawing a sort control anywhere — either way, fix the scan before trusting it"
+    ).toBeGreaterThan(1)
+    expect(
+      controlOffenders,
+      `R53 — a sort or view control is built by the toolbar that draws it, nowhere else:\n  ${controlOffenders.join("\n  ")}`
+    ).toEqual([])
+    const staleOwners = Object.keys(TOOLBAR_CONTROL_OWNERS).filter((k) => !ownerUsed.has(k))
+    expect(
+      staleOwners,
+      `these TOOLBAR_CONTROL_OWNERS entries no longer render either control — the file was folded into <ToolbarRow> or deleted, so delete the entry:\n  ${staleOwners.join("\n  ")}`
+    ).toEqual([])
+
+    // ── iii · SORT IS A DEFAULT ──────────────────────────────────────────────
+    //
+    // KEYED BY ENCLOSING COMPONENT, not by file: three of these files hold two
+    // or three separate toolbars with genuinely different answers (contact-
+    // panels.tsx alone has one panel that sorts by two columns, one that sorts
+    // by direction only, and one that cannot honestly sort at all), and a
+    // file-level pin would exempt all three on one panel's reason.
+    const sortOffenders: string[] = []
+    const sortExemptUsed = new Set<string>()
+    let rowsScanned = 0
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      // screen-bits.tsx DECLARES <ToolbarRow> — it is not a call site of it.
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue
+      const src = stripComments(f.source)
+      let from = 0
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        // The same brace-depth walk to this tag's OWN closing `>` that R48,
+        // R49 and R50 use, so a `search={<SearchInput onClear={() => …} />}`
+        // prop's nested braces and tags cannot end the scan early.
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        rowsScanned++
+        // TOP-LEVEL PROPS ONLY. `\bsort\s*=` over the whole tag would be
+        // satisfied by a `sort={deptSort}` sitting INSIDE a `search={…}`
+        // prop's own child — which is exactly the shape this law exists to
+        // fail (client-org-panel's `<ListToolbar sort={…}>`, handed to
+        // `search`, read as a compliant `sort` prop on the first draft of this
+        // census). So the props are split at brace depth 0 first, and the
+        // question is asked of the NAMES that survive.
+        const topLevelProps = new Set<string>()
+        {
+          const body = tag.slice("<ToolbarRow".length, tag.length - 1)
+          let j = 0
+          while (j < body.length) {
+            const m = /^\s*([A-Za-z][A-Za-z0-9]*)\s*=\s*/.exec(body.slice(j))
+            if (!m) {
+              j++
+              continue
+            }
+            topLevelProps.add(m[1])
+            let k = j + m[0].length
+            if (body[k] === "{") {
+              let d = 0
+              do {
+                if (body[k] === "{") d++
+                else if (body[k] === "}") d--
+                k++
+              } while (k < body.length && d > 0)
+            } else if (body[k] === '"') {
+              k++
+              while (k < body.length && body[k] !== '"') k++
+              k++
+            }
+            j = k
+          }
+        }
+        if (!topLevelProps.has("sort")) {
+          // The enclosing component: the last `function X` declared before
+          // this tag. Derived rather than hand-mapped, so a renamed component
+          // rots its own pin instead of silently keeping it.
+          const decls = [...src.slice(0, at).matchAll(/(?:^|\n)(?:export\s+)?(?:default\s+)?function\s+([A-Za-z0-9_]+)/g)]
+          const owner = decls.length > 0 ? decls[decls.length - 1][1] : "?"
+          const key = `${f.rel}#${owner}`
+          if (key in TOOLBAR_SORT_EXEMPT) sortExemptUsed.add(key)
+          else
+            sortOffenders.push(
+              `${key}: a <ToolbarRow> with no \`sort\` prop, and it is not in TOOLBAR_SORT_EXEMPT — ` +
+                `either hand the row a \`sort\` config (it builds the control), or name the reason this collection has no order to offer`
+            )
+        }
+        from = i + 1
+      }
+    }
+    // THE TRIPWIRE FOR THIS CENSUS. Eighteen call sites today; a scan finding
+    // none would pass every assertion below it.
+    expect(
+      rowsScanned,
+      "R53 — the <ToolbarRow> call-site census found fewer than ten rows across both front doors. Either the component was renamed (so this law now guards nothing) or the scan is blind — fix it before trusting the result"
+    ).toBeGreaterThan(9)
+    expect(
+      sortOffenders,
+      `R53 — every <ToolbarRow> call site offers an order, or says why it cannot:\n  ${sortOffenders.join("\n  ")}`
+    ).toEqual([])
+    const staleSort = Object.keys(TOOLBAR_SORT_EXEMPT).filter((k) => !sortExemptUsed.has(k))
+    expect(
+      staleSort,
+      `these TOOLBAR_SORT_EXEMPT entries match nothing any more — the component now passes \`sort\` (or was renamed/deleted), so delete the entry:\n  ${staleSort.join("\n  ")}`
+    ).toEqual([])
+  })
+
   /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.
    *
    * THE SUBJECT IS DERIVED, never listed. A record detail is drawn by rendering
@@ -3415,6 +3642,7 @@ describe("RULES — the laws of the base", () => {
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
       "record-title-treatment", // R52: the both-detail-paths title census above
+      "toolbar-slot-set", // R53: the row-owns-its-slots guard + the who-builds-a-control and sort-is-a-default censuses above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

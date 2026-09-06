@@ -55,6 +55,8 @@ import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning } from "@shared/ui/foundations/icons"
+import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
@@ -240,6 +242,76 @@ export function AddButton({
   )
 }
 
+/** THE SORT SLOT'S OWN SHAPE — R53, and the reason it is a CONFIG rather than a
+ * `React.ReactNode` is the whole law in one type.
+ *
+ * The client, 2026-09-06, on two screenshots of her own MAIN COLLECTION screens
+ * side by side (Apps: `Search apps…` / Filter / ↑ / Name / ▦ Tiles / +; Tasks:
+ * `Search 82 tasks…` / Filter / +): "why the fuck i still have different
+ * toolbar variations??? unify joder."
+ *
+ * PART OF THE ANSWER IS HONEST — Tasks' five table tabs sort by their column
+ * headers and its views are a tab strip, so it genuinely offers neither picker
+ * (`TOOLBAR_SORT_EXEMPT` in `shared/rules/registry.ts` names every screen that
+ * cannot, with the reason each). THE REST WAS NOT. Eleven of this component's
+ * eighteen call sites DID draw a sort control and eight of them drew it INSIDE
+ * the `search` slot — `<>{searchInput}{statusSelect}{sortControl}</>` handed to
+ * a prop typed `React.ReactNode`, which accepts anything and therefore enforces
+ * nothing. Every one of those eight sat in the row's own GROWING box (`search`
+ * is `flex-1`, the only slot that grows — see the track below), at whatever
+ * label treatment that call site happened to type, instead of in the
+ * non-growing `sort` box between `filters` and `actions` where this component's
+ * documented order (search → filters → sort → view → actions) puts it. Two
+ * screens passed `sort` properly. That is the variation she is looking at, and
+ * it is not a design decision anybody made — it is what a `ReactNode` slot
+ * cannot stop.
+ *
+ * SO THE ROW DRAWS THE CONTROL AND THE CALL SITE HANDS IT THE ANSWERS. Exactly
+ * the move this file already made for the tab strip (`FolderTabStrip`, see this
+ * file's header: "a tab strip is never passed as raw JSX any more — a
+ * `React.ReactNode` prop cannot enforce" the shape) and exactly the move R50
+ * made for `empty`: a rule a call site can forget is not a rule. A screen hands
+ * over what only IT knows — which columns this collection may be ordered by,
+ * which one is chosen, which way — and the placement, the wrapper, the
+ * `label`/`hideLabel` treatment and the glyph are this component's, identically,
+ * on every screen in the app. There is nothing left to put in the wrong slot,
+ * because a call site no longer constructs a `<SortControl>` at all. */
+export type ToolbarSortSlot = {
+  /** WHAT THIS COLLECTION MAY BE ORDERED BY, in the screen's own already-
+   * translated words. The same contract `<PagedFind>`'s `sorts` keeps for the
+   * door-searched half of the app: a name offered here that the rows cannot
+   * actually be ordered by is dead UI, so a screen with nothing meaningful to
+   * order by passes no `sort` at all and says why in `TOOLBAR_SORT_EXEMPT`. */
+  options: SortOption[]
+  /** The chosen column. A single-option control is legitimate and common here
+   * (a meetings list ordered by when, a logins list by when it was given): the
+   * FIELD is fixed and the DIRECTION is the live question. */
+  value: string
+  onValueChange: (value: string) => void
+  direction: "asc" | "desc"
+  onDirectionChange: (direction: "asc" | "desc") => void
+}
+
+/** THE VIEW SLOT'S OWN SHAPE — the same ruling as `ToolbarSortSlot` above, on
+ * the one control beside it, so neither can be smuggled into another slot.
+ *
+ * `view` NEEDS NO EXEMPTION REGISTRY and that is a property of the control
+ * rather than a gap in the law: `ViewSwitch` renders NOTHING for fewer than two
+ * views (its own `views` doc says so), so a collection offering one body draws
+ * nothing whether or not it passes this — the absence is self-enforcing where
+ * `sort`'s was not. That asymmetry is why R53 rules the sort slot by census and
+ * leaves this one to the component. */
+export type ToolbarViewSlot = {
+  /** The bodies THIS collection offers — the kit's own `CollectionViewOption`,
+   * glyph included. Fewer than two draws nothing. */
+  views: CollectionViewOption[]
+  /** The body on screen. Controlled only, remembered per person by whatever the
+   * screen remembers it with (the kit's `ViewSwitch` doc: a store keyed by
+   * anything shared would move a colleague's screen). */
+  value: string
+  onValueChange: (value: string) => void
+}
+
 /** A BOUNDED COLLECTION'S OWN TOOLBAR ROW — the one shape a call site reaches
  * for below a `folderTabs` strip, still inside the card, whenever its tab body
  * is bespoke (a grouped list, a month grid, a chart) rather than a
@@ -267,23 +339,32 @@ export function AddButton({
  * Two call sites is two chances to draw that shape by hand, so it is a slot of
  * this component now, the same way `search` and `actions` already are.
  *
- * `sort` and `view` are wrapped in their own non-growing flex box rather than
- * rendered bare, so a child that asks for `w-full` fills the WRAPPER instead
- * of claiming the rest of this row and pushing `actions` onto a line of its
- * own — the same two-row shape one level down. `filters` is NOT wrapped here,
- * and that is deliberate rather than an omission: `FilterBar`
- * (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own pill in
- * exactly that non-growing box internally, so a wrapper here would add a
- * second identical box round it and buy nothing. See the `{filters}` slot
- * below.
+ * `sort` and `view` are drawn by this component into their own non-growing flex
+ * box (R53, 2026-09-06 — see `ToolbarSortSlot` above for the client ruling that
+ * moved them). They used to be `React.ReactNode` slots wrapped in that box, so
+ * that a child asking for `w-full` filled the WRAPPER instead of claiming the
+ * rest of the row and pushing `actions` onto a line of its own — a real
+ * problem, solved one level too late: a node slot could be handed the right
+ * control and could equally be handed nothing while the SAME control went into
+ * `search`, which is what eight call sites did. `filters` is still a node and
+ * is still NOT wrapped, and that is deliberate rather than an omission:
+ * `FilterBar` (`shared/web/screen-engine/filter-bar.tsx`) already wraps its own
+ * pill in exactly that non-growing box internally, so a wrapper here would add
+ * a second identical box round it and buy nothing, and `useFilterBar` hands a
+ * caller a `pill`/`panel` PAIR that a second census (`filter-row-is-the-kits`)
+ * already holds it to. See the `{filters}` slot below.
  *
- * FIVE NAMED SLOTS, NOT A HARDCODED ROW. Each is independently optional (a
- * caller with no facets passes no `filters`, exactly as one with no search
- * passes no `search`), and the ORDER is this component's, not the call
- * site's — the same discipline the kit's own contract keeps. `view` was
- * added 2026-09-01, first reached by Apps' Tiles/List switch (apps-screen.tsx)
- * — CH27.13's own order (search, filters, view switcher, actions) is why it
- * sits between `sort` and `actions` rather than anywhere else.
+ * FIVE NAMED SLOTS, NOT A HARDCODED ROW, and the ORDER is this component's,
+ * not the call site's — the same discipline the kit's own contract keeps.
+ * `view` was added 2026-09-01, first reached by Apps' Tiles/List switch
+ * (apps-screen.tsx) — CH27.13's own order (search, filters, view switcher,
+ * actions) is why it sits between `sort` and `actions` rather than anywhere
+ * else. INDEPENDENTLY OPTIONAL IS NO LONGER THE WHOLE STORY (R53): a caller
+ * with no facets still passes no `filters` and a single-body collection still
+ * passes no `view`, but a missing `sort` is now an offence unless the screen is
+ * named in `TOOLBAR_SORT_EXEMPT` with the reason its rows have no order to
+ * offer — because "optional" is precisely how eleven toolbars ended up with a
+ * sort control, seven without one, and nobody having decided either way.
  *
  * `empty` IS A SIXTH SLOT, AND IT IS NOT OPTIONAL (R50 — "once again, when
  * empty collection no toolbar at all — fix everywhere and set as a rule",
@@ -359,16 +440,26 @@ export function ToolbarRow({
    * draws nothing, which is the pill closed or a caller with no facets at
    * all — and it is also what keeps the container a pill. */
   toolbarPanel?: React.ReactNode
-  /** The sort control, after `filters` and before the pinned-right
-   * `actions` — a `SortControl`, typically. Omitted wherever a screen has
-   * nothing to sort by. */
-  sort?: React.ReactNode
-  /** THE VIEW SWITCH — a `ViewSwitch` pill (`shared/ui/components/
-   * collection-frame/view-switch.tsx`), after `sort` and before the
-   * pinned-right `actions`. Omitted wherever a screen offers only one body
-   * (`ViewSwitch` itself already renders nothing for fewer than two views,
-   * so a caller can pass it unconditionally once it has more than one). */
-  view?: React.ReactNode
+  /** THE SORT CONTROL, after `filters` and before `view` — and a CONFIG, not
+   * a node (R53). This row constructs the `<SortControl>` itself, so its
+   * placement, its wrapper and its `label`/`hideLabel` treatment are the
+   * same on every screen and there is nothing for a call site to put in the
+   * wrong slot. See `ToolbarSortSlot` above for the ruling that moved it.
+   *
+   * A DEFAULT, NOT A PER-SCREEN CHOICE (R53, the same sentence R48 wrote for
+   * the search box one slot along): a `<ToolbarRow>` that passes no `sort`
+   * must be named in `TOOLBAR_SORT_EXEMPT` (`shared/rules/registry.ts`) with
+   * the real reason its collection has no order to offer — a queue, a month
+   * grid, a grouped pair of lists, a paged list whose order is the door's.
+   * `false`/`null` are accepted so a caller can gate it on the same
+   * "have the rows arrived" expression `search` beside it is gated on. */
+  sort?: ToolbarSortSlot | false | null
+  /** THE VIEW SWITCH — after `sort` and before the pinned-right `actions`,
+   * and a CONFIG for the same reason `sort` is. Omitted wherever a screen
+   * offers only one body; `ViewSwitch` itself renders nothing for fewer than
+   * two views, so the absence needs no exemption entry (see
+   * `ToolbarViewSlot`). */
+  view?: ToolbarViewSlot | false | null
   /** THE ROW'S OWN ACTION BUTTONS (New/Import/Export…), last in the row —
    * client, 2 Sep 2026, correcting the `ml-auto` this slot carried until
    * then: her reference artifact never stretches the track open to park the
@@ -378,6 +469,12 @@ export function ToolbarRow({
   actions?: React.ReactNode
   className?: string
 }) {
+  // THE TWO CONTROL NAMES THIS ROW NOW OWNS (R53) — read here rather than at
+  // eighteen call sites, which is the point: "Sort by" and "View" used to be
+  // typed out beside every hand-built `<SortControl>`, so the accessible name
+  // of the same control was a per-screen decision. Called ABOVE the `empty`
+  // return below, because a hook cannot sit after one.
+  const t = useT()
   // NEVER TOOLBAR ON EMPTY COLLECTION (R50) — checked FIRST and unconditionally,
   // before any slot is even looked at, so a truthy `actions` (the one slot every
   // recurrence of this bug shared) cannot keep the row alive on its own.
@@ -490,8 +587,32 @@ export function ToolbarRow({
             folded into this slot, which is exactly the shape a `ReactNode`
             prop could not enforce back when one component drew both. */}
         {filters}
-        {sort && <div className="flex min-w-0 flex-wrap items-center gap-2">{sort}</div>}
-        {view && <div className="flex min-w-0 flex-wrap items-center gap-2">{view}</div>}
+        {/* THE ROW DRAWS BOTH OF THESE (R53), from the configs above. Before
+            this, both were `React.ReactNode` and eight call sites handed
+            their `<SortControl>` to `search` instead — where it sat inside
+            the one GROWING box, at whatever label treatment each screen
+            typed, rather than in this non-growing one. The wrapper, the
+            order, the name and the hidden label are this component's now, so
+            every collection toolbar in the app draws the same chip in the
+            same place. */}
+        {sort && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <SortControl
+              options={sort.options}
+              value={sort.value}
+              onValueChange={sort.onValueChange}
+              direction={sort.direction}
+              onDirectionChange={sort.onDirectionChange}
+              label={t("Sort by")}
+              hideLabel
+            />
+          </div>
+        )}
+        {view && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
+          </div>
+        )}
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
       {toolbarPanel}

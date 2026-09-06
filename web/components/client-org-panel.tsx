@@ -51,13 +51,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@shared/ui/components/select/select"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, ToolbarRow, type ToolbarSortSlot } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** THREE BOUNDED LISTS (see the file header), each read whole and narrowed here
@@ -70,27 +69,32 @@ function matchesActive(filter: ActiveFilter, active: boolean): boolean {
   return filter === "all" || (filter === "active" ? active : !active)
 }
 
-/** A plain search + status toolbar, the search slot of a `<ToolbarRow>`. One
- * function for the three lists below rather than three copies of the same
- * three controls. */
+/** A plain search + status control, the SEARCH slot of a `<ToolbarRow>`. One
+ * function for the three lists below rather than three copies of the same two
+ * controls.
+ *
+ * IT DREW THE SORT CONTROL TOO UNTIL 2026-09-06 (R53), and that is why all
+ * three of these lists put their sort chip somewhere different from the Apps
+ * screen's: everything this function returns lands in the row's one GROWING
+ * slot, so a sort control returned from here sat inside the search cluster
+ * instead of in the row's own `sort` box between `filters` and `actions`. It
+ * was a helper doing the right thing for the search field and quietly carrying
+ * a second control past the row's own ordering contract. `<ToolbarRow>` builds
+ * the sort control itself now (screen-bits.tsx's `ToolbarSortSlot`); the three
+ * call sites below hand it a config, which is also why `sortOptions`/`sort`/
+ * `onSort` are gone from this signature rather than moved within it. */
 function ListToolbar({
   query,
   onQuery,
   status,
   onStatus,
   placeholder,
-  sortOptions,
-  sort,
-  onSort,
 }: {
   query: string
   onQuery: (v: string) => void
   status: ActiveFilter
   onStatus: (v: ActiveFilter) => void
   placeholder: string
-  sortOptions: { value: string; label: string }[]
-  sort: { by: string; dir: "asc" | "desc" }
-  onSort: (next: { by: string; dir: "asc" | "desc" }) => void
 }) {
   const t = useT()
   return (
@@ -112,17 +116,26 @@ function ListToolbar({
           <SelectItem value="inactive">{t("Switched off")}</SelectItem>
         </SelectContent>
       </Select>
-      <SortControl
-        options={sortOptions}
-        value={sort.by}
-        onValueChange={(by) => onSort({ by, dir: "asc" })}
-        direction={sort.dir}
-        onDirectionChange={(dir) => onSort({ ...sort, dir })}
-        label={t("Sort by")}
-        hideLabel
-      />
     </>
   )
+}
+
+/** THE SORT SLOT FOR ONE OF THE THREE LISTS BELOW (R53) — the config
+ * `<ToolbarRow>` builds its own `<SortControl>` from. Written once here for the
+ * same reason `ListToolbar` above exists: three lists, one shape, and a
+ * per-list copy is three chances for them to drift apart again. */
+function listSort(
+  options: { value: string; label: string }[],
+  sort: { by: string; dir: "asc" | "desc" },
+  onSort: (next: { by: string; dir: "asc" | "desc" }) => void
+): ToolbarSortSlot {
+  return {
+    options,
+    value: sort.by,
+    onValueChange: (by) => onSort({ by, dir: "asc" }),
+    direction: sort.dir,
+    onDirectionChange: (dir) => onSort({ ...sort, dir }),
+  }
 }
 import {
   InternalRecordDialog,
@@ -374,13 +387,21 @@ export function ClientOrgPanel({
                   status={deptStatus}
                   onStatus={setDeptStatus}
                   placeholder={t("Search departments…")}
-                  sortOptions={[
-                    { value: "name", label: t("Name") },
-                    { value: "roleCount", label: t("Roles") },
-                  ]}
-                  sort={deptSort}
-                  onSort={setDeptSort}
                 />
+              )
+            }
+            // R53 — THE SORT CONTROL IS THE ROW'S NOW, in its own slot between
+            // `filters` and `actions`, rather than the third thing `ListToolbar`
+            // returned into `search`. See that helper's own note above.
+            sort={
+              departments.length > 0 &&
+              listSort(
+                [
+                  { value: "name", label: t("Name") },
+                  { value: "roleCount", label: t("Roles") },
+                ],
+                deptSort,
+                setDeptSort
               )
             }
             actions={canCreate && <AddButton onClick={() => setAddingDept(true)} label={t("Add department")} />}
@@ -448,13 +469,19 @@ export function ClientOrgPanel({
                   status={roleStatus}
                   onStatus={setRoleStatus}
                   placeholder={t("Search roles…")}
-                  sortOptions={[
-                    { value: "name", label: t("Name") },
-                    { value: "cost", label: t("Cost an hour") },
-                  ]}
-                  sort={roleSort}
-                  onSort={setRoleSort}
                 />
+              )
+            }
+            // R53 — see the Departments list above.
+            sort={
+              roles.length > 0 &&
+              listSort(
+                [
+                  { value: "name", label: t("Name") },
+                  { value: "cost", label: t("Cost an hour") },
+                ],
+                roleSort,
+                setRoleSort
               )
             }
             actions={canCreate && <AddButton onClick={() => setAddingRole(true)} label={t("Add role")} />}
@@ -595,13 +622,19 @@ export function ClientOrgPanel({
                   status={toolStatus}
                   onStatus={setToolStatus}
                   placeholder={t("Search tools…")}
-                  sortOptions={[
-                    { value: "name", label: t("Name") },
-                    { value: "price", label: t("Price") },
-                  ]}
-                  sort={toolSort}
-                  onSort={setToolSort}
                 />
+              )
+            }
+            // R53 — see the Departments list above.
+            sort={
+              tools.length > 0 &&
+              listSort(
+                [
+                  { value: "name", label: t("Name") },
+                  { value: "price", label: t("Price") },
+                ],
+                toolSort,
+                setToolSort
               )
             }
             actions={canCreate && <AddButton onClick={() => setAddingTool(true)} label={t("Add tool")} />}

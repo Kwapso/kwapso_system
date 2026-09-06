@@ -477,6 +477,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "record-title-treatment",
     status: "enforced",
   },
+  {
+    id: "R53",
+    dimension: "ui",
+    law: "THE COLLECTION TOOLBAR'S SLOT SET IS THE ROW'S, NOT THE CALL SITE'S — AND ITS SORT SLOT IS A DEFAULT. R48 made the search box a default and R50 made the whole row answer one question about emptiness; this rules the slots BETWEEN them. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) draws its five slots in one fixed order — search → filters → sort → view → actions — and two of them, `sort` and `view`, are now STRUCTURED CONFIGS (`ToolbarSortSlot` / `ToolbarViewSlot`) that the row builds the `<SortControl>` and `<ViewSwitch>` from itself, exactly as `folderTabs` is a `FolderTabStrip` rather than raw JSX. Three censuses, off the disk, never a hand-list. (i) THE CENTRAL GUARD: `ToolbarRow`'s own source must declare `sort?: ToolbarSortSlot` and `view?: ToolbarViewSlot` (never a `React.ReactNode`, which accepts anything and therefore enforces nothing) and must render both controls itself. (ii) NOBODY ELSE BUILDS EITHER CONTROL: no `.tsx` under `web/`, `web-portal/` or `shared/web/` may render a `<SortControl>` or a `<ViewSwitch>` unless it is named in `TOOLBAR_CONTROL_OWNERS` — the app's other toolbar-owning components, each with the reason it owns one. (iii) SORT IS A DEFAULT: every `<ToolbarRow>` call site must pass a `sort` prop, or its enclosing component must be named in `TOOLBAR_SORT_EXEMPT` with the real reason its rows have no order to offer. `view` needs no exemption registry and that is a property of the control rather than a gap in the law: `ViewSwitch` renders nothing for fewer than two views, so a single-body collection draws nothing whether or not it passes one — the absence is self-enforcing where `sort`'s was not. Both lists are rot-checked in both directions, and a tripwire fails the build if either census matches nothing at all.",
+    why: "The client's own words, 2026-09-06, on two screenshots of her own MAIN COLLECTION screens side by side — Apps (`Search apps…` / Filter / ↑ / Name / ▦ Tiles / +) and Tasks (`Search 82 tasks…` / Filter / +): \"why the fuck i still have different toolbar variations??? unify joder.\" PART OF THE ANSWER IS HONEST AND IS NOW WRITTEN DOWN RATHER THAN ASSUMED: Tasks' five table tabs sort by their own column headers (the engine's `frameSortOptions` stands its picker down when it can see a table, so a screen does not get two controls for one question) and its six views are a folder tab strip, so it genuinely offers neither picker — that is a reasoned exemption, and every screen like it now says so in `TOOLBAR_SORT_EXEMPT` where a reviewer can read it. THE REST WAS NOT A DECISION ANYBODY MADE. `sort` and `view` were ordinary optional `React.ReactNode` props, so a call site could pass the right control, pass nothing, or — the shape that actually happened — pass the control to a DIFFERENT slot. Eleven of the eighteen bespoke toolbars drew a sort control and EIGHT of them handed it to `search`: `<>{searchInput}{statusSelect}{sortControl}</>` on Dropdown values, Modules, both account panels, a contact's meetings, a wave's sprints and all three of Client-org's lists (that last one through a `ListToolbar` helper written to stop three copies of the search field, quietly carrying a second control past the row's ordering contract with it). `search` is the row's ONE GROWING slot, so every one of those eight sat inside the stretching search cluster at whatever `label`/`hideLabel` treatment that screen happened to type, while Apps and Deliverables — the two that used the slot as named — drew the identical chip in the non-growing box beside `actions`. Same control, same app, two places, and R48/R49/R50 could all see the row and none of them could see this: they ask whether a PROP is present, and a `ReactNode` slot's contents are invisible to a census by construction. That is why the fix is not an eighteenth call-site patch but a change of TYPE — a config the row renders, so a caller no longer constructs a `<SortControl>` at all and has nothing left to misplace. The reverse census (iii) is the same sentence R48 wrote one slot along: an opt-IN can be forgotten by omission, which is exactly how a contact's Companies panel ended up with no order at all while the mirror-image list of the people inside one company — the same `AccountLink` rows, the same two columns — had ordered by both since the day it was written.",
+    checkId: "toolbar-slot-set",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -1299,6 +1307,67 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
     "all three <ToolbarRow> call sites (Companies/Tickets/Meetings, one person's read-only summary panels) carry `empty={false}` — each is reached only PAST that panel's own early `X.length === 0` return, so the row can never actually be empty by the time it renders; the literal records that guarantee rather than hides it.",
   "web/components/tickets-collection.tsx":
     "TriageQueue's <ToolbarRow> carries `empty={false}` — reached only past two earlier returns (`!view.yours`, `view.waiting.length === 0`), so the queue is guaranteed non-empty by the time this row renders; the literal records that guarantee rather than hides it.",
+}
+
+/** R53, clause (ii) — THE COMPONENTS THAT MAY BUILD A `<SortControl>` OR A
+ * `<ViewSwitch>`, and the reason each owns one.
+ *
+ * The law's point is that a toolbar control belongs to the ROW that draws it,
+ * not to the screen that wants one: `<ToolbarRow>` (`web/components/deep-link/
+ * screen-bits.tsx`) builds both from a config now, so eleven screens that used
+ * to construct their own — eight of them into the wrong slot — construct
+ * nothing. That sentence is only true while the census can name every OTHER
+ * place a sort or view control is made, which is what this list is. It is
+ * deliberately NOT a scope exemption ("shared/web/ is out of scope"): each of
+ * these is a real, second toolbar with its own slots, and a second toolbar is
+ * exactly the thing the client is looking at when she says "different toolbar
+ * variations". Naming them here makes them visible as data instead of invisible
+ * to a census that only walks `<ToolbarRow>` call sites.
+ *
+ * Rot-checked: an entry whose file no longer renders either control fails the
+ * build, so the list can only shrink. */
+export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
+  "web/components/deep-link/screen-bits.tsx":
+    "THE ROW THIS LAW IS ABOUT. `<ToolbarRow>` builds both controls from `ToolbarSortSlot`/`ToolbarViewSlot`, which is clause (i) of R53 — it is the owner, not an exception to the rule.",
+  "web/components/paged-find.tsx":
+    "THE DOOR-SEARCHED HALF OF THE APP. `<PagedFind>` draws its own toolbar because its search, its facets and its ORDER all have to reach the door rather than the fifty rows in the browser (R14 — \"the sort actually doesn't work\" was a frame ordering page one and calling it sorted). Its `sorts`/`defaultSort` props are already the same default-with-a-reason shape R53 clause (iii) puts on `<ToolbarRow>`, and all nine of its call sites pass both.",
+  "shared/web/screen-engine/collection-frame.tsx":
+    "THE RECIPE ENGINE'S OWN FRAME, and the one path that already got this right: its sort control is DERIVED (`frameSortOptions`, web/lib/screens.ts) from the recipe's own columns rather than passed in, and it stands itself down for a paged collection, for a table whose headers already order it, and for a list with fewer than two orderable columns. A screen drawn this way cannot forget a sort control, because it never had to ask for one — which is the shape R53 is copying onto the bespoke row.",
+  "web/components/wave-finder.tsx":
+    "A SECOND HAND-WRITTEN COPY OF `<ToolbarRow>`, and the honest name for it. It repeats the row's own `data-slot=\"toolbar-row-column\"`/`\"toolbar-row-track\"`, its fill, its two-radius rule and its `--toolbar-content-gap` margin, and then adds a sixth slot `<ToolbarRow>` has no name for (`period`, the waves timeline's own date-range control) and puts `view` AFTER it rather than before `actions`. FOLDING IT IN IS OPEN WORK, not a decision this law makes: it needs a `period` slot on the shared row and a ruling on which fill a toolbar wears inside a `<CollectionCard>` (this one paints `bg-surface-panel`, `<ToolbarRow>` paints `--surface-raised`, and Dropdown values draws a `<ToolbarRow>` inside a `CollectionCard` today — so the two disagree and neither is obviously wrong). Pinned here so the divergence is a line somebody can read rather than a file the toolbar censuses cannot see.",
+}
+
+/** R53, clause (iii) — COLLECTIONS WITH NO ORDER TO OFFER, each with the real
+ * reason, keyed by the component that draws the `<ToolbarRow>`.
+ *
+ * The sort slot is a DEFAULT (the same sentence R48 wrote for the search box
+ * one slot along), so a `<ToolbarRow>` that passes no `sort` has to say why
+ * here. Keyed by ENCLOSING COMPONENT rather than by file, unlike R48's and
+ * R50's own lists: three of these files hold two or three separate toolbars
+ * with genuinely different answers — `contact-panels.tsx` alone has one panel
+ * that now sorts by two columns, one that sorts by direction only, and one that
+ * cannot honestly sort at all — and a file-level pin would exempt all three on
+ * one panel's reason.
+ *
+ * NONE OF THESE IS "we did not get round to it". A slot a screen cannot fill
+ * honestly is not a defect, and the bar is the one `frameSortOptions` already
+ * sets for the engine's own frame: a control offering an order the rows cannot
+ * actually be put in is dead UI, and a control that orders page one of a paged
+ * list is worse than dead — it is wrong. Rot-checked in both directions: an
+ * entry whose component now passes `sort` fails the build. */
+export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
+  "web/components/tasks-screen.tsx#TasksScreen":
+    "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
+  "web/components/tickets-collection.tsx#TriageQueue":
+    "A QUEUE, and reordering it is the one thing a queue is not. The rows are what has been sitting unread longest first, which is the whole claim the screen makes; a person can re-order it into any sequence they like and the queue stops being the answer to \"what has been waiting\".",
+  "web/components/stakeholders-panel.tsx#StakeholdersPanel":
+    "NOT ONE LIST. It draws two named groups — Ours and Theirs — each with the lead/main contact pinned at the top, so the grouping and that pin ARE the order; one search box narrows both (\"who is on this, on either side\" is one question). There is no single sequence for a sort control to act on, and applying one per group would order two lists from one chip.",
+  "web/components/work-logs-panel.tsx#WorkLogsPanel":
+    "TIME IS READ IN TIME ORDER, and this list PAGES (`<LoadMore>`, R14). A browser-side reorder would put the fifty entries currently in hand into a new sequence and present it as the order of the whole log, which is exactly the defect `frameSortOptions` refuses for every paged collection in the engine. If this ever earns a sort it belongs on the door, as a `<PagedFind>` `sorts` option, not here.",
+  "web/components/contact-panels.tsx#ContactTicketsPanel":
+    "A PAGE-ONE SUMMARY OF A PAGED LIST (`<LoadMore>`, R14) on somebody's record — the whole ticket collection has its own screen, with its own door-backed search, filters and sort. Same reason as WorkLogsPanel above: ordering the loaded page and calling it the order of the list is the lie R14 exists to stop.",
+  "web/components/sprints-screen.tsx#SprintsScreen":
+    "THE BESPOKE ROW SERVES TWO BODIES THAT ARE NOT FLAT LISTS — Overview, which groups sprints under their own state headings, and Calendar, a month grid. A sort chip would either fight the grouping or reorder squares by something other than the date they sit on. The third tab, \"All sprints\", is a flat list drawn by the recipe engine, and it gets its picker from `frameSortOptions` off its own columns — which is why this screen looks sorted where it is a list and unsorted where it is not.",
 }
 
 /** R29 — reviewed exceptions. A file listed here matches the page-container

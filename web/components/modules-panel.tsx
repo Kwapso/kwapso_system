@@ -42,7 +42,6 @@ import {
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
@@ -157,28 +156,31 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
         empty={modules.length === 0}
         search={
           modules.length > 0 && (
-            <>
-              <SearchInput
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("Search modules…")}
-                className="flex-1"
-                aria-label={t("Search modules")}
-              />
-              <SortControl
-                options={[
-                  { value: "name", label: t("Name") },
-                  { value: "ticketCount", label: t("Open tickets") },
-                ]}
-                value={sort.by}
-                onValueChange={(by) => setSort({ by: by as typeof sort.by, dir: "asc" })}
-                direction={sort.dir}
-                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                label={t("Sort by")}
-                hideLabel
-              />
-            </>
+            <SearchInput
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("Search modules…")}
+              className="flex-1"
+              aria-label={t("Search modules")}
+            />
           )
+        }
+        // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06) — see
+        // screen-bits.tsx's `ToolbarSortSlot` for the client ruling behind the
+        // move. The control was drawn inside the row's one GROWING box beside
+        // the search field; the row builds it in its own non-growing box now,
+        // in the same place on every collection toolbar in the app.
+        sort={
+          modules.length > 0 && {
+            options: [
+              { value: "name", label: t("Name") },
+              { value: "ticketCount", label: t("Open tickets") },
+            ],
+            value: sort.by,
+            onValueChange: (by: string) => setSort({ by: by as typeof sort.by, dir: "asc" }),
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }
         }
         actions={canCreate && <AddButton onClick={() => setAddOpen(true)} label={t("Add module")} />}
       />

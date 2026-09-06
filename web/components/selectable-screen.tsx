@@ -25,7 +25,6 @@ import {
   SelectValue,
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -570,17 +569,23 @@ export function SelectableScreen({
                       <SelectItem value="all">{t("All")}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <SortControl
-                    options={VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))}
-                    value={sort.by}
-                    onValueChange={(by) => setSort({ by, dir: "asc" })}
-                    direction={sort.dir}
-                    onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                    label={t("Sort by")}
-                    hideLabel
-                  />
                 </>
               )
+            }
+            // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06) — see
+            // screen-bits.tsx's `ToolbarSortSlot`. This screen was one of the
+            // eight that handed a `<SortControl>` to `search`, so it drew
+            // inside the row's growing box while Apps and Deliverables drew
+            // theirs in the sort box beside `actions` — the same control, two
+            // places, on two screens of the same kind.
+            sort={
+              (valuesLoading || values.length > 0) && {
+                options: VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) })),
+                value: sort.by,
+                onValueChange: (by: string) => setSort({ by, dir: "asc" }),
+                direction: sort.dir,
+                onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+              }
             }
             actions={
               <>

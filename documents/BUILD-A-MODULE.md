@@ -814,7 +814,13 @@ again, which is the only property that matters here.
 - **R48 `toolbar-shows-search`**, **R49 `toolbar-content-gap`**, **R50
   `empty-toolbar`** — a collection screen gets the toolbar with its search box,
   the gap below it is the row's own margin, and on an EMPTY collection the row
-  draws nothing at all, create button included. **R51 `aside-collapse`** — a
+  draws nothing at all, create button included. **R53 `toolbar-slot-set`** — the
+  row owns its slot SET too: `sort` and `view` are configs `<ToolbarRow>` builds
+  the `<SortControl>`/`<ViewSwitch>` from, no other file in `web/`,
+  `web-portal/` or `shared/web/` may build either control unless it is named in
+  `TOOLBAR_CONTROL_OWNERS`, and every call site passes `sort` or names its
+  enclosing component in `TOOLBAR_SORT_EXEMPT` with the reason its rows have no
+  order to offer. **R51 `aside-collapse`** — a
   panel that minimises collapses; it is never unmounted on the state that
   animates it. **R52 `record-title-treatment`** — a record detail wears the
   one shared title treatment whichever path draws it, imported from

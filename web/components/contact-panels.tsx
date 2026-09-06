@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@shared/ui/components/select/select"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -114,6 +113,20 @@ export function CompaniesPanel({
   const t = useT()
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState<ActiveFilter>("all")
+  // R53 — THE SORT SLOT IS A DEFAULT, AND THIS PANEL HAD NO REASON TO SKIP IT.
+  // The mirror-image list on the other side of the same relationship —
+  // `ContactsPanel` (account-detail-panels.tsx), the people inside ONE company
+  // — has ordered by exactly these two columns since it was written; this one,
+  // the companies ONE person is a contact of, drew the same rows off the same
+  // `AccountLink` shape and offered no order at all. Nobody decided that: the
+  // slot was optional, so it was simply never passed. Two columns, both on the
+  // row itself (the company's name, then the relationship), and the whole list
+  // is in hand — bounded, prop-fed, no `<LoadMore>` — so ordering it here
+  // orders ALL of it rather than page one of it (R14).
+  const [sort, setSort] = React.useState<{ by: "name" | "relationship"; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
 
   if (companies.length === 0)
     // No `onCreate` on purpose — this whole panel is read-only (see the file
@@ -126,13 +139,23 @@ export function CompaniesPanel({
     )
 
   const q = query.trim().toLowerCase()
-  const shown = companies.filter(
-    (c) =>
-      matchesActive(status, c.active) &&
-      (q === "" ||
-        c.personName.toLowerCase().includes(q) ||
-        (c.relationship ?? "").toLowerCase().includes(q))
-  )
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const shown = companies
+    .filter(
+      (c) =>
+        matchesActive(status, c.active) &&
+        (q === "" ||
+          c.personName.toLowerCase().includes(q) ||
+          (c.relationship ?? "").toLowerCase().includes(q))
+    )
+    // A COPY BEFORE `.sort()` — `companies` is a prop, and `Array.prototype.sort`
+    // mutates in place; `.filter()` above already returns a fresh array, so this
+    // is sorting our own copy and never the host's row list.
+    .sort((a, b) =>
+      sort.by === "name"
+        ? a.personName.localeCompare(b.personName) * dirMul
+        : (a.relationship ?? "").localeCompare(b.relationship ?? "") * dirMul
+    )
 
   return (
     <div className="flex flex-col">
@@ -161,6 +184,19 @@ export function CompaniesPanel({
               </Select>
             </>
           }
+          // R53 — the same two columns `ContactsPanel` orders by on the other
+          // side of this relationship. See the `sort` state above for why this
+          // panel had none until now.
+          sort={{
+            options: [
+              { value: "name", label: t("Name") },
+              { value: "relationship", label: t("Relationship") },
+            ],
+            value: sort.by,
+            onValueChange: (by: string) => setSort({ by: by as typeof sort.by, dir: "asc" }),
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }}
         />
       )}
       {shown.length === 0 && (
@@ -415,17 +451,20 @@ export function ContactMeetingsPanel({
                 className="flex-1"
                 aria-label={t("Search meetings")}
               />
-              <SortControl
-                options={[{ value: "startsAt", label: t("When") }]}
-                value="startsAt"
-                onValueChange={() => undefined}
-                direction={sort.dir}
-                onDirectionChange={(dir) => setSort({ dir })}
-                label={t("Sort by")}
-                hideLabel
-              />
             </>
           }
+          // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06) — see
+          // screen-bits.tsx's `ToolbarSortSlot` for the ruling. One option is
+          // the whole control: a meetings list has one order worth offering
+          // (when it happened), so the field is fixed and the direction is the
+          // live question.
+          sort={{
+            options: [{ value: "startsAt", label: t("When") }],
+            value: "startsAt",
+            onValueChange: () => undefined,
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort({ dir }),
+          }}
         />
       )}
       {shown.length === 0 && (

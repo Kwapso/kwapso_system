@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@shared/ui/components/select/select"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Prohibit, Key, LinkSimple, Power, UserMinus } from "@shared/ui/foundations/icons"
 
 import type { AccountDetail } from "@shared/types"
@@ -169,20 +168,28 @@ export function ContactsPanel({
                   <SelectItem value="inactive">{t("Not a contact now")}</SelectItem>
                 </SelectContent>
               </Select>
-              <SortControl
-                options={[
-                  { value: "name", label: t("Name") },
-                  { value: "relationship", label: t("Relationship") },
-                ]}
-                value={sort.by}
-                onValueChange={(by) => setSort({ by: by as typeof sort.by, dir: "asc" })}
-                direction={sort.dir}
-                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                label={t("Sort by")}
-                hideLabel
-              />
             </>
           )
+        }
+        // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06). This
+        // `<SortControl>` used to be the third child of the fragment above —
+        // inside the row's one GROWING box, beside the search field, which is
+        // not where `<ToolbarRow>`'s own documented order (search → filters →
+        // sort → view → actions) puts it. Eight call sites had drifted into
+        // that shape and two had not, which is the "different toolbar
+        // variations" the client photographed. The row builds the control
+        // itself now; this hands it only what this panel knows.
+        sort={
+          links.length > 0 && {
+            options: [
+              { value: "name", label: t("Name") },
+              { value: "relationship", label: t("Relationship") },
+            ],
+            value: sort.by,
+            onValueChange: (by: string) => setSort({ by: by as typeof sort.by, dir: "asc" }),
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }
         }
         actions={
           (canCreate || canCreatePerson) && (
@@ -357,17 +364,23 @@ export function PortalAccessPanel({
                   <SelectItem value="inactive">{t("Access taken away")}</SelectItem>
                 </SelectContent>
               </Select>
-              <SortControl
-                options={[{ value: "grantedAt", label: t("Given") }]}
-                value={sort.by}
-                onValueChange={() => undefined}
-                direction={sort.dir}
-                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                label={t("Sort by")}
-                hideLabel
-              />
             </>
           )
+        }
+        // OUT OF `search` AND INTO ITS OWN SLOT (R53) — see the identical note
+        // on `ContactsPanel` above. ONE OPTION IS THE WHOLE CONTROL HERE and
+        // that is legitimate: a list of logins has exactly one order worth
+        // offering (when access was given), so the FIELD is fixed and the
+        // DIRECTION is the live question — which is why `onValueChange` has
+        // nothing to do.
+        sort={
+          portalUsers.length > 0 && {
+            options: [{ value: "grantedAt", label: t("Given") }],
+            value: sort.by,
+            onValueChange: () => undefined,
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }
         }
         actions={
           canGrant && (

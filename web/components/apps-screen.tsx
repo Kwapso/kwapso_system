@@ -45,8 +45,6 @@ import * as React from "react"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
-import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { List, SquaresFour } from "@shared/ui/foundations/icons"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -460,37 +458,40 @@ export function AppsScreen({
           }
           filters={(appsLoading || loadedApps.length > 0) && filterPill}
           toolbarPanel={(appsLoading || loadedApps.length > 0) && filterPanel}
+          // SORT AND VIEW ARE CONFIGS NOW, NOT NODES (R53, 2026-09-06 — the
+          // client on two of her own screenshots: "why the fuck i still have
+          // different toolbar variations??? unify joder"). This screen was one
+          // of only two that passed `sort` through its own slot at all; eight
+          // others handed a `<SortControl>` to `search` and drew it inside the
+          // row's growing box. `<ToolbarRow>` builds both controls itself now,
+          // so the placement, the wrapper and the `label`/`hideLabel`
+          // treatment are the row's on every screen — this call site keeps
+          // only what it alone knows: the columns, the choice and the
+          // direction. See screen-bits.tsx's `ToolbarSortSlot`.
           sort={
-            (appsLoading || loadedApps.length > 0) && (
-              <SortControl
-                options={sortOptions}
-                value={sort.by}
-                onValueChange={(by) => {
-                  const opt = APP_SORTS.find((o) => o.value === by)
-                  setSort({ by, dir: opt?.defaultDir ?? "asc" })
-                }}
-                direction={sort.dir}
-                onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-                label={t("Sort by")}
-                hideLabel
-              />
-            )
+            (appsLoading || loadedApps.length > 0) && {
+              options: sortOptions,
+              value: sort.by,
+              onValueChange: (by: string) => {
+                const opt = APP_SORTS.find((o) => o.value === by)
+                setSort({ by, dir: opt?.defaultDir ?? "asc" })
+              },
+              direction: sort.dir,
+              onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+            }
           }
           view={
-            (appsLoading || loadedApps.length > 0) && (
-              <ViewSwitch
-                // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
-                // generic table-first default (see the state declaration
-                // above and the file's header comment).
-                views={[
-                  { value: "tiles", label: t("Tiles"), icon: <SquaresFour size={16} /> },
-                  { value: "list", label: t("List"), icon: <List size={16} /> },
-                ]}
-                value={view}
-                onValueChange={(next) => setView(next as "tiles" | "list")}
-                label={t("View")}
-              />
-            )
+            (appsLoading || loadedApps.length > 0) && {
+              // TILES FIRST — CHECKLIST 8.1's own ruling, not the kit's
+              // generic table-first default (see the state declaration
+              // above and the file's header comment).
+              views: [
+                { value: "tiles", label: t("Tiles"), icon: <SquaresFour size={16} /> },
+                { value: "list", label: t("List"), icon: <List size={16} /> },
+              ],
+              value: view,
+              onValueChange: (next: string) => setView(next as "tiles" | "list"),
+            }
           }
           actions={canCreate && <AddButton label={t("Record an app")} onClick={() => setAddOpen(true)} />}
         />
