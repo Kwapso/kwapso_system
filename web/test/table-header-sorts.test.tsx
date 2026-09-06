@@ -24,6 +24,16 @@
 // asked anything to sort. A green test on a helper the screen does not call is
 // how this shape ships three times in one day.
 //
+// THAT HELPER IS GONE, 2026-09-06, and the sentence above is now history rather
+// than description. It bought a correct order by spelling the date for the
+// COMPARATOR instead of for the reader — "2026-04-14" on a screen built for a
+// manager — because the cell and the comparison value were the same string.
+// `record-table.tsx` now takes a `sortType`/`sortKey` per column and compares
+// the raw instant off the row, so Deadline and Closed render `formatDate` again
+// and this file's fixtures read like the screen does. The comparison itself has
+// its own suite: `sorts-compare-the-value-not-the-text.test.tsx`, whose whole
+// point is fixture dates where the calendar and the alphabet DISAGREE.
+//
 // So NOTHING here tests a comparator. Every assertion is about the ORDER OF THE
 // RENDERED ROWS BEFORE AND AFTER A PERSON CLICKS, read out of the DOM of the real
 // screen — the one fact a working helper cannot fake and a lit-up dead control
@@ -39,6 +49,7 @@ import { primeCache } from "@shared/web/store"
 import { PagedFind } from "@/components/paged-find"
 import { RecordTable } from "@/components/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { formatDate } from "@shared/web/format"
 import { appsKey, tasksKey } from "@/lib/live-resources"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
 import { TasksScreen } from "@/components/tasks-screen"
@@ -269,7 +280,13 @@ describe("the rest of the collection's chrome survived the swap", () => {
   it("still narrows, and sorting what is left keeps it narrowed", async () => {
     renderTasks()
     // The two rows that share a deadline — the frame searches every column.
-    await search("2025-04-14")
+    //
+    // DERIVED FROM THE FORMATTER rather than typed, because the Deadline cell is
+    // now the warm date and the words in it are the reader's language's: typing
+    // "Apr 14, 2025" here would pin this assertion to English and to a build of
+    // ICU, and typing "2025-04-14" is what it used to say when the cell was the
+    // sortable spelling — which is exactly the string this pass removed.
+    await search(formatDate("2025-04-14T00:00:00.000Z", "en"))
     const narrowed = rowOrder()
     expect(narrowed.length).toBe(2)
     fireEvent.click(header("Deadline"))

@@ -5,7 +5,7 @@
 
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
-import { formatDate, formatDateSortable, formatDateTime, formatRelative } from "@shared/web/format"
+import { formatDate, formatDateTime, formatRelative } from "@shared/web/format"
 import { nameInitials, personName } from "@/lib/identity"
 import { richTextPlain } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
@@ -344,10 +344,16 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // columns"). They ride every row rather than a second shaper, because the
       // three views are three renderings of ONE list — a second shaper is a
       // second idea of what a meeting row is, and the two drift.
-      // A TABLE COLUMN, and the one the "All" view is most often ordered by — so
-      // it is the sortable spelling of a date. The subtitle above it keeps
-      // `formatDate`, because that one is read rather than compared.
-      when: formatDateSortable(m.startsAt),
+      // A TABLE COLUMN, and the one the "All" view is most often ordered by —
+      // BY THE DOOR. The meetings list pages, so its column headers ask
+      // `<PagedFind>`'s own order (meetings-screen.tsx passes `order` to the
+      // table) and the browser never compares this cell against another one.
+      // Nothing here is a sort key, so nothing here has to be spelled for a
+      // comparison: it used to render `formatDateSortable` ("2026-04-14"),
+      // which was the tax the OLD table charged every date column and which
+      // record-table.tsx's `sortKey`/`sortType` seam has now removed. Warm and
+      // in the reader's own language, the same as the subtitle above it.
+      when: formatDate(m.startsAt, lang),
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),

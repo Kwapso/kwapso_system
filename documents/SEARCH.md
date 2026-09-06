@@ -316,17 +316,34 @@ see the correction above.)
   both values are already numbers, so any column whose value is a *rendered* date
   sorted alphabetically — April before January, and 2019 between 2018 and 2020
   only by luck. Three columns did this: **Deadline** and **Closed** on Tasks, and
-  **When** on the meetings list's *All*. They now render through `formatDateSortable`
-  ("2026-04-14"), which is the same trade `formatActivityWhen` already made in
-  this app and for the same reason: the value being compared IS the value being
-  shown, so the one whose job is to be compared is the one that gives.
+  **When** on the meetings list's *All*. They rendered through `formatDateSortable`
+  ("2026-04-14") from 2026-08 until **2026-09-06**, which was the same trade
+  `formatActivityWhen` still makes and for the same reason: the value being
+  compared IS the value being shown, so the one whose job is to be compared was
+  the one that gave.
+  **That trade is off, and `formatDateSortable` is gone with it.** `TableColumn`
+  now carries a `sortType` (`"text" | "number" | "date"`) and a `sortKey` reading
+  the RAW value the shaped row still holds beside the cell (`dueOn` beside
+  `deadline`), so display and comparison stopped being the same string and all
+  three columns render `formatDate` again — warm, and in the reader's own
+  language. The comparison never touches the words, which is what makes the
+  order identical in English, German, Spanish and Catalan; a comparison that
+  re-parsed "14.04.2025" would not be. UI-GAPS #32(a) is closed app-side by that
+  seam. `web/test/sorts-compare-the-value-not-the-text.test.tsx` holds it with
+  fixture dates whose calendar order, English text order and German text order
+  are three different sequences, and
+  `web/test/sorted-columns-declare-their-type.test.ts` censuses the columns so
+  the next one cannot ship undeclared.
 - **Wrong, mildly**: **Department** on Tasks carries the department's own mark
   before its name ("➤ Sales"), so ordering it groups by mark rather than
-  alphabetically. Left as it is — the mark is a deliberate design decision and
-  the fix needs a per-column sort key the library does not have (UI-GAPS #22).
+  alphabetically. **Fixed 2026-09-06** by the same seam — the mark stays (it is a
+  deliberate design decision) and the column's `sortKey` reads the department's
+  bare name, which is what the per-column sort key the row above asked for buys.
 - **Correct, and correct by accident**: **Priority** renders as "1 · Whenever" …
   "4 · Do it now", so the leading digit makes lexical order equal numeric order.
-  It works; it would stop working at ten levels.
+  It works; it would stop working at ten levels — so as of 2026-09-06 it is
+  `sortType: "number"` over the level itself and no longer depends on there
+  being fewer than ten.
 - **Correct all along**: every text column — Task, Who has it, App, Client,
   Important, Urgent, and the meetings list's title/client/purpose/where/status/notes.
 - **Not broken at all, and this is the one to be careful about**: on the Tasks

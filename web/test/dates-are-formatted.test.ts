@@ -79,14 +79,18 @@ import { join } from "node:path"
  * `formatTime` is here because an AGENDA row says the clock time alone under a
  * heading that already said the day.
  *
- * `DateSortable` is here for a reason worth reading: it produces "2026-06-13",
- * which is exactly the shape this check exists to catch. The difference is that
- * it is a decision rather than a leak — a table column somebody clicks to sort
- * has to compare correctly, and the library compares the rendered text
- * (shared/web/format.ts says the rest). Its output being a date and not a
- * timestamp is the visible half of that: no clock, no `T`, no `Z`, nothing that
- * looks like a database row. */
-const FORMATTED = /format(DateSortable|DateTime|Date|Time|Relative|ActivityWhen)\s*\(/
+ * `DateSortable` USED TO BE ON THIS LIST and is gone with the function, 2026-09-06.
+ * It produced "2026-06-13" — exactly the shape this check exists to catch — and
+ * was allowed because it was a decision rather than a leak: a table column
+ * somebody clicks to sort had to compare correctly, and the comparison WAS the
+ * rendered text, so the date on screen had to be spelled for the comparator
+ * instead of for the reader. `web/components/record-table.tsx` now takes a
+ * `sortKey`/`sortType` per column and compares the RAW value off the row, so a
+ * sortable date column no longer buys its order with its own legibility, and
+ * the two columns that were paying (Tasks' Deadline and Closed) render
+ * `formatDate` again. Nothing is exempt from this rule any more, which is the
+ * shape it should have had all along. */
+const FORMATTED = /format(DateTime|Date|Time|Relative|ActivityWhen)\s*\(/
 
 // `.toLocaleDateString(`/`.toLocaleTimeString(` are Date-only, so any receiver
 // counts. `.toLocaleString(` is shared with Number.prototype (money, byte
