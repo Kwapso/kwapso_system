@@ -49,6 +49,32 @@
 //
 // It is idempotent: `r2 bucket lifecycle set` replaces the rule set, so running
 // it twice leaves the same rules. Nothing here reads or writes an object.
+//
+// ── IT HAS NEVER BEEN RUN. Checked 2026-09-06, against the live account ──────
+//
+// All nine kwapso buckets carry exactly one lifecycle rule and it is not ours:
+//
+//     cf-exec npx wrangler r2 bucket lifecycle list kwapso-media
+//     name: Default Multipart Abort Rule
+//
+// That is Cloudflare's own rule, applied when a bucket is created. The rule THIS
+// script writes has id `abort-incomplete-multipart`, and it appears on no bucket
+// in either environment. So the script exists, is correct, is tested, and is not
+// a control — an unrun script protects nothing, and from the disk alone the two
+// are indistinguishable.
+//
+// What that costs today is small and worth stating rather than assuming:
+// Cloudflare's default rule happens to do the same job as rule 1, so incomplete
+// multiparts ARE being aborted. What is missing is rule 2 (infrequent access),
+// which is opt-in and off, and the guarantee that rule 1 stays there if the
+// default ever changes.
+//
+// Running it is an infrastructure change to live buckets, so it is the owner's
+// to make, not a lane's:
+//
+//     cf-exec node scripts/r2-lifecycle.mjs staging --dry-run   # see it first
+//     cf-exec node scripts/r2-lifecycle.mjs staging
+//     cf-exec node scripts/r2-lifecycle.mjs production
 
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
