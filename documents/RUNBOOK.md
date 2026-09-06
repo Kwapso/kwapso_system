@@ -189,13 +189,27 @@ npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
 > learned by doing exactly that, briefly, during the rehearsal RESILIENCE.md
 > records. Announce the window first, as you would for any other outage.
 >
-> **Check the account first, every time — § 0 above, not a wrapper.** A bare
-> `wrangler` acts on whichever Cloudflare account the machine is signed into, and
-> this one is shared: eleven of its sixteen D1 databases belong to other
-> companies. Run `npx wrangler whoami` and compare the id against
-> `CF_ACCOUNT_ID` before you export anything. (On the original author's machine a
-> `cf-exec` wrapper did this automatically. It is **not in this repository** —
-> § 0 says so — so on your machine the check is yours to run.)
+> **CHECK THE ACCOUNT FIRST, EVERY TIME — and there are two ways, because there
+> are two kinds of reader here.** A bare `wrangler` acts on whichever Cloudflare
+> account the machine is signed into, and **this account is shared: eleven of its
+> sixteen D1 databases belong to other companies.** An export aimed at the wrong
+> one is a real read of somebody else's production database.
+>
+> - **If you hold only this repository** (the stranger this runbook is written
+>   for): the command above is correct as written. Export
+>   `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` and confirm with
+>   `npx wrangler whoami` against `CF_ACCOUNT_ID` — **§ 0 above** has both steps.
+>   Do that before every export, not once per session.
+> - **If you are on a machine that has the `cf-exec` wrapper**, put it in front
+>   (`cf-exec npx wrangler d1 export …`). It resolves the account from the
+>   project registry and refuses rather than guessing, which is exactly the guard
+>   § 0 asks you to perform by hand. It is **not in this repository** — § 0 says
+>   so, and that is still true — so it is an accelerator for the people who have
+>   it, never a prerequisite.
+>
+> Both paths do the same job. What is not acceptable is neither: on a
+> multi-account machine, an unchecked `wrangler` is one letter away from the
+> wrong company.
 
 There is no scheduled job doing this. **If an off-Cloudflare backup matters to
 this product, that is a decision nobody has made yet**, it is listed in
