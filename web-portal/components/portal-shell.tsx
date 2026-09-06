@@ -32,6 +32,7 @@ import { Logotype } from "@shared/ui/components/brand/brand"
 import { AuthPhotograph } from "@shared/ui/compositions/templates/sign-in"
 
 import { brand } from "@shared/brand"
+import { LiveStatus } from "@shared/web/live-status"
 import { useRealtime } from "@shared/web/realtime"
 import { clearAllFormDrafts } from "@shared/web/use-form-draft"
 import { clearCache } from "@shared/web/store"
@@ -209,6 +210,13 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
        * `children(session)` inside 600 characters of each other, which is its way
        * of saying the flag still gates the body. Keep prose out of that gap. */}
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-8">
+        {/* The client's door is cache-first over the same socket the agency's
+         * is, so it can go quietly stale in exactly the same way — and a client
+         * has less reason than anybody to suspect it. Above the switch, not
+         * inside it: a company switch is a wait the shell already draws, and
+         * this is about the connection rather than about which company's rows
+         * are coming. Renders nothing while the socket is up. */}
+        <LiveStatus />
         {/* Mid-switch the rows below still belong to the company being left, so
          * they are held back rather than shown under the new company's name.
          * Skeletons in the SHAPE of what's coming — a heading, then request rows

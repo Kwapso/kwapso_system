@@ -246,6 +246,16 @@ export type ActivityItem = {
   /** who did it (name snapshot), or null if unknown */
   actorName: string | null
   createdAt: string
+  /** WHICH OF THE EIGHT (shared/workers/activity-verbs.ts). `type` is the
+   * sentence a person reads; this is the word a filter can stand on. Written on
+   * every row since the column landed; older rows answer null. */
+  verb: string | null
+  /** WHICH DOOR THE CHANGE CAME THROUGH — the agency app, the client portal, a
+   * machine token, the assistant, a cron. Every surface writes the same row
+   * through the same seam, so without this the trail cannot tell you which one
+   * a change came from; with it, "did Alex do this or did Alex's token?" is a
+   * question the feed answers. `unknown` where the writer could not say. */
+  origin: string | null
 }
 
 /** A team's Overview-tab metadata (who made it + when). */

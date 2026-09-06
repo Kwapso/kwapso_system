@@ -81,6 +81,7 @@ import { auth } from "@/lib/api"
 import { personInitials, personName } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { sectionClick } from "@/lib/nav-memory"
+import { LiveStatus } from "@shared/web/live-status"
 import { useRealtime, useUserRealtime } from "@shared/web/realtime"
 // The row-level registry + coarse invalidations moved to lib (R15): they're DATA
 // the live-collections check imports, and the thread/help_threads + agent_usage
@@ -1512,7 +1513,19 @@ export function AppShell({
          * `pb-24 md:pb-0` IS STILL THE PHONE'S BOTTOM BAR, and it still has
          * to be paid inside the scroller: that bar is `fixed` and overlays
          * the pane's last rows whether or not the page behind it moves. */}
-        <div className="mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pt-[var(--space-6)] lg:pt-[var(--space-7)] pb-24 md:pb-0">{children}</div>
+        <div className="mx-auto flex w-full max-w-none min-w-0 min-h-full flex-col overflow-x-clip pt-[var(--space-6)] lg:pt-[var(--space-7)] pb-24 md:pb-0">
+          {/* IS THIS SCREEN STILL LIVE? Renders nothing while the team socket
+              is up, which is nearly always — so this adds no box, no height
+              and no width in the ordinary case, and R29's one page container
+              is the div it sits inside rather than anything it draws. It is
+              here, above the screen, because the thing it qualifies is
+              whatever the screen is showing: every list and every record on
+              this door is painted cache-first and kept fresh by that socket,
+              so when the socket is gone the warning belongs in front of all
+              of it rather than beside one collection. */}
+          <LiveStatus />
+          {children}
+        </div>
       </ScreenShell>
 
       {/* Mobile bottom tabs — five slots, gated items hidden, and when there

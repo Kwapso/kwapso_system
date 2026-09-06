@@ -243,6 +243,28 @@ CREATE TABLE agent_threads (
 );
 CREATE INDEX idx_agent_threads_creator ON agent_threads (creator_id);
 
+-- WHAT WAS ASKED AND WHAT WAS ANSWERED, AND content IS NEVER REWRITTEN.
+--
+-- (No backticks anywhere in this comment: it lives inside a TEMPLATE LITERAL,
+-- so a backtick here ends the SQL string and the file stops parsing. The lint
+-- caught it in 15ms; it is worth the sentence because the next person to
+-- document a column in this file will reach for them exactly as I did.)
+--
+-- Nothing in any worker issues an UPDATE against this column. The ONE update
+-- this table takes is on tool_calls_json (data-ops lib/threads.ts), and it is a
+-- compare-and-swap -- AND tool_calls_json = the value we just read -- so even
+-- that cannot silently overwrite a concurrent decision.
+--
+-- Said out loud because the property is LOAD-BEARING and was carried by nothing
+-- but the absence of code. This is the assistant's own trail: it is what the
+-- team is shown when they ask what the assistant did on their behalf, and the
+-- one place a machine's account of its own actions is kept. A trail whose text
+-- can be edited after the fact answers a different question from the one people
+-- think they are asking it, and the edit would leave no mark. The activity
+-- table states the same guarantee for the same reason; this one had it and
+-- never claimed it.
+--
+-- If a message ever needs to CHANGE, append a new row and leave this one alone.
 CREATE TABLE agent_messages (
   id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL REFERENCES agent_threads (id),

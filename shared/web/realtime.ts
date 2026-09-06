@@ -48,6 +48,65 @@ export function teamLiveSince(): number | null {
   return teamConnectedAt
 }
 
+/* ------------------------- SAYING IT OUT LOUD ------------------------- */
+
+/** THE SAME FACT, FOR A PERSON RATHER THAN FOR THE CACHE.
+ *
+ * `teamConnectedAt` has always known whether this tab is being told about
+ * changes. Until now the only thing that ever asked was `store.ts`, deciding
+ * whether it could paint from cache — so the app knew it had gone deaf and
+ * never said so. A screen that has quietly stopped updating looks exactly like
+ * a screen where nothing is happening, which is the live layer's worst failure
+ * shape and the one nobody reports as a bug.
+ *
+ * So the fact becomes subscribable, the same way `running-jobs` publishes
+ * whether an act is in flight: one module-level value, one listener set, and a
+ * `useSyncExternalStore` hook so the FIRST render already knows rather than
+ * flashing the wrong state through an effect.
+ *
+ * WHAT IT DELIBERATELY DOES NOT DO: distinguish "connecting for the first
+ * time" from "dropped, retrying". Both mean the same thing to the person
+ * reading the screen — you are not being told about changes right now — and a
+ * three-state indicator that says "connecting" for the 200 ms of a healthy
+ * page load would be a flicker on every navigation, reporting a problem that
+ * is not one. The cache makes the same simplification for the same reason.
+ *
+ * The USER channel is not in it: it carries identity events and knows nothing
+ * about a collection, so its uptime cannot vouch for what is on screen — the
+ * same line `teamConnectedAt` itself draws two dozen lines up. */
+const liveListeners = new Set<() => void>()
+
+/** Move the connection fact and tell anyone showing it. The ONE writer, so a
+ * future `teamConnectedAt = …` cannot update the cache's view of the world and
+ * leave the person's view behind — which is the exact drift this file already
+ * warns about between the socket and the screen. */
+function setTeamConnectedAt(at: number | null): void {
+  if (teamConnectedAt === at) return
+  teamConnectedAt = at
+  for (const listener of liveListeners) listener()
+}
+
+function subscribeLive(cb: () => void): () => void {
+  liveListeners.add(cb)
+  return () => {
+    liveListeners.delete(cb)
+  }
+}
+
+/** Is this tab being told about team changes RIGHT NOW?
+ *
+ * The server snapshot is `true`: a static export has no socket and never will,
+ * and shipping "not live" into the exported HTML of every screen would put a
+ * warning in front of every person for the first paint of every cold load,
+ * about a connection that is simply not open yet. Absent is not broken. */
+export function useTeamLive(): boolean {
+  return React.useSyncExternalStore(
+    subscribeLive,
+    () => teamConnectedAt != null,
+    () => true
+  )
+}
+
 /** Open one live socket to `path` (e.g. "team=<id>" / "user=<id>"), reconnecting
  * with backoff. `onReconnect` is called only on a RE-connect after a drop. */
 function useLiveChannel(
@@ -85,7 +144,7 @@ function useLiveChannel(
         retry = 0
         // The coverage window starts NOW, and starts again on every re-open:
         // anything cached before this moment may have missed a ping in the gap.
-        if (isTeamChannel) teamConnectedAt = Date.now()
+        if (isTeamChannel) setTeamConnectedAt(Date.now())
       }
       socket.onmessage = (e) => {
         try {
@@ -97,7 +156,7 @@ function useLiveChannel(
       socket.onclose = () => {
         // The window shuts the moment the link does, whether or not we are
         // going to retry — a disconnected tab must revalidate normally.
-        if (isTeamChannel) teamConnectedAt = null
+        if (isTeamChannel) setTeamConnectedAt(null)
         if (closed) return
         // Backoff: 1s, 2s, 4s … capped at 15s, until we reconnect.
         const delay = Math.min(15000, 1000 * 2 ** retry)
@@ -113,7 +172,7 @@ function useLiveChannel(
       if (timer) clearTimeout(timer)
       // Unmount, a team switch, or a fence that moved: the identity of the
       // socket changed, so nothing cached under the old one is vouched for.
-      if (isTeamChannel) teamConnectedAt = null
+      if (isTeamChannel) setTeamConnectedAt(null)
       socket?.close()
     }
   }, [query])

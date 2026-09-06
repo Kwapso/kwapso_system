@@ -327,16 +327,16 @@ export const SHARED_TOOLS: SharedTool[] = [
     // per-module fence and breached R24 in the same row.
     name: "read_activity",
     summary:
-      "What has CHANGED, and who changed it — edits, deactivations and reactivations across the whole team, newest first. A creation is not here: a record's own audit line says who made it, so this feed is the history AFTER that. `scope` says what you are asking about and is one of team, record, user, role or invite; it defaults to team, the whole feed narrowed to the modules your role may read. For one record's own history use scope record with `table` (the table the record lives in — help, stories, accounts, meetings, and so on) and `id`. For what one colleague changed use scope user with their user id in `id`; scope role takes a role id and scope invite takes an invite id. Any scope but team with no `id` answers with nothing rather than with everybody's. The reply carries `activity` — each row an `id`, a `type`, a plain-English `description` of the change, the `actorName` who made it and `createdAt` — plus an exact `total` over the same question (`totalCapped` true means the count stopped at its ceiling), `hasMore`, and an opaque `nextCursor` to hand straight back as `cursor` for the next page. YOU ONLY EVER SEE WHAT YOUR OWN ROLE MAY READ: the team feed subtracts every module you are denied, so a number here is the number for YOU and not for the team, and the door refuses a client login outright.",
+      "What has CHANGED, and who changed it — edits, deactivations and reactivations across the whole team, newest first. A creation is not here: a record's own audit line says who made it, so this feed is the history AFTER that. `scope` says what you are asking about and is one of team, record, user, role, invite or actor; it defaults to team, the whole feed narrowed to the modules your role may read. For one record's own history use scope record with `table` (the table the record lives in — help, stories, accounts, meetings, and so on) and `id`. THE TWO QUESTIONS ABOUT A PERSON ARE DIFFERENT ONES: scope actor with their user id in `id` is what THEY CHANGED, anywhere in the team; scope user with the same id is what happened TO THEM as a member — they joined, their role changed, they were removed. Scope role takes a role id and scope invite takes an invite id. Any scope but team with no `id` answers with nothing rather than with everybody's. `verb` narrows any scope to one kind of event and is one of created, edited, status, archived, restored, deleted, viewed or other — an equality on the row's own stored word, so it finds every archive whatever sentence was written for it. The reply carries `activity` — each row an `id`, a `type`, a plain-English `description` of the change, the `actorName` who made it, `createdAt`, the same `verb`, and `origin`, which door the change came through — plus an exact `total` over the same question (`totalCapped` true means the count stopped at its ceiling), `hasMore`, and an opaque `nextCursor` to hand straight back as `cursor` for the next page. YOU ONLY EVER SEE WHAT YOUR OWN ROLE MAY READ: the team and actor feeds both subtract every module you are denied, so a number here is the number for YOU and not for the team, and the door refuses a client login outright.",
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/activity",
-    schema: obj({ scope: S, id: S, table: S, cursor: S }),
+    schema: obj({ scope: S, id: S, table: S, cursor: S, verb: S }),
     // R19: every parameter the door parses is exposed above and forwarded here —
-    // scope, id, table and cursor, which is all four of them.
+    // scope, id, table, cursor and verb, which is all five of them.
     buildQuery: (i) => {
       const parts: string[] = []
-      for (const key of ["scope", "id", "table", "cursor"])
+      for (const key of ["scope", "id", "table", "cursor", "verb"])
         if (str(i, key)) parts.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return parts.length ? `?${parts.join("&")}` : ""
     },
@@ -345,9 +345,15 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i, names) =>
         str(i, "scope") === "record"
           ? `Read what changed on ${names?.[str(i, "id")] ?? (str(i, "id") || "a record")}`
-          : str(i, "id")
+          : // "what X changed" is true of the ACTOR scope and was being said about
+            // every id-scope, including `user` — which answers what happened TO
+            // them. The panel a person approves said the wrong thing about the
+            // one scope somebody would check it for.
+            str(i, "scope") === "actor" && str(i, "id")
             ? `Read what ${names?.[str(i, "id")] ?? str(i, "id")} changed`
-            : "Read what has changed",
+            : str(i, "id")
+              ? `Read the history of ${names?.[str(i, "id")] ?? str(i, "id")}`
+              : "Read what has changed",
     },
   },
   {
