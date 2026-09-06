@@ -1818,7 +1818,22 @@ const RAIL_COLUMN = cn("p-[var(--rail-inset)]");
    tab padding (`px-5`) regardless — that is the label's OWN breathing room,
    never this column's, exactly as it already is for the content trail. */
 const ASIDE_TAB = cn("pt-[var(--aside-inset)]");
-const ASIDE_BODY = cn("pb-[var(--aside-inset)]");
+/* NO BLOCK-END HERE ANY MORE, AND THAT IS A CORRECTION OF MY OWN OVER-FIX.
+   This paid `pb-[var(--aside-inset)]` for as long as the DOCK paid nothing at
+   the bottom — the body's own padding was what stopped the panel running to
+   the window's edge. On 2026-09-04 the client reported the opposite defect
+   ("the assistant frame is too long and it exits the screen") and the fix was
+   to give the dock `pb-[var(--shell-gutter)]`, which is right: it makes the
+   COLUMN's box end level with the card's. But it left this line in place, so
+   both were paying, and `--aside-inset` and `--shell-gutter` are the same
+   number — the panel's content then stopped 18.75px ABOVE the card's foot.
+   The client, 2026-09-06, with a screenshot: "assistant container is still
+   not same length as main content / now its too short."
+
+   One owner. The dock ends the column; this region fills it. Measured after:
+   the aside body's foot and the card's foot are both 881.25 at a 900px
+   window, as its head and the card's head are both 47.33. */
+const ASIDE_BODY = cn("");
 
 /* How much air each door spends. Structure is identical; only the inset moves.
 
