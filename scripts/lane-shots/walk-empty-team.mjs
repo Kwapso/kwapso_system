@@ -13,6 +13,8 @@
 //     node scripts/lane-shots/walk-empty-team.mjs
 import { chromium } from "playwright"
 import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const PORT = process.env.VERIFY_PORT ?? "3065"
 const OUT = "/tmp/empty-walk-shots"
@@ -161,7 +163,24 @@ console.log("\nJSON:", JSON.stringify(results))
 // this answers "what does the app look like empty TODAY", and the history of
 // that answer is the file's own git log, which is a better record than a
 // folder of dated blobs nobody prunes.
-const REPORT = process.env.WALK_REPORT ?? ".session-notes/lanes/empty-walk.json"
+// RESOLVED AGAINST THE REPO, NOT AGAINST WHEREVER YOU HAPPEN TO BE STANDING.
+//
+// This was a relative path for about an hour and it was wrong in the exact
+// shape this whole file is about. `writeFileSync(".session-notes/lanes/…")`
+// resolves against `process.cwd()`, so running the walk from anywhere but the
+// repo root threw ENOENT — AFTER the browser had closed and after the JSON had
+// already been printed to the terminal. You would have done the expensive
+// thing, seen your results scroll past, and had nothing on disk: which is
+// precisely the 2026-08-29 failure this block was added to prevent, rebuilt by
+// the fix for it.
+//
+// So the default is anchored to this file's own location (the script lives at
+// <repo>/scripts/lane-shots/), and the directory is created before the write.
+// An explicit WALK_REPORT still wins and is taken as given — an override is a
+// deliberate act, and resolving it for somebody would be the surprise.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
+const REPORT = process.env.WALK_REPORT ?? resolve(REPO_ROOT, ".session-notes/lanes/empty-walk.json")
+mkdirSync(dirname(REPORT), { recursive: true })
 writeFileSync(
   REPORT,
   JSON.stringify(
