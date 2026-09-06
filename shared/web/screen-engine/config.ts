@@ -8,6 +8,12 @@
 // intersection types + spreading the matching `defaultXConfig`.
 // =============================================================================
 
+// Type-only, same as `icon-map.ts` beside this file: nothing here runs in the
+// DOM, so a runtime import would be dead weight, and no worker compiles this
+// file (a grep across `workers/` turns up no import of it) so the question of
+// whether a worker's tsconfig carries React types never arises.
+import type * as React from "react"
+
 /* ----------------------------- visibility rules ---------------------------- */
 
 /** Where a rule reads its value from. */
@@ -176,6 +182,32 @@ export interface FacetOption {
   value: string
   label: string
   count?: number
+  /** THE RECORD'S OWN MARK, PRE-DRAWN BY THE CALLER — optional, and it stays
+   * that way on purpose. Most facets (Client, Module, Status, every closed
+   * vocabulary in `collection-filters.ts`) are words and nothing else, and a
+   * mark that appeared on the type merely by existing on this interface would
+   * be exactly the "grows one by accident" risk this field was asked not to
+   * create: `useFilterBar` (filter-bar.tsx) is one function rendering every
+   * facet on both front doors, so a change here reaches all of them at once.
+   *
+   * A `ReactNode` rather than a colour string or an icon name, for the same
+   * reason `ticket-chips.tsx` takes `typeDot`/`AppLink` as props instead of
+   * importing `ticketTypeColour`/`AppMark` itself: this file sits under
+   * `shared/web/`, read by BOTH front doors, and neither the ticket type's
+   * colour map (`web/lib/type-colours.ts`) nor an app's own mark
+   * (`web/components/app-tiles.tsx`'s `AppMark`) lives somewhere this layer
+   * may import from (`@/...` resolves to a different folder per door). The
+   * CALLER that builds a `FilterFacet`'s options already has both concerns
+   * addressed — the ticket screens draw a `<Swatch>` for a type and an
+   * `<AppMark>` for an app everywhere else a ticket appears — so it hands the
+   * finished element in, and this layer only ever composes it beside the
+   * word, never decides what it looks like.
+   *
+   * NEVER THE ONLY THING AN OPTION SAYS — the house rule a mark answers to
+   * everywhere else in this app (`type-colours.ts`'s own "the dot is never
+   * alone" section, R32's "a mark comes from the chart series"): `useFilterBar`
+   * renders this beside `label`, `aria-hidden`, never instead of it. */
+  mark?: React.ReactNode
 }
 
 /** One field the user may sort by. `value` is the row field. */
