@@ -131,19 +131,49 @@ function freshCfg() {
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]
 
+/** WHAT THE TRIP COLUMN IS, AND WHAT IT IS NOT — read this before renaming it back.
+ *
+ * `stats[].ms` is the ROUND TRIP: `d1-rest.ts` starts its clock before the fetch
+ * and stops it in a `finally`, so every millisecond of network is in there and
+ * the database's own time is a rounding error inside it. This column printed
+ * `…ms in D1` until 6 Sep 2026, which is the opposite of what the number means.
+ *
+ * IT IS WRONG BY ABOUT A HUNDRED TIMES, and it pointed at the wrong repair.
+ * Measured the same day, same query, same staging database: 312ms of wall clock
+ * against D1's own `meta.duration` of 3.4ms — the database is 1.1% of it. The
+ * bench was reporting "382ms in D1" for that read. Somebody reading that
+ * concludes the database is slow and goes looking for an index, in a tool whose
+ * own header says the query is not the cost and none of the four wins was an
+ * index. A measuring instrument that misnames its column is worse than no
+ * instrument, because it produces action.
+ *
+ * IT IS STILL WORTH PRINTING, correctly named. Beside the wall clock it says
+ * whether the trips ran together or one after another: the work-log insights
+ * panel spends ~1,500ms across five trips and ~380ms of wall clock, and that gap
+ * IS the parallelism. Equal numbers would mean a serial chain.
+ *
+ * (D1's own duration is not here because `D1Stat` does not carry it, and adding
+ * it means widening a shared seam that five workers hang timings on — a bigger
+ * change than this file, and not one a bench should make on its own.) */
 async function time(label, budgetKey, run, samples = SAMPLES) {
   const wall = []
-  let trips = 0
-  let d1ms = 0
+  // PER SAMPLE, and reduced the same way `ms` is. These used to be assigned
+  // inside the loop, so the line printed the LAST sample's trip count and trip
+  // time beside a MEDIAN wall clock — three numbers from different runs, read as
+  // if they described one.
+  const tripCounts = []
+  const tripTimes = []
   for (let i = 0; i < samples; i++) {
     const { cfg, stats } = freshCfg()
     const started = Date.now()
     await run(cfg)
     wall.push(Date.now() - started)
-    trips = stats.length
-    d1ms = stats.reduce((s, x) => s + x.ms, 0)
+    tripCounts.push(stats.length)
+    tripTimes.push(stats.reduce((s, x) => s + x.ms, 0))
   }
   const ms = median(wall)
+  const trips = median(tripCounts)
+  const tripMs = median(tripTimes)
   const budget = LATENCY_BUDGET_MS[budgetKey]
   const verdict = ms <= budget ? "within" : `${(ms / budget).toFixed(1)}x over`
   // BESIDE THE RECORDED READING, not on its own. One number is an opinion; this
@@ -156,9 +186,9 @@ async function time(label, budgetKey, run, samples = SAMPLES) {
   console.log(
     `  ${label.padEnd(42)} ${String(ms).padStart(6)}ms  ` +
       `(${Math.min(...wall)}–${Math.max(...wall)})  ${String(trips).padStart(3)} trips, ` +
-      `${d1ms}ms in D1  —  ${budgetKey} budget ${budget}ms: ${verdict}${drift}`
+      `${tripMs}ms round trip  —  ${budgetKey} budget ${budget}ms: ${verdict}${drift}`
   )
-  return { ms, trips, d1ms }
+  return { ms, trips, tripMs }
 }
 
 console.log(`\nspeed-bench — team "${TEAM_NAME}" on staging, code from ${REPO}`)
