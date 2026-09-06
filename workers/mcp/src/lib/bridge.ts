@@ -8,19 +8,25 @@
 
 import { AUTH_UNAVAILABLE_MS, GuardError } from "@shared/workers/gating"
 import { traceHeaders } from "@shared/workers/trace"
+import { SESSION_COOKIE } from "@shared/workers/session-cookie"
 import type { Env } from "../env"
 import { requireStaff } from "./staff"
 import type { McpTokenRow } from "./tokens"
 
-/** Auth's cookie name (workers/auth/src/lib/sessions.ts), restated rather than
- * imported — one worker does not reach into another's source.
+/** The cookie name, IMPORTED now rather than restated.
+ *
+ * It used to be written out here, with the true reason that one worker does not
+ * reach into another's source. What was missing was a third option: the name now
+ * lives in `shared/workers/session-cookie.ts`, which both workers may import
+ * without either reaching into the other. Three hand-written copies of a
+ * security-relevant literal — one of them on the legacy migration's thirty-day
+ * clock — is a drift nothing was comparing.
  *
  * The `__Host-` prefix is auth's session-fixation defence and belongs to the
  * BROWSER contract, not this one: prefix rules constrain what a browser accepts
  * in `Set-Cookie`, while this is a request header minted worker-to-worker. It
  * matches anyway, because the name has to be the one auth reads — and auth reads
  * the prefixed name first. */
-const SESSION_COOKIE = "__Host-kwapso_session"
 
 /** HOW LONG A PASSED STAFF CHECK MAY STAND.
  *

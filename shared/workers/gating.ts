@@ -15,6 +15,7 @@ import { callerHasBudget, TOO_FAST, type RateLimitEnv } from "./rate-limit"
 import { deferrerFor } from "./parallel"
 import { beginD1Timing, noteTeam } from "./timing"
 import { requestId, traceHeaders } from "./trace"
+import { sessionFromCore } from "./session-fallback"
 
 /** The slice of a worker Env the gating needs. Every domain worker's Env
  * structurally satisfies this (the AUTH binding + the core DB + the Cloudflare
@@ -212,13 +213,33 @@ export async function whoAmI(request: Request, env: GatingEnv): Promise<SessionU
     if (!res.ok) return null
     return ((await res.json()) as { user: SessionUser }).user
   } catch {
-    // Includes an unreadable body: auth answering nonsense is auth being
-    // unwell, and it must not read to the caller as "you are signed out".
-    throw new GuardError(
-      503,
-      "auth_unavailable",
-      "We can't check who you are right now. Try again in a moment."
-    )
+    // AUTH IS UNREACHABLE — resolve the caller from the session row instead of
+    // refusing everybody (the owner's ruling, 2026-09-05: keep people working
+    // for a few minutes if the sign-in service goes down).
+    //
+    // Not a cached identity, which is what makes it safe: `sessionFromCore`
+    // reads the same live row auth reads, so an expired session, a sign-out and
+    // a deactivated member are all still refused. It is READ-ONLY, so auth
+    // stays the only thing that mints, slides or destroys a session. And it
+    // changes nothing about RIGHTS — `requireMember` and `requireRight` below
+    // already read core directly and never involved auth at all.
+    // documents/RESILIENCE.md § "The recommendation, now taken" argues it in full.
+    //
+    // A null here still means "not signed in" and still reads as a 401, exactly
+    // as a healthy auth's null does. Only if CORE is unreachable too do we
+    // arrive at the throw below — which is the one sentence this seam has always
+    // said when it genuinely cannot tell who is asking.
+    try {
+      return await sessionFromCore(request, env)
+    } catch {
+      // Includes an unreadable body from auth: auth answering nonsense is auth
+      // being unwell, and it must not read to the caller as "you are signed out".
+      throw new GuardError(
+        503,
+        "auth_unavailable",
+        "We can't check who you are right now. Try again in a moment."
+      )
+    }
   }
 }
 

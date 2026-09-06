@@ -1,58 +1,33 @@
 import type { Env } from "../env"
 import { randomToken, sha256Hex } from "./crypto"
 import { ulid } from "@shared/workers/id"
+import { readCookie, sessionCookieName, LEGACY_SESSION_COOKIE, SESSION_COOKIE, readSessionToken } from "@shared/workers/session-cookie"
 import type { UserRow } from "./users"
 
-/** THE COOKIE NAME, AND WHY IT CARRIES `__Host-`.
+/** THE COOKIE NAME AND THE TWO PURE FUNCTIONS OVER IT NOW LIVE IN
+ * `shared/workers/session-cookie.ts`, with the whole `__Host-` argument that
+ * used to sit here.
  *
- * `SameSite=Lax` is same-SITE, and "site" is the registrable domain —
- * kwapso.app, which this product SHARES with a live third party (the legacy
- * Glide portal on portal.kwapso.app; the portal gateway's own config says so).
- * `refuseForeignOrigin` closed one half of what that means: a page over there
- * cannot make a WRITE ride this cookie. It says nothing about the other half. A
- * related host can also SET a cookie for `.kwapso.app`, and `readCookie` below
- * returns the FIRST match in the header — so an injected `kwapso_session` that
- * predates the victim's own would be the one read, and the victim would be
- * quietly signed in AS THE ATTACKER. Everything they then typed, uploaded or
- * created would land in the attacker's account. That is session fixation, and it
- * is the exact attack `__Host-` exists for: a browser refuses to accept a
- * `__Host-` cookie that carries a `Domain`, so no other host on the site can
- * write one. The three preconditions (Secure, Path=/, no Domain) were already
- * true here — only the name was missing.
+ * WHY THEY MOVED: the literal was hand-written in three places (this file's
+ * pair, plus a third copy in workers/mcp/src/lib/bridge.ts) and the gating
+ * seam's sign-in fallback was about to write a fourth — shared code cannot
+ * import from a worker, so it had nothing to reach for. During the legacy
+ * migration below, a copy that is not updated does not break on the day it is
+ * wrong: it keeps working until the estate drains and then stops finding
+ * sessions, green build and nothing to point at.
  *
- * THE LEGACY NAME IS STILL READ, and that is a migration, not a hedge. Every
- * signed-in person holds `kwapso_session` today; accepting only the new name
- * would sign every one of them out on deploy, at which point somebody reverses
- * the change. So the prefixed name is written and is read FIRST — a victim who
- * has been migrated cannot be overridden by an injected legacy cookie, because
- * the prefixed one wins before the fallback is consulted.
- *
- * THE WINDOW IS REAL AND IT IS THE RESIDUAL RISK: somebody who has not made a
- * request since the deploy still holds only the legacy name and is still
- * fixable until they do. Sessions slide and every sign-in mints the new name, so
- * it drains on its own. `destroySession` closes the nastiest corner of it —
- * see its own note. DELETE the fallback (and this paragraph) once the estate has
- * been through one full session lifetime, 30 days after this ships.
- *
- * `INSECURE_COOKIE=1` keeps the bare name, because a browser will not accept a
- * `__Host-` cookie without `Secure` and local dev is http. */
-export const LEGACY_SESSION_COOKIE = "kwapso_session"
-export const SESSION_COOKIE = "__Host-kwapso_session"
+ * RE-EXPORTED so every call site in this worker keeps its habitual import, and
+ * so auth still reads as the place the session is decided. Auth remains the only
+ * thing that MINTS, SLIDES or DESTROYS one — what moved is a name and two pure
+ * functions. `shared/workers/test/session-cookie.test.ts` fails the build if a
+ * fourth copy of the literal appears anywhere. */
+export {
+  LEGACY_SESSION_COOKIE,
+  SESSION_COOKIE,
+  readCookie,
+  readSessionToken,
+} from "@shared/workers/session-cookie"
 
-/** The name this environment WRITES. Reading is a different question — see
- * `readSessionToken`, which accepts both. */
-function cookieName(env: Env): string {
-  return env.INSECURE_COOKIE === "1" ? LEGACY_SESSION_COOKIE : SESSION_COOKIE
-}
-
-/** THE SESSION TOKEN THIS REQUEST PRESENTS, prefixed name first.
- *
- * The ORDER is the security property, not a tidiness preference: a browser that
- * holds both — a migrated victim plus a cookie some other host on the site
- * injected — must resolve to its own. */
-export function readSessionToken(req: Request): string | null {
-  return readCookie(req, SESSION_COOKIE) ?? readCookie(req, LEGACY_SESSION_COOKIE)
-}
 const SESSION_DAYS = 30
 /** When less than this many days remain, the session quietly extends itself. */
 const SLIDE_THRESHOLD_DAYS = 15
@@ -76,17 +51,7 @@ function buildCookie(env: Env, value: string, maxAgeSeconds: number): string {
   // things a browser REQUIRES before it will accept a `__Host-` cookie at all
   // (the third is `Secure`, above). Change any of them and the cookie is
   // silently rejected, which reads as "sign-in does nothing".
-  return `${cookieName(env)}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${maxAgeSeconds}`
-}
-
-export function readCookie(req: Request, name: string): string | null {
-  const header = req.headers.get("Cookie")
-  if (!header) return null
-  for (const part of header.split(";")) {
-    const [k, ...rest] = part.trim().split("=")
-    if (k === name) return rest.join("=")
-  }
-  return null
+  return `${sessionCookieName(env.INSECURE_COOKIE === "1")}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}; Max-Age=${maxAgeSeconds}`
 }
 
 /** Log a user in: store a hashed session row, hand the browser the cookie. */

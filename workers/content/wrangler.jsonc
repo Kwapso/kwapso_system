@@ -90,6 +90,14 @@
   // third-party product and must never appear here.
   "vars": {
     "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
+    // THE BUCKET NAMES, BESIDE THEIR BINDINGS — the pair a presigned upload
+    // needs, and the same shape as `TEAM_DB_<n>_ID` beside its D1 binding: a
+    // binding cannot be asked its own bucket name at runtime, and an S3
+    // presign has to put that name in the signed path. Inert until
+    // `R2_ACCESS_KEY_ID` is set as a secret; with no credential every upload
+    // door takes the byte-through-the-worker path it takes today.
+    "MEDIA_BUCKET": "kwapso-media",
+    "INTERNAL_MEDIA_BUCKET": "kwapso-internal-media",
     "PUBLIC_APP_URL": "https://agency.kwapso.app",
     "PUBLIC_PORTAL_URL": "https://client.kwapso.app",
     "AGENT_FREE_DAILY": "50",
@@ -153,6 +161,9 @@
       "vars": {
         "CF_ACCOUNT_ID": "b5bb3d84a59c029ea5e0fe164dab1cf7",
         "TEAM_DB_0_ID": "727537f7-653d-4114-af23-332d1aae0f90",
+        // The staging twins — see the production note above.
+        "MEDIA_BUCKET": "kwapso-media-staging",
+        "INTERNAL_MEDIA_BUCKET": "kwapso-internal-media-staging",
         "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
         "PUBLIC_PORTAL_URL": "https://staging-client.kwapso.app",
         "AGENT_FREE_DAILY": "2000",

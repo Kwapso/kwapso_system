@@ -1,6 +1,31 @@
 // IS ANYBODY ELSE STILL POINTING AT THIS OBJECT? — the question that has to be
 // asked between "this row stopped pointing at it" and "delete it".
 //
+// ── WHY THE ATTACHMENTS ARE NOT ON THE RECLAIM LIST, AND ARE NOT AN OVERSIGHT
+//
+// Written here because "there is nothing to do" is a finding, and an unwritten
+// one is rediscovered every review round. It has now been raised twice.
+//
+// The nine reclaiming call sites all sit on a REPLACE-or-CLEAR path: a column
+// that held one `/media/…` path and now holds another, which leaves the first
+// object referenced by nothing. Four fields look like they belong beside them
+// and do not, because they have no replace path at all:
+//
+//   help_attachments.url    never UPDATEd — only `deactivated_at` (remove) and
+//   story_attachments.url   `label` (rename). Taking an attachment off is an
+//                           ARCHIVE, and archiving reclaims nothing on purpose
+//                           (setBrandAssetActive says why: a restored record
+//                           whose file 404s is worse than an orphan).
+//   todos.file_url          write-once. `completeTodo` writes it as
+//   tasks.file_url          `COALESCE(?, file_url)` / on INSERT, so a second
+//                           write cannot supersede a first.
+//
+// So there is no fifth, sixth, seventh or eighth site to add here: every column
+// that HAS a replace path already has one. The bytes those four hold are freed
+// by the periodic orphan sweep — delete what nothing points at any more, on a
+// schedule — which is the owner's own choice over delete-on-archive, and lives
+// with the errors/housekeeping work rather than here.
+//
 // ── THE HOLE THIS CLOSES, AND IT IS ONE THE RECLAIM ITSELF OPENED ───────────
 //
 // `ownedMediaKey` proves a key belongs to the CALLER — their team, their module,
