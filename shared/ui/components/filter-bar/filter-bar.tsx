@@ -272,9 +272,36 @@ const facetFieldVariants = cva(
            swapped and promoted 8% to 20% on hover, so a resting facet and a
            disabled one carried the same stroke. The hover came from
            kwapso-ui.css; it is gone and nothing replaces it. */
-        default: "shadow-[var(--hairline-strong)] bg-background text-foreground",
+        /* THE PILL TAKES THE OTHER PAPER, NOT THE PAGE'S — client, 2026-09-06:
+           "I don't like not seeing the contour of these buttons (the filter and
+           so on). Please make it beige #F7F2EB."
+     
+           The contour was there all along: `--hairline-strong` is a real 20%
+           edge. What was missing is a FILL, because this pill painted
+           `bg-background` — the same tone as the toolbar track it sits on — so
+           a hairline was the only thing separating a control from its own
+           ground. tokens.css states the principle for buttons in as many words:
+           "a secondary button is a filled button in the other paper tone, which
+           is why a header band and the buttons inside it are never the same
+           paper tone". A pill in a toolbar is that same object and was the one
+           control breaking the rule: `SortControl` and `ViewSwitch` beside it
+           already spend `--btn-secondary-fill`, which is why those two read as
+           objects and this one read as text with a line round it.
+     
+           `--btn-secondary-fill` RATHER THAN THE LITERAL #F7F2EB she named, and
+           it resolves to exactly that here: the token is GROUND-AWARE
+           (tokens.css rebinds it per surface, so it is soft paper on an
+           off-beige ground and off-beige on a soft-paper one). Writing the
+           colour would have been right on this toolbar and invisible on a
+           panel, which is the failure the rebind exists to prevent — and it has
+           no dark half, so a hex here would have shipped a light-only pill. */
+        default:
+          "shadow-[var(--hairline-strong)] bg-[var(--btn-secondary-fill)] text-foreground",
         /** Chapter 9's error hairline: poppy at 65%, so dark re-resolves for free. */
-        error: ["shadow-[var(--hairline-error)]", "bg-background text-foreground"],
+        /* The error pill moves with the resting one: it differs by its EDGE
+           (`--hairline-error`), and leaving it on the page tone would have made
+           the one pill that most needs to be seen the flattest on the row. */
+        error: ["shadow-[var(--hairline-error)]", "bg-[var(--btn-secondary-fill)] text-foreground"],
         /** A system-set value loses its edge entirely, and its tab stop. */
         readOnly: "shadow-none bg-hair-faint text-foreground",
         /* A fill, an ink, and the WEAK 8% edge against the resting facet's

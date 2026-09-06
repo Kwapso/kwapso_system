@@ -605,6 +605,24 @@ export function ToolbarRow({
               onDirectionChange={sort.onDirectionChange}
               label={t("Sort by")}
               hideLabel
+              /* DENSE, NOT THE STANDING HEIGHT — client: "the sort component
+                 everywhere, I feel it's too big. Could we make it a bit more
+                 compact, like the two parts with the arrow and the other one?"
+                 She is describing the control's own two halves, which is what
+                 it already is: a direction button fused to a field.
+
+                 Nothing is redrawn. `size="sm"` is the kit's own second size
+                 and its doc names this exact place — "32,
+                 `--control-height-dense`, for a table header or A TOOLBAR". The
+                 toolbar had simply never asked for it, so every collection in
+                 the app drew the 40 standing height inside a row of 32s. The
+                 glyph steps 20 -> 16 with it, by the control's own rule rather
+                 than by anything written here.
+
+                 One line, every collection screen, because this row builds the
+                 control now (R53) instead of eighteen call sites each passing
+                 their own. */
+              size="sm"
             />
           </div>
         )}

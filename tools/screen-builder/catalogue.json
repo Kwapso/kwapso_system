@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.54",
-  "sha": "269c9f96edae87325d63390096d2eede5f276211",
+  "tag": "v1.2.55",
+  "sha": "add0c0452f6dc92c51d1c21c016ab6d518b541d4",
   "syncedAt": "2026-09-06"
  },
- "generatedAt": "2026-09-06T13:06:07.262Z",
+ "generatedAt": "2026-09-06T15:39:33.197Z",
  "counts": {
   "components": 116,
   "hooks": 2,
@@ -3800,13 +3800,13 @@
        "options": [
         {
          "name": "default",
-         "classes": "shadow-[var(--hairline-strong)] bg-background text-foreground",
-         "note": "A field, so ch02's hairline carve-out applies — as an inset shadow, never a `border` (review 1A · fix 2). Focus adds nothing of its own: the global ring is the whole treatment (fix 4). OVERRIDE 42 — the resting edge is `--hair-strong` and there is no hover. CH16 draws the facet field the way CH09 draws every field: `var(--hair2)` at rest, `var(--hair)` disabled. The build had them swapped and promoted 8% to 20% on hover, so a resting facet and a disabled one carried the same stroke. The hover came from kwapso-ui.css; it is gone and nothing replaces it."
+         "classes": "shadow-[var(--hairline-strong)] bg-[var(--btn-secondary-fill)] text-foreground",
+         "note": "THE PILL TAKES THE OTHER PAPER, NOT THE PAGE'S — client, 2026-09-06: \"I don't like not seeing the contour of these buttons (the filter and so on). Please make it beige #F7F2EB.\" The contour was there all along: `--hairline-strong` is a real 20% edge. What was missing is a FILL, because this pill painted `bg-background` — the same tone as the toolbar track it sits on — so a hairline was the only thing separating a control from its own ground. tokens.css states the principle for buttons in as many words: \"a secondary button is a filled button in the other paper tone, which is why a header band and the buttons inside it are never the same paper tone\". A pill in a toolbar is that same object and was the one control breaking the rule: `SortControl` and `ViewSwitch` beside it already spend `--btn-secondary-fill`, which is why those two read as objects and this one read as text with a line round it. `--btn-secondary-fill` RATHER THAN THE LITERAL #F7F2EB she named, and it resolves to exactly that here: the token is GROUND-AWARE (tokens.css rebinds it per surface, so it is soft paper on an off-beige ground and off-beige on a soft-paper one). Writing the colour would have been right on this toolbar and invisible on a panel, which is the failure the rebind exists to prevent — and it has no dark half, so a hex here would have shipped a light-only pill."
         },
         {
          "name": "error",
-         "classes": "shadow-[var(--hairline-error)] bg-background text-foreground",
-         "note": "Chapter 9's error hairline: poppy at 65%, so dark re-resolves for free."
+         "classes": "shadow-[var(--hairline-error)] bg-[var(--btn-secondary-fill)] text-foreground",
+         "note": "The error pill moves with the resting one: it differs by its EDGE (`--hairline-error`), and leaving it on the page tone would have made the one pill that most needs to be seen the flattest on the row."
         },
         {
          "name": "readOnly",
