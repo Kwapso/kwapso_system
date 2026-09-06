@@ -497,6 +497,25 @@ export const MAX_ACCOUNT_DEPTH = 64
  * for a proposal somebody else already spent. */
 export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
 
+/** HOW MANY TIMES A SOURCE IS RE-EMBEDDED BEFORE THE SWEEP GIVES UP ON IT.
+ *
+ * `embed` is best-effort on purpose: an embedding failure must not lose the
+ * material, so a failed batch stores NULL vectors, `indexSource` blanks the
+ * content hash, and the next sweep picks the source up again. That self-healing
+ * is right and it had no floor — a source that fails REPEATABLY was re-read and
+ * re-sent to the model every fifteen minutes for ever, writing the same error
+ * row each time, until somebody happened to look.
+ *
+ * Five, and it is per TEXT rather than per source: the counter resets the moment
+ * a source's title or body changes (the upsert in knowledge-ingest.ts does it),
+ * so a document somebody fixes is tried again immediately and a document nobody
+ * touches stops costing a model call every quarter of an hour. Five ticks is
+ * seventy-five minutes of a transient Workers AI wobble, which is far longer
+ * than any outage this has actually seen.
+ *
+ * The same shape and the same reasoning as TRANSCRIPT_ATTEMPT_CAP next door. */
+export const EMBED_ATTEMPT_CAP = 5
+
 // ── the agent's reply ceiling, and the bulk cap DERIVED from it ───────────────
 // A cap the model is TOLD but cannot physically EMIT is a promise the runtime
 // breaks silently, mid-JSON: the tool call truncates, the turn dies, nothing

@@ -964,7 +964,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // is unchanged except `task`, whose slice merely moved (see its note). So no
 // textVersion moves, and a bump here would re-index the whole base to fix
 // nothing.
-const SHARED_DIGEST = "60d395561678771d"
+// 6 Sep 2026: an unembeddable source stops being retried (EMBED_ATTEMPT_CAP).
+// Three edits, all of them about WHETHER a source is sent to the model and none
+// about what it SAYS: the upsert clears `embed_attempts` when a row's title or
+// body changes, the loop skips a source that has failed the cap and reports the
+// set once, and `indexSource` counts the attempt in the branch that already
+// blanked the hash. Not one reader was touched, and every per-kind digest above
+// is unchanged — which is the evidence, not the claim: this pin was the ONLY
+// one that moved. So no textVersion moves, and a bump here would re-read every
+// row of every kind to fix nothing.
+const SHARED_DIGEST = "0a1a388130854c76"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
