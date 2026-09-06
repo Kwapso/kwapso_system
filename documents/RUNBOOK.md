@@ -151,7 +151,7 @@ against is *losing the account* rather than losing a row, take a file:
 
 ```bash
 cd workers/auth
-cf-exec npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
+npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).sql
 ```
 
 > **THIS TAKES THE DATABASE OFFLINE, AND IN A SCRIPT IT WILL NOT ASK YOU FIRST.**
@@ -189,9 +189,13 @@ cf-exec npx wrangler d1 export kwapso-core --remote --output ./core-$(date +%F).
 > learned by doing exactly that, briefly, during the rehearsal RESILIENCE.md
 > records. Announce the window first, as you would for any other outage.
 >
-> `cf-exec` is on the front of that command deliberately: a bare `wrangler`
-> resolves to whichever Cloudflare account the machine is signed into, and this
-> one is shared — eleven of its sixteen D1 databases belong to other companies.
+> **Check the account first, every time — § 0 above, not a wrapper.** A bare
+> `wrangler` acts on whichever Cloudflare account the machine is signed into, and
+> this one is shared: eleven of its sixteen D1 databases belong to other
+> companies. Run `npx wrangler whoami` and compare the id against
+> `CF_ACCOUNT_ID` before you export anything. (On the original author's machine a
+> `cf-exec` wrapper did this automatically. It is **not in this repository** —
+> § 0 says so — so on your machine the check is yours to run.)
 
 There is no scheduled job doing this. **If an off-Cloudflare backup matters to
 this product, that is a decision nobody has made yet**, it is listed in
@@ -289,7 +293,7 @@ job after repeated test logins, not a fault. Wait it out.
 - **A new core migration** goes on `kwapso-core-staging` and `kwapso-core` BEFORE
   the workers that read it are deployed. Apply first, deploy second, the reverse
   is an outage.
-- **A new team-schema migration** ships in `workers/tenancy/src/team-schema.ts`
+- **A new team-schema migration** ships in `workers/tenancy/src/team-schema/migrations.ts`
   and reaches existing teams only when the migrate-teams robot runs. New teams get
   it automatically. Until you run the robot the estate is split.
 - **Rotating a shared secret** (`INTERNAL_KEY` above all) is not atomic. Every

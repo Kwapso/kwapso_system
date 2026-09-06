@@ -36,7 +36,7 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 
 | Layer | File(s) | What you add |
 |---|---|---|
-| 1. Table + migration | `workers/tenancy/src/team-schema.ts` | a `CREATE TABLE`, appended as a new `TEAM_MIGRATIONS` entry |
+| 1. Table + migration | `workers/tenancy/src/team-schema/migrations.ts` | a `CREATE TABLE`, appended as a new `TEAM_MIGRATIONS` entry |
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.tsx`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
@@ -55,13 +55,16 @@ add a worker for a new module, you add routes to an existing one.
 
 Every team has its **own** D1 database (locked, ARCHITECTURE.md). The one master
 definition of what lives inside it is `TEAM_MIGRATIONS` in
-`workers/tenancy/src/team-schema.ts`. A new table is a **new entry appended to that
-array**. Never an edit to an existing migration (existing databases have already
+`workers/tenancy/src/team-schema/migrations.ts`. A new table is a **new entry
+appended to that array**. *(It lived in `team-schema.ts` until 6 Sep 2026, when
+that file became a 37-line barrel that re-exports the ledger and the seed. Every
+IMPORT still says `../src/team-schema` and still resolves — only the place you
+APPEND moved.)* Never an edit to an existing migration (existing databases have already
 run them). The runner stamps each applied version into the per-team `_migrations`
 table and only applies what's missing.
 
 Look at how the brand library did it (migration `0018_agency_internal`,
-team-schema.ts):
+`team-schema/migrations.ts`):
 
 ```sql
 CREATE TABLE brand_assets (
@@ -94,7 +97,7 @@ The **shape rules**, every one visible above and non-negotiable:
 Append your migration. The version prefix is monotonic:
 
 ```ts
-// workers/tenancy/src/team-schema.ts — appended to TEAM_MIGRATIONS
+// workers/tenancy/src/team-schema/migrations.ts — appended to TEAM_MIGRATIONS
 {
   version: "0006_notes",
   sql: `
@@ -127,7 +130,7 @@ the whole story, no per-table binding, no wrangler migration file.
 **Permissions are the spine.** A module the matrix doesn't know about can't be
 gated, so the server would refuse every request. Registering is three edits across
 **two** files: the module key and its label live in `shared/team-modules.ts`, the
-seed loop in `workers/tenancy/src/team-schema.ts`.
+seed loop in `workers/tenancy/src/team-schema/seed.ts`.
 
 > **Why two files, and why it is worth knowing.** The list used to sit in
 > `team-schema.ts` and moved to `shared/` the moment data-ops needed the same list
@@ -169,7 +172,7 @@ both the worker gate and the Roles UI.
 
 ### 2c. Seed the two default roles
 
-`buildTeamSeed` (team-schema.ts) writes the starter permission sheet every new
+`buildTeamSeed` (`team-schema/seed.ts`) writes the starter permission sheet every new
 team gets: **Admin** (full) and **Viewer** (read-only). The loop already iterates
 `TEAM_MODULES`, so your module is seeded automatically. Admin gets
 `read/create/edit/delete = 1,1,1,1`, Viewer gets `1,0,0,0`. You only touch this if
@@ -617,13 +620,13 @@ it red.
 ## The copy-paste checklist
 
 ```
-LAYER 1 — table + migration  (workers/tenancy/src/team-schema.ts)
+LAYER 1 — table + migration  (workers/tenancy/src/team-schema/migrations.ts)
 [ ] Append a NEW entry to TEAM_MIGRATIONS (version "NNNN_<module>"); never edit an old one
 [ ] Table has: id TEXT PRIMARY KEY (ULID); the 3 audit blocks (created_/editor_/deactivator_)
 [ ] Deactivate-not-delete: a deactivated_at column, NO DELETE anywhere
 [ ] Indexes for the columns you filter/join on
 
-LAYER 2 — register + permissions  (shared/team-modules.ts, then team-schema.ts)
+LAYER 2 — register + permissions  (shared/team-modules.ts, then team-schema/seed.ts)
 [ ] Add the module key to TEAM_MODULES          (shared/team-modules.ts)
 [ ] Add its label to MODULE_LABELS (TS forces this) (same file)
 [ ] buildTeamSeed already seeds it (Admin 1111 / Viewer 1000) — only touch for a special Viewer default

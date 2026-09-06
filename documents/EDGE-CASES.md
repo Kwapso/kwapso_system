@@ -647,7 +647,7 @@ last) fails, and deploying a worker before its migration 500s at runtime.
   need them.** Core migrations (e.g. `0008 importable_databases`, `0009
   agent_usage`, `0010 agent_credits`) go to `kwapso-core` **and**
   `kwapso-core-staging`; the team-schema migrations, the whole
-  `TEAM_MIGRATIONS` array in `workers/tenancy/src/team-schema.ts`, `0001_team_base`
+  `TEAM_MIGRATIONS` array in `workers/tenancy/src/team-schema/migrations.ts`, `0001_team_base`
   through `0021_meetings` today, roll to **every** team DB via `POST
   /api/tenancy/admin/migrate-teams` (x-admin-key). Read the range off that array
   rather than out of any doc: this line named `0004`–`0008` for thirteen migrations

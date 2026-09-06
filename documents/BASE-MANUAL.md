@@ -85,7 +85,7 @@ gets its *own* database holding all of that team's content: `member_roles` +
 `help_threads`, `invite_logs`, `activity`, `data_import_sessions`,
 `agent_threads` + `agent_messages`. The master definition of what lives in a team
 DB, and the seed rows a newborn team starts with, is
-`workers/tenancy/src/team-schema.ts` (`TEAM_MIGRATIONS`).
+`workers/tenancy/src/team-schema/migrations.ts` (`TEAM_MIGRATIONS`; `team-schema.ts` is the barrel that re-exports it).
 
 **Why this split.** Two invariants pull in opposite directions:
 

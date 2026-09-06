@@ -399,7 +399,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 | `web-portal/` | the CLIENT PORTAL screens (static export → `web-portal/out`, served by `workers/portal-gateway`). Its own workspace, its own tests, including the account-fence suite |
 | `workers/` | the eight workers. Six private brains + the two public gateways |
 | `shared/` | what every side agrees on. `shared/workers/`, the worker seams (gating, the data door, validation, publish); `shared/web/`, the front-end seams BOTH apps import (the cache `store.ts`, the live client `realtime.ts`, `log.ts`, `form-shell.tsx`, `format-count.ts`, `use-form-draft.ts`); plus the types, the glossary and the rules registry. A file lands in `shared/web/` the moment the second front end needs it, that is why several seams the docs used to place under `web/lib/` now live here |
-| `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema.ts`) |
+| `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema/migrations.ts`) |
 | `scripts/` | the operational scripts, reset, seed, the smokes, the Glide pull |
 | `tools/` | developer tools that are never deployed and sit outside both front doors' import closure. `tools/screen-builder/` is a Glide-like sandbox that assembles kit parts with the options the kit's own source declares and nothing else (its README has the rule and the one command that rebuilds it) |
 | `skills/` | the build skills that travel with the base (`new-app`) |
