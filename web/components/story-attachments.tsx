@@ -65,6 +65,7 @@ import { formatRelative } from "@shared/web/format"
 import { primeCache, useCached } from "@shared/web/store"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import { useLanguage } from "@shared/web/language"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useConfirm } from "@shared/web/use-confirm"
 
 
@@ -230,7 +231,10 @@ export function StoryAttachmentsPanel({
   return (
     <div className="flex flex-col gap-4">
       {listQ.data.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing attached yet.")}</p>
+        // The kit's register (27.21), not a bare line — owner ruling,
+        // 2026-09-07. No act on it: "Add a file" / "Add a link" sit right
+        // under this list, for whoever may edit.
+        <CollectionEmptyState title={t("Nothing attached yet.")} />
       ) : (
         <ul className="divide-border divide-y">
           {listQ.data.map((a) => {

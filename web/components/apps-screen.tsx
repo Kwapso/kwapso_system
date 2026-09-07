@@ -503,7 +503,11 @@ export function AppsScreen({
           narrowed ? (
             <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
           ) : tab === "inactive" ? (
-            <p className="text-muted-foreground text-sm">{t("Nothing is finished or put away yet.")}</p>
+            // The same register as the Active tab below (owner ruling,
+            // 2026-09-07: empty states for everything), with no act — an app
+            // reaches this pile by being finished or put away on its own
+            // screen, never by being added here.
+            <CollectionEmptyState title={t("Nothing is finished or put away yet.")} />
           ) : (
             // GENUINELY EMPTY (no search, the Active tab): the kit's own
             // 27.21 register, not the plain sentence — there is no apps

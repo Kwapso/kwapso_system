@@ -50,6 +50,7 @@ import { ArrowsOut, Minus, Plus } from "@shared/ui/foundations/icons"
 
 import { InAppLink } from "@/components/in-app-link"
 import { useT } from "@shared/web/language"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /* ------------------------------- the layout ------------------------------- */
 
@@ -308,6 +309,12 @@ export function RelationshipMap({
           a sighted person uses to actually GO somewhere, because a line between
           two circles is not a link and a sentence is. One payload, two
           renderings; there is no second query and no second fence. */}
+      {links.length === 0 ? (
+        // The kit's register (27.21), not a grey `<li>` in an otherwise empty
+        // list — owner ruling, 2026-09-07. No act: a link is made on the
+        // record it links from, not from this picture of them.
+        <CollectionEmptyState title={t("Nothing is linked to this yet.")} />
+      ) : (
       <ul className="flex flex-col gap-1 text-sm">
         {links.map((l, i) => {
           const a = at.get(l.from)
@@ -327,10 +334,8 @@ export function RelationshipMap({
             </li>
           )
         })}
-        {links.length === 0 && (
-          <li className="text-muted-foreground">{t("Nothing is linked to this yet.")}</li>
-        )}
       </ul>
+      )}
     </div>
   )
 }

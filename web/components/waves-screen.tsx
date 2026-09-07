@@ -169,6 +169,13 @@ export function waveTimelineWindow(
   const lanes: GanttLane[] = []
   for (const waves of byAccount.values()) {
     const sorted = [...waves].sort((a, b) => monthIndex(a.startsOn) - monthIndex(b.startsOn))
+    // THE ACCOUNT EVERY LANE IN THIS GROUP BELONGS TO, taken once. `byAccount`
+    // never holds an empty group, so this cannot be undefined — but said as a
+    // guard here rather than read off the first element twice inside the loop
+    // below, where a reader (and the first-run review's zero-row scan) has to
+    // prove the same thing from three screens away.
+    const head = sorted[0]
+    if (!head) continue
     // GREEDY LANE PACKING. `laneEnds[i]` is the last occupied month-index of
     // lane `i`; a wave joins the first lane whose last wave ends strictly
     // before it starts, or opens a new lane. Not necessarily the fewest
@@ -202,7 +209,7 @@ export function waveTimelineWindow(
     }
     laneBars.forEach((bars, i) => {
       if (bars.length === 0) return
-      lanes.push({ id: `${sorted[0].accountId}:${i}`, label: sorted[0].accountName ?? t("No client"), bars })
+      lanes.push({ id: `${head.accountId}:${i}`, label: head.accountName ?? t("No client"), bars })
     })
   }
 

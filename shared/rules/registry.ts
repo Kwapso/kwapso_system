@@ -767,6 +767,28 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 211 -> 213 in all three on 7 Sep 2026, first-run lane, under the
+  // owner's ruling that there should be empty states for everything. TWO new
+  // English sentences, both the kit's own empty register (27.21) reaching a
+  // host-composed tab the engine never drew for:
+  //
+  //  · "No tasks with a deadline yet." — Tasks' Calendar tab on a team with
+  //    nothing dated. Its own sentence because that tab's collection is the
+  //    dated tasks, and a team with undated tasks lands there too, so "no
+  //    tasks yet" would be false for them.
+  //  · "Nothing in Meetings yet." — Meetings' Calendar tab. The SAME words the
+  //    meetings recipe has always carried as its `emptyText`, said at a `t(…)`
+  //    call site for the first time; a recipe's `emptyText` is translated
+  //    where it is read (screens.ts, `t(c.emptyText)`), which the extractor
+  //    does not see, so the sentence was never in the catalogue although a
+  //    screen has drawn it since 5 Sep. The calendar tab saying it through
+  //    `t()` is what put it here — a genuine debt made visible, not a new one.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, for the same reason as every entry below:
+  // `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 196 -> 211 in all three on 5 Sep 2026, first-run lane, and the
   // arithmetic is written down because R44's whole point is that a ceiling
   // cannot move quietly. SIXTEEN new English sentences and TWO retired ones:
@@ -808,9 +830,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 211,
-  es: 211,
-  ca: 211,
+  de: 213,
+  es: 213,
+  ca: 213,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
