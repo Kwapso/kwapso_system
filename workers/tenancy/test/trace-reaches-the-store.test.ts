@@ -159,7 +159,7 @@ describe("sendBrandedEmail records its failure under THIS request's name", () =>
   })
 })
 
-// ── AND THE HALF THAT MAKES THE OTHER SIX WORTH ANYTHING ─────────────────────
+// ── AND THE HALF THAT MAKES ALL THE OTHERS WORTH ANYTHING ────────────────────
 //
 // Everything above proves the seams USE `env.TRACE`. Nothing above proves
 // anybody ever puts one there — and a seam nobody feeds is `undefined` in
