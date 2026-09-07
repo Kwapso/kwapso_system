@@ -407,9 +407,23 @@ describe("every table in the agency app is one whose headers work", () => {
     // would ship the same defect with a green build — and nothing else in the
     // repo can see it, because a lit arrow over unmoved rows is not a type error.
     const offenders: string[] = []
+    /** Every screen the census actually judged — the positive control, and the
+     * only thing between this test and a silent all-clear.
+     *
+     * TWO WAYS IT GOES QUIET, and the second is the near one. The WALK could
+     * collapse (`web/components` renamed) and this loop would judge no screen.
+     * More likely: the SUBJECT is small. Two screens build a table recipe today
+     * — tasks and meetings — out of 144 component files, so the gate
+     * `display: "table"` is doing the work of finding two needles, and any
+     * change of spelling (a constant instead of the literal, the recipe built
+     * by a helper) empties this census while leaving both defects shippable.
+     * If this floor fails, the shape moved: teach it the new one, do not
+     * lower it. */
+    const judged: string[] = []
     for (const f of sourceFiles(join(__dirname, "..", "components"), { extensions: [".tsx"] })) {
       const src = stripComments(f.source)
       if (!/display:\s*"table"/.test(src)) continue
+      judged.push(f.path.split("/").pop() as string)
       // The recipe a file builds as a table must reach `RecordTable`. Named, so
       // the check reads the same way the screens do: `<name>Recipe` in, table out.
       const names = [...src.matchAll(/const (\w+)\s*=\s*withDataDrivenCollection\(\s*\{[^}]*display:\s*"table"/g)]
@@ -421,6 +435,10 @@ describe("every table in the agency app is one whose headers work", () => {
       if (!src.includes("<RecordTable"))
         offenders.push(`${f.path.split("/").pop()}: builds a table recipe and renders no RecordTable`)
     }
+    expect(
+      judged,
+      `this census judged ${judged.length} screens. There are table screens in this app — finding none means the recipe's shape has moved and nothing here is being checked`
+    ).not.toEqual([])
     expect(
       offenders,
       `a table whose column headers cannot sort: ${offenders.join(" · ")}`

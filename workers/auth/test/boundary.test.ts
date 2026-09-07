@@ -69,9 +69,45 @@ describe("auth validates at the boundary", () => {
   })
 
   it("puts every body field through the one validation seam", () => {
-    expect(CODE, "auth must import the shared validator").toMatch(
-      /requireText[\s\S]{0,80}from "@shared\/workers\/validate"/
-    )
+    /* THE SEAM IS NAMED, NOT MEASURED IN CHARACTERS (2026-09-08).
+     *
+     * This was `/requireText[\s\S]{0,80}from "@shared\/workers\/validate"/` —
+     * "the word `requireText` occurs within eighty characters of that import
+     * path". Eighty was comfortable for `import { requireText, TEXT_LIMITS }
+     * from "@shared/workers/validate"` and would stay comfortable for a while,
+     * so this is not a fix for something about to break. It is a fix for a
+     * check that was never asking the question:
+     *
+     *   · the window says nothing about WHICH import the word belongs to. Two
+     *     import lines next to each other — `import { requireText } from
+     *     "./local-shim"` above the shared one — satisfy it while auth
+     *     validates through a local copy, which is exactly the drift the ONE
+     *     seam exists to prevent;
+     *   · and it is one named import away from failing while everything is
+     *     correct, which teaches the next person that the window is the
+     *     problem rather than that the rule was.
+     *
+     * So the import statements are read as statements, and the question asked
+     * is the one that matters: is `requireText` a name auth got FROM the shared
+     * validator? A namespace import (`import * as v from …`) answers it too. */
+    const importedFrom = (module: string): Set<string> => {
+      const names = new Set<string>()
+      for (const m of CODE.matchAll(/import\s+([\s\S]*?)\s+from\s+"([^"]+)"/g)) {
+        if (m[2] !== module) continue
+        for (const n of m[1].replace(/[{}]/g, " ").split(","))
+          names.add(n.trim().split(/\s+as\s+/).pop()?.trim() ?? "")
+      }
+      return names
+    }
+    const seam = importedFrom("@shared/workers/validate")
+    expect(
+      [...seam].length,
+      "auth imports nothing at all from @shared/workers/validate — this derivation has gone blind, or the seam has moved"
+    ).toBeGreaterThan(0)
+    expect(
+      seam.has("requireText"),
+      `auth must get requireText FROM the shared validator; it imports [${[...seam].join(", ")}] from it. A local \`requireText\` is a second seam, and the second one is the one that drifts.`
+    ).toBe(true)
     // Every door that reads a body must validate: email start, verify, and both
     // halves of the email change.
     const uses = (CODE.match(/requireText\(/g) ?? []).length

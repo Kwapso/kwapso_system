@@ -4,6 +4,8 @@ import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { globSync } from "node:fs"
 
+import { stripComments } from "@shared/rules/source-scan"
+
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
 
@@ -64,11 +66,28 @@ describe("ground classes", () => {
     for (const file of files) {
       const rel = relative(".", file).replace(/\\/g, "/")
       if (DELIBERATE.has(rel)) continue
-      const source = readFileSync(join(ROOT, file), "utf8")
+      /* COMMENTS OUT, THROUGH THE ONE STRIPPER — and the line numbers kept.
+         This used to be two regexes applied per line (`//…` to end of line, and
+         a leading `*` for a block's continuation). Both directions were wrong,
+         and the dangerous one is the second:
+
+           · a BLOCK comment opened mid-line, or one whose continuation lines
+             do not start with a star, was not a comment as far as those two
+             regexes were concerned — a false RED on prose, the failure that
+             bit this repo twice on 7 Sep 2026 (and the reason this paragraph
+             describes that syntax in words rather than writing it out: the
+             delimiter would close the comment it is inside);
+           · and `//` inside a STRING — any URL — truncated the rest of the
+             line, so a className written after one was never scanned. That is
+             a false NEGATIVE, an offender the census cannot see, which is the
+             direction that ships a bug under a green build.
+
+         `stripComments` is the tokeniser the other laws read source through and
+         it preserves every newline a comment spanned, so `rel:line` below still
+         points where it says it does. */
+      const source = stripComments(readFileSync(join(ROOT, file), "utf8"))
       source.split("\n").forEach((line, i) => {
-        // Comments discuss this bug at length; only real class strings count.
-        const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "")
-        const hit = code.match(ESCAPE)
+        const hit = line.match(ESCAPE)
         if (hit) offenders.push(`${rel}:${i + 1} — ${hit[0]}`)
       })
     }

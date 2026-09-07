@@ -327,7 +327,16 @@ describe("the agency's own doors on the shelf still refuse a client", () => {
     // wire-level version of the same promise is further down this file, asserted
     // on a real response body.
     const offenders: string[] = []
-    for (const { path, source } of sourceFiles(join(ROOT, "web-portal"), { extensions: [".ts", ".tsx"] }))
+    /* AND THE WALK MUST HAVE HAPPENED — the same floor `agency-internal.test.ts`
+       carries beside its own portal scan, for the same reason: an empty walk
+       produces an empty offender list, which is this test's pass. 54 .ts/.tsx
+       files under web-portal/ today; 25 is the floor. */
+    const portalFiles = sourceFiles(join(ROOT, "web-portal"), { extensions: [".ts", ".tsx"] })
+    expect(
+      portalFiles.length,
+      `only ${portalFiles.length} files were read out of the client app — this scan is checking nothing`
+    ).toBeGreaterThan(25)
+    for (const { path, source } of portalFiles)
       if (source.includes("/api/content/deliverables")) offenders.push(path)
     expect(
       offenders,

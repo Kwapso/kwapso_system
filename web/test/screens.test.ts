@@ -224,11 +224,44 @@ describe("translateFields", () => {
       relativeTo: ROOT,
     })
     const offenders: string[] = []
+    /** Every spread-recipe `fields:` the scan located, offending or not — the
+     * positive control, gathered on the same pass. */
+    const seen: string[] = []
     for (const file of screens)
       for (const [line] of file.source.matchAll(/\{\s*\.\.\.recipe,[^}]*?\bfields:\s*([^,}\n]+)/g)) {
         const value = /\bfields:\s*([^,}\n]+)/.exec(line)?.[1]?.trim() ?? ""
+        seen.push(`${file.rel}: ${value}`)
         if (!value.startsWith("translateFields(")) offenders.push(`${file.rel}: fields: ${value}`)
       }
+
+    /* TWO FLOORS, BECAUSE AN EMPTY OFFENDER LIST IS THIS TEST'S PASS.
+     *
+     * The derivation is the point of the test — "covered the day it lands" —
+     * and it is also what makes it able to go quiet in two different ways, one
+     * of them likely.
+     *
+     * The WALK could collapse (a components directory renamed): 168 .tsx files
+     * across the two front doors today, so 80 is a floor with half the tree's
+     * worth of room.
+     *
+     * The PATTERN could outgrow its own shape, and this is the near one. It
+     * matches `{ ...recipe, … fields: …` with `[^}]*?` in the middle — so the
+     * first host to put an OBJECT between the spread and its fields (a nested
+     * `{…}` in a prop, a `columns` map inline) closes the character class early
+     * and the match is lost, silently, on the very screen that needed
+     * checking. Two host-composed tables today (`tasks-screen.tsx`,
+     * `meetings-screen.tsx`); if this floor ever fails, the pattern has stopped
+     * seeing them — do not lower it, teach it the new shape. */
+    expect(
+      screens.length,
+      `only ${screens.length} component files were walked — a components directory has moved`
+    ).toBeGreaterThan(80)
+    expect(
+      seen.length,
+      `the scan found ${seen.length} spread-recipe \`fields:\` in ${screens.length} files. There are host-composed tables in this app; finding none means the shape has changed and this check is watching nothing:\n  ` +
+        seen.join("\n  ")
+    ).toBeGreaterThanOrEqual(2)
+
     expect(
       offenders,
       "a host-composed table's headings are the app's own words and must be translated"

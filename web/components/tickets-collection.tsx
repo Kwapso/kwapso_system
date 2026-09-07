@@ -692,11 +692,15 @@ function narrowTriage(
   // NOT CALLED `rows`, and that is a real constraint rather than taste. R14's
   // search census (`web/test/paged-search.test.ts`) binds on the shape every
   // find-bar screen writes — `const rows = found.active ? found.rows` — and
-  // then fails the build on any `rows.filter(` in the same FILE, because a
-  // screen that re-narrows the door's own answer under the door's own exact
-  // count is R16's exact defect. This file holds such a screen (the ticket list
+  // then fails the build on any `.filter(` on THAT NAME anywhere in the same
+  // FILE (whitespace and line breaks included), because a screen that
+  // re-narrows the door's own answer under the door's own exact count is R16's
+  // exact defect. The census is file-wide because the rows travel: this
+  // function's caller could hand a paged list to a helper and the helper would
+  // be doing the narrowing. This file holds such a screen (the ticket list
   // above), so the name is spoken for; `waiting` is what the triage door calls
-  // this list anyway.
+  // this list anyway — and this list is a BOUNDED read, which is what makes
+  // narrowing it here honest (see the note inside).
   waiting: TriageWaiting[],
   ask: { query: string; accountId?: string; helpType?: string; appId?: string }
 ): TriageWaiting[] {
@@ -2057,21 +2061,25 @@ function OpenBoard({
              fail here rather than paint nothing. */
           dot: helpStatusDotTone(stage) satisfies KanbanColumnDot,
           count: narrowed ? undefined : counts?.[stage],
-          /* THE CHAIN STAYS BROKEN ACROSS LINES, and that is load-bearing
-             rather than formatting. Two censuses forbid this screen from
-             narrowing the door's own loaded rows in the browser (R16:
-             `web/test/paged-search.test.ts` and `web/test/tab-facets.test.tsx`,
-             both matching the literal `rows.filter(`), and BUCKETING page one
-             into five columns is not that narrowing — nothing here drops a row,
-             and the moment the toolbar is asking anything every column stops
-             quoting the door's count and falls back to the cards it is holding
-             (see `narrowed`, below). Collapsed onto one line this reads to both
-             checks as the offence they exist for. Said out loud because a later
-             tidy-up would otherwise turn a passing suite red for no reason it
-             could explain. */
-          cards: rows
-            .filter((r) => r.status === stage)
-            .map(boardCard),
+          /* A PARTITION, NOT A NARROWING, and the difference is the whole of
+             R16 on this screen. Two censuses forbid a paged screen from
+             narrowing the door's own loaded rows in the browser
+             (`web/test/paged-search.test.ts`, the law; and
+             `web/test/tab-facets.test.tsx`, this screen's own suite). Bucketing
+             page one into five columns is not that: a ticket has exactly one
+             status, every status in `OPEN_TAB_STATUSES` is drawn, so no loaded
+             card is dropped — and the moment the toolbar is asking anything,
+             every column stops quoting the door's count and falls back to the
+             cards it is holding (`narrowed`, above).
+
+             THIS USED TO BE WRITTEN ACROSS THREE LINES ON PURPOSE, because the
+             censuses matched the literal `rows.filter(` and a newline walked
+             past them. That is a law bending the code it polices, and it went
+             the other way on 2026-09-07: both matchers tolerate the whitespace
+             now, and the exception is DATA with this reason attached
+             (`FIND_NARROWING_OK`, shared/rules/registry.ts) rather than a
+             keystroke nobody could see. Lay this call out however reads best. */
+          cards: rows.filter((r) => r.status === stage).map(boardCard),
           emptyLabel: t("Nothing at this stage."),
         })),
         /* THE FIFTH COLUMN, AND IT IS NOT A `GROUP BY status` BUCKET — client,

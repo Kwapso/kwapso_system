@@ -253,6 +253,16 @@ describe("nothing rewrites a verdict", () => {
     // The negative half, which no behavioural test can reach: the write somebody
     // adds next month. An upsert here is the single change that would quietly
     // turn this table back into the column it exists instead of.
+    //
+    // NO BLINDNESS TRIPWIRE HERE, AND ON PURPOSE. An empty-list census over a
+    // directory walk normally needs one, because a walk that finds nothing
+    // reports all clear in the same words as a walk that finds nothing WRONG.
+    // This one is already covered by its neighbour: "one file writes the table"
+    // runs the same `workerSources()` and asserts a NON-EMPTY answer
+    // (`["workers/content/src/lib/help-ratings.ts"]`), so a walk that went
+    // quiet turns that test red first. Verified by blinding the walk — the
+    // sibling failed, this one passed, which is exactly the division of labour
+    // intended. A floor here would be a second copy of a check that exists.
     const offenders: string[] = []
     for (const { rel, source } of workerSources())
       for (const m of stripComments(source).matchAll(/(UPDATE|DELETE\s+FROM)\s+help_ratings/gi))

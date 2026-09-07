@@ -394,6 +394,14 @@ describe("no status writer escapes the seam", () => {
   it("nothing anywhere UPDATEs or DELETEs a recorded move", () => {
     // The table is append-only by design: a history somebody can edit is a
     // history nothing can be computed from.
+    //
+    // NO BLINDNESS TRIPWIRE HERE, AND ON PURPOSE. This is an empty-list census
+    // over a directory walk, which is the shape that normally needs one — but
+    // three tests above it drive the same `workerSources()` and assert
+    // NON-EMPTY answers (the writers list, the create's own stamp, the one
+    // seam). Blinding the walk fails all three and leaves this one green, which
+    // is the point: the positive controls are where the walk is proved, and
+    // this test is left to say the one thing only it says.
     const offenders: string[] = []
     for (const { rel, source } of workerSources())
       for (const m of stripComments(source).matchAll(

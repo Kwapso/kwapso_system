@@ -176,6 +176,13 @@ describe("no second writer, anywhere", () => {
   }
 
   it("no UPDATE statement in any worker names raised_as_type", () => {
+    // NO BLINDNESS TRIPWIRE HERE, AND ON PURPOSE — an empty-list census over a
+    // directory walk usually needs one, because a walk that matched NOTHING
+    // reports all clear in the same words as a walk that matched everything and
+    // found nothing wrong. The neighbour below ("exactly one INSERT writes it")
+    // drives the same `workerSources()` and asserts a non-empty answer, so a
+    // walk gone quiet turns that one red. Measured, not assumed: pointing the
+    // walk at a directory with no worker source in it fails BOTH of these.
     const offenders: string[] = []
     for (const { rel, source } of workerSources()) {
       // The migration ledger is the one file allowed to name it in DDL — it is

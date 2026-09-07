@@ -75,6 +75,28 @@ const src = readFileSync(join(WEB, "components/tickets-collection.tsx"), "utf8")
  * censuses use, for the same reason. */
 const code = stripComments(src)
 
+/** ANY `.filter(` HANGING OFF THE FIND BAR'S OWN ROWS, whatever the layout.
+ *
+ * The `\s*` before the dot is not cosmetic and it is not free. Until
+ * 2026-09-07 this was the literal `\brows\.filter\(` — so a chain broken after
+ * `rows` was invisible to it, this file's assertion below was passing on
+ * whitespace, and `tickets-collection.tsx` carried a paragraph telling the next
+ * reader to KEEP the line break so the suite would stay green. The law that
+ * owns this shape (`web/test/paged-search.test.ts`, R14's search half) was
+ * fixed the same way and on the same day; this is its screen-local echo. */
+const NARROWS_LOADED_ROWS = /\brows\s*\.filter\(/g
+
+/** THE BOARD'S OWN SOURCE, AND THE SCREEN WITHOUT IT — one slice, taken once,
+ * because two assertions need opposite halves of it: inside the `<Kanban>` tag
+ * a `rows.filter(` is a PARTITION and is checked as one, and outside it there
+ * may be none at all. Offsets rather than just the text, so "the rest of the
+ * screen" is exactly the complement and nothing falls between the two. */
+const BOARD = (() => {
+  const at = code.indexOf("<Kanban")
+  const end = code.indexOf("\n    />", at)
+  return { at, end, text: at < 0 || end < at ? "" : code.slice(at, end) }
+})()
+
 /** EVERY TAB TOKEN THE STRIP DRAWS, resolved off the component's own source.
  *
  * Two reads, because the strip is written in two halves. The `tabs: [` array
@@ -459,10 +481,21 @@ describe("which filters a ticket tab offers", () => {
     // …AND NOTHING NARROWS THE LOADED ROWS. The one in-browser narrowing on this
     // screen is the queue's, and it is named `waiting` rather than `rows`
     // precisely so the paged half cannot borrow it by accident.
+    //
+    // ONE PLACE MAY TOUCH THOSE ROWS AND IT IS THE BOARD, which PARTITIONS them
+    // into columns rather than dropping any (its own `it` below proves that, and
+    // is where the exception is argued). Everywhere else on this screen the
+    // count is zero, and the match is whitespace-insensitive now — see
+    // NARROWS_LOADED_ROWS for the newline that used to be the whole check.
+    expect(BOARD.at, "the Open tab no longer draws the kit's board").toBeGreaterThan(-1)
+    expect(BOARD.end, "the Kanban tag is not closed where this slice expects").toBeGreaterThan(BOARD.at)
+    const elsewhere = code.slice(0, BOARD.at) + code.slice(BOARD.end)
     expect(
-      /\brows\.filter\(/.test(code),
-      "something on this screen filters the door's own loaded rows — that is the narrowing R16 exists to prevent"
-    ).toBe(false)
+      [...elsewhere.matchAll(NARROWS_LOADED_ROWS)].map((m) =>
+        elsewhere.slice(m.index, elsewhere.indexOf("\n", m.index)).trim()
+      ),
+      "something outside the board filters the door's own loaded rows — that is the narrowing R16 exists to prevent"
+    ).toEqual([])
     expect(
       code.includes("waiting: TriageWaiting[],"),
       "narrowTriage no longer takes the queue's own bounded list — if the triage door started paging, its facets must move to the door too"
@@ -491,12 +524,47 @@ describe("the Open tab's board", () => {
   /** The `<Kanban …>` tag, sliced out so an assertion about the BOARD cannot be
    * satisfied by something else on this 3,600-line screen. */
   const board = (() => {
-    const at = code.indexOf("<Kanban")
-    expect(at, "the Open tab no longer draws the kit's board").toBeGreaterThan(-1)
-    const end = code.indexOf("\n    />", at)
-    expect(end, "the Kanban tag is not closed where this slice expects").toBeGreaterThan(at)
-    return code.slice(at, end)
+    expect(BOARD.at, "the Open tab no longer draws the kit's board").toBeGreaterThan(-1)
+    expect(BOARD.end, "the Kanban tag is not closed where this slice expects").toBeGreaterThan(BOARD.at)
+    return BOARD.text
   })()
+
+  it("touches the loaded rows exactly once, and that touch is a PARTITION", () => {
+    /* THE ONE EXCEPTION TO "NOTHING NARROWS THE DOOR'S ANSWER", ARGUED RATHER
+       THAN ASSUMED — and the assertion that replaced a check the layout used to
+       decide. Until 2026-09-07 both this suite and R14's own law matched the
+       literal `rows.filter(`, so THIS call passed only because its chain was
+       written across three lines, and the component said so in a comment
+       telling the reader not to tidy it. That is a law bending the code it
+       polices. Both matchers ignore the whitespace now, so the call has to earn
+       its place on what it MEANS:
+
+         1 · there is exactly ONE of them on the board — no second, quieter one
+             hiding behind the first;
+         2 · its predicate keys on the COLUMN'S OWN `stage`, the variable the
+             `.map` binds, so each loaded ticket lands in the column matching
+             the one status it has;
+         3 · and the columns are mapped off `OPEN_TAB_STATUSES` (the `it` above
+             holds that), so EVERY status a loaded row can carry is drawn.
+
+       Together those three are the sentence a regex cannot say on its own:
+       nothing this screen loaded is dropped. A `.filter(` here on anything
+       else — a date, an assignee, a search term — is the R16 defect and fails
+       on (2), which is the whole reason the predicate is read rather than
+       counted. The COUNT above each column is the other half and stands down
+       under `narrowed`; that is checked where the counts are. */
+    const partitions = [...board.matchAll(NARROWS_LOADED_ROWS)].map((m) =>
+      board.slice(m.index, board.indexOf(")", board.indexOf("=>", m.index)) + 1).replace(/\s+/g, " ")
+    )
+    expect(
+      partitions.length,
+      "the board no longer buckets the loaded rows at all, or it does it more than once — either way this check is describing a screen that has moved on"
+    ).toBe(1)
+    expect(
+      /^rows\s*\.filter\(\(\w+\) => \w+\.status === stage\)$/.test(partitions[0]),
+      `the board's one touch of the loaded rows is \`${partitions[0]}\`, which is not a partition by the column's own stage — a filter on anything else drops cards the exact count above them still counts (R16)`
+    ).toBe(true)
+  })
 
   it("takes its stage columns from OPEN_TAB_STATUSES, so it cannot show one the tab's list denies", () => {
     /* THE WHOLE OF 2026-09-07's TENSION, IN ONE ASSERTION. `ready` could have

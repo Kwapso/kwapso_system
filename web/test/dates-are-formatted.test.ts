@@ -158,6 +158,27 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
 }
 
 describe("no screen shows a raw timestamp", () => {
+  /* THIS CENSUS ALREADY HAS ITS BLINDNESS TRIPWIRE, and it is the rot check —
+   * said out loud because it is not obvious and because the next person auditing
+   * this file for one will otherwise add a second.
+   *
+   * The usual danger of a census whose pass condition is an empty list is that a
+   * scan matching NOTHING reports all clear in the same words as a scan matching
+   * everything and finding nothing wrong. A walk over five directories is
+   * exactly the shape that goes quiet: rename `web/components`, move
+   * `shared/web`, and `offenders` is empty for the wrong reason.
+   *
+   * It cannot happen here. RAW_DATE_EXEMPT is not empty, and every entry in it
+   * is a line the walk MUST reach and MUST match — that is what `exemptUsed`
+   * records and what the stale check at the bottom of this test asserts. A walk
+   * that lost a directory loses those lines with it, `exemptUsed` comes back
+   * short, and the suite goes red naming the exact files it could no longer
+   * find. The exemptions are the positive control, for free.
+   *
+   * THE ONE CONDITION: that holds only while the list is NON-EMPTY. If the last
+   * exemption is ever fixed and deleted, this test loses its tripwire silently
+   * — add an explicit floor on the number of files walked at that moment, and
+   * delete this paragraph. */
   it("every date put in front of a person goes through shared/web/format", () => {
     const offenders: string[] = []
     const exemptUsed = new Set<string>()

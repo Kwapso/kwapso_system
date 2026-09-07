@@ -49,6 +49,19 @@ const SUSPECT = /^(.*?) \d+(\..+)?$/
  * deliberately included — the `tsc` failures came from `web/.next/types`. */
 const ROOTS = ["shared", "web", "web-portal", "workers", "scripts", "tools", "documents"]
 
+/** How many directories the sweep actually opened. THE ONLY THING THIS CHECK
+ * CAN FLOOR.
+ *
+ * Every other empty-list census in this repo can name a positive control — some
+ * file that MUST match the pattern, so a scan matching nothing goes red. This
+ * one cannot: the pattern is "a conflict copy", the correct state of the tree is
+ * that there are none, and a control would have to be a conflict copy committed
+ * on purpose. So the tripwire is one level down — not "did it find something"
+ * but "did it LOOK anywhere". A sweep that walked four directories because six
+ * of the seven roots were renamed reports a clean tree in the same words as a
+ * clean tree. */
+let visited = 0
+
 function conflictCopies(dir: string, out: string[]): void {
   let entries
   try {
@@ -56,6 +69,7 @@ function conflictCopies(dir: string, out: string[]): void {
   } catch {
     return
   }
+  visited++
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === ".git") continue
     const full = join(dir, entry.name)
@@ -76,14 +90,35 @@ function conflictCopies(dir: string, out: string[]): void {
 describe("the working copy", () => {
   it("carries no iCloud conflict copies", () => {
     const found: string[] = []
+    /** A root the sweep could not open. This USED to be swallowed — `catch {}`
+     * with a note saying a missing root is not this test's business — and that
+     * was the one way this check could go quiet: rename `workers/` and the
+     * sweep skips it in silence, on a machine where iCloud is duplicating
+     * directories under it. A root that has genuinely gone is a fact worth a
+     * red line and a one-word edit here, not a shrug. */
+    const unreachable: string[] = []
     for (const root of ROOTS) {
       const dir = join(ROOT, root)
       try {
         if (statSync(dir).isDirectory()) conflictCopies(dir, found)
+        else unreachable.push(`${root} (not a directory)`)
       } catch {
-        /* a root that does not exist here is not this test's business */
+        unreachable.push(`${root} (missing)`)
       }
     }
+    expect(
+      unreachable,
+      "these roots could not be swept, so nothing was checked under them — a root that has moved must be renamed in ROOTS, not skipped:\n  " +
+        unreachable.join("\n  ")
+    ).toEqual([])
+    // …AND IT REALLY WALKED THE TREE. Seven roots, 538 directories between
+    // them today (measured, node_modules and .git excluded as the sweep
+    // excludes them). 200 is a floor with room to lose more than half the tree
+    // and still far above what a sweep down to one root would reach.
+    expect(
+      visited,
+      `the sweep opened only ${visited} directories — it is reporting a clean tree it never looked at`
+    ).toBeGreaterThan(200)
     expect(
       found,
       "iCloud has made conflict copies inside the working tree. These are NOT " +

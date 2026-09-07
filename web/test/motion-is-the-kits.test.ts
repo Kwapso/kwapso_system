@@ -72,6 +72,21 @@ describe("motion is the kit's, everywhere", () => {
   })
 
   it("no front-door file hand-rolls a transition", () => {
+    /* THE BLINDNESS TRIPWIRE, and this census genuinely needs its own.
+     *
+     * The rot check below LOOKS like one and is not: it reads each pinned file
+     * by path (`readFileSync(join(ROOT, rel))`), so it goes on passing happily
+     * while `files` — the walk everything here stands on — comes back empty.
+     * Rename `web/components`, move `shared/web`, and this test reports "no
+     * file hand-rolls a transition" about a set of no files, in the same words
+     * it uses when the app is clean.
+     *
+     * 330 .tsx/.ts files across the two front doors and the shared seams today,
+     * measured. 150 is a floor with room to lose half of them. */
+    expect(
+      files.length,
+      `only ${files.length} front-door files were walked — a root has moved and this census is looking at nothing`
+    ).toBeGreaterThan(150)
     const offenders: string[] = []
     for (const file of files) {
       // Comments are not code, and the reasoning above one of these fixes

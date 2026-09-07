@@ -264,7 +264,17 @@ describe("nothing rewrites history", () => {
   it("no worker updates or deletes a row in the activity table", () => {
     // Stated in the schema since 0062's comment; asserted here, because an
     // invariant that is only true by habit is one the next person breaks without
-    // knowing it existed. Both spellings of the table's own name are covered, and
+    // knowing it existed.
+    //
+    // NO BLINDNESS TRIPWIRE HERE, AND ON PURPOSE. An empty-list census over a
+    // `readdirSync` of workers/ is the shape that goes quiet when a directory
+    // moves — but this file already owns one, at the top: "finds the write
+    // sites (the scan itself must not go blind)" is a floor on the same
+    // `writerSources()` every census here drives, and the test immediately
+    // below demands a non-empty answer from it as well
+    // (`["shared/workers/activity.ts"]` is the only INSERT). Measured: pointing
+    // the walk at the wrong directories fails six tests in this file and leaves
+    // this one green, which is the division of labour intended. Both spellings of the table's own name are covered, and
     // `account_activity` (the global identity trail) is deliberately NOT matched
     // by the word boundary — it has its own ceiling test.
     const offenders: string[] = []

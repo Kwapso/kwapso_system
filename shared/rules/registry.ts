@@ -2260,6 +2260,32 @@ export const GROWING_COLLECTIONS: Record<
   },
 }
 
+/** R14, THE SEARCH HALF — reviewed exceptions to "no screen re-narrows the rows
+ * a find bar gave it", keyed EXACTLY as `web/test/paged-search.test.ts` names
+ * them: `<file relative to the repo root>::<the call, whitespace collapsed>`.
+ *
+ * WHY THIS LIST EXISTS AT ALL, AND WHAT IT REPLACED. The census used to match
+ * the LITERAL `rows.filter(`, so it was defeated by a newline: a chain broken
+ * after `rows` walked straight past it. That is not a hypothetical. On
+ * 2026-09-07 `web/components/tickets-collection.tsx` carried a paragraph saying
+ * the chain must STAY broken across lines *because the matcher demanded it* —
+ * a law bending the code it polices, and a passing suite resting on
+ * whitespace. The matcher is whitespace-insensitive now, which caught that call
+ * immediately, and this is where the call earns its keep in words instead.
+ *
+ * THE ONE THING A PIN HERE HAS TO CLAIM: that the `.filter(` does not DROP a
+ * row from what the person can see. R16's defect is a screen showing fewer rows
+ * than the exact server count above them. A PARTITION — every loaded row landing
+ * in exactly one bucket, all buckets drawn — is not that, and no regex can tell
+ * the two apart, which is precisely why the reason is written by a person.
+ *
+ * A RATCHET, like RAW_BODY_EXEMPT: an entry matching nothing in its file turns
+ * the build red, so the list can only shrink. */
+export const FIND_NARROWING_OK: Record<string, string> = {
+  "web/components/tickets-collection.tsx::rows.filter((r) => r.status === stage)":
+    "the Open tab's BOARD, and a partition rather than a narrowing: the columns are mapped off OPEN_TAB_STATUSES (`web/test/tab-facets.test.tsx` holds that), a loaded ticket has exactly one status, and every one of those statuses is drawn — so no card the page loaded is dropped from the board. The number beside each column stands down the moment anything is being asked (`count: narrowed ? undefined : counts?.[stage]`, with `narrowed={found.active}`), so the exact server count never sits over a bucketed page. The fifth column (Waiting) is a SECOND door read, not a slice of these rows, for the same reason.",
+}
+
 export const DEAF_EXEMPT: Record<string, string> = {
   help_threads:
     "a reply pings the parent help row too (op edit), whose deps now name the open conversation itself (`help-thread:<id>` + its total, web/lib/live-resources.ts) and whose portal listener drops the `portal:thread:` slice — so the thread updates live through the parent's ping, and this resource's own ping (whose id is the REPLY, which no cache is keyed by) stays deaf on purpose",

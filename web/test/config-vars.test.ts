@@ -55,11 +55,50 @@ describe("numeric env vars parse at the boundaries", () => {
   // The scan: neither raw spelling may come back anywhere on the server side.
   it("no worker reads a numeric env var without the one parse", () => {
     const offenders: string[] = []
+    /** The POSITIVE CONTROL, gathered on the same pass as the offenders and
+     * through the same walk: every place a numeric var goes through the seam
+     * correctly. See the two floors below for why it is collected at all. */
+    const correct: string[] = []
     for (const [path, src] of serverSources()) {
       const code = stripComments(src)
       for (const m of code.matchAll(/(?:Number|parseInt|parseFloat)\s*\(\s*env\.(\w+)/g))
         offenders.push(`${path} → ${m[0].trim()}… (use numberVar(env.${m[1]}, DEFAULT))`)
+      for (const m of code.matchAll(/numberVar\(\s*env\.(\w+)/g)) correct.push(`${path} → ${m[1]}`)
     }
+
+    /* TWO FLOORS, BECAUSE "NOTHING FOUND" IS THIS CHECK'S PASSING ANSWER.
+     *
+     * `serverSources()` is a DIRECTORY WALK — `shared/workers/` plus a
+     * `readdirSync` of `workers/` — and neither of those is a path this file
+     * would notice losing. A worker folder renamed, `src/` moved a level, the
+     * shared seam relocated: the walk returns fewer files, or none, the
+     * offender list is empty, and the suite reports all clear in precisely the
+     * words it uses when the code is right. That is the whole failure mode of a
+     * census whose pass condition is an empty list.
+     *
+     * The FILE COUNT catches the walk collapsing. Eight workers plus
+     * shared/workers today: 195 `.ts` files between them, measured. 120 is a
+     * floor with a quarter of the tree's worth of room to move and no room to
+     * disappear.
+     *
+     * The POSITIVE CONTROL catches the subtler half — a walk that still finds
+     * files but no longer finds the SUBJECT. There are numeric env vars in this
+     * codebase and they go through `numberVar`; if the scan can see none of
+     * them, then whatever it is reading is not the server, and the regex above
+     * is being asked about the wrong text. SIX today (the AI allowance, the
+     * team cap and the ceilings around them); three is the floor, so the app
+     * may retire half of them before anybody has to think about this line. */
+    const scanned = serverSources()
+    expect(
+      scanned.length,
+      "the server walk came back nearly empty — a worker directory moved and this census is looking at nothing"
+    ).toBeGreaterThan(120)
+    expect(
+      correct.length,
+      `the scan can see no numeric env var going through numberVar at all (found ${scanned.length} files) — ` +
+        "so it cannot be trusted to see one that does not"
+    ).toBeGreaterThanOrEqual(3)
+
     expect(
       offenders,
       `a numeric env var parsed by hand — 0 and unset both go wrong: ${offenders.join("; ")}`

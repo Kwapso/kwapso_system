@@ -151,7 +151,20 @@ describe("the agency's own housekeeping never reaches the client's side", () => 
       "weaknesses",
     ]
     const offenders: string[] = []
-    for (const { path, source } of sourceFiles(join(ROOT, "web-portal"), { extensions: [".ts", ".tsx"] }))
+    /* AND THE WALK MUST HAVE HAPPENED. This is the leg the comment above calls
+       the one a permission cannot grant its way past — which is only true while
+       something is actually reading the client app. `sourceFiles(join(ROOT,
+       "web-portal"))` is a path built from this test file's own location; move
+       the worker, rename the portal, and it returns an empty list, the offender
+       list is empty, and the strongest of the three legs reports all clear
+       having opened no file at all. 54 .ts/.tsx files under web-portal/ today;
+       25 is a floor with half the app's worth of room in it. */
+    const portalFiles = sourceFiles(join(ROOT, "web-portal"), { extensions: [".ts", ".tsx"] })
+    expect(
+      portalFiles.length,
+      `only ${portalFiles.length} files were read out of the client app — this leg is checking nothing`
+    ).toBeGreaterThan(25)
+    for (const { path, source } of portalFiles)
       for (const word of forbidden)
         if (source.includes(word)) offenders.push(`${path} names "${word}"`)
     expect(
