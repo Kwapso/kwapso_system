@@ -81,6 +81,16 @@ describe("publishChange records its failure under THIS request's name", () => {
     expect(s.rows[0].requestId).toBe("req-abc")
   })
 
+  it("and on the console line, so the tail and the store filter alike", async () => {
+    const s = store()
+    const rt = refusing()
+    const said: unknown[][] = []
+    const quiet = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => void said.push(a))
+    await publishChange({ REALTIME: rt, DB: s.DB, TRACE: "req-abc" } as never, "team1", "help", "h1", "edit")
+    quiet.mockRestore()
+    expect(said.flat(), "the live tail and error_logs are one store only if one key filters both").toContain("req-abc")
+  })
+
   it("puts the same name on the wire, so realtime's own rows join", async () => {
     const s = store()
     const rt = refusing()
@@ -115,6 +125,16 @@ describe("sendBrandedEmail records its failure under THIS request's name", () =>
     expect(s.rows.length).toBe(1)
     expect(s.rows[0].source).toBe("email-send")
     expect(s.rows[0].requestId).toBe("req-xyz")
+  })
+
+  it("and on the console line, so the tail and the store filter alike", async () => {
+    const s = store()
+    const auth = refusing()
+    const said: unknown[][] = []
+    const quiet = vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => void said.push(a))
+    await sendBrandedEmail({ AUTH: auth, DB: s.DB, TRACE: "req-xyz" } as never, "a@b.c", "Subj", content)
+    quiet.mockRestore()
+    expect(said.flat()).toContain("req-xyz")
   })
 
   it("puts the same name on the wire, so auth's own rows join", async () => {

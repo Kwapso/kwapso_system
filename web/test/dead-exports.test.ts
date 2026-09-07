@@ -104,15 +104,45 @@ describe("every exported value is named by something", () => {
   })
 
   it("nothing is exported for nobody, outside DEAD_EXPORT_OK", () => {
-    const used = new Set<string>()
-    for (const f of others) for (const m of f.source.matchAll(/[A-Za-z_$][\w$]*/g)) used.add(m[0])
+    // WHICH FILES COULD POSSIBLY CONTAIN EACH NAME — built once, in one pass.
+    //
+    // This used to run `new RegExp(\`\\b${name}\\b\`).test(f.source)` for every
+    // (export × file) pair: ~800 exports against ~1,400 files is over a million
+    // regex compiles and scans, which measured 13 to 58 SECONDS depending on what
+    // else the machine was doing — intermittently past vitest's 20-second default,
+    // so the census failed as a TIMEOUT rather than as a finding, and starved the
+    // time-sensitive suites sharing the pool while it ran.
+    //
+    // The index is a deliberate SUPERSET of what the regex can match, so nothing
+    // below changes meaning. `\\bNAME\\b` can only match where NAME appears as a
+    // maximal run of word characters, or as a run delimited by `$` inside one
+    // (`$` is not a word character, so it makes a boundary) — both are indexed. A
+    // name containing a `$` is the one case where that reasoning does not hold, so
+    // such a name skips the index and is scanned exactly as before. There are none
+    // today; the fallback is there so the index cannot become wrong if there is.
+    const owners = new Map<string, Set<string>>()
+    const add = (tok: string, rel: string) => {
+      if (!tok) return
+      const at = owners.get(tok) ?? new Set<string>()
+      at.add(rel)
+      owners.set(tok, at)
+    }
+    for (const f of others)
+      for (const m of f.source.matchAll(/[\w$]+/g)) {
+        add(m[0], f.rel)
+        if (m[0].includes("$")) for (const part of m[0].split("$")) add(part, f.rel)
+      }
+    const byRel = new Map(others.map((f) => [f.rel, f.source]))
+
     // A name is used if any OTHER file contains it. Own-file uses do not count:
     // that is precisely the case where the `export` keyword buys nothing.
     const orphans: string[] = []
     for (const { rel, name } of declared) {
-      const elsewhere = others.some(
-        (f) => f.rel !== rel && used.has(name) && new RegExp(`\\b${name}\\b`).test(f.source)
-      )
+      const re = new RegExp(`\\b${name}\\b`)
+      const candidates = name.includes("$")
+        ? others.map((f) => f.rel)
+        : [...(owners.get(name) ?? [])]
+      const elsewhere = candidates.some((r) => r !== rel && re.test(byRel.get(r) ?? ""))
       if (!elsewhere) orphans.push(`${rel}::${name}`)
     }
     const unexplained = orphans.filter((k) => !DEAD_EXPORT_OK[k])
@@ -123,14 +153,22 @@ describe("every exported value is named by something", () => {
         `line: ${unexplained.join(", ")}`
     ).toEqual([])
 
-    // The ratchet, both ways.
+    // The ratchet, both ways. It is also this census's POSITIVE CONTROL: the one
+    // line in DEAD_EXPORT_OK must still come back as an orphan, so a matcher that
+    // had quietly started answering "used" to everything fails here.
     const live = Object.keys(DEAD_EXPORT_OK).filter((k) => !orphans.includes(k))
     expect(
       live,
       `DEAD_EXPORT_OK names exports that something imports now, or that no longer exist — ` +
         `delete these lines: ${live.join(", ")}`
     ).toEqual([])
-  })
+    // A WHOLE-CORPUS CENSUS NEEDS MORE THAN THE DEFAULT TWENTY SECONDS. It reads
+    // every app-owned source file and indexes every token in every file that
+    // could name one — measured 6 to 14 seconds on this machine, and it used to
+    // be 13 to 58 before the index above. Twenty was never a decision about this
+    // test; it is vitest's default, and hitting it turned a census into a TIMEOUT,
+    // which is the one failure that says nothing about the codebase.
+  }, 120_000)
 
   it("every DEAD_EXPORT_OK line states a real reason", () => {
     for (const [key, why] of Object.entries(DEAD_EXPORT_OK))

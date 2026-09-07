@@ -92,7 +92,8 @@ export async function sendBrandedEmail(
  * by developers and an address is somebody's personal data, so the row says WHICH
  * DOOR and WHAT SUBJECT, which is what a diagnosis actually needs. */
 async function note(env: MailEnv, to: string, subject: string, why: string): Promise<void> {
-  console.error("email send failed:", subject, why)
+  // Same key on the tail as on the row — see the note in realtime.ts.
+  console.error("email send failed:", env.TRACE ?? "-", subject, why)
   if (env.DB)
     await logError(env.DB, {
       source: "email-send",

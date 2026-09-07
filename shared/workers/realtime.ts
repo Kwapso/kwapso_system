@@ -329,7 +329,11 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
  * hour writes a bounded number of rows and not one per mutation. */
 async function note(env: RealtimeEnv, channel: string, event: ChangeEvent, why: string): Promise<void> {
   const what = `${channel} ${event.resource}${event.id ? `/${event.id}` : ""}${event.op ? ` (${event.op})` : ""}`
-  console.error("realtime publish failed:", what, why)
+  // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW — the sentence each
+  // worker's central catch already writes out, applied to the seam that writes
+  // both. The live tail and `error_logs` are only one store if the same key
+  // filters both, and this line had no key at all.
+  console.error("realtime publish failed:", env.TRACE ?? "-", what, why)
   if (env.DB)
     await logError(env.DB, {
       source: "realtime-publish",
