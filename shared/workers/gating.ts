@@ -186,8 +186,20 @@ export const AUTH_UNAVAILABLE_MS = 5_000
  *     GuardError first, the caller keeps their session, and the error store gets
  *     a row that says `auth_unavailable` rather than a generic 500.
  *
- * There is deliberately NO fallback answer here — no cached identity, no
- * "assume signed in". Guessing on the identity read is guessing on the gate. */
+ * THERE IS A FALLBACK, AND IT IS NOT A GUESS. This sentence used to read "there
+ * is deliberately NO fallback answer here — no cached identity, no 'assume signed
+ * in'", and it stopped being true on 2026-09-05, twenty lines above the catch
+ * that makes it untrue: `sessionFromCore` answers from the core database when
+ * auth cannot. RESILIENCE.md §1 was corrected for exactly this on 6 Sep and this
+ * comment was not, which left the seam's own doc comment contradicting the seam.
+ *
+ * The half that was always the point STANDS, and it is what makes the fallback
+ * safe: no CACHED identity and no "assume signed in". `sessionFromCore` reads the
+ * same live session row auth reads, so an expired session, a sign-out and a
+ * deactivated member are all still refused, and it is READ-ONLY — auth remains
+ * the only thing that mints, slides or destroys a session. Guessing on the
+ * identity read would be guessing on the gate; reading the same row from one hop
+ * closer is not guessing. The catch below argues it in full. */
 export async function whoAmI(request: Request, env: GatingEnv): Promise<SessionUser | null> {
   // The init is assembled apart and cast once. `shared/` is compiled by the two
   // WEB workspaces as well as the workers, and there the ambient `AbortSignal`

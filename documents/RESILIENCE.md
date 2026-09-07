@@ -403,10 +403,12 @@ resolves.
 > at the $0.001-per-million overage rate, i.e. zero. No resource was created and
 > nothing was written to any database.
 >
-> **STILL NOT DONE, and deliberately not claimed: Time Travel.** Nothing has been
-> restored to a bookmark. That is the path RUNBOOK § 2 sends you down for a live
-> database inside 30 days, so it is the most likely of all of these to be used
-> and the only one never tried.
+> **STILL NOT DONE HERE, and deliberately not claimed: Time Travel.** Nobody
+> writing in this file has restored to a bookmark. That is the path RUNBOOK § 2
+> sends you down for a live database inside 30 days, so it is the most likely of
+> all of these to be used and the only one never tried first-hand. (A relayed,
+> unwitnessed 2026-09-07 rehearsal is recorded at the end of this document — as
+> a relay, and it does not change this sentence.)
 
 **An untested restore is not a restore**, and until 2026-09-05 that rule was
 enforced by nobody — which is how the recorded rehearsal came to be eight
@@ -420,12 +422,27 @@ The REMOTE half is still a manual rehearsal, and it is still the half that runs
 on the bad day. **Export-and-reload was rehearsed on 2026-09-06, on both tiers,
 and passed** — core and a real team database, figures in the block above.
 
-**One piece remains untested, and it is now the most likely to be used:
-Time Travel.** Nothing has been restored to a bookmark. RUNBOOK § 2 sends you
-there for any live database inside 30 days, which is most bad days; the dump
-path rehearsed above is the one for a database that is *gone*. Do it in the next
-staging window and extend the block above.
+**One piece is still not rehearsed FIRST-HAND, and it is the most likely to be
+used: Time Travel.** RUNBOOK § 2 sends you there for any live database inside 30
+days, which is most bad days; the dump path rehearsed above is the one for a
+database that is *gone*.
+
+> **RELAYED, NOT WITNESSED — 2026-09-07.** A `wrangler d1 time-travel restore
+> --bookmark=…` against a throwaway staging database, reported as restoring
+> 67 tables, was relayed to this lane by the planner coordinating that day's run.
+> It is written down here rather than lost, and it is written down as a RELAY
+> rather than as a result, because nobody who has edited this file has seen it:
+> no command output, no database name, no bookmark. Every other figure in this
+> section was produced by the person who wrote it down, and that difference is
+> the whole value of the section.
+>
+> **So it does not yet count.** Treat Time Travel as unrehearsed until somebody
+> runs it and replaces this block with the real numbers — the database, the
+> bookmark, the tables and rows back, and the time it took. Delete this
+> paragraph on that day; it exists only to stop the next person redoing work
+> that may already be done, and to stop anyone reading it as done.
 
 Until then the honest statement is: *we know the export mechanism works on both
 tiers and produces a dump that reloads faithfully, we know one team database
-takes about seven minutes to come back, and we have never used Time Travel.*
+takes about seven minutes to come back, and nobody who has written in this file
+has used Time Travel.*

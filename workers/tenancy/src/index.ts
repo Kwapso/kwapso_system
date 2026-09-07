@@ -471,12 +471,16 @@ export default {
       // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
-      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      // is new. `publishChange` reads the deferrer off `env.DEFER`.
+      // …AND THIS REQUEST'S NAME rides the same copy (`TRACE`), for the same
+      // reason and by the same route: `publishChange` and `sendBrandedEmail`
+      // take no `Request`, so the id the door minted reaches their failure rows
+      // through `env` rather than through 190 call sites (trace.ts).
       // …and the CORE database counted, so the slow-door line below can see the
       // trips this worker actually makes. `beginD1Timing` only ever saw the D1
       // REST door, so a native `env.DB` statement was invisible and a worker that
       // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)
@@ -532,6 +536,12 @@ export default {
     // (error-log.ts `tickId`), so "what went wrong last night" is one query and
     // not a date-range guess across five places.
     const tick = tickId("nightly", controller.scheduledTime)
+    // …AND THE MAIL THIS TICK SENDS CARRIES IT TOO. `sendBrandedEmail` reads the
+    // name off `env` (notify.ts), and a cron has no request to read one from —
+    // so the tick's own id goes on the same shallow copy the dispatcher builds
+    // for a click. Without it the one row saying an 80% alarm never reached
+    // anybody joined nothing else the tick wrote.
+    const traced = { ...env, TRACE: tick }
     let failed = false
     // Two independent jobs, two try blocks. A failing size check must not cost
     // the estate its sweep, and a failing sweep must not hide an 80% alarm.
@@ -582,7 +592,7 @@ export default {
       // it is RECORDED, because a database crossing 80% that nobody was told about
       // is precisely the silence R12 and ARCHITECTURE §7 both exist to prevent.
       try {
-        const sent = await alertNewAlarms(env, result.alerted)
+        const sent = await alertNewAlarms(traced, result.alerted)
         if (sent.mailed)
           console.log(`size alarm emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
       } catch (e) {
@@ -644,7 +654,7 @@ export default {
       console.log(
         `ops digest: ${digest.fresh.length} new, ${digest.spiking.length} spiking, ${digest.nearQuota.length} near quota, ${digest.spend.turns} assistant turn(s)`
       )
-      const sent = await sendOpsDigest(env, digest)
+      const sent = await sendOpsDigest(traced, digest)
       if (sent.mailed) console.log(`ops digest emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
     } catch (e) {
       failed = true

@@ -11,7 +11,7 @@
 
 import { fail } from "./http"
 import { safeMediaKey } from "./image"
-import { requestId } from "./trace"
+import { requestId, traceHeaders } from "./trace"
 
 /** Anything with `.fetch()` — a service binding, in worker terms. */
 type Upstream = { fetch(url: string, init?: RequestInit): Promise<Response> }
@@ -38,8 +38,15 @@ type Upstream = { fetch(url: string, init?: RequestInit): Promise<Response> }
  * gateways bundle THIS file and not the gating seam, and pulling the data door's
  * module into a worker that binds no database to borrow one number is a bigger
  * change than writing the number down. If the identity ceiling ever moves, the
- * comment there and this one both say so. */
-const REPORT_HOP_MS = 5_000
+ * comment there and this one both say so.
+ *
+ * EXPORTED since 7 Sep 2026 for the gateway's FOURTH report hop — the
+ * maintenance throttle's row (`recordMaintenanceRefusal`), which shipped without
+ * a ceiling because it is written in the gateway rather than in here. The
+ * gateway already imports this file for the other three; giving that one hop the
+ * same number is the one-line version of the paragraph above, and a second
+ * `5_000` in a second file would have been a second decision. */
+export const REPORT_HOP_MS = 5_000
 
 /**
  * THE WRITE HAS TO HAVE STARTED HERE. The cross-site request forgery check,
@@ -404,8 +411,14 @@ export async function recordClientError(
   const cookie = request.headers.get("Cookie") ?? ""
   const me = cookie.includes("kwapso_session=")
     ? await auth
+        // THE NAME TRAVELS ON THIS HOP TOO. It was the one report hop in this
+        // file that carried the id in its BODY (the `log-error` post below) and
+        // not on the wire — so if THIS call was the thing that went wrong, auth's
+        // own crash row for it landed under a fresh ULID and the beacon's row and
+        // the lookup that failed on the way to writing it were two unjoinable
+        // rows about one moment.
         .fetch("https://internal/api/auth/me", {
-          headers: { Cookie: cookie },
+          headers: { Cookie: cookie, ...traceHeaders(requestId(request)) },
           signal: AbortSignal.timeout(REPORT_HOP_MS),
         })
         .catch(() => null)

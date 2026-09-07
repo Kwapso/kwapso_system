@@ -674,12 +674,16 @@ export default {
       // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
-      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      // is new. `publishChange` reads the deferrer off `env.DEFER`.
+      // …AND THIS REQUEST'S NAME rides the same copy (`TRACE`), for the same
+      // reason and by the same route: `publishChange` and `sendBrandedEmail`
+      // take no `Request`, so the id the door minted reaches their failure rows
+      // through `env` rather than through 190 call sites (trace.ts).
       // …and the CORE database counted, so the slow-door line below can see the
       // trips this worker actually makes. `beginD1Timing` only ever saw the D1
       // REST door, so a native `env.DB` statement was invisible and a worker that
       // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)
@@ -745,6 +749,12 @@ export default {
     if (controller.cron === DIGEST_CRON) return morningDigest(env, controller.scheduledTime)
     // ONE TICK, ONE NAME — every row this tick writes joins on it (`tickId`).
     const tick = tickId("knowledge-sweep", controller.scheduledTime)
+    // …AND THE PINGS THIS TICK SENDS CARRY IT TOO. A cron has no request, so
+    // the per-request copy the dispatcher builds does not exist here — this is
+    // the unattended equivalent, and it is the same shallow copy with the same
+    // one field on it. Without it a live-layer failure during the sweep was the
+    // one row of the tick that joined nothing (`error_logs.request_id`).
+    const traced = { ...env, TRACE: tick }
     let failed = false
     let teams: { id: string; database_id: string }[] = []
     try {
@@ -771,7 +781,7 @@ export default {
         // under a system actor, so every activity row it writes says so.
         const results = await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
-        if (indexed > 0) await publishChange(env, team.id, "knowledge")
+        if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 
         // AND GOOGLE BRINGS ITSELF IN (owner, 19 Aug 2026). This cannot run under
         // the guard above: `userId` there is `system:knowledge-sweep`, a value no
@@ -789,8 +799,8 @@ export default {
         // A captured transcript changes a meeting AND puts words in the knowledge
         // base on the next pass, so both listeners are told.
         if (auto.captured > 0) {
-          await publishChange(env, team.id, "meetings")
-          await publishChange(env, team.id, "knowledge")
+          await publishChange(traced, team.id, "meetings")
+          await publishChange(traced, team.id, "knowledge")
         }
         // R12: every failure recorded, per person, so one expired token is
         // visible without being fatal. `googleAutopilot` throws nothing — it
