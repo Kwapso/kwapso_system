@@ -827,6 +827,13 @@ again, which is the only property that matters here.
   question as an ungated one, so gating it is not a way out.
 - **R25 `savings-caption`** — a screen that shows a saving renders
   `SAVINGS_CAPTION` word for word.
+- **R53 `component-folders`** — a new component joins its module's folder under
+  `web/components/`, never the top level; a NEW module gets a new folder AND a
+  row in `web/components/README.md` saying what belongs in it, because the check
+  derives the permitted set from that file's own rows.
+- **R54 `named-paths`** — every path your module NAMES resolves on disk: in a
+  document, in a comment, in a string literal. A comment naming the check that
+  guards your module is the shape this exists for — the check has to be there.
 
 **The words** (the ones that catch every new module, every time)
 
