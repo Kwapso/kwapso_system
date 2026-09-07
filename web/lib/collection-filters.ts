@@ -44,7 +44,7 @@
 // `paged-sort.test.ts` makes of a sort menu. A facet naming a parameter its door
 // does not parse is a control that quietly answers nothing.
 
-import type { FilterFacet } from "@shared/web/screen-engine/config"
+import type { FacetOption as DrawnFacetOption, FilterFacet } from "@shared/web/screen-engine/config"
 
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 
@@ -95,20 +95,67 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   // matches: `workers/content/src/routes/help.ts` calls it `view`
   // (`"live" | "archived"`), never `archived`, so the field says what the door
   // actually reads rather than copying a sibling screen's spelling.
-  // CLIENT AND MODULE, added for the toolbar spec Aurora approved overnight
-  // (2026-09-01): the Tickets mockup she confirmed shows the toolbar's filter
-  // group as "Client ▾ | Module ▾ | + Filter", and this screen offered neither
-  // — `ticketFilterFrom` (workers/content/src/routes/help.ts) has parsed both
-  // `accountId` and `moduleId` since the door existed, so the door could always
-  // answer the question and nothing on the toolbar could ever ask it. Rows,
-  // not a closed vocabulary, exactly like `meetings.accountId` and
-  // `processes.appId` above: the door matches an id, and `tickets-collection.tsx`
-  // fills the options from the accounts/modules it already reads for this
-  // toolbar. Client leads (the mockup's own order), then Module, then the
-  // existing Archived view — unchanged.
+  // CLIENT, APP, TYPE, STATUS — the client's own four, 2026-09-07, verbatim:
+  // "On open, I want, instead of the current filters, client, app, type, and
+  // status." Her order is her reading order and it is the order she gets: this
+  // array is what `translatedFacets` walks, so the panel reads Client, App,
+  // Type, Status, top to bottom, on every tab that offers them.
+  //
+  // WHICH TABS OFFER WHICH is NOT decided here, and deliberately: this file is
+  // the collection's declaration of what its DOOR can answer, and the tab is a
+  // narrowing of the same door. The rule that subtracts a facet from a tab
+  // whose own token already pins that field lives with the tab grammar it is
+  // computed from (`helpTabFacets`, web/lib/live-resources.ts) and is applied
+  // by the screen, which simply hands an empty option list for a facet a tab
+  // may not ask — and an empty list is already dropped four lines from the
+  // bottom of this file. One subtraction, one mechanism.
+  //
+  // MODULE LEFT THIS LIST the same day. It was here for the toolbar mockup
+  // Aurora approved on 2026-09-01 ("Client ▾ | Module ▾ | + Filter") and the
+  // client has now named the level she actually works at: an APP, not one of
+  // its sections. `moduleId` is still parsed by the door and still reached by
+  // the machine surface and by an app record's own screens — nothing was
+  // removed from the door, one control was removed from this toolbar, because
+  // she asked for four filters and a fifth she did not ask for is a fifth thing
+  // to reject before reaching the one she wanted.
+  //
+  // ARCHIVED STAYED, AND THAT IS A JUDGEMENT CALL WRITTEN DOWN RATHER THAN A
+  // SILENT ONE. Her sentence says "instead of the current filters", and the
+  // current filters were Client, Module and Archived — so a literal reading
+  // retires this one too. It is kept because the other four are facets over a
+  // ticket's OWN FIELDS and this is not: `view` chooses WHICH COLLECTION is
+  // being looked at (the everyday list, or the drawer things are put away in),
+  // and it is the entire surviving surface of a tab the 2026-08-31 redesign
+  // retired ("there can never be 2 rows of tabs … just never") on the explicit
+  // understanding that the capability moved HERE rather than being deleted.
+  // Dropping it would make every archived ticket unreachable from this screen,
+  // which is a subtraction she was not asked to approve and would not see until
+  // she went looking for one. If she meant it to go, it is this one line and
+  // the census entry beside it — cheap. Reinstating a lost route to a thousand
+  // archived tickets is not.
   help: [
     { field: "accountId", label: "Client" },
-    { field: "moduleId", label: "Module" },
+    // ROWS, NOT A CLOSED VOCABULARY: the door matches an app's id, and the
+    // tickets screen fills these from the apps list it already holds — which
+    // is BOUNDED (a team's own systems), so page one is the collection and the
+    // menu is not the truncated one an accounts-shaped read would give.
+    { field: "appId", label: "App" },
+    // THE TEAM'S OWN `Ticket type` WORDS, so the options cannot be declared
+    // here: this is a per-team, editable vocabulary (`selectable_data`), not a
+    // constant. It is filled in by the screen from `helpTypeOptions` — the one
+    // list the create form, the dashboard's legend and this facet all read —
+    // which already subtracts the kind that is kept but never shown
+    // (`ticketTypeKeptForMigration`, shared/types.ts).
+    { field: "helpType", label: "Type" },
+    // A CLOSED VOCABULARY THAT STILL CANNOT BE SPELLED HERE, and it is the one
+    // genuine exception to this file's own two-sources rule at the top. The
+    // seven stages ARE fixed and server-owned (`HELP_STATUSES`) — but the SLICE
+    // of them a tab may offer is the tab's, and a static list here would offer
+    // "Resolved" on the Open tab: a stage that tab cannot contain, on a control
+    // that would return nothing and look broken. So the screen supplies exactly
+    // the words `helpTabFacets` says the open tab spans, taken from
+    // `HELP_STATUSES` and never from the rows on the page.
+    { field: "status", label: "Status" },
     { field: "view", label: "Archived", options: [
       { value: "live", label: "No" },
       { value: "archived", label: "Yes" },
@@ -225,7 +272,18 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
 export function translatedFacets(
   key: string,
   t: (english: string) => string,
-  rows: Record<string, FacetOption[]> = {}
+  /** THE DRAWN OPTION, not this file's plain pair — a screen may hand each one
+   * the record's own mark (`FacetOption.mark`, shared/web/screen-engine/
+   * config.ts: a pre-drawn node, never a colour or an icon name, because this
+   * layer is read by both front doors and neither `ticketTypeColour` nor
+   * `AppMark` lives somewhere it may import from). Widened on 2026-09-07 for
+   * the tickets toolbar, whose four facets each wear the mark that record wears
+   * everywhere else on the screen; a facet that hands a bare `{value,label}`
+   * is unchanged and draws no mark, which every other call site does.
+   *
+   * THE MARK NEVER CARRIES THE MEANING: `useFilterBar` renders it `aria-hidden`
+   * beside the word, so the WORD stays the whole accessible name. */
+  rows: Record<string, DrawnFacetOption[]> = {}
 ): FilterFacet[] {
   const out: FilterFacet[] = []
   for (const facet of COLLECTION_FILTERS[key] ?? []) {

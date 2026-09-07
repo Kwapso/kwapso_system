@@ -169,17 +169,22 @@ import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
 import { AppMark } from "@/components/app-tiles"
 import { RecordPicker, Swatch, type PickerOption } from "@/components/record-picker"
 import { assignableMembers, staffedOn } from "@/lib/members"
-import { ticketTypeColour } from "@/lib/type-colours"
+import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
+import { HELP_STATUS } from "@/components/deep-link/shape"
+import { RecordMark } from "@shared/web/record-mark"
+import { helpStatusDotTone } from "@shared/status-tones"
+import type { DotTone } from "@shared/app-stages"
 import type { TriageGap } from "@shared/triage-readiness"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import {
   accountsKey,
-  appModulesKey,
   appsKey,
   helpAttachmentsKey,
+  helpByAccountKey,
   helpFacetFilter,
   helpFacetKey,
   helpKey,
+  helpTabFacets,
   listFetch,
   OPEN_FACET,
   totalKey,
@@ -192,10 +197,9 @@ import { formatDate } from "@shared/web/format"
 import { primeCache, invalidate,
   mergePage, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
-import { OPEN_TAB_STATUSES } from "@shared/types"
+import { OPEN_TAB_STATUSES, ticketTypeKeptForMigration } from "@shared/types"
 import type {
   Account,
-  AppModule,
   AppRow,
   HelpAttachment,
   HelpTicket,
@@ -271,6 +275,199 @@ const ALL: HelpFacet = "all"
  * the render switch below and the `narrowed` check needed to know about it. */
 const DASHBOARD: HelpFacet = "dashboard"
 
+/** A STAGE'S TONE, AS A FILL THE FACET'S SWATCH CAN TAKE.
+ *
+ * `helpStatusDotTone` (shared/status-tones.ts) answers "which of the kit's six
+ * dot tones is this stage" and `Badge` turns that into a Tailwind class of its
+ * own (`DOT_FILL`, badge.tsx). The Status facet does not draw a `Badge` — a
+ * badge carries the word, and inside a facet option the word is already there —
+ * so it needs the same six answers as a CSS colour value, which is the one form
+ * `<Swatch>` takes (and the same shape `type-colours.ts` hands back for exactly
+ * this reason: one value an inline style, an SVG fill and a chart series can
+ * all read).
+ *
+ * A `Record<DotTone, …>` RATHER THAN AN INTERPOLATED `var(--dot-${tone})`, and
+ * that is the whole point of writing it out: a seventh tone added to the kit
+ * fails this file's own type check instead of rendering a swatch filled with an
+ * undefined custom property, which paints nothing and looks like a missing dot.
+ * It is the same argument `status-tones.ts` makes about typing its own map as a
+ * `Record<HelpStatus, …>` instead of a function with a fallback.
+ *
+ * R32-CLEAN: every value is a token the kit defines, never a hex and never a
+ * Tailwind ramp. The two greens are genuinely one colour (`--dot-shipped` and
+ * `--dot-done` both resolve to the forest — badge.tsx's own note), which is a
+ * NAMING split rather than a palette one and is why the closed/finished pair is
+ * still distinguishable here only by its word. That is fine and is the house
+ * rule rather than a defect: the mark never carries the meaning alone. */
+const DOT_TONE_FILL: Record<DotTone, string> = {
+  shipped: "var(--dot-shipped)",
+  building: "var(--dot-building)",
+  review: "var(--dot-review)",
+  blocked: "var(--dot-blocked)",
+  archived: "var(--dot-archived)",
+  done: "var(--dot-done)",
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE LIST TOOLBAR'S FILTERS, FOR WHICHEVER TAB IS OPEN.
+
+   ── THE CLIENT'S RULING, 2026-09-07 ──────────────────────────────────────
+
+     "On open, I want, instead of the current filters, client, app, type, and
+      status. On waiting, client, app, and type. On closed client app type. On
+      all client app type status. On triage client up and type."
+
+   Triage is the queue and has its own vocabulary two functions down
+   (`triageFacets`); this is the five paged tabs, and it holds NO LIST OF THEM.
+   WHICH facets a tab may ask is `helpTabFacets`' rule
+   (web/lib/live-resources.ts), computed from the tab TOKEN — a facet is offered
+   only where the tab spans more than one value of its field, and a DERIVED tab
+   (Waiting, whose status clause is scaffolding borrowed from Open so its
+   predicate has a pile to run over) offers no Status. The whole ruling and the
+   reasoning behind it are written out there. Read it before changing anything
+   here.
+
+   ── A FUNCTION, AND NOT AN EXPRESSION INSIDE THE COMPONENT ────────────────
+
+   It was written inline first and moved out for the reason `triageFacets` gives
+   for living up here rather than inside the card it draws: a facet vocabulary
+   that lives inside the thing it decorates cannot be checked, and cannot be
+   shared by a second body over the same collection. Both apply. The rule this
+   applies is the one thing on this screen that MUST NOT be got wrong quietly —
+   an over-offered facet looks exactly like a correctly-offered one — so
+   `web/test/tab-facets.test.tsx` drives this function directly over every token
+   on the strip, which it could not do while this was six statements in the
+   middle of a render.
+
+   It also keeps the `<PagedFind>` tag short: `facets-ask-the-door`
+   (web/test/rules.test.ts) reads a fixed window after that tag, and four option
+   lists spelled out inside it would push the `...query` the same census has to
+   see out the far end.
+
+   ── A FACET A TAB MAY NOT ASK IS HANDED AN EMPTY OPTION LIST ──────────────
+
+   …which is the one mechanism rather than a second `if` per facet:
+   `translatedFacets` already drops a facet whose options came back empty — the
+   rule it has always applied to a row-backed facet on a screen holding no rows
+   — so "this tab does not offer Status" and "there is nothing to offer" take
+   the identical, already-tested path. Nothing here re-implements the
+   subtraction. `view` (Archived) is not one of the four and is not touched: it
+   comes straight off `COLLECTION_FILTERS.help` as the closed vocabulary it has
+   always been, on every tab.
+   ══════════════════════════════════════════════════════════════════════════ */
+export function ticketFacets({
+  facet,
+  t,
+  clients,
+  accounts,
+  apps,
+  helpTypeOptions,
+}: {
+  /** the tab token the strip is on — the ONLY thing that decides which of the
+   * four may be asked */
+  facet: HelpFacet
+  t: (english: string) => string
+  /** THE DOOR'S OWN PER-CLIENT TALLY over the whole collection, never the
+   * accounts cache — see the call site for the R14 reasoning in full. */
+  clients: HelpAccountFacet[]
+  /** the accounts we happen to hold, by id. A FACE lookup and nothing else. */
+  accounts: Map<string, Account>
+  /** the team's own systems — a BOUNDED read, so this list is the answer */
+  apps: AppRow[]
+  /** the team's live `Ticket type` values */
+  helpTypeOptions: string[]
+}): FilterFacet[] {
+  const tabFacets = helpTabFacets(facet)
+  return translatedFacets("help", t, {
+    // CLIENT — the door's own whole-collection tally. The block beside
+    // `byAccount` at the call site below carries the R14 reasoning for why this
+    // is not the accounts cache. The face comes from the accounts page when
+    // this client happens to be on it, and from the name's own initial when it
+    // does not; `A client` is the fallback WORD for a row whose account has
+    // somehow lost its name, the same shape the app uses everywhere it draws a
+    // client it cannot name.
+    accountId: tabFacets.accountId
+      ? clients
+          .map((a) => {
+            const known = accounts.get(a.accountId)
+            const label = a.accountName ?? t("A client")
+            return {
+              value: a.accountId,
+              label,
+              mark: (
+                <RecordMark
+                  picture={known?.logoUrl ?? null}
+                  name={label}
+                  size="choice"
+                  fit={known?.accountType === "individual" ? "cover" : "contain"}
+                />
+              ),
+            }
+          })
+          .sort((a, b) => a.label.localeCompare(b.label))
+      : [],
+    // APP — the bounded apps list, each option wearing the app's own `AppMark`
+    // (the client, 2026-09-06: "on filter app i wanna see the icon of the app").
+    // `choice` is the dense mark size the picker's own option rows use, which is
+    // exactly this context.
+    appId: tabFacets.appId
+      ? apps
+          .map((a) => ({ value: a.id, label: a.name, mark: <AppMark app={a} size="choice" /> }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+      : [],
+    // TYPE — the TEAM'S OWN `Ticket type` words, in the client's fixed reading
+    // order (`orderTicketTypes`: issue, question, request, extra, then anything
+    // this order has never heard of, in the order it arrived). Each wears the
+    // colour ruled for it, through the same `Swatch` + `ticketTypeColour` pair
+    // the rows, the chips and the triage picker draw — so the dot a person
+    // filters by and the dot they read back are one object.
+    //
+    // THE WORDS ARE NOT TRANSLATED and the field's label is: `helpType` is a
+    // dropdown value a team typed itself, so it is DATA rather than copy, and
+    // `t()` would be looking a sentence up that is not in the catalogue (R28's
+    // own distinction; `triageFacets` below says the same about the same list).
+    //
+    // AND THE RETIRED KIND IS SUBTRACTED AGAIN HERE. `helpTypeOptions` already
+    // excludes it (use-screen-data.ts), the door already refuses to answer about
+    // it and already refuses to create one — this is the fourth fence and it is
+    // deliberate, exactly as `help-detail.tsx`'s own type picker filters a list
+    // that was already filtered. The cost is one call; the failure it prevents
+    // is a filter offering a word whose rows the door has excluded from both the
+    // list AND its count, which reads as an empty collection rather than as an
+    // impossible question.
+    helpType: tabFacets.helpType
+      ? orderTicketTypes(helpTypeOptions)
+          .filter((v) => !ticketTypeKeptForMigration(v))
+          .map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
+      : [],
+    // STATUS — the CLOSED, server-owned vocabulary, sliced to exactly what this
+    // tab can contain, and never taken off the page. `helpTabFacets` hands back
+    // the words themselves for that reason: on Open it is the three stages
+    // `OPEN_TAB_STATUSES` names and nothing else, so "Resolved" — a stage that
+    // tab cannot hold — is not offered, and on All it is all seven.
+    //
+    // THE WORDS ARE THE AGENCY'S OWN (`HELP_STATUS`, deep-link/shape.tsx), which
+    // is where every other agency-side rendering of a ticket's stage takes them
+    // from. NOT the portal's `STATUS_WORDS` ("With us", "Almost there"): those
+    // are the CLIENT's words for the same seven stages and R21's account fence
+    // is the reason the two files never import each other. Reusing the agency's
+    // map also means this control adds no new English sentence to translate —
+    // all seven are already catalogued and answered in all three languages.
+    //
+    // THE MARK IS THE STAGE'S OWN TONE, through `helpStatusDotTone`
+    // (shared/status-tones.ts) — the same six-tone vocabulary the ticket's own
+    // status chip is filled from, so the dot in this menu and the dot on the
+    // record are one ruling. Drawn with the same `<Swatch>` the Type facet uses
+    // rather than a `<Badge>`: a badge would put a second copy of the word
+    // inside the option beside the option's own label.
+    status: tabFacets.statuses.map((s) => ({
+      value: s,
+      label: t(HELP_STATUS[s]),
+      mark: <Swatch colour={DOT_TONE_FILL[helpStatusDotTone(s)]} />,
+    })),
+  })
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    THE TRIAGE QUEUE'S OWN VOCABULARY — the four things a person can ask of the
    pile, written HERE rather than inside `TriageQueue` for one stated reason.
@@ -325,11 +522,31 @@ const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultD
 
 /** WHAT THE TOOLBAR MAY NARROW BY, derived from the rows themselves.
  *
- * BY TYPE AND BY APP — the client's two, and no more. Deliberately NOT by
- * client: the pile is small (it is the tickets nobody has read in three days,
- * not the ticket collection), and a third select on a row that also carries a
- * search box, a sort chip and a create button is a toolbar that wraps on a
- * laptop before it has been asked anything.
+ * BY CLIENT, BY APP AND BY TYPE — client ruling, 2026-09-07: "On triage client
+ * up and type" ("up" is "app"; she was typing fast). CLIENT IS NEW HERE and it
+ * REVERSES an argument written one day earlier, which is worth leaving on the
+ * record rather than quietly deleting: this function used to say client was
+ * deliberately left out because "the pile is small … and a third select on a
+ * row that also carries a search box, a sort chip and a create button is a
+ * toolbar that wraps on a laptop before it has been asked anything". That was a
+ * guess about her screen dressed as a design principle, and she has now said
+ * what she wants on hers. The wrapping worry was also answered by a change
+ * nobody made for this reason: the facets live in the filter PANEL, a second
+ * row that opens under the whole toolbar (filter-bar.tsx, client ruling
+ * 2026-09-02), so a third select does not lengthen the track at all.
+ *
+ * AND NO STATUS, which is the same rule the list tabs are held to and not a
+ * separate decision: every row in this queue is `status = 'new'` — that is what
+ * put it in the queue (`needsTriage`, workers/content/src/lib/triage.ts) — so a
+ * Status facet here would offer exactly one word. See `helpTabFacets`
+ * (web/lib/live-resources.ts) for the ruling written out in full.
+ *
+ * THE OPTIONS COME OFF THE ROWS, AND HERE THAT IS THE WHOLE COLLECTION. The
+ * same derivation would be wrong on the list below — it PAGES, so page one's
+ * clients are not the team's clients — and it is right here because the triage
+ * door is a BOUNDED read that hands back the entire queue in one answer (no
+ * cursor, no `hasMore`). The rows in hand ARE the collection, so a menu built
+ * from them can neither truncate nor go stale against the pile it narrows.
  *
  * DERIVED FROM THE WHOLE COLLECTION, NEVER FROM WHAT IS ALREADY NARROWED, which
  * is the rule `filter-bar.tsx` states about its own defaults and `apps-screen`
@@ -366,13 +583,29 @@ const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultD
    `apps` arrives as the full rows rather than the names the tickets carry,
    because a mark is drawn from the app's own stage and logo — a ticket row
    knows an `appId` and a name and nothing that could be drawn. */
-function triageFacets(
+export function triageFacets(
   rows: TriageWaiting[],
   t: (english: string) => string,
   apps: AppRow[]
 ): FilterFacet[] {
-  const types = [...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v)))]
-    .sort((a, b) => a.localeCompare(b))
+  /* THE KINDS IN THE PILE, IN THE CLIENT'S OWN FIXED ORDER — issue, question,
+     request, extra, then any word that order has never heard of, in the order
+     it arrived (`orderTicketTypes`, web/lib/type-colours.ts, where the ruling
+     lives beside the colours it is keyed the same way as). It sorted
+     alphabetically until 2026-09-07, which put Extra first and was invisible
+     while this was the only Type menu on the screen; the list tabs' toolbar has
+     one now, and two Type menus in two different orders on one screen is the
+     kind of drift the client has twice told us to stop.
+     AND THE RETIRED KIND IS SUBTRACTED, though it cannot be here: `needsTriage`
+     already excludes it at the door, so this is a second fence over an empty
+     set. It is written anyway because the test that proves this menu never
+     offers that word should be able to prove it of THIS function rather than of
+     a door two workers away — and because the day somebody widens the triage
+     door, the fence is already standing. */
+  const types = orderTicketTypes([
+    ...new Set(rows.map((w) => w.helpType).filter((v): v is string => Boolean(v))),
+  ])
+    .filter((v) => !ticketTypeKeptForMigration(v))
     .map((v) => ({ value: v, label: v, mark: <Swatch colour={ticketTypeColour(v)} /> }))
   // BY ID, LABELLED BY NAME. A Map rather than a Set of ids plus a second
   // lookup: one pass, and an app whose rows disagree about its name (they
@@ -390,14 +623,47 @@ function triageFacets(
       return { value, label, mark: row ? <AppMark app={row} size="choice" /> : undefined }
     })
     .sort((a, b) => a.label.localeCompare(b.label))
+  /* THE CLIENT, WEARING ITS OWN FACE — and every fact it needs is already ON
+     THE ROW. `needsTriage` resolves `accountName` and `accountLogo` at the door
+     for precisely this reason (its own note, and R35's): `accounts` PAGES, so a
+     menu that looked a client up in the accounts cache this screen holds would
+     have gone blank on the fifty-first client. The list tab below has the same
+     problem and solves it differently, because it has a different answer
+     available (the door's grouped tally) — here the row already carries the
+     name, so nothing has to be resolved at all.
+     A Map by id for the same reason the apps one is: one pass, and one option
+     per client however many of its tickets are in the pile.
+     THE SHAPE IS A SQUARE with the logo contained, which is what a CLIENT wears
+     everywhere in this app (`shape.tsx`'s accounts list carries the ruling: one
+     list, one column, and two shapes in it read as two kinds of record). The
+     crop a sole trader's photograph needs is not available here — the triage
+     row carries a name and a logo and not the account TYPE — so the contain is
+     unconditional, which letterboxes a face rather than cropping one. That is
+     the safe direction of the two: a whole picture in the wrong box beats a
+     cropped one, and the WORD beside it is the name either way. */
+  const accountsSeen = new Map<string, { label: string; logo: string | null }>()
+  for (const w of rows)
+    if (w.accountId)
+      accountsSeen.set(w.accountId, { label: w.accountName ?? t("A client"), logo: w.accountLogo })
+  const accountOptions = [...accountsSeen]
+    .map(([value, { label, logo }]) => ({
+      value,
+      label,
+      mark: <RecordMark picture={logo} name={label} size="choice" />,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label))
   return [
+    // HER ORDER, and the same order the list tabs' toolbar reads in
+    // (`COLLECTION_FILTERS.help`): client, app, type. One screen, one reading
+    // order, whichever tab a person is standing on.
+    { field: "accountId", label: t("Client"), control: "select" as const, options: accountOptions },
+    { field: "appId", label: t("App"), control: "select" as const, options: appOptions },
     // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
     // value a team typed itself, so it is data rather than copy and `t()` would
     // be looking up a sentence that is not in the catalogue (R28's own
     // distinction; the tab strip above passes these same words as labels for
     // exactly this reason). The FIELD's label is copy and is translated.
     { field: "helpType", label: t("Type"), control: "select" as const, options: types },
-    { field: "appId", label: t("App"), control: "select" as const, options: appOptions },
   ].filter((f) => f.options.length > 0)
 }
 
@@ -424,12 +690,20 @@ function narrowTriage(
   // above), so the name is spoken for; `waiting` is what the triage door calls
   // this list anyway.
   waiting: TriageWaiting[],
-  ask: { query: string; helpType?: string; appId?: string }
+  ask: { query: string; accountId?: string; helpType?: string; appId?: string }
 ): TriageWaiting[] {
   const q = ask.query.trim().toLowerCase()
   return waiting.filter((w) => {
     if (q && !(w.ref ?? "").toLowerCase().includes(q) && !richTextPlain(w.description).toLowerCase().includes(q))
       return false
+    // NARROWED IN THE BROWSER, AND THAT IS HONEST HERE AND NOWHERE ELSE ON THIS
+    // SCREEN. The triage door is a BOUNDED read — the whole queue arrives in
+    // one answer, with no cursor — so filtering it filters the collection
+    // rather than a page of it, and the count above it (`matching.length`) is a
+    // count of the same thing. The list tabs below page, so every one of their
+    // facets is a DOOR parameter instead; the difference is not a style, it is
+    // whether the number and the rows are answering one question (R16).
+    if (ask.accountId && w.accountId !== ask.accountId) return false
     if (ask.helpType && w.helpType !== ask.helpType) return false
     if (ask.appId && w.appId !== ask.appId) return false
     return true
@@ -602,29 +876,77 @@ export function TicketsCollection({
     tenancy.selectable().then((r) => r.values)
   )
   const ticketMarks = markMap(selectableQ.data, MARK_GROUP.ticket)
-  // THE TWO NEW TOOLBAR FACETS (Client, Module) — read unconditionally, like
-  // Processes' own `appId` facet reads `appsKey` (processes-screen.tsx), because
-  // narrowing by either is a READ act available to anyone who can see this
-  // screen at all, not something gated behind creating a ticket. Modules are a
-  // BOUNDED, whole-team read (help-form-dialog.tsx reads the identical
-  // `appModulesKey` the same way, for the same reason: "a team's systems, not a
-  // feed"). Accounts is the one with a real caveat: `tenancy.accounts()` is
-  // page ONE of a GROWING_COLLECTIONS list (R14) — exactly the defect
-  // help-form-dialog.tsx's own account picker was rewritten off of ("offered
-  // the newest fifty companies and had no opinion about the rest"). This facet
-  // inherits that same limitation rather than fixing it: a live, searched
-  // facet option list is a capability no facet control in this app has today
-  // (shared/web/screen-engine/filter-bar.tsx's own header says the async
-  // option-provider was removed as dead code, and — since 2 Sep 2026 — that a
-  // facet is a compact `Select`, which scrolls and type-aheads but does not
-  // search; re-adding a searched one is outside this fix's remit). Filed as a
-  // known gap rather than silently shipped as if it were complete.
+  /* ── WHERE THE TOOLBAR'S FOUR FACETS GET THEIR OPTIONS ────────────────────
+     Client, App, Type, Status — the client's own four, 2026-09-07. WHICH tabs
+     may ask each of them is `helpTabFacets`' rule (web/lib/live-resources.ts,
+     where it is written out in full); this block is the other half of the
+     question, and it is a separate decision per facet because each one has a
+     different trap.
+
+     THE TRAP IS ALWAYS THE SAME SHAPE AND IT IS R14/R16's: this list PAGES, so
+     an option list derived from the rows in hand describes the newest fifty
+     tickets under a count describing all of them. Page one's clients are not
+     the team's clients. Every facet below therefore has to say where its whole
+     answer comes from, and none of them may be "the rows on screen".
+
+     APPS — BOUNDED, so the list IS the answer. `listFetch.apps` primes an exact
+     total and parks no cursor: a team's own systems are a collection that grows
+     at the speed of contracts, not of use, and it is not in
+     `GROWING_COLLECTIONS`. Read unconditionally the way Processes' own `appId`
+     facet reads the identical key (processes-screen.tsx), because narrowing by
+     app is a READ act anyone who can open this screen may perform. Shared cache
+     key, so `TriageQueue` below and this toolbar are one fetch.
+
+     CLIENTS — GROWING, and this is the facet that was WRONG until today. It
+     read `tenancy.accounts()`, which is page ONE of a `GROWING_COLLECTIONS`
+     list, with a comment admitting it ("filed as a known gap"). It is not a gap
+     any more and it did not need a searched facet control to fix: the DOOR
+     already answers this exact question. `countTicketFacets`
+     (workers/content/src/lib/help.ts) groups the WHOLE ticket collection by
+     client on every ticket read — one row per client, with the client's own
+     name resolved server-side — and `listFetch.help`/`helpFacet` have primed it
+     into `helpByAccountKey` since 28 Aug 2026 with nothing reading it. So the
+     Client menu is now the door's own grouped tally, which is the whole
+     collection by construction and cannot truncate.
+
+     THREE PROPERTIES OF THAT TALLY WORTH SAYING OUT LOUD, because each one
+     could otherwise read as a bug later:
+       · IT IS THE SAME LIST ON EVERY TAB. `countTicketFacets` deliberately
+         counts with the kind and stage facets turned OFF, so opening Closed
+         does not shrink the Client menu to the clients with closed tickets.
+       · IT DOES NOT NARROW AS YOU FILTER, which is the rule `filter-bar.tsx`
+         states about its own defaults: it is primed only by the RESTING reads
+         (`listFetch.*`), never by `<PagedFind>`'s `fetchPage`, which calls the
+         raw API and primes nothing. Picking a client therefore cannot empty the
+         menu you picked it from.
+       · IT HOLDS ONLY CLIENTS THAT HAVE A TICKET, and that is the right set for
+         a filter rather than a subtraction: an option that can only ever return
+         an empty list is the control-with-nothing-to-control this whole pass is
+         about. The agency's own tickets carry no client at all and are excluded
+         at the door (`account_id IS NOT NULL`), which is honest — `accountId`
+         takes an id, so there is no "none of them" to send it.
+
+     `accountsQ` STAYS, and only as a FACE. The tally carries a name and no
+     logo, so the accounts cache is read for the picture and the account type
+     (a sole trader's photo is cropped, a company's wordmark is contained —
+     `record-mark.tsx`'s own rule, and `shape.tsx` draws the accounts list the
+     same way). A client past page one still gets a mark, because `RecordMark`
+     falls back to the initial of the name the DOOR sent: every option wears
+     one, some wear a better one. A menu with a face on four rows and nothing on
+     the fifth reads as the broken row, which is `ticketTypeColour`'s own
+     never-null argument in another medium.
+
+     MODULES ARE GONE. The client named the APP as the level she filters at, and
+     `modulesQ` existed for nothing else on this screen. */
   const accountsQ = useCached<Account[]>(accountsKey(teamId), () =>
     tenancy.accounts().then((r) => r.accounts)
   )
-  const modulesQ = useCached<AppModule[]>(appModulesKey(teamId), () =>
-    tenancy.appModules().then((r) => r.modules)
-  )
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  const byAccount = useCachedValue<HelpAccountFacet[]>(helpByAccountKey(teamId))
+  /** The accounts we happen to hold, by id — a FACE lookup and nothing else.
+   * Never the option list itself: that is `byAccount` above, and the difference
+   * between the two is the whole of R14 on this control. */
+  const accountRows = new Map((accountsQ.data ?? []).map((a) => [a.id, a]))
   // THE RESTING CACHE — always the LIVE list now that Archived has moved off a
   // tab and onto the toolbar's Filter (see the header comment). It never holds
   // archived rows: those are an ACTIVE question, asked through `<PagedFind>`'s
@@ -826,6 +1148,16 @@ export function TicketsCollection({
     return { views: [list], value: "list", onValueChange: () => {} }
   })()
 
+  /** THE TOOLBAR'S FILTERS FOR THE TAB THAT IS OPEN — see `ticketFacets`. */
+  const helpFacets = ticketFacets({
+    facet,
+    t,
+    clients: byAccount ?? [],
+    accounts: accountRows,
+    apps: appsQ.data ?? [],
+    helpTypeOptions,
+  })
+
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
@@ -963,25 +1295,24 @@ export function TicketsCollection({
               // the one honest "is THIS tab's collection empty" answer.
               restingEmpty={scopedRows.length === 0}
               restingLoading={scopedLoading}
-              // CLIENT, MODULE, ARCHIVED — the toolbar spec Aurora approved
-              // overnight (2026-09-01) names Client and Module as the ticket
-              // screen's own worked example of "real filter facet chips"; the
-              // Status select the old frame drew is still gone (the tab strip
-              // above still narrows kind/stage AT THE DOOR — spread into
-              // `fetchPage` below, NOT through `facets`, so there are never two
-              // controls asking the same field — "the Accounts tab is a bit
-              // confusing"). All three are rows/options `COLLECTION_FILTERS.help`
-              // now declares; Client and Module are filled in from the accounts
-              // and modules this screen reads above, Archived is the closed
-              // `view` vocabulary it always was.
-              facets={translatedFacets("help", t, {
-                accountId: (accountsQ.data ?? [])
-                  .filter((a) => a.active)
-                  .map((a) => ({ value: a.id, label: a.name })),
-                moduleId: (modulesQ.data ?? [])
-                  .filter((m) => m.active)
-                  .map((m) => ({ value: m.id, label: `${m.appName} · ${m.name}` })),
-              })}
+              /* CLIENT, APP, TYPE, STATUS (+ the Archived view) — built above
+                 as `helpFacets`, per tab, by the rule in `helpTabFacets`.
+
+                 THE STATUS FACET AND THE TAB STRIP BOTH REACH `status`, AND
+                 THAT IS COMPOSITION RATHER THAN THE TWO-CONTROLS-ON-ONE-FIELD
+                 CLUTTER THIS PROP USED TO WARN ABOUT. The old note was right
+                 for the old shape: a free Status select beside a strip of stage
+                 tabs is two controls answering the same question from two
+                 places, and the client's own word for that was "the Accounts
+                 tab is a bit confusing". What is drawn now is a control that
+                 narrows WITHIN the tab and can only offer stages the tab
+                 already contains — three on Open, seven on All, none anywhere
+                 else. The spread order below is what makes that true rather
+                 than a hope: the tab's own narrowing goes in first and the
+                 person's question goes over the top, so picking "Scheduled" on
+                 the Open tab asks the door for scheduled tickets and never for
+                 the three the tab would otherwise have sent. */
+              facets={helpFacets}
               /* THE VIEW SELECTOR, ON EVERY ROW TAB — client, 2026-09-06:
                  "For the tabs Open, Closed, and All, do the list view exactly
                  the same as we have it in the Triage list, and put the view
@@ -1877,14 +2208,15 @@ function TriageQueue({
   const waiting = view?.waiting ?? []
   // NARROWED MEANS "SOMETHING IS ASKED", AND THE FACETS COUNT TOO. This used to
   // read `query.trim() !== ""` and was the whole truth while search was the only
-  // control; with two facets beside it, a reader who filters to an app with no
+  // control; with three facets beside it, a reader who filters to an app with no
   // rows would otherwise be shown the kit's "you have been through everything"
   // register — a sitting reported as FINISHED because a dropdown was set. It is
   // the same expression `apps-screen.tsx` writes one line below its own search.
   const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
-  // The toolbar's three questions, applied in one place (see `narrowTriage`).
+  // The toolbar's four questions, applied in one place (see `narrowTriage`).
   const matching = narrowTriage(waiting, {
     query,
+    accountId: facetValues.accountId,
     helpType: facetValues.helpType,
     appId: facetValues.appId,
   })

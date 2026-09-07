@@ -308,6 +308,8 @@ describe("there is exactly one comment stripper", () => {
 // meant to be a decision somebody makes on purpose.
 const DIRECT_READDIR: Record<string, string> = {
   "shared/rules/source-scan.ts": "the one walker itself — this is where the recursion lives",
+  "web/test/no-icloud-conflict-copies.test.ts":
+    "the conflict-copy guard looks for files sourceFiles() is built to ignore — whole DUPLICATED DIRECTORIES and non-source bytes like `components 2/` inside the vendored kit and `routes.d 2.ts` under the build output. The one walker filters to our source extensions and skips build directories, which is exactly where iCloud's copies land, so routing this through it would make the guard blind to every case it exists to catch",
   "web/test/vendored-kit.test.ts":
     "the hand-edit guard hashes EVERY delivered byte of the vendored kit — css, svg, fonts, json, not just source — and must walk byte-for-byte the same way scripts/sync-design.mjs does, or the two hashes drift and the guard lies",
   "web/test/rules.test.ts":
