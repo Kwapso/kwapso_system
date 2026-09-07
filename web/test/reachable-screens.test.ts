@@ -562,8 +562,8 @@ describe("the screens are reachable", () => {
  * exit is signing out and trying another address. */
 const FULL_SCREEN_SURFACES: Record<string, { kind: "shell" | "retry" | "form" | "terminal"; why: string }> = {
   "web/app/layout.tsx": { kind: "shell", why: "the document frame; it draws whatever page is under it and never a state of its own." },
-  "web/components/app-shell.tsx": { kind: "shell", why: "the signed-in app: the rail is on the screen, so every destination is a click away." },
-  "web/components/error-boundary.tsx": { kind: "retry", why: "the root boundary. Something broke and nothing is lost — the offer is to try again." },
+  "web/components/shell/app-shell.tsx": { kind: "shell", why: "the signed-in app: the rail is on the screen, so every destination is a click away." },
+  "web/components/shell/error-boundary.tsx": { kind: "retry", why: "the root boundary. Something broke and nothing is lost — the offer is to try again." },
   "web/app/onboarding/page.tsx": {
     kind: "terminal",
     why: "THREE screens in one file and two of them end: \"You're not in a team\" (invite expired, or removed) and \"You're in the right place\" (a client login at the agency's door). Neither has anything to submit — team creation is closed, and this build cannot know the portal's address — so `SignOutEscape` is the way off both. The third face is the profile form, which submits.",

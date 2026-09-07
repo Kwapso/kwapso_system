@@ -187,7 +187,7 @@ afterEach(() => {
 async function coldShell() {
   vi.resetModules()
   const [{ DeepLinkScreen }, store] = await Promise.all([
-    import("@/components/deep-link-screen"),
+    import("@/components/deep-link/deep-link-screen"),
     import("@shared/web/store"),
   ])
   store.clearCache()

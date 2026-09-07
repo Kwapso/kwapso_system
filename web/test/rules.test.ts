@@ -3554,7 +3554,7 @@ describe("offered-rights: no permission switch decides nothing", () => {
   // the source, because the screen is a host-composed component with a cache
   // and a door behind it and a render harness would prove less than it looked.
   it("offered-rights: the Roles screen hands the kit each module's offered rights and refuses a press on any other", () => {
-    const screen = read(join(ROOT, "web", "components", "role-detail.tsx"))
+    const screen = read(join(ROOT, "web", "components", "team", "role-detail.tsx"))
     expect(screen, "the matrix rows no longer carry `rights` from the door").toMatch(
       /rights:\s*m\.rights\.map\(\(r\)\s*=>\s*RIGHT_TO_KIT\[r\]\)/
     )

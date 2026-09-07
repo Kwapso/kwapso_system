@@ -25,9 +25,9 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { primeCache } from "@shared/web/store"
 import { appsKey, meetingsKey, meetingsMonthKey, sprintsKey, tasksKey, totalKey } from "@/lib/live-resources"
 import { BASE_RECIPES } from "@/lib/screens"
-import { MeetingsScreen } from "@/components/meetings-screen"
-import { SprintsScreen } from "@/components/sprints-screen"
-import { TasksScreen } from "@/components/tasks-screen"
+import { MeetingsScreen } from "@/components/meetings/meetings-screen"
+import { SprintsScreen } from "@/components/work/sprints-screen"
+import { TasksScreen } from "@/components/work/tasks-screen"
 import type { Meeting, Sprint, Task } from "@shared/types"
 
 // The screens mount their create dialogs, which reach the router; every cached

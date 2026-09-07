@@ -25,27 +25,6 @@ import * as React from "react"
 
 import { useIsAnyLoading } from "./store"
 
-/** The browser's idle moment, or the next macrotask where there is no such
- * thing (Safari has no `requestIdleCallback`). A `setTimeout(0)` still lands
- * after the current frame, which is all this needs — it is a "not now", not a
- * scheduling guarantee. Returns its own canceller.
- *
- * NOT `requestAnimationFrame`: a background or hidden tab never fires one, and
- * a screen that quietly never asks for its badges is a worse bug than a screen
- * that asks too early. */
-export function whenIdle(run: () => void): () => void {
-  const w = globalThis as unknown as {
-    requestIdleCallback?: (fn: () => void, opts?: { timeout: number }) => number
-    cancelIdleCallback?: (id: number) => void
-  }
-  if (typeof w.requestIdleCallback === "function") {
-    const id = w.requestIdleCallback(run, { timeout: 2_000 })
-    return () => w.cancelIdleCallback?.(id)
-  }
-  const id = setTimeout(run, 0)
-  return () => clearTimeout(id)
-}
-
 /** A screen that never settles must not starve its own chrome for ever. Past
  * this, the secondary reads go anyway — a badge that is a few seconds late is a
  * detail; a badge that never arrives because one panel is wedged is a bug. */

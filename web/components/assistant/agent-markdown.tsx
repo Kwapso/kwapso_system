@@ -8,7 +8,7 @@
 //   text  → the shared markdown grouping (@shared/web/markdown-html), rendered as
 //           REACT and injected with RichText's PROSE classes so a reply reads like
 //           any other rich text in the app.
-//   block → a real component (@/components/agent-blocks). React children, never
+//   block → a real component (@/components/assistant/agent-blocks). React children, never
 //           injected HTML — the structured path never touches innerHTML at all.
 //   code  → a fence we closed and REFUSED (bad JSON, an unknown kind, a value that
 //           wasn't a number): the model's own text, inert, in a <pre>. Shown rather

@@ -29,7 +29,7 @@ import * as React from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { clearCache, patchRow, primeCache, useCached } from "@shared/web/store"
-import { RoleFormDialog } from "@/components/role-form-dialog"
+import { RoleFormDialog } from "@/components/team/role-form-dialog"
 
 vi.mock("@/lib/api", () => ({ ApiFailure: class extends Error {} }))
 

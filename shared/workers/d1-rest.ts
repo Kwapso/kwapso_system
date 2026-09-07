@@ -110,7 +110,7 @@ const RETRIES = 2 // total attempts = 1 + RETRIES — 5xx, network blips, and CF
 
 /** LAW R11's deadline on this door, named because the message that reports a
  * breach has to quote it. A hung socket here would otherwise never return. */
-export const D1_REST_TIMEOUT_MS = 15_000
+const D1_REST_TIMEOUT_MS = 15_000
 
 /** THE MEASURED DOOR. Everything below goes through `cfTimed`, so a trip cannot
  * be made without being counted — the alternative (asking each call site to
