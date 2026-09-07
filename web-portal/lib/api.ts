@@ -24,6 +24,7 @@ import type {
   HelpTicket,
   ProcessComment,
   SessionUser,
+  TicketRating,
   Todo,
   TodoViewName,
 } from "@shared/types"
@@ -209,6 +210,30 @@ export const support = {
       "/api/content/help/validate",
       post({ id })
     ),
+
+  /** HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
+   * portal for how did we do it to see if client is happy", then "sentiment they
+   * can add a text (optional)"). Team migration 0067.
+   *
+   * The READ answers this person with THEIR OWN answers and nobody else's — the
+   * narrowing is in the door's statement, not in this call and not in the screen
+   * — because a colleague's private "1 out of 3" is a personal statement rather
+   * than a fact about the ticket the way a reply is.
+   *
+   * The WRITE is narrow at the door rather than by this function being careful:
+   * the account fence decides whose ticket it is before a row is written, and
+   * the door refuses anything that is not answered yet. It APPENDS — a person
+   * who changes their mind writes a new row, and what they said at the time
+   * survives it. */
+  rating: (id: string) =>
+    api<{ ratings: TicketRating[]; mine: TicketRating | null }>(
+      `/api/content/help/rating?id=${enc(id)}`
+    ),
+  /** `comment` is genuinely optional: omitted, the request carries no field at
+   * all and the door reads an absent one as absent. A score on its own is a
+   * complete rating and nothing on either side of this call asks twice. */
+  rate: (id: string, score: 1 | 2 | 3, comment?: string) =>
+    api<{ rating: TicketRating }>("/api/content/help/rating", post({ id, score, comment })),
 }
 
 /** WHAT WE ARE WAITING ON YOU FOR, and WHAT YOU BOUGHT. The two halves of the

@@ -29,6 +29,11 @@ import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { OPEN_HELP_STATUSES } from "@shared/types"
+// THE THREE AUTOMATIC FLIPS ARE STATUS WRITERS TOO (team migration 0066), and
+// they are the three most likely to be forgotten: nobody presses them, so a
+// history that covered only the buttons would look complete and would be missing
+// every rung a ticket climbed by itself. lib/help-stages.ts is the one seam.
+import { recordStatusEvent } from "./help-stages"
 
 /** What the flip did, for the route to publish (or not). */
 export type ReadyFlip = {
@@ -109,13 +114,19 @@ export async function readyFlipForTicket(
   const total = counts[0]?.total ?? 0
   const outstanding = counts[0]?.outstanding ?? 0
 
-  const before = await d1Query<{ account_id: string | null }>(
+  // THE STATUS RIDES THIS READ, beside the account. It costs nothing — the row
+  // is already being fetched for the ping's address — and it is what the stage
+  // event below records as the rung this flip climbed OUT of (team migration
+  // 0066). Reading it in a second statement afterwards would be a second trip
+  // for a value this one was already standing on.
+  const before = await d1Query<{ account_id: string | null; status: string }>(
     cfg,
     guard.databaseId,
-    `SELECT account_id FROM help WHERE id = ? LIMIT 1`,
+    `SELECT account_id, status FROM help WHERE id = ? LIMIT 1`,
     [ticketId]
   )
   const accountId = before[0]?.account_id ?? null
+  const wasAt = before[0]?.status ?? null
   if (total === 0 || outstanding > 0) return { moved: false, accountId, outstanding }
 
   const now = new Date().toISOString()
@@ -136,6 +147,15 @@ export async function readyFlipForTicket(
     [now, now, actor.id, actor.email, actor.name, ticketId, ...FLIPPABLE]
   )
   if (!changed[0]) return { moved: false, accountId, outstanding }
+
+  // WORK FINISHING IS A STAGE MOVE (0066), and this is the one that would have
+  // been easiest to leave out: no person pressed it, so it has no button and no
+  // door of its own. It also NULLs the resolver block above — the same erasure
+  // `setStatus` makes, for the same reason and with the same remedy: the row
+  // below keeps the resolve that was, so a ticket answered, dragged back to
+  // ready by a straggler story and answered again reads as three events rather
+  // than as one closure whose first half has gone.
+  await recordStatusEvent(cfg, guard, actor, ticketId, wasAt, "ready", now)
 
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket ready",
@@ -190,14 +210,22 @@ async function ticketState(
 }
 
 /** Move a ticket to `status`, but only OUT OF one of `from`. The one statement
- * every flip below shares — R17 lives here, once, rather than three times. */
+ * every flip below shares — R17 lives here, once, rather than three times.
+ *
+ * THE STAGE EVENT LIVES HERE TOO (team migration 0066), for the same reason R17
+ * does: two callers, one statement, and a rule written at the call sites is a
+ * rule the third caller forgets. `wasAt` is the status the caller OBSERVED a
+ * moment ago through `ticketState` — it is always one of `from`, since that is
+ * what the caller checked before coming here, and lib/help-stages.ts says why
+ * the tiny window between the two costs the sequence nothing. */
 async function flip(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
   ticketId: string,
   status: string,
-  from: readonly string[]
+  from: readonly string[],
+  wasAt: string
 ): Promise<boolean> {
   const now = new Date().toISOString()
   // The lock closes on the way past, as it does on every other staff touch: work
@@ -210,7 +238,11 @@ async function flip(
      WHERE id = ? AND status IN (${from.map(() => "?").join(", ")}) RETURNING id`,
     [status, now, now, actor.id, actor.email, actor.name, ticketId, ...from]
   )
-  return Boolean(changed[0])
+  // R17's silence covers the event too: zero rows moved is not a stage, so
+  // nothing is recorded and the caller returns without a ping or a sentence.
+  if (!changed[0]) return false
+  await recordStatusEvent(cfg, guard, actor, ticketId, wasAt, status, now)
+  return true
 }
 
 /** SCHEDULED — "stories exist AND are in a sprint" (CHECKLIST 5.3).
@@ -241,7 +273,7 @@ export async function scheduledFlip(
   )
   if ((rows[0]?.sprinted ?? 0) === 0) return { moved: false, accountId: state.accountId }
 
-  if (!(await flip(cfg, guard, actor, ticketId, "scheduled", SCHEDULABLE)))
+  if (!(await flip(cfg, guard, actor, ticketId, "scheduled", SCHEDULABLE, state.status)))
     return { moved: false, accountId: state.accountId }
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket scheduled",
@@ -271,7 +303,7 @@ export async function progressFlip(
   if (!STARTABLE.includes(state.status as (typeof STARTABLE)[number]))
     return { moved: false, accountId: state.accountId }
 
-  if (!(await flip(cfg, guard, actor, ticketId, "in_progress", STARTABLE)))
+  if (!(await flip(cfg, guard, actor, ticketId, "in_progress", STARTABLE, state.status)))
     return { moved: false, accountId: state.accountId }
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket in progress",

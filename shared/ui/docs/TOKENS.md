@@ -133,6 +133,8 @@ need no line at all.
 | `--secondary` | `#F7F2EB` | `#3A3833` | A secondary *control* is a FILLED control in the other paper tone. |
 | `--surface-quiet` | `#E2DDD4` | `#3A3833` | Disabled wells, skeletons, tracks, the quiet chip. **The dark value is lifted** — override 12. |
 | `--surface-inverse` | `#1A1918` | `#FFFEF9` | Charcoal panel in light, off-beige in dark. Flips. |
+| `--surface-record-footer` | → `--surface-inverse` | → `--surface-raised` | CH27.8's ink footer, the **one block that is a different kind of surface in each palette**: an inverse panel in light, an ordinary raised card in dark. It wears **no edge** in either — client, 2026-09-06. |
+| `--surface-record-footer-well` | `#3A3833` | *same* | The well a field or a pill sits in **on** that footer. One value in both palettes, because the footer is a dark surface in both. Measures 1.499 on the light footer, 1.324 on the dark one. |
 | `--surface-brand` | `#FED069` | *same* | Mango. One per view. |
 | `--accent` | `rgba(26,25,24,.05)` | `rgba(255,254,249,.05)` **⚠** | **The neutral hover/active wash.** A row, a menu item, a well. |
 
@@ -180,6 +182,9 @@ Four tiers, plus two that belong to a specific ground.
 | `--ink-on-accent` | `#1A1918` | *same* | **The accent law, as a token.** Charcoal, both modes. |
 | `--ink-on-inverse-secondary` | `#BFBEBA` | `#5A5957` | The **second** tier on `--surface-inverse`. Flips with it. |
 | `--ink-on-accent-secondary` | `#5E5030` | *same* | The second tier on mango. Mango does not flip, so neither does this. |
+| `--ink-on-record-footer` | → `--ink-on-inverse` | → `--foreground` | Type on `--surface-record-footer`. Follows whichever surface that is in the palette you are in. |
+| `--ink-on-record-footer-secondary` | → `--ink-on-inverse-secondary` | → `--ink-secondary` | Its second tier. |
+| `--hair-record-footer` | → `--hair-inverse` | → `--hair` | The rules **inside** the ink footer — the feed's row separators and the Record column's. Both resolve to `rgba(255,254,249,.12)`, so they agree by arithmetic as well as by rule. It is **not** a card edge: the footer wears none. |
 
 The last two exist because the artifact quietens a line on an accent with
 `opacity: .7` and reaches for a `--invfg2` it never defines. An opacity is a

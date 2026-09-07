@@ -2,6 +2,152 @@
 
 ## Unreleased
 
+### Changed — the ink footer wears no outline, in either palette, and CH27.8's dark clause is overruled
+
+Client, 2026-09-06, on a screenshot of a ticket's detail screen in dark mode:
+"in dark mode the footer is wrong no? what are this outline??? review this".
+What she is looking at is two outlined boxes, one inside the other — the ink
+footer card holding "LATEST ACTIVITY" and "RECORD", and the "Add a note" field
+inside it.
+
+**Both edges were deliberate and both were transcriptions, which is why this is
+a reversal and not a fix.** CH27.8's dark clause, verbatim: "On dark, ink would
+sit almost on top of the page, so the card moves up to raised #26241F **with a
+hairline** — same two columns, same content." The chapter's own markup draws the
+note field with `box-shadow: inset 0 0 0 1px var(--invhair)` besides. The
+component transcribed both faithfully and said so in its comments.
+
+**Measured first, on `verify/ink-footer`, both palettes, before anything moved.**
+
+| edge | light | dark |
+| --- | --- | --- |
+| the card's own | 8% charcoal over #1A1918 — **1.000** | 12% off-beige over #26241F — **1.455** |
+| the note field's | 12% off-beige over #26241F — **1.455** | 12% off-beige over #141310 — **1.391** |
+| the two columns' row rules | **1.423** | **1.455** |
+
+Three findings in that table. The card's light edge **was never drawing at all**
+— 1.000, exactly its own ground — so the file's old claim that "the light card
+has no edge, as drawn" was true, and light mode has nothing to lose here. The
+field's edge was visible in **both** palettes, not only in the one she
+screenshotted. And every one of the three is the same 12%: an outline around a
+card, an outline around a control and a rule between rows, all at one weight.
+That is the whole complaint.
+
+**What the card is now: its fill, and a seat.** Chapter 13's subtitle is
+"Colour separates, strokes don't", and `card.tsx`'s law reserves the hairline
+for SAME-TONE separation — two cards of one tone against each other, which this
+card is in neither palette. So the outline goes and the fill does the work it
+was already doing: **17.386** against the page in light, **1.198** against
+`--background` and **1.111** against `--surface-panel` in dark. Both dark
+figures are at or above steps this kit already ships as visible surface changes
+(override 77 measures its selected wash at 1.103 light / 1.111 dark and calls
+that the answer). Under it, `shadow-sm` — which the bridge points at
+`--shadow-rest`, the elevation `Card variant="raised"` gets for free, and in
+dark this card **is** a raised card by the chapter's own words. It measures
+**1.057** against the dark page and **1.103** against dark soft paper, so it is
+loudest exactly where the fill is quietest. A shadow, not a stroke: the standing
+rule that separation is a fill or an inset shadow and never a border is
+satisfied by the change rather than bent around it.
+
+**What the field is now: its well, its shape, its placeholder and its ring.**
+This is the harder half, because override 42 is emphatic that a field's resting
+edge earns its keep — "a resting field and a disabled one carried the SAME edge,
+and telling those apart is the one job that edge has" — so the stroke could not
+simply be deleted and paid for nowhere. It is paid for with the fill. The well
+was two tones pointing in opposite directions (`--kw-unlit-raised` in light, the
+page tone in dark) measuring **1.132** and **1.198**, each leaning on the stroke.
+It is now **one tone in both palettes**, `--surface-record-footer-well`
+(#3A3833) — RULED N2's own lift, minted for the identical failure: "a quiet
+badge measured 1.13:1 against the card it sat on … the pill stopped existing and
+only the label carried." Measured **1.499** on the light footer and **1.324** on
+the dark one, so **the fill alone is now stronger than the fill and the stroke
+used to be**. Beside it, three things that are not strokes: the pill shape at 38
+tall, which nothing else in this card has; the placeholder "Add a note" at
+**7.69** on the well, which is also the field's accessible name; and tokens.css
+§8's ring, on the ink that reads on this card, the moment it is used.
+
+**The row rules are untouched.** A line between two rows is not an outline
+around a shape, and the client's word was "outline". They are chapter 13's
+blessed case exactly — same-tone separation between stacked rows inside one
+shell.
+
+**Light mode does not regress**, and that is a measurement rather than a hope:
+the card's edge was 1.000 before and is absent now, so nothing visible changed
+about the card except a 1.105 rest shadow; the field went from a 1.132 well
+under a stroke to a 1.499 well without one.
+
+An artifact correction is owed against 27.8's dark clause and against its
+note-field markup, alongside the one override 49 already owes it. The whole
+argument — what the chapter asked for, what she said, what was measured, what is
+drawn — is written into `record-detail.tsx` immediately above region 4, next to
+the code, where somebody about to "restore" it will be standing.
+
+### Fixed — the ink footer's card had been outside every ground-keyed rebind in the system, and rendered correctly anyway
+
+Found while measuring the above, and the reason the footer now paints its ground
+with a real utility. The card carried `variant="inverse"` **and**
+`bg-[var(--rd-footer-surface)]`. `cn`'s tailwind-merge files both in the
+`bg-color` group and keeps the last, so `bg-surface-inverse` **was deleted from
+the element before it reached the DOM** — confirmed on the built lane, where the
+class list carries no such name and the card's `--hair` reads
+`rgba(255,254,249,.12)` straight off `:root` rather than off tokens.css §8's
+`.bg-surface-inverse` block, whose entire job is to make hairlines correct on
+this kind of ground. The card rendered the right colour and sat outside every
+ground-keyed rebind in the system. **That is the `--btn-secondary-fill` freeze
+in a different costume**, and it is why the house rule is a named utility,
+always.
+
+Fixed by naming the pair instead of branching inline. tokens.css §3 and §6/§7
+grow `--surface-record-footer`, `--ink-on-record-footer`,
+`--ink-on-record-footer-secondary`, `--hair-record-footer` and
+`--surface-record-footer-well`; §10 bridges the two that need a class. The
+component's `light-dark()` pairs are gone with them — the palette split already
+exists in the stylesheet and did not need re-stating in a `style` attribute.
+
+`--surface-record-footer-well` is declared **only** in `:root`, and the omission
+is the point: the ink footer is a dark surface in light mode and a dark surface
+in dark mode, so the paper a field is sunk into does not have to flip.
+
+`variant="inverse"` is kept even though both of its classes are merged away —
+`data-variant="inverse"` is what a consuming app keys on, and the variant is
+still the truth in light. `data-surface="inverse"` is deliberately **not** set:
+§8's rebind would then fire in dark too, where this card is an ordinary raised
+card, and its rules would flip to charcoal-on-#26241F — invisible.
+
+### Fixed — `shadow-none` does not beat `shadow-[var(…)]`, so the note field does not ask it to
+
+A second merge trap, in the same family as the one `lib/utils.ts` was written
+for, in a group its `extend` does not cover. Measured, not assumed:
+
+```
+twMerge("shadow-[var(--hairline-strong)]", "shadow-none")
+  -> "shadow-[var(--hairline-strong)] shadow-none"
+```
+
+tailwind-merge cannot see inside an opaque `shadow-[var(…)]`, so it files it
+under shadow-COLOUR rather than shadow, the two do not conflict, both survive,
+and the winner is Tailwind's emission order rather than the caller —
+**PATTERN §1's promise that a call site can always win is not true for this
+pair**. It happens to render correctly today, by luck of ordering. The note
+field therefore rebinds the SHAPE on its own element instead, which is scoped,
+cannot be reordered, and is the escape hatch tokens.css §4 states in its own
+words: "Set them all to `0 0` and every edge disappears." It stays a valid
+shadow (`0 0 #0000`, Tailwind's own spelling) rather than `none`, because the
+utility composes five comma-separated parts into one `box-shadow` and a `none`
+in the middle of that list invalidates the whole declaration — taking the ring
+with it.
+
+### Added — `verify/ink-footer/`
+
+The footer as it shipped at v1.2.62 beside the footer that ships now, in both
+palettes and on both grounds it lands on. One iframe per palette, because
+tokens.css §6/§7 key dark off `:root[data-theme]` and a document is one palette
+at a time; `?t=dark` is the switch, as in every other lane. The left cell is a
+verbatim quotation of the old code — including the arbitrary background and both
+strokes — so the pair differs only in the thing under discussion; the right cell
+is the real `RecordDetail`, so it cannot drift from what ships. Every figure in
+the entries above is printed on the page beside the drawing it came from.
+
 ### Fixed — the feed's mark sat 3.414 below its sentence, and `items-center` was the wrong way to raise it
 
 Client, 2026-09-06: "align horizontally avatar + text on activity + footer",

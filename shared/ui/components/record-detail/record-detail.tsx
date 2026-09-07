@@ -94,7 +94,7 @@
         normal document flow and scrolls away with the rest of the content.
         It appears once per detail page."
 
-   FOUR PLACES THE DRAWING IS NOT COPIED, AND WHY
+   FIVE PLACES THE DRAWING IS NOT COPIED, AND WHY
    1 · THE FEED ROW'S GEOMETRY IS `ActivityFeed`'S, NOT 27.8'S `96px 1fr`.
        OVERRIDE 18 (verify/decisions.html R2) already ruled on where a log's
        time sits — trailing, not leading — and built one row for CH18, 27.9,
@@ -120,18 +120,47 @@
        `ActivityFeed` drops it. The narrow specimen is followed at both
        widths; a trailing rule under the last row of a column is a hanging
        edge, not a separation. GAPS-DEF1 Q2.
+   5 · NEITHER THE CARD NOR THE NOTE FIELD WEARS THE EDGE 27.8 DRAWS. This is
+       the only one of the five that is not a reading of the drawing but a
+       REVERSAL of it, made on the client's instruction of 2026-09-06. The
+       chapter's dark clause ("raised #26241F with a hairline") keeps its fill
+       and loses its hairline; 27.8's own `inset 0 0 0 1px var(--invhair)` on
+       the note field goes with it, and the field's well is re-tuned to pay
+       for it. Everything — what the chapter asked for, what she said, what
+       was measured, and what is drawn now — is written out immediately above
+       region 4 in the body of this file, next to the code, where somebody
+       about to "restore" it will actually be standing. An artifact correction
+       is owed. Drawn side by side in both palettes at verify/ink-footer.
 
    HOW THE CARD ANSWERS THE PALETTE — READ THIS BEFORE CHANGING A COLOUR
-   CH27.8 asks for two DIFFERENT surfaces, and no single token holds both:
+   CH27.8 asks for two DIFFERENT surfaces, and no single token held both:
    `--surface-inverse` is charcoal in light but flips to off-beige in dark,
-   which is the whole reason the chapter writes a dark clause at all. So the
-   footer states the pair with `light-dark()`, which keys off `color-scheme` —
-   the property tokens.css §1 and §6/§7 already set in BOTH dark blocks
-   (`@media (prefers-color-scheme: dark)` and `[data-theme="dark"]`). A
-   Tailwind `dark:` variant would have been WRONG here: it compiles to the
-   media query alone, so an explicit `[data-theme="dark"]` on a light OS would
-   have kept the light branch while every token around it flipped — exactly
-   the drift tokens.css §6's header warns about.
+   which is the whole reason the chapter writes a dark clause at all. This
+   file used to state the pair inline with `light-dark()` and paint it with
+   `bg-[var(--rd-footer-surface)]`. BOTH HALVES OF THAT ARE GONE, 2026-09-07:
+   tokens.css §3 and §6/§7 now name the pair — `--surface-record-footer`,
+   `--ink-on-record-footer`, `--ink-on-record-footer-secondary`,
+   `--hair-record-footer`, `--surface-record-footer-well` — and this card
+   paints its ground with the real utility `bg-surface-record-footer`.
+
+   THE ARBITRARY BACKGROUND WAS NOT A STYLE PREFERENCE, IT WAS A BUG.
+   `cn`'s tailwind-merge puts `bg-[…]` and `bg-surface-inverse` in one group
+   and keeps only the last, so `variant="inverse"`'s own class was DELETED
+   from this element before it ever reached the DOM. Measured on the built
+   lane, 2026-09-07: the card's class list carried no `bg-surface-inverse`,
+   and its `--hair` read `rgba(255,254,249,.12)` straight off `:root` rather
+   than off tokens.css §8's `.bg-surface-inverse` block — the block whose
+   entire job is to make hairlines correct on this exact kind of ground. The
+   card rendered the right colour and sat outside every ground-keyed rebind
+   in the system. That is the `--btn-secondary-fill` freeze in a different
+   costume, and it is why the house rule is "a named utility, always".
+
+   `variant="inverse"` is KEPT even though both of its classes are merged
+   away, because `data-variant="inverse"` is what a consuming app keys on and
+   because the variant is still the truth in light. What is deliberately NOT
+   set is `data-surface="inverse"`: §8's rebind would then fire in dark too,
+   where this card is not an inverse surface at all but an ordinary raised
+   one, and its rules would flip to charcoal-on-#26241F — invisible.
 
    Everything else is then rebound ONCE on the card's inner grid, which is the
    mechanism tokens.css §8 already blesses in its own words: "Inverse surfaces
@@ -139,16 +168,16 @@
    what makes `ActivityFeed`, `Input` and `Avatar` COMPOSABLE onto a charcoal
    ground without one of them learning about this footer.
 
-   `--hair` is not rebound for the card's OUTER edge, and that is deliberate:
-   inherited, it is 8% charcoal in light — imperceptible inset over #1A1918,
-   so the light card has no edge, as drawn — and 12% off-beige in dark, which
-   is exactly the hairline the chapter asks for. One `Card hairline` covers
-   both clauses with no branch at all.
+   THE CARD HAS NO OUTER EDGE — CH27.8's DARK CLAUSE IS REVERSED, 2026-09-07.
+   See the block above region 4 for the full record of what the chapter asked
+   for, what the client said, and what is drawn now. In short: the chapter's
+   "raised #26241F with a hairline" keeps the fill and loses the hairline.
 
    THE HAIRLINE ON A CHARCOAL GROUND — AND THE HALF OF IT tokens.css CANNOT
-   REACH. `--hair-inverse` landed in tokens.css the same day as this fix (the
-   Part A audit), which retires the derivation this file first carried: the
-   inner rules take the artifact's own `--invhair` by name in both palettes.
+   REACH. `--hair-inverse` landed in tokens.css on 2026-08-23 (the Part A
+   audit), which retires the derivation this file first carried: the inner
+   rules take the artifact's own `--invhair` by name in both palettes, now
+   through `--hair-record-footer`.
 
    That commit also rebinds `--hair` on `.bg-surface-inverse` and states that
    doing so "keeps every existing consumer of --hairline, --hairline-under,
@@ -162,8 +191,9 @@
    three shapes this card needs are restated on its inner grid below, and it
    is logged for the file's owner as GAPS-DEF1 Q3 — the fix there is to
    redeclare the `--hairline*` shapes inside the same `.bg-surface-inverse`
-   block that already rebinds `--hair`, at which point the three lines here
-   can go.
+   block that already rebinds `--hair`. NOTE, since 2026-09-07, that fixing
+   GAPS-DEF1 Q3 would still not reach THIS card: it does not carry the class,
+   by the paragraph above. The three lines stay either way.
 
    The stage hero above the strip is chapter 23's, already transcribed into
    `status-stepper.tsx`; this file composes that component and redraws none of
@@ -864,51 +894,87 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
             sticky, not full-bleed", which is why nothing here pins it. It is
             the LAST child of the flow, which is 27.8's "then the ink footer.
             That order never changes." */}
+        {/* ---- THE FOOTER WEARS NO OUTLINE — A CHAPTER REVERSED ----------
+            2026-09-07. Read this before restoring `hairline`.
+
+            WHAT THE CHAPTER ASKED FOR. CH27.8's dark clause, verbatim and
+            already quoted in full at the top of this file: "On dark, ink
+            would sit almost on top of the page, so the card moves up to
+            raised #26241F WITH A HAIRLINE — same two columns, same content."
+            27.8 also draws the note field with an edge of its own, in its own
+            markup: `box-shadow: inset 0 0 0 1px var(--invhair)`. Both edges
+            were transcribed faithfully and both shipped.
+
+            WHAT THE CLIENT SAID. 2026-09-06, on a screenshot of a ticket's
+            detail screen in dark mode, verbatim: "in dark mode the footer is
+            wrong no? what are this outline??? review this". What she is
+            looking at is two outlined boxes, one inside the other — this card
+            and the field inside it — drawn in the same ink at the same 12%.
+
+            WHAT WAS ACTUALLY DRAWN, measured on the built lane before the
+            change (verify/ink-footer, both palettes):
+              · this card's edge   light  8% charcoal over #1A1918 → 1.000
+                                          (it was never drawing; the file's
+                                          old comment was right about that)
+                                   dark  12% off-beige over #26241F → 1.455
+              · the note field     light 12% off-beige over #26241F → 1.455
+                                   dark  12% off-beige over #141310 → 1.391
+              · the two columns' row rules   1.423 light / 1.455 dark
+            So the "dark-only" edge was one of THREE, the field's edge was
+            visible in BOTH palettes, and every one of them was the same 12%
+            — an outline around a card, an outline around a control and a rule
+            between rows, all at one weight. That is the whole complaint.
+
+            WHAT IS DRAWN NOW.
+              · THE CARD: no edge, either palette. Chapter 13's own subtitle
+                is "Colour separates, strokes don't", and `card.tsx`'s law
+                reserves the hairline for SAME-TONE separation — two cards of
+                one tone against each other. This card is not that in either
+                palette. It is separated by its FILL, which is also what the
+                dark clause's own first half already does: 17.386 against the
+                page in light, and in dark 1.198 against `--background` and
+                1.111 against `--surface-panel`. Both dark figures are at or
+                above steps this kit already ships as visible surface changes
+                (override 77 measures its selected wash at 1.103 light /
+                1.111 dark and calls that the answer).
+              · AND `shadow-sm` UNDER IT, which the tokens bridge points at
+                `--shadow-rest` — the elevation `Card variant="raised"` gets
+                for free, and in dark this card IS a raised card, by the
+                chapter's own words. It measures 1.057 against the dark page:
+                a seat, not a lift, and deliberately quieter than the fill it
+                supports. It is a shadow, not a stroke, so the standing rule —
+                separation is a fill or an inset shadow, never a border — is
+                satisfied by the change rather than bent around it.
+              · THE FIELD: see the `Input` below. Its edge goes too, and its
+                well changes to pay for it.
+
+            WHAT IS NOT TOUCHED. The two columns' row rules stay. They are
+            chapter 13's blessed case exactly — same-tone separation between
+            stacked rows inside one shell — and they are not what anybody is
+            pointing at: a line BETWEEN two rows is not an outline AROUND a
+            shape, and the client's word was "outline".
+
+            AN ARTIFACT CORRECTION IS OWED against 27.8's dark clause and
+            against its note-field markup, alongside the one override 49
+            already owes it. */}
         {showFooter ? (
           <Card
             variant="inverse"
-            /* The dark clause's hairline. It costs no branch: `--hair` is
-               inherited, so this inset is 8% charcoal over #1A1918 in light
-               (no edge, as drawn) and 12% off-beige over #26241F in dark
-               (the edge the chapter asks for). */
-            hairline
             data-record-region="footer"
             className={cn(
               "min-w-0",
-              // The two surfaces CH27.8 names. See the palette note at the
-              // top of this file for why this is `light-dark()` and not a
-              // Tailwind `dark:` variant.
-              "bg-[var(--rd-footer-surface)] text-[var(--rd-footer-ink)]",
+              /* The two surfaces CH27.8 names, as NAMED utilities. Both of
+                 `variant="inverse"`'s own classes are merged out by `cn`
+                 here, on purpose — see the palette note at the top of this
+                 file for why that had to stop being an arbitrary `bg-[…]`. */
+              "bg-surface-record-footer text-ink-on-record-footer",
+              /* The card's seat, replacing its outline. `shadow-sm` is
+                 re-pointed at `--shadow-rest` by tokens.css §10, so this is
+                 the kit's own rest elevation and not a shadow invented here.
+                 Unbranched: in light it is 5% charcoal under a charcoal card,
+                 which is what a raised block in that palette carries anyway. */
+              "shadow-sm",
             )}
-            style={
-              {
-                "--rd-footer-surface":
-                  "light-dark(var(--surface-inverse), var(--surface-raised))",
-                "--rd-footer-ink": "light-dark(var(--ink-on-inverse), var(--foreground))",
-                /* RULED M2 / override 13. The quieter lines take the inverse
-                   ground's own second ink in light; in dark the card is an
-                   ordinary raised card, so they take the ordinary second ink.
-                   Never an opacity — that is a standing rejection. */
-                "--rd-footer-ink-2":
-                  "light-dark(var(--ink-on-inverse-secondary), var(--ink-secondary))",
-                /* The rules INSIDE the card, and both branches are now a plain
-                   token. `--hair-inverse` landed in tokens.css on 2026-08-23
-                   (the Part A audit, same day as this fix): it is the
-                   artifact's own `--invhair`, and in light it is exactly the
-                   rgba(255,254,249,.12) 27.8 draws these rules with. In dark
-                   the card is an ordinary raised card, so its rules are the
-                   ordinary `--hair` — which in dark holds that same value, so
-                   the two branches agree by arithmetic as well as by rule. */
-                "--rd-footer-hair": "light-dark(var(--hair-inverse), var(--hair))",
-                /* The well a field or a mark sits in ON this card. 27.8 draws
-                   the note field #26241F on the charcoal card, which is
-                   `--kw-unlit-raised` — the paper is already in the file, so
-                   no hex is written. In dark the card IS that paper, so the
-                   well steps down to the page tone instead and the field
-                   reads as a recess rather than vanishing. */
-                "--rd-footer-well": "light-dark(var(--kw-unlit-raised), var(--background))",
-              } as React.CSSProperties
-            }
           >
             <CardContent
               /* 27.8's own insets where ruling 28's ladder has them (18 / 20
@@ -968,24 +1034,33 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
 
                  Declared HERE and not on the card above, because the values
                  are computed from tokens this element overrides and a custom
-                 property may not depend on its own element. */
+                 property may not depend on its own element.
+
+                 EVERY RIGHT-HAND SIDE IS NOW A SEMANTIC TOKEN. It used to be
+                 a local `--rd-footer-*` holding a `light-dark()` pair; the
+                 pairs live in tokens.css §3 and §6/§7 since 2026-09-07, which
+                 is what let the card's ground become a named utility. The
+                 self-reference reads alarming and is not: `--hair-record-
+                 footer: var(--hair)` is substituted on `:root`, so rebinding
+                 `--hair` here cannot feed back into it. Same for
+                 `--ink-on-record-footer-secondary: var(--ink-secondary)`. */
               style={
                 {
-                  "--foreground": "var(--rd-footer-ink)",
-                  "--ink-primary": "var(--rd-footer-ink)",
-                  "--muted-foreground": "var(--rd-footer-ink-2)",
-                  "--ink-tertiary": "var(--rd-footer-ink-2)",
-                  "--ink-secondary": "var(--rd-footer-ink-2)",
-                  "--border": "var(--rd-footer-hair)",
-                  "--hair": "var(--rd-footer-hair)",
-                  "--hairline": "inset 0 0 0 0.0625rem var(--rd-footer-hair)",
-                  "--hairline-under": "inset 0 -0.0625rem 0 var(--rd-footer-hair)",
-                  "--hairline-strong": "inset 0 0 0 0.0625rem var(--rd-footer-hair)",
-                  "--card": "var(--rd-footer-well)",
-                  "--surface-raised": "var(--rd-footer-well)",
-                  "--background": "var(--rd-footer-well)",
-                  "--pill-fill": "var(--rd-footer-well)",
-                  "--focus": "var(--rd-footer-ink)",
+                  "--foreground": "var(--ink-on-record-footer)",
+                  "--ink-primary": "var(--ink-on-record-footer)",
+                  "--muted-foreground": "var(--ink-on-record-footer-secondary)",
+                  "--ink-tertiary": "var(--ink-on-record-footer-secondary)",
+                  "--ink-secondary": "var(--ink-on-record-footer-secondary)",
+                  "--border": "var(--hair-record-footer)",
+                  "--hair": "var(--hair-record-footer)",
+                  "--hairline": "inset 0 0 0 0.0625rem var(--hair-record-footer)",
+                  "--hairline-under": "inset 0 -0.0625rem 0 var(--hair-record-footer)",
+                  "--hairline-strong": "inset 0 0 0 0.0625rem var(--hair-record-footer)",
+                  "--card": "var(--surface-record-footer-well)",
+                  "--surface-raised": "var(--surface-record-footer-well)",
+                  "--background": "var(--surface-record-footer-well)",
+                  "--pill-fill": "var(--surface-record-footer-well)",
+                  "--focus": "var(--ink-on-record-footer)",
                 } as React.CSSProperties
               }
             >
@@ -1023,7 +1098,95 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
                       placeholder={notePlaceholder}
                       aria-label={notePlaceholder}
                       /* 38 — ruling 28's "field inside a row", which is what
-                         27.8 draws here rather than `Input`'s standing 44. */
+                         27.8 draws here rather than `Input`'s standing 44.
+
+                         `shadow-none` IS THE SECOND HALF OF THE REVERSAL, and
+                         it is the harder half, so it is argued here in full.
+
+                         WHAT IT REMOVES. `Input`'s resting skin is
+                         `shadow-[var(--hairline-strong)]` (override 42), and
+                         on this card the grid above has rebound that shape to
+                         `--hair-record-footer`. Measured before: 12% off-beige
+                         at 1.455 over the light well and 1.391 over the dark
+                         one — the inner of the client's "two outlined boxes",
+                         and the one that was visible in BOTH palettes rather
+                         than only in the one she screenshotted.
+
+                         WHY IT CANNOT JUST GO. Override 42 is emphatic that a
+                         field's resting edge is doing real work: "a resting
+                         field and a disabled one carried the SAME edge, and
+                         telling those apart is the one job that edge has."
+                         Delete the stroke and pay for it nowhere and this
+                         becomes the one field in the kit that does not say it
+                         is a field.
+
+                         SO IT IS PAID FOR, WITH A FILL. The well under this
+                         field is no longer `--kw-unlit-raised` in light and
+                         the page tone in dark — two tones, pointing in
+                         opposite directions, each about 1.13–1.20 against its
+                         card and each leaning on the stroke. It is one tone in
+                         both palettes now, `--surface-record-footer-well`
+                         (#3A3833, RULED N2's own lift, minted for exactly
+                         this "the shape stopped existing" failure): measured
+                         1.499 against the light footer and 1.324 against the
+                         dark one. The fill alone is now stronger than the fill
+                         AND the stroke used to be.
+
+                         AND FOUR THINGS BESIDES THE FILL SAY "TYPE HERE",
+                         none of which is a stroke:
+                           · the SHAPE. `rounded-pill` at 38 tall. Nothing else
+                             in this card is a pill — the feed rows and the
+                             Record rows are flat, full-width, and separated by
+                             rules. A pill on this card is a control by
+                             elimination.
+                           · the PLACEHOLDER. "Add a note", in the quiet ink,
+                             which is also this field's accessible name. A
+                             filled shape with a verb in it is an invitation;
+                             an empty well is not.
+                           · the CARET, on hover-free pointer entry and on tab.
+                           · the RING. tokens.css §8, at the control's own
+                             radius, on `--focus` which the grid above has
+                             already pointed at the ink that reads on this
+                             card. The moment the field is used it is the
+                             loudest thing in the footer.
+
+                         WHY IT IS A PROPERTY AND NOT `shadow-none`. Because
+                         `shadow-none` DOES NOT WIN — measured, not assumed:
+
+                           twMerge("shadow-[var(--hairline-strong)]",
+                                   "shadow-none")
+                             -> "shadow-[var(--hairline-strong)] shadow-none"
+
+                         tailwind-merge cannot see inside an opaque
+                         `shadow-[var(…)]`, so it files it under shadow-COLOUR
+                         rather than shadow, the two classes do not conflict,
+                         BOTH survive, and the winner is decided by Tailwind's
+                         emission order instead of by the caller. That is
+                         precisely the failure `lib/utils.ts` exists to prevent
+                         and documents for `rounded-*` and `text-*`, arriving
+                         here in a group its `extend` does not cover — and it
+                         renders correctly today purely by luck of ordering.
+                         PATTERN §1's promise that "the caller's className goes
+                         last so a call site can always win" is not true for
+                         this pair, so the call site does not rely on it.
+
+                         Rebinding the SHAPE on this element is exact: it is
+                         scoped to the field, it cannot be reordered, and
+                         tokens.css §4 states this escape hatch in its own
+                         words — "Set them all to `0 0` and every edge
+                         disappears." `0 0 #0000` is Tailwind's own spelling of
+                         a shadow that paints nothing, and it must stay a VALID
+                         shadow rather than `none`: the utility composes five
+                         comma-separated parts into one `box-shadow`, and a
+                         `none` in the middle of that list invalidates the
+                         whole declaration — taking the ring with it.
+
+                         It cannot mask a state, either. `Input`'s error and
+                         read-only skins reach for different shapes, and this
+                         field can be neither: no `error`, no `loading`, and it
+                         never will — a note either sends on Enter or does
+                         nothing. */
+                      style={{ "--hairline-strong": "0 0 #0000" } as React.CSSProperties}
                       className="mt-[var(--space-3h)] h-[var(--control-height-field)] text-caption"
                     />
                   )}

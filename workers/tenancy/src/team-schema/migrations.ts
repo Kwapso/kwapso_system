@@ -4093,4 +4093,200 @@ ALTER TABLE knowledge_sources ADD COLUMN embed_attempts INTEGER NOT NULL DEFAULT
 ALTER TABLE help ADD COLUMN raised_as_type TEXT;
 `,
   },
+  {
+    // A TICKET REMEMBERS THE STAGES IT WENT THROUGH.
+    //
+    // THE CLIENT, 2026-09-06: "we need record on category when it arrived vs the
+    // category we assigned / also how long it sat on each stage / also how often
+    // sth is reopened". 0065 answered the first clause. This answers the other
+    // two, and it answers them with ONE table rather than two, because they are
+    // one fact asked twice.
+    //
+    // ── WHY TIME-IN-STAGE AND REOPEN-COUNT ARE NOT TWO THINGS ───────────────
+    //
+    // A ticket's stage history is a sequence of transitions. Given the sequence,
+    // TIME IN A STAGE is the gap between consecutive rows — no column needed —
+    // and a REOPEN is a transition whose `from_status` is `resolved` and whose
+    // `to_status` is not. A `reopen_count` column beside this table would be a
+    // SECOND SOURCE OF TRUTH for a fact this table already holds, and the two
+    // would disagree the first time a row was written and the counter was not
+    // (or the counter incremented and the row lost). One table, two questions,
+    // no arithmetic anybody has to keep in sync.
+    //
+    // It is also the record that survives a REOPEN, which is the reason this is
+    // worth a table at all. `setStatus` (workers/content/src/lib/help.ts) NULLs
+    // `resolved_at` and the whole resolver block on any move to a non-resolved
+    // status — deliberately: those columns mean "the answer that stands NOW",
+    // and a reopened ticket has no standing answer. The owner blessed exactly
+    // that and named where the fact should go instead: "Reopening a ticket nulls
+    // its closing timestamp, yeah — but keep it in activity, like closed on x,
+    // reopen on y, closed again on z". A row here carries the actor and the
+    // instant of every transition, resolves included, so who answered it and
+    // when is no longer erased by the reopen — it is one row up the sequence.
+    //
+    // ── WHAT A TICKET WITH NO ROWS REPORTS ──────────────────────────────────
+    //
+    // NOTHING. Not zero. Every ticket that exists on the day this runs has an
+    // EMPTY history and cannot be given one, and every reader of this table has
+    // to say so in those words. `readTicketStages` returns `recorded: false` and
+    // the Activity tab prints "This ticket has no record of the stages it went
+    // through." — never "0 days in each stage", which is a measurement nobody
+    // took wearing the clothes of one that was.
+    //
+    // A PARTIAL history is the second shape and it is just as real: a ticket
+    // raised last month and moved tomorrow gets its first row tomorrow, with a
+    // `from_status` that names a stage nothing recorded the START of. So the
+    // reader reports `fromCreation: false` for it and the panel says the earlier
+    // stages are not recorded — the SEQUENCE is honest from the first row on,
+    // and the duration of the stage before it is simply not a number we have.
+    // That is why `from_status` is stored at all rather than inferred from the
+    // previous row: on the first row there IS no previous row, and "what it came
+    // out of" is the only thing that says whether the sequence is whole.
+    //
+    // ── THE BACKFILL, AND WHY THERE ISN'T ONE ───────────────────────────────
+    //
+    // 0065 refused to reconstruct `raised_as_type` from the activity feed's
+    // prose and its argument is the same one here, only stronger. The feed does
+    // carry a sentence per status move ("Alaap set T-0412 to in progress") and
+    // it does parse. It is still the wrong source:
+    //
+    //   1. `logActivity` is BEST-EFFORT and swallows its own failures, so the
+    //      feed is incomplete in a way nothing can measure — and a duration
+    //      computed across a MISSING transition is not a slightly-wrong number,
+    //      it is two stages reported as one long one. A gap in a list of events
+    //      is visible; a gap inside an arithmetic answer is not.
+    //   2. The sentence is PROSE and `describeChanges` has been reworded before.
+    //      A parser over it is a build that goes green while reading nothing.
+    //   3. `bulkSetStatusByFilter` writes ONE activity row for a whole SET of
+    //      tickets, naming a count rather than the ids — so for every ticket in
+    //      every bulk move ever run there is no per-ticket sentence to read.
+    //   4. The ~788 tickets imported from Glide never had their transitions
+    //      happen in this app at all. Whatever stages they went through happened
+    //      in another system with its own ladder, and there is nothing here to
+    //      recover.
+    //
+    // So the series starts today, an empty history says "not recorded" in those
+    // words, and if the past is ever wanted it is a DATED ONE-OFF SCRIPT that
+    // records what it inferred and how (the shape scripts/backfill-ticket-
+    // raisers.mjs already has) — never a migration that blends a stamped event
+    // with a guessed one in a table nothing can tell them apart in afterwards.
+    //
+    // ── THE SHAPE ───────────────────────────────────────────────────────────
+    //
+    // `from_status` NULL means "no recorded stage before this one". It is the
+    // honest value in exactly two places: the row `createTicket` stamps (there
+    // was nothing before it — the ticket did not exist), and the one race in
+    // `bulkSetStatusByFilter`, which reads the set's statuses and then moves the
+    // set in two statements and so can be beaten to a row by a concurrent write.
+    // Both mean the same sentence, which is why they share the same value.
+    //
+    // NO FOREIGN KEY TO A STATUS VOCABULARY, because there isn't one: `status`
+    // on `help` is a free TEXT column the CODE validates against `HELP_STATUSES`
+    // (0028 says why), and a CHECK constraint here would make adding a stage a
+    // schema migration on a table whose whole job is to record history. It would
+    // also make this table REFUSE to record a move the app performed, which is
+    // the one thing a history table must never do.
+    //
+    // THE INDEX IS THE ONLY READ THERE IS: one ticket's rows, oldest first. That
+    // is the panel, the durations and the reopen count, all three, so
+    // `(help_id, created_at, id)` is a single seek plus a scan of one ticket's
+    // own rows and there is no second question to serve.
+    //
+    // `id` RIDES THE KEY FOR THE SEEK, NOT FOR THE ORDER, and the difference is
+    // worth writing down because it looks like a tie-break and is not one. Two
+    // moves on one ticket inside the same millisecond sort equal on
+    // `created_at`, and a ULID's low half is RANDOM (shared/workers/id.ts), so
+    // `id` cannot say which came first — it reversed a resolve and the reopen
+    // after it the first time this was tested. The reader breaks the tie on
+    // `rowid`, which is the insertion order and which nothing can recycle here
+    // because nothing ever deletes from this table (a source scan in
+    // workers/content/test/status-history-has-no-holes.test.ts holds that shut).
+    version: "0066_a_ticket_remembers_its_stages",
+    sql: `
+CREATE TABLE help_status_events (
+  id TEXT PRIMARY KEY,
+  help_id TEXT NOT NULL REFERENCES help (id),
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE INDEX idx_help_status_events_ticket ON help_status_events (help_id, created_at, id);
+`,
+  },
+  {
+    // THE CLIENT SAYS HOW WE DID.
+    //
+    // THE OWNER, 2026-09-06: "let's store sentiment (1-3) on the portal for how
+    // did we do it to see if client is happy", then "sentiment they can add a
+    // text (optional)".
+    //
+    // ── WHY IT IS A TABLE AND NOT TWO COLUMNS ON `help` ─────────────────────
+    //
+    // A score on the ticket row would be overwritten the second time somebody
+    // answered, and the second answer is a DIFFERENT FACT from the first: "we
+    // did badly, and then we fixed it" is the most useful thing this data can
+    // ever say, and a column cannot say it. The question is "how did we do",
+    // past tense, asked about a moment — so the row records WHO said it and WHEN
+    // beside the score, and a later change of mind is a new row rather than an
+    // edit of the old one. Nothing here is ever UPDATEd.
+    //
+    // MANY ROWS PER PERSON, ON PURPOSE, and the standing answer is the newest of
+    // them. A UNIQUE (help_id, rater_id) with an upsert behind it was the
+    // obvious alternative and it is exactly the shape the paragraph above rules
+    // out: it answers "what do they think now" perfectly and destroys "what did
+    // they think then" to do it. Readers take the latest row per rater, so the
+    // portal can still show one person one answer; the table keeps the rest.
+    //
+    // ── WHEN IT MAY BE GIVEN ────────────────────────────────────────────────
+    //
+    // ONLY ON A RESOLVED TICKET, and that is enforced at the door
+    // (`rateTicket`, workers/content/src/lib/help-ratings.ts) rather than left
+    // to the screen. "How did we do" is a question about work that is FINISHED.
+    // Asked on a ticket still in progress it measures how a person feels about
+    // waiting, which is a different quantity that would sit in the same column
+    // and could never be separated out afterwards. The schema does not carry
+    // that rule — a CHECK cannot see the `help` row — but the door does, and
+    // the ticket's own stage history (0066) is what makes the pair readable
+    // later: the rating's timestamp against the resolve it followed.
+    //
+    // A REOPEN does not delete anything. A ticket answered, rated 1, reopened
+    // and answered again keeps the 1 and gains a second row, which is the whole
+    // point of the shape.
+    //
+    // ── OPTIONAL MEANS OPTIONAL ─────────────────────────────────────────────
+    //
+    // `comment` is nullable and nothing anywhere may refuse or nag on its
+    // absence: a score with no words is a COMPLETE rating, said in full. The
+    // owner's second message added the text as an extra, not as a second half.
+    //
+    // `score` carries its CHECK in the schema rather than only in code, and this
+    // is the opposite call from `help.status` above — deliberately. A status is
+    // a vocabulary that has grown twice and will grow again; a three-point scale
+    // is the WHOLE instrument, and a 4 in this column would not be a new value,
+    // it would be a row nothing knows how to average. The door validates it too
+    // (a CHECK failure is a 500 and a person deserves a 400), so this is the
+    // floor under the door and not a substitute for it.
+    //
+    // THE INDEX is the one read: one ticket's ratings, newest first, so "what
+    // does this person currently say" and "everything anybody ever said" are the
+    // same seek. No index on the score — nothing groups by it yet, and 0065's
+    // sentence about an index on a handful of repeated words holds here too.
+    //
+    // `id` IS IN THE KEY FOR THE SEEK AND NOT FOR THE ORDER, the same caveat
+    // 0066 above carries: two answers inside one millisecond sort equal on
+    // `created_at`, and a ULID's low half is random, so the reader breaks that
+    // tie on `rowid` — which is safe because nothing ever deletes from here
+    // either, and "which of these is the standing answer" is the whole question.
+    version: "0067_the_client_says_how_we_did",
+    sql: `
+CREATE TABLE help_ratings (
+  id TEXT PRIMARY KEY,
+  help_id TEXT NOT NULL REFERENCES help (id),
+  score INTEGER NOT NULL CHECK (score IN (1, 2, 3)),
+  comment TEXT,
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT
+);
+CREATE INDEX idx_help_ratings_ticket ON help_ratings (help_id, created_at DESC, id DESC);
+`,
+  },
 ]

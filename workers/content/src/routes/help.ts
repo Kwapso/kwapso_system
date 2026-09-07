@@ -47,6 +47,14 @@ import {
   listAttachments,
   removeAttachment,
 } from "../lib/help-attachments"
+// THE STAGE HISTORY and THE CLIENT'S OWN VERDICT — two tables one along from
+// `help`, each with a single reader (team migrations 0066 and 0067). Both live
+// in their own files rather than in `lib/help.ts` for the reason
+// `help-attachments.ts` does: the fence they carry is a decision about a
+// DIFFERENT table, and a file-level claim about `help.ts` should never be asked
+// to cover it.
+import { readTicketStages } from "../lib/help-stages"
+import { rateTicket, readTicketRatings } from "../lib/help-ratings"
 import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
@@ -913,6 +921,100 @@ export async function getHelpStakeholders(request: Request, env: Env): Promise<R
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({ stakeholders: await listStakeholders(cfg, env, guard, scope, id) })
+}
+
+/** GET /api/content/help/stages?id=<ticketId> — the stages this ticket went
+ * through, how long it sat in each, and how many times it came back out of
+ * `resolved` (team migration 0066).
+ *
+ * ONE DOOR FOR ALL THREE, because they are one fact asked three ways: the
+ * sequence IS the durations and the reopens, computed off the same rows. A
+ * second door for "how many reopens" would be a second answer to a question this
+ * one has already answered.
+ *
+ * REFUSED TO A CLIENT LOGIN, and not merely absent from the portal's table. The
+ * rows name the staff who moved each ticket, which is the same disclosure the
+ * activity feed is kept off the portal for (SCOPE ch.06, PORTAL_ACTIVITY_EXEMPT)
+ * — a tidier shape does not make it a different fact. The agency gateway
+ * forwards /api/content/* by PREFIX and the Client role holds `help:read`, so
+ * the refusal has to be here (R21) rather than on the other door's allow-list.
+ *
+ * THE FENCE STILL RIDES IT, through `getTicket`, even though a client is already
+ * refused: a staff member's scope is no clause at all, so this costs nothing and
+ * means the door cannot become a leak the day somebody widens the refusal. A
+ * ticket that is not there answers 404, never 403. */
+export async function getHelpStages(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+  return json(await readTicketStages(cfg, guard, id))
+}
+
+/** GET /api/content/help/rating?id=<ticketId> — what was said about how we did
+ * (team migration 0067).
+ *
+ * OPEN TO BOTH SIDES, deliberately, and it is the one place on this module where
+ * that is the right answer. A client reads their own answer back so the portal
+ * can show it rather than asking twice; the agency reads the whole set, because
+ * being able to read what a client said is the entire reason the fact is stored.
+ * The NARROWING for a portal caller is in the statement, in
+ * `readTicketRatings` — not here, and not in the screen.
+ *
+ * R21: gated on `help:read`, which the seeded Client role holds, and it is a
+ * door the portal itself opens, so it is fenced rather than refused. The fence is
+ * `getTicket` inside the lib. */
+export async function getHelpRating(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await callerScope(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  return json(await readTicketRatings(cfg, guard, scope, id))
+}
+
+/** POST /api/content/help/rating — the client says how we did (CHECKLIST: the
+ * owner's ruling of 6 Sep 2026, "let's store sentiment (1-3) on the portal for
+ * how did we do it to see if client is happy").
+ *
+ * GATED ON `help:read`, NOT `help:edit`, and that is the same reading the
+ * `validate` door already makes: `help:edit` is a right the seeded Client role
+ * deliberately does not hold, so gating on it would close this door to the only
+ * people it exists for. A rating changes no lifecycle, moves no status and edits
+ * nothing — it appends a sentence about work that is already finished.
+ *
+ * NOT `refusePortalCaller`, then, and the safety is by construction rather than
+ * by a condition: the account fence decides whose ticket it is before a row is
+ * written (a miss is a 404, so "not yours" never confirms a ticket exists), the
+ * door refuses anything that is not `resolved`, and the account a client's row is
+ * judged against comes from the guard corridor — `callerScope` — and never from
+ * the body.
+ *
+ * THE COMMENT IS OPTIONAL AND NOTHING HERE NAGS. `optionalText` returns
+ * undefined for an absent field and that is a complete request. */
+export async function postHelpRating(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    score?: unknown
+    comment?: unknown
+  }>(request, env, "help", "read")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  // R20: the score sits inside `Number(...)`, the checking position for a
+  // numeric field, and `rateTicket` then holds it against the three values the
+  // scale HAS — so a "2" and a 2 are one answer and a 4 is a sentence rather
+  // than a constraint violation wearing a 500.
+  const score = Number(body.score)
+  const comment = optionalText(body.comment, "Comment", TEXT_LIMITS.long) ?? null
+  const scope = await callerScope(cfg, guard)
+  const rating = await rateTicket(cfg, guard, scope, actor, id, score, comment)
+  // R1: the ticket gained something a screen shows, so the row is pinged — aimed
+  // at the account it belongs to, so a client's colleagues hear it and nobody
+  // else's people do. The ticket is re-read through the fence for that address
+  // rather than trusted off the request.
+  const ticket = await getTicket(cfg, guard, scope, id)
+  await publishChange(env, guard.teamId, "help", id, "edit", ticket?.accountId ?? undefined)
+  return json({ rating })
 }
 
 /** POST /api/content/help/stakeholders — manually add a stakeholder (help:read;

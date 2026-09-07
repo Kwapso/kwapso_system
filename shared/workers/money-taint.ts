@@ -173,6 +173,12 @@ export const CLIENT_READABLE_WRITE_DOORS: readonly string[] = [
   "POST /api/content/help/attachments",
   "POST /api/content/help/attachments/remove",
   "POST /api/content/help/validate",
+  // HOW WE DID, from the person we did it for (team migration 0067). On the list
+  // because the mirror is the whole point and an editorial subtraction is the
+  // thing that stops being true later — though this one is the least likely door
+  // in the base to carry an agency figure out: it writes a number between one
+  // and three and, optionally, words a CLIENT typed.
+  "POST /api/content/help/rating",
   "POST /api/content/todos/complete",
   "POST /api/tenancy/processes/comments",
 ]

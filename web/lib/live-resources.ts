@@ -688,6 +688,17 @@ export function storyAttachmentsKey(storyId: string): string {
 export function helpAttachmentsKey(ticketId: string): string {
   return `help-attachments:${ticketId}`
 }
+/** THE STAGES ONE TICKET WENT THROUGH (team migration 0066).
+ *
+ * HERE RATHER THAN IN THE PANEL, learning the two bugs directly above rather
+ * than repeating them: every status writer publishes `help` with the TICKET's
+ * own id, and this key has to be nameable by `TEAM_RESOURCES.help` for that ping
+ * to reach the sequence. It is not a cosmetic dependency — the panel draws how
+ * long the ticket has been in its CURRENT stage, and that number stops being
+ * true at the exact instant somebody moves it. */
+export function helpStagesKey(ticketId: string): string {
+  return `help-stages:${ticketId}`
+}
 /** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
  * because a deliverable is never read anywhere but the app it belongs to —
  * spelled the way `sliceKey` spells every nested collection (`<kind>-of:<id>`),
@@ -1138,6 +1149,11 @@ export const TEAM_RESOURCES: Record<
       // ping. The story's twin is directly above; this is its ticket half.
       helpAttachmentsKey(id),
       `total:${helpAttachmentsKey(id)}`,
+      // …AND THE LADDER IT CLIMBED. Every status writer publishes `help` with
+      // the ticket's own id (0066 lists all eight of them), so this is where the
+      // Activity tab's stage strip learns that a rung was added — and, just as
+      // importantly, that the CURRENT stage's running duration has restarted.
+      helpStagesKey(id),
       `help-mine:${t}`,
       insightsKey(t),
       ...recordCountDeps("help"),

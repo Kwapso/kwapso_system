@@ -78,6 +78,14 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   connected: "created",
   linked: "created",
   proposed: "created",
+  // HOW WE DID, according to the client (team migration 0067). `created` rather
+  // than `status`, and the distinction is worth a line: a rating moves nothing
+  // and changes nothing — it APPENDS a row that did not exist, which is exactly
+  // what every other word in this block does. Nothing here is ever updated, so
+  // there is no second sentence about a rating being "changed": a person who
+  // changes their mind writes another one, and this word is right about that one
+  // too.
+  rated: "created",
   // The Google lane, where the app acts inside somebody else's system and the
   // row here is the ONLY record in this product that it happened. Naming a
   // folder, writing a file, filing a mail, posting in a space — each brings

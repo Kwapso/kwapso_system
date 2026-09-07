@@ -324,6 +324,29 @@ export const TICKET_DASHBOARD_GROUP_CAP = 100
  * read to the end of and a count can be trusted. */
 export const TICKET_ATTACHMENT_CAP = 50
 
+/** Recorded stage moves ONE ticket's history read may return (R14, team
+ * migration 0066).
+ *
+ * A ticket's ladder has seven rungs and every move up it is a person pressing
+ * something or a story closing, so a real ticket carries single figures and a
+ * badly behaved one carries dozens. Two hundred is therefore a REFUSAL CEILING
+ * rather than a page size: nothing legitimate approaches it, and the read is a
+ * summary of one record rather than a collection a screen pages through — which
+ * is why this is a cap and not `GROWING_COLLECTIONS` paging. The rows come back
+ * OLDEST FIRST because the sequence is the answer ("closed on x, reopen on y,
+ * closed again on z") and a sequence read from the wrong end is not one. */
+export const TICKET_STAGE_EVENT_CAP = 200
+
+/** Ratings ONE ticket's read may return (R14, team migration 0067).
+ *
+ * A rating is one sentence from one person about one finished request, and the
+ * people who can give one are the contacts on a single account. A ticket at this
+ * many is not a ticket anybody is still learning from, so — like the stage cap
+ * above — this exists to make the bound visible at the query rather than to page
+ * anything. Newest first: the standing answer is the newest row per person, and
+ * everything older is the record of how we did at the time. */
+export const TICKET_RATING_CAP = 50
+
 /** WHAT A STORY MAY SHOW FOR ITSELF. Smaller than a ticket's fifty on purpose:
  * a ticket accumulates evidence over a conversation that can run for weeks, and
  * a story's attachments are what one person put up to say "come and look". Past

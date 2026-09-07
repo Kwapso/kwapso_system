@@ -46,6 +46,7 @@ import type {
   StaffCertificate,
   StaffProfile,
   StoryAttachment,
+  TicketStageHistory,
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, listQuery, post } from "@shared/web/api"
@@ -514,6 +515,16 @@ export const content = {
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
+  /** THE STAGES ONE TICKET WENT THROUGH (team migration 0066) — the sequence,
+   * how long it sat in each rung in WORKING days, and how many times it came
+   * back out of `resolved`.
+   *
+   * R14: bounded by the door (`TICKET_STAGE_EVENT_CAP`), so this is the whole
+   * history and there is no page two to walk. A ticket that predates the table
+   * answers `recorded: false`, which the Activity tab must render as WORDS —
+   * never as zeroes, which would be a measurement nobody took. */
+  helpStages: (id: string) =>
+    api<TicketStageHistory>(`/api/content/help/stages?id=${enc(id)}`),
 
   /* --------------------------- the work engine ----------------------------- */
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to

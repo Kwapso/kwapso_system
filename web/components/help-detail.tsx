@@ -80,6 +80,7 @@ import { RecordTimerButton } from "@/components/timer-bar"
 import { ReplyComposer, useReplySend } from "@/components/reply-composer"
 import { OverviewList } from "@/components/overview-list"
 import { ActivityPanel } from "@/components/activity-panel"
+import { TicketStages } from "@/components/ticket-stages"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -874,11 +875,22 @@ export function HelpDetailScreen({
             return <OverviewList items={overviewItems} />
           if (panel.value === "activity")
             return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("help", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
+              /* THE SEQUENCE, THEN THE STORY. The client asked to read a
+                 ticket's stage history "in activity" — "closed on x, reopen on
+                 y, closed again on z" (2026-09-06) — and the feed below already
+                 writes a sentence for every status move. So the strip is not a
+                 second telling of those sentences: it is the three things a
+                 feed structurally cannot say (which rungs, in what order, for
+                 how long each), above the feed that says everything else.
+                 web/components/ticket-stages.tsx carries the argument. */
+              <div className="flex flex-col gap-4">
+                <TicketStages ticketId={helpId} />
+                <ActivityPanel
+                  activity={activity}
+                  onAddNote={can("help", "create") ? activity.addNote : undefined}
+                  notePlaceholder={t("Add a note")}
+                />
+              </div>
             )
           // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
           // answer many tickets and one ticket may need many stories, so this is

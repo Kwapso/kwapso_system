@@ -24,6 +24,9 @@
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
 //   GET  /api/content/help/dashboard      -> the Dashboard tab's grouped reads, ?accountId/?helpType/?appId/?q (agency only)
+//   GET  /api/content/help/stages         -> one ticket's stage history + time in each (?id=<ticketId>, agency only)
+//   GET  /api/content/help/rating         -> how we did on one ticket (?id=<ticketId>)
+//   POST /api/content/help/rating         -> the client says how we did (1-3 + optional words)
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
 //   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)
@@ -112,6 +115,9 @@ import {
   postRemoveHelpAttachment,
   postHelpTriageRead,
   postValidateHelp,
+  getHelpStages,
+  getHelpRating,
+  postHelpRating,
 } from "./routes/help"
 import {
   getSprints,
@@ -388,6 +394,15 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/help/attachments/remove": { handler: postRemoveHelpAttachment, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
+  // THE STAGES A TICKET WENT THROUGH, how long it sat in each, and how many
+  // times it was reopened — one read over one table (team migration 0066).
+  // Agency only: the rows name who moved what (SCOPE ch.06).
+  "GET /api/content/help/stages": { handler: getHelpStages, kind: "read" },
+  // HOW WE DID, according to the client (team migration 0067). The POST is the
+  // portal's own control; the GET answers a client with their own answer and the
+  // agency with the whole set.
+  "GET /api/content/help/rating": { handler: getHelpRating, kind: "read" },
+  "POST /api/content/help/rating": { handler: postHelpRating, kind: "mutation" },
   // THE WORK ENGINE — what we DO about a request, and the block of work it was
   // sold inside. Every one of these doors refuses a client login at the door
   // (R21): a story names the staff member doing the work, which the portal never

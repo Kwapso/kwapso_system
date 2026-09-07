@@ -144,6 +144,24 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   // awaiting_validation → new. It cannot reopen, resolve, or touch a request
   // somebody here has already started.
   "POST /api/content/help/validate": "CONTENT",
+  // HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
+  // portal for how did we do it to see if client is happy"). The portal is where
+  // it is GIVEN, which is why these two are the only doors on the whole feature.
+  //
+  // It is not a lifecycle door and it is not the exception the paragraph above
+  // is: a rating changes no status, edits nothing and appends a sentence about
+  // work that is already finished. Narrow by construction — the account fence
+  // decides whose ticket it is before a row is written, the door refuses
+  // anything that is not `resolved`, and the account the row is judged against
+  // comes from the guard corridor rather than the body.
+  //
+  // The GET answers a CLIENT with their own answer and nobody else's — the
+  // narrowing is in the statement (`readTicketRatings`), not in the screen —
+  // because a colleague's private "1 out of 3" is a personal statement rather
+  // than a fact about the ticket. `GET /api/content/help/stages` is deliberately
+  // NOT here for the sibling reason: its rows name the staff who moved the work.
+  "GET /api/content/help/rating": "CONTENT",
+  "POST /api/content/help/rating": "CONTENT",
 
   // ── what we are waiting on them for ────────────────────────────────────────
   // The only rows in the work engine a client writes to. They read their own

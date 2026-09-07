@@ -3654,4 +3654,33 @@ export const SEED: Catalogue = {
     es: "Dígito {position} de {total}",
     ca: "Dígit {position} de {total}",
   },
+  /* ── The stages a ticket went through, and how the client says we did ────
+   * Team migrations 0066 and 0067, 2026-09-07. Written by hand at the same
+   * commit as the English, so the ceiling (R44) never rises: a string shipped
+   * with no answer is an English sentence on a screen that looks finished.
+   *
+   * TWO REGISTERS, unchanged from the rest of this file: German keeps `Sie`,
+   * Spanish and Catalan keep the second person singular. The three points of
+   * the scale are ordinary words a person would say out loud about a job — not
+   * "unzufrieden / neutral / zufrieden", which is a survey talking, and this is
+   * one question at the bottom of a request somebody raised. */
+  "Stages": { de: "Phasen", es: "Etapas", ca: "Etapes"},
+  "Still here": { de: "Noch hier", es: "Sigue aquí", ca: "Encara aquí"},
+  "Reopened": { de: "Wieder geöffnet", es: "Reabierto", ca: "Reobert"},
+  "New": { de: "Neu", es: "Nuevo", ca: "Nou"},
+  "Waiting on you": { de: "Wartet auf Sie", es: "Esperando tu respuesta", ca: "Esperant la teva resposta"},
+  /* The compact day count on a stage row. A letter rather than the word, so a
+   * six-rung strip stays one line per rung on a phone — the same shape
+   * `formatRelative`'s own "{count}d ago" already uses, and translated the same
+   * way (T for Tage, d for días / dies). */
+  "{count}d": { de: "{count} T", es: "{count} d", ca: "{count} d"},
+  "Earlier stages have no record.": { de: "Für frühere Phasen gibt es keine Aufzeichnung.", es: "No hay registro de las etapas anteriores.", ca: "No hi ha registre de les etapes anteriors."},
+  "This ticket has no record of the stages it went through.": { de: "Für dieses Ticket gibt es keine Aufzeichnung der durchlaufenen Phasen.", es: "Este ticket no tiene registro de las etapas por las que pasó.", ca: "Aquest ticket no té registre de les etapes per les quals ha passat."},
+  "How did we do?": { de: "Wie haben wir das gemacht?", es: "¿Qué tal lo hemos hecho?", ca: "Com ho hem fet?"},
+  "Not great": { de: "Nicht gut", es: "No muy bien", ca: "No gaire bé"},
+  "Fine": { de: "Geht so", es: "Bien", ca: "Bé"},
+  "Great": { de: "Sehr gut", es: "Muy bien", ca: "Molt bé"},
+  "Anything you'd like to add? (optional)": { de: "Möchten Sie noch etwas ergänzen? (optional)", es: "¿Quieres añadir algo? (opcional)", ca: "Vols afegir-hi alguna cosa? (opcional)"},
+  "Send": { de: "Senden", es: "Enviar", ca: "Enviar"},
+  "Thanks for telling us.": { de: "Danke für Ihre Rückmeldung.", es: "Gracias por decírnoslo.", ca: "Gràcies per dir-nos-ho."},
 }

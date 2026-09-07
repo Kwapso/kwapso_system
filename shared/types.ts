@@ -585,6 +585,80 @@ export type HelpTicket = {
   validatedAt: string | null
 }
 
+/** ONE MOVE ALONG THE LADDER — a row of `help_status_events` (team migration
+ * 0066), as a screen reads it.
+ *
+ * `fromStatus` is null when nothing before this was recorded: on the row
+ * `createTicket` stamps there genuinely was nothing (the ticket did not exist),
+ * and 0066 names the one race that shares the value. It is stored rather than
+ * inferred from the previous event because the FIRST event has no previous
+ * event, and whether the sequence is whole is exactly what it answers. */
+export type TicketStageEvent = {
+  id: string
+  fromStatus: HelpStatus | null
+  toStatus: HelpStatus
+  at: string
+  /** Who moved it. Null on a row whose actor was not recorded. */
+  byName: string | null
+}
+
+/** HOW LONG THE TICKET SAT IN ONE STAGE — the gap between two consecutive
+ * events, in WORKING days (`shared/business-days.ts`: the owner's Mon–Fri rule,
+ * "saturday and sunday do not count towards how long it took").
+ *
+ * `to` is null on the stage the ticket is in NOW, and `workingDays` is then
+ * measured to the moment the door answered — which is why it is computed on the
+ * server beside the rows rather than in a browser that may have the tab open all
+ * week. */
+export type TicketStageSpan = {
+  status: HelpStatus
+  from: string
+  to: string | null
+  workingDays: number
+}
+
+/** A TICKET'S STAGE HISTORY, and its honest empty shape.
+ *
+ * `recorded: false` is what every ticket that existed before 0066 reports, for
+ * ever. It is NOT "zero days in every stage" and no reader may render it as a
+ * number: nothing was measured, and 0066 carries the argument for why the past
+ * was not invented out of the activity feed's prose.
+ *
+ * `fromCreation` is the second, subtler honesty: a ticket raised before 0066 and
+ * moved after it has a REAL sequence that simply does not start at the
+ * beginning, so the first span's own start is unknown and the screen says so
+ * rather than drawing a stage that begins where the recording does. */
+export type TicketStageHistory = {
+  recorded: boolean
+  /** The first recorded event is the ticket's creation, so the sequence is whole. */
+  fromCreation: boolean
+  events: TicketStageEvent[]
+  spans: TicketStageSpan[]
+  /** Transitions back OUT of `resolved`. Null when nothing is recorded — the
+   * difference between "it was never reopened" and "we have no record" is the
+   * whole reason this is nullable rather than 0. */
+  reopens: number | null
+}
+
+/** HOW WE DID, ACCORDING TO THE PERSON WE DID IT FOR (team migration 0067).
+ *
+ * A score out of three and, if they felt like it, some words. The comment is
+ * OPTIONAL in the real sense: a score on its own is a complete rating and
+ * nothing may refuse or nag on the absence of text.
+ *
+ * `by*` is who said it, and it is on the row rather than implied because a
+ * rating is a personal statement — the agency has to be able to tell a client's
+ * own answer from one a staff member relayed off a phone call. */
+export type TicketRating = {
+  id: string
+  ticketId: string
+  score: 1 | 2 | 3
+  comment: string | null
+  createdAt: string
+  byId: string | null
+  byName: string | null
+}
+
 /** A FILE OR A LINK ON A TICKET (CHECKLIST 5.10) — several of each, from either
  * front door. One row shape for both, because "here is the thing I mean" is one
  * act: a `file` carries the R2 key we stored it under, a `link` carries only a

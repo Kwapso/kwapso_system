@@ -47,6 +47,14 @@ import { workingDaysAgo, workingDaysSql } from "@shared/business-days"
 // 3 here. It is not a new promise: the dashboard is reporting on the queue's own
 // threshold, so the day somebody moves it, both move together.
 import { TRIAGE_AFTER_DAYS } from "./triage"
+// EVERY STATUS MOVE IN THIS FILE GOES THROUGH ONE SEAM (team migration 0066).
+// `createTicket` embeds the statement in its own script — one transaction, so a
+// ticket cannot exist for an instant with no first stage — while `setStatus`,
+// `validateTicket`, `markTriaged` and the set-shaped bulk write theirs after the
+// UPDATE that made the move. lib/help-stages.ts carries the argument for that
+// order, and for why this one seam does not swallow its own failures the way
+// `logActivity` does.
+import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import {
@@ -1796,7 +1804,18 @@ export async function createTicket(
     // together — shared/selectable-homes.ts says why that is not an update of
     // this fact.
     `INSERT INTO help (id, help_type, raised_as_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, module_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});
+` +
+      // WHERE THE SEQUENCE STARTS (team migration 0066). The first stage event
+      // rides INSIDE this script rather than following it, which is a property
+      // no other status writer in the codebase can have: `d1ExecScript` runs the
+      // statements as one batch, so there is no instant in which a ticket exists
+      // with no recorded first stage — and the ONE reader of that sequence can
+      // therefore treat a `from_status` of null as "this ticket was born here"
+      // rather than as "something went missing". Same `status` value, same
+      // statement, same argument `raised_as_type` makes two lines above: two
+      // facts that must agree at birth are written in one place.
+      statusEventStatement(actor, id, null, status, now)
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -2019,6 +2038,24 @@ export async function setStatus(
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
 
+  // THE MOVE, AS A ROW (team migration 0066) — and this is the writer that makes
+  // the reopen legible. The `resolveBlock` above NULLs `resolved_at` and the
+  // whole resolver block on any move to a non-resolved status, so before this
+  // existed a reopen ERASED who answered the ticket and when, with nothing
+  // anywhere that could say it had ever been answered at all. The owner blessed
+  // the nulling and named where the fact belongs instead: "Reopening a ticket
+  // nulls its closing timestamp, yeah — but keep it in activity, like closed on
+  // x, reopen on y, closed again on z". The row below IS that record: the
+  // resolve is one event carrying its resolver and its instant, the reopen is
+  // the next, and neither can rub the other out.
+  //
+  // AFTER the R17 early return, so a zero-row move writes no event — a re-run
+  // must not put a stage of zero seconds into the sequence. And BEFORE the
+  // activity sentence deliberately: this is the record the numbers are computed
+  // from, `logActivity` is prose that is allowed to fail, and the one that must
+  // not fail goes first.
+  await recordStatusEvent(cfg, guard, actor, id, before.status, status, now)
+
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Ticket ${status === "resolved" ? "resolved" : status === "ready" ? "ready" : "updated"}`,
     description: `${actor.name} set ${before.ref ?? "a ticket"} to ${status.replace("_", " ")}`,
@@ -2079,6 +2116,13 @@ export async function validateTicket(
     [now, now, id, ...fence.params]
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
+  // The one lifecycle move a CLIENT makes is a stage move like any other, and it
+  // is recorded like any other (0066). The `from` is written as the literal the
+  // UPDATE's own predicate names rather than as `before.status`, because here
+  // they are the same word by construction — the statement can only have moved a
+  // row that was `awaiting_validation` — and saying it that way keeps the event
+  // honest even if the read above is ever widened.
+  await recordStatusEvent(cfg, guard, actor, id, "awaiting_validation", "new", now)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket validated",
     description: `${actor.name} confirmed ${before.ref ?? "a ticket"} should go ahead`,
@@ -2145,6 +2189,11 @@ export async function markTriaged(
     [now, now, actor.id, actor.email, actor.name, id]
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
+  // Somebody reading a request is the second rung of the ladder and it is
+  // recorded like every other (0066). `new` is written rather than
+  // `before.status` for the same reason validation writes its own: the UPDATE's
+  // predicate is `status IN ('new')`, so a row that moved was `new`, full stop.
+  await recordStatusEvent(cfg, guard, actor, id, "new", "triaged", now)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket triaged",
     description: `${actor.name} read ${before.ref ?? "a ticket"}`,
@@ -2378,6 +2427,35 @@ export async function bulkSetStatusByFilter(
     )
 
   const now = new Date().toISOString()
+  // WHAT EACH OF THEM IS ABOUT TO MOVE OUT OF (team migration 0066).
+  //
+  // THE ONE PLACE A STAGE EVENT NEEDS A SECOND READ, and it is worth saying why
+  // there is no cheaper way. This is the only status writer in the module that
+  // moves MANY rows in ONE statement, and SQLite's `RETURNING` hands back the
+  // row as it is AFTER the update — so the statement that performs the move
+  // cannot also report what each row was before it. The alternative was to drop
+  // `from_status` for a bulk, which would make the FIRST recorded event on a
+  // bulk-moved ticket indistinguishable from a creation row, and a creation row
+  // is what tells the reader the sequence is whole.
+  //
+  // BOUNDED AND POSITIONED, not merely added: it runs AFTER the ceiling refusal
+  // above, so it can never read more than `BULK_IDS_LIMIT` rows, and it reads
+  // exactly the WHERE the UPDATE below is about to carry. R14: the cap rides the
+  // statement anyway, because a bound that is only true because of a check
+  // fifteen lines up is a bound the next reader has to go and find.
+  //
+  // A row the UPDATE moves that this read did not see means a concurrent write
+  // pushed a ticket INTO the filter between the two statements. 0066 names that
+  // race: such a row is recorded with a null `from_status`, which reads as "no
+  // recorded stage before this one" — true, and the same sentence the creation
+  // row means.
+  const beforeRows = await d1Query<{ id: string; status: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, status FROM help WHERE status <> ?${extraSql} LIMIT ${BULK_IDS_LIMIT}`,
+    [toStatus, ...extraParams]
+  )
+  const wasAt = new Map(beforeRows.map((r) => [r.id, r.status]))
   const resolved = toStatus === "resolved"
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
@@ -2394,6 +2472,23 @@ export async function bulkSetStatusByFilter(
     [toStatus, now, now, toStatus, ...extraParams]
   )
   const changed = changedRows.length
+  // ONE EVENT PER TICKET, even though there is one activity row for the whole
+  // set — and the asymmetry is the point rather than an inconsistency. The
+  // activity feed is a story a person reads, and "Aurora set 40 tickets to
+  // ready" is the sentence that happened. The stage history is a MEASUREMENT,
+  // per ticket: fold a bulk into one row there and forty tickets each lose a
+  // rung, their durations either side of it silently merge, and nothing on any
+  // chart says a thing went missing. This is also the writer whose omission the
+  // activity feed could never have been backfilled from, for exactly this reason
+  // (0066's third refusal).
+  if (changed > 0)
+    await recordStatusEvents(
+      cfg,
+      guard,
+      actor,
+      changedRows.map((r) => ({ ticketId: r.id, from: wasAt.get(r.id) ?? null, to: toStatus })),
+      now
+    )
   if (changed > 0)
     // ONE activity row for the set — history says what happened, not per-row noise.
     await logActivity(cfg, guard.databaseId, actor, {

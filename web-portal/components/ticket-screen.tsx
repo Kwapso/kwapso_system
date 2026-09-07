@@ -97,6 +97,7 @@ import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import { TicketAttachments } from "@/components/ticket-attachments"
+import { TicketRating } from "@/components/ticket-rating"
 import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage } from "@shared/web/language"
@@ -352,6 +353,15 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           errorDescription: t("Try again in a moment."),
         }}
       />
+
+      {/* HOW DID WE DO (the owner, 6 Sep 2026). UNDER the conversation and above
+          the composer, which is the one arrangement decision here: the question
+          is about work that is finished, so it belongs after the person has read
+          what we said — the same "read it back first" ordering the approval band
+          above is placed by. It draws nothing at all until the ticket is
+          answered, and the door refuses a rating on anything else besides, so
+          this prop is the screen agreeing with the rule rather than owning it. */}
+      <TicketRating ticketId={ticketId} resolved={ticket.status === "resolved"} />
 
       {/* No @mentions from this surface: a client has no business naming which
        * staff member picks their request up — so no mention hint in the

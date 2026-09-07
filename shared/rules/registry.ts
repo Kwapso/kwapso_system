@@ -1635,6 +1635,10 @@ export const PORTAL_VISIBLE_READS: Record<string, { fence: string | null; why: s
     fence: "attachmentFence",
     why: "the files and links on a ticket (CHECKLIST 5.10), and the fence is the TICKET's fence one table along — `attachmentFence` wraps `ticketFence` as a subquery so it rides the same WHERE as the rows AND the count, exactly as `threadFence` does for a reply. It has to be here rather than merely be safe by accident: an attachment is the one thing on a ticket a CLIENT uploads, so it is the one place where the rows a caller may read and the rows a caller may write are being decided about the same table from two directions.",
   },
+  "workers/content/src/lib/help-ratings.ts": {
+    fence: "getTicket",
+    why: "how we did on one ticket, according to the person we did it for (team migration 0067). The fence is the TICKET's, resolved through the fenced `getTicket` before anything is read or written — a rating is a PROPERTY of a ticket, so whether the ticket is theirs to ask about is the only question, and it is already answered by one fenced read (the same shape `stakeholders.ts` stands on). A ticket outside the fence answers 404 rather than 403, so 'not yours' never confirms one exists. One NARROWING rides on top of it for a portal caller and it is in the STATEMENT rather than applied to the rows afterwards: a client is answered with their own rows and nobody else's, because a colleague's private '1 out of 3' is a personal statement and not a fact about the ticket the way a reply is. Staff read the whole set — being able to read what a client said is the entire reason the fact is stored.",
+  },
   "workers/content/src/lib/notify.ts": {
     fence: null,
     why: "it sends email and returns no rows to the caller: the only ids it resolves are the ticket's own raiser (read through the fence) and the mentions the route already refused from a client login, and the lookup joins team_members so an address outside the team can never be reached.",
@@ -1721,6 +1725,11 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
   "POST /api/content/help/validate": {
     fence: "callerScope",
     why: "THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2), and the deliberate exception to this module's every-other-status-move-refuses-a-portal-caller rule. It is narrow by CONSTRUCTION rather than by a condition somebody could invert: the account fence rides the UPDATE, so it can only reach a ticket their own company raised, and R17's predicate is `status = 'awaiting_validation'`, so the only transition in it is into `new`. It cannot reopen, cannot resolve, and moves zero rows against a request somebody here has already started.",
+  },
+
+  "POST /api/content/help/rating": {
+    fence: "callerScope",
+    why: "the client says how we did (the owner, 6 Sep 2026: 'let's store sentiment (1-3) on the portal for how did we do it to see if client is happy'). The account the row is judged against comes from the guard corridor through `callerScope` and never from the body, and the ticket named by a caller-supplied id is resolved through the fenced `getTicket` before a row is written — a miss is a 404, so 'not yours' never confirms the ticket exists. TWO more rules ride the same door and neither is on the screen: it refuses anything that is not `resolved`, because 'how did we do' is a question in the past tense about work that is finished and asking it mid-flight measures impatience into the same column; and it INSERTs, never UPDATEs, so a later change of mind is a new row and the record of how we did at the time survives it. Gated on `help:read` rather than `help:edit` for the same reason the validate door is: `help:edit` is a right the seeded Client role does not hold, and a rating moves no status and edits nothing.",
   },
 
   // ── the client's own world ─────────────────────────────────────────────────

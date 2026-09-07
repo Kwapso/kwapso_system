@@ -112,15 +112,15 @@ const REF_AS_STRING_OK: Record<string, string> = {
   "web/components/stories-screen.tsx:137":
     "the ticket picker on the story form, building the same `PickerOption.label` " +
     "the two lines in picker-sources.ts build.",
-  "web/components/help-detail.tsx:906":
+  "web/components/help-detail.tsx:918":
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
     "a row of its own.",
-  "web/components/help-detail.tsx:1023":
+  "web/components/help-detail.tsx:1035":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
     "string slot as picker-sources.ts, for the ticket the form is pinned to.",
   "web/components/story-detail.tsx:420":
-    "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:906.",
+    "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:918.",
   "web/components/sprints-screen.tsx:522":
     "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
     "the chip would be wrong even if the slot allowed it: a day cell is a few " +

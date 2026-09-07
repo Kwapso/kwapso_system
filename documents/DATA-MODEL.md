@@ -26,7 +26,7 @@ resumable ledger, and the size + rate watch) ·
 | Subsystem | Tables |
 |---|---|
 | Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
-| Content | `help` + `help_threads` (**Tickets**) · `help_stakeholders` · `ref_counters` |
+| Content | `help` + `help_threads` (**Tickets**) · `help_status_events` · `help_ratings` · `help_stakeholders` · `ref_counters` |
 | History + invites | `activity` · `invite_logs` |
 | Import | `data_import_sessions` · `data_import_batches` |
 | The assistant | `agent_threads` + `agent_messages` |
@@ -619,6 +619,66 @@ describes; there is no second ticket beside it, and there never will be.
 - **`title_de` / `title_en`**, both titles, and neither derived from the other.
   788 of the tickets arriving from Glide exist only in German, so a translation
   SETS the empty one and never overwrites the original.
+
+### help_status_events. BUILT (per-team, team migration `0066_a_ticket_remembers_its_stages`). THE LADDER A TICKET CLIMBED
+
+One row per status transition: `help_id`, `from_status`, `to_status`, the instant
+and the creator block. The owner, 2026-09-06, asked for two things — "how long it
+sat on each stage" and "how often sth is reopened" — and they are ONE table
+rather than two, because they are one fact asked twice: **time in a stage is the
+gap between consecutive rows, and a reopen is a transition back out of
+`resolved`.** A `reopen_count` column would be a second source of truth for a
+fact this table already holds.
+
+- **Every status writer records, and that is a checked census.** Eight of them:
+  `createTicket` (the first rung, inside the same script as the ticket's own
+  INSERT, so there is no instant in which a ticket has no first stage),
+  `setStatus` (which the status door, the resolve door and `bulkSetStatus` all go
+  through), `validateTicket`, `markTriaged`, `bulkSetStatusByFilter`, and the
+  three flips in `lib/ready-flip`. The statement is written once, in
+  `lib/help-stages.ts`, and `workers/content/test/status-history-has-no-holes.test.ts`
+  reads every worker source off disk and fails if a status UPDATE ever appears
+  somewhere that does not reach it. A history with holes is worse than none: the
+  gap is invisible and the stages either side of it merge into one long one.
+- **It is what survives a reopen.** `setStatus` NULLs `resolved_at` and the whole
+  resolver block on any move to a non-resolved status — deliberately, since those
+  columns mean "the answer that stands NOW" — so before this table a reopen
+  erased who answered the ticket and when. The owner blessed the nulling and named
+  the remedy: *"Reopening a ticket nulls its closing timestamp, yeah — but keep it
+  in activity, like closed on x, reopen on y, closed again on z."*
+- **A ticket with no rows reports NOTHING, never zero.** Every ticket that existed
+  before this migration has an empty history and cannot be given one; the reader
+  answers `recorded: false` and the Activity tab prints it in words. A ticket
+  raised before and moved after has a real sequence that does not start at the
+  beginning (`fromCreation: false`), and says so. **Nothing is backfilled** —
+  0066 lists the four reasons the activity feed cannot supply the past.
+- **Append-only, and the order is `created_at` then `rowid`.** A ULID's low half is
+  random, so `id` cannot break a same-millisecond tie; nothing ever deletes from
+  here, so no rowid is recycled. Durations go through `shared/business-days.ts`
+  (Mon–Fri only).
+
+### help_ratings. BUILT (per-team, team migration `0067_the_client_says_how_we_did`). HOW WE DID
+
+The client's own verdict on a finished request: `help_id`, `score` (1–3, with the
+CHECK in the schema), an OPTIONAL `comment`, and the creator block — who said it
+and when. The owner, 2026-09-06: *"let's store sentiment (1-3) on the portal for
+how did we do it to see if client is happy"*, then *"sentiment they can add a text
+(optional)"*.
+
+- **A table and not two columns on `help`**, because "we did badly, and then we
+  fixed it" is the most useful thing this data can say and a column cannot say it.
+  Nothing here is ever UPDATEd; a change of mind is a NEW row and readers take the
+  newest per person as the standing answer.
+- **Only on a `resolved` ticket**, enforced at the door (`lib/help-ratings.ts`).
+  "How did we do" is past tense; asked mid-flight it measures impatience into the
+  same column. A reopen does not take an answer back.
+- **The portal is where it is given** (`POST /api/content/help/rating`), the
+  account comes from the guard corridor, and the fence is the ticket's own
+  (`getTicket`). The READ narrows a client to their own rows — a colleague's
+  private "1 out of 3" is a personal statement, not a fact about the ticket the
+  way a reply is — and answers the agency with the whole set. There is no
+  agency-side dashboard yet, deliberately; a rating writes an activity row, so
+  what a client said is readable on the ticket's own history today.
 
 ### help_stakeholders. KEEP (BUILT, per-team, team migration `0005_help_stakeholders`). WHO ELSE IS WATCHING A TICKET
 
