@@ -570,6 +570,19 @@ cf-exec node scripts/r2-lifecycle.mjs production           # apply
 cf-exec node scripts/r2-lifecycle.mjs production --infrequent
 ```
 
+**WHERE IT HAS ACTUALLY BEEN RUN.** Applied to the five STAGING buckets on
+2026-09-07 — before that day the script had never been run against anything, and
+every bucket carried only Cloudflare's own `Default Multipart Abort Rule`.
+**Production is still unset and is the owner's to set**, and it has one blocker:
+`bucketsFor("production")` names `kwapso-glide-archive`, which does not exist on
+the account (only the `-staging` one was ever created) and sorts first, so a
+production run fails on its first bucket and sets nothing. Create the bucket or
+drop it from the derivation first. Check either environment with:
+
+```bash
+cf-exec npx wrangler r2 bucket lifecycle list kwapso-media-staging
+```
+
 Idempotent (`lifecycle set` replaces the rule set), reads and writes no object,
 and covers every bucket the wrangler configs declare plus the unbound Glide
 archive — derived, and `workers/gateway/test/r2-lifecycle.test.ts` re-derives both
