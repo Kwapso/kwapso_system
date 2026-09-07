@@ -18,6 +18,7 @@
 import type { Fetcher } from "@cloudflare/workers-types"
 
 import { logError, type CoreDb } from "./error-log"
+import { traceHeaders } from "./trace"
 
 /** THE PEAK ONE TENANT IS BUILT FOR — the review yardstick, in code.
  *
@@ -197,6 +198,22 @@ export type RealtimeEnv = {
    * without it (a cron, a test, a lib called directly) awaits the ping exactly
    * as before. */
   DEFER?: (work: Promise<unknown>) => void
+  /** THIS REQUEST'S NAME — the id the public door minted, so a ping that did not
+   * go out is a row that JOINS the click that triggered it (`error_logs.request_id`,
+   * db/core/0020; shared/workers/trace.ts).
+   *
+   * On the env for exactly the reason `DB` and `DEFER` are, one screen up: there
+   * are 186 `publishChange` call sites, this function takes no `Request`, and a
+   * new parameter would be 186 chances to forget it. The dispatchers already
+   * build a per-request shallow copy of `env`; this rides it, and not one call
+   * site changed. On an unattended tick it carries the TICK's id instead
+   * (`tickId`), which is the same joinability and says plainly that nobody
+   * clicked.
+   *
+   * `?` because a cron that never set it, a lib called directly and every suite
+   * that hands a bare `env` must behave exactly as they did — the row still
+   * lands, simply with no thread back to a request there wasn't one of. */
+  TRACE?: string
 }
 
 /** One change ping. `op` is advisory; the client re-pulls the row and decides
@@ -261,6 +278,13 @@ async function publish(env: RealtimeEnv, channel: string, event: ChangeEvent): P
       // and the gateway never routing it) was its only protection before —
       // one config regression away from an open broadcast door.
       "x-internal-key": env.INTERNAL_KEY ?? "",
+      // AND THE REQUEST'S NAME TRAVELS WITH IT. Realtime's own catch re-reads
+      // this header rather than minting a second id, so a switchboard crash on
+      // this ping lands in `error_logs` under the same name as the mutation that
+      // caused it. Spread conditionally: an absent id must send no header at all
+      // rather than an empty one, or `requestId` on the other side keeps a blank
+      // string and the row is named after nothing.
+      ...(env.TRACE ? traceHeaders(env.TRACE) : {}),
     },
     body: JSON.stringify({ channel, event }),
     signal: AbortSignal.timeout(2_000),
@@ -314,6 +338,10 @@ async function note(env: RealtimeEnv, channel: string, event: ChangeEvent, why: 
       // The CHANNEL carries the team, so "whose screens went stale" is answerable
       // from the row rather than from the message text.
       teamId: channel.startsWith("team:") ? channel.slice("team:".length) : undefined,
+      // WHICH CLICK. The team says whose screens went stale; this says which
+      // action's ping it was, so the live-layer failure and the mutation's own
+      // rows come back from one query instead of a timestamp guess.
+      requestId: env.TRACE,
     })
 }
 

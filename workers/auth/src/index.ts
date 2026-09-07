@@ -135,11 +135,13 @@ export default {
       // sibling workers do — auth publishes on the USER channel (a profile edit,
       // an email change, a forced sign-out), and those pings held the response
       // for the same reason every other one did.
+      // …and this request's NAME, so a user-channel ping that did not go out
+      // leaves a row that joins the click that caused it (trace.ts).
       // …and the CORE database counted, so the slow-door line below can see the
       // trips this worker actually makes. `beginD1Timing` only ever saw the D1
       // REST door, so a native `env.DB` statement was invisible and a worker that
       // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {

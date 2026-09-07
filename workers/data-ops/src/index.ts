@@ -135,12 +135,16 @@ export default {
       // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
-      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
+      // is new. `publishChange` reads the deferrer off `env.DEFER`.
+      // …AND THIS REQUEST'S NAME rides the same copy (`TRACE`), for the same
+      // reason and by the same route: `publishChange` and `sendBrandedEmail`
+      // take no `Request`, so the id the door minted reaches their failure rows
+      // through `env` rather than through 190 call sites (trace.ts).
       // …and the CORE database counted, so the slow-door line below can see the
       // trips this worker actually makes. `beginD1Timing` only ever saw the D1
       // REST door, so a native `env.DB` statement was invisible and a worker that
       // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)

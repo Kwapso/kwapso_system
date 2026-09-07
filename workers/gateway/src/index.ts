@@ -14,10 +14,11 @@ import {
   refuseForeignOrigin,
   serveMedia,
   isRead,
+  REPORT_HOP_MS,
 } from "@shared/workers/front-door"
 import { isMaintenancePath, maintenanceCaller } from "@shared/workers/gating"
 import { fail } from "@shared/workers/http"
-import { requestId, stampTrace } from "@shared/workers/trace"
+import { requestId, stampTrace, traceHeaders } from "@shared/workers/trace"
 import { stampOrigin } from "@shared/workers/origin"
 
 /** The top-level module pages that are CLIENT-RESOLVED SHELLS: /stories is a real
@@ -308,7 +309,11 @@ async function guardMaintenance(
   }
   if (allowed) return null
 
-  const note = recordMaintenanceRefusal(env, caller, request.method, pathname)
+  // THE REQUEST'S OWN NAME, read back off the header this worker stamped at the
+  // top of `fetch` — never minted a second time (trace.ts: "the header IS the
+  // memo"). Without it the one record of a throttled maintenance call landed
+  // under a fresh ULID, on the one door in the product with no session behind it.
+  const note = recordMaintenanceRefusal(env, caller, request.method, pathname, requestId(request))
   if (ctx) ctx.waitUntil(note)
   else await note
   return fail(
@@ -324,20 +329,40 @@ async function guardMaintenance(
  * cannot report is still a door that must answer. The IP is the whole point of
  * the row — "somebody at 203.0.113.9 hit the maintenance doors 400 times" is the
  * sentence nobody could have written before — and it is the only caller
- * identifier there is, because these doors carry no session. */
+ * identifier there is, because these doors carry no session.
+ *
+ * AND IT IS A HOP LIKE EVERY OTHER HOP, which it was not when it shipped. Two
+ * things were missing and both are the same sentence one layer apart:
+ *
+ *   • A NAME. The gateway MINTS the request id, so a report written here under a
+ *     fresh ULID is the one row nothing can join to the click that caused it.
+ *     `traceId` rides the body (auth's `/internal/log-error` reads it there, off
+ *     the door and never off a browser) AND the wire, so auth's own crash on the
+ *     way to writing the row joins as well.
+ *   • A CEILING. This rides `ctx.waitUntil`, so it cannot hold the 429 — but a
+ *     stuck auth holds the waitUntil open, and "allowed to fail" and "allowed to
+ *     hang" are different permissions. Same `REPORT_HOP_MS` as this door's other
+ *     three report hops (front-door.ts), imported rather than written again. */
 async function recordMaintenanceRefusal(
   env: Env,
   caller: string,
   method: string,
-  pathname: string
+  pathname: string,
+  traceId: string
 ): Promise<void> {
   await env.AUTH.fetch("https://internal/internal/log-error", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-key": env.INTERNAL_KEY ?? "",
+      ...traceHeaders(traceId),
+    },
     body: JSON.stringify({
       source: "gateway",
       place: `${method} ${pathname}`,
       message: `maintenance door throttled: ${caller} exceeded ${MAINTENANCE_CALLS_PER_MINUTE} calls a minute. Repeated rows here are somebody guessing the maintenance key — rotate ADMIN_KEY and check the address.`,
+      requestId: traceId,
     }),
+    signal: AbortSignal.timeout(REPORT_HOP_MS),
   }).catch(() => null)
 }

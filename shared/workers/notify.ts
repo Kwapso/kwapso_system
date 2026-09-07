@@ -12,6 +12,7 @@ import type { D1Database, Fetcher } from "@cloudflare/workers-types"
 
 import { brandedEmail, type BrandedEmail } from "./email-template"
 import { logError, type CoreDb } from "./error-log"
+import { traceHeaders } from "./trace"
 
 /** What a worker needs to send: the auth binding, the origin its links point at,
  * and the shared secret guarding the internal door. */
@@ -24,6 +25,16 @@ export type MailEnv = {
    * every caller already passes `env`, so nothing at a call site has to remember
    * anything, and a worker without a database behaves exactly as before. */
   DB?: CoreDb
+  /** THIS REQUEST'S NAME, on the env for the same reason `DB` is — so a mail
+   * that did not go out is a row that JOINS the click that ordered it
+   * (`error_logs.request_id`; shared/workers/trace.ts). The dispatcher already
+   * builds a per-request shallow copy of `env`, and an unattended tick puts the
+   * TICK's id here instead (`tickId`), so the nightly alarm's failed send joins
+   * the rest of that tick's rows.
+   *
+   * `?` because an env without it must behave exactly as before: the row still
+   * lands, with nothing to join on, which is what it had. */
+  TRACE?: string
 }
 
 /** Send one branded email through the auth worker. `origin` overrides
@@ -48,7 +59,14 @@ export async function sendBrandedEmail(
     // (Cast: see whoAmI in gating.ts — shared/ compiles in the web workspaces too.)
     const init = {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-key": env.INTERNAL_KEY ?? "",
+        // The name travels, so auth's own crash on the send door joins this
+        // request's rows. Conditional, so an absent id sends no header rather
+        // than an empty one — `requestId` on the far side would keep a blank.
+        ...(env.TRACE ? traceHeaders(env.TRACE) : {}),
+      },
       body: JSON.stringify({ to, subject, html, text }),
       signal: AbortSignal.timeout(15_000),
     } as unknown as Parameters<typeof env.AUTH.fetch>[1]
@@ -80,6 +98,10 @@ async function note(env: MailEnv, to: string, subject: string, why: string): Pro
       source: "email-send",
       place: subject.slice(0, 200),
       message: `an email was not sent (recipient domain ${to.split("@")[1] ?? "unknown"}): ${why}`,
+      // WHICH ACTION ordered the mail — the invite that was accepted, the tick
+      // that raised the alarm. Without it "why did three invites this week not
+      // send" was answerable and "which click was that" was not.
+      requestId: env.TRACE,
     })
 }
 

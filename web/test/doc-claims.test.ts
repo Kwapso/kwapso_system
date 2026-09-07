@@ -26,6 +26,8 @@ import { describe, expect, it } from "vitest"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, sep } from "node:path"
 
+import { sourceFiles } from "@shared/rules/source-scan"
+
 const ROOT = join(__dirname, "..", "..")
 const read = (p: string) => readFileSync(p, "utf8")
 
@@ -307,6 +309,87 @@ describe("docs agree with the roster on disk", () => {
       `A doc names a Laws range that disagrees with shared/rules/registry.ts. A reader who ` +
         `trusts the range never learns the newest laws exist — fix the sentence, and say what ` +
         `the new laws are while you are there:\n` + wrong.join("\n")
+    ).toEqual([])
+  })
+
+  // THE ONE NUMBER THAT PRICES A PLATFORM MOVE, DERIVED RATHER THAN REMEMBERED.
+  //
+  // PLATFORMS.md is the only document that estimates what leaving Cloudflare
+  // would cost, and the honest half of that estimate is its admission that the
+  // GLOBAL core database has no adapter: it is reached raw, at N call sites in M
+  // files, and every effort band in that file understates pillar 1 by exactly
+  // that work. The number was typed by hand, and two independent architecture
+  // measurements have now caught it stale in a row — 151/27 on the page against
+  // 154/28, then against 156/29. It drifts one direction only, nobody reading
+  // the sentence can tell, and it is load-bearing.
+  //
+  // So it is censused off the SOURCE, by the doc's own published command:
+  // `grep -rn "env.DB.prepare(" --include='*.ts' workers/ shared/ | grep -v test`,
+  // reproduced here line for line — including the fact that `grep -v test`
+  // filters the whole `path:line:text`, not just the path.
+  it("PLATFORMS.md's core-database count is the count on disk", () => {
+    const lines: string[] = []
+    for (const { rel, source } of sourceFiles([join(ROOT, "workers"), join(ROOT, "shared")], {
+      extensions: [".ts"],
+      relativeTo: ROOT,
+    }))
+      source.split("\n").forEach((text, i) => {
+        if (text.includes("env.DB.prepare(")) lines.push(`${rel}:${i + 1}:${text}`)
+      })
+    // `grep -v test` — the doc's own filter, on the whole line, so the census
+    // and the sentence can never mean two different things.
+    const hits = lines.filter((l) => !l.includes("test"))
+    const sites = hits.length
+    const files = new Set(hits.map((l) => l.split(":")[0])).size
+
+    // THE TRIPWIRE. Every assertion below compares against these two numbers, and
+    // a walk that found nothing would satisfy an equality with a doc that had
+    // been "corrected" to zero. Core is reached raw by five workers; if this is
+    // small, the walk is broken, not the codebase.
+    expect(sites, "the census collapsed — fix the walk, never the expectation").toBeGreaterThan(100)
+    expect(files, "the census collapsed — fix the walk, never the expectation").toBeGreaterThan(15)
+
+    // The three places the file states it, each matched on its own SHAPE so a
+    // reworded sentence goes red rather than going quiet — the same bargain
+    // SUBSET_CLAIMS above makes. Read off the RAW source, not `prose()`: the
+    // first of them carries a backticked identifier, which `prose` strips.
+    const src = read(join(ROOT, "documents", "PLATFORMS.md"))
+    const CLAIMS: { what: string; re: RegExp; expect: number[] }[] = [
+      {
+        what: "the pillar-1 table row",
+        re: /plus (\d+) raw `env\.DB\.prepare\(…\)` sites in (\d+) files/,
+        expect: [sites, files],
+      },
+      {
+        what: "the paragraph that admits core has no adapter",
+        re: /\*\*(\d+) call sites across (\d+) production files\*\*/,
+        expect: [sites, files],
+      },
+      { what: "the port estimate", re: /a codemod over (\d+) sites/, expect: [sites] },
+    ]
+
+    const wrong: string[] = []
+    for (const c of CLAIMS) {
+      const m = c.re.exec(src)
+      if (!m) {
+        wrong.push(
+          `${c.what}: PLATFORMS.md no longer states the count in the shape this check reads ` +
+            `(${c.re}). Re-point the pattern at the new sentence — do not delete the claim.`
+        )
+        continue
+      }
+      c.expect.forEach((want, i) => {
+        const said = Number(m[i + 1])
+        if (said !== want) wrong.push(`${c.what}: says ${said}, the source has ${want} ("${m[0]}")`)
+      })
+    }
+
+    expect(
+      wrong,
+      `PLATFORMS.md's core-database count has drifted from the source. It is the size of the ` +
+        `one gap in the estimate of what leaving Cloudflare costs, so a stale figure there ` +
+        `understates a port by exactly the work nobody counted. Current census: ${sites} sites ` +
+        `in ${files} files.\n` + wrong.join("\n")
     ).toEqual([])
   })
 
