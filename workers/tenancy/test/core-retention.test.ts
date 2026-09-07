@@ -220,6 +220,30 @@ describe("the sweep does bounded work, and says when it did not finish", () => {
     expect(report.deleted.login_codes).toBe(0)
     expect(h.count("login_sends"), "the sweep carried on past the broken table").toBe(0)
   })
+
+  it("…and NAMES the table it failed on, because a zero count is not a quiet night", async () => {
+    // The bug this closes: a broken table reported `deleted: { login_codes: 0 }`,
+    // which is the exact same report as "there was nothing to take". A table that
+    // silently stopped being swept is the unbounded growth this whole file exists
+    // to prevent, so the failure has to LEAVE the function — the console line it
+    // used to have is gone by morning.
+    const h = harness()
+    h.db.exec("DROP TABLE login_codes")
+
+    const report = await h.sweep()
+
+    expect(report.failed.map((f) => f.table), "the failure was invisible in the report").toEqual([
+      "login_codes",
+    ])
+    expect(report.failed[0].message, "and it says what the database said").toMatch(/login_codes/)
+    expect(report.deleted.login_codes, "the count is still reported, so partial work is not lost").toBe(0)
+  })
+
+  it("a healthy sweep names nothing — an empty list is the ordinary night", async () => {
+    const h = harness()
+    h.code(ago(AUTH_RETENTION_HOURS + 1))
+    expect((await h.sweep()).failed).toEqual([])
+  })
 })
 
 describe("the nightly cron actually runs it", () => {
@@ -254,6 +278,19 @@ describe("the nightly cron actually runs it", () => {
       /recordWorkerError/
     )
     expect(branch.toLowerCase()).toMatch(/not fully swept|still hold/)
+  })
+
+  it("records the table the sweep FAILED on, and does not call the tick clean", () => {
+    const body = scheduledBody()
+    const at = body.indexOf("swept.failed")
+    expect(at, "the failure list must be consulted — the seam reports it and nobody read it").toBeGreaterThan(-1)
+    const branch = body.slice(at, at + 900)
+    expect(branch, "R12: unattended work that failed must reach the error store").toMatch(/recordWorkerError/)
+    expect(branch.toLowerCase()).toMatch(/not swept|failed/)
+    expect(
+      branch,
+      "a night that left a table unswept is not an OK tick, so last_ok_at must not move"
+    ).toMatch(/failed = true/)
   })
 
   it("keeps the sweep and the size check in separate try blocks", () => {

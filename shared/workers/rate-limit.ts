@@ -30,9 +30,19 @@
 //
 // It is not silent, though — a limiter that has stopped working is an
 // infrastructure event somebody must hear about, and a request that succeeded is
-// not the place to report it (ERROR-HANDLING.md: never swallow). It logs, and the
-// request carries on.
+// not the place to report it (ERROR-HANDLING.md: never swallow). It RECORDS, and
+// the request carries on.
+//
+// AND "IT LOGS" USED TO MEAN THE CONSOLE ALONE, which is the same sentence as
+// "nobody finds out". A console line lives as long as somebody is watching the
+// tail; this failure's whole shape is that nothing goes wrong at the time. Every
+// request succeeds, every screen works, and the only thing that changed is that
+// the per-caller ceiling is off — so the day a loop hammers a team's database,
+// the answer to "wasn't there a limiter?" was a log line that expired weeks ago.
+// A safety valve that has failed open is exactly the class of fact the error
+// store exists to keep.
 
+import { logError, type CoreDb } from "./error-log"
 import { CALLER_REQUESTS_PER_MINUTE } from "./limits"
 
 /** Cloudflare's rate-limiting binding, as much of it as this seam uses.
@@ -43,7 +53,31 @@ import { CALLER_REQUESTS_PER_MINUTE } from "./limits"
  * deployment is in until its wrangler config catches up. */
 export type RateLimiter = { limit(options: { key: string }): Promise<{ success: boolean }> }
 
-export type RateLimitEnv = { CALLER_LIMIT?: RateLimiter }
+export type RateLimitEnv = {
+  CALLER_LIMIT?: RateLimiter
+  /** The CORE database, so a limiter that has fallen over can say so somewhere
+   * that outlives a log tail. Optional and structurally typed for the same
+   * reason `CALLER_LIMIT` is: every suite in this repo passes an env without it,
+   * and a seam that cannot be called without a database would have to be
+   * rewritten in every one of them. Absent means the console line alone, which
+   * is exactly the behaviour this file had before. */
+  DB?: CoreDb
+}
+
+/** The source a fail-open row is filed under.
+ *
+ * NOT the worker's name, and that is a decision rather than an omission: this
+ * seam is called from `teamContext` (tenancy, content and data-ops all pass
+ * through it) and from the MCP endpoint, and it is handed an env, not an
+ * identity — nothing in scope here knows which worker it is running in. Naming
+ * the SEAM is the honest answer, it matches how `slow-door` already files rows
+ * that belong to a measurement rather than a worker, and it has a second
+ * property worth having: `error_logs` buckets its hourly ceiling on
+ * `COALESCE(user_id, source)`, so every fail-open in the estate shares ONE
+ * budget of MAX_ERROR_LOGS_PER_HOUR. A limiter that is down for every request on
+ * every worker writes 120 rows an hour and then stops, which is the correct
+ * amount of noise for one infrastructure fact. */
+export const RATE_LIMIT_SOURCE = "rate-limit"
 
 /** THE ONE SENTENCE a throttled caller reads. Plain, and it says the two things a
  * person needs: nothing is broken, and waiting is the fix. No numbers — "600 per
@@ -100,6 +134,19 @@ export async function callerHasBudget(
     console.error(
       `rate limiter unavailable, request allowed through (fail open): ${e instanceof Error ? e.message : String(e)}`
     )
+    // SAY SO WHERE IT KEEPS. `logError` cannot throw and cannot change this
+    // answer (error-log.ts's contract), so the fail-open stays a fail-open: the
+    // request is allowed through whether or not the row lands. The caller id is
+    // NOT recorded — this is a fact about the limiter, not about the person who
+    // happened to be asking, and filing it under a user would give every user
+    // their own 120-row budget for one broken binding.
+    if (env.DB)
+      await logError(env.DB, {
+        source: RATE_LIMIT_SOURCE,
+        place: `caller-budget/${kind}`,
+        message: `the per-caller rate limiter did not answer, so this request was allowed through UNCHECKED (fail open). Per-caller throttling is off wherever this binding is unwell — check the CALLER_LIMIT rate-limiting binding on this worker: ${e instanceof Error ? e.message : String(e)}`,
+        stack: e instanceof Error ? e.stack : undefined,
+      })
     return true
   }
 }

@@ -551,6 +551,27 @@ export default {
           ),
           tick
         )
+      // THE SAME SENTENCE FOR THE TABLE THAT THREW. `sweepCoreRetention` never
+      // throws by design — one broken predicate must not cost the other three
+      // tables their sweep — so the catch below never sees a single-table
+      // failure, and until this line it was a console message and a count of
+      // zero that looked exactly like a quiet night. A table that has silently
+      // stopped being swept is the unbounded growth this job exists to prevent.
+      for (const f of swept.failed) {
+        // …and the tick is NOT clean, so `last_ok_at` must not move: the cron
+        // watch's whole question is "did this schedule last run to a good end",
+        // and a night that left one table unswept did not.
+        failed = true
+        await recordWorkerError(
+          env.DB,
+          "tenancy",
+          "cron/retention",
+          new Error(
+            `the retention sweep FAILED on ${f.table} and that table was not swept tonight — it keeps every row past its retention window until this is fixed, and the other tables were swept normally: ${f.message}`
+          ),
+          tick
+        )
+      }
     } catch (e) {
       failed = true
       console.error("nightly retention sweep failed:", tick, e)

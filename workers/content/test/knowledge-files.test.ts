@@ -202,6 +202,98 @@ describe("extractFile: the file is kept, the words are only claimed when they ex
   })
 })
 
+// A CRASHED READER TELLS THE PERSON HONESTLY AND TELLS US WHICH READER, ON WHICH
+// FILE. The note above is the right thing to SAY — the file is kept, try again —
+// and it was the whole of what anybody knew: a `console.error` and a sentence
+// with no reader in it, no format, no file name. R42 exists because a reader
+// failure is precisely the fact somebody must be able to act on, and "every PDF
+// in the base scores zero" is what it looks like when nobody could.
+describe("a conversion crash: honest to the person, named in the store", () => {
+  /** The core database, for real, with the real error_logs migrations. */
+  async function coreDb() {
+    const { readFileSync } = await import("node:fs")
+    const { join } = await import("node:path")
+    const { DatabaseSync } = await import("node:sqlite")
+    const CORE = join(__dirname, "..", "..", "..", "db", "core")
+    const db = new DatabaseSync(":memory:")
+    for (const m of ["0012_error_logs.sql", "0019_error_log_bound.sql", "0020_error_request_id.sql"])
+      db.exec(readFileSync(join(CORE, m), "utf8"))
+    const binding = {
+      prepare(sql: string) {
+        const stmt = db.prepare(sql)
+        let args: unknown[] = []
+        const api = {
+          bind(...a: unknown[]) {
+            args = a
+            return api
+          },
+          async run() {
+            return { meta: { changes: Number(stmt.run(...(args as never[])).changes) } }
+          },
+        }
+        return api
+      },
+    }
+    const rows = () =>
+      db.prepare("SELECT source, place, message FROM error_logs ORDER BY rowid").all() as {
+        source: string
+        place: string
+        message: string
+      }[]
+    return { binding, rows }
+  }
+
+  it("names the reader, the file and the format — and still keeps the file", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const core = await coreDb()
+    const env = {
+      AI: {
+        toMarkdown: () => {
+          throw new Error("AI binding: markdown conversion is unavailable")
+        },
+      },
+      DB: core.binding,
+    } as unknown as Env
+
+    const out = await extractFile(env, {
+      bytes: bytes("%PDF-1.7 a real-looking document"),
+      contentType: "application/pdf",
+      fileName: "board-pack.pdf",
+    })
+
+    // THE PERSON'S SIDE IS UNCHANGED: no words claimed, an honest note, no throw.
+    expect(out.text).toBeNull()
+    expect(out.note).toMatch(/couldn't read this file just now/)
+
+    // AND THE OPERATOR'S SIDE EXISTS.
+    const written = core.rows()
+    expect(written, "a reader crashed and nothing in the store said which one").toHaveLength(1)
+    expect(written[0].source).toBe("content")
+    expect(written[0].place, "the READER is in the place, so one query groups every file it broke on").toBe(
+      "knowledge/extract:markdown"
+    )
+    expect(written[0].message).toMatch(/board-pack\.pdf/)
+    expect(written[0].message).toMatch(/application\/pdf/)
+    expect(written[0].message).toMatch(/markdown conversion is unavailable/)
+    spy.mockRestore()
+  })
+
+  it("an outcome is not a crash — a reader that answers 'I could not' writes no row", async () => {
+    // The difference this suite is built on: `runReader` returning an `error` is
+    // a declared outcome with a sentence for the person, and belongs in the note
+    // rather than the error store. Only a THROW is unexpected.
+    const core = await coreDb()
+    const env = { AI: { toMarkdown: async () => ({ data: "" }) }, DB: core.binding } as unknown as Env
+    const out = await extractFile(env, {
+      bytes: bytes("%PDF-1.7 a real-looking document"),
+      contentType: "application/pdf",
+      fileName: "blank.pdf",
+    })
+    expect(out.text).toBeNull()
+    expect(core.rows(), "a file with no words in it is not an incident").toHaveLength(0)
+  })
+})
+
 // AN UNREADABLE FILE INDEXES TO NOTHING — the clause the first real upload
 // earned. A .pptx came back "stored, not searchable" in words and `chunkCount:
 // 1` in the same row, because the indexer falls back to the TITLE when there is

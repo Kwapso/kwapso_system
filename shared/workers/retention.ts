@@ -61,8 +61,20 @@ type CoreDb = {
 }
 
 /** What one nightly sweep removed, per table — reported so the cron can say it
- * out loud, and so a sweep that hits its ceiling is visible rather than silent. */
-export type SweepReport = { deleted: Record<string, number>; capped: string[] }
+ * out loud, and so a sweep that hits its ceiling is visible rather than silent.
+ *
+ * `failed` is the third of those, and it was missing. A table whose sweep threw
+ * printed one console line here and then reported a count like every other
+ * table, so `deleted: { sessions: 0 }` meant BOTH "there was nothing to take"
+ * and "this table has not been swept since the night the predicate broke" — and
+ * only the first of those is a quiet success. A table that stopped being swept
+ * is precisely the growth this whole file exists to bound, so the failure has to
+ * leave the function, and the cron that already records the ceiling records it. */
+export type SweepReport = {
+  deleted: Record<string, number>
+  capped: string[]
+  failed: { table: string; message: string }[]
+}
 
 /** One bounded delete. The predicate names the rows; the inner SELECT bounds how
  * many of them go tonight. */
@@ -113,6 +125,7 @@ export async function sweepCoreRetention(db: CoreDb, now: Date = new Date()): Pr
   const cutoff = new Date(now.getTime() - AUTH_RETENTION_HOURS * 60 * 60 * 1000).toISOString()
   const deleted: Record<string, number> = {}
   const capped: string[] = []
+  const failed: { table: string; message: string }[] = []
 
   for (const sweep of SWEEPS) {
     let total = 0
@@ -139,7 +152,14 @@ export async function sweepCoreRetention(db: CoreDb, now: Date = new Date()): Pr
       // zero would make a partly-successful night look like a broken one.
       console.error(`retention sweep failed for ${sweep.table}:`, e)
       deleted[sweep.table] = total
+      // NAMED, not just printed. This function still never throws — one table's
+      // failure must not cost the other three their sweep — but "never throws"
+      // and "never tells anybody" are different promises, and only the first one
+      // was this file's to keep. The caller records it (tenancy's nightly), so
+      // the seam stays a pure function of a database handle and the worker keeps
+      // the one recorder.
+      failed.push({ table: sweep.table, message: e instanceof Error ? e.message : String(e) })
     }
   }
-  return { deleted, capped }
+  return { deleted, capped, failed }
 }
