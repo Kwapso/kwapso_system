@@ -1282,14 +1282,36 @@ export function TicketsCollection({
                reach. The two cards still exist and are still drawn where they
                belong: `TicketStagesCard` on Home's band, beside the hours.
 
-               NOT INSIDE A `CollectionCard`. Every other branch here is one
-               card holding one collection; this branch is five panels and its
-               own toolbar, and wrapping them in a sixth card would put a card
+               STILL NOT INSIDE A `CollectionCard`, AND NOW ITS TOOLBAR SAYS SO
+               OUT LOUD (`standsOn`, below). Every other branch here is one card
+               holding one collection; this branch is five panels and its own
+               toolbar, and wrapping THEM in a sixth card would put a card
                inside a card — CLAUDE.md's own `useKitPanel` note calls that
-               the broken combination. The dashboard draws its own furniture. */
+               the broken combination. That reasoning is untouched: the panels
+               are still bare on the shell's own pane and always will be.
+
+               WHAT CHANGED, 7 Sep 2026 ("the toolbar in dashboard needs some
+               kind of container 😕 … the most similar possible to the in-card
+               toolbars!"): the argument above was read as covering the TOOLBAR
+               too, and it never did. A toolbar is not a collection, so a card
+               around one holds no rows and nests nothing. What the missing card
+               cost was not decoration — `<ToolbarRow>` paints its own well in
+               `--surface-raised` and `ScreenShell`'s pane is `--surface-raised`,
+               so on THIS branch alone the well measured 1.000:1 against its
+               ground in both palettes while the Triage branch above, inside a
+               `CollectionCard`, measured 1.103:1 light / 1.111:1 dark. Same
+               component, same fill, two different grounds. The dashboard draws
+               its own furniture, and one piece of it is now a card around its
+               toolbar — never around its panels. */
             <TicketsDashboard
               teamId={teamId}
               helpTypeOptions={helpTypeOptions}
+              // THE ONE FACT ONLY THIS HOST KNOWS: there is no card under the
+              // dashboard here, so its toolbar has to bring one. The app
+              // record's Tickets tab says nothing and gets the default,
+              // because `RecordChrome` already puts soft paper under it — see
+              // `standsOn`'s own doc for the measurements on both hosts.
+              standsOn="screen"
               // R50's own question, asked of the WHOLE collection: `totals.help`
               // is the door's exact COUNT(*) of the everyday list, before this
               // tab's own two filters narrow anything. A dashboard filtered to a
@@ -1848,7 +1870,15 @@ function TicketRowsTable<T extends TicketFace>({
  * ticket surface in the app: "replicate the pills that we have on the view
  * outside. These are: ID, type, app, date … and everywhere else where tickets
  * have pills, reuse this." A fifth way of drawing a ticket's four facts is
- * precisely what that ruling exists to prevent. */
+ * precisely what that ruling exists to prevent.
+ *
+ * WITH ONE FACT MOVED, NOT DROPPED (2026-09-07, "lets put the date below title
+ * as simole tex"): the board asks that line to leave its date chip out and
+ * draws the date under the title instead, in the kit card's own quiet caption
+ * slot. All four facts are still on the card and all four are still drawn by
+ * the shared component's rules — see `boardCard` below for the whole argument,
+ * and `shared/web/ticket-chips.tsx` for why it is one boolean rather than a
+ * board-flavoured copy of the chip line. */
 function OpenBoard({
   teamId,
   rows,
@@ -1876,8 +1906,15 @@ function OpenBoard({
   narrowed: boolean
   onOpen: (id: string) => void
 }) {
-  const t = useT()
-  /** THE STAGES IN THE READER'S OWN LANGUAGE, and the one dot each takes.
+  /* `useLanguage` RATHER THAN `useT`, from 2026-09-07: the cards now carry a
+     date of their own under the title (see `boardCard` below) and `formatDate`
+     takes the reader's own language explicitly — ruling 07, never the runtime's
+     ambient locale. This is the same swap the list view made for the same
+     reason two components down, and the same one it made back when the date
+     lived in the chips. */
+  const { t, lang } = useLanguage()
+  /** THE STAGES IN THE READER'S OWN LANGUAGE. THE DOT IS NOT HERE — it is one
+   * function call below, and 2026-09-07 is the day that stopped being a detail.
    *
    * WRITTEN OUT AS LITERALS INSIDE THE COMPONENT rather than read off
    * `HELP_STATUS` (web/components/deep-link/shape.tsx). That map is a copy TABLE
@@ -1891,25 +1928,92 @@ function OpenBoard({
    * and 2026-09-07 is what that bought: `ready` joined the Open tab (shared/
    * types.ts says why) and this map failed its own type check until the fourth
    * entry was written, instead of the board quietly drawing a fourth column
-   * with no name and no dot.
+   * with no name.
    *
-   * THE DOTS ARE A PROGRESSION, not a decoration: grey while nothing has started
-   * (`archived` is `--ink-disabled`), blue once it is booked into a sprint
-   * (`review` is `--info`), charcoal while somebody is actually on it
-   * (`building`, and the kit's own token comment for it reads "in build / with
-   * us"), green once every story is closed and only the sending is left
-   * (`done` — `shared/status-tones.ts` gives `ready` exactly that tone, and the
-   * split between `done` and `shipped` is its own note: the work is finished,
-   * the record is not). Taken from that file's reading rather than re-decided
-   * here, because a stage's colour cannot be chosen twice. The kit rules that
-   * the dot never carries the state alone; the column's name in words is beside
-   * it, which is what it is there for. */
-  const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string; dot: KanbanColumnDot }> = {
-    triaged: { title: t("Triaged"), dot: "archived" },
-    scheduled: { title: t("Scheduled"), dot: "review" },
-    in_progress: { title: t("In progress"), dot: "building" },
-    ready: { title: t("Ready"), dot: "done" },
+   * ── THE DOT USED TO BE THE FIFTH VALUE IN THIS MAP, AND IT WAS WRONG ──────
+   *
+   * CLIENT, 2026-09-07, over this exact board, verbatim: *"grerat but status
+   * (th header) have no color associated."* She is not asking for a brighter
+   * shade. She is reading a column head whose dot is not the colour this app
+   * gives that status, on a screen that shows her the right one six inches
+   * above: the Status FILTER on this same tab draws each stage's swatch through
+   * `helpStatusDotTone` (see `DOT_TONE_FILL` and `helpFacets` at the top of this
+   * file), so "Triaged" was a BLUE dot in the filter menu and a GREY one on the
+   * column head of the tickets it selects. One stage, two colours, one screen.
+   *
+   * THE PARAGRAPH THAT USED TO STAND HERE CLAIMED OTHERWISE — "Taken from that
+   * file's reading rather than re-decided here, because a stage's colour cannot
+   * be chosen twice" — and then wrote four literals that were the tiering of
+   * `shared/status-tones.ts` shifted one rung DOWN: `triaged` was `archived`
+   * where that file says `review`, `scheduled` was `review` where that file says
+   * `building`. A comment promising a single source is not a single source. It
+   * is replaced rather than deleted because the promise was right and only the
+   * spelling was wrong: the answer is now READ, so it cannot drift again and no
+   * comment has to be believed.
+   *
+   * WHAT THE FIVE COLUMNS NOW WEAR, and it is `status-tones.ts`'s tiering
+   * verbatim: `triaged` is `review` (blue — somebody has read it and is looking
+   * at it), `scheduled` and `in_progress` are both `building` (charcoal, "in
+   * build / with us" in the kit's own token comment — booked in and being worked
+   * on are the same tier of the same lifecycle), `ready` is `done` (green — every
+   * story closed, only the sending left) and Waiting is `blocked`.
+   *
+   * TWO COLUMNS SHARE A COLOUR AND THAT IS THE ANSWER, NOT A DEFECT LEFT IN.
+   * `scheduled` and `in_progress` are one tone because the app rules they are
+   * one tier, and the fix for two neighbours wearing charcoal is emphatically
+   * NOT to give this board its own private shade for one of them — that is
+   * precisely the second decision the client's complaint is about. The kit
+   * already rules the case: the dot never carries the state alone, and the name
+   * in words is beside it. It is the same situation the six tones have with
+   * their two greens (`--dot-shipped` and `--dot-done` are one colour, named
+   * twice), which `DOT_TONE_FILL`'s own note at the top of this file spells out.
+   * If four distinct colours across five columns is not enough for her, the
+   * vocabulary is the kit's and the fix is a kit release, not a literal here. */
+  const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string }> = {
+    triaged: { title: t("Triaged") },
+    scheduled: { title: t("Scheduled") },
+    in_progress: { title: t("In progress") },
+    ready: { title: t("Ready") },
   }
+  /** ONE CARD, BUILT ONCE, FOR BOTH KINDS OF COLUMN.
+   *
+   * The four stage columns and the Waiting column are fed by two different
+   * reads (see the fifth column's own note below) and used to spell their card
+   * out twice, identically. That was survivable while a card was an id, a title
+   * and a chip line; 2026-09-07 gave it a fourth part, and a fourth part
+   * written twice is the drift this whole screen's chip ruling exists to
+   * prevent, in miniature — the same ticket drawn two ways depending on which
+   * column you happened to find it in, and a waiting ticket is drawn in BOTH.
+   *
+   * THE DATE MOVES OUT OF THE CHIPS AND UNDER THE TITLE — client, 2026-09-07:
+   * *"lets put the date below title as simole tex"*. So `TriageChips` is asked
+   * to leave its fourth chip out (`omitDate`, and `shared/web/ticket-chips.tsx`
+   * carries the argument for why that is a subtraction rather than a fork), and
+   * the kit's own `description` slot takes the date instead — a `text-micro`
+   * line in `--ink-tertiary` under the title, which IS this app's quiet caption
+   * treatment and is drawn by the kit rather than styled here.
+   *
+   * THE WORDS ARE "raised {date}", WHICH IS HER OWN PHRASING FOR THIS EXACT
+   * POSITION rather than a new sentence. The chip that is being retired here
+   * carried that sentence as its accessible name only, because she ruled about
+   * the CHIP that it should "not say raised on date, but only date" — a word
+   * that needs explaining in a row scanned at speed is one word too many. A
+   * caption line under a title is not that row: it is where the sentence lived
+   * before it became a chip at all (`shared/web/ticket-chips.tsx` records it as
+   * "what an older layout said under the description, word for word"), it is
+   * already in the catalogue so nothing new needs translating, and it means the
+   * line a screen reader hears is the one it heard from the chip's label
+   * instead of a bare date with nothing saying which date it is.
+   *
+   * AND IT GOES THROUGH `formatDate` LIKE EVERY OTHER DATE ON A SCREEN
+   * (R-law: no screen shows a raw timestamp; `web/test/dates-are-formatted.test.ts`
+   * reads this file off disk to make sure). */
+  const boardCard = (r: HelpTicket) => ({
+    id: r.id,
+    title: ticketTitle(r),
+    badges: <TriageChips teamId={teamId} ticket={r} omitDate />,
+    description: t("raised {date}", { date: formatDate(r.createdAt, lang) }),
+  })
   return (
     <Kanban
       /* USE ALL THE WIDTH THERE IS — client, 2026-09-07: "with this 5 columns,
@@ -1943,15 +2047,31 @@ function OpenBoard({
         ...OPEN_TAB_STATUSES.map((stage) => ({
           id: stage,
           title: COLUMN[stage].title,
-          dot: COLUMN[stage].dot,
+          /* THE STAGE'S OWN TONE, READ — never a literal written here. See the
+             `COLUMN` note above for the client ruling this closes and for the
+             two colours the same stage used to have on this one screen. The six
+             values `helpStatusDotTone` returns ARE the kit's six `dot` names
+             (`DotTone` in shared/app-stages.ts is the same union, restated there
+             because a worker cannot import a `.tsx`), so this satisfies
+             `KanbanColumnDot` structurally and a seventh tone in the kit would
+             fail here rather than paint nothing. */
+          dot: helpStatusDotTone(stage) satisfies KanbanColumnDot,
           count: narrowed ? undefined : counts?.[stage],
+          /* THE CHAIN STAYS BROKEN ACROSS LINES, and that is load-bearing
+             rather than formatting. Two censuses forbid this screen from
+             narrowing the door's own loaded rows in the browser (R16:
+             `web/test/paged-search.test.ts` and `web/test/tab-facets.test.tsx`,
+             both matching the literal `rows.filter(`), and BUCKETING page one
+             into five columns is not that narrowing — nothing here drops a row,
+             and the moment the toolbar is asking anything every column stops
+             quoting the door's count and falls back to the cards it is holding
+             (see `narrowed`, below). Collapsed onto one line this reads to both
+             checks as the offence they exist for. Said out loud because a later
+             tidy-up would otherwise turn a passing suite red for no reason it
+             could explain. */
           cards: rows
             .filter((r) => r.status === stage)
-            .map((r) => ({
-              id: r.id,
-              title: ticketTitle(r),
-              badges: <TriageChips teamId={teamId} ticket={r} />,
-            })),
+            .map(boardCard),
           emptyLabel: t("Nothing at this stage."),
         })),
         /* THE FIFTH COLUMN, AND IT IS NOT A `GROUP BY status` BUCKET — client,
@@ -1987,9 +2107,25 @@ function OpenBoard({
                once on this screen (R16). The footnote says all of this in the
                reader's own words, because a fifth column beside four is read as
                a fifth bucket unless something says otherwise.
-           `blocked` IS THE DOT, and it is the app's own existing answer rather
-           than a new one: `shared/status-tones.ts` defines that tone as "stuck
-           on somebody OUTSIDE the team", which is this column exactly.
+           THE DOT IS READ, NOT WRITTEN, EVEN THOUGH THIS COLUMN IS NOT A
+           STATUS — and that is the sharpest form of the 2026-09-07 ruling
+           ("status (th header) have no color associated"). `waiting` has no row
+           in `helpStatusDotTone` because it is a predicate, so the honest
+           question is not "which of the six do I like here" but "what colour
+           does this app already give the state where the client owes us an
+           answer" — and it has one: `awaiting_validation`, the stage
+           `shared/status-tones.ts` singles out with the note "waiting on the
+           CLIENT to say yes — nothing here moves until they do", which is this
+           column's own sentence. So the tone is ASKED FOR by naming that stage
+           rather than typed as `"blocked"`, and the two cannot come apart: if
+           the app ever re-tones waiting-on-the-client, this column follows
+           without an edit. It resolves to `blocked` today.
+           IT IS NOT A FILTER, AND THE NAMED STAGE IS NOT WHAT FILLS THIS
+           COLUMN. `awaiting_validation` is deliberately OUT of
+           `OPEN_TAB_STATUSES` (shared/types.ts says why) and no card here is
+           read by status at all — the cards come from the door's waiting
+           predicate, below. The stage is named here for its COLOUR and for
+           nothing else.
            NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
            columns give: the waiting read is a RESTING one and carries none of
            the toolbar's narrowing, so a searched board would put an
@@ -1997,13 +2133,9 @@ function OpenBoard({
         {
           id: WAITING,
           title: t("Waiting"),
-          dot: "blocked" as KanbanColumnDot,
+          dot: helpStatusDotTone("awaiting_validation") satisfies KanbanColumnDot,
           count: narrowed ? undefined : waitingTotal,
-          cards: (waitingRows ?? []).map((r) => ({
-            id: r.id,
-            title: ticketTitle(r),
-            badges: <TriageChips teamId={teamId} ticket={r} />,
-          })),
+          cards: (waitingRows ?? []).map(boardCard),
           emptyLabel: t("Nothing is waiting on a client."),
         },
       ]}
@@ -3418,7 +3550,23 @@ type UndoableTriageAct =
    surfaces share one chip line instead of two of them growing a fourth and a
    fifth way to draw a ticket's number — which is the exact thing the client's
    ruling behind `ticket-chips.tsx` forbids. */
-function TriageChips({ teamId, ticket }: { teamId: string; ticket: TicketChipFacts }) {
+/* AND IT FORWARDS `omitDate` (2026-09-07), which is the whole of what the
+   board's own ruling costs this file. Client, reading the Open tab's board:
+   "lets put the date below title as simole tex". `OpenBoard` is the one caller
+   that passes it, and it draws the date itself in the kit card's `description`
+   slot — the shared line still owns what a ticket's date LOOKS like (through
+   `formatDate`, and through the sentence the client dictated for this exact
+   position), the board only owns where it sits. See `shared/web/ticket-chips.tsx`
+   for why that is a subtraction rather than a second chip line. */
+function TriageChips({
+  teamId,
+  ticket,
+  omitDate,
+}: {
+  teamId: string
+  ticket: TicketChipFacts
+  omitDate?: boolean
+}) {
   return (
     // THE ONE PLACE THIS SCREEN NAMES THE PAPER — see `shared/web/ticket-chips.tsx`'s
     // header for why the fill is a REBIND the call site owns rather than
@@ -3437,6 +3585,7 @@ function TriageChips({ teamId, ticket }: { teamId: string; ticket: TicketChipFac
         typeDot={<Swatch colour={ticketTypeColour(ticket.helpType)} />}
         appHref={ticket.appId ? `/t/${teamId}/apps/${ticket.appId}` : undefined}
         AppLink={InAppLink}
+        omitDate={omitDate}
       />
     </span>
   )

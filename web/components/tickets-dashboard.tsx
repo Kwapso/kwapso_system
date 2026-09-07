@@ -1542,6 +1542,7 @@ export function TicketsDashboard({
   helpTypeOptions,
   ticketTotal,
   appId,
+  standsOn = "card",
   viewSlot,
   actions,
 }: {
@@ -1573,6 +1574,42 @@ export function TicketsDashboard({
    * a facet: the app is the record whose page this is, and offering a control to
    * change it would be offering to navigate. */
   appId?: string
+  /** WHAT THIS DASHBOARD IS STANDING ON — and the ONE thing it decides is
+   * whether the toolbar draws a card of its own.
+   *
+   * THE CLIENT, 7 Sep 2026, on two screenshots side by side: "the toolbar in
+   * dashboard needs some kind of container 😕 think of sth — the most similar
+   * possible to the in-card toolbars!" Her Triage screenshot has the well she
+   * wants; her Dashboard screenshot has the identical `<ToolbarRow>` and no
+   * well at all. NOTHING WAS MISSING FROM THE ROW. `<ToolbarRow>` already
+   * draws the well — its own `toolbar-row-column` div, `bg-surface-raised`
+   * (= `--card`), `rounded-pill`, `py-1.5 pe-1.5 ps-4` — and the well is only
+   * VISIBLE because of what it stands on. Every other toolbar in this app is
+   * inside a `<Card>`, whose default variant paints `bg-surface-panel`, so the
+   * raised well reads against soft paper: measured 1.103:1 in light
+   * (#FFFEF9 on #F7F2EB) and 1.111:1 in dark (#26241F on #1C1B18).
+   *
+   * THIS SCREEN IS THE ONE THAT IS NOT. `ScreenShell`'s content card and body
+   * are `bg-[var(--surface-raised)]` (screen-shell.tsx), so the Tickets
+   * screen's Dashboard tab drew a raised well on a raised ground: **1.000:1
+   * in BOTH palettes** — the record footer's own defect, on a second screen.
+   * Not a light-mode accident either; the two tones are literally the same
+   * token, so no palette could ever separate them.
+   *
+   * SO THE FIX IS THE GROUND AND NEVER THE ROW, and it belongs to the HOST
+   * because the two hosts genuinely differ. `"card"` — the app record's
+   * Tickets tab (`AppTicketsTab`, work-panels.tsx) — is already inside
+   * `RecordChrome`'s soft-paper card, so its well already reads and a second
+   * card here would be the card-in-a-card CLAUDE.md's `useKitPanel` note calls
+   * the broken combination. `"screen"` — the Tickets screen's Dashboard tab,
+   * where the branch deliberately draws no `CollectionCard` (five panels, not
+   * one collection) — has no paper under it, so the toolbar brings its own.
+   * ONLY the toolbar: the panels stay where they are, outside it.
+   *
+   * `"card"` IS THE DEFAULT because it is the shape this component has always
+   * drawn — omitting it changes nothing on screen, so a host that says nothing
+   * gets exactly what it got before this prop existed. */
+  standsOn?: "card" | "screen"
   /** THE OTHER BODY THIS COLLECTION HAS, when it has one (R53's `view` slot,
    * passed straight through to `<ToolbarRow>`).
    *
@@ -1797,77 +1834,150 @@ export function TicketsDashboard({
       </Card>
     )
 
+  // R50'S OWN QUESTION, ASKED ONCE AND SPENT TWICE. The row takes it as
+  // `empty` and returns null; the CARD below is drawn for that row and has to
+  // agree with it, because a container around a row that drew nothing is an
+  // empty box of soft paper above the collection's own empty state — the same
+  // "lone floating furniture" R50 exists to stop, one level out. One
+  // expression, so the two answers cannot drift apart.
+  const noTickets = ticketTotal === 0
+
+  // THE ROW ITSELF, NAMED SO THE CONTAINER DECISION BELOW CAN BE READ AS ONE
+  // LINE rather than as two copies of a fifty-line tag in a ternary.
+  const toolbar = (
+    /* THE TOOLBAR (client ruling, 2026-09-06: "dashboard should also have
+    toolbar / filter by client and type / no sort", and later the same day
+    "on the dashboard, I'm missing the full toolbar, so go ahead and
+    implement that" — which was this row's `actions` slot standing empty
+    while every sibling ticket tab drew a create button in it).
+
+    THE SEARCH BOX IS HERE NOW (client, 7 Sep 2026: "still missing full
+    toolbar!"), and `TOOLBAR_EXEMPT`'s line for this file was DELETED
+    rather than reworded in the same change — an exemption that no longer
+    describes the code is worse than none, because it reads as a decision
+    somebody made about the screen in front of you.
+
+    NO SORT CONTROL, and that one is still recorded (`TOOLBAR_SORT_EXEMPT`)
+    rather than decided here: a dashboard has no row order to offer,
+    because it has no rows. That is not the same sentence as the search
+    box's, which is why only one of the two entries died — searching a
+    backlog and reordering a picture are different acts.
+
+    ALL THREE NARROWINGS ARE DOOR PARAMETERS — they land in the cache key
+    above and in the WHERE clause of every read behind it — which is the
+    only shape that can work when every number on screen is a COUNT(*)
+    somebody else took.
+
+    `empty` is the WHOLE collection's count and never this tab's own
+    answer (R50): the row must disappear for a team with no tickets, and
+    must not disappear because somebody filtered to a quiet client, or
+    typed a word nothing matches. */
+    <ToolbarRow
+      empty={noTickets}
+      // THE SAME PLACEHOLDER THE LIST TAB'S OWN BOX SAYS, deliberately the
+      // same words rather than a dashboard-flavoured variant: it is the same
+      // search, over the same tickets, through the same door-side clause, and
+      // a second wording would advertise a difference that does not exist.
+      search={
+        <SearchInput
+          value={text}
+          onChange={(e) => {
+            setText(e.currentTarget.value)
+            askDoor(e.currentTarget.value)
+          }}
+          // CLEARING IS IMMEDIATE ON BOTH VALUES, never debounced: "show me
+          // everything again" is one deliberate act, and making somebody
+          // watch a stale answer for a fifth of a second after it is the one
+          // moment a debounce is felt rather than unnoticed.
+          onClear={() => {
+            setText("")
+            setTerm("")
+          }}
+          placeholder={t("Search tickets…")}
+          className="w-full"
+        />
+      }
+      filters={filterPill}
+      toolbarPanel={filterPanel}
+      // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
+      // record's Tickets tab, which is this dashboard and a list. `undefined`
+      // on the Tickets screen's own Dashboard TAB, where the strip above it
+      // already is the way out. `undefined` DRAWS NOTHING and needs no
+      // exemption (R53 says so about this exact prop); note that since kit
+      // v1.2.60 passing a single view would draw a static label instead, so
+      // "omit it" and "pass one" are no longer the same thing on screen.
+      view={viewSlot}
+      // "RAISE TICKET", at the right of the row — the host's own node, the
+      // identical one its other body draws (see the `actions` prop above).
+      actions={actions}
+    />
+  )
+
   return (
     <>
-      {/* THE TOOLBAR (client ruling, 2026-09-06: "dashboard should also have
-          toolbar / filter by client and type / no sort", and later the same day
-          "on the dashboard, I'm missing the full toolbar, so go ahead and
-          implement that" — which was this row's `actions` slot standing empty
-          while every sibling ticket tab drew a create button in it).
+      {/* THE TOOLBAR'S OWN CONTAINER, AND ONLY WHERE THERE IS NO PAPER UNDER
+          IT — client, 7 Sep 2026: "the toolbar in dashboard needs some kind of
+          container 😕 think of sth — the most similar possible to the in-card
+          toolbars!"
 
-          THE SEARCH BOX IS HERE NOW (client, 7 Sep 2026: "still missing full
-          toolbar!"), and `TOOLBAR_EXEMPT`'s line for this file was DELETED
-          rather than reworded in the same change — an exemption that no longer
-          describes the code is worse than none, because it reads as a decision
-          somebody made about the screen in front of you.
+          THE IN-CARD TOOLBAR IS NOT A SECOND TREATMENT TO COPY. It is this
+          exact `<ToolbarRow>`, drawing its own `toolbar-row-column` well
+          (`bg-surface-raised`, `rounded-pill`, `py-1.5 pe-1.5 ps-4`, R53's
+          fixed slot order) inside a `<Card>` whose default variant paints
+          `bg-surface-panel`. So there is nothing here to re-tune: the SAME
+          component draws the well, and the same two kit parts — `Card` +
+          `CardContent` — put soft paper under it, which is `CollectionCard`'s
+          whole body (screen-bits.tsx) and this file's own `Panel` (above).
+          Reused, not agreed with: the radius, the fill, the inner padding, the
+          control sizes and the slot order are all still the row's, so they
+          cannot drift from Triage's by a hand-typed number.
 
-          NO SORT CONTROL, and that one is still recorded (`TOOLBAR_SORT_EXEMPT`)
-          rather than decided here: a dashboard has no row order to offer,
-          because it has no rows. That is not the same sentence as the search
-          box's, which is why only one of the two entries died — searching a
-          backlog and reordering a picture are different acts.
+          MEASURED, BOTH PALETTES, BECAUSE AN INVISIBLE CONTAINER IS NOT ONE.
+          The well against the paper it now sits on is 1.103:1 in light
+          (#FFFEF9 on #F7F2EB) and 1.111:1 in dark (#26241F on #1C1B18) —
+          byte-identical to Triage, because it is the identical token pair.
+          Against the shell it used to sit on it was 1.000:1 in BOTH:
+          `ScreenShell`'s card and its body both paint `--surface-raised`
+          (screen-shell.tsx, in the arbitrary form) and the row's own fill is
+          `--surface-raised` too — one token painted on itself, which no
+          palette could ever separate. That is the record footer's defect on a
+          second screen, and it is why "the container is missing" was the right
+          reading of a row that had been drawing one all along.
 
-          ALL THREE NARROWINGS ARE DOOR PARAMETERS — they land in the cache key
-          above and in the WHERE clause of every read behind it — which is the
-          only shape that can work when every number on screen is a COUNT(*)
-          somebody else took.
+          ONE DELIBERATE DIFFERENCE FROM `CollectionCard`, AND IT IS A NUMBER
+          THIS ROW ALREADY PAYS. `CollectionCard` is `<CardContent
+          className="p-4">` — which keeps `CardContent`'s own `lg:` step
+          through `cn()`, so its inset is `--space-4` and `--space-7` above
+          `lg`, and this card takes the identical ladder. The BOTTOM inset is
+          zeroed at both steps (`pb-0 lg:pb-0`) because the row inside it
+          already pays `mb-[var(--toolbar-content-gap)]` on its own
+          root (R49 — that gap is the row's and no call site may spend it
+          twice). Without the zero the card would stack the two, 30 + 18.75 of
+          air under a pill with 30 above it; with it the card is the kit's
+          own inset on three sides and the row's own gap below. In Triage the
+          same number falls between the toolbar and the ROWS, which is the job
+          it was written for — here there are no rows in the card, so it
+          becomes the card's last inset instead of a second one.
 
-          `empty` is the WHOLE collection's count and never this tab's own
-          answer (R50): the row must disappear for a team with no tickets, and
-          must not disappear because somebody filtered to a quiet client, or
-          typed a word nothing matches. */}
-      <ToolbarRow
-        empty={ticketTotal === 0}
-        // THE SAME PLACEHOLDER THE LIST TAB'S OWN BOX SAYS, deliberately the
-        // same words rather than a dashboard-flavoured variant: it is the same
-        // search, over the same tickets, through the same door-side clause, and
-        // a second wording would advertise a difference that does not exist.
-        search={
-          <SearchInput
-            value={text}
-            onChange={(e) => {
-              setText(e.currentTarget.value)
-              askDoor(e.currentTarget.value)
-            }}
-            // CLEARING IS IMMEDIATE ON BOTH VALUES, never debounced: "show me
-            // everything again" is one deliberate act, and making somebody
-            // watch a stale answer for a fifth of a second after it is the one
-            // moment a debounce is felt rather than unnoticed.
-            onClear={() => {
-              setText("")
-              setTerm("")
-            }}
-            placeholder={t("Search tickets…")}
-            className="w-full"
-          />
-        }
-        filters={filterPill}
-        toolbarPanel={filterPanel}
-        // THE VIEW SWITCH, WHERE THERE IS A SECOND BODY TO SWITCH TO — the app
-        // record's Tickets tab, which is this dashboard and a list. `undefined`
-        // on the Tickets screen's own Dashboard TAB, where the strip above it
-        // already is the way out. `undefined` DRAWS NOTHING and needs no
-        // exemption (R53 says so about this exact prop); note that since kit
-        // v1.2.60 passing a single view would draw a static label instead, so
-        // "omit it" and "pass one" are no longer the same thing on screen.
-        view={viewSlot}
-        // "RAISE TICKET", at the right of the row — the host's own node, the
-        // identical one its other body draws (see the `actions` prop above).
-        actions={actions}
-      />
+          `mb-4` IS A DIFFERENT NUMBER FOR A DIFFERENT JOB, and is not a
+          second hand on R49's: it is the gap from THIS card to the next
+          piece of furniture, the same `gap-4` every panel-to-panel gap on
+          this screen already spends.
+
+          NO SORT CONTROL COMES BACK WITH THE PAPER. The container decides
+          where the row stands and nothing about what is in it — the row is one
+          node, built once above, and `TOOLBAR_SORT_EXEMPT` still carries the
+          reason a dashboard offers no order (R53). */}
+      {standsOn === "screen" && !noTickets ? (
+        <Card className="mb-4">
+          <CardContent className="p-4 pb-0 lg:pb-0">{toolbar}</CardContent>
+        </Card>
+      ) : (
+        toolbar
+      )}
       {loading ? (
         <Skeleton className="h-64 w-full rounded-[var(--radius)]" />
-      ) : ticketTotal === 0 ? (
+      ) : noTickets ? (
         <Card>
           <CardContent className="p-4">
             <ShapeStateBody
@@ -1900,7 +2010,7 @@ export function TicketsDashboard({
            whole reason it is not written again here.
 
            IT IS NOT THE COLLECTION'S EMPTY STATE, and the branch above it is
-           why the two cannot be confused: `ticketTotal === 0` is a team with
+           why the two cannot be confused: `noTickets` is a team with
            no tickets, which is a different fact and gets a different, and
            welcoming, sentence. This one only ever appears once somebody has
            asked something. */

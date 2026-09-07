@@ -1,9 +1,10 @@
 "use client"
 
 // Ticket form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
-// Description is required. Type and "Raised by" are optional and are LINES OF
-// CHIPS, not dropdowns (the client, 2026-09-07) — the type's words come from the
-// team's own "Ticket type" dropdown values (selectable_data), the people from the
+// Description and Type are required; App and "Raised by" are optional. Type, App
+// and "Raised by" are all LINES OF CHIPS, not dropdowns (the client, 2026-09-07)
+// — the type's words come from the team's own "Ticket type" dropdown values
+// (selectable_data), the apps from the team's own systems, the people from the
 // chosen client's own contacts. Every member can see every ticket (the My/All
 // tabs are just a raiser filter), so there's no audience picker.
 // Library primitives.
@@ -51,7 +52,12 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 import { RecordPicker } from "@/components/record-picker"
-import { NEUTRAL_TYPE_COLOUR, orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
+// `NEUTRAL_TYPE_COLOUR` USED TO BE IMPORTED HERE, for the dot on the "No type"
+// chip. The chip is gone (see `typeField` below) and it was that row's only
+// reader in the app, so the import goes with it — the constant itself stays
+// exactly where it was, because `ticketTypeColour` still answers with it for a
+// word its map has never heard of, which is that constant's real job.
+import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import { appStageMark } from "@shared/app-stages"
 import { ticketTypeKeptForMigration } from "@shared/types"
 import type { AppModule, AppRow } from "@shared/types"
@@ -90,7 +96,39 @@ const titleField = { ...defaultFieldConfig, label: "Title", required: false }
  * column of nouns with one question in it reads as a form that changed its mind
  * halfway down. */
 const descField = { ...defaultFieldConfig, label: "Description", required: true }
-const typeField = { ...defaultFieldConfig, label: "Type", required: false }
+/** THE TYPE, AND A TICKET NOW HAS ONE.
+ *
+ * CLIENT, 2026-09-07, twice in two separate sentences on the same screenshot:
+ * "no type is not an option", and then "good, but o type does not exist". The
+ * row used to end in a chip labelled "No type", drawn black whenever nothing
+ * was chosen, and the paragraph that defended it is replaced by this one at the
+ * chip's own call site below rather than deleted — it argued honestly from the
+ * row's mechanics (a chip line commits on the click, so "leave it off" has to be
+ * reachable or a mis-click is permanent), and the client's answer is not that
+ * the mechanics were wrong but that the ESCAPE ITSELF is: a ticket is one of the
+ * four things, and a fifth chip meaning "none of them" is a category she does
+ * not have.
+ *
+ * SO IT IS REQUIRED — through the seam this form already validates with, and no
+ * second one. `moduleField` directly below takes its `required` as an argument
+ * and pairs with a `moduleMissing` flag feeding `submit.disabled`; this does the
+ * identical thing with `typeRequired`/`typeMissing`, so the marker a person sees
+ * and the button that refuses them are computed from one boolean rather than
+ * from two rules that can drift apart.
+ *
+ * AND REQUIRED ONLY WHERE IT CAN BE ANSWERED, which is the same sentence
+ * `moduleField` makes and is not a softening of the rule. Two cases, both real:
+ *
+ *   · A TEAM WITH NO TICKET TYPES. Every word on the Choices screen can be
+ *     switched off, and then the row draws no chips at all and says so. Demanding
+ *     one there would be a door with no handle — a form nobody in that team could
+ *     ever submit, on a screen that offers them nothing to press.
+ *   · A TICKET THAT ARRIVED WITHOUT ONE. See `typeGrandfathered` below. */
+const typeField = (required: boolean) => ({
+  ...defaultFieldConfig,
+  label: "Type",
+  required,
+})
 const accountField = {
   ...defaultFieldConfig,
   label: "Client",
@@ -138,7 +176,13 @@ const contactField = {
   hint: "The person at that client who asked. Not always whoever types it in.",
 }
 
-// Radix Select can't hold an empty value, so "no type" uses a sentinel.
+// "NOTHING CHOSEN", as a value a control can actually hold. Radix Select can't
+// hold an empty string, and the draft this form saves has to round-trip the
+// answer either way, so every optional record field on this form parks on this
+// sentinel until somebody picks something and `submit` maps it back to
+// `undefined`. It is no longer OFFERED anywhere on the type row — see
+// `typeField` — but it is still what that row's value IS before a chip is
+// pressed, which is the state `typeMissing` reads.
 const NONE = "__none__"
 
 /** THE SCREENSHOT FIELD. Same words as the story form's, because it is the same
@@ -348,26 +392,168 @@ export function HelpFormDialog({
     const missing = !!held && !live.some((v) => v.trim().toLowerCase() === held.toLowerCase())
     return orderTicketTypes(missing ? [...live, held as string] : live)
   }, [helpTypeOptions, initial?.helpType])
-  /** The chips, with "no type" as the LAST of them.
+  /** The chips, and there is no longer a "no type" one at the end of them.
    *
-   * WHAT "NO TYPE" LOOKS LIKE, and it is a real chip rather than an absence.
-   * The row layout has no clear X and no `emptyOption` by design — a chip line
-   * commits on the click, so "leave it off" has to be one of the choices or it
-   * is not reachable at all, and a type set by a mis-click would then be
-   * permanent for the length of the form. So it is a chip, it wears the neutral
-   * (`ticketTypeColour`'s own answer for a word it does not know, so every chip
-   * in the line has a dot and none of them reads as the broken one), and when
-   * nothing is chosen it is the one drawn BLACK — which is how "no type" says
-   * itself out loud instead of being four unlit chips a person has to interpret.
+   * WHAT USED TO BE HERE, kept because the ruling that removed it only makes
+   * sense against it. The row ended in a fifth chip labelled "No type", wearing
+   * the neutral colour, drawn BLACK whenever nothing was chosen — the argument
+   * being that a chip line has no clear X and no `emptyOption` (the row commits
+   * on the click), so "leave it off" had to be one of the choices or a type set
+   * by a mis-click would be permanent for the length of the form.
    *
-   * LAST, not first, and that is the client's ruling deciding it: "in the order
-   * that we predetermine … with issue first". Issue is first. Anything that is
-   * not one of the four sorts after them, and "no type" is the most not-one-of-
-   * the-four thing on the row. */
-  const typeOptions = [
-    ...typeChoices.map((v) => ({ value: v, label: v, swatch: ticketTypeColour(v) })),
-    { value: NONE, label: t("No type"), swatch: NEUTRAL_TYPE_COLOUR },
-  ]
+   * CLIENT, 2026-09-07: "no type is not an option" … "o type does not exist."
+   * Twice, in two sentences, which is how a person rejects a thing rather than
+   * queries it. The mechanical argument above was never the disputed half — the
+   * row does still commit on the click — she is refusing the CATEGORY. A ticket
+   * is an issue, a question, a request or an extra; "none of those" is not a
+   * fifth kind of ticket, it is a ticket nobody has read yet, and offering it as
+   * a chip made the unread state look like a decision somebody took.
+   *
+   * WHAT THE MIS-CLICK COSTS NOW, said out loud rather than left as a surprise:
+   * pressing the wrong chip is undone by pressing the right one, and the only
+   * thing that is no longer reachable is getting BACK to nothing. That is the
+   * whole of what she asked for, and it is why Type is required below — a
+   * control with no way to mean "empty" and a form that still accepts empty
+   * would be the two halves disagreeing.
+   *
+   * The words, their order and their colours are all decided above; nothing
+   * about the vocabulary is decided on this line. */
+  const typeOptions = typeChoices.map((v) => ({
+    value: v,
+    label: v,
+    swatch: ticketTypeColour(v),
+  }))
+  /** THE TICKET THAT ARRIVED WITH NO TYPE, and there are about sixty of them.
+   *
+   * Type is required from here on, and that is a rule about the tickets this
+   * form RAISES. It cannot be a rule about the ones it OPENS: `help_type` is
+   * nullable, about sixty rows are null (the count reported on 2026-09-07; the
+   * exact number is a property of the data and not of this file, which is why
+   * nothing here is written against it), and a person who opens
+   * one of those to fix a typo in the description would meet a dialog whose
+   * Submit is dead until they categorise somebody else's two-year-old request.
+   * That is the trap, and it is worse than the hole it would close — it turns a
+   * one-word correction into a judgement call, and a person in a hurry makes
+   * that judgement by pressing whichever chip is nearest, which is how sixty
+   * honest nulls become sixty wrong answers nobody can tell from real ones.
+   *
+   * So a ticket that arrived without a type is GRANDFATHERED: the row draws
+   * every chip unpressed (it does not invent one — `values.helpType` stays on
+   * the sentinel, `submit` maps that to `undefined`, and `updateTicket`'s
+   * `optionalText` leaves the stored null exactly as it found it), the field
+   * shows no required marker, and Submit works. Setting a type is offered and
+   * never demanded, which is the same shape `moduleField` already uses one field
+   * up and the same shape `ticketTypeKeptForMigration` uses for a retired word:
+   * never orphan the record that already says something, and never make the
+   * screen lie about a record that says nothing.
+   *
+   * It is narrow on purpose. It reads `initial`, which is the ticket AS OPENED,
+   * so it cannot leak into a create (there is no `initial`), and it does not
+   * follow `values` — once somebody picks a type in this session the field is
+   * answered anyway, and once they SAVE one the next open is an ordinary
+   * required edit. The exemption dies with the row it was written for. */
+  const typeGrandfathered = isEdit && !initial?.helpType?.trim()
+  /** Demanded once there is something to demand and something to demand it OF —
+   * see `typeField`. Both conditions are real states, not defensive coding: a
+   * team can switch every ticket type off on the Choices screen, and sixty
+   * imported tickets carry no type. */
+  const typeRequired = typeOptions.length > 0 && !typeGrandfathered
+  const typeMissing = typeRequired && values.helpType === NONE
+  const typeConfig = typeField(typeRequired)
+
+  /* ── THE APP CHIPS ─────────────────────────────────────────────────────────
+     CLIENT, 2026-09-07: "make app not openable until client is selected, and
+     whe it is horizontal pills instead of dropdown."
+
+     TWO RULINGS, and the second is the same one the type row and the people row
+     already answer, so it is the same component with the same prop: `layout=
+     "row"`. A third hand-written chip line would be three ideas of what a
+     selected chip looks like inside one dialog.
+
+     THE ICONS SURVIVE, which she asked for by name a sentence earlier ("when I
+     select the app, I want to see the icons"). The three fields the closed
+     picker was passing — `picture` (the client's own logo), `mark` (the stage
+     glyph) and the `face` flag that makes an app with NEITHER draw its own
+     initial rather than a blank — are `PickerOption`'s, not the control
+     layout's, and `RowChip` reads the identical three in the identical
+     precedence. So the chips wear exactly what the dropdown's rows wore, at the
+     same `choice` size, out of the same `RecordMark`.
+
+     NO CAP, AND THE NUMBER IS KNOWN RATHER THAN HOPED. The people row one field
+     down leaves its chips uncapped and argues it from the client fence keeping
+     the number small; the same conclusion holds here for a stronger reason,
+     because the ceiling is not an estimate. The agency's own record
+     (glide/RECONCILIATION.md, pulled from the live Glide app on 10 Aug 2026) is
+     TWENTY-EIGHT apps across TWENTY customers — 1.4 apps per client, and 28 is
+     the whole agency's list, which is the most this row can ever draw even with
+     the fence off. A wrapping line of twenty-eight chips in a scrolling dialog
+     is a tall row, not a wall, and the alternative — chips up to some N and a
+     dropdown above it — reintroduces at an unpredictable threshold the exact
+     control she asked to remove. If a team ever does make a wall of this, the
+     honest fix is a cap she can SEE, not a control that changes shape behind
+     her.
+
+     "NO APP" IS STILL A CHIP, and that is not an inconsistency with the type row
+     losing its escape. She ruled that a ticket has a type; she ruled nothing of
+     the sort about the app, and the field's own note two screens up is why —
+     the agency's housekeeping questions are about no system at all, so "no app"
+     is a real and common answer rather than an unread state. The row commits on
+     the click, so a real answer has to be one of the chips.
+
+     THE GATE IS AN ORDERING RULE, NOT A FENCE, and the difference is worth
+     stating because the module row one field down looks identical and is not.
+     There, `moduleForTicket` refuses a module that is not part of the named app,
+     so the picker is shut because an open one could only produce a refusal. The
+     ticket door has NO such opinion about apps: `appForTicket` checks that the
+     app is a live row in the team and nothing else, so every app on this list
+     would be accepted for every client. What the gate buys is the client's own
+     sequence — client, then app, then module, then who — which is the order the
+     rest of this form already depends downward in. Said plainly so nobody later
+     "fixes" it by narrowing the list to the client's own apps: that would hide
+     the agency's own systems (`AppRow.accountId` is null on those) from every
+     client's ticket, and the door has never asked for it. */
+  const appChoices = (appsQ.data ?? []).filter((a) => a.active)
+  /** THE TICKET THAT ALREADY NAMES AN APP AND NO CLIENT, which the gate above
+   * would otherwise hide and then silently save.
+   *
+   * The door allows the pair: `createTicket` stamps a null account on the
+   * agency's own questions and `appForTicket` never asks which client an app
+   * belongs to, so a housekeeping ticket about one of our own systems is a legal
+   * row. Open one under a bare client-gate and the row would read "Choose a
+   * client first." while `values.appId` still held that app — and `submit` would
+   * send it, because nothing on this form clears a value the screen has stopped
+   * showing. That is the same silent-hidden-value bug the client picker's own
+   * `onChange` note describes, arriving from the other direction.
+   *
+   * So the gate asks whether there is anything to SAY about the app yet, which
+   * is a client OR an app the ticket already had, rather than a client alone.
+   * Read off `initial` (the ticket AS OPENED) and not off `values`, for
+   * `typeGrandfathered`'s reason one field up: a row that closed itself the
+   * moment somebody pressed "No app" would jump under their hand. */
+  const appAlreadyNamed = !!initial?.appId
+  /** The chips, with the SAME two empty states the people row has and for the
+   * same reasons — the sentence rather than a lone escape chip, because one
+   * black chip on an otherwise empty line reads as a row that failed to load
+   * its options. */
+  const appOptions =
+    (!chosenAccountId && !appAlreadyNamed) || appChoices.length === 0
+      ? []
+      : [
+          ...appChoices.map((a) => ({
+            value: a.id,
+            label: a.name,
+            picture: a.logoUrl,
+            mark: appStageMark(a.stage),
+            // ALWAYS, even for an app with no logo AND no stage —
+            // `appStageMark` answers "" for a stage nobody has written down,
+            // and without this flag that app would be the one blank chip in a
+            // line of icons. `AppMark` on the ticket LIST has no such hole
+            // because it hands `RecordMark` the job unconditionally; `face` is
+            // how a picker option says the same thing.
+            face: true,
+          })),
+          { value: NONE, label: t("No app") },
+        ]
 
   /* ── THE PEOPLE CHIPS ──────────────────────────────────────────────────────
      CLIENT, 2026-09-07: "the raise by, no dropdown but visible all chips."
@@ -410,9 +596,11 @@ export function HelpFormDialog({
    * row that appears and disappears inside a fixed order moves every field under
    * it as somebody fills the form in. So the field keeps its place and SAYS why
    * it is empty ("Choose a client first.", the same sentence the module picker
-   * has always said one field up about its app), which is a reason rather than a
-   * vanishing act — and it is honest about the agency's own tickets, which have
-   * no client on purpose and will read that line for good.
+   * has always said one field up about its app, and — since 2026-09-07, the
+   * client's own second correction — the very same sentence the APP row says
+   * about its client), which is a reason rather than a vanishing act, and it is
+   * honest about the agency's own tickets, which have no client on purpose and
+   * will read that line for good.
    *
    * A CLIENT WITH NO CONTACTS is the second, and it gets the sentence rather
    * than a lone "Not said" chip: one black chip on an otherwise empty line looks
@@ -428,9 +616,14 @@ export function HelpFormDialog({
             hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
             shape: "round" as const,
           })),
-          // "Not said" is the same escape hatch "No type" is, in the same place
-          // for the same reason: the row commits on the click, so naming the
-          // wrong person has to be undoable without closing the form.
+          // "Not said" is the same escape hatch "No app" is one field up, in
+          // the same place for the same reason: the row commits on the click,
+          // so naming the wrong person has to be undoable without closing the
+          // form. The TYPE row used to have one too and no longer does — see
+          // `typeField`; the difference is not that this row's mechanics are
+          // different but that "nobody said who asked" is a real and common
+          // answer about a ticket, where "this is none of the four kinds" is
+          // not.
           { value: NONE, label: t("Not said"), shape: "round" as const },
         ]
 
@@ -517,7 +710,14 @@ export function HelpFormDialog({
       }
       submit={{
         busy: busy,
-        disabled: !richTextValue(values.description) || moduleMissing,
+        // HOW THIS FORM REFUSES, and there is only one way it does it. Every
+        // required field on this form is a boolean in this expression and
+        // nothing else: no submit-time throw, no per-field error text, no
+        // second validation style. `typeMissing` joins `moduleMissing` here
+        // (see `typeField`) — and the marker each field draws comes from the
+        // SAME boolean, so the button and the label can never disagree about
+        // what is still outstanding.
+        disabled: !richTextValue(values.description) || typeMissing || moduleMissing,
       }}
     >
       {/* THE ORDER IS THE CLIENT'S, 2026-09-07, and it is her own list of seven
@@ -557,7 +757,27 @@ export function HelpFormDialog({
           <RecordPicker
             id="help-account"
             value={values.accountId || NONE}
-            onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
+            // CHANGING THE CLIENT CLEARS THE THREE FIELDS THAT HANG OFF IT, the
+            // same behaviour changing the app already had over the module and
+            // for the same reason: an app row that is only offered once a client
+            // is named must not keep an answer from before one was. Without
+            // this, picking a client, picking an app and then going back to
+            // "Ours, no client" leaves the row showing "Choose a client first."
+            // while `values.appId` still holds an app — and that one WOULD be
+            // saved, silently, because `appForTicket` has no opinion about which
+            // client an app belongs to. The contact rides along because it has
+            // always depended on the client outright (the door refuses a contact
+            // of another company), so a stale one was a refusal waiting to
+            // happen rather than a silent write.
+            onChange={(accountId) =>
+              setValues((v) => ({
+                ...v,
+                accountId,
+                appId: NONE,
+                moduleId: NONE,
+                raisedByContactId: NONE,
+              }))
+            }
             search={(term) => searchAccounts(term, { type: "entity" })}
             searchKey={pickerKey("companies", teamId)}
             emptyOption={{ value: NONE, label: t("Ours, no client") }}
@@ -585,33 +805,59 @@ export function HelpFormDialog({
           other side. Same component, same size, same fallback chain (the
           client's logo where there is one, the stage mark where there is not,
           the name's own initial where there is neither) — one treatment drawn
-          from two call sites, not a second treatment invented here. */}
+          from two call sites, not a second treatment invented here. AS CHIPS
+          since 2026-09-07 ("horizontal pills instead of dropdown"), which
+          changes the surface those three fields are drawn on and nothing about
+          the fields: `RowChip` reads them in the same precedence the open list
+          did. The options, the gate and the no-cap decision are all worked out
+          above.
+
+          THE FIELD KEEPS ITS SLOT WHEN IT HAS NOTHING TO OFFER, which is the
+          same ruling the people row states at length: this form has a FIXED
+          ORDER the client dictated field by field, and a row that appears and
+          disappears inside a fixed order moves every field under it as somebody
+          fills the form in. So it stays where it is and SAYS why it is empty,
+          in the same sentence the module row one field down has always said
+          about ITS app.
+
+          AND ON AN APP'S OWN SCREEN THERE IS NO QUESTION TO ASK. `fixedApp`
+          means the form was opened from the app itself, so which system this is
+          about is a fact about where you are standing — the prop's own note has
+          always said the picker is "replaced by its name", and until today it
+          was not: the row rendered anyway, `submit` sent `fixedApp.id` whatever
+          it said, and the module list followed `fixedApp` too, so a person could
+          press a different chip and change nothing at all. It is drawn as the
+          name now, the same shape `fixedAccount` uses directly above and the
+          same shape the sprint and story forms already use for this exact prop.
+          It is also what keeps the gate honest: the app is known on that screen
+          even when no client is, so a chip row asking for a client first would
+          be refusing to state a fact it already has. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
-        <RecordPicker
-          id="help-app"
-          value={values.appId || NONE}
-          onChange={(appId) => setValues((v) => ({ ...v, appId, moduleId: NONE }))}
-          options={(appsQ.data ?? [])
-            .filter((a) => a.active)
-            .map((a) => ({
-              value: a.id,
-              label: a.name,
-              picture: a.logoUrl,
-              mark: appStageMark(a.stage),
-              // ALWAYS, even for an app with no logo AND no stage —
-              // `appStageMark` answers "" for a stage nobody has written down,
-              // and without this flag that app would be the one blank line in a
-              // list of icons. `AppMark` on the ticket LIST has no such hole
-              // because it hands `RecordMark` the job unconditionally; `face`
-              // is how a picker option says the same thing.
-              face: true,
-            }))}
-          emptyOption={{ value: NONE, label: t("No app") }}
-          placeholder={t("No app")}
-          searchPlaceholder={t("Search apps…")}
-          emptyText={t("No app matched.")}
-          disabled={busy}
-        />
+        {fixedApp ? (
+          <p className="text-muted-foreground text-sm" id="help-app">
+            {fixedApp.name}
+          </p>
+        ) : (
+          <RecordPicker
+            id="help-app"
+            layout="row"
+            // Same wall, same answer as the type and people rows: a group of
+            // chips is not a labelable control, so the name a screen reader
+            // reads comes from the field's own config rather than from the
+            // `<label for>` above it.
+            ariaLabel={t(appField.label)}
+            value={values.appId || NONE}
+            onChange={(appId) => setValues((v) => ({ ...v, appId, moduleId: NONE }))}
+            options={appOptions}
+            searchPlaceholder={t("Search apps…")}
+            emptyText={
+              chosenAccountId || appAlreadyNamed
+                ? t("No apps yet.")
+                : t("Choose a client first.")
+            }
+            disabled={busy}
+          />
+        )}
       </Field>
       {/* WHICH SECTION OF IT. Offered only once an app is chosen, because a
           module belongs to one and the door refuses a pair that does not match —
@@ -649,8 +895,20 @@ export function HelpFormDialog({
           edited a Question. A fixed order and a promoted lead are two different
           promises about the same line, and she made the first one. The chosen
           chip is still drawn BLACK wherever it sits, which is what actually
-          answers "which one is it" without moving anything. */}
-      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
+          answers "which one is it" without moving anything.
+
+          AND IT IS REQUIRED, which is what the config carries here: `typeConfig`
+          is `typeField(typeRequired)`, so the `Required` marker at the row's
+          trailing edge (form-shell.tsx puts it there — "title always left,
+          required always right", her ruling of the same day) is drawn from the
+          same boolean that disables Submit, and stands down on the two states
+          that genuinely cannot answer. Nothing is preselected on a NEW ticket:
+          the row opens with four unpressed chips and Submit refused until one is
+          pressed, which is the honest picture of a question nobody has answered
+          — and it is the reason the old black "No type" chip had to go rather
+          than merely stop being the default, because a black chip at rest said
+          an answer had been given. */}
+      <Field config={typeConfig} htmlFor="help-type" className={fieldSpacing}>
         <RecordPicker
           id="help-type"
           layout="row"
@@ -659,7 +917,7 @@ export function HelpFormDialog({
           // description editor hits two fields down, answered the same way and
           // out of the same config, so the visible label and the spoken one
           // cannot drift.
-          ariaLabel={t(typeField.label)}
+          ariaLabel={t(typeConfig.label)}
           value={values.helpType}
           onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
           options={typeOptions}

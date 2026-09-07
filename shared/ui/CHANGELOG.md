@@ -2,6 +2,77 @@
 
 ## Unreleased
 
+### Fixed — two dark-palette colours that were not faint but absent
+
+The client, on a dark ticket screen: *"in dark mode cannot see the footer- fix
+it"*, and, on the ticket board: *"grerat but status (th header) have no color
+associated."* Both read like taste. Neither was.
+
+**THE RECORD FOOTER WAS PAINTING ITSELF ITS OWN PARENT'S COLOUR.** In dark,
+`--surface-record-footer` resolved to `--surface-raised`, which resolves to
+`--card` — and the record detail's own card *is* `--card`. #26241F on #26241F.
+**Contrast 1.000.** Not a low-contrast surface; the same surface. Every child of
+that footer was drawn correctly, laid out correctly, and sitting on nothing.
+
+CH27.8's dark clause says the ink footer "stops being an inverse surface and
+becomes an ordinary RAISED card", and that sentence is true — of a footer
+sitting on the PAGE. This one sits on a card. Nothing in the clause, and nothing
+in any check, asked what was behind it. **Two tokens can each be correct and
+still name one colour**, which is the whole lesson and the reason the entry
+below shares this heading.
+
+The rule both palettes now keep is the one light already stated: the footer is
+the record's DARKEST band. In light it is the ink card on paper (17.386). In
+dark it RECESSES below the card instead of matching it — `--kw-unlit-page`, an
+existing brand paper, nothing minted. Measured both ways, because this is a card
+that also holds one: **1.198** against the record card above it, and it carries
+`--hair-record-footer` as well, so the boundary is a step AND a rule; and the
+well inside it now reads **1.587**, which is *better* separation than the 1.499
+the same pair manages in light. `docs/TOKENS.md` rows 136 and 137 are corrected.
+
+**AND `--dot-building` WAS INVISIBLE IN DARK — 1.02.** Ruling 26's dark clause
+puts a `building` dot on a MANGO pill, where charcoal is the only legible ink,
+and `GAPS-TRACK1.md` STA-2 recorded the justification plainly: *"Nothing in the
+kit consumes `--pill-fill` or the six `--dot-*` tokens."* That was true when it
+was written. `Kanban`'s column header consumes one now — a bare 7px dot on
+`--surface-panel` — and a value tuned against mango is nothing at all there.
+`docs/TOKENS.md` had documented dark `--dot-building` as `#FFFEF9` the whole
+time and `verify/out.css` still resolved it to off-beige, so source, docs and
+the verify build had been disagreeing with each other.
+
+**So the pill becomes the exception, not the token.** `--dot-building` returns to
+`--foreground` (17.06 on the panel, and the docs are right again), and
+`badge.tsx`'s `variant="status"` + `building` compound variant now repaints its
+own dot with `--pill-label-building` — the charcoal that pill already sets for
+its label, so the dot and the words cannot drift apart. The dot gained a
+`data-slot="badge-dot"` so that variant can reach it without a `span` selector
+that would also catch anything nested in `label`.
+
+Measured, on `--surface-panel`:
+
+| tone | light | dark before | dark after |
+|---|---|---|---|
+| `building` | 15.76 | **1.02** | 17.06 |
+
+The other five are unchanged and are argued separately: `--dot-review` (1.81
+light) and `--dot-archived` (2.21 light) are low, but every one of the six was
+sized for a dot INSIDE a labelled pill, where ruling 26's "the dot never speaks
+alone" holds and the words carry the meaning. The board is the first surface to
+use one bare. Retuning all six for the harder context is a real decision and is
+not being taken in a bug fix — **but no tone may be invisible, and 1.02 was not
+a design position.**
+
+#### FINDING — the check that should have caught both
+
+Neither of these could go red, because nothing in this kit measures a token
+against the surface it is actually used on. Both bugs are the same shape: a
+value that is correct in the context it was written for, consumed in a context
+nobody re-measured. A contrast law — every shipped pair, both palettes, red when
+illegible — would have caught both before either reached a person, and it
+matters more than either fix, because this kit is about to be the only UI input
+for more than one application.
+
+
 ### Changed — a board card reads its chips BEFORE its title, and they are the title's overline rather than a fourth row
 
 Client, 2026-09-07, over a screenshot of a board card reading title-then-chips,

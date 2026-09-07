@@ -1517,7 +1517,32 @@
        "the card moves up to raised #26241F" — so its ink and its rules are
        the ordinary dark ones. `--surface-record-footer-well` is NOT repeated:
        it is one value in both palettes by design (see §3). */
-    --surface-record-footer:          var(--surface-raised);
+    /* CORRECTED 7 Sep 2026 — this line said `var(--surface-raised)`, and the
+       record detail's OWN card is `--card`, which `--surface-raised` IS. So the
+       footer painted itself the exact colour of the thing it sits inside:
+       #26241F on #26241F, contrast 1.000, no boundary of any kind. The client, on
+       a dark ticket screen: "in dark mode cannot see the footer- fix it". It was
+       not faint. It was absent.
+
+       WHY IT WAS MISSED, because the shape of the mistake matters more than the
+       value. CH27.8's dark clause says the ink footer "stops being an inverse
+       surface and becomes an ordinary RAISED card", and that sentence is true of
+       a footer sitting on the PAGE. This one sits on a card, and nothing in the
+       clause — or in any check — asked what was behind it. Two tokens can each be
+       correct and still name one colour.
+
+       THE FIX KEEPS THE RULE THE LIGHT PALETTE ALREADY STATES: the footer is the
+       DARKEST BAND of the record, in both palettes. In light it is the ink card
+       on paper (17.386). In dark it now RECESSES below the card rather than
+       matching it — the same idea, not a second one. `--kw-unlit-page` is an
+       existing brand paper; nothing was minted.
+
+       MEASURED, both relationships, because this is a card that also HOLDS one:
+       1.198 against the record card above it (and it carries
+       `--hair-record-footer` too, so the boundary is a step AND a rule), and the
+       well inside it then reads at 1.587 — better separation than the 1.499 the
+       same pair manages in light. */
+    --surface-record-footer:          var(--kw-unlit-page);
     --ink-on-record-footer:           var(--foreground);
     --ink-on-record-footer-secondary: var(--ink-secondary);
     --hair-record-footer:             var(--hair);
@@ -1628,7 +1653,23 @@
     --dot-shipped:          var(--kw-forest-lift);
     --dot-blocked:          var(--kw-poppy-lift);
     --dot-done:             var(--kw-forest-lift);
-    --dot-building:         var(--kw-charcoal);
+    /* CORRECTED 7 Sep 2026. Charcoal was right for the ONE surface this token was
+       written for, and invisible on the one it reached later. Ruling 26's dark
+       clause puts a `building` dot on a MANGO pill, where charcoal is the only
+       legible ink — and GAPS-TRACK1 STA-2 recorded, as the justification, that
+       "nothing in the kit consumes the six `--dot-*` tokens" outside that pill.
+       `Kanban`'s column header does now: a bare 7px dot on `--surface-panel`,
+       where charcoal measured 1.02. That is the client's "status (th header) have
+       no color associated" — what an invisible dot looks like, described honestly.
+
+       SO THE PILL BECOMES THE EXCEPTION, NOT THE TOKEN. This returns to the value
+       `docs/TOKENS.md` has documented all along (`--foreground`, 17.06 on the
+       panel), and `badge.tsx`'s `variant="status"` + `building` compound variant
+       now paints its own dot `--pill-label-building` — the charcoal that pill
+       already uses for its label, stated beside the fill it has to survive. A
+       token tuned for one context and consumed bare in another is the failure;
+       the fix names the context that is special. */
+    --dot-building:         var(--foreground);
   }
 }
 
@@ -1681,7 +1722,32 @@
      "the card moves up to raised #26241F" — so its ink and its rules are
      the ordinary dark ones. `--surface-record-footer-well` is NOT repeated:
      it is one value in both palettes by design (see §3). */
-  --surface-record-footer:          var(--surface-raised);
+  /* CORRECTED 7 Sep 2026 — this line said `var(--surface-raised)`, and the
+     record detail's OWN card is `--card`, which `--surface-raised` IS. So the
+     footer painted itself the exact colour of the thing it sits inside:
+     #26241F on #26241F, contrast 1.000, no boundary of any kind. The client, on
+     a dark ticket screen: "in dark mode cannot see the footer- fix it". It was
+     not faint. It was absent.
+
+     WHY IT WAS MISSED, because the shape of the mistake matters more than the
+     value. CH27.8's dark clause says the ink footer "stops being an inverse
+     surface and becomes an ordinary RAISED card", and that sentence is true of
+     a footer sitting on the PAGE. This one sits on a card, and nothing in the
+     clause — or in any check — asked what was behind it. Two tokens can each be
+     correct and still name one colour.
+
+     THE FIX KEEPS THE RULE THE LIGHT PALETTE ALREADY STATES: the footer is the
+     DARKEST BAND of the record, in both palettes. In light it is the ink card
+     on paper (17.386). In dark it now RECESSES below the card rather than
+     matching it — the same idea, not a second one. `--kw-unlit-page` is an
+     existing brand paper; nothing was minted.
+
+     MEASURED, both relationships, because this is a card that also HOLDS one:
+     1.198 against the record card above it (and it carries
+     `--hair-record-footer` too, so the boundary is a step AND a rule), and the
+     well inside it then reads at 1.587 — better separation than the 1.499 the
+     same pair manages in light. */
+  --surface-record-footer:          var(--kw-unlit-page);
   --ink-on-record-footer:           var(--foreground);
   --ink-on-record-footer-secondary: var(--ink-secondary);
   --hair-record-footer:             var(--hair);
@@ -1792,7 +1858,23 @@
   --dot-shipped:          var(--kw-forest-lift);
   --dot-blocked:          var(--kw-poppy-lift);
   --dot-done:             var(--kw-forest-lift);
-  --dot-building:         var(--kw-charcoal);
+  /* CORRECTED 7 Sep 2026. Charcoal was right for the ONE surface this token was
+     written for, and invisible on the one it reached later. Ruling 26's dark
+     clause puts a `building` dot on a MANGO pill, where charcoal is the only
+     legible ink — and GAPS-TRACK1 STA-2 recorded, as the justification, that
+     "nothing in the kit consumes the six `--dot-*` tokens" outside that pill.
+     `Kanban`'s column header does now: a bare 7px dot on `--surface-panel`,
+     where charcoal measured 1.02. That is the client's "status (th header) have
+     no color associated" — what an invisible dot looks like, described honestly.
+
+     SO THE PILL BECOMES THE EXCEPTION, NOT THE TOKEN. This returns to the value
+     `docs/TOKENS.md` has documented all along (`--foreground`, 17.06 on the
+     panel), and `badge.tsx`'s `variant="status"` + `building` compound variant
+     now paints its own dot `--pill-label-building` — the charcoal that pill
+     already uses for its label, stated beside the fill it has to survive. A
+     token tuned for one context and consumed bare in another is the failure;
+     the fix names the context that is special. */
+  --dot-building:         var(--foreground);
 }
 
 

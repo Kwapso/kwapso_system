@@ -9,7 +9,9 @@ import { RecordRef } from "@shared/web/record-ref"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 
 /** THE CHIP LINE — four facts and nothing else: the number, the type, the
- * app, the date.
+ * app, the date. (One surface draws the fourth of them under the title
+ * instead of in the row, and says so with `omitDate`; the row is still these
+ * four facts and no fifth.)
  *
  * MOVED HERE FROM `web/components/tickets-collection.tsx` (where it was
  * `TriageChips`), 2026-09-06, BECAUSE THE CLIENT ASKED FOR IT TWICE IN ONE
@@ -76,6 +78,43 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * row is one word too many, so what it is stays in the accessible name
  * instead, where a reader who cannot see the row's shape still hears which
  * date this is.
+ *
+ * ── ONE SURFACE DRAWS THE DATE SOMEWHERE ELSE, AND ASKS FOR IT BY OMISSION ─
+ *
+ * CLIENT, 2026-09-07, over the Open tab's board: *"lets put the date below
+ * title as simole tex"*. A board card is the one ticket surface with a slot
+ * UNDER the title — the kit's `KanbanCard.description`, a quiet tertiary-ink
+ * caption line — and she wants the date in it rather than as the fourth chip
+ * in a row above it. So the board asks for `omitDate` and renders the date
+ * itself, one line down.
+ *
+ * WHY A PROP AND NOT A SECOND CHIP LINE, WHICH IS THE ONLY OTHER SHAPE. This
+ * component exists because the client ruled that every ticket surface draws
+ * the same face ("everywhere else where tickets have pills, reuse this"), and
+ * the failure that ruling forbids is a fifth way of drawing a ticket's number.
+ * A board-flavoured copy of this file would have its own `RecordRef`, its own
+ * type chip, its own app link and its own null rules, and it would be right on
+ * the day it was written and wrong the first time any of the four moved. A
+ * boolean that SUBTRACTS one chip cannot drift from the three it leaves
+ * standing, because they are still the same three elements.
+ *
+ * AND WHY THE PROP IS A SUBTRACTION RATHER THAN A POSITION. The tempting
+ * shape is `datePlacement: "chip" | "below"` — this component drawing the
+ * caption line itself. It cannot: the line does not belong to this component's
+ * box on the board at all. It is a slot in the KIT's card, drawn under a title
+ * this file never sees, between the chips and whatever `content` the card
+ * carries. A `datePlacement` would either have to render outside its own
+ * fragment (it cannot) or make the board card's layout this file's business,
+ * which is exactly the coupling the `typeDot`/`AppLink` props exist to avoid.
+ * The caller owns the placement; this file owns the four facts and is told
+ * when one of them has already been said.
+ *
+ * IT IS THE DATE AND ONLY THE DATE. There is no `omitRef`, no `omitApp` and
+ * no `omitType`, and none should be added on the strength of this one: the
+ * date is the only fact the client has moved off the chip row, and a general
+ * "which chips do you want" prop is the fifth-implementation problem again
+ * wearing an options bag. A second surface that wants a second omission is a
+ * second client ruling, and it can add its own named boolean then.
  *
  * ── WHY THE PAPER IS NEVER NAMED HERE (dependency injection, not an
  *    oversight) ──────────────────────────────────────────────────────────
@@ -206,11 +245,19 @@ export function TicketChips({
    * on the agency side today. See the header comment for why this is a prop
    * and not an import. */
   AppLink,
+  /** THE DATE HAS ALREADY BEEN SAID, one line down, by the caller. The Open
+   * tab's board card is the only surface that passes this today — see the
+   * header for the ruling and for why the prop subtracts a chip rather than
+   * moving one. A caller that sets this and then draws no date anywhere has
+   * silently dropped a fact; the flag is a statement that it is drawn
+   * elsewhere, not permission to lose it. */
+  omitDate = false,
 }: {
   ticket: TicketChipFacts
   typeDot?: React.ReactNode
   appHref?: string
   AppLink: React.ComponentType<{ href: string; className?: string; children: React.ReactNode }>
+  omitDate?: boolean
 }) {
   const { t, lang } = useLanguage()
   // THE URL SEAM, EVEN THOUGH EVERY CALLER BUILDS THIS FROM A TEAM ID AND A
@@ -267,14 +314,21 @@ export function TicketChips({
           </Badge>
         </AppLink>
       )}
-      <Badge
-        variant="secondary"
-        size="pill"
-        className="tabular-nums"
-        aria-label={t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
-      >
-        {formatDate(ticket.createdAt, lang)}
-      </Badge>
+      {/* THE FOURTH CHIP, unless the caller has already said this fact under
+          the title — see `omitDate` and the header's ruling. Guarded here
+          rather than at the three call sites that still want it, so the chip
+          and its accessible name stay one object: a surface that opted out
+          cannot end up with the lozenge gone and the label still spoken. */}
+      {!omitDate && (
+        <Badge
+          variant="secondary"
+          size="pill"
+          className="tabular-nums"
+          aria-label={t("raised {date}", { date: formatDate(ticket.createdAt, lang) })}
+        >
+          {formatDate(ticket.createdAt, lang)}
+        </Badge>
+      )}
     </span>
   )
 }

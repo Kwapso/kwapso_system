@@ -166,7 +166,17 @@ const badgeVariants = cva(
       {
         variant: "status",
         dotTone: "building",
-        class: "bg-[var(--pill-fill-building)] text-[var(--pill-label-building)]",
+        /* …AND THE DOT WITH IT, 7 Sep 2026. `--dot-building` used to BE
+           charcoal in dark, so this pill got a legible dot for free and the
+           token carried the pill's requirement for every other surface. The
+           board's bare dot on paper measured 1.02 under that arrangement, so
+           the token went back to `--foreground` and the debt lands here,
+           where it is one pill rather than every consumer. `--pill-label-
+           building` is the charcoal this pill already sets for its words, so
+           the dot and the label cannot drift apart. */
+        class:
+          "bg-[var(--pill-fill-building)] text-[var(--pill-label-building)] " +
+          "[&_[data-slot=badge-dot]]:bg-[var(--pill-label-building)]",
       },
       /* CH11 draws the Archived pill's label in tertiary ink — the one status
          whose words go quiet along with its dot. */
@@ -336,6 +346,13 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
              never carries the meaning alone (ruling 26); the label says it. */
           <span
             aria-hidden="true"
+            /* NAMED so the ONE compound variant that has to repaint it can
+               reach it (7 Sep 2026). `building`'s dot is `--foreground` on
+               paper and must be charcoal on this pill's mango — two answers
+               for one tone, and the pill is the exceptional half. Without a
+               slot the variant could only reach `span`, which would also
+               catch anything a caller nests in `label`. */
+            data-slot="badge-dot"
             className={cn("size-[var(--dot-status)] shrink-0 rounded-pill", DOT_FILL[dot])}
           />
         ) : null}
