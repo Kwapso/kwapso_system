@@ -9,6 +9,7 @@
 //     act-as-user (the caller's cookie is forwarded), so every imported row respects the
 //     caller's permissions and the module's validation exactly like a typed-in one.
 
+import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { ulid } from "@shared/workers/id"
 import { type Actor } from "@shared/workers/gating"
 import type { Env } from "../env"
@@ -62,8 +63,11 @@ export async function getActiveCatalog(env: Env): Promise<CatalogTarget[]> {
   await reconcileCatalog(env)
   // NO is_active pre-filter in SQL (R13): filter in memory, or "switched off"
   // and "never existed" look identical and the reconcile can't tell them apart.
+  // R14 hard cap on the statement anyway — "one row per code-supported target"
+  // is a fact about today's TARGETS, and a LIMIT is a fact about the read.
   const { results } = await env.DB.prepare(
-    "SELECT id, table_key, display_name, description, required_columns_json, is_active FROM importable_databases"
+    `SELECT id, table_key, display_name, description, required_columns_json, is_active
+       FROM importable_databases LIMIT ${LIST_HARD_CAP}`
   ).all<{
     id: string
     table_key: string
