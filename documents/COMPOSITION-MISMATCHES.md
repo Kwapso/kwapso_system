@@ -387,9 +387,12 @@ highlighted" (ruling 26: never two mangos). This app already assembles
 exactly that shape, out of the same two-to-three parts, already adopted
 individually: `AppShell` is now `ScreenShell` (this file), every record
 screen composes `RecordChrome` through the `RecordScreen` host seam
-(`web/components/records/record-chrome.tsx`), and `StepperHero` is in the hero
-slot wherever a record has stages worth showing (`help-status-stepper.tsx`,
-this session). There is no additional composition to import — the shape
+(`web/components/records/record-chrome.tsx`), and `StepperHero` was in the hero
+slot wherever a record had stages worth showing (`help-status-stepper.tsx`, this
+session) — *reversed on 31 Aug 2026 by the "nothing after the chips" ruling; see
+the `templates/stepper-hero.tsx` entry above, and note that `RecordChrome`'s
+`hero` prop is now passed by no record screen*. There is no additional composition
+to import — the shape
 these two templates document is already built, from parts, under different
 file names. The one real difference is a decision already made rather than
 a gap: `AppShell`'s `ScreenShell` header carries a persistent
@@ -616,7 +619,9 @@ way, just empty. There is no escape hatch. Confirmed unchanged.
 
 `ArchiveConfirmationDialog` (the mandatory-reason sibling of
 `DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
-(the 4-stage door mismatch) are also still real, unresolved mismatches, but
+(the 4-stage door mismatch — that file was deleted on 1 Sep 2026 and the mismatch
+is now moot for a second, larger reason, above) are also still real, unresolved
+mismatches, but
 each is recorded once already — under the `[~]`/`[x]` entry for its sibling
 composition — rather than duplicated here.
 
