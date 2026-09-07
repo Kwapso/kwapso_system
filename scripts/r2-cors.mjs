@@ -57,6 +57,13 @@
 // rule until somebody runs this against it, and until then production's direct
 // path falls back to the streaming door on every upload — by design, and the
 // client reports it (`upload/direct-put-failed`).
+//
+// THE RULE IS LEFT IN PLACE THOUGH THE FAST PATH IS OFF, and that is not an
+// oversight. Staging has no R2 credential today (presign.ts item 3 says why it
+// was taken off), so no signature can be minted and R2 refuses every unsigned
+// request whatever this rule says — a CORS rule on its own grants nothing. What
+// it does is mean the fast path works the moment a properly scoped token is put
+// back, without a second infrastructure step nobody remembers.
 
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs"

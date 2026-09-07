@@ -35,12 +35,23 @@
 //      it is handed; the DOOR is what must never hand it a caller's string, and
 //      `presign-key-is-ours.test.ts` is what holds the door to it.
 //  2 · ONE KEY, `PUT` ONLY, MINUTES OF EXPIRY. Below.
-//  3 · THE CREDENTIAL IS WRITE-ONLY AND SCOPED TO TWO BUCKETS. That is an
+//  3 · THE CREDENTIAL MUST BE WRITE-ONLY AND SCOPED TO TWO BUCKETS. That is an
 //      infrastructure property this code cannot enforce and must not pretend to:
 //      an account-scoped key would turn a worker compromise from "can write
 //      through gated doors" into "can read and delete every object in every
 //      bucket". It is the CONDITION the owner's approval rests on, written out
 //      in the lane report's apply-list, and it is applied by a person.
+//
+//      MEASURED 7 SEP 2026, AND IT IS NOT MET YET. The credential in the
+//      Keychain under `cf-r2-key-kwapso` is account-wide and read-write: signed
+//      against it, LIST every bucket on the account answered 200, GET an object
+//      in the PRODUCTION bucket answered 200, and DELETE answered 204. This
+//      Cloudflare account is shared with two other companies, so that key can
+//      read and destroy their objects too. It had been put on the staging
+//      content worker while this was being built; it was REMOVED the same day,
+//      and staging is back to the streaming door until a scoped token exists.
+//      Do not put a credential here that has not been checked the same way —
+//      the check is four signed requests and it takes a minute.
 //
 // ── AND IT IS OFF UNTIL SOMEBODY TURNS IT ON ────────────────────────────────
 //
