@@ -66,7 +66,7 @@ export type NavItem = {
  * its heading and its three rows (Details · Team · Branding) are gone from
  * the rail — not folded into one of the three sections above, because the
  * client's own instruction names where they go instead, and it isn't a rail
- * section. See `ProfileMenu` (web/components/profile-menu.tsx) for where the
+ * section. See `ProfileMenu` (web/components/shell/profile-menu.tsx) for where the
  * three destinations live now: one "Kwapso" entry landing on `/kwapso`'s own
  * default tab, the same shape Settings already has in this menu —
  * `KwapsoScreen`'s own tab strip (Details · The team · Brand library) is how
@@ -125,14 +125,14 @@ export const NAV: NavItem[] = [
   // `KwapsoScreen`) before the client reversed that in the same breath as
   // Settings: "remove the whole kwapso section from the sidebar and move with
   // your profile and settings." So this is one entry again, landing on the
-  // page's own default tab — `ProfileMenu` (web/components/profile-menu.tsx)
+  // page's own default tab — `ProfileMenu` (web/components/shell/profile-menu.tsx)
   // is the door now, exactly the shape `settings` below already has, and the
   // page's own tab strip (Details · The team · Brand library) is how the
   // other two stay reachable without a second and third row in this menu.
   { slug: "kwapso", path: "/kwapso", title: "Details", icon: "kwapso", group: "none", inRail: false },
   // OFF THE RAIL (client, 31 Aug 2026: "remove settings from navbar, this is
   // only accessible through clicking profile"). The page and the route are
-  // unchanged — `ProfileMenu` (web/components/profile-menu.tsx) is the one door
+  // unchanged — `ProfileMenu` (web/components/shell/profile-menu.tsx) is the one door
   // to it now. `group` is unused while `inRail` is false; kept a real value
   // rather than a cast so the field is never accidentally read as "unset".
   { slug: "settings", path: "/settings", title: "Settings", icon: "settings", group: "none", inRail: false },

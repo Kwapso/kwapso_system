@@ -942,7 +942,7 @@ and it is the owner's call which" ended with the owner deleting the category.
 `workers/mcp/`. `POST /mcp` (JSON-RPC) + session-gated token management under
 `/api/mcp/tokens*`; the staff-only rule is `workers/mcp/src/lib/staff.ts` (called from
 `postToken` and from the session bridge, held by `test/staff-only.test.ts`); the
-human-facing card is `web/components/access-tokens.tsx`
+human-facing card is `web/components/team/access-tokens.tsx`
 (Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migrations
 `0013` + `0016`, `expires_at`, backfilled so applying it gives every existing token a
 full term rather than killing it); the TTL and the per-person cap are

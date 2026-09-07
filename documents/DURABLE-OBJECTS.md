@@ -472,7 +472,7 @@ runtime drops it on close).
 ### Step 4, the client patches ONE row (browser)
 
 `shared/web/realtime.ts` receives the frame and calls the host's `onEvent`; the
-registry-driven handler in `web/components/app-shell.tsx` decides what to do. It
+registry-driven handler in `web/components/shell/app-shell.tsx` decides what to do. It
 is **not** a per-resource `switch`, every module is one entry in
 `TEAM_RESOURCES`:
 

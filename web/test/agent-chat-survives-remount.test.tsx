@@ -1,6 +1,6 @@
 // THE REMOUNT THIS HOOK MUST SURVIVE.
 //
-// AgentHost (web/components/agent-host.tsx) renders EITHER the docked column
+// AgentHost (web/components/assistant/agent-host.tsx) renders EITHER the docked column
 // OR a floating `Popover` — two structurally different subtrees at the same
 // return, picked by `useShellColumns()`'s 48rem query — so crossing that
 // width (a window drag, a tablet rotating through its own portrait width)

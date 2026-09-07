@@ -23,7 +23,7 @@ describe("the one shell — no reload on in-app navigation", () => {
   })
 
   it("every account module has a render branch in the shell (no blank screen)", () => {
-    const src = read("components/deep-link-screen.tsx")
+    const src = read("components/deep-link/deep-link-screen.tsx")
     for (const m of ACCOUNT_MODULES)
       expect(src, `deep-link-screen must render a screen for module "${m}"`).toContain(`module === "${m}"`)
   })
@@ -33,12 +33,12 @@ describe("the one shell — no reload on in-app navigation", () => {
     // components + the account screens must use softNavigate instead. (router.replace to
     // a pre-auth route like /login on sign-out is fine — that's leaving the app.)
     const files = [
-      "components/profile-menu.tsx",
-      "components/team-switcher.tsx",
-      "components/invitations.tsx",
+      "components/shell/profile-menu.tsx",
+      "components/shell/team-switcher.tsx",
+      "components/team/invitations.tsx",
       "components/screens/home-screen.tsx",
       "components/screens/settings-screen.tsx",
-      "components/app-shell.tsx",
+      "components/shell/app-shell.tsx",
     ]
     for (const f of files) {
       const src = read(f)
@@ -96,7 +96,7 @@ describe("the one shell — no reload on in-app navigation", () => {
   it("in-app-anchors: the InAppLink seam actually intercepts", () => {
     // A component everything is routed through, that forgot to preventDefault,
     // would turn the rule above into decoration.
-    const src = read("components/in-app-link.tsx")
+    const src = read("components/shell/in-app-link.tsx")
     expect(src, "InAppLink must render a real <a> so middle-click still works").toMatch(/<a\b/)
     expect(src, "InAppLink must cancel the browser's own navigation").toContain("preventDefault()")
     expect(src, "InAppLink must move through the soft-nav bus").toContain("softNavigate")
@@ -108,7 +108,7 @@ describe("the one shell — no reload on in-app navigation", () => {
     expect(nav).toContain("export function softNavigate")
     expect(nav).toContain("export function registerHostGo")
     // The shell registers its go() so softNavigate resolves to a soft History-API move.
-    expect(read("components/deep-link-screen.tsx")).toContain("registerHostGo(go)")
+    expect(read("components/deep-link/deep-link-screen.tsx")).toContain("registerHostGo(go)")
   })
 })
 
@@ -136,7 +136,7 @@ describe("the shell's own chrome stays on screen", () => {
   // content, which is what put the account menu off screen), and the nav inside
   // it scrolls on its own. Both are read off the one element that carries them.
   const railClasses = () => {
-    const src = read("components/app-shell.tsx")
+    const src = read("components/shell/app-shell.tsx")
     const line = src
       .split("\n")
       .find((l) => l.includes("data-rail-collapsed") === false && l.includes("flex min-h-0 flex-1 flex-col"))
@@ -164,7 +164,7 @@ describe("the shell's own chrome stays on screen", () => {
     // COMMENT-STRIPPED, because this file EXPLAINS the mechanism it no longer
     // uses — a prose mention of the old class pair would fail a check about
     // what the file draws.
-    const drawn = stripComments(read("components/app-shell.tsx"))
+    const drawn = stripComments(read("components/shell/app-shell.tsx"))
     expect(
       drawn,
       "the rail must not re-grow a viewport height of its own — the shell's column already is one"
@@ -190,7 +190,7 @@ describe("the shell's own chrome stays on screen", () => {
   // region scrolls in its own wrapper so a long list can never push the team
   // switcher or the account menu off the bottom of the window.
   it("the nav region is a bounded, independently-scrolling wrapper around Rail", () => {
-    const src = read("components/app-shell.tsx")
+    const src = read("components/shell/app-shell.tsx")
     // Substring, not the exact class list (31 Aug 2026): the wrapper also picked
     // up `overflow-x-clip` (a real bug fix — Rail's own row bleed made this
     // wrapper's un-set overflow-x compute to `auto`, letting the rail drag
@@ -207,7 +207,7 @@ describe("the shell's own chrome stays on screen", () => {
     // the note in app-shell.tsx); the actual account menu (profile, settings,
     // appearance, sign out) has no Rail slot, so it stays a real,
     // separately-composed control rather than being dropped.
-    const src = read("components/app-shell.tsx")
+    const src = read("components/shell/app-shell.tsx")
     const rail = src.indexOf("<Rail")
     expect(rail, "app-shell must render the kit's Rail").toBeGreaterThan(-1)
     // NO `compact` PROP ANY MORE (client feedback, 1 Sep 2026: "kill the three
@@ -236,9 +236,9 @@ describe("the shell's own chrome stays on screen", () => {
     // Asserted BOTH ways on purpose: "it left the rail" alone would pass if it
     // had simply been deleted, and a theme control nobody can reach is worse
     // than a wide one.
-    const shell = read("components/app-shell.tsx")
+    const shell = read("components/shell/app-shell.tsx")
     expect(shell, "the shell must not draw it inline").not.toContain("<ModeToggle")
-    expect(read("components/profile-menu.tsx"), "…and the menu must").toContain("<ModeToggle")
+    expect(read("components/shell/profile-menu.tsx"), "…and the menu must").toContain("<ModeToggle")
   })
 
   it("Rail never gets a real in-app href (its own <a> never calls preventDefault)", () => {
@@ -248,7 +248,7 @@ describe("the shell's own chrome stays on screen", () => {
     // it. Wiring `RailItem.href` to an in-app path would hard-reload this
     // static-export shell on every click (EDGE-CASES.md's trap, R37). Every
     // row and the member chip must go through `onSelect` only.
-    const src = read("components/app-shell.tsx")
+    const src = read("components/shell/app-shell.tsx")
     const groups = src.indexOf("const railGroups")
     const member = src.indexOf("const railMember")
     expect(groups, "railGroups must be built in app-shell.tsx").toBeGreaterThan(-1)

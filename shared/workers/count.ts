@@ -26,7 +26,7 @@
 // count exact and cache it for a minute per collection per team. It was rejected
 // for two reasons, and the second is the one that decided it:
 //
-//   1. A CACHE FIGHTS A MECHANISM THAT ALREADY EXISTS. `web/components/app-shell.tsx`
+//   1. A CACHE FIGHTS A MECHANISM THAT ALREADY EXISTS. `web/components/shell/app-shell.tsx`
 //      bumps the primed `total:` sidecar by ±1 on every add/remove ping, so the
 //      badge is already correct BETWEEN fetches. A 60-second server cache would be
 //      overwritten back to the stale value by the next list fetch: create a ticket,

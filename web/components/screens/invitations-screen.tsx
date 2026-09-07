@@ -3,7 +3,7 @@
 // The Invitations inbox — where the invite email's "Join" button lands. A content
 // component rendered inside the one deep-link shell (the shell provides AppShell chrome).
 
-import { InvitationsPanel } from "@/components/invitations"
+import { InvitationsPanel } from "@/components/team/invitations"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
 

@@ -138,7 +138,7 @@ describe("AgentMarkdown toHtml — XSS-safe", () => {
 // this locks the two classes that have to travel together, and the browser
 // measurement above is what says they are the right two.
 describe("a markdown table scrolls inside the bubble instead of widening it", () => {
-  const src = readFileSync(join(__dirname, "..", "components", "agent-markdown.tsx"), "utf8")
+  const src = readFileSync(join(__dirname, "..", "components", "assistant", "agent-markdown.tsx"), "utf8")
   const wrapper = /<div className="([^"]*overflow-x-auto[^"]*)">\s*\n\s*<table/.exec(src)
 
   it("the table's own wrapper is the one this scan found", () => {

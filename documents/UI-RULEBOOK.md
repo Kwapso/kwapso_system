@@ -111,7 +111,7 @@ because the field drifts, the card colour changes while you look at it. That is 
 
 ### Finding 2: two thirds of a wide screen is empty margin
 
-`web/components/deep-link-screen.tsx:330` is the only width cap in the agency app and it
+`web/components/deep-link/deep-link-screen.tsx:330` is the only width cap in the agency app and it
 governs every module screen:
 
 ```
@@ -131,7 +131,7 @@ Glide app runs edge to edge with roughly a 45px gutter and no cap at all
 all of them chrome switchers (`profile-menu.tsx`, `team-switcher.tsx`,
 `web-portal/components/account-switcher.tsx`, `shared/web/language-menu.tsx`). So every
 action a record has is a visible button, which is why the ticket detail grew six on the
-title line plus two below (`web/components/help-detail.tsx:418-539`). The three-dot menu
+title line plus two below (`web/components/tickets/help-detail.tsx:418-539`). The three-dot menu
 is net-new work, and it is the single highest-leverage change in this document. The old
 app had one on every record (`A-3.57.42`, `A-4.05.52`, `A-4.07.25`).
 
@@ -325,13 +325,13 @@ deliberate restraint worth carrying into a working tool.
 
 ### L1: one page container, one cap
 
-Replace `max-w-3xl` at `web/components/deep-link-screen.tsx:330` with:
+Replace `max-w-3xl` at `web/components/deep-link/deep-link-screen.tsx:330` with:
 
 ```tsx
 className="mx-auto flex w-full max-w-[1600px] flex-col gap-6"
 ```
 
-and set the shell gutters at `web/components/app-shell.tsx:373`:
+and set the shell gutters at `web/components/shell/app-shell.tsx:373`:
 
 ```tsx
 <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 pb-24 sm:px-6 lg:px-10 md:pb-8">
@@ -633,7 +633,7 @@ are never mixed.
 "9 Open Stories". "16 Open Tickets". "21 Active Apps". "1 Open Issues".
 
 This is R16's `formatCount` seam plus `CollectionHeading`
-(`web/components/collection-heading.tsx`), which already renders the count as a chip
+(`web/components/records/collection-heading.tsx`), which already renders the count as a chip
 beside the `<h1>`. The change is the wording: the number leads, and the heading names the
 filter state it is counting.
 
@@ -642,7 +642,7 @@ Evidence: `A-3.59.37`, `A-3.59.42`, `A-4.05.42`, `A-4.07.02`, `A-4.00.30`.
 ### K4: a tab that reveals a collection carries the count as a badge, and the heading stands down
 
 Already law (R8, R16) and already arbitrated by
-`web/components/counted-tabs.tsx`. Restated because the old app is a clean model of it:
+`web/components/records/counted-tabs.tsx`. Restated because the old app is a clean model of it:
 "Backlog 11", "Tickets 16", "Ready 1", "Issues 1", "Questions 4", "Requests 24",
 "Extras 170".
 
@@ -707,7 +707,7 @@ Ranking, when you have to choose which two survive:
 3. Everything else: Edit, Archive, Deactivate, Translate, Reply by email, Make it a
    story, Move up, Move down, Read the transcript, Take it back out.
 
-Concrete target, `web/components/help-detail.tsx:418-539`, which is Aurora's seven:
+Concrete target, `web/components/tickets/help-detail.tsx:418-539`, which is Aurora's seven:
 
 | Action | Line today | Where it goes |
 |---|---|---|
@@ -1169,8 +1169,8 @@ Use a comma, a full stop, a colon or a pair of brackets. In a dot-separated meta
 
 There are about **53** em dashes in user-visible strings today (the ~2,100 total
 occurrences are overwhelmingly in code comments, which are not covered by this rule).
-Highest counts: `web/components/google-connections.tsx` (4),
-`web/components/access-tokens.tsx` (4), then `time-panel.tsx`,
+Highest counts: `web/components/knowledge/google-connections.tsx` (4),
+`web/components/team/access-tokens.tsx` (4), then `time-panel.tsx`,
 `staff-profile-dialog.tsx`, `process-detail.tsx`, `meeting-form-dialog.tsx`,
 `meeting-detail.tsx`, `knowledge-detail.tsx`, `help-form-dialog.tsx`,
 `google-source-dialog.tsx`, `deep-link/write-panels.tsx`, `app-form-dialog.tsx` (2 each).
@@ -1388,12 +1388,12 @@ these rows stand as the evidence that round was ordered on, not as today's scree
 | Band | File | Units |
 |---|---|---|
 | The language switcher | `shared/web/language-section.tsx:72` | **29** |
-| Meetings, `?view=all` table | `web/components/meetings-screen.tsx:72` | 9 columns |
-| A work-log row | `web/components/time-panel.tsx` | 8 |
-| A process step row | `web/components/process-detail.tsx` | 8 |
-| A sprint overview row | `web/components/sprints-screen.tsx` | 7 |
-| A story's work-log row | `web/components/story-detail.tsx:214` | 7 |
-| A process version row | `web/components/process-detail.tsx:287` | 7 |
+| Meetings, `?view=all` table | `web/components/meetings/meetings-screen.tsx:72` | 9 columns |
+| A work-log row | `web/components/work/time-panel.tsx` | 8 |
+| A process step row | `web/components/process/process-detail.tsx` | 8 |
+| A sprint overview row | `web/components/work/sprints-screen.tsx` | 7 |
+| A story's work-log row | `web/components/work/story-detail.tsx:214` | 7 |
+| A process version row | `web/components/process/process-detail.tsx:287` | 7 |
 | The portal's `StepLine` | `web-portal/components/impact-screen.tsx:72` | 7 |
 
 The fix is never a smaller font. It is
@@ -1412,11 +1412,11 @@ CollectionCard**, which is V=3 and passes. Every screen that fails does so by in
 something between the heading and the rows:
 
 - **Tickets** puts a TriageStrip, an outer tab strip and an inner tab strip in there
-  (`web/components/tickets-collection.tsx:148-193`). V=6.
+  (`web/components/tickets/tickets-collection.tsx:148-193`). V=6.
 - **Sprints** adds a state heading and a kind label above the first row
-  (`web/components/sprints-screen.tsx:212`). V=5.
+  (`web/components/work/sprints-screen.tsx:212`). V=5.
 - **Processes** puts the whole ImpactPanel, an accordion three levels deep, above the list
-  (`web/components/processes-screen.tsx:67`). V=4.
+  (`web/components/process/processes-screen.tsx:67`). V=4.
 - **Knowledge base** puts the ask box above the list
   (`web/components/deep-link/collection-content.tsx:461`). V=4.
 
@@ -1440,11 +1440,11 @@ This is the "twisted" rule, and it is the one that does not show up in a count.
 
 A band fails when its units are co-located rather than related. Two live examples:
 
-- **Dropdown values** (`web/components/selectable-screen.tsx:115`) puts a filter bar that
+- **Dropdown values** (`web/components/choices/selectable-screen.tsx:115`) puts a filter bar that
   says "Showing X of Y" on the same band as a search box and a status Select. The count is
   a *result*, the search and the select are *causes*. Three units, one band, two different
   questions.
-- **Internal rates** (`web/components/internal-rate-card.tsx:138`) puts the label, the
+- **Internal rates** (`web/components/money/internal-rate-card.tsx:138`) puts the label, the
   rate, "Used when unnamed", "Retired", Edit and Retire on one row: two facts, two states
   and two actions, in one left-to-right sweep.
 
@@ -1492,7 +1492,7 @@ the border comes off and this amendment is deleted.
 ([C10](#c10-there-is-one-ink-stepped-by-opacity-not-a-grey-ramp)). Two live breaches, both
 cheap:
 
-- `web/components/import-screen.tsx` uses `amber-500`, `amber-600`, `emerald-600` and
+- `web/components/screens/import-screen.tsx` uses `amber-500`, `amber-600`, `emerald-600` and
   `emerald-500` at lines 309, 310, 423, 425, 482, 484. **11 class occurrences, one file,
   the only file in either front door that touches a banned Tailwind ramp.** They mean
   warning and success, and both are tokens already: `text-warning` and `text-success`.
@@ -1527,15 +1527,15 @@ and it is countable:
 
 A heading, a paragraph, a single stat, a single action, a callout, an audit footer: bare on
 the page, separated by `gap-6`. Today the app draws **130 border classes across 58 files**,
-plus 6 `divide-y`. The heaviest are `web/components/import-screen.tsx` (9),
-`web/components/process-detail.tsx` (8), `web-portal/components/impact-screen.tsx` (7),
-`web/components/app-shell.tsx` (6) and `web/components/internal-rate-card.tsx` (5).
+plus 6 `divide-y`. The heaviest are `web/components/screens/import-screen.tsx` (9),
+`web/components/process/process-detail.tsx` (8), `web-portal/components/impact-screen.tsx` (7),
+`web/components/shell/app-shell.tsx` (6) and `web/components/money/internal-rate-card.tsx` (5).
 Import's review phase draws a bordered card per step inside a bordered plan inside a
 bordered screen, and that is the twisted feeling arriving as geometry.
 
 `<Separator>` is used **zero** times and stays that way: a separator inside a block is a
 hairline, and a separator between blocks is `gap-6`. `shadow-*` is used **once**
-(`web/components/agent-host.tsx:45`), on the floating assistant button, which is the one
+(`web/components/assistant/agent-host.tsx:45`), on the floating assistant button, which is the one
 thing on screen that genuinely hovers. No other shadow ships.
 
 ### N7: five gaps, and each one means something
@@ -1565,7 +1565,7 @@ nowhere to rest and no way to tell where one idea ends and the next begins.
 The conversion is mechanical: `gap-1.5` becomes `gap-1` inside a control and `gap-2`
 between controls; `gap-3` becomes `gap-2` inside a group and `gap-4` between rows; `gap-5`
 and `gap-8` become `gap-6`. `space-y-*` is used twice
-(`web/components/install-prompt.tsx:114,128`) and both become `gap-*` on a flex column.
+(`web/components/shell/install-prompt.tsx:114,128`) and both become `gap-*` on a flex column.
 
 ### N8: one width, one set of gutters, and no screen sets its own
 
@@ -1576,7 +1576,7 @@ good. I just don't know why it's not applied to other places."*
 
 Here is why. Work logs, tasks and meetings render through `DeepLinkScreen`, whose one
 container is `mx-auto flex w-full max-w-[1600px] flex-col gap-6`
-(`web/components/deep-link-screen.tsx:336`). At 1440 that is 1120px of content in 1120px
+(`web/components/deep-link/deep-link-screen.tsx:336`). At 1440 that is 1120px of content in 1120px
 of available room, **S = 100%**. Six screens do not go through it and cap themselves
 instead:
 
@@ -1587,7 +1587,7 @@ instead:
 | Profile | `web/components/screens/profile-screen.tsx:58` | `max-w-2xl` | 60% |
 | Invitations | `web/components/screens/invitations-screen.tsx:13` | `max-w-2xl` | 60% |
 | Kwapso | `web/components/screens/kwapso-screen.tsx:65` | `max-w-3xl` (768) | 69% |
-| The shell's own loading skeleton | `web/components/app-shell.tsx:489` | `max-w-2xl` | 60% |
+| The shell's own loading skeleton | `web/components/shell/app-shell.tsx:489` | `max-w-2xl` | 60% |
 
 The last one is worth its own sentence: the skeleton is 672px wide and the content that
 replaces it is 1120px, so **every cold load of the agency app visibly snaps sideways.**
@@ -1662,9 +1662,9 @@ Three more controls meet the same test today, and two of them take the same answ
 
 - `shared/web/scale-section.tsx:84` renders 3 buttons. **Three is chips. It passes, leave
   it alone.** ([S4](#s4-the-scale-setting-is-three-steps-and-it-sets-one-css-variable))
-- `web/components/time-panel.tsx:117` renders one button per assigned story, unbounded.
+- `web/components/work/time-panel.tsx:117` renders one button per assigned story, unbounded.
   Past six it is a dropdown.
-- `web/components/tickets-collection.tsx:168-178` builds an inner strip of
+- `web/components/tickets/tickets-collection.tsx:168-178` builds an inner strip of
   `4 + N ticket types`, so it crosses six the moment a team defines three types. The tab
   strip stops at six and the rest becomes a filter facet, which is what it always was:
   ticket type is a *filter*, not a *view*.
@@ -1680,15 +1680,15 @@ Here is what is achievable today without touching the library, and what is not.
 - The nav rail already resolves its glyph from `CONCEPT_ICON` in `web/lib/pages.ts:262`.
   Every destination has one; keep it that way, and add the concept there before the screen.
 - A tab strip already takes an icon per tab: `TabsView` is given `icon` on every team
-  section (`web/components/team-section-nav.tsx:42-59`), and
+  section (`web/components/shell/team-section-nav.tsx:42-59`), and
   [R3](../RULES.md) is written around "icon + count badge". Any strip that
   is missing icons can have them today.
 - A **collection heading** may carry its concept glyph beside the title.
   `CollectionHeading` is the host's own component
-  (`web/components/collection-heading.tsx`), so this is a host change.
+  (`web/components/records/collection-heading.tsx`), so this is a host change.
 - A **group heading** inside a collection may carry the type mark: the sprints overview
-  already does it (`web/components/sprints-screen.tsx`), and so does the header band
-  (`TypeMark` in `web/components/record-chrome.tsx`).
+  already does it (`web/components/work/sprints-screen.tsx`), and so does the header band
+  (`TypeMark` in `web/components/records/record-chrome.tsx`).
 - Any **host-composed** row may carry a mark, because the library `List` has the slot:
   `item.leading` (`shared/ui/components/list/list.tsx`). Home and Settings use it
   today.
@@ -1730,7 +1730,7 @@ whole section above exists.
 holding Blocked, Edit, Archive and Delete. `A-3.57.42`: a meeting detail with nothing but
 a three-dot. `P-4.10.05`: a portal app detail with exactly "Open App" and "New Ticket".
 
-Here, `web/components/help-detail.tsx:418-539` puts Translate, Answer, Reply by email,
+Here, `web/components/tickets/help-detail.tsx:418-539` puts Translate, Answer, Reply by email,
 Make it a story, Edit, Archive, Move up and Move down on the same screen region, and the
 codebase contains no overflow menu at all. The old app made the primary action obvious by
 removing its competitors. See [B1](#b1-two-visible-actions-maximum-on-any-title) and
@@ -1762,7 +1762,7 @@ five. The result is a wall of text with no shape. See
 `A-4.06.36`, `A-4.05.42`, `A-4.08.47`: content runs edge to edge with a gutter of roughly
 45px and no width cap, so a table of nine stories shows five columns without truncating
 any of them. This app caps every module screen at 768px
-(`web/components/deep-link-screen.tsx:330`), so the same table would truncate at column
+(`web/components/deep-link/deep-link-screen.tsx:330`), so the same table would truncate at column
 two while 138px of empty page sits on either side, and over 700px on a large display. See
 [L1](#l1-one-page-container-one-cap).
 
@@ -1878,10 +1878,10 @@ implemented. Kept as the record of what landed and where:
 |---|---|---|
 | `shared/web/library-overrides.css` | C3, C11 | The `.glass` override deleted outright. Killed the pink and the drift. **Done.** |
 | `web/components/deep-link/screen-bits.tsx` | C2, B3, S3 | `CollectionCard` flattened; the add button became an icon. **Done.** |
-| `web/components/deep-link-screen.tsx` | L1 | One line: `max-w-3xl` became `max-w-[1600px]`. **Done.** |
-| `web/components/app-shell.tsx` | L1, S2, T2 | Gutters and the 11px tab labels. **Done.** |
+| `web/components/deep-link/deep-link-screen.tsx` | L1 | One line: `max-w-3xl` became `max-w-[1600px]`. **Done.** |
+| `web/components/shell/app-shell.tsx` | L1, S2, T2 | Gutters and the 11px tab labels. **Done.** |
 | `shared/web/form-shell.tsx` | F1, F2, F3 | The three-row grid, the pinned action bar, "Submit". **Done.** |
-| `web/components/help-detail.tsx` | B1, B2, L7, T5 | Six buttons became one plus a menu; the title became an `<h1>`. **Done**, via the new `web/components/record-chrome.tsx`. |
+| `web/components/tickets/help-detail.tsx` | B1, B2, L7, T5 | Six buttons became one plus a menu; the title became an `<h1>`. **Done**, via the new `web/components/records/record-chrome.tsx`. |
 | `web/components/deep-link/shape.tsx` | K1, W1, W2 | Subtitles dropped to three facts. **Done.** |
 
 ### The seven files that carry the density round
@@ -1895,8 +1895,8 @@ R32 the ramp). Every one was ordered, with its exact diff, in
 |---|---|---|
 | `web/components/screens/*.tsx` (5 files) + `app-shell.tsx:489` | N8 | Delete six `max-w-2xl` / `max-w-3xl` caps. Six screens go from 60% span to 100%, and the cold-load width jump stops. **Done** — and held by R29 (`SCREEN_WIDTH_EXEMPT` is down to one reasoned entry). |
 | `shared/web/language-section.tsx` | N1, N10 | 29 pills become one dropdown showing the flag and the native name. Removes the single worst band in either front door. **Done** — it is the library `Select`, and `LANGUAGES` is four. |
-| `web/components/time-panel.tsx` | N1, N4 | The 8-fact work-log row becomes a title plus a three-fact meta line. **Done.** |
-| `web/components/process-detail.tsx` | N1, N4, N6 | The 8-fact step row, and three nested bordered containers, become one. **Done.** |
-| `web/components/meetings-screen.tsx` | N1 | The 9-column all-view table drops to six columns. **Done.** |
-| `web/components/tickets-collection.tsx` | N2, N10 | Six blocks before the first ticket become three; the derived type strip becomes a facet. **Done.** |
-| `web/components/import-screen.tsx` | N5, N6 | The only file in either app using a banned Tailwind ramp, and the heaviest border user (9). **Done** — and held by R32. |
+| `web/components/work/time-panel.tsx` | N1, N4 | The 8-fact work-log row becomes a title plus a three-fact meta line. **Done.** |
+| `web/components/process/process-detail.tsx` | N1, N4, N6 | The 8-fact step row, and three nested bordered containers, become one. **Done.** |
+| `web/components/meetings/meetings-screen.tsx` | N1 | The 9-column all-view table drops to six columns. **Done.** |
+| `web/components/tickets/tickets-collection.tsx` | N2, N10 | Six blocks before the first ticket become three; the derived type strip becomes a facet. **Done.** |
+| `web/components/screens/import-screen.tsx` | N5, N6 | The only file in either app using a banned Tailwind ramp, and the heaviest border user (9). **Done** — and held by R32. |

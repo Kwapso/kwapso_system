@@ -100,7 +100,7 @@ describe("the panel is wired to that step list", () => {
   // renders them — otherwise the two could drift and the admin would still be
   // approving a bare label.
   const HERE = dirname(fileURLToPath(import.meta.url))
-  const panel = readFileSync(join(HERE, "..", "components", "agent-panel.tsx"), "utf8")
+  const panel = readFileSync(join(HERE, "..", "components", "assistant", "agent-panel.tsx"), "utf8")
 
   it("agent-panel.tsx feeds chat.confirmSteps to <RunSteps>", () => {
     expect(panel).toMatch(/<RunSteps\s+steps=\{chat\.confirmSteps\}/)

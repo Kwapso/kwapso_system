@@ -27,7 +27,7 @@ vi.mock("@shared/web/store", async (importOriginal) => {
   return { ...actual, useCached: () => ({ data: holder.view, error: undefined }) }
 })
 
-import { AppMoneyPanel } from "@/components/app-money-panel"
+import { AppMoneyPanel } from "@/components/apps/app-money-panel"
 
 afterEach(cleanup)
 

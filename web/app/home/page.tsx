@@ -5,7 +5,7 @@
 // History-API nav, never a reload. The Home content is HomeScreen (deep-link-screen.tsx
 // dispatches to it).
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export default function HomePage() {
   return <DeepLinkScreen />

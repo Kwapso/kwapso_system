@@ -597,7 +597,7 @@ export function brandAssetsKey(teamId: string): string {
  *
  * WRITTEN HERE RATHER THAN IN THE PANEL, and that is the difference from the
  * ticket's twin rather than a stylistic choice. `helpAttachmentsKey` lives in
- * `web/components/help-attachments.tsx`, so `TEAM_RESOURCES.help` — which is
+ * `web/components/tickets/help-attachments.tsx`, so `TEAM_RESOURCES.help` — which is
  * `lib`, and must not import a component — cannot NAME it, and does not: a
  * ticket's attachment list is dropped by nothing at all, so a screenshot a
  * colleague adds appears on their screen and not on yours. Putting the story's
@@ -608,7 +608,7 @@ export function storyAttachmentsKey(storyId: string): string {
 }
 /** …AND THE TICKET'S, for the same reason and after the same bug.
  *
- * This lived in `web/components/help-attachments.tsx` and carried a comment
+ * This lived in `web/components/tickets/help-attachments.tsx` and carried a comment
  * saying "the ticket's own deps carry this". They did not. They could not: this
  * file is `lib`, `lib` must not import a component, so `TEAM_RESOURCES.help`
  * below had no way to NAME the key even though the resource it needed was

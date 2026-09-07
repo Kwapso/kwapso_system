@@ -21,7 +21,7 @@
 import { cleanup, render } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { layout, RelationshipMap } from "@/components/relationship-map"
+import { layout, RelationshipMap } from "@/components/records/relationship-map"
 
 afterEach(cleanup)
 

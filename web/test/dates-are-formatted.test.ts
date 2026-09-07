@@ -119,13 +119,13 @@ const ROOTS = [
  * pattern it was pinned for is a stale exemption, exactly as much a failure
  * as an unlisted offender — so the list can only shrink or stay current. */
 const RAW_DATE_EXEMPT: Record<string, string> = {
-  "web/components/record-calendar.tsx:149":
+  "web/components/records/record-calendar.tsx:149":
     "the month heading needs the reader's own LONG month name + year — " +
     "shared/web/format.ts has no formatter for that shape (formatMonth is " +
     "the short-month AXIS one) — so it calls Intl directly, with the real " +
     "`lang` (this line used to pass `undefined`, which is the bug R1 of this " +
     "pass fixed).",
-  "web/components/record-calendar.tsx:159":
+  "web/components/records/record-calendar.tsx:159":
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
@@ -138,7 +138,7 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "same shape as use-record-activity.ts:139 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute.",
-  "web/components/work-panels.tsx:1178":
+  "web/components/work/work-panels.tsx:1178":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +

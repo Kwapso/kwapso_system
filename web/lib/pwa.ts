@@ -1,5 +1,5 @@
 // PWA install detection — pure, browser-only helpers used by the install
-// prompt (components/install-prompt.tsx). No deps; safe to import anywhere.
+// prompt (components/shell/install-prompt.tsx). No deps; safe to import anywhere.
 
 export type PwaPlatform = "ios" | "android" | "desktop"
 

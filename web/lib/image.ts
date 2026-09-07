@@ -19,7 +19,7 @@ import { KNOWLEDGE_FILE_MAX_BYTES } from "@shared/workers/limits"
 // `shared/workers/limits.ts`'s own name for the one number this app already
 // teaches on every other upload door (its own comment says so); it is pure
 // constants with no imports, so importing it here costs the browser bundle
-// nothing, and `web/components/access-tokens.tsx` already reaches into the
+// nothing, and `web/components/team/access-tokens.tsx` already reaches into the
 // same file for `MCP_TOKEN_TTL_DAYS`. One cap, read once, never retyped.
 export const MAX_UPLOAD_BYTES = KNOWLEDGE_FILE_MAX_BYTES
 

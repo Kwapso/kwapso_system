@@ -122,7 +122,7 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver
 
-import { AccountDetailScreen } from "@/components/account-detail"
+import { AccountDetailScreen } from "@/components/accounts/account-detail"
 
 afterEach(cleanup)
 beforeEach(() => {

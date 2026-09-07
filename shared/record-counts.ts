@@ -65,7 +65,7 @@ export type RecordChild = {
 /** THE SIDECAR A RECORD'S TIME TAB BADGES, composed from the record's own table.
  *
  * The one family here whose key is not a literal, and it is not tidiness: ONE
- * panel (`web/components/work-logs-panel.tsx`) serves all four things time can be
+ * panel (`web/components/work/work-logs-panel.tsx`) serves all four things time can be
  * logged against, so the prefix has to be built at runtime from whichever record
  * it is hung on. Written once, and the registry lines below are built from it, so
  * the key the panel primes, the key the badge reads, the line the door owes and

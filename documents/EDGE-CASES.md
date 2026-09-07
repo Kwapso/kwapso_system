@@ -80,7 +80,7 @@ edits, not one.**
 
 **version-watch heals the stale tab, it doesn't prevent reloads.** Because there
 is no service worker, a long-lived tab holds the **old shell + its hashed
-chunks** across a deploy. `web/components/version-watch.tsx` handles the two
+chunks** across a deploy. `web/components/shell/version-watch.tsx` handles the two
 failure modes: (1) a `ChunkLoadError` from a now-missing chunk → reload **once**
 (a `sessionStorage` timestamp, `version_watch_reloaded_at`, and a 30-second
 cooldown stop a reload loop); (2) on focus/return, fetch `/` and compare the
@@ -93,7 +93,7 @@ Fixed 2026-08-18, and the trap is worth stating because the code looked right fo
 months. A missing chunk almost always belongs to a **lazy route**: React consumes
 the rejected import and re-throws it in the RENDER phase, which dispatches
 neither `error` nor `unhandledrejection` — so version-watch's own two listeners
-never heard the failure they exist for, and `web/components/error-boundary.tsx`
+never heard the failure they exist for, and `web/components/shell/error-boundary.tsx`
 showed a crash card reading "Loading chunk 67631 failed." at a manager. The heal
 is therefore invited in from `componentDidCatch` (`healStaleShell`, exported from
 version-watch, one seam, one cooldown), and the boundary renders "A new version
@@ -104,7 +104,7 @@ at all** — the same stale tab there still ends at a crash card (UI-GAPS).
 
 **The AI co-pilot is mounted at the ROOT, and its open state persists.** The
 assistant panel is the one surface that spans *all* screens, so it lives in a single
-root-mounted host (`web/components/agent-host.tsx`, rendered once in
+root-mounted host (`web/components/assistant/agent-host.tsx`, rendered once in
 `app/layout.tsx`), **not** inside any per-route `AppShell`. Root-mounting is what
 carries it across *soft* navigation, which since the one-shell re-architecture is
 **all** in-app navigation, crossing into `/t` from a top-level route no longer
@@ -146,7 +146,7 @@ screen (or the agent's reading copy).
 `members:<teamId>`, …). A detail screen subscribes to that **same key**
 and `.find()`s its row, so the first tap paints instantly from the warm list
 cache, and a row-level live patch updates detail and list together. From
-`web/components/help-detail.tsx`:
+`web/components/tickets/help-detail.tsx`:
 
 ```ts
 const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>

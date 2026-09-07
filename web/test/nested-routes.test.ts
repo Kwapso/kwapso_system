@@ -209,7 +209,7 @@ describe("a screen's own address keeps everything it was opened inside", () => {
   // this codebase has been bitten by before, so the wiring gets its own check.
   it("the shell derives BOTH of its paths from the trail, not from the module", () => {
     const src = stripComments(
-      readFileSync(join(WEB, "components", "deep-link-screen.tsx"), "utf8")
+      readFileSync(join(WEB, "components", "deep-link", "deep-link-screen.tsx"), "utf8")
     )
     for (const name of ["sectionPath", "currentPath"]) {
       const line = new RegExp(`const ${name}\\s*=([\\s\\S]*?)\\n\\s*const `).exec(src)?.[1] ?? ""
@@ -382,7 +382,7 @@ describe("the breadcrumb walks the whole way in, however deep", () => {
 // historical regressions actually turned on.
 describe("every screen carries its trail, and a top-level one carries a trail of one", () => {
   const shell = stripComments(
-    readFileSync(join(WEB, "components", "deep-link-screen.tsx"), "utf8")
+    readFileSync(join(WEB, "components", "deep-link", "deep-link-screen.tsx"), "utf8")
   )
 
   it("asks for the trail on every screen, with no gate in front of it", () => {

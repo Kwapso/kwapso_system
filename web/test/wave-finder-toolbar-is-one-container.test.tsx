@@ -16,7 +16,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import * as React from "react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import { WaveFinder, EMPTY_WAVE_QUERY } from "@/components/wave-finder"
+import { WaveFinder, EMPTY_WAVE_QUERY } from "@/components/work/wave-finder"
 import type { Account } from "@shared/types"
 
 beforeAll(() => {

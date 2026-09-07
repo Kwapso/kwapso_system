@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        * re-review, verbatim "pills no border!" (see the agency layout's
        * comment for the full back-and-forth). The portal has no record
        * header identity row of the agency door's shape, so this rule needs
-       * no further special-casing the way `web/components/record-chrome.tsx`
+       * no further special-casing the way `web/components/records/record-chrome.tsx`
        * does. */}
       <body className="bg-background min-h-[100svh] antialiased [&_[data-slot=badge].bg-surface-quiet]:bg-surface-panel">
         {/* The client's front door opens on the same frame the agency's does —

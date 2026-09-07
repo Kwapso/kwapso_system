@@ -862,7 +862,7 @@ UPDATE the way the archive toggle's does, because on this statement zero rows
 changed already MEANS the ring refusal, and a no-op reported as "that would put
 the account inside itself" is a sentence that isn't true. **Who moves one**: a
 CONTACT is moved from her own record (the parent-account control on her Overview,
-`web/components/contact-detail.tsx`) — people change jobs; a COMPANY is moved by
+`web/components/accounts/contact-detail.tsx`) — people change jobs; a COMPANY is moved by
 the assistant (`set_account_parent`) or an import column, because a company an
 agency takes on is its own thing and its create/edit form deliberately never asks.
 

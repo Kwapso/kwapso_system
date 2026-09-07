@@ -10,15 +10,32 @@
 // consulting shared/product.ts fails here rather than in someone's sidebar.
 
 import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { TEAM_CREATION_CLOSED, TEAM_SCREENS_HIDDEN } from "@shared/product"
-import { stripComments } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
-const read = (p: string) => readFileSync(join(WEB, "components", p), "utf8")
+
+/** A component BY BASENAME, wherever web/components' folders put it — the reads
+ * below name a switcher and a shell, not a folder.
+ *
+ * It used to join WEB with a folder and a filename, and on 7 Sep 2026
+ * the folder fold moved every one of them one level down. That failed LOUDLY,
+ * with an ENOENT, which is the only reason this file is being fixed rather than
+ * quietly enforcing nothing — the same shape guarded with `existsSync` would have
+ * gone green and blind. Throwing on a name the walk cannot find (or finds twice)
+ * keeps that property: a component this suite names can move, but it cannot
+ * disappear from the check. */
+const read = (name: string) => {
+  const hits = sourceFiles(join(WEB, "components"), { extensions: [".tsx", ".ts"] }).filter(
+    (f) => basename(f.path) === name
+  )
+  if (hits.length !== 1) throw new Error(`${name}: ${hits.length} components carry that basename`)
+  return hits[0].source
+}
 
 /** The file's CODE — comments gone, and the import statements with them.
  *
@@ -126,7 +143,7 @@ describe("the team screens are hidden, and nothing underneath moved", () => {
 
   for (const [file, what] of [
     ["team-switcher.tsx", "the switcher in the sidebar and the mobile bar"],
-    ["screens/settings-screen.tsx", "the Teams list on Settings"],
+    ["settings-screen.tsx", "the Teams list on Settings"],
   ] as const) {
     it(`${what} reads the product flag`, () => {
       const src = code(read(file))

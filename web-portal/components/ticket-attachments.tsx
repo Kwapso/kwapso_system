@@ -4,7 +4,7 @@
 // back, and take their own off. NOT rename or replace one the agency attached —
 // owner's ruling, 27 Aug 2026, answered "never" when asked. The reasoning and
 // the fence that would have to carry it live where the mistake would be made:
-// `web/components/help-attachments.tsx`'s header and the door in
+// `web/components/tickets/help-attachments.tsx`'s header and the door in
 // `workers/content/src/routes/help.ts`.
 
 // FILES AND LINKS ON ONE TICKET (CHECKLIST 5.10) — "show us what you mean".

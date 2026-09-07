@@ -141,7 +141,7 @@ describe("the screens are reachable", () => {
     // …and the SHELL must partition by that field rather than naming pages. A
     // hand-listed group in the component would leave the registry describing a
     // rail it no longer controls.
-    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    const shell = read(join(WEB, "components", "shell", "app-shell.tsx"))
     expect(shell, "app-shell must build the rail groups from each destination's own group field").toContain(
       'i.group === g'
     )
@@ -465,7 +465,7 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/google/gmail/label":
     "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
   "POST /api/content/google/gmail/trash":
-    "FOR A MACHINE, and specifically to undo a machine — the mail counterpart of the Drive bin two lines up, and the owner asked for it in those words ('why is there no method for you to delete drafts?'). The assistant can write a draft into somebody's mailbox, so it must be able to take one back; a person bins their own mail in Gmail, which is one click from where the message already is. It is also why this app lists no mail and no drafts on any screen: there is no inbox here to hang a bin button on, deliberately, because Gmail is better at being Gmail than a card we could build beside it. THE ONE THING WORTH RE-READING IF THAT CHANGES: web/components/mail-reply-dialog.tsx is the only place in either front end that ever holds a draft id, and today no screen opens it — the day something does, that dialog is where a person's own 'bin it' belongs and this line goes.",
+    "FOR A MACHINE, and specifically to undo a machine — the mail counterpart of the Drive bin two lines up, and the owner asked for it in those words ('why is there no method for you to delete drafts?'). The assistant can write a draft into somebody's mailbox, so it must be able to take one back; a person bins their own mail in Gmail, which is one click from where the message already is. It is also why this app lists no mail and no drafts on any screen: there is no inbox here to hang a bin button on, deliberately, because Gmail is better at being Gmail than a card we could build beside it. THE ONE THING WORTH RE-READING IF THAT CHANGES: web/components/tickets/mail-reply-dialog.tsx is the only place in either front end that ever holds a draft id, and today no screen opens it — the day something does, that dialog is where a person's own 'bin it' belongs and this line goes.",
   "POST /api/content/google/chat/delete":
     "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
 

@@ -22,7 +22,7 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { ContactsByCompany } from "@/components/contacts-by-company"
+import { ContactsByCompany } from "@/components/accounts/contacts-by-company"
 import { BASE_RECIPES } from "@/lib/screens"
 import { cursorKey } from "@/lib/live-resources"
 import { primeCache } from "@shared/web/store"

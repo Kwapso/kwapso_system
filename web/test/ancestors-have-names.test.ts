@@ -266,7 +266,7 @@ describe("the shell actually asks for those names", () => {
   // THE WIRING, NOT THE FUNCTION. On 24 Aug 2026 a nesting test passed with the
   // bug still in it, because it proved trailPath while the defect sat in the
   // caller. So this reads the caller.
-  const shell = read("web/components/deep-link-screen.tsx")
+  const shell = read("web/components/deep-link/deep-link-screen.tsx")
 
   it("calls useTrailNames over the whole trail", () => {
     expect(

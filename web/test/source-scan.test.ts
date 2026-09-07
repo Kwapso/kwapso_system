@@ -36,14 +36,18 @@ describe("the one walker every law reads source through", () => {
   it("RECURSES by default — the whole reason it exists", () => {
     const all = sourceFiles(COMPONENTS, { extensions: [".tsx"] })
     const nested = all.filter((f) => f.rel.includes("/"))
-    // web/components has subdirectories (deep-link, screens, temp). A walk that
-    // stopped at the top level would enforce the UI laws on part of the app and
-    // report success for all of it.
+    // web/components is ENTIRELY subdirectories since the 7 Sep 2026 fold (one
+    // folder per module or kind). A walk that stopped at the top level would
+    // enforce the UI laws on nothing and report success for all of it.
     expect(
       nested.length,
       "web/components has subdirectories — a default walk must reach into them"
-    ).toBeGreaterThan(0)
-    expect(all.length).toBeGreaterThan(nested.length)
+    ).toBeGreaterThan(100)
+    // …and the top level is still read where there is one: web/lib keeps its
+    // files flat beside one `api/` folder, so both halves of the walk show here.
+    const lib = sourceFiles(join(WEB, "lib"), { extensions: [".ts", ".tsx"] })
+    expect(lib.some((f) => !f.rel.includes("/")), "web/lib's own top-level files").toBe(true)
+    expect(lib.some((f) => f.rel.includes("/")), "web/lib/api/, one level down").toBe(true)
   })
 
   it("`recursive: false` means flat, and the difference is real", () => {

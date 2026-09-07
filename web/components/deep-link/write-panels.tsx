@@ -11,20 +11,20 @@ import * as React from "react"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
-import { AccountFormDialog } from "@/components/account-form-dialog"
-import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
-import { KnowledgeUploadDialog } from "@/components/knowledge-upload-dialog"
-import { HelpFormDialog } from "@/components/help-form-dialog"
-import { RolePickerDialog } from "@/components/role-picker-dialog"
-import { RoleFormDialog } from "@/components/role-form-dialog"
-import { InviteDialog } from "@/components/invite-dialog"
-import { TeamEditDialog } from "@/components/team-edit-dialog"
+import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
+import { KnowledgeFormDialog } from "@/components/knowledge/knowledge-form-dialog"
+import { KnowledgeUploadDialog } from "@/components/knowledge/knowledge-upload-dialog"
+import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
+import { RolePickerDialog } from "@/components/team/role-picker-dialog"
+import { RoleFormDialog } from "@/components/team/role-form-dialog"
+import { InviteDialog } from "@/components/team/invite-dialog"
+import { TeamEditDialog } from "@/components/team/team-edit-dialog"
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import {
   InternalRecordDialog,
   brandAssetFields,
   purposeFields,
-} from "@/components/internal-record-dialog"
+} from "@/components/team/internal-record-dialog"
 import {
   AlertDialog,
   AlertDialogAction,

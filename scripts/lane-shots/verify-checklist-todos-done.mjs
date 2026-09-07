@@ -1,5 +1,5 @@
 // Screenshot rig for the TodosPanel done-pile Checklist swap
-// (web/components/work-panels.tsx) — four widths, both themes, real staging
+// (web/components/work/work-panels.tsx) — four widths, both themes, real staging
 // data (the smoke team's completed to-dos). SESSION_COOKIE is minted the way
 // this session's own notes describe (staging-session-on-a-local-worktree);
 // needs a dev server already running against staging on VERIFY_PORT (default

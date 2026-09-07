@@ -37,7 +37,7 @@ import { describe, expect, it } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 
-const RAW = readFileSync(join(__dirname, "..", "components", "app-shell.tsx"), "utf8")
+const RAW = readFileSync(join(__dirname, "..", "components", "shell", "app-shell.tsx"), "utf8")
 /** THE CODE, WITHOUT THE PROSE ABOUT IT — a check that reads its own
  * explanation is a check measuring the wrong text. */
 const SHELL = stripComments(RAW)

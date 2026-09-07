@@ -29,8 +29,8 @@ import {
 } from "@/lib/live-resources"
 import { invalidate, primeCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import type { AccountFormValues } from "@/components/account-form-dialog"
-import type { KnowledgeFormValues } from "@/components/knowledge-form-dialog"
+import type { AccountFormValues } from "@/components/accounts/account-form-dialog"
+import type { KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 
 /** The four agency-internal record kinds, keyed by their URL segment (which is
  * what the host has in hand when a panel opens). */

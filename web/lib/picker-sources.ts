@@ -18,7 +18,7 @@
 // picker cannot be shown a row its own caller may not list. Search makes a
 // nameable record easier to find; it never makes an unnameable one nameable.
 
-import type { PickerOption } from "@/components/record-picker"
+import type { PickerOption } from "@/components/records/record-picker"
 import { content, tenancy } from "@/lib/api"
 
 /** The cache prefix a picker's answers land under. TEAM-SCOPED, like every key

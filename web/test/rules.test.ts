@@ -111,6 +111,17 @@ function componentFiles(): string[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] }).map((f) => f.path)
 }
 
+/** One component BY BASENAME, wherever the folder fold put it — the R4/R7/R38
+ * reads below name a dialog, not a folder. Throws on a name the walk cannot find
+ * (or finds twice), so a dialog that moves or goes cannot be skipped in silence:
+ * until 7 Sep 2026 the R38 read below guarded its path with `existsSync` and
+ * would have skipped all 26 dialogs, green, the day they moved. */
+function componentPath(name: string): string {
+  const hits = componentFiles().filter((p) => basename(p, ".tsx") === name)
+  if (hits.length !== 1) throw new Error(`${name}: ${hits.length} components carry that basename`)
+  return hits[0]
+}
+
 /** THE CLIENT PORTAL'S ALLOW-LIST, READ OFF THE GATEWAY'S OWN TABLE.
  *
  * THREE LAWS ASK THE SAME QUESTION and, until 5 Sep 2026, they asked it with two
@@ -280,7 +291,7 @@ describe("RULES — the laws of the base", () => {
   // R2 — every record-detail screen exposes Overview + Activity tabs. The
   // engine-recipe details (team/members/invites) carry them as recipe data; the
   // bespoke ones must render them themselves.
-  // The Activity tab is now ONE component (components/activity-panel.tsx), so
+  // The Activity tab is now ONE component (components/records/activity-panel.tsx), so
   // this check follows it there. It reads the same way round: each detail must
   // render the panel, and the panel must be a feed you can page. Before, the two
   // strings were looked for in every detail — which is why the block they name
@@ -293,7 +304,7 @@ describe("RULES — the laws of the base", () => {
     // R2 meets R14: the feed is a PAGE of a growing collection under a badge
     // counting ALL of it — the gap that let a record with 143 events truthfully
     // badge 143 over its newest 50, forever.
-    const panel = stripComments(read(join(WEB, "components", "activity-panel.tsx")))
+    const panel = stripComments(read(join(WEB, "components", "records", "activity-panel.tsx")))
     expect(panel, "the Activity panel must render the library ActivityFeed").toContain("ActivityFeed")
     expect(panel, "the Activity panel must carry a <LoadMore> — its badge counts rows it can't reach (R14)").toContain(
       "<LoadMore"
@@ -358,7 +369,7 @@ describe("RULES — the laws of the base", () => {
   // R4 — every form dialog renders through the shared FormShell.
   it("forms-use-formshell: every form dialog imports FormShell", () => {
     for (const d of FORM_DIALOGS) {
-      const src = stripComments(read(join(WEB, "components", `${d}.tsx`)))
+      const src = stripComments(read(componentPath(d)))
       expect(src, `${d} must use FormShell (one shared form layout)`).toContain("form-shell")
     }
   })
@@ -367,19 +378,19 @@ describe("RULES — the laws of the base", () => {
   // navigating away (CACHING.md §11). The draft hook is the single seam.
   it("forms-persist-drafts: every form dialog persists its draft via useFormDraft", () => {
     for (const d of FORM_DIALOGS) {
-      const src = stripComments(read(join(WEB, "components", `${d}.tsx`)))
+      const src = stripComments(read(componentPath(d)))
       expect(src, `${d} must persist its draft (useFormDraft — CACHING.md §11)`).toContain("useFormDraft")
     }
   })
 
   // ONE SEARCHABLE PICKER, NOT NINE. Not a law of its own — a regression lock on
   // the shape R4 already asks for. Every "which record do you mean?" control goes
-  // through components/record-picker.tsx, which is the only file that composes the
+  // through components/records/record-picker.tsx, which is the only file that composes the
   // library's Command palette. Nine screens each building their own is how they
   // came to behave nine different ways, reported from a phone as "any drop-downs
   // are becoming impossible to search through".
   it("one-record-picker: only record-picker.tsx composes the library Command", () => {
-    const picker = stripComments(read(join(WEB, "components", "record-picker.tsx")))
+    const picker = stripComments(read(join(WEB, "components", "records", "record-picker.tsx")))
     // A blind check reports "all clear" exactly like a passing one.
     expect(picker, "the record picker must be the library Command + Popover").toContain(
       "components/command/command"
@@ -420,7 +431,7 @@ describe("RULES — the laws of the base", () => {
   // keep the two paths that make it a way in — an entry that calls `onOpen`, and
   // an overflow that OPENS THE DAY instead of naming records nobody can reach.
   it("one-calendar: every calendar is the host's, and every record on it opens", () => {
-    const host = join(WEB, "components", "record-calendar.tsx")
+    const host = join(WEB, "components", "records", "record-calendar.tsx")
     const src = stripComments(read(host))
     // i · an entry opens the record it names, through the kit's own click prop.
     expect(src, "the month grid must open a record via onSelectEvent → onOpen").toMatch(
@@ -711,9 +722,7 @@ describe("RULES — the laws of the base", () => {
 
     const offenders: string[] = []
     for (const d of FORM_DIALOGS) {
-      const file = join(WEB, "components", `${d}.tsx`)
-      if (!existsSync(file)) continue
-      const src = stripComments(read(file))
+      const src = stripComments(read(componentPath(d)))
       for (const key of pagedKeys) if (src.includes(key)) offenders.push(`${d} reads ${key}`)
     }
     expect(
@@ -888,7 +897,7 @@ describe("RULES — the laws of the base", () => {
     }
     // Anti-regression: the host derives the badges by iterating countCacheKey — no
     // hand-listed per-section literal can creep back in.
-    const src = stripComments(read(join(WEB, "components", "deep-link-screen.tsx")))
+    const src = stripComments(read(join(WEB, "components", "deep-link", "deep-link-screen.tsx")))
     expect(src, "deep-link-screen must derive tab counts from countCacheKey").toContain("s.countCacheKey")
   })
 
@@ -1062,7 +1071,7 @@ describe("RULES — the laws of the base", () => {
     // COULD have drawn one.
     // Stripped: the field probe is `\n\s*picture:`, which a commented-out line
     // matches exactly as well as a declared one.
-    const picker = stripComments(read(join(WEB, "components", "record-picker.tsx")))
+    const picker = stripComments(read(join(WEB, "components", "records", "record-picker.tsx")))
     for (const field of ["picture", "mark", "shape"])
       expect(
         new RegExp(`\\n\\s*${field}\\??:`).test(picker),
@@ -1110,7 +1119,7 @@ describe("RULES — the laws of the base", () => {
     // `null` is a real answer said out loud at the call site, and an omitted
     // optional prop says nothing at all — which is exactly how twenty panels came
     // to draw bare words without anybody deciding to.
-    const panels = read(join(WEB, "components", "work-panels.tsx"))
+    const panels = read(join(WEB, "components", "work", "work-panels.tsx"))
     expect(
       /\n\s*mark: React\.ReactNode \| null\n/.test(panels),
       "the shared nested Row must take its mark as a REQUIRED prop — an optional one is a rule a twenty-first panel can skip in silence"
@@ -1313,7 +1322,7 @@ describe("RULES — the laws of the base", () => {
     // itself really ends in a live `<LoadMore>`. Proved here, once, off the
     // function's own text: its declared `listKey` parameter must be the same
     // name the `<LoadMore>` inside it reads.
-    const sharedBody = read(join(WEB, "components", "work-panels.tsx"))
+    const sharedBody = read(join(WEB, "components", "work", "work-panels.tsx"))
     const bodyAt = sharedBody.indexOf("function PagedPanelBody")
     expect(bodyAt, "PagedPanelBody must exist — the shared-body proof below has nothing to check").toBeGreaterThan(-1)
     const bodyEnd = sharedBody.indexOf("\n}\n", bodyAt)
@@ -1647,7 +1656,7 @@ describe("RULES — the laws of the base", () => {
     // resource declares, not the first one: a shell that read `r.slicePrefix`
     // straight would silently ignore the second family of every resource that
     // has two.
-    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    const shell = read(join(WEB, "components", "shell", "app-shell.tsx"))
     expect(
       /for \(const \w+ of \[r\.slicePrefix\]\.flat\(\)\) invalidatePrefix\(/.test(shell),
       "app-shell must drop EVERY prefix in each resource's declared slice family on a ping (R15)"
@@ -1839,7 +1848,7 @@ describe("RULES — the laws of the base", () => {
     // badges are all on the COLLECTION half (a record detail badges its tabs
     // through withTabCounts instead), so that is the file named here — it used to
     // be module-content.tsx, before the switch became two files.
-    expect(read(join(WEB, "components", "team-section-nav.tsx"))).toContain("formatCount")
+    expect(read(join(WEB, "components", "shell", "team-section-nav.tsx"))).toContain("formatCount")
     const collections = read(join(WEB, "components", "deep-link", "collection-content.tsx"))
     expect(collections).toContain("formatCount")
 
@@ -1869,10 +1878,10 @@ describe("RULES — the laws of the base", () => {
     // the BADGE. The name is not the count's to take, and
     // `web/test/a-page-keeps-its-name.test.tsx` renders the component both ways
     // to prove it.
-    const counted = read(join(WEB, "components", "counted-tabs.tsx"))
+    const counted = read(join(WEB, "components", "records", "counted-tabs.tsx"))
     expect(counted).toContain("createContext")
     expect(counted).toContain("CountedAbove")
-    const heading = read(join(WEB, "components", "collection-heading.tsx"))
+    const heading = read(join(WEB, "components", "records", "collection-heading.tsx"))
     const hookAt = heading.indexOf("useCountStandsDown()")
     expect(hookAt, "the heading must consult the arbitration hook").toBeGreaterThan(-1)
     expect(
@@ -1883,7 +1892,7 @@ describe("RULES — the laws of the base", () => {
       /if \(\w*[Ss]tandsDown\) return null/.test(heading),
       "the heading must NOT disappear when a strip owns the count: that is how six screens shipped anonymous"
     ).toBe(false)
-    const host = read(join(WEB, "components", "deep-link-screen.tsx"))
+    const host = read(join(WEB, "components", "deep-link", "deep-link-screen.tsx"))
     expect(host, "the tab host marks badged panels via CountedTabs").toContain("<CountedTabs badged=")
     for (const f of componentFiles()) {
       const src = read(f)
@@ -3214,7 +3223,7 @@ describe("RULES — the laws of the base", () => {
 
     // i(b) · `PagedFind`'s own central guard — `genuinelyEmpty` computed from
     // `restingEmpty` and gating the whole toolbar column, before `children`.
-    const pagedFind = stripComments(readFileSync(join(WEB, "components/paged-find.tsx"), "utf8"))
+    const pagedFind = stripComments(readFileSync(join(WEB, "components/records/paged-find.tsx"), "utf8"))
     expect(
       pagedFind,
       "R50 — PagedFind must compute `genuinelyEmpty` from its own `restingEmpty` prop (paged-find.tsx)"
@@ -3295,7 +3304,7 @@ describe("RULES — the laws of the base", () => {
       }
 
       // iii · every real `<PagedFind` TAG — paged-find.tsx DECLARES it.
-      if (!f.rel.endsWith("components/paged-find.tsx")) {
+      if (!f.rel.endsWith("components/records/paged-find.tsx")) {
         let from = 0
         for (;;) {
           const at = src.indexOf("<PagedFind", from)
@@ -3684,7 +3693,7 @@ describe("nothing pushes the page sideways", () => {
     // It was. The theme control is three segments the kit will not collapse to
     // an icon, and beside the brand, the timer and the avatar it did not fit a
     // 375px screen — so the bar overflowed and took the page with it.
-    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    const shell = read(join(WEB, "components", "shell", "app-shell.tsx"))
     const bar = shell.slice(shell.indexOf("md:hidden"), shell.indexOf("md:hidden") + 200)
     const header = shell.slice(shell.indexOf("<header"), shell.indexOf("</header>"))
     expect(header, "the bar must clip its own contents").toContain("overflow-hidden")
