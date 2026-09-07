@@ -34,7 +34,6 @@
 
 import { content as contentApi, tenancy } from "@/lib/api"
 import { RECORD_CHILDREN, type RecordChild } from "@shared/record-counts"
-import { useAfterPaint } from "@shared/web/after-paint"
 import { primeCache, useCached } from "@shared/web/store"
 import { recordCountsKey, totalKey } from "@/lib/live-resources"
 
@@ -96,17 +95,16 @@ function fetchRecordCounts(table: string, id: string): Promise<Record<string, nu
 export function useRecordCounts(table: string | null, id: string | null): void {
   // "IT DOES NOT BLOCK FIRST PAINT" (above) was true of what the screen AWAITS
   // and not of what the browser is doing while somebody waits, and the budget
-  // beside this one counts the second thing: `MAX_REQUESTS_BEFORE_FIRST_PAINT`
-  // is requests issued before the record is on screen, awaited or not. Censused
-  // 7 Sep 2026 this was one of them on a ticket, an account and a meeting — two
-  // of them on an account, which straddles two workers.
+  // beside it counts the second thing: `MAX_REQUESTS_BEFORE_FIRST_PAINT` is
+  // requests issued before the record is on screen, awaited or not. Censused
+  // 7 Sep 2026 this was one of them on a ticket and a meeting, and two on an
+  // account, which straddles two workers.
   //
-  // The owner's sentence still holds, which is the only thing that could have
-  // stopped this: he asked for the badge to be there BEFORE the click, not
-  // before the record. It arrives a beat later, still long before anybody can
-  // reach the tab.
-  const painted = useAfterPaint()
-  const on = painted && Boolean(table && id && RECORD_CHILDREN[table as string]?.length)
+  // The fix is the CALLER's, not this hook's: a screen passes null until it has
+  // the record, which is the deterministic gate after-paint.ts asks for. The
+  // owner's sentence is untouched either way — he asked for the badge before the
+  // CLICK, not before the record.
+  const on = Boolean(table && id && RECORD_CHILDREN[table as string]?.length)
   useCached<Record<string, number | null>>(
     on ? recordCountsKey(table as string, id as string) : null,
     () => fetchRecordCounts(table as string, id as string)

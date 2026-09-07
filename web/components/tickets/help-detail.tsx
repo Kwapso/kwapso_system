@@ -44,7 +44,6 @@ import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
-import { useAfterPaint } from "@shared/web/after-paint"
 import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
@@ -126,27 +125,32 @@ export function HelpDetailScreen({
     })
   )
   const threadTotal = useCachedValue<number>(`total:help-thread:${helpId}`)
-  // THE SECONDARY HALF, AFTER THE RECORD IS READABLE. Everything below this line
-  // is a picker, a badge or a panel beside the record rather than the record —
-  // and until 7 Sep 2026 every one of them left the browser in front of it. The
-  // gate is the one the team-wide prewarm already sits behind
-  // (shared/web/after-paint.ts; use-screen-data.ts says why), and the census
-  // that found them is web/test/cold-screen-hops.test.tsx.
-  const painted = useAfterPaint()
-  const membersQ = useCached<TeamMember[]>(painted ? `members:${teamId}` : null, () =>
+  // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND. Everything below this line
+  // is a picker, a badge or a panel BESIDE the record rather than the record —
+  // and until 7 Sep 2026 every one of them left the browser in front of it
+  // (censused by web/test/cold-screen-hops.test.tsx: a ticket cost thirteen
+  // requests before a person could read one sentence).
+  //
+  // `have` is the DETERMINISTIC gate shared/web/after-paint.ts asks callers to
+  // prefer over its own scheduler — "a secondary panel that needs the record
+  // anyway should key on the record being in hand … exact, needs no scheduler,
+  // and cannot be flaky". Every read below is about THIS record or about the
+  // form that edits it, so every one of them has that dependency already.
+  const have = ticket !== null
+  const membersQ = useCached<TeamMember[]>(have ? `members:${teamId}` : null, () =>
     tenancy.members().then((r) => r.members)
   )
   // The generic record feed (Law R5) + the exact server total its tab badges
   // (R8 for the place, R16 for the number — never the loaded page's length).
-  const activity = useRecordActivity("help", helpId)
+  const activity = useRecordActivity("help", have ? helpId : null)
   // THE BADGES, BEFORE THE CLICK — the work written down against this request,
-  // and what is attached to it. One bounded read of both totals when the ticket
-  // opens; the rows behind each tab stay lazy (lib/use-record-counts).
-  useRecordCounts("help", helpId)
-  const selectableQ = useCached<SelectableValue[]>(painted ? `selectable:${teamId}` : null, () =>
+  // and what is attached to it. One bounded read of both totals once the ticket
+  // is readable; the rows behind each tab stay lazy (lib/use-record-counts).
+  useRecordCounts("help", have ? helpId : null)
+  const selectableQ = useCached<SelectableValue[]>(have ? `selectable:${teamId}` : null, () =>
     tenancy.selectable().then((r) => r.values)
   )
-  const stakeholdersQ = useCached<HelpStakeholder[]>(painted ? `help-stakeholders:${helpId}` : null, () =>
+  const stakeholdersQ = useCached<HelpStakeholder[]>(have ? `help-stakeholders:${helpId}` : null, () =>
     content.helpStakeholders(helpId).then((r) => r.stakeholders)
   )
 

@@ -405,11 +405,18 @@ const beforePaint = (rows: Seen[]) => distinct(rows.filter((r) => !r.afterPaint)
  * their tab badges in front of the record, and a person opening a ticket from
  * an email waited through thirteen requests to read one sentence.
  *
- * WHAT MOVED, all of it behind the SAME existing gate and none of it deleted:
- * `useRecordActivity` and `useRecordCounts` (shared, so every record screen at
- * once), `useStoryFormOptions` (six lists for a dialog nobody has opened), and
- * the three screens' own secondary reads. The last test in this file is the
- * assertion in the other direction — the work still happens, afterwards.
+ * WHAT MOVED, and none of it deleted. Every read a record screen makes BESIDE
+ * the record now waits until that screen has the record — `have`, the
+ * DETERMINISTIC gate shared/web/after-paint.ts asks callers to prefer over its
+ * own scheduler ("exact, needs no scheduler, and cannot be flaky"): the record's
+ * activity feed and tab badges, a ticket's members, dropdown values and
+ * stakeholders, an account's glyphs, impact panel and apps picker, a meeting's
+ * three edit-form pickers. The one read with no such dependency —
+ * `useStoryFormOptions`, six lists for a dialog nobody has opened — is behind
+ * the scheduler itself, which is the case that hook reserves for itself.
+ *
+ * The last test in this file is unchanged and is the assertion in the other
+ * direction: the deferred work still HAPPENS, afterwards.
  *
  * ONE BUDGET FOR EVERY ROW, deliberately. A per-screen ceiling was written here
  * first, while the numbers were 13 and 11, and thrown away when they came under

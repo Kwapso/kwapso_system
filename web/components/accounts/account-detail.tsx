@@ -112,7 +112,6 @@ import {
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
-import { useAfterPaint } from "@shared/web/after-paint"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { WaveCollection } from "@/components/work/waves-screen"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -133,27 +132,29 @@ export function AccountDetailScreen({
   basePath: string
 }) {
   const t = useT()
+  const detailQ = useCached<AccountDetail>(accountKey(accountId), () =>
+    tenancy.accountDetail(accountId)
+  )
+  // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND — a picker, a badge or a
+  // panel BESIDE the record rather than the record, and until 7 Sep 2026 every
+  // one of them left the browser in front of it (web/test/cold-screen-hops.test.tsx
+  // censused this screen before a person could read it).
+  //
+  // `have` is the DETERMINISTIC gate shared/web/after-paint.ts asks callers to
+  // prefer over its own scheduler — "exact, needs no scheduler, and cannot be
+  // flaky". Every read below is about THIS record or the form that edits it, so
+  // every one of them has that dependency already.
+  const have = detailQ.data !== undefined
   // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
   // nested panel on it. The same key the Dropdown values manager writes, so
   // an emoji changed there reaches these rows with no deploy.
-  // THE SECONDARY HALF, AFTER THE RECORD IS READABLE. The glyphs, the impact panel and the
-  // apps picker are, a badge or a panel beside the record rather than the record —
-  // and until 7 Sep 2026 every one of them left the browser in front of it. The
-  // gate is the one the team-wide prewarm already sits behind
-  // (shared/web/after-paint.ts; use-screen-data.ts says why), and the census
-  // that found them is web/test/cold-screen-hops.test.tsx.
-  const painted = useAfterPaint()
-  const teamVocabulary = useCached<SelectableValue[]>(painted ? `selectable:${teamId}` : null, () =>
+  const teamVocabulary = useCached<SelectableValue[]>(have ? `selectable:${teamId}` : null, () =>
     tenancy.selectable().then((r) => r.values)
-  )
-
-  const detailQ = useCached<AccountDetail>(accountKey(accountId), () =>
-    tenancy.accountDetail(accountId)
   )
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends. Hand-rolling
   // this read is what let a badge and its feed disagree elsewhere.
-  const activity = useRecordActivity("accounts", accountId)
+  const activity = useRecordActivity("accounts", have ? accountId : null)
   // A READ OF PAGE ONE STOOD HERE, for the parent picker and the statuses in
   // use. The statuses went with the column (0042) and the picker gets its own
   // list, so this record now opens without it.
@@ -161,7 +162,7 @@ export function AccountDetailScreen({
   // that is worth, from the ONE savings door (it narrows by account, so the
   // arithmetic here is the same arithmetic the maps screen shows for everybody).
   // R25: the panel renders SAVINGS_CAPTION with it, word for word.
-  const valueQ = useCached<SavingsView>(painted ? accountImpactKey(accountId) : null, () =>
+  const valueQ = useCached<SavingsView>(have ? accountImpactKey(accountId) : null, () =>
     tenancy.impact({ accountId })
   )
 
@@ -173,7 +174,7 @@ export function AccountDetailScreen({
   // rather than asked for again: a sprint covers one app and an app belongs to
   // one account, so offering another client's systems would be offering a row
   // the door would refuse.
-  const appsQ = useCached<AppRow[]>(painted ? appsKey(teamId) : null, () => listFetch.apps(teamId))
+  const appsQ = useCached<AppRow[]>(have ? appsKey(teamId) : null, () => listFetch.apps(teamId))
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")
@@ -229,7 +230,7 @@ export function AccountDetailScreen({
   // record, primed into the same sidecars below — so a tab with work behind it
   // says so on arrival instead of only once you open it. The ROWS stay lazy:
   // each panel still fetches its own when its tab is shown.
-  useRecordCounts("accounts", accountId)
+  useRecordCounts("accounts", have ? accountId : null)
   // R16: the exact totals those tabs badge — from the counts read above, and
   // re-primed by each panel's own fetch over the same filter its rows came from.
   // `null` is a THIRD answer beside a number and an absence: the role holds no

@@ -24,7 +24,6 @@ import { cursorKey } from "@/lib/live-resources"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
-import { useAfterPaint } from "@shared/web/after-paint"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import type { ActivityItem } from "@shared/types"
 
@@ -119,20 +118,14 @@ export function useRecordActivity(
   addNote: (note: string) => void
 } {
   const { t, lang } = useLanguage()
-  // AFTER THE RECORD IS READABLE, not beside it. A record's history is a TAB
-  // nobody has pressed — the same class of thing as the team-wide prewarm that
-  // moved behind this gate on 6 Sep 2026 (use-screen-data.ts says why), and a
-  // request in front of the record whichever way you argue it. Censused
-  // 7 Sep 2026 it was on the cold path of every record screen but processes,
-  // where it only looked settled because that screen paints in three requests
-  // and this one happened to land after.
-  //
-  // Nothing on screen waits a moment longer for it: the Activity tab draws its
-  // own loading register from `loading` below, and `useAfterPaint` is true
-  // within a beat of the screen going quiet (60ms) and unconditionally within
-  // three seconds, so a tab pressed by hand always finds it already asked.
-  const painted = useAfterPaint()
-  const on = painted && Boolean(table && id)
+  // NULL UNTIL THE RECORD IS IN HAND, and that is the caller's job rather than
+  // this hook's. A record's history is a TAB nobody has pressed, and censused
+  // 7 Sep 2026 it was in front of the record on every record screen but
+  // processes — so the three screens that were doing that now pass null until
+  // they have the record, which is the DETERMINISTIC gate after-paint.ts's own
+  // doc asks for ("keys on the record being in hand … exact, needs no
+  // scheduler, and cannot be flaky") rather than the scheduler itself.
+  const on = Boolean(table && id)
   const key = recordActivityKey(table ?? "", id ?? "")
   const query = useCached<ActivityItem[]>(on ? key : null, () =>
     tenancy.recordActivity(table as string, id as string).then((r) => {
