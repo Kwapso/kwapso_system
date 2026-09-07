@@ -374,7 +374,16 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     files are the evidence for "we decided this, and here is who said so". They are a
     RECORD, never a spec — where a form answer and SCOPE.html disagree, SCOPE wins,
     and where SCOPE is silent, base law applies. They hold no customer data.
-27. **`scaling-review.md`** — **NOT IN THIS REPOSITORY. Do not go looking for it.**
+27. **[docs-audit/RULING.md](docs-audit/RULING.md)** and
+    **[docs-audit/RECONCILIATION.md](docs-audit/RECONCILIATION.md)**, the owner's ruling of
+    2026-08-27 — *"Kwapso's UI/UX rules have the final authority"* — and the line-by-line
+    reconciliation of this repo's UI rules against the kit's own 3,378-line law-book in
+    `shared/ui/docs/`. Read RULING.md before arguing with the kit about a UI question: it
+    says which of our own rules are a second opinion on somebody else's subject, and which
+    are not overturned. *(Added to this map on 7 Sep 2026. Both files have been tracked
+    since 29 Aug and this map indexed neither — a directory that is not `documents/` is
+    invisible to every tool that walks the docs, this map included.)*
+28. **`scaling-review.md`** — **NOT IN THIS REPOSITORY. Do not go looking for it.**
     It was the scaling audit of 14 Aug 2026 (the twelve-dimension score, the platform
     limits looked up live, what breaks first and at what size, the twelve repairs that
     landed and the eleven items judged too risky to change), and it was deleted on
@@ -384,11 +393,13 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     **The DECISION it produced is [ARCHITECTURE.md §7](documents/ARCHITECTURE.md) — 78 accepted,
     LOCKED — and that section is self-sufficient**: the live layer as the first
     ceiling, at roughly 3,000–5,000 concurrent sockets in one team, is written there,
-    not only here. Cite §7. Two notes for anyone tidying this up: `.gitignore` still
-    carries a comment claiming this file is deliberately tracked (it is not tracked and
-    it is not present — both halves are stale), and `DATA-MODEL.md` cites it once for
-    R16's price. Either restore the report or re-point both at §7; leaving it as a name
-    with nothing behind it is the state this entry exists to warn about.
+    not only here. Cite §7. One note for anyone tidying this up: `.gitignore` (line 44)
+    still carries a comment saying this file is deliberately NOT ignored "so it is a
+    DOCUMENT that two other documents depend on", and cites this entry by its item
+    NUMBER, which has moved once already. Neither half holds: the file is not tracked and
+    not present, and `DATA-MODEL.md` has since re-pointed its one citation at §7. Either
+    restore the report or delete that comment; leaving a name with nothing behind it is
+    the state this entry exists to warn about.
 
 ### Where the code lives
 

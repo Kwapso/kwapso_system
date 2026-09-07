@@ -893,7 +893,7 @@ measured 75.9 across 53 screens on 18 Aug 2026; the table and the ordered work l
 `.session-notes/ui-rearrangement-plan.md` — **a session note, not a repository
 document**: `.gitignore` keeps everything under `.session-notes/` except
 `lanes/`, so it is on the owner's machine and in no clone. Do not go looking for
-it here (README item 27 says the same of `scaling-review.md`); the numbers you
+it here (README's document map says the same of `scaling-review.md`); the numbers you
 need are quoted above and in UI-RULEBOOK.md § 12.
 
 **An information unit** is one thing the eye decodes on its own: a heading, a
