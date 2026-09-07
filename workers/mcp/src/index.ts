@@ -35,7 +35,7 @@
 
 import { fail, json } from "@shared/workers/http"
 import { healthBody } from "@shared/workers/config-health"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, identityFor } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
@@ -100,7 +100,13 @@ export default {
       logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      if (e instanceof GuardError) {
+        // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx (gating.ts `detail`):
+        // the caller's answer is unchanged and the cause stops being console-only.
+        if (e.detail)
+          await recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
       // `console.*` sites in this codebase and not one of them named a request,
       // which made the live tail and `error_logs` two stores with no join between
@@ -109,7 +115,9 @@ export default {
       // highest-traffic of those sites — every unexpected crash in the worker
       // passes through it — so it is the one worth the two extra fields.
       console.error(`mcp worker error:`, requestId(request), `${request.method} ${new URL(request.url).pathname}`, e)
-      afterResponse(request, recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request)))
+      // WHOSE: the token's owner and pinned team, noted in routes/mcp.ts the
+      // moment the token verifies — the one point this surface knows its caller.
+      afterResponse(request, recordWorkerError(env.DB, "mcp", `${request.method} ${pathname}`, e, requestId(request), identityFor(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

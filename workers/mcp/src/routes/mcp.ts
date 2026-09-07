@@ -9,7 +9,7 @@
 // here changed but the file it sits in and the `export` keyword.
 
 import { fail, json } from "@shared/workers/http"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, noteIdentity } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requestId } from "@shared/workers/trace"
 import { brand } from "@shared/brand"
@@ -38,6 +38,10 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!bearer)
     return fail(401, "no_token", "Send a personal access token: Authorization: Bearer <token>.")
   const token = await verifyToken(env, bearer)
+  // WHOSE REQUEST THIS IS, for the central catch: the token's owner, in the
+  // token's pinned team. This surface never passes through `teamContext`, so
+  // until this line its error rows named nobody.
+  noteIdentity(request, { userId: token.user_id, teamId: token.team_id })
 
   // THE MACHINE SURFACE'S OWN CEILING, spent per TOKEN OWNER and separately from
   // their budget inside the app (rate-limit.ts). It sits here because this is where

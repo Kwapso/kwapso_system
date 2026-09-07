@@ -108,6 +108,10 @@ import { labelFor } from "./timing"
 const API = "https://api.cloudflare.com/client/v4"
 const RETRIES = 2 // total attempts = 1 + RETRIES — 5xx, network blips, and CF's 7500-in-a-200
 
+/** LAW R11's deadline on this door, named because the message that reports a
+ * breach has to quote it. A hung socket here would otherwise never return. */
+export const D1_REST_TIMEOUT_MS = 15_000
+
 /** THE MEASURED DOOR. Everything below goes through `cfTimed`, so a trip cannot
  * be made without being counted — the alternative (asking each call site to
  * report itself) is the shape that always ends with the expensive path being the
@@ -167,11 +171,27 @@ async function cfRaw<T>(
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         // LAW R11: bound the socket. A hung D1 REST call would otherwise never return
         // and stall the worker; a timeout throws → the retry loop above handles it.
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(D1_REST_TIMEOUT_MS),
       })
     } catch (e) {
-      // Network hiccup — worth retrying.
-      lastError = e instanceof Error ? e : new Error(String(e))
+      // A HUNG SOCKET AND AN UNREACHABLE ONE ARE DIFFERENT FACTS, and when the
+      // retries are spent this `lastError` is the whole diagnosis: it is what
+      // the central catch records and all anyone gets.
+      //
+      // It used to be the raw abort, "The operation was aborted due to timeout"
+      // — a sentence that names no door, no call and no deadline, and that reads
+      // identically whether the far side was slow, gone, or never asked. Beside
+      // it in the same table sat "Cloudflare D1 API 500 on /d1/database/…",
+      // which says all three. So the branch that already knows the difference
+      // says it: which door, which call, how many attempts, and — the one word
+      // that separates them — whether we stopped waiting or could not get there.
+      const said = e instanceof Error ? e.message : String(e)
+      const tries = `attempt ${attempt + 1} of ${RETRIES + 1}`
+      lastError = /^(TimeoutError|AbortError)$/.test((e as { name?: string } | null)?.name ?? "")
+        ? new Error(
+            `Cloudflare D1 API did not answer within ${D1_REST_TIMEOUT_MS}ms on ${path} (R11 deadline, ${tries}): ${said}`
+          )
+        : new Error(`Cloudflare D1 API could not be reached on ${path} (${tries}): ${said}`)
       continue
     }
     if (res.status >= 500) {

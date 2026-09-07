@@ -1,6 +1,7 @@
 import type { Env } from "../env"
 import { randomToken, sha256Hex } from "./crypto"
 import { ulid } from "@shared/workers/id"
+import { noteIdentity } from "@shared/workers/gating"
 import { readCookie, sessionCookieName, LEGACY_SESSION_COOKIE, SESSION_COOKIE, readSessionToken } from "@shared/workers/session-cookie"
 import type { UserRow } from "./users"
 
@@ -139,6 +140,12 @@ export async function getSessionUser(
   // An MCP-minted session is PINNED: it acts in the token's team, not the
   // human's current app team — the whole gating chain downstream just works.
   if (row.team_pin) row.current_team_id = row.team_pin
+
+  // WHOSE REQUEST THIS IS, for the central catch. auth never passes through
+  // `teamContext`, so its error rows carried neither column; this is the one
+  // place every signed-in auth door resolves the person, and it is where the
+  // sibling workers' equivalent (`teamContext`) does the same thing.
+  noteIdentity(req, { userId: row.id, teamId: row.current_team_id ?? undefined })
 
   // Slide the expiry forward while the session is actively used. A pinned
   // (MCP) session is deliberately short-lived — never slid.

@@ -22,7 +22,7 @@ import { DurableObject } from "cloudflare:workers"
 import type { SessionUser } from "@shared/types"
 import { healthBody } from "@shared/workers/config-health"
 import { accountScope, mayHearChange, scopeStamp, type ScopeStamp } from "@shared/workers/account-scope"
-import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, requireMember } from "@shared/workers/gating"
+import { AUTH_UNAVAILABLE_MS, d1ConfigFrom, GuardError, identityFor, noteIdentity, requireMember } from "@shared/workers/gating"
 import { readOrigin } from "@shared/workers/origin"
 import {
   INTEREST_STALE_MS,
@@ -495,16 +495,24 @@ export default {
       // for: adding boundary validation to a worker whose catch had no
       // GuardError branch turns every intended 400 into exactly the 500 the
       // validation existed to prevent, and records a row for each one.
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      if (e instanceof GuardError) {
+        // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx (gating.ts `detail`):
+        // the caller's answer is unchanged and the cause stops being console-only.
+        if (e.detail)
+          await recordWorkerError(env.DB, "realtime", new URL(request.url).pathname, e, requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       // Never a bare 1101. Realtime binds the core database, so a crash here is
       // recorded like every other worker's (ERROR-HANDLING.md) instead of
-      // vanishing into Cloudflare's exception counter.
+      // vanishing into Cloudflare's exception counter. WHOSE: noted below the
+      // moment `whoAmI` answers, and the team once `?team=` is read.
       await recordWorkerError(
         env.DB,
         "realtime",
         new URL(request.url).pathname,
         e,
-        requestId(request)
+        requestId(request),
+        identityFor(request)
       ).catch(() => null)
       return fail(500, "server_error", "Something went wrong.")
     }
@@ -624,6 +632,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
       // Signed-in gate first (same session system as the API — one master).
       const user = await whoAmI(request, env)
       if (!user) return fail(401, "signed_out", "Not signed in.")
+      // WHOSE socket this is, for every row this request may write below.
+      noteIdentity(request, { userId: user.id })
 
       // R20's QUERY half. These two were the only request inputs in the whole
       // worker fleet read raw, and both name something: `?user=` picks a Durable
@@ -665,6 +675,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
       const teamId = queryText(url.searchParams.get("team"), "Team", TEXT_LIMITS.short)
       if (teamId) {
+        // …and WHICH team's fence is being looked up. Noted before the
+        // membership read, on purpose: the row this branch records is the fence
+        // lookup FAILING, and "which team" is the fact that makes 2,021 identical
+        // staging rows answerable. Diagnostics context only — nothing gates on
+        // an error row's team_id (trace.ts makes the same promise of request_id).
+        noteIdentity(request, { teamId })
         // Team channel: must be an active member of THIS team — the same
         // team_members + teams join the API gates on (requireMember), which also
         // hands back the team's database so the next line can resolve the fence.
@@ -702,8 +718,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
           // this is the refusal of a fail-closed gate on a token that HAS
           // failed in production before (the bootstrap D1 auth error). Learning
           // about it from a log tail is learning about it too late.
-          console.error("realtime fence lookup failed:", e)
-          await recordWorkerError(env.DB, "realtime", "GET /?team= (fence lookup)", e)
+          console.error("realtime fence lookup failed:", requestId(request), e)
+          // THE TRACE AND THE CALLER RIDE THE ROW — every one of the 2,021 rows
+          // this line wrote on staging carried neither, on a request that had both.
+          await recordWorkerError(env.DB, "realtime", "GET /?team= (fence lookup)", e, requestId(request), identityFor(request))
           return fail(503, "live_unavailable", "The live connection isn't available right now.")
         }
         // WHICH SHARD THEY JOIN — from their USER id, so all of one person's

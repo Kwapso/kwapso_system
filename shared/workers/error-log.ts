@@ -26,10 +26,81 @@ export type ErrorReport = {
   userId?: string
   url?: string
   /** The id the public door minted for this request, carried on every internal
-   * hop (shared/workers/trace.ts). Optional because a cron tick is not a
-   * request and has no id to carry — and inventing one there would suggest a
-   * click that never happened. */
+   * hop (shared/workers/trace.ts) — or, on unattended work, the TICK's id from
+   * `tickId` below. Optional because a worker's own crash may have neither.
+   *
+   * This used to say a cron "has no id to carry — and inventing one there would
+   * suggest a click that never happened". Half right: a tick is not a click,
+   * and the id must not look like one. But the column exists so that every row
+   * one unit of work wrote can be found with one query, and a sweep that writes
+   * one row per broken team per tick is exactly that unit — 2,020 cron rows on
+   * staging with nothing joining a tick's rows to each other. So a tick carries
+   * an id that SAYS it is a tick. */
   requestId?: string
+}
+
+/** Sources whose rows are MEASUREMENTS and never exceptions — written on
+ * purpose, by a seam that measured something, and carrying NO STACK BY DESIGN.
+ *
+ * The slow-door line (timing.ts) writes into this table because the ops alarm
+ * already watches it, and that is right: a door that got slower three weeks ago
+ * raises itself instead of waiting to be found. But a reviewer counting
+ * `stack IS NULL` read those rows as a defect — 1,442 of them on staging by
+ * 7 Sep 2026, and every exception row beside them carried a stack. The
+ * distinction has to be DECLARED somewhere a reader can ask, so: a source in
+ * this list is a measurement, the errors door announces the list, and a stack
+ * missing from any OTHER source is still the defect it always was. */
+export const SLOW_DOOR_SOURCE = "slow-door"
+export const MEASUREMENT_SOURCES: readonly string[] = [SLOW_DOOR_SOURCE]
+
+/** WHAT TO RECORD ABOUT A THROWN THING — the diagnosis where there is one, the
+ * message where there is not.
+ *
+ * The recording seam wants the sentence a developer can act on; the caller
+ * wants the sentence a person can read. For everything except a diagnosed
+ * refusal those are the same string, which is why this reads as a no-op most
+ * of the time and is worth its own name anyway: `String(e)` at a recording
+ * site is exactly how 1,991 cron rows came to say "Google couldn't answer that
+ * just now. Try again." — our own words, quoted back at us, about a token
+ * Google had revoked.
+ *
+ * DUCK-TYPED on `detail`, deliberately: `GuardError` lives in gating.ts, and
+ * gating reaches this file through timing.ts, so an `instanceof` here would be
+ * an import cycle. A string `detail` on a thrown thing IS the contract
+ * (gating.ts documents it), and nothing else in the codebase puts one there.
+ * gating.ts re-exports this under the same name so every existing call site
+ * keeps its import. */
+export function causeOf(e: unknown): string {
+  const detail = (e as { detail?: unknown } | null)?.detail
+  if (typeof detail === "string" && detail) return detail
+  return e instanceof Error ? e.message : String(e)
+}
+
+/** The id one cron tick carries on every row it writes, so a tick's rows join
+ * the way a request's do (`request_id`, db/core/0020). It names itself a tick
+ * so nobody reads it as a click, carries the JOB so two crons firing in the
+ * same minute stay apart, and uses the tick's own `scheduledTime` rather than
+ * the clock, so a re-run of a late tick writes under the same id.
+ *
+ * Same alphabet as trace.ts's SAFE (`[A-Za-z0-9_.-]` plus the `:` that keeps the
+ * three parts readable) and well inside the 64 the column keeps. */
+export function tickId(job: string, scheduledTime: number): string {
+  return `tick:${job.replace(/[^A-Za-z0-9_.-]+/g, "-")}:${new Date(scheduledTime).toISOString()}`
+}
+
+/** The page a browser was on, WITHOUT its query string or fragment. The query
+ * is where a person's search words live (google-api.ts strips its own for
+ * exactly this reason), and a `?token=` on a sign-in landing is the other thing
+ * a full `location.href` would carry into a table read by whoever reads the
+ * error log. A URL that does not parse is kept as it came, capped like every
+ * other field — refusing to record is the wrong failure. */
+function pageOf(url: string): string {
+  try {
+    const u = new URL(url)
+    return `${u.origin}${u.pathname}`
+  } catch {
+    return url
+  }
 }
 
 /** How many rows one BUCKET may write to the store in a trailing hour.
@@ -48,8 +119,8 @@ export type ErrorReport = {
 export const MAX_ERROR_LOGS_PER_HOUR = 120
 
 export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
+  const now = new Date()
   try {
-    const now = new Date()
     // THE BUDGET RIDES THE WRITE (CONCURRENCY.md, and the same shape as the
     // login-send ledger): the ceiling sits in the INSERT's own WHERE, so a burst
     // of beacons cannot all read "under the line" and all write. Over the line
@@ -57,7 +128,7 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
     // become one: this seam's whole contract is that recording never throws and
     // never changes the response, so a dropped row is silence, exactly as a
     // failed insert already was.
-    await db
+    const result = await db
       .prepare(
         `INSERT INTO error_logs (id, at, source, place, message, stack, team_id, user_id, url, request_id)
          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -73,7 +144,7 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
         r.stack ? String(r.stack).slice(0, 2000) : null,
         r.teamId ?? null,
         r.userId ?? null,
-        r.url ? String(r.url).slice(0, 300) : null,
+        r.url ? pageOf(String(r.url)).slice(0, 300) : null,
         // Capped like every other caller-influenced field: the id may have come
         // from an outside tool's own header (trace.ts keeps a sane one).
         r.requestId ? String(r.requestId).slice(0, 64) : null,
@@ -85,13 +156,36 @@ export async function logError(db: CoreDb, r: ErrorReport): Promise<void> {
         MAX_ERROR_LOGS_PER_HOUR
       )
       .run()
-  } catch {
-    /* recording must never break the request */
+    // A DROPPED ROW IS SILENT IN THE TABLE AND MUST NOT BE SILENT EVERYWHERE.
+    // Over the ceiling the statement moves zero rows, which is correct and is
+    // the one outcome a reader of the store cannot see: a bucket that hit its
+    // hourly line and a quiet hour look identical. So the drop goes to the
+    // console — the short-lived tail a developer is already watching when a
+    // flood is on — as one line naming the bucket and the place, never the
+    // message (the catch that called us printed that already).
+    const changes = (result as { meta?: { changes?: number } } | null)?.meta?.changes
+    if (changes === 0)
+      console.error(
+        `error_logs: dropped a row from ${r.source} at ${String(r.place).slice(0, 200)} — bucket ${r.userId ?? r.source} is over its ${MAX_ERROR_LOGS_PER_HOUR}/hour ceiling`
+      )
+  } catch (e) {
+    // Recording must never break the request — and a store that has stopped
+    // accepting writes (a missing migration, a full database) must not look
+    // like a quiet week. The line is the counter this seam has.
+    console.error(`error_logs: could not record a row from ${r.source} at ${String(r.place).slice(0, 200)}:`, e)
   }
 }
 
 /** The central-catch recorder. `e` is whatever was thrown; `place` is
- * "<METHOD> <pathname>".
+ * "<METHOD> <pathname>" on a request, "cron/<job>" on a tick.
+ *
+ * THE MESSAGE IS THE CAUSE, NOT THE SENTENCE (`causeOf`). A refusal that
+ * carries a `detail` records the detail — what Google actually said, which call,
+ * what status — and the person still reads the refusal's own sentence, because
+ * `fail()` at the catch never sees this function. Before this sat in the seam,
+ * three of six central catches wrapped the detail by hand (`new Error(e.detail)`,
+ * which also threw away the refusal's real stack for the catch's own) and the
+ * other three recorded nothing for a diagnosed refusal at all.
  *
  * IT WRITES THE ROW AND NOT THE CONSOLE LINE, and this comment used to claim
  * both ("console (for live tails) + the table (for history)"). The console half
@@ -119,7 +213,7 @@ export async function recordWorkerError(
   await logError(db, {
     source,
     place,
-    message: err.message,
+    message: causeOf(e),
     stack: err.stack,
     requestId,
     teamId: who?.teamId,
