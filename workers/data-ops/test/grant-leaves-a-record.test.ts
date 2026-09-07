@@ -131,7 +131,11 @@ describe("a credit grant leaves a record", () => {
   it("writes one row naming the amount and the team", async () => {
     const res = await postGrantCredits(grant({ teamId: TEAM, amount: 500 }), env)
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ teamId: TEAM, balance: 500 })
+    // `lifetimeGranted` rides along because the operator running the grant is the
+    // only reader that column has ever had (lifetime-granted.test.ts). Asserted
+    // with toEqual rather than toMatchObject on purpose: the door's answer is a
+    // contract, and a field appearing in it unannounced is the thing to catch.
+    expect(await res.json()).toEqual({ teamId: TEAM, balance: 500, lifetimeGranted: 500 })
 
     const rows = grants(db)
     expect(rows.length, "a grant that records nothing is the bug this closes").toBe(1)

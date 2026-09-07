@@ -40,7 +40,7 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.tsx`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
-| 5. Record detail | a `<module>.detail` recipe, or `web/components/notes/note-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx`, in the module's OWN folder (`web/components/` has no top-level files — UI-CONVENTIONS.md), and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
+| 5. Record detail | a `<module>.detail` recipe, or `web/components/<module>/<module>-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx`, in the module's OWN folder (`web/components/` has no top-level files — UI-CONVENTIONS.md), and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
 | 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | nothing to register for the detail — the laws already walk it; pin any tab that shows no collection, with its reason |
 
 The workers involved: **content** (`workers/content`) is the right home for a
@@ -827,6 +827,15 @@ again, which is the only property that matters here.
   question as an ungated one, so gating it is not a way out.
 - **R25 `savings-caption`** — a screen that shows a saving renders
   `SAVINGS_CAPTION` word for word.
+- **R53 `component-folders`** — your module's components go in ONE folder named
+  for it, `web/components/<module>/`, and that folder gets a line in
+  `web/components/README.md` saying what belongs there. The top level holds no
+  files at all, and the folder set is derived from the README rather than from a
+  list in a test, so the paragraph a person reads is the one the build enforces.
+- **R54 `named-paths`** — every path your module's documents and comments name
+  must open. Write a real file's path or none: an illustrative one goes in
+  `<angle brackets>` so it reads as a template, and a path named precisely
+  BECAUSE the file is gone gets a reasoned `GONE_ON_PURPOSE` line.
 
 **The words** (the ones that catch every new module, every time)
 
