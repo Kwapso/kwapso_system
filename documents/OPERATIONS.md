@@ -573,8 +573,12 @@ production callers, so it cannot be left set the wrong way.
 retention sweeps, or an owner's decision about old rows), or give that TEAM a new
 database and repoint `teams.database_id` — the restore path in RESILIENCE.md is
 the same procedure. Wiring the mover properly needs the read path to consult the
-routing table AND a merged read that can page, sort and count; `d1QueryAcross`
-refuses all three across more than one database on purpose.
+routing table AND a merged read that can page, sort and count. *(Fact updated
+7 Sep 2026: this line used to end "`d1QueryAcross` refuses all three across more
+than one database on purpose". It sorts and cuts now, and `countCollectionAcross`
+counts; what it still refuses is an OFFSET, a raw aggregate and an ordering it
+cannot parse. So of the two things wiring needs, the merged read is DONE and the
+routing is not — ARCHITECTURE.md §1 has the whole picture.)*
 
 ### The account's D1 storage, and why the mover is the wrong answer to it
 

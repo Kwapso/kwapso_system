@@ -605,8 +605,11 @@ paths already route through it. They don't.
   When you wire a module onto the split path, audit its batched scripts: any
   script touching two tables that could land in different shards must be
   reworked into merged reads + per-DB writes.
-- **AND A CONCATENATION CANNOT PAGE, SORT OR COUNT** (scaling review 2026-08-14).
-  `d1QueryAcross` runs one statement against every shard and concatenates the rows.
+- **A CONCATENATION CANNOT PAGE, SORT OR COUNT — so it stopped being one**
+  (scaling review 2026-08-14; **the seam changed on 7 Sep 2026, and the three
+  traps below are the reason it changed, not a description of it now** — jump to
+  the paragraph after the list for what it does today).
+  `d1QueryAcross` ran one statement against every shard and concatenated the rows.
   That is right for "give me the rows" and quietly wrong for three shapes, each of
   which *looks* correct while there is only one database, which is every
   environment until the mover runs:
@@ -619,13 +622,24 @@ paths already route through it. They don't.
   - `COUNT(…)` and friends → one row per shard, and every caller here reads
     `rows[0].n`. R16's *exact* count would report the first shard's total as the whole.
 
-  `d1QueryAcross` now **throws** on all three when handed more than one database, so
-  the day somebody points a paged or counted read at the split path they get a
-  refusal instead of a plausible number. Making it correct, a cursor token encoding
-  a position per shard, plus folding aggregates, is real work with a decision in it,
-  and it is the prerequisite for wiring any PAGED module onto the split path. One
-  database is untouched: every read today takes that branch.
-  Locked by `workers/tenancy/test/merged-read-guard.test.ts`.
+  **What it does today (7 Sep 2026).** Two of the three have a real answer and the
+  third has a better one. `ORDER BY` and `LIMIT` are MERGED: `mergePlan` parses the
+  statement's own ordering off its tail (bare columns and an optional direction —
+  anything else is refused rather than guessed at), each shard answers its own top n
+  under that ordering, and `mergeAndCut` sorts the union with SQLite's own value
+  order and cuts to n, so the answer is the top n OVERALL. A collection COUNT does
+  not come through this seam at all: `countCollectionAcross`
+  (`shared/workers/count.ts`) sums the per-shard bounded counts and clamps once —
+  exact below R16's ceiling and an honest floor above it. What still **throws** on
+  more than one database is an OFFSET (skipping m rows per shard skips a different m
+  in the merged order — page by key, which R14 already asks for), a raw aggregate,
+  and an ordering the parse could not read. So the prerequisite for wiring a PAGED
+  module onto the split path is now one thing rather than three: a cursor token that
+  names the same position on every shard. One database is untouched: every read today
+  takes that branch. Locked, both halves, by
+  `workers/tenancy/test/merged-read-guard.test.ts` — which asserts the top n is
+  global rather than per-shard, that ascending and multi-key orderings hold, that
+  NULLs land where SQLite puts them, AND that the three refusals still refuse.
 - **The mover has to survive the size it exists for.** It is what an 80% alarm tells
   you to run, so it only ever sees a table too big for its database, and two of its
   steps could not survive that. The copy paged with `LIMIT/OFFSET` (quadratic reads,

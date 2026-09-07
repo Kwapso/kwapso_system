@@ -616,14 +616,20 @@ answer and MCP tool for that module would then read the database it had just
 emptied, on both front doors, while the door answered `status: "done"` and resolved
 the size alarm.
 
-Two things have to land before the valve opens, and the second is the larger:
-(1) the read path has to consult `team_module_databases`, and (2) a merged read has
-to be able to PAGE, SORT and COUNT — `d1QueryAcross` deliberately refuses all three
-across more than one database, because a concatenation cannot answer them, and
-every collection in this base does all three (R14, R16). That is a cross-shard
-cursor, a merged sort and a summed count: an architecture decision, not a patch.
-Until it is taken, a full team database is relieved by archiving or by moving the
-TEAM, and stage 2's same-table cutover stays a documented path (Prime Directive 1).
+Two things had to land before the valve opens, and **the second one has (7 Sep
+2026)**: (1) the read path has to consult `team_module_databases`, and (2) a merged
+read has to be able to PAGE, SORT and COUNT. This paragraph used to say
+`d1QueryAcross` "deliberately refuses all three". It does not any more — the merged
+SORT and the CUT are built (each shard answers its own top n under the same
+ordering; the seam sorts the union by the statement's own keys and cuts to the
+limit) and the summed COUNT is `countCollectionAcross` in
+`shared/workers/count.ts`. What it still refuses is an OFFSET, a raw aggregate and
+an ordering it cannot read as bare columns — which is the honest shape of what is
+LEFT: a cross-shard keyset CURSOR that means the same position on every shard, and,
+before that, the routing of (1). Still an architecture decision rather than a patch,
+and now one decision rather than three. Until it is taken, a full team database is
+relieved by archiving or by moving the TEAM, and stage 2's same-table cutover stays
+a documented path (Prime Directive 1).
 
 **Organizing many apps in Cloudflare:** Cloudflare has no folders. The base's
 convention is (a) a name prefix per product, every worker, database and bucket
