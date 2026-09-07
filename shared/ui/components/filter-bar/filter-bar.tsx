@@ -272,9 +272,51 @@ const facetFieldVariants = cva(
            swapped and promoted 8% to 20% on hover, so a resting facet and a
            disabled one carried the same stroke. The hover came from
            kwapso-ui.css; it is gone and nothing replaces it. */
-        default: "shadow-[var(--hairline-strong)] bg-background text-foreground",
+        /* NO EDGE, JUST THE FILL — client, 2026-09-06, twice. First: "I don't
+           like not seeing the contour of these buttons (the filter and so on).
+           Please make it beige #F7F2EB." Then, having seen the fill arrive
+           beside the edge: "for filter, sort, and all of the buttons in the
+           toolbar, I do not want the border. I want them to have a background
+           in the beige so I can see them at all times."
+
+           She is right, and the kit already said so for the control next to
+           this one: tokens.css, on buttons — "NO border in any state — no
+           outline, no hairline, no stroke. A secondary button is a filled
+           button in the other paper tone", and "SECONDARY IS A FILL, AND THE
+           FILL IS THE AFFORDANCE". The pill was carrying both a fill and a 20%
+           edge, which is one affordance too many and the only reason it looked
+           unlike `SortControl` and `ViewSwitch` beside it — neither of which
+           has ever drawn an edge.
+
+           So the hairline goes and the fill stays. What follows is the history
+           of how the fill got here, kept because the reasoning still governs
+           WHICH beige this is.
+
+           The contour was there all along: `--hairline-strong` is a real 20%
+           edge. What was missing is a FILL, because this pill painted
+           `bg-background` — the same tone as the toolbar track it sits on — so
+           a hairline was the only thing separating a control from its own
+           ground. tokens.css states the principle for buttons in as many words:
+           "a secondary button is a filled button in the other paper tone, which
+           is why a header band and the buttons inside it are never the same
+           paper tone". A pill in a toolbar is that same object and was the one
+           control breaking the rule: `SortControl` and `ViewSwitch` beside it
+           already spend `--btn-secondary-fill`, which is why those two read as
+           objects and this one read as text with a line round it.
+     
+           `--btn-secondary-fill` RATHER THAN THE LITERAL #F7F2EB she named, and
+           it resolves to exactly that here: the token is GROUND-AWARE
+           (tokens.css rebinds it per surface, so it is soft paper on an
+           off-beige ground and off-beige on a soft-paper one). Writing the
+           colour would have been right on this toolbar and invisible on a
+           panel, which is the failure the rebind exists to prevent — and it has
+           no dark half, so a hex here would have shipped a light-only pill. */
+        default: "shadow-none bg-[var(--btn-secondary-fill)] text-foreground",
         /** Chapter 9's error hairline: poppy at 65%, so dark re-resolves for free. */
-        error: ["shadow-[var(--hairline-error)]", "bg-background text-foreground"],
+        /* The error pill moves with the resting one: it differs by its EDGE
+           (`--hairline-error`), and leaving it on the page tone would have made
+           the one pill that most needs to be seen the flattest on the row. */
+        error: ["shadow-[var(--hairline-error)]", "bg-[var(--btn-secondary-fill)] text-foreground"],
         /** A system-set value loses its edge entirely, and its tab stop. */
         readOnly: "shadow-none bg-hair-faint text-foreground",
         /* A fill, an ink, and the WEAK 8% edge against the resting facet's
@@ -528,6 +570,38 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
   /** The bar's accessible name. Translatable. */
   label?: string;
   /**
+   * THE SHAPE OF THE CHIP ROW. Added 2026-09-04 for the one-row toolbar.
+   *
+   * `"wrap"` (the default, and byte-identical to every call site that does
+   * not pass this) is the bar's own long-standing behaviour: a one-line
+   * horizontal scroller below `sm`, a wrapping row from `sm` up. That is
+   * right for a bar standing on its own above a list, where the row may take
+   * as many lines as it needs and the page simply gets taller.
+   *
+   * `"line"` keeps the one-line scroller at EVERY width. It exists because a
+   * bar dropped into `CollectionFrame`'s toolbar is not standing on its own:
+   * it is one slot in a row the client has ruled must stay a single row
+   * ("i want that toolbar is a single row"), and a wrapping chip block is the
+   * single largest reason that row grew to four and five lines — measured at
+   * 472px of intrinsic width for three chips plus the add slot and clear, on
+   * a 699px toolbar at 834. A slot that can wrap inside a row that cannot is
+   * a contradiction, and this is the side of it the bar can settle.
+   *
+   * WHY A PROP AND NOT A CHANGE OF DEFAULT. `FilterBar` is also drawn by
+   * `filter-builder`, `archive`, `search-results` and `no-results`, none of
+   * which sit inside a one-row toolbar and all of which want the wrapping
+   * row they have today. Flipping the default would have narrowed four
+   * screens to fix one, so the toolbar asks for what the toolbar needs and
+   * nothing else moves. `collection-screen.tsx` is the only caller that
+   * passes `"line"`.
+   *
+   * WHAT IS NOT LOST. A scrolled row hides nothing from the keyboard: every
+   * chip and its remove control stay in the tab order, and the browser
+   * scrolls a focused chip into view on its own. Nothing here sets
+   * `overflow` on the vertical axis by hand — see the row's own note.
+   */
+  chips?: "wrap" | "line";
+  /**
    * Busy. The chips are not drawn: a set of active facets that has not
    * arrived is not an empty set, and drawing "no filters" while they load
    * would tell the reader something false about the list below.
@@ -577,6 +651,10 @@ export interface FilterBarProps extends React.ComponentPropsWithoutRef<"div"> {
  *            composition that wants a facet rail builds one and puts these
  *            facets in it.
  *
+ *  `chips="line"` holds the mobile shape at all three, and is what a bar
+ *  standing inside `CollectionFrame`'s single-row toolbar is passed. It is
+ *  the only thing in this file that any breakpoint answer depends on.
+ *
  * RTL — safe. Chips run in DOM order in a flex row, the remove control sits at
  * the INLINE end via `pe-*` and DOM order, and the scroller scrolls the
  * inline axis, which the browser already mirrors.
@@ -597,6 +675,7 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
       formatRemoveLabel,
       label = "Filters",
       loading = false,
+      chips: chipShape = "wrap",
       children,
       ...props
     },
@@ -639,11 +718,18 @@ const FilterBar = React.forwardRef<HTMLDivElement, FilterBarProps>(
         {hasRow ? (
           <div
             data-slot="filter-bar-chips"
+            data-chips={chipShape}
             className={cn(
               "flex items-center gap-2",
               // MOBILE: one line, scrolled. From `sm` up: wrapped. See header.
               "flex-nowrap overflow-x-auto",
-              "sm:flex-wrap sm:overflow-x-visible",
+              /* `chips="line"` is the same one-line scroller, held at every
+                 width instead of released at `sm`. It is expressed by simply
+                 NOT writing the `sm:` release, rather than by a second pair of
+                 utilities fighting the first at the same specificity — see
+                 PATTERN §4 on exclusive states resolved before the class list,
+                 never stacked inside it. */
+              chipShape === "wrap" && "sm:flex-wrap sm:overflow-x-visible",
             )}
           >
             {chips.map((chip) => {

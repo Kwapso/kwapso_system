@@ -1,5 +1,22 @@
 /* ============================================================================
-   Breadcrumbs — the whole trail from one array (1 direct call site).
+   Breadcrumbs — the whole trail from one array (2 direct call sites).
+
+   THE SECOND CALL SITE IS `breadcrumb-folders.tsx`, ONE FILE AWAY, SINCE
+   2026-09-04, and it is the reason this file's plain drawing now ships on
+   every screen the folder strip does. The client, on the live product: "in
+   monile, lets use normal breadcrumbs (like they ware before, jhust teh
+   text)". Below the shell's own `md` breakpoint the strip is `display: none`
+   and THIS component is the trail — same items, same landmark name, wrapping
+   the way `BreadcrumbList` already argues a narrow trail should. Nothing about
+   this file changed to accommodate it except one attribute that was wrong
+   either way; see the `aria-current` block in the render.
+
+   WHAT THAT MEANS FOR ANY CHANGE MADE HERE. This is no longer one drawing
+   beside another — it is the PHONE'S drawing of the trail the strip draws on a
+   desktop, from the identical array. A crumb that reads differently here
+   than it does there is now a difference a single user can hear by rotating
+   a tablet, so the two must be kept in step; where they already disagreed,
+   they were reconciled rather than left.
 
    WHY THIS EXISTS ALONGSIDE `breadcrumb/`
    Commission §6 lists both, as two separate folders with two separate exports,
@@ -81,6 +98,25 @@ export interface BreadcrumbsProps
    * trail is too long for a layout it cannot see.
    */
   maxItems?: number;
+  /**
+   * WHICH crumb is the current page. Defaults to the LAST, which is what a
+   * trail means and is exactly what this component did before the prop
+   * existed.
+   *
+   * ADDED 2026-09-06, AND IT IS NOT THIS DRAWING'S OWN IDEA. The folder strip
+   * one file away gained `activeIndex` so a workspace tab set could mark the
+   * tab the reader activated without MOVING it to the end of the strip — see
+   * that file. Below `md` the strip is `display: none` and THIS component is
+   * the trail, from the identical array; without the same prop the phone
+   * would announce a different crumb as `aria-current="page"` than the
+   * desktop does, which this file's own header names as the exact class of
+   * bug to refuse: "a crumb that reads differently here than it does there is
+   * now a difference a single user can hear by rotating a tablet."
+   *
+   * An index outside the array marks no crumb as current — deliberate, and
+   * argued in full at the strip's own copy of this prop.
+   */
+  activeIndex?: number;
   /** What the elision announces. Defaults to `BreadcrumbEllipsis`'s own English. */
   ellipsisLabel?: string;
   /** Classes for the `<ol>`, for a call site that needs to change the wrap. */
@@ -130,8 +166,10 @@ export function collapse(items: BreadcrumbsItem[], maxItems?: number): Rendered[
  *  7. empty          — `items: []` renders `null`. Not an empty `<nav>`, not a
  *                      lone chevron, not a dash.
  *  8. error          — does not apply. A trail reports nothing.
- *  9. selected       — the last crumb, always: `BreadcrumbPage`, primary ink
- *                      plus `aria-current="page"`.
+ *  9. selected       — exactly one crumb: `BreadcrumbPage`, primary ink plus
+ *                      `aria-current="page"`. The LAST one unless
+ *                      `activeIndex` names another, and none at all when that
+ *                      index falls outside the array.
  * 10. read-only      — always.
  *
  * THREE BREAKPOINTS
@@ -152,6 +190,7 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
       label = "Breadcrumb",
       separator,
       maxItems,
+      activeIndex,
       ellipsisLabel,
       className,
       listClassName,
@@ -162,7 +201,9 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
     if (items.length === 0) return null;
 
     const rendered = collapse(items, maxItems);
-    const lastIndex = items.length - 1;
+    /* The LAST crumb unless the caller names another. `-1` on an empty array
+       never runs — the guard above returned. */
+    const currentIndex = activeIndex ?? items.length - 1;
 
     return (
       <Breadcrumb
@@ -187,8 +228,42 @@ const Breadcrumbs = React.forwardRef<HTMLElement, BreadcrumbsProps>(
                 <BreadcrumbItem>
                   {entry.kind === "gap" ? (
                     <BreadcrumbEllipsis label={ellipsisLabel} />
-                  ) : entry.index === lastIndex || entry.item.href === undefined ? (
+                  ) : entry.index === currentIndex ? (
                     <BreadcrumbPage>{entry.item.label}</BreadcrumbPage>
+                  ) : entry.item.href === undefined ? (
+                    /* AN ANCESTOR WITH NO ROUTE — THE PAGE ELEMENT FOR ITS
+                       SEMANTICS, WITHOUT ITS `aria-current`.
+
+                       SPLIT OUT OF THE BRANCH ABOVE ON 2026-09-04. The two
+                       cases shared one arm and therefore one attribute:
+                       `BreadcrumbPage` sets `aria-current="page"`
+                       unconditionally (it is the element FOR the page you are
+                       on), so a middle crumb that merely had no `href`
+                       announced itself as the current location too, and a
+                       trail like `Clients / Halloway / Q3` with an unrouted
+                       middle published TWO current pages. There is exactly one
+                       location a reader is at, and `aria-current` is how it is
+                       heard when the ink cannot be seen.
+
+                       THE FIX IS NOT NEW HERE — IT IS THE SECOND DRAWING'S,
+                       BROUGHT BACK. `breadcrumb-folders.tsx` in this same
+                       folder hit it first and wrote the ruling down at its own
+                       rest tab: such a crumb "takes the page element for its
+                       semantics and the REST fill for its drawing, and
+                       `aria-current` is dropped: there is exactly one current
+                       location and it is the last tab." The two forms of one
+                       trail must not disagree about that, and since 2026-09-04
+                       they cannot be heard apart: below `md` the folder strip
+                       renders THIS component, so a divergence here would have
+                       been a phone announcing a different current page than
+                       the desktop did from the same array.
+
+                       The DRAWING is untouched — still the non-link crumb, a
+                       step you can see and not visit, which is TEN STATES #5
+                       above and remains true word for word. */
+                    <BreadcrumbPage aria-current={undefined}>
+                      {entry.item.label}
+                    </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink href={entry.item.href}>{entry.item.label}</BreadcrumbLink>
                   )}

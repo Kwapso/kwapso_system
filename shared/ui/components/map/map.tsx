@@ -83,29 +83,51 @@ import {
 } from "../../foundations/icons";
 
 /**
- * Scripts and same-origin, nothing else — a map provider's frame needs both
- * (it runs its own script and reads its own cookies and storage for tiles and
- * preferences) and none of them needs form submission or top-level navigation
- * from inside the frame.
+ * Scripts, and nothing else. Stated as a constant so a reader can see what
+ * "the default" is without reading the JSX. `allow-same-origin` is
+ * deliberately absent — paired with `allow-scripts` it lets framed content
+ * remove its own sandbox.
  *
- * IT IS NO LONGER `web-embed`'s DEFAULT, and the sentence that said it was is
- * gone. `web-embed` dropped `allow-same-origin` on 2026-09-02, because the
- * pair lets a SAME-ORIGIN framed document rewrite its own `sandbox` and
- * reload out of it — and `web-embed`'s `src` is anything at all, including
- * one of ours. This component's `src` is a third party's embed URL by
- * definition (its own header: "a provider's embed URL, framed and
- * sandboxed"), where the pair grants the provider its own storage and grants
- * it nothing of ours.
+ * IT USED TO BE `allow-scripts allow-same-origin`, AND THE ARGUMENT FOR THAT
+ * ANSWERED ITS OWN QUESTION WRONG. The old comment here said, correctly, that
+ * `web-embed` had dropped the pair on 2026-09-02 because a SAME-ORIGIN framed
+ * document can reach `window.parent`, rewrite its own `sandbox` attribute and
+ * reload itself out of the sandbox entirely — and then kept the pair anyway,
+ * on the grounds that THIS component's `src` is a third party's embed URL by
+ * definition. It then wrote down, in its own last paragraph, the reason that
+ * is not good enough: **"it rests on `src` never being first-party, which
+ * nothing in the type system enforces."**
  *
- * THAT IS A JUDGEMENT AND IT IS NOT RULED. It rests on `src` never being
- * first-party, which nothing in the type system enforces. Whether this file
- * should follow `web-embed` — closed by default, with an explicit
- * `allowSameOrigin` for the providers that turn out to need it — is open, and
- * it is not a change to make without a provider in front of you: the demo
- * makes no network calls, so which providers actually break cannot be
- * measured here. A call site may replace this wholesale today.
+ * `src` is a `string`. A screen that pastes a URL a person typed, or an
+ * application that frames its own map surface by URL rather than through
+ * `children`, hands this component a first-party document while the type
+ * checker nods along — and the pair is then no sandbox at all, on a prop
+ * whose header still promises "framed and sandboxed". A default may not rest
+ * on a convention the compiler cannot see; that is exactly the shape of
+ * defect this component's sibling already corrected.
+ *
+ * THE COST OF CLOSING IT IS PAID BY THE PROVIDERS THAT ACTUALLY NEED IT, AND
+ * THEY SAY SO BY NAME. A cross-origin provider — a Google or Mapbox embed —
+ * was already in a different origin and was never reading ours, so an opaque
+ * origin costs it nothing it had. A provider that genuinely needs its own
+ * storage for tiles or preferences gets it by passing `allowSameOrigin`, one
+ * greppable word at the call site, rather than by every map in the product
+ * inheriting the loosest setting because one provider might want it.
+ *
+ * THIS IS NOW THE SAME ANSWER `web-embed` GIVES, DELIBERATELY. Two components
+ * in one kit that both frame foreign content must not hold two different
+ * opinions about what a sandbox is: a reader who learns the rule at one has
+ * learned it at the other, and a security default that varies by component is
+ * a default nobody can state.
  */
-const DEFAULT_SANDBOX = "allow-scripts allow-same-origin";
+const DEFAULT_SANDBOX = "allow-scripts";
+
+/**
+ * The default plus `allow-same-origin`, for a trusted embed that has said so.
+ * Composed from the constant above rather than written out again, so the two
+ * can never disagree about what "the default plus one token" is.
+ */
+const SAME_ORIGIN_SANDBOX = `${DEFAULT_SANDBOX} allow-same-origin`;
 
 /**
  * The three status accents the artifact names for a pin, plus the bare dot
@@ -208,6 +230,26 @@ export interface MapProps extends Omit<React.ComponentPropsWithoutRef<"div">, "t
   listLabel?: string;
   /** Defer an embedded map until the box is near the viewport. Default `true`. */
   lazy?: boolean;
+  /**
+   * Add `allow-same-origin` to the sandbox. Default `false`, and it must stay
+   * the exception: together with the default's `allow-scripts` it lets a
+   * SAME-ORIGIN document reach `window.parent`, rewrite its own `sandbox`
+   * attribute and reload itself unsandboxed — which is no sandbox at all.
+   *
+   * Pass it for a map provider you TRUST and whose embed actually needs its
+   * own cookies or `localStorage` for tiles and preferences — a named
+   * provider you chose, not a URL that arrived as data. A provider on its own
+   * origin is already walled off from ours without this, so it buys a
+   * cross-origin embed nothing and gives away the wall.
+   *
+   * Never pass it for a URL a person pasted. That is the case the default
+   * exists for, and it is the only case the type system cannot tell apart
+   * from the others on its own.
+   *
+   * Ignored when the call site passes its own `sandbox`; that string replaces
+   * the default wholesale and is the call site's own business.
+   */
+  allowSameOrigin?: boolean;
   /** Replaces the sandbox on the embedded frame wholesale. See the header. */
   sandbox?: string;
   /** Render nothing when there is no map, no pins, no items and no children. */
@@ -285,7 +327,12 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
       errorLabel = "The map could not be loaded",
       listLabel = "Records in view",
       lazy = true,
-      sandbox = DEFAULT_SANDBOX,
+      allowSameOrigin = false,
+      /* NOT defaulted in the destructure. The default depends on
+         `allowSameOrigin`, and a defaulted parameter cannot see a sibling's
+         resolved value without asserting an evaluation order a reader has to
+         work out. Resolved on its own line below instead. */
+      sandbox,
       hideWhenEmpty = false,
       style,
       children,
@@ -298,6 +345,16 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
     React.useEffect(() => {
       setLoaded(false);
     }, [src]);
+
+    /* A call site's own `sandbox` wins outright — including an empty string,
+       which is the maximally restrictive sandbox and a real thing to ask for,
+       so the test is `!== undefined` and never a truthiness check. */
+    const frameSandbox =
+      sandbox !== undefined
+        ? sandbox
+        : allowSameOrigin
+          ? SAME_ORIGIN_SANDBOX
+          : DEFAULT_SANDBOX;
 
     const embedded = src !== undefined && src !== null && src !== "";
     const hasPins = (pins?.length ?? 0) > 0;
@@ -339,7 +396,7 @@ const Map = React.forwardRef<HTMLDivElement, MapProps>(
             data-slot="map-frame"
             src={src}
             title={title}
-            sandbox={sandbox}
+            sandbox={frameSandbox}
             referrerPolicy="strict-origin-when-cross-origin"
             loading={lazy ? "lazy" : "eager"}
             onLoad={() => setLoaded(true)}

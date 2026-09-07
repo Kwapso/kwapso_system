@@ -201,7 +201,28 @@ const fieldVariants = cva(["w-auto"], {
         Since the ORDER FLIP (client, 2026-09-02) the field is the SECOND
         (end) half of the chip, so it is the END corner that stays a pill. */
     fused: {
-      true: "rounded-e-pill rounded-s-none",
+      /* THE SEAM SIDE LOSES THE FIELD'S OWN INSET — client, 2026-09-06: "sort
+         and view should have same spacing between icon and text. I know sort
+         has the break, keep it, but make it more compact; to the eye it should
+         look the same as the view selector."
+
+         MEASURED, both on verify/toolbar-trio: `ViewSwitch` puts 8 between its
+         glyph and its label. This control put 26 — and none of it was a gap.
+         The two halves are FUSED (no `gap-2` between them at all), so the space
+         is entirely padding: 8 inside the direction square, which centres a 16
+         glyph in a 32 box, plus the field's own leading `--space-4h` (18).
+         Three times the distance, on a control sitting beside the one it is
+         meant to match.
+
+         So the LEADING inset drops to `--space-2`, whose own line in the scale
+         reads "chip padding, ICON TO LABEL" — the same 8 `ViewSwitch` spends on
+         exactly this, rather than a number chosen to look right. The TRAILING
+         inset keeps its 18: that edge faces the pill's outside, where nothing
+         has changed and the header's arithmetic above still holds.
+
+         ONLY WHEN FUSED. An unfused field has no seam and no glyph beside it,
+         so it keeps the symmetric inset it always had. */
+      true: "rounded-e-pill rounded-s-none ps-[var(--space-2)]",
       false: "",
     },
   },

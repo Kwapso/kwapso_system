@@ -33,8 +33,10 @@ resolves here, with nothing translating it on the way in.
 
 **Fill is the default weight. The exceptions, drawn at regular (outline)
 weight instead, are `Plus`, `Power`, `Prohibit`, `X`, `DotsThree`,
-`DotsThreeVertical`, `MagnifyingGlass`, `Paperclip`, and THE WHOLE `Arrow*`
-FAMILY — all 96 of them.** Phosphor's fill weight renders a bare mark (a plus
+`DotsThreeVertical`, `MagnifyingGlass`, `Paperclip`, `Asterisk`, `Check`, and
+THE WHOLE `Arrow*` FAMILY — all 96 of them. 108 files in total; the other
+1,404 are fill, and both counts are now machine-checked — see "The audit"
+below.** Phosphor's fill weight renders a bare mark (a plus
 sign, a power glyph's slash-in-a-ring, a prohibit circle, a cross, three dots,
 a paperclip) as a solid disc, square or plate with the mark knocked out —
 there is no line to fill, so fill wraps it in a plate instead. That reads as a
@@ -105,6 +107,27 @@ product, so it was carrying the same heaviness her earlier rulings on `X` and
 the dots were both correcting elsewhere. Regular is the bare clip line and
 nothing else.
 
+`Asterisk` AND `Check` WERE ADDED TO THIS LIST ON 2026-09-06, AND BOTH HAD
+ALREADY BEEN CHANGED IN THE FOLDER BEFORE THIS PARAGRAPH EXISTED. That gap is
+the point of recording them here. `Asterisk` moved on the client's own ruling
+("everywhere there's asterisk, use the regular version instead of solid") and
+`Check` moved as the fix for the filled-square defect below — but neither
+edited this sentence, so for the rest of that day the folder's stated rule
+said `fill` about two files that were not, and an audit run against the rule
+as written would have reported both as defects and "corrected" them back into
+the bugs they had just come out of. **A weight rule that lives only in prose
+drifts silently from the art it describes; that is why `icon-art.manifest.json`
+now records the verified weight of every glyph as data.**
+
+`Check` is also the strongest case in the set on its own merits, and it is
+worth stating so the next reader does not re-open it. `check-fill` is not a
+heavier tick — it is a **rounded rectangle 208 units across with the tick
+knocked out of it**, the same plate as `x-fill` and `dots-three-fill`. Drawing
+the fill weight under this name would reproduce, almost exactly, the filled box
+that shipped to ten sites as `Check`. There is no reading of the client's
+stated reason under which the tick — the single most-drawn confirmation mark in
+the product — is the one bare mark that keeps its plate.
+
 Measured on `verify/icons/`: the four mark-shaped exceptions rasterize to
 9–22% opaque coverage of their viewBox; a comparable fill glyph rasterizes to
 47–53%. The dots sit far below even that — three r=12 discs cover about 2% of
@@ -126,6 +149,54 @@ in `generate-icons.mjs` — are gone, along with `aliases.json`. **A logged
 rule they used to answer to is `docs/RULES.md` §9.1, "never rename or drop an
 export": recorded there as overturned, by the client ruling above, for this
 folder specifically.**
+
+## The audit — 2026-09-06
+
+**All 1,512 glyphs in this folder were compared against the authentic upstream
+art, and every one of them matches a real Phosphor drawing exactly.** The
+comparison was against the WHOLE upstream set — all six weights of all 1,512
+names, 9,072 files — rather than against the same name, because the two defects
+this folder has actually shipped were a glyph carrying a DIFFERENT NAME's art
+and a glyph carrying a different WEIGHT's, and only a search of the whole set
+can say what a wrong file actually is instead of merely that it is wrong.
+
+Result: 1,509 correct at the intended name and weight. Zero hand-drawn glyphs,
+zero glyphs from another set, zero glyphs whose picture belongs to another
+name. **The `Check`-class defect — the dangerous one — has no second instance.**
+The three exceptions were all naming, not art, and are recorded below.
+
+`check-icon-art.mjs` is what keeps this true. It runs offline in `npm run
+check` against `icon-art.manifest.json`, which records every glyph's art as a
+hash beside the upstream name and weight it was verified against, with the pack
+version pinned. The file's own header argues at length for why the check must
+NOT hit the network in CI; the short version is that a check needing a CDN is a
+check somebody eventually disables, and a disabled check looks exactly like the
+nothing that let a filled square ship as a tick. `npm run refresh:icon-art`
+re-derives the manifest from the pinned pack in one request and prints what
+moved.
+
+### Three files were spelled in a way phosphor.dev does not
+
+`LightBulb.svg`, `SnowFlake.svg` and `TextBox.svg` were renamed to
+`Lightbulb.svg`, `Snowflake.svg` and `Textbox.svg`. **The art in all three was
+already perfect** — authentic `lightbulb-fill`, `snowflake-fill` and
+`textbox-fill`, byte-for-byte. The defect was the other direction, and it is
+the one this folder's contract exists to prevent: Phosphor spells these three
+as single words, so a designer reading `lightbulb` off phosphor.dev and writing
+`<Lightbulb />` got a compile error, and the only way to find the working
+spelling was to open this directory — which is exactly the translating step the
+client twice said she did not want ("i want to be able to go on the website
+from phosphor and give you the name there").
+
+An alias was deliberately NOT the fix. This folder has no alias table on
+purpose; adding one to paper over a misspelling would reintroduce the
+translation layer the ruling deleted, to solve a problem caused by not having
+followed it. Renaming an export is normally forbidden by `docs/RULES.md` §9.1,
+which is precisely the rule the client's ruling overturned for this folder —
+so the rename is not an exception to the contract, it is the contract being
+applied. Zero call sites used the old spellings, in this repo or in the app:
+they appeared only in `manifest.json` and in the generated file, both of which
+regenerate.
 
 ## What normalising the Iconoir pack once looked like
 

@@ -2,6 +2,714 @@
 
 ## Unreleased
 
+### Changed — the ink footer wears no outline, in either palette, and CH27.8's dark clause is overruled
+
+Client, 2026-09-06, on a screenshot of a ticket's detail screen in dark mode:
+"in dark mode the footer is wrong no? what are this outline??? review this".
+What she is looking at is two outlined boxes, one inside the other — the ink
+footer card holding "LATEST ACTIVITY" and "RECORD", and the "Add a note" field
+inside it.
+
+**Both edges were deliberate and both were transcriptions, which is why this is
+a reversal and not a fix.** CH27.8's dark clause, verbatim: "On dark, ink would
+sit almost on top of the page, so the card moves up to raised #26241F **with a
+hairline** — same two columns, same content." The chapter's own markup draws the
+note field with `box-shadow: inset 0 0 0 1px var(--invhair)` besides. The
+component transcribed both faithfully and said so in its comments.
+
+**Measured first, on `verify/ink-footer`, both palettes, before anything moved.**
+
+| edge | light | dark |
+| --- | --- | --- |
+| the card's own | 8% charcoal over #1A1918 — **1.000** | 12% off-beige over #26241F — **1.455** |
+| the note field's | 12% off-beige over #26241F — **1.455** | 12% off-beige over #141310 — **1.391** |
+| the two columns' row rules | **1.423** | **1.455** |
+
+Three findings in that table. The card's light edge **was never drawing at all**
+— 1.000, exactly its own ground — so the file's old claim that "the light card
+has no edge, as drawn" was true, and light mode has nothing to lose here. The
+field's edge was visible in **both** palettes, not only in the one she
+screenshotted. And every one of the three is the same 12%: an outline around a
+card, an outline around a control and a rule between rows, all at one weight.
+That is the whole complaint.
+
+**What the card is now: its fill, and a seat.** Chapter 13's subtitle is
+"Colour separates, strokes don't", and `card.tsx`'s law reserves the hairline
+for SAME-TONE separation — two cards of one tone against each other, which this
+card is in neither palette. So the outline goes and the fill does the work it
+was already doing: **17.386** against the page in light, **1.198** against
+`--background` and **1.111** against `--surface-panel` in dark. Both dark
+figures are at or above steps this kit already ships as visible surface changes
+(override 77 measures its selected wash at 1.103 light / 1.111 dark and calls
+that the answer). Under it, `shadow-sm` — which the bridge points at
+`--shadow-rest`, the elevation `Card variant="raised"` gets for free, and in
+dark this card **is** a raised card by the chapter's own words. It measures
+**1.057** against the dark page and **1.103** against dark soft paper, so it is
+loudest exactly where the fill is quietest. A shadow, not a stroke: the standing
+rule that separation is a fill or an inset shadow and never a border is
+satisfied by the change rather than bent around it.
+
+**What the field is now: its well, its shape, its placeholder and its ring.**
+This is the harder half, because override 42 is emphatic that a field's resting
+edge earns its keep — "a resting field and a disabled one carried the SAME edge,
+and telling those apart is the one job that edge has" — so the stroke could not
+simply be deleted and paid for nowhere. It is paid for with the fill. The well
+was two tones pointing in opposite directions (`--kw-unlit-raised` in light, the
+page tone in dark) measuring **1.132** and **1.198**, each leaning on the stroke.
+It is now **one tone in both palettes**, `--surface-record-footer-well`
+(#3A3833) — RULED N2's own lift, minted for the identical failure: "a quiet
+badge measured 1.13:1 against the card it sat on … the pill stopped existing and
+only the label carried." Measured **1.499** on the light footer and **1.324** on
+the dark one, so **the fill alone is now stronger than the fill and the stroke
+used to be**. Beside it, three things that are not strokes: the pill shape at 38
+tall, which nothing else in this card has; the placeholder "Add a note" at
+**7.69** on the well, which is also the field's accessible name; and tokens.css
+§8's ring, on the ink that reads on this card, the moment it is used.
+
+**The row rules are untouched.** A line between two rows is not an outline
+around a shape, and the client's word was "outline". They are chapter 13's
+blessed case exactly — same-tone separation between stacked rows inside one
+shell.
+
+**Light mode does not regress**, and that is a measurement rather than a hope:
+the card's edge was 1.000 before and is absent now, so nothing visible changed
+about the card except a 1.105 rest shadow; the field went from a 1.132 well
+under a stroke to a 1.499 well without one.
+
+An artifact correction is owed against 27.8's dark clause and against its
+note-field markup, alongside the one override 49 already owes it. The whole
+argument — what the chapter asked for, what she said, what was measured, what is
+drawn — is written into `record-detail.tsx` immediately above region 4, next to
+the code, where somebody about to "restore" it will be standing.
+
+### Fixed — the ink footer's card had been outside every ground-keyed rebind in the system, and rendered correctly anyway
+
+Found while measuring the above, and the reason the footer now paints its ground
+with a real utility. The card carried `variant="inverse"` **and**
+`bg-[var(--rd-footer-surface)]`. `cn`'s tailwind-merge files both in the
+`bg-color` group and keeps the last, so `bg-surface-inverse` **was deleted from
+the element before it reached the DOM** — confirmed on the built lane, where the
+class list carries no such name and the card's `--hair` reads
+`rgba(255,254,249,.12)` straight off `:root` rather than off tokens.css §8's
+`.bg-surface-inverse` block, whose entire job is to make hairlines correct on
+this kind of ground. The card rendered the right colour and sat outside every
+ground-keyed rebind in the system. **That is the `--btn-secondary-fill` freeze
+in a different costume**, and it is why the house rule is a named utility,
+always.
+
+Fixed by naming the pair instead of branching inline. tokens.css §3 and §6/§7
+grow `--surface-record-footer`, `--ink-on-record-footer`,
+`--ink-on-record-footer-secondary`, `--hair-record-footer` and
+`--surface-record-footer-well`; §10 bridges the two that need a class. The
+component's `light-dark()` pairs are gone with them — the palette split already
+exists in the stylesheet and did not need re-stating in a `style` attribute.
+
+`--surface-record-footer-well` is declared **only** in `:root`, and the omission
+is the point: the ink footer is a dark surface in light mode and a dark surface
+in dark mode, so the paper a field is sunk into does not have to flip.
+
+`variant="inverse"` is kept even though both of its classes are merged away —
+`data-variant="inverse"` is what a consuming app keys on, and the variant is
+still the truth in light. `data-surface="inverse"` is deliberately **not** set:
+§8's rebind would then fire in dark too, where this card is an ordinary raised
+card, and its rules would flip to charcoal-on-#26241F — invisible.
+
+### Fixed — `shadow-none` does not beat `shadow-[var(…)]`, so the note field does not ask it to
+
+A second merge trap, in the same family as the one `lib/utils.ts` was written
+for, in a group its `extend` does not cover. Measured, not assumed:
+
+```
+twMerge("shadow-[var(--hairline-strong)]", "shadow-none")
+  -> "shadow-[var(--hairline-strong)] shadow-none"
+```
+
+tailwind-merge cannot see inside an opaque `shadow-[var(…)]`, so it files it
+under shadow-COLOUR rather than shadow, the two do not conflict, both survive,
+and the winner is Tailwind's emission order rather than the caller —
+**PATTERN §1's promise that a call site can always win is not true for this
+pair**. It happens to render correctly today, by luck of ordering. The note
+field therefore rebinds the SHAPE on its own element instead, which is scoped,
+cannot be reordered, and is the escape hatch tokens.css §4 states in its own
+words: "Set them all to `0 0` and every edge disappears." It stays a valid
+shadow (`0 0 #0000`, Tailwind's own spelling) rather than `none`, because the
+utility composes five comma-separated parts into one `box-shadow` and a `none`
+in the middle of that list invalidates the whole declaration — taking the ring
+with it.
+
+### Added — `verify/ink-footer/`
+
+The footer as it shipped at v1.2.62 beside the footer that ships now, in both
+palettes and on both grounds it lands on. One iframe per palette, because
+tokens.css §6/§7 key dark off `:root[data-theme]` and a document is one palette
+at a time; `?t=dark` is the switch, as in every other lane. The left cell is a
+verbatim quotation of the old code — including the arbitrary background and both
+strokes — so the pair differs only in the thing under discussion; the right cell
+is the real `RecordDetail`, so it cannot drift from what ships. Every figure in
+the entries above is printed on the page beside the drawing it came from.
+
+### Fixed — the feed's mark sat 3.414 below its sentence, and `items-center` was the wrong way to raise it
+
+Client, 2026-09-06: "align horizontally avatar + text on activity + footer",
+with two screenshots of a one-line entry — an "AT" mark beside "Aurora Thalassa
+added a note". The two places are one component: `ActivityFeed`, which the
+record's Activity tab and the ink footer's "Latest activity" column both
+compose.
+
+Measured on `verify/feed-align`, before anything moved: the mark's centre sat
+**3.414px below the first line's centre**, identically in both hosts and in both
+shapes. It decomposes exactly. The mark is 22.5 (`--avatar-sm`, 1.5rem at the
+shipped 15px root) and the sentence's line box measures **17.672** — so under
+`items-start`, with their TOPS flush, the mark's centre is already
+(22.5 − 17.672) / 2 = 2.414 low. The `mt-px` on the mark then pushed it a
+further 1 the same way. The nudge that was there to fix this was making it
+worse.
+
+**`items-center` is the obvious answer and it is wrong**, which is why this is a
+derivation and not a one-word diff. The same row carries WRAPPED entries — a
+note that runs to four lines is ordinary here — and a centred mark on a
+four-line block floats to the middle of the paragraph instead of sitting beside
+the sentence it belongs to. The row keeps `items-start` and the MARK takes an
+offset onto the first line's own centre:
+
+```
+margin-top = (--feed-line − --avatar-sm) / 2 = (1.178125rem − 1.5rem) / 2 = −0.1609375rem
+```
+
+`--feed-line` is the first line's box and **the one place it is written**:
+`calc(var(--text-caption) * var(--leading-normal))`. Note WHICH leading. The
+caption step carries `--text-caption--line-height: 1.4` by default, but this row
+overrides it to `--leading-normal`, 1.45; deriving from the token's own 1.4
+would have been 0.6px wrong and would have looked right. The sentence now takes
+`--feed-line` as its leading too, so the leading the reader sees and the offsets
+measured against it are literally the same declaration and cannot drift.
+
+**The equal and opposite `margin-bottom` on the mark is not decoration.** A grid
+track is sized from the MARGIN box, so a bare negative `margin-top` would have
+quietly shortened every one-line row by the same 2.414 and let the mark eat into
+the 12 of padding chapter 18 draws above it. Cancelling the lift at the bottom
+keeps the mark's LAYOUT footprint at exactly 24 — ruling 30's "24 with
+`flex: none`" — while only its OPTICAL position moves. The one-line row now
+measures 45.0, which is the drawn geometry with no nudge in it at all; it was
+46.0, and the extra 1 was the `mt-px`.
+
+**The trailing timestamp's `mt-px` was doing something, and it is kept as a
+derivation rather than deleted.** The time is `text-xs`, a SHORTER line
+(0.75rem × 1.35 = 15.188), so it has to come DOWN to meet the sentence:
+(17.672 − 15.188) / 2 = **1.242**. `mt-px` is 1, which left the time 0.242
+high — invisible, and a coincidence of the 15px root rather than a rule.
+Deleting it would have been a 1.242 regression; leaving it at `px` would be
+wrong in both directions at the other two text scales, where the true value is
+1.077 and 1.408.
+
+Every number here is a product of tokens, so all three follow the text-size
+control. Measured at all three: **0.014 / 0.008 / 0.002** residual at 13 / 15 /
+17px root, which is subpixel rounding. A hand-picked pixel would have been right
+at one scale and wrong at two.
+
+One residue is known and deliberately not chased. This centres the mark on the
+LINE BOX. Saans's own content box (ascent+descent, 14 here) is not centred
+inside that line box — the browser reports 1 of half-leading above it and 2.672
+below — so the glyphs' own centre is a further 0.836 above where the mark sits.
+Chasing it would mean hardcoding one font file's vertical metrics, which no
+token holds and which the fallback face does not share; tokens.css §5.0 records
+the same trap for `ch`. **The line box is the only centre a stylesheet can
+hold.**
+
+Fixes all four call sites at once, because none of them redraws the row:
+`RecordDetail`'s footer, `Notifications`, `QuickView` and `CompanyHub`.
+
+`Comments` and `Notes` draw the same 24 mark beside the same caption body and
+**were left alone, on a measurement rather than a shrug.** In both, the line
+beside the mark is a name and a time on a shared baseline and the sentence is a
+line BELOW it; the plain row's header box is 17.063 and the mark reads 2.719
+low, which is the same fault. But that header also holds an unread dot, a
+resolved badge and a mark-read button when the caller sets them, and with those
+present it measures **43.313**. The feed's derivation assumes the first line is
+one type step; there it is whatever the caller put in it. Copying this across
+would be right for the plain row and 10.4 wrong for the full one, so those two
+need their own answer to "which line is the first line".
+
+### Added — `verify/feed-align/`
+
+The one-line entry and the wrapped one, side by side, in both hosts — the
+ordinary panel and a verbatim copy of `RecordDetail`'s ink-footer token rebind,
+because the client saw the fault on both grounds. The left column is a replica
+of the row as it shipped at v1.2.61 so the two states can be looked at together;
+the right column is the real `ActivityFeed`, never redrawn.
+
+`window.__feedAlign()` returns, per row, the mark's centre against the first
+line's centre in page pixels — **0 is the pass** — and reads the line box two
+ways, from `getComputedStyle().lineHeight` and from a `Range` over the first
+text node, so a disagreement between the two methods cannot hide inside one
+number. It is that second reading that surfaced the font-metric residue above.
+`Comments` and `Notes` are drawn underneath with the specimen that disqualifies
+them.
+
+### Added — every glyph is now checked against the art it claims to be, and 1,509 of 1,512 already were
+
+Two glyphs have shipped wrong out of this folder and **both were found by eye**.
+`Check.svg` held Phosphor's `check-square-fill` — a filled rounded rectangle —
+under the name `Check`, and went to ten sites drawing a box wherever the product
+meant a tick. `Asterisk.svg` held the fill weight where the client had asked for
+regular. Neither was a sloppy file: both were well formed, correctly named, and
+passed every guard `generate-icons.mjs` has. That is the whole problem. **The
+generator checks that a glyph is well FORMED and has never checked that it is
+the right PICTURE**, because this folder has no upstream dependency — art
+arrives by hand, one `.svg` per export, and a hand-dropped file is exactly as
+authoritative as whoever dropped it. A name is not evidence.
+
+**So all 1,512 were compared against the authentic upstream art, and the answer
+is better than feared: 1,509 correct at the intended name and weight, zero
+hand-drawn, zero from another set, and no second instance of the `Check`
+defect.** The comparison ran against the WHOLE upstream set — six weights of
+1,512 names, 9,072 files — rather than against the matching name, because a
+same-name diff can only ever say a file is wrong. Searching everything says what
+it actually IS, which is the difference between "Check.svg does not match check"
+and "Check.svg is `check-square-fill`". The three exceptions were all naming;
+they are below, and none of them was a wrong picture.
+
+**`check-icon-art.mjs` is what stops this recurring, and it runs OFFLINE in `npm
+run check` — which is the load-bearing decision in this change, not an
+optimisation.** The obvious design fetches Phosphor at check time and diffs. It
+is worse three ways. A check that needs a CDN goes red on a DNS blip, a rate
+limit or an aeroplane, and the first time it fails for a reason nobody caused,
+somebody adds `|| true` — **and a disabled check looks exactly like the nothing
+that let a filled square ship as a tick.** Second, upstream is not an authority
+on what we decided: when 2.2.0 redraws a glyph, a live diff reports our correct
+file as wrong and invites a "fix" nobody asked for. Third, it would re-derive
+the answer at check time from a source it cannot authenticate, when the control
+that was actually missing is **a human reading a diff**.
+
+So `icon-art.manifest.json` is the authority: every glyph's art as a hash,
+beside the upstream name and weight it was verified against, with the pack
+version pinned at `@phosphor-icons/core@2.1.1`. It goes through review like
+anything else, so changing a picture means showing someone. The network is used
+only to BUILD it — `npm run refresh:icon-art`, one 1.4MB tarball for the whole
+pack rather than 9,072 CDN round trips, printing what moved. Nine thousand
+requests to answer one question is rude enough that somebody would narrow it to
+"just the ones we use", and "just the ones we use" is how a wrong glyph waits in
+the folder for the screen that finally draws it.
+
+The hash is of the ART, not the file: geometry-bearing attributes in document
+order, whitespace collapsed. A reformat, a re-indent or a rewritten root `<svg>`
+compare equal — vendoring is allowed to normalise on the way in and did for the
+Iconoir pack — while a single moved coordinate does not. A check that failed on
+things nobody can see is a check that gets deleted. **Both failure modes are
+proved rather than asserted: dropping `check-square-fill` back over `Check.svg`
+fails with the file's real identity in the message, and an unmanifested `.svg`
+fails as UNVERIFIED** — because a file nobody has compared is precisely the
+state `Check.svg` was in for its entire shipping life.
+
+**Three files were spelled in a way phosphor.dev is not.** `LightBulb.svg`,
+`SnowFlake.svg` and `TextBox.svg` are now `Lightbulb`, `Snowflake` and
+`Textbox`. The art in all three was already perfect — authentic
+`lightbulb-fill`, `snowflake-fill`, `textbox-fill`, byte-for-byte — so this is
+the defect running the other way, and it is the exact one the folder's contract
+exists to prevent: Phosphor spells these as single words, so reading `lightbulb`
+off the website and writing `<Lightbulb />` was a compile error, and the only
+way to find the working spelling was to open this directory. That is the
+translating step the client twice said she did not want. An alias was
+deliberately not the fix — this folder has no alias table on purpose, and adding
+one to paper over a misspelling would reintroduce the layer her ruling deleted
+in order to solve a problem caused by not following it. §9.1's "never rename an
+export" is the rule that ruling overturned for this folder, so the rename is the
+contract being applied, not an exception to it. Zero call sites used the old
+spellings in this repo or in the app; they appeared only in `manifest.json` and
+in generated files, all of which regenerate.
+
+**`ATTRIBUTION.md`'s weight list was two glyphs out of date, and that is worth
+more than the correction.** It said fill about `Asterisk` and `Check` on the day
+both were changed to regular — the edits moved the art and did not move the
+prose. An audit run against the rule AS WRITTEN would have reported both as
+defects and "corrected" them straight back into the bugs they had just come out
+of. The list now names all ten plus the 96 arrows, and the manifest records
+every glyph's verified weight as DATA, because a weight rule that lives only in
+a paragraph drifts silently from the art it describes. Counted: 108 regular,
+1,404 fill.
+
+### Fixed — the map could remove its own sandbox, on a default that argued itself out of being safe
+
+`Map` framed its embed with `allow-scripts allow-same-origin`. The HTML standard
+calls out that exact pair: a SAME-ORIGIN framed document can reach
+`window.parent`, rewrite its own `sandbox` attribute and reload itself out of
+the sandbox entirely — so the component's own header promise, "a provider's
+embed URL, framed and sandboxed", was not true of a first-party `src`.
+
+**`WebEmbed` had already fixed this on 2026-09-02, and `Map`'s comment cited
+that fix and then declined to follow it** — on the grounds that this component's
+`src` is a third party's URL by definition. The comment then wrote down, in its
+own last paragraph, the reason that is not good enough: *"it rests on `src`
+never being first-party, which nothing in the type system enforces."* `src` is a
+`string`. A screen that frames a URL a person pasted, or an application that
+points at its own map surface by URL rather than through `children`, hands this
+component a first-party document while the type checker nods along. **A default
+may not rest on a convention the compiler cannot see** — and a comment that
+states the counter-argument to its own conclusion has already made the decision;
+it just had not been actioned.
+
+The default is now `allow-scripts` alone, and `allowSameOrigin` is an opt-in
+boolean — **the same name, the same shape and the same resolution order
+`WebEmbed` uses, deliberately.** Two components in one kit that both frame
+foreign content must not hold two opinions about what a sandbox is: a reader who
+learns the rule at one has learned it at the other, and a security default that
+varies by component is a default nobody can state. A boolean rather than a
+hand-typed sandbox string keeps the dangerous pair **one greppable word at the
+call site** instead of a token buried in a string nobody re-reads, so the call
+site states its trust rather than inheriting it. A call site's own `sandbox`
+still replaces everything wholesale, tested with `!== undefined` and never for
+truthiness, because the empty string is the maximally restrictive sandbox and a
+real thing to ask for.
+
+**Nothing legitimate pays for this.** A cross-origin provider — Google, Mapbox —
+was already in a different origin and never had access to ours, so an opaque
+origin takes away nothing it had. A provider that genuinely needs its own
+storage for tiles or preferences says so by name, once, at the call site.
+
+`verify/writeback/` gains stage D2: the same three questions already asked of
+`WebEmbed` — default, opted in, own string — asked of `Map`, on the same page
+rather than in a harness of its own, so the two components' defaults are read
+off the DOM side by side. That is the only arrangement under which "they give
+the same answer" stays checkable instead of remembered.
+
+### Changed — a view switcher offering ONE view now draws the pill as a label instead of drawing nothing
+
+Client, 2026-09-06, verbatim: "And then, when there is no other option, so
+there is only one, include this in the kit. Basically, it looks exactly like if
+it was selected, only that you cannot click, and there is no dropdown."
+
+**This reverses a decision this kit had written down and argued for, and the
+argument it reverses was right about the wrong thing.** `ViewSwitch` has
+rendered `null` below two views since it was written, on the reasoning that a
+control offering no choice is not a control — `/meetings`'s standing decision
+(OPEN.md §C21) made general so no route had to remember it. That is a correct
+statement about the CONTROL and a wrong one about the ROW. The client has twice
+demanded the toolbars stop varying between screens — *"why the fuck i still have
+different toolbar variations??? unify joder"* — and a third zone that is present
+on one tab and gone on the next **is** that variation: the actions slide left,
+the row's rhythm changes, and two screens of the same product stop looking like
+the same product. Drawing the pill costs one inert `<span>` and buys a toolbar
+that reads identically everywhere.
+
+**Exactly ONE view draws the pill exactly as the selected trigger draws it, and
+"exactly" is enforced by there being one copy of it.** The skin the pill wears —
+`w-auto min-w-0`, `--control-height-button`, `justify-start`, `shadow-none`,
+`--btn-secondary-fill` / `--btn-secondary-label`, `--font-weight-medium` — moved
+out of the trigger's `className` into a `VIEW_PILL_SKIN` constant that both
+drawings compose, on top of the same `selectTriggerVariants({ state: "default" })`
+the interactive one already sat on. A claim of sameness kept by two class lists
+that happen to agree is a claim with a review step in it, and the last time this
+toolbar moved, `SortControl` and `ViewSwitch` drifted apart on exactly this list.
+**Measured: width delta 0.0, height delta 0.0, both palettes.**
+
+**The hover is the one resting rule the two must NOT share**, so it stayed at
+the interactive call site rather than moving into the constant. A label that
+lightens under the cursor is a control saying "press me" about nothing.
+`cursor-default` is the only class the static branch adds, and it is the whole
+of the pointer's story: the arrow does not become a hand, so a reader learns
+there is nothing to press before they press it.
+
+**It is not a disabled button, and that is the load-bearing call.** A disabled
+control is a promise deferred — assistive technology says "dimmed",
+"unavailable", and a reader who hears it goes looking for the condition that
+would switch it on. There is no such condition and there never will be one: the
+collection ships one body, and the day it ships two this becomes a real `Select`
+rather than an enabled version of this. So `disabled`, `aria-disabled`,
+`role="button"` and `role="combobox"` are all refused, and `tabIndex={-1}` with
+them — you cannot remove from the tab order a thing that was never in it, and
+writing it would imply there was a control to exclude. The `disabled` PROP is
+ignored in this drawing for the same reason: dimming a fact would announce the
+body you are currently looking at as unavailable.
+
+**It is text.** A `<span>` with no role, the glyph `aria-hidden` exactly as the
+trigger's is, and the naming context — the word "View" — carried as `sr-only`
+text rather than `aria-label`, because a roleless `<span>` is not a reliable
+naming target and several screen readers ignore a label on one. That would have
+left a non-sighted reader with a bare "Board" floating in a toolbar. The two
+drawings therefore tell a screen reader the same two facts and differ only in
+the third — `"View, Board, combobox"` against `"View, Board"` — and the colon in
+the hidden text is a pause, not a word, so the two do not run together into
+"Viewboard". Hiding the pill entirely was the other short route and gives the
+non-sighted reader less than the sighted one gets, which is the reverse of the
+point: the pill exists to say which view you are in.
+
+**There was no caret to remove.** The trigger has drawn none since 2026-09-02
+("same on views - rmeove the chevron"), and `hideChevron` does not hide the
+glyph — it declines to render it, so the 16 of glyph and the 8 of gap went with
+it then. The one-view pill is therefore not the two-view pill minus something;
+both are `[glyph, label]` in the same box, and the metric question the caret
+would have raised does not arise. Proved by a count rather than by the source:
+one `<svg>` each, and it is the view's.
+
+**`data-slot="view-switch-static"`, a slot of its own rather than a second
+spelling of `view-switch`.** The two differ in tag name and in whether they can
+be operated, and a shared slot would make `[data-slot="view-switch"]` a lie
+about being a button — the app and the harness both need to be able to ask which
+one is on screen. The glyph keeps `data-slot="view-switch-icon"` in both, so
+anything targeting the mark is written once, and the label's word is reachable
+at `data-slot="view-switch-label"`.
+
+**ZERO views is unchanged and still renders nothing.** The ruling is a sentence
+about one. With none there is no view to name, the only word a pill could show
+would be one this kit invented — the thing `views` refuses everywhere else — and
+an absent third zone is not a toolbar variation but an absence of data.
+
+**Consuming apps: a toolbar that used to lose its third zone will now keep it.**
+Nothing in a call site changes and no prop is added; a route already passing one
+view starts drawing a label where it drew a hole. A rule that exempts a
+single-view toolbar from the "every toolbar has a view zone" check on the
+grounds that nothing is drawn is now exempting a case that no longer exists.
+
+Measured in `verify/toolbar-trio`, which gains a one-view pill beside a two-view
+one **carrying the same label** — a width comparison between "Board" and "List
+view" would prove nothing — and diffs every property that could make the two sit
+differently: box, inline padding, radius, resting fill and ink, type step and
+weight, gap, glyph box, and the SVG count. The readout prints the list of keys
+that differ, and the expected content of that list is exactly four — `tag`,
+`cursor`, `spokenText`, `ariaLabel`. **Any fifth key is the bug the page exists
+to catch**; `paintedText` appearing in it would mean the hidden name leaked into
+the paint, and `widthPx` or `heightPx` appearing would mean a one-view toolbar
+sits differently from a two-view one on the same screen. It also asks the DOM
+rather than the source whether the label is a control — role, `aria-disabled`,
+`tabIndex`, and a real `focus()` call followed by "who is `document.activeElement`
+now" — and counts the zero-view host's children to show that case still draws
+nothing. Light and dark: four differing keys, `widthDelta 0.0`, `heightDelta
+0.0`, `tabIndex -1`, `takesFocusOnCall false`.
+
+**One harness bug was found and fixed on the way.** The new probe first sampled
+on mount and read the control 36.9px narrower than the label with an empty
+`paintedText` — Radix renders a `Select`'s chosen value by cloning the selected
+`ItemText`, and the item registers in its own effect, so a trigger measured
+synchronously on mount is a pill with no word in it. It now samples on a
+`setTimeout` rather than the `requestAnimationFrame` the older probe on that page
+uses: a browser runs no animation frames for a tab it is not painting, so in a
+background tab that callback never fires and the readout sits on its placeholder
+while every number on the page is ready. A timer is throttled in the background;
+it is not cancelled.
+
+The demo's `CollectionFrame` page draws the one-view frame directly beneath a
+two-view one so the two toolbars can be compared without a devtools panel, and
+gains a third specimen for the zero-view case.
+
+### Added — a breadcrumb strip can be a workspace tab set, and its tabs can be closed with a keyboard
+
+Client, 2026-09-06, on the live product: "all tabs i open stay open unless i
+close them", with "a x icon on the tabs to close them". The app had built its
+half of that against `BreadcrumbFolders` and two things this kit could not
+express were in the way. Both are now props on
+`components/breadcrumbs/breadcrumb-folders.tsx`, both are opt-in, and a call
+site that passes neither renders the DOM it rendered yesterday.
+
+**`onClose?: (item, index) => void` — the × is a REAL CONTROL.** It renders a
+`<button>` as a SIBLING of the crumb's link inside the `<li>`, never inside the
+anchor: interactive content inside an `<a>` is invalid HTML, which is why the
+app's own stopgap had to be an `aria-hidden` `<span data-tab-close>` caught by
+an `onClickCapture`. The cost of that workaround is the whole reason this
+exists — **a keyboard or screen-reader user could not close a tab at all**, and
+the span was rightly hidden rather than promise an affordance assistive
+technology cannot operate. As a sibling it takes focus, `Enter` and `Space` fire
+it natively, and tokens.css §8 rings it like every other control.
+
+It sits IN THE TAB ORDER, immediately after the tab it closes. A roving
+`tabindex` and a bare key binding were both considered and rejected: this strip
+is an `<ol>` of links and not a `role="tablist"`, so it has no keyboard model to
+hang an arrow-key scheme on, and an undiscoverable shortcut is — for the one
+user this change is for — the same as nothing. `filter-bar.tsx` settled the
+identical shape in its own words: "A REMOVABLE CHIP HAS TWO FOCUS TARGETS… and
+both are in the tab order." The cost is that a strip has twice the stops.
+
+Each control is announced with the tab it shuts — "Close tab: Halloway", not a
+row of five identical "Close"es. `closeLabel` is the verb, `formatCloseLabel`
+replaces the join for a language "verb: name" does not fit, and an item's own
+`closeLabel` replaces the result — which is the answer when a crumb's `label` is
+a node rather than a string, because an accessible name cannot be read out of
+arbitrary markup and this file does not guess at one. The same trio
+`filter-bar.tsx` already runs.
+
+`BreadcrumbFoldersItem` is exported: `BreadcrumbsItem` plus `closable` (default
+`true`; `false` pins the tab a set may not be emptied below) and the per-item
+`closeLabel`. It EXTENDS the shared item rather than widening it — `BreadcrumbsItem`
+is also the phone's text trail and `ScreenRenderer`'s recipe data, and a field
+only the desktop strip can honour does not belong in a type two other renderers
+must silently ignore. Every existing `BreadcrumbsItem` already is one,
+structurally, so nothing has to change to adopt it.
+
+**`activeIndex?: number` — WHICH tab is live, decoupled from WHERE it sits.**
+The live paper, `aria-current="page"`, the z-lift and the scroll-into-view were
+all wired to `items.length - 1`; the only way to mark a tab live was to move it
+to the end, so every switch re-ordered the strip under the reader's cursor —
+the opposite of the thing being copied, where a tab stays where it was opened.
+Defaults to the last item, so a trail is untouched. An index outside the array
+marks no crumb as current, deliberately: that is a real state for a tab set, and
+clamping would announce a crumb the caller never named while hiding the
+off-by-one that produced it.
+
+`Breadcrumbs` gained the identical prop on the same day. Below `md` the strip is
+`display: none` and that component IS the trail, from the same array — without
+it a phone would announce a different `aria-current="page"` than the desktop
+does, which `breadcrumbs.tsx`'s own header names as the class of bug to refuse.
+
+**Three consequences, each argued at its own site in the source:**
+
+- **A tab set does not fold.** A folded tab can be re-opened from the `···`
+  menu and cannot be closed from it: a `DropdownMenuItem` is a `role="menuitem"`
+  in a menu that moves focus with the arrow keys, so a second control inside a
+  row is not keyboard-reachable at all. A menu of tabs you can open and not shut
+  is exactly the half-affordance this change deletes. The strip already scrolls,
+  and that is also what a browser does with a tab strip. `foldAfter` is a
+  trail's lever and is ignored while `onClose` is given.
+- **A tab set keeps its tabs on a phone.** The 2026-09-04 ruling — "in monile,
+  lets use normal breadcrumbs (like they ware before, jhust teh text)" — is
+  about the breadcrumb TRAIL, and text has nowhere to put a close control.
+  `onCurrentActivate` already made and won this argument for its own tab.
+- **The fold can no longer hide the current location.** It keeps the head and
+  the last two, which was safe only while live meant last. With `activeIndex`
+  pointing into the middle, nothing folds.
+
+**The z-order moved by one step and paints identically today.** `TAB_REST` drops
+from `z-[1]` to `z-0`; `TAB_LIVE` keeps the `z-[1]` the 2026-09-03 fix gave it,
+so the live tab is still strictly below a card at `z-[2]` and still cannot paint
+over content. The lift used to be held by DOM order — true only while live was
+last. There is no integer between 1 and 2, so it is bought by lowering the
+others. `z-index: 0` still establishes a stacking context, so `CrumbShape`'s
+`-z-10` stays inside its tab.
+
+**Sizing: `--control-height-pill` (26), and the reason is measured.** A tab is
+`--folder-tab-height` (47.5) with `--folder-tab-overlap` (17.02) of it spent as
+the foot the card rides over, so a control may occupy `--folder-lip` — 30.48.
+The dialog's own close chip is `--control-height-dense` (32) and would break the
+silhouette's top edge; 26 is the only one of the kit's five control heights that
+fits, with 2.24 of air at each end. It is NOT the 44 touch row and cannot be:
+the lip is chapter 14's, client-ruled, and "reuse the existing folder tabs
+without changing anything on the shape" forbids growing the tab. The TAB stays
+the large target (128 x 47.5) and the strip is `md` and up.
+
+No resting fill — the control is drawn on the tab's own paper and six discs down
+a strip would compete with the labels the tabs exist to show. The mark is the
+affordance at rest; `bg-accent` arrives on hover, a named utility, never mango.
+The glyph is Phosphor's `X` at `--icon-16`.
+
+**`TAB` / `TAB_REST` / `TAB_LIVE` are still not exported, and that was decided
+rather than skipped** — the argument is written at the bottom of the file. A
+class string is not an interface: exporting it freezes every value in it (the
+z-index moved in this very change), and tailwind-merge lets a consumer silently
+delete any class in the skin by naming one in the same group. The papers are
+already reachable as `--kw-crumb-rest` / `--kw-crumb-live` on the `<nav>`, and
+every part carries a `data-slot`. If an app needs a tab-shaped control that is
+not a crumb — a "+" slot — that is a component this folder should ship, not a
+string it should leak.
+
+Measured in `verify/breadcrumb-folder/`, which gains three five-level hosts
+(trail / set / pinned) asserting: every close control's parent is the `<li>` and
+`closest("a")` is null; each one's `aria-label` names its own tab; the tab order
+alternates tab, its close, tab, its close, taken by focusing each candidate and
+asking `document.activeElement` who took it; the control's box sits inside the
+lip (2.09 above, 24.38 tall, 2.11 below, at the 15px root); and the z-order
+reads live 1 · rest 0 · close 1 · card 2. A trail in the same harness still
+folds at five, marks the last tab current and draws zero close controls.
+
+Also **fixed in that harness, a wrong reading it has printed since the mobile
+split landed on 2026-09-04**: every structural query started at the case host,
+and an ordinary trail renders the hidden text trail FIRST — so the strip's own
+rect came back all zeros (`overlapPx` was measuring the card's distance from the
+viewport origin) and the weights block reported the text trail's 400 /
+`--ink-tertiary` where a rest tab is 300 / `--ink-secondary`. A `display: none`
+element answers every query without erroring, which is how it survived. Scoped
+to the strip, the numbers return: `overlapPx` 15.95 against
+`--folder-tab-overlap` 15.96, rest 300 on `--ink-secondary`, live 500 on
+`--foreground`. Nothing about the component was ever wrong.
+
+The demo gains a live tab set under `breadcrumbs` — five tabs, the second live,
+the head pinned — because a still picture cannot show that closing one leaves
+the others where they were.
+
+### Changed — the asterisk is the regular weight, not the filled disc
+
+Client, 2026-09-06: "everywhere there's asterisk, use the regular version
+instead of solid."
+
+`Asterisk.svg` held Phosphor's FILL weight — verified byte-for-byte against
+`@phosphor-icons/core` `assets/fill/asterisk-fill.svg`, which is a solid 104r
+disc with the star knocked out of it. At tab size that reads as a filled dot
+with some texture, not as an asterisk. The art is now `assets/regular/
+asterisk.svg`, the six strokes alone, fetched from the same package rather than
+drawn here — the icon folder has no upstream dependency, so art arrives by hand
+and the only defence against a wrong glyph is taking it from source. (The Check
+glyph shipped as a filled square under the right name for exactly this reason,
+across ten sites.)
+
+Its one consumer today is the "All" tab (`tabs-view.tsx`, `all: "asterisk"`).
+
+NOT A GENERAL SHIFT. Ninety glyphs in this pack still carry the filled-disc
+shape and are untouched; this is the one she named. If the disc weight is wrong
+elsewhere it is a separate decision, taken by looking, not inferred from here.
+
+
+### Fixed — the sort control carried three times the gap it looked like it had
+
+Client, 2026-09-06: "sort and view should have same spacing between icon and
+text. I know sort has the break, keep it, but make it more compact; to the eye
+it should look the same as the view selector."
+
+Measured on `verify/toolbar-trio`: `ViewSwitch` puts 8 between its glyph and its
+label. `SortControl` put 26 — and none of it was a gap. The two halves are
+FUSED, with no `gap-2` between them at all, so every one of those 26 pixels was
+padding: 8 inside the direction square (a 16 glyph centred in a 32 box) plus the
+field's own leading `--space-4h`, 18.
+
+So the field's LEADING inset drops to `--space-2` when fused. That token's own
+line in the scale reads "chip padding, icon to label" — it is the same 8
+`ViewSwitch` spends on exactly this relationship, rather than a number picked to
+look right. The TRAILING inset keeps its 18: that edge faces the pill's outside,
+where nothing changed and the component header's width arithmetic still holds.
+Only when FUSED — an unfused field has no seam and no glyph beside it, so it
+keeps the symmetric inset it always had.
+
+The direction square is untouched, as its own header requires. Its 8 (or 10 at
+the standing height) is the glyph's own centring, so the seam now sits between
+two comparable margins instead of one against three.
+
+
+### Fixed — an icon rename had reached inside the sentences people read
+
+The Iconoir -> Phosphor swap renamed `Search` to `MagnifyingGlass` and `Check`
+to `CheckFat`, and it went through STRING LITERALS as well as identifiers.
+Twelve places across eight shipped files have since been offering to
+"MagnifyingGlass this collection" and advising people to "CheckFat the number":
+`components/command/command.tsx` (the palette's own description),
+`compositions/templates/collection-screen.tsx`, `compositions/states/
+no-results.tsx` and `empty-collection.tsx` (their search labels),
+`compositions/overlays/filter-builder.tsx`, `compositions/screens/home.tsx`
+(placeholder and label), `compositions/overlays/import.tsx` (the commit step)
+and `compositions/screens/not-found.tsx` (its advice, twice).
+
+Every one is a DEFAULT, so a consumer passing its own copy never saw it —
+kwapso-system passes `t("Search members…")` and its own `NotFound`, and none of
+the corrupted strings appear in its translation catalogue. Latent there, and
+plainly visible in this repo's own demo, which is where it was found.
+
+Fixes are quote-anchored (`"MagnifyingGlass ` -> `"Search `), so no JSX usage
+moved: `<MagnifyingGlass size={16} />` is the icon and stays the icon. The
+discriminator that makes this findable again: a MULTI-WORD CamelCase glyph name
+cannot occur in English prose, while `Record`, `Ticket`, `Check` and `List` are
+ordinary words and yield nothing but false positives.
+
+### Changed — `demo/` is a book you navigate, not a completeness check
+
+Not a delivered surface, so nothing an app imports changes. Recorded because
+the demo is how a reader finds a component, and the way in is now different:
+five parts and thirty pages (foundations · components · charts · data views ·
+screens) with an address per page, replacing one scrolling document filed under
+the commission's 27 numbered chapters. `demo/artifact.ts` is deleted; the
+component's NAME is the largest thing on its card, with its source path
+copyable beneath. Live at https://kwapso-ui-ux.kwapso.workers.dev
+
+`demo/book.ts` is the map and `demo/check-book.mjs` guards it in `npm run
+check`: a section on no page, a page holding nothing, a map entry naming a slug
+nothing uses, a data view drawn without its toolbar, an exemption that stopped
+being true, and a component folder no section draws. `docs/BUILD-A-COMPONENT.md`
+§12.2 carries the two steps this asks of a new component.
+
 ### Added — `FilterBar`'s "+ filter" slot takes an optional badge node
 
 A consuming app's filter row (kwapso-system's `shared/web/screen-engine/

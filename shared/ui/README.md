@@ -207,7 +207,16 @@ compositions/  the client: "everything currently compositions/xyz is
   overlays/    8 — what opens OVER a screen rather than replacing it
   states/      5 — the same screen with nothing in it
 docs/          RULES · BUILD-A-COMPONENT · TOKENS (BUILD-A-SCREEN pending)
-demo/          three views: foundations · components · compositions
+demo/          THE BOOK — five parts and thirty pages, navigated one page at a
+               time: foundations · components · charts · data views · screens.
+               Live at https://kwapso-ui-ux.kwapso.workers.dev
+               demo/book.ts is the map; demo/check-book.mjs guards it.
+               `npm run deploy` publishes it. DO THIS WHEN YOU CUT A TAG —
+               the book is a static build and is only as current as its last
+               deploy. It went eight kit commits stale in two days, and the
+               only thing that caught it was somebody recognising a component.
+               The header now prints the tag it was built from, so the next
+               time it drifts the page says so.
 verify/        decision artefacts and a smoke build — NOT delivered
 KWAPSO-SPEC.md the artifact, verbatim. The king. Its OVERRIDE REGISTER lists
                every place a client decision beats the artifact text — read it
@@ -240,7 +249,7 @@ from it, everything else is superseded.
 | Motion — 100 rules | done |
 | Components — 108 (controls + structures merged 2026-08-26; was 67 + 42, minus portal-conversation, deleted the same day) | done |
 | Compositions — 45: 15 templates · 17 screens · 8 overlays · 5 states | done |
-| Demo | three views: foundations · components · compositions |
+| Demo | THE BOOK — 5 parts, 30 pages, 136 sections. Live at kwapso-ui-ux.kwapso.workers.dev |
 | Docs | 3 of 4 — BUILD-A-SCREEN waits on the screens |
 
 **Where to look first.** `verify/decisions.html` is the record of every design
