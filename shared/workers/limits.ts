@@ -134,6 +134,27 @@ export const CRON_ALERT_CAP = 50
  * no read). */
 export const CRON_GROWTH_CAP = 200
 
+/** TEAM DATABASES ONE MIGRATION RUN WILL TOUCH.
+ *
+ * The migration robot walks every ready team, reads that team's own
+ * `_migrations` table and applies whatever is missing — so its work is
+ * databases × unapplied migrations, and it had NO ceiling at all: the one bulk
+ * path in the product with neither a chunk size nor a bound of any kind. On a
+ * large estate that is a worker killed halfway with some databases migrated,
+ * some not, and a response nobody ever received to say which.
+ *
+ * Deliberately smaller than `CRON_TEAM_CAP`, because a migration is not a
+ * bounded slice of one team's rows — it is a schema change, several statements
+ * per database, and the slowest thing this product ever does per tenant.
+ *
+ * RESUMING COSTS NOTHING AND NEEDS NO CHECKPOINT, which is why this is a plain
+ * cap rather than a cursor: a team already at the latest version is SKIPPED by
+ * its own `_migrations` table, so the next run starts where this one stopped by
+ * construction. The response says `remaining` so the operator knows to run it
+ * again — and running it again when nothing is left is one read per team and no
+ * writes. */
+export const MIGRATE_TEAMS_PER_RUN = 25
+
 /** Error SIGNATURES one nightly ops digest will name.
  *
  * The digest reads yesterday's rows grouped by signature, so this bounds the
@@ -797,6 +818,32 @@ export function budgetForKind(kind: "read" | "mutation" | "housekeeping" | undef
  * now makes them in five waves. */
 export const MAX_D1_TRIPS_PER_DOOR = 12
 
+/** HOW MANY TIMES A COLD SCREEN MAY ASK THE SERVER BEFORE THE RECORD IS ON
+ * SCREEN — the hop budget on the OTHER half of the round trip, the one the
+ * browser owns.
+ *
+ * `MAX_D1_TRIPS_PER_DOOR` above bounds door → database. Nothing bounded
+ * browser → server, and that is the half a person actually feels: a deep link
+ * pasted from an email (R30 builds emails around exactly this) opens on a fresh
+ * tab with nothing cached, and on 6 Sep 2026 the process-map screen made
+ * FOURTEEN distinct requests before anything rendered — two to learn who was
+ * asking and where they stood, four warming caches the screen never read, one
+ * for the breadcrumb, one for the screen's overrides, and six for a record whose
+ * first paint needs exactly one of them. Every one was a real round trip to a
+ * worker and back, in front of a person waiting.
+ *
+ * FIVE, and the number is the budget round_trip_review already scores against
+ * ("the busiest screen costs 5 hops or fewer") — the owner's own bar since the
+ * 24 Aug 2026 report that first-time loading of a record screen was "a bit
+ * troubling". It is a ceiling on requests BEFORE FIRST PAINT, not on requests:
+ * a screen may warm every cache it likes once the person can read the record,
+ * and `web/test/cold-screen-hops.test.tsx` counts both sides of that line by
+ * rendering the shell cold and stamping each request with whether the record
+ * was already on screen when it left. The cold path today is three: the one
+ * boot call (identity, team, rights), the screen's overrides, and the record
+ * by id. */
+export const MAX_REQUESTS_BEFORE_FIRST_PAINT = 5
+
 /** WHAT THE FOUR CLASSES ACTUALLY COST, MEASURED — the other half of a budget.
  *
  * Taken 5 Sep 2026 by `scripts/speed-bench.mjs`, which runs the shipped libs in
@@ -838,3 +885,214 @@ export const MEASURED_MS = {
 
 /** WHEN. A figure with no date is a figure nobody can argue with. */
 export const MEASURED_ON = "2026-09-05"
+
+/* ─────────────────────────── every bulk path, declared ─────────────────────── */
+
+/** WHAT MOVES MANY ROWS, HOW MUCH IT TAKES AT A TIME, AND WHERE THE NEXT RUN
+ * PICKS UP.
+ *
+ * speed_review's third criterion asks four questions of every bulk path — does
+ * it chunk, with a stated size; can it resume; what happens to the row that
+ * fails; and can whoever started it see how far it got. Twice now that has been
+ * scored off a keyword probe, and twice the probe was wrong in BOTH directions:
+ * it counted `loadBatch`, `createBatch` and `getBatchView` as bulk paths because
+ * the word "batch" is in their names, and it missed the knowledge sweep's own
+ * row loop because the cursor that resumes it sits thirty lines above the `for`.
+ * A census that a regex derives from names is a census about names.
+ *
+ * So the answer is DATA, one row per path, and `bulk-waves.test.ts` holds it to
+ * the source: every file exists, every function is still in it, and every chunk
+ * size names a constant that is really declared. A row for a path that has been
+ * deleted or renamed turns the build red, which is the only property that stops
+ * a list like this becoming a record of what the app used to do.
+ *
+ * `chunk: "one statement"` is a real answer and not a gap — a set-shaped UPDATE
+ * bounded by a refusal is not improved by being cut into pieces, and saying so
+ * here is what stops somebody "fixing" it later.
+ *
+ * `resume` is where the NEXT run reads its position. Several of these store
+ * nothing on purpose: a predicate that re-selects what is left ("still open",
+ * "still behind", "not yet swept") is a resume point with no state to get out of
+ * step, and it is the better answer wherever it is available. */
+export const BULK_PATHS = [
+  {
+    file: "workers/data-ops/src/lib/import-batch.ts",
+    fn: "confirmBatch",
+    iterates: "the parsed rows of up to 8 CSV files, in the plan's topological order",
+    chunk: "BULK_CONCURRENCY",
+    resume: "data_import_batches.cursor_json — {targetKey, rowsDone, report}, written after every settled wave",
+    onFailure: "skip the row with a reason; the wave is folded after it settles, never inside it",
+    progress: "the import screen polls the batch row and shows rowsDone; Continue resumes it",
+  },
+  {
+    file: "workers/content/src/lib/help.ts",
+    fn: "bulkSetStatus",
+    iterates: "an explicit list of ticket ids, capped at BULK_IDS_LIMIT",
+    chunk: "BULK_CONCURRENCY",
+    resume: "the ids themselves — R17's `status <> ?` rides the UPDATE, so re-sending the whole list moves only what is left and writes no duplicate history",
+    onFailure: "a missing ticket is counted as skipped; any other database error stops the call rather than being swallowed",
+    progress: "the response's changed/skipped counts",
+  },
+  {
+    file: "workers/content/src/lib/help.ts",
+    fn: "bulkSetStatusByFilter",
+    iterates: "every ticket matching the facets — help GROWS with use",
+    chunk: "one statement",
+    resume: "the predicate — `status <> ?` means a re-run matches only what has not moved",
+    onFailure: "all or nothing, in one statement; past BULK_IDS_LIMIT the door refuses before writing",
+    progress: "counted first, so the confirm states the true number; one activity row for the set",
+  },
+  {
+    file: "workers/content/src/index.ts",
+    fn: "teamSlice",
+    iterates: "teams in the core database, every 15 minutes — GROWS with tenants",
+    chunk: "CRON_TEAM_CAP",
+    resume: "the rotating window — floor(scheduledTime / everyMs) % windows, deterministic and lap-complete",
+    onFailure: "per-team catch to an error_logs row naming the team; the lap continues",
+    progress: "a slow lap is recorded once per lap",
+  },
+  {
+    file: "workers/content/src/lib/knowledge-ingest.ts",
+    fn: "sweepKind",
+    iterates: "each ingest kind's own table — tickets, accounts, apps, stories, meetings, all GROWING",
+    chunk: "INGEST_SOURCES_PER_TICK",
+    resume: "knowledge_ingest.cursor — a versioned `v<n>|<sortAt>|<id>`, kinds ordered oldest-swept-first so none starves",
+    onFailure: "one kind's throw is caught, stamped on knowledge_ingest.last_error, and the sweep goes on",
+    progress: "the Sync screen reads listIngestState — per-kind lastRunAt, lastOkAt, lastError",
+  },
+  {
+    file: "workers/content/src/lib/knowledge.ts",
+    fn: "indexSource",
+    iterates: "the chunks of one source, up to MAX_CHUNKS_PER_SOURCE",
+    chunk: "INDEX_CHUNKS_PER_SLICE",
+    resume: "knowledge_sources.indexed_chunks beside content_hash — a tick that dies is finished by the next",
+    onFailure: "degrade, never abort: a failed embed batch stores null vectors and records one error row",
+    progress: "IndexProgress {total, indexed, done}, shown per source on the Sync screen",
+  },
+  {
+    file: "workers/content/src/lib/knowledge-vectors.ts",
+    fn: "upsertVectors",
+    iterates: "the vector rows of one source",
+    chunk: "UPSERT_BATCH",
+    resume: "indexSource's content_hash — only stamped once the whole source succeeded, so a lost batch is redone",
+    onFailure: "each batch retried once, then thrown so the resumable caller above hears it",
+    progress: "the counter it returns, which indexSource turns into IndexProgress",
+  },
+  {
+    file: "workers/content/src/lib/knowledge-google.ts",
+    fn: "sweepGoogle",
+    iterates: "one person's Drive, Gmail, Calendar and Chat listings — external and unbounded",
+    chunk: "INGEST_SOURCES_PER_TICK",
+    resume: "the same per-kind knowledge_ingest cursor, keyed per person per service, behind a sync lease",
+    onFailure: "per-kind catch, and busy/skipped are returned as distinct answers rather than as silence",
+    progress: "the Google sync screen drives it and reads the same per-service rows",
+  },
+  {
+    file: "workers/content/src/lib/knowledge-google.ts",
+    fn: "retireVanished",
+    iterates: "this person's held knowledge_sources per Google service — GROWS",
+    chunk: "RETIRE_PROBES_PER_TICK",
+    resume: "none stored — the scan is ORDER BY RANDOM() within RETIRE_SCAN_CAP, so completeness is statistical over ticks rather than exact. Written down because it is the weakest resume in this table: a source can be probed twice before another is probed once.",
+    onFailure: "a service whose token fails is skipped; the others are still probed",
+    progress: "none beyond the log",
+  },
+  {
+    file: "workers/content/src/lib/google-autopilot.ts",
+    fn: "googleAutopilot",
+    iterates: "connected people × meetings still waiting for a transcript — both GROW",
+    chunk: "GOOGLE_SWEEP_PEOPLE_PER_TICK",
+    resume: "the selection predicate advances itself — people ordered by least-recently-used, meetings by attempts under TRANSCRIPT_ATTEMPT_CAP inside TRANSCRIPT_HORIZON_DAYS",
+    onFailure: "every failure is collected and recorded per person and per meeting; nothing throws out",
+    progress: "error_logs rows only",
+  },
+  {
+    file: "workers/content/src/index.ts",
+    fn: "morningDigest",
+    iterates: "teams — one email each, daily",
+    chunk: "CRON_TEAM_CAP",
+    resume: "the rotating window, as the sweep above; nothing is stored, so a tick that dies re-mails that window tomorrow",
+    onFailure: "per-team catch to an error_logs row naming the team",
+    progress: "log and error_logs",
+  },
+  {
+    file: "workers/content/src/lib/notify.ts",
+    fn: "sendToMany",
+    iterates: "a recipient list — team members or a client's stakeholders",
+    chunk: "SEND_CONCURRENCY",
+    resume: "none — a send is not replayable, so the ceiling is the answer: past SEND_FAN_CAP the extras are DROPPED and named in the log rather than queued",
+    onFailure: "per-recipient failure recorded to error_logs; one bad address never stops the rest",
+    progress: "error_logs rows only",
+  },
+  {
+    file: "shared/workers/retention.ts",
+    fn: "sweepCoreRetention",
+    iterates: "login_codes, login_sends, sessions and error_logs — all GROW, some from unauthenticated callers",
+    chunk: "RETENTION_DELETE_CAP",
+    resume: "the predicate re-selects tomorrow; a short pass stops early, and a capped table is recorded",
+    onFailure: "per-table catch keeps the partial count and names the table",
+    progress: "log, and an error_logs row when a table hit the pass ceiling",
+  },
+  {
+    file: "workers/tenancy/src/lib/sharding.ts",
+    fn: "recordGrowth",
+    iterates: "every D1 database on the account — GROWS",
+    chunk: "CRON_GROWTH_CAP",
+    resume: "none stored — the tick takes the LARGEST N every night, which is a deliberate sampling rather than a walk, because a trend only matters where there is a ceiling to reach",
+    onFailure: "per-database catch to error_logs; a truncated listing is recorded as its own row",
+    progress: "GET /api/tenancy/admin/db-sizes",
+  },
+  {
+    file: "shared/workers/d1-rest.ts",
+    fn: "d1ListAllDatabases",
+    iterates: "Cloudflare's own D1 listing, 100 to a page",
+    chunk: "D1_LIST_PAGE_CAP",
+    resume: "none — truncation is RETURNED as `complete: false` and the caller decides, which is why this is not silently short",
+    onFailure: "a page that throws ends the listing; the partial is not passed off as whole",
+    progress: "the caller's own log",
+  },
+  {
+    file: "workers/tenancy/src/lib/sharding.ts",
+    fn: "moveModuleToOwnDatabase",
+    iterates: "every row of a module's tables — the largest collection in the product by definition",
+    chunk: "COPY_BATCH",
+    resume: "team_module_moves — per-table keyset cursors, verified and drained sets, rows copied, and a claim that goes stale after MOVE_CLAIM_STALE_MS",
+    onFailure: "refuses rather than leaving a half-emptied source: copy_mismatch and move_drain_incomplete are thrown AND stamped on last_error with the claim released",
+    progress: "MoveProgress {movedRows, done, status, copying} per call",
+  },
+  {
+    file: "workers/tenancy/src/routes/admin.ts",
+    fn: "migrateTeams",
+    iterates: "every ready team behind the latest schema — GROWS with tenants and with schema history",
+    chunk: "MIGRATE_TEAMS_PER_RUN",
+    resume: "each team's own _migrations table, plus schema_version on the core row — nothing is stored, so nothing can get out of step; the response says `remaining`",
+    onFailure: "one unreachable database is named in `failed` and the rest are still migrated",
+    progress: "the response: teamsChecked, teamsMigrated, failed, remaining",
+  },
+  {
+    file: "workers/tenancy/src/lib/teams.ts",
+    fn: "acceptPendingInvites",
+    iterates: "invite_index rows for one email — attacker-influenced, since anyone may invite any address",
+    chunk: "INVITE_SWEEP_CAP",
+    resume: "the rest stay pending and are accepted from the Invitations inbox; ORDER BY created_at so the oldest never starve",
+    onFailure: "a claim that moves zero rows is skipped — the pending status rides the UPDATE",
+    progress: "the count returned, plus a live ping per team joined",
+  },
+  {
+    file: "shared/workers/csv.ts",
+    fn: "exportTooLarge",
+    iterates: "a whole collection, on each of the six export doors",
+    chunk: "one statement",
+    resume: "none, deliberately — an export is one whole document or it is an error, because a truncated export re-imported is data loss",
+    onFailure: "refused at EXPORT_HARD_CAP with a sentence telling the caller how to ask for less",
+    progress: "none — it is a synchronous download",
+  },
+  {
+    file: "workers/data-ops/src/routes/admin.ts",
+    fn: "postResolveErrorSignature",
+    iterates: "open error_logs rows under one folded signature — the one table built to grow",
+    chunk: "RESOLVE_SCAN_CAP",
+    resume: "re-running it — newest-first with `status = 'open'` riding the UPDATE always makes progress, and `capped: true` says to run it again",
+    onFailure: "each id batch is one statement, so there is no partial state to reconcile",
+    progress: "the response: updated, scanned, matched, capped",
+  },
+] as const

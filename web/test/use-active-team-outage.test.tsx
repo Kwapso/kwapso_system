@@ -52,6 +52,11 @@ const withTeam = {
   role: null,
   memberCount: 3,
   teams: [{ id: "t1", name: "Kwapso" }],
+  // ONE BOOT CALL. The context door carries the caller and their rights now
+  // (shared/types.ts `ActiveContext`), so the hook no longer asks `/api/auth/me`
+  // at all — which is why the 401 case below rejects THIS door.
+  user,
+  permissions: null,
 }
 
 /** The hook caches the session at MODULE level, so a test that wants a COLD
@@ -113,7 +118,7 @@ describe("a failing API is not a signed-out person", () => {
 
   it("a 401 still signs you out — the fix must not break the real case", async () => {
     const { useActiveTeam: hook, ApiFailure } = await freshHook()
-    me.mockRejectedValue(new ApiFailure(401, "unauthenticated", "Sign in to continue."))
+    active.mockRejectedValue(new ApiFailure(401, "unauthenticated", "Sign in to continue."))
 
     renderHook(() => hook())
 

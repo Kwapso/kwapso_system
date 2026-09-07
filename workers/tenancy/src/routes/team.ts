@@ -27,6 +27,7 @@ import { accountScope, refusePortalCaller } from "@shared/workers/account-scope"
 import { gatedBody, openTeam } from "@shared/workers/route"
 import { teamContext, toActor, whoAmI } from "../context"
 import type { Env } from "../env"
+import type { SessionUser } from "@shared/types"
 
 /** A route body is untrusted JSON until each field is validated. The alias keeps
  * the gate call free of NESTED angle brackets, which the gating-seam scan
@@ -169,15 +170,17 @@ export async function myTeams(request: Request, env: Env): Promise<Response> {
  * in the wrong place, and a guard that scans for the shared name cannot see the
  * private one. The copy is gone; this reads the seam beside the fence. */
 
-async function agencyContext(env: Env, userId: string) {
+async function agencyContext(env: Env, user: SessionUser) {
   // Read-only, like the fence helper above, and `unknown` for the same reason.
   const cfg = d1Config(env, "unknown")
-  const ctx = await getActiveContext(env, cfg, userId)
+  const userId = user.id
+  const ctx = await getActiveContext(env, cfg, user)
   // Resolved from the ANSWER, never from the stored pointer — getActiveContext
   // self-heals a stale current team, and a guard built from the un-healed value
   // would refuse a member who is simply looking at a different team today.
   if (ctx.team) {
-    await refusePortalCaller(cfg, await requireMember(env, userId, ctx.team.id))
+    const memberGuard = await requireMember(env, userId, ctx.team.id)
+    await refusePortalCaller(cfg, memberGuard)
     // …and the OTHER teams in the answer fence for themselves, exactly as the
     // team-list doors below do (round-three security sweep, N4: the per-team
     // fence landed on myTeams/bootstrap while this door — the SAME payload,
@@ -189,7 +192,24 @@ async function agencyContext(env: Env, userId: string) {
     const others = await refuseClientOnTeams(env, userId, ctx.teams.filter((t) => t.id !== currentId))
     const keep = new Set([currentId, ...others.map((t) => t.id)])
     ctx.teams = ctx.teams.filter((t) => keep.has(t.id))
+    // WHAT THIS PERSON MAY DO, ANSWERED IN THE SAME BREATH AS WHERE THEY STAND.
+    //
+    // The rights sheet is one statement against the team database, and this door
+    // has already resolved the guard that reads it — the fence above IS that
+    // guard. Answering it here costs one D1 trip on a door that already made
+    // several; asking for it separately costs the browser a whole round trip
+    // through the gateway, auth and back, on the one hook nothing in the app can
+    // render without (web/lib/perms.ts says so in its own words). Measured
+    // 7 Sep 2026: the record screen would not mount until that request landed,
+    // so it was not merely a hop — it was a hop in FRONT of the record read.
+    ctx.permissions = await getMyPermissions(cfg, memberGuard)
   }
+  // …AND WHO IS ASKING. `whoAmI` above already fetched this from auth over the
+  // service binding in order to answer at all, so handing it back is free, and
+  // it is the whole of what `/api/auth/me` says. The agency app's boot was two
+  // requests for two halves of one question (MAX_REQUESTS_BEFORE_FIRST_PAINT,
+  // shared/workers/limits.ts); it is now one.
+  ctx.user = user
   return ctx
 }
 
@@ -197,7 +217,7 @@ async function agencyContext(env: Env, userId: string) {
 export async function active(request: Request, env: Env): Promise<Response> {
   const user = await whoAmI(request, env)
   if (!user) return fail(401, "signed_out", "Not signed in.")
-  return json(await agencyContext(env, user.id))
+  return json(await agencyContext(env, user))
 }
 
 /** Switch the active team (one team session at a time, validated). */
@@ -212,7 +232,7 @@ export async function switchActiveTeam(request: Request, env: Env): Promise<Resp
   if (!ok) return fail(403, "not_member", "You're not a member of that team.")
   // The SAME answer as /active, so it carries the same refusal — a door that
   // returns a payload another door guards is that payload's second front door.
-  return json(await agencyContext(env, user.id))
+  return json(await agencyContext(env, user))
 }
 
 /** Create a brand-new team (its own database, you as Admin) and switch to it. */
@@ -254,7 +274,7 @@ export async function createNamedTeam(request: Request, env: Env): Promise<Respo
     )
 
   await createTeam(env, toActor(user), name, null, readOrigin(request))
-  return json(await agencyContext(env, user.id))
+  return json(await agencyContext(env, user))
 }
 
 export async function postUpdateTeam(request: Request, env: Env): Promise<Response> {

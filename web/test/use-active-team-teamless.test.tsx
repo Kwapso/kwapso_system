@@ -37,13 +37,17 @@ const user = {
   onboardingComplete: true,
   currentTeamId: "t1",
 }
+// The context door carries the caller and their rights now (shared/types.ts),
+// so the hook boots on ONE request and there is no `/api/auth/me` in this flow.
 const withTeam = {
   team: { id: "t1", name: "Kwapso" },
   role: null,
   memberCount: 2,
   teams: [{ id: "t1", name: "Kwapso" }],
+  user,
+  permissions: null,
 }
-const teamless = { team: null, role: null, memberCount: 0, teams: [] }
+const teamless = { team: null, role: null, memberCount: 0, teams: [], user, permissions: null }
 
 beforeEach(() => {
   replace.mockClear()
@@ -60,10 +64,18 @@ describe("a person removed from their last team", () => {
 
     // 2 · Meanwhile an admin removes them. The next context read says so — and
     // this instance starts from the CACHE, so it renders painted-and-populated
-    // before its own revalidate lands. That is the window under test.
+    // before the revalidate lands. That is the window under test.
     active.mockResolvedValue(teamless)
     const revalidating = renderHook(() => useActiveTeam())
     expect(revalidating.result.current.loading, "starts from the cache").toBe(false)
+
+    // THE REVALIDATE IS `refresh()`, WHICH IS WHAT ACTUALLY HAPPENS. A second
+    // mount within seconds of a real answer no longer re-asks the boot door
+    // (`BOOT_FRESH_MS` in use-active-team.ts — the post-auth app mounts several
+    // of these in one commit and a cold tab was asking once per component). The
+    // path a removal really takes is unchanged: the live ping calls
+    // `active.refresh()`, and a deliberate refresh never joins or skips.
+    await painted.result.current.refresh()
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/onboarding"))
 

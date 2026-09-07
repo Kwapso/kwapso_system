@@ -217,6 +217,27 @@ export function hasVectorStore(env: Env): env is Env & { KNOWLEDGE_INDEX: Vector
   return Boolean(env.KNOWLEDGE_INDEX)
 }
 
+/** ONCE MORE, THEN GIVE UP HONESTLY — and until 7 Sep 2026 this function's own
+ * doc comment promised a retry that was not in the loop below it.
+ *
+ * A promise in a comment is worse than no promise: it is the reason nobody looks
+ * again. So here it is, and it is deliberately ONE retry rather than a backoff
+ * ladder — the caller is a bounded slice of a bulk job that is itself resumable
+ * (`indexSource` stamps `indexed_chunks` per slice and the content hash only
+ * once the whole source succeeded), so a batch that fails twice in a row is not
+ * a blip and the right answer is to let the next sweep have it rather than to
+ * spend a worker's lifetime here.
+ *
+ * A batch is idempotent — an upsert by a derived id — so retrying one that
+ * actually landed and then failed to answer costs nothing and cannot duplicate. */
+async function twice<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch {
+    return await run()
+  }
+}
+
 /** Put vectors in. Batched, and each batch retried once — a partial upsert is
  * survivable (the source's content hash is only stamped when the whole index
  * succeeded, so the next sweep redoes it) but a lost batch that nobody retries
@@ -236,7 +257,7 @@ export async function upsertVectors(
       namespace,
       metadata: r.labels as unknown as Record<string, string | number>,
     }))
-    await env.KNOWLEDGE_INDEX.upsert(batch)
+    await twice(() => env.KNOWLEDGE_INDEX.upsert(batch))
     written += batch.length
   }
   return written
@@ -247,8 +268,15 @@ export async function upsertVectors(
  * written, which is what makes the two rebuildable from one another. */
 export async function deleteVectors(env: Env, ids: string[]): Promise<void> {
   if (!hasVectorStore(env) || !ids.length) return
-  for (let i = 0; i < ids.length; i += DELETE_BATCH)
-    await env.KNOWLEDGE_INDEX.deleteByIds(ids.slice(i, i + DELETE_BATCH))
+  for (let i = 0; i < ids.length; i += DELETE_BATCH) {
+    const batch = ids.slice(i, i + DELETE_BATCH)
+    // Retried once, exactly as the upsert is, and for the sharper reason: a
+    // delete that is lost leaves a passage in the index that the database no
+    // longer holds, and R26's guarantee is that the index only ever NARROWS —
+    // a stale id costs a lookup that finds nothing, which is a wasted slot in
+    // an answer rather than a leak, but it does not heal on its own.
+    await twice(() => env.KNOWLEDGE_INDEX.deleteByIds(batch))
+  }
 }
 
 /** SEARCH. Ids and scores, inside this team's namespace, inside this caller's

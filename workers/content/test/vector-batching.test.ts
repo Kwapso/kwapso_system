@@ -92,6 +92,49 @@ describe("vector writes are batched to what Vectorize actually accepts", () => {
     expect(index.writes().filter((w) => w.kind === "upsert").every((c) => c.count <= 1000)).toBe(true)
   })
 
+  it("a batch that fails ONCE is retried, and the write still lands", async () => {
+    // THE COMMENT WAS THE ONLY PLACE THE RETRY EXISTED. `upsertVectors`'s own
+    // doc said "each batch retried once" from the day it shipped, and the loop
+    // under it had no retry in it — so a batch lost to one blip was a hole in
+    // the index that healed at the next sweep at best. A promise in a comment is
+    // worse than no promise, because it is the reason nobody looks again.
+    const { index, env } = harness()
+    let refused = 0
+    const real = index.binding.upsert.bind(index.binding)
+    index.binding.upsert = async (batch: unknown) => {
+      if (refused++ === 0) throw new Error("vectorize said no, once")
+      return real(batch as never)
+    }
+    const rows = [{ id: "chunk_0", values: [1, 0, 0], labels: { owner: "team" } }] as unknown as Parameters<
+      typeof upsertVectors
+    >[2]
+
+    await expect(upsertVectors(env, guard, rows)).resolves.toBe(1)
+    expect(refused, "it asked twice").toBe(2)
+    expect(index.ids()).toContain("chunk_0")
+  })
+
+  it("…and a batch that fails TWICE is not swallowed", async () => {
+    // The other direction, and the one that keeps the retry honest: one more go
+    // is a blip absorbed, not an error hidden. The caller is a resumable slice
+    // and has to hear about a store that is actually down.
+    const { env } = harness()
+    const { index } = harness()
+    void index
+    const broken = {
+      ...env,
+      KNOWLEDGE_INDEX: {
+        upsert: async () => {
+          throw new Error("vectorize is down")
+        },
+      },
+    } as unknown as typeof env
+    const rows = [{ id: "chunk_0", values: [1, 0, 0], labels: {} }] as unknown as Parameters<
+      typeof upsertVectors
+    >[2]
+    await expect(upsertVectors(broken, guard, rows)).rejects.toThrow("vectorize is down")
+  })
+
   it("the stand-in refuses an oversized call, so a wrong batch size cannot pass", async () => {
     const { index } = harness()
     // Straight at the binding, bypassing the batching seam: this is the check

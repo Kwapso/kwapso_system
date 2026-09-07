@@ -1,7 +1,7 @@
 // Team lifecycle: the factory that gives every new team its OWN database
 // (locked architecture), seeded with default roles + dropdown values.
 
-import type { ActiveContext, ReceivedInvite, TeamMeta, TeamSummary } from "@shared/types"
+import type { ActiveContext, ReceivedInvite, SessionUser, TeamMeta, TeamSummary } from "@shared/types"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { logActivity } from "@shared/workers/activity"
 import {
@@ -522,11 +522,15 @@ export async function acceptInvite(
 export async function getActiveContext(
   env: Env,
   cfg: D1Rest,
-  userId: string
+  /** WHO IS ASKING, passed in rather than read again. The door above resolved
+   * this through auth to know there was anybody to answer, and the answer now
+   * carries it — see `ActiveContext.user` in shared/types.ts for why. */
+  user: SessionUser
 ): Promise<ActiveContext> {
+  const userId = user.id
   const teams = await listMyTeams(env, userId)
   if (teams.length === 0)
-    return { team: null, role: null, memberCount: 0, teams: [] }
+    return { team: null, role: null, memberCount: 0, teams: [], user, permissions: null }
 
   const stored = await env.DB.prepare(
     "SELECT current_team_id FROM users WHERE id = ?"
@@ -569,7 +573,10 @@ export async function getActiveContext(
     if (roleRows[0]) role = { id: roleRows[0].id, title: roleRows[0].title }
   }
 
-  return { team: current, role, memberCount: countRow?.n ?? 0, teams }
+  // `permissions` is filled by the DOOR, which holds the fence guard the rights
+  // sheet is read with; null here means only "not answered yet", exactly as it
+  // does for a person with no team.
+  return { team: current, role, memberCount: countRow?.n ?? 0, teams, user, permissions: null }
 }
 
 /** Switch the active team (locked: one team session at a time). Validates the

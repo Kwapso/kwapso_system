@@ -17,10 +17,10 @@ import type { ActiveContext, SessionUser } from "@shared/types"
 // `e instanceof undefined` throws — turning the branch below into the very
 // bounce it exists to prevent, in exactly the tests meant to prove it doesn't.
 import { ApiFailure } from "@shared/web/api"
-import { clearCache } from "@shared/web/store"
+import { clearCache, primeCache } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
 
-import { auth, tenancy } from "@/lib/api"
+import { tenancy } from "@/lib/api"
 
 export type ActiveTeam = {
   loading: boolean
@@ -39,6 +39,32 @@ type Session = { user: SessionUser; ctx: ActiveContext }
 // after a manual reload (the launcher-needs-reload bug).
 let sessionCache: Session | null = null
 const sessionSubs = new Set<() => void>()
+
+/** ONE BOOT PER TAB, NOT ONE PER COMPONENT. `sessionCache` is checked before a
+ * load and written after it, and that gap is a whole round trip wide: the root
+ * `AgentHost` and the screen's own shell mount in the SAME commit with nothing
+ * cached, so each of them booted, and a cold tab asked the same door twice.
+ * Measured 7 Sep 2026 on a cold deep link, which is where nobody is watching.
+ *
+ * The shape is `loadShared`'s in shared/web/store.ts, for the same reason: a
+ * promise held while it is in flight, cleared when it settles, so the second
+ * caller joins the first rather than starting a second. Not the store itself,
+ * because this answer is not a cached ROW — it decides where the person is sent
+ * next, and a stale one would bounce them. */
+let booting: Promise<void> | null = null
+
+/** WHEN THE DOOR LAST ANSWERED. `load()` runs on every mount, because
+ * cache-first means show what you have and top it up — right for a shell that
+ * has been open for ten minutes, wrong for the second component to mount in the
+ * same second as the first. The post-auth app mounts several `useActiveTeam`
+ * instances (the screen, the shell, the assistant's host) and a cold tab asked
+ * the boot door once for each of them.
+ *
+ * The same sentence `primeCache`'s `justAnswered` flag makes about a row, made
+ * here about the session: within a breath of a real answer there is nothing to
+ * revalidate. Ten seconds, so a genuine navigation minutes later still tops up. */
+let bootedAt = 0
+const BOOT_FRESH_MS = 10_000
 function setSessionCache(next: Session | null): void {
   // SIGNING OUT FORGETS THE DATA, not just the session. `null` here is the
   // sign-out / auth-failure path, and the row cache is keyed by resource + team —
@@ -48,6 +74,22 @@ function setSessionCache(next: Session | null): void {
   if (next === null) clearCache()
   sessionCache = next
   for (const fn of sessionSubs) fn()
+}
+
+/** THE RIGHTS SHEET ARRIVED WITH THE CONTEXT — put it where the app looks.
+ *
+ * `usePermissions` reads `my-perms:<teamId>` out of the row store, and nothing
+ * in the post-auth app renders without it (web/lib/perms.ts). Priming it from
+ * the boot answer is not a cache warm-up: it is the same value, from the same
+ * door, in the same breath — so the first screen never asks for it at all.
+ *
+ * `primeCache` and not `primeCacheIfCold`, deliberately: this is the freshest
+ * possible answer, and a `refresh()` after a role change must be allowed to
+ * overwrite what the tab was holding. Null (a teamless person) primes nothing —
+ * there is no team to have rights in, and writing an empty sheet would render
+ * as "you may do nothing". */
+function primeRights(ctx: ActiveContext): void {
+  if (ctx.team && ctx.permissions) primeCache(`my-perms:${ctx.team.id}`, ctx.permissions, true)
 }
 
 export function useActiveTeam(): ActiveTeam {
@@ -98,17 +140,23 @@ export function useActiveTeam(): ActiveTeam {
     let alive = true
     async function load() {
       try {
-        // ONE wait, not two — the identity read and the team read are
-        // independent doors, and this runs on every page load. The sibling
-        // refresh() below has always paired them; the boot path serialising
-        // the same two calls was paying one full round trip for nothing.
-        const [me, ctx] = await Promise.all([auth.me(), tenancy.active()])
-        if (!me.user.onboardingComplete) {
+        // ONE REQUEST, NOT TWO. This used to be `Promise.all([auth.me(),
+        // tenancy.active()])` — one wait, but still two round trips — and the
+        // second door had already asked the first one, over a service binding,
+        // in order to answer at all. So the team door now hands the identity
+        // back with the context (shared/types.ts `ActiveContext.user`), and the
+        // browser asks once. On a cold deep link that is one of the fourteen
+        // requests a person used to wait through before anything rendered
+        // (MAX_REQUESTS_BEFORE_FIRST_PAINT, shared/workers/limits.ts).
+        const ctx = await tenancy.active()
+        if (!ctx.user.onboardingComplete) {
           router.replace("/onboarding")
           return
         }
         if (sendToOnboardingIfTeamless(ctx)) return
-        const next: Session = { user: me.user, ctx }
+        primeRights(ctx)
+        bootedAt = Date.now()
+        const next: Session = { user: ctx.user, ctx }
         setSessionCache(next)
         if (!alive) return
         setUser(next.user)
@@ -149,7 +197,20 @@ export function useActiveTeam(): ActiveTeam {
       setCtx(sessionCache.ctx)
       setLoading(false)
     }
-    void load()
+    // Joined, not repeated — see `booting` above. And not asked again at all
+    // when the answer is seconds old (`bootedAt`).
+    const stillFresh = sessionCache !== null && Date.now() - bootedAt < BOOT_FRESH_MS
+    if (!booting && !stillFresh) booting = load().finally(() => { booting = null })
+    if (!booting) return () => { alive = false }
+    const joined = booting
+    void joined.then(() => {
+      // The winner wrote `sessionCache`; a joiner has to read it, because its
+      // own `load()` never ran and its state is still empty.
+      if (!alive || !sessionCache) return
+      setUser(sessionCache.user)
+      setCtx(sessionCache.ctx)
+      setLoading(false)
+    })
     return () => {
       alive = false
     }
@@ -163,14 +224,21 @@ export function useActiveTeam(): ActiveTeam {
     // was carrying all five. Dropped on the switch, which is the moment they stop
     // being anything anyone is looking at.
     clearCache()
-    if (sessionCache) setSessionCache({ ...sessionCache, ctx: nextCtx })
+    // AFTER the clear, never before — `clearCache()` takes every key, and a
+    // shell holding no rights renders as "you may do nothing" (perms.ts says
+    // the same thing about its own ordering).
+    primeRights(nextCtx)
+    if (sessionCache) setSessionCache({ user: nextCtx.user, ctx: nextCtx })
     setCtx(nextCtx)
+    setUser(nextCtx.user)
   }, [])
 
   const createTeam = React.useCallback(async (name: string) => {
     const nextCtx = await tenancy.createTeam(name)
-    if (sessionCache) setSessionCache({ ...sessionCache, ctx: nextCtx })
+    primeRights(nextCtx)
+    if (sessionCache) setSessionCache({ user: nextCtx.user, ctx: nextCtx })
     setCtx(nextCtx)
+    setUser(nextCtx.user)
   }, [])
 
   const refresh = React.useCallback(async () => {
@@ -196,10 +264,12 @@ export function useActiveTeam(): ActiveTeam {
     // is not allowed to become a sign-out (use-active-team-outage.test.tsx).
     try {
       // reload both identity (profile edits) and context (member counts, etc.)
-      const [me, nextCtx] = await Promise.all([auth.me(), tenancy.active()])
+      const nextCtx = await tenancy.active()
       if (sendToOnboardingIfTeamless(nextCtx)) return
-      setSessionCache({ user: me.user, ctx: nextCtx })
-      setUser(me.user)
+      primeRights(nextCtx)
+      bootedAt = Date.now()
+      setSessionCache({ user: nextCtx.user, ctx: nextCtx })
+      setUser(nextCtx.user)
       setCtx(nextCtx)
     } catch (e) {
       reportError("active-team refresh", e)

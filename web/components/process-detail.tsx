@@ -171,33 +171,49 @@ export function ProcessDetailScreen({
     () => tenancy.processDetail(processId, againstId ?? undefined)
   )
 
+  // ── EVERYTHING BELOW WAITS FOR THE RECORD ──────────────────────────────────
+  //
+  // Six reads, none of which the record's own first paint needs: the comment
+  // list (the TOTAL is on the record), the peer maps the connect-picker offers,
+  // the calls the step form can point at, the client's roles and tools, and the
+  // history behind the Activity tab. They used to leave in the same commit as
+  // the record read, so a person arriving on a deep link from an email waited
+  // for seven requests to see one map (`MAX_REQUESTS_BEFORE_FIRST_PAINT`,
+  // shared/workers/limits.ts, and web/test/cold-screen-hops.test.tsx counts it).
+  //
+  // A NULL KEY FETCHES NOTHING, so the gate is `useCached`'s own and costs no
+  // machinery: `ready` is simply "the record is in hand". Deterministic rather
+  // than a timer — the panels these feed are drawn from the record anyway, so
+  // there was never a frame in which they could have been useful earlier.
+  const ready = detailQ.data !== undefined
+
   const commentsQ = useCached<{ comments: ProcessComment[]; total: number }>(
-    processCommentsKey(processId),
+    ready ? processCommentsKey(processId) : null,
     () => tenancy.processComments(processId)
   )
   // THE OTHER MAPS THIS ONE COULD CONNECT TO — the same bounded, cached read the
   // processes screen makes, so opening this after browsing them costs nothing.
-  const peerProcessesQ = useCached<ProcessSummary[]>(processesKey(teamId), () =>
+  const peerProcessesQ = useCached<ProcessSummary[]>(ready ? processesKey(teamId) : null, () =>
     listFetch.processes(teamId)
   )
   // THE MEETINGS "READ A CALL" CAN READ. The same bounded, cached list the
   // Meetings section fills, narrowed to this map's client on screen — a call
   // about somebody else has nothing to say about this process.
-  const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
+  const meetingsQ = useCached<Meeting[]>(ready ? meetingsKey(teamId) : null, () => listFetch.meetings(teamId))
   // WHO DOES THE WORK AND WHAT IN — the CLIENT's own organisation, read on the
   // same two cache keys the account's Organisation tab fills, so opening a map
   // after looking at the client costs nothing and a rename reaches both through
   // the ordinary live path. Both are bounded lists of a client's own roles and
   // tools; the step form narrows them to this map's client below.
-  const clientRolesQ = useCached<ClientRole[]>(clientRolesKey(teamId), () =>
+  const clientRolesQ = useCached<ClientRole[]>(ready ? clientRolesKey(teamId) : null, () =>
     tenancy.clientRoles().then((r) => r.roles)
   )
-  const clientToolsQ = useCached<ClientTool[]>(clientToolsKey(teamId), () =>
+  const clientToolsQ = useCached<ClientTool[]>(ready ? clientToolsKey(teamId) : null, () =>
     tenancy.clientTools().then((r) => r.tools)
   )
   // The ONE web-side read of a record's history (R5) — rows, the door's exact
   // COUNT(*) for the tab badge, and the cursor the feed below spends.
-  const activity = useRecordActivity("processes", processId)
+  const activity = useRecordActivity("processes", ready ? processId : null)
 
   const { can } = usePermissions(teamId)
   const canEdit = can("processes", "edit")

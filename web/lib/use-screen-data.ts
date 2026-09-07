@@ -33,6 +33,7 @@ import {
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useAfterPaint } from "@shared/web/after-paint"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
  * enabled (on-team + signed-in), the active module and the record id in view. */
@@ -91,15 +92,32 @@ export function useScreenData({
     enabled && onScreen("members") ? `members:${teamId}` : null,
     () => tenancy.members().then((r) => r.members)
   )
-  // Roles back the roles list, the breadcrumb label, the change-role picker and
-  // the invite form's role options — load them for the whole team area. The
-  // listFetch fetchers ALSO prime each collection's exact `total:` sidecar (R16).
-  const rolesQ = useCached(enabled ? `member_roles:${teamId}` : null, () =>
+  // ── THE THREE TEAM-WIDE READS, AND WHY THEY NOW WAIT ────────────────────────
+  //
+  // Roles, invites and the dropdown values are read across the WHOLE team area
+  // rather than on their own screens, because they back count badges on the
+  // section tabs as well as their own lists. That is right, and it had one
+  // cost: they left in the same commit as the read of whatever record a person
+  // had actually opened, so a cold deep link from an email (R30) waited on three
+  // requests about the team before it could show one row. A count badge is
+  // secondary content by definition — it is a number beside a word, on a tab
+  // nobody has pressed.
+  //
+  // `teamWide` is false on the commit that paints and true from the browser's
+  // next idle moment (shared/web/after-paint.ts), so the badges arrive a beat
+  // after the record instead of in front of it. Their own SCREENS are unaffected
+  // in any way a person can see: those read the same cache keys and the same
+  // beat is spent inside a skeleton they were already drawing.
+  //
+  // The listFetch fetchers ALSO prime each collection's exact `total:` sidecar (R16).
+  // Called unconditionally — `enabled` flips from false to true on this very
+  // path, and a hook behind a short-circuit is a hook that changes order.
+  const painted = useAfterPaint()
+  const teamWide = enabled && painted
+  const rolesQ = useCached(teamWide ? `member_roles:${teamId}` : null, () =>
     listFetch.roles(teamId as string)
   )
-  // Invites back the invites list AND the section-tab count badge, so load them
-  // across the team area (cache-first + live, so the count stays honest).
-  const invitesQ = useCached(enabled ? `invites:${teamId}` : null, () =>
+  const invitesQ = useCached(teamWide ? `invites:${teamId}` : null, () =>
     listFetch.invites(teamId as string)
   )
   const metaQ = useCached(enabled && module === "team" ? `team-meta:${teamId}` : null, () =>
@@ -218,7 +236,7 @@ export function useScreenData({
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
   const formSelectableQ = useCached(
-    enabled ? `selectable:${teamId}` : null,
+    teamWide ? `selectable:${teamId}` : null,
     () => listFetch.selectable(teamId as string)
   )
   // R16: the exact server totals the badges show (primed by the fetchers above;

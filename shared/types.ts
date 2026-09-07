@@ -233,6 +233,18 @@ export type ActiveContext = {
   memberCount: number
   /** every team you belong to — feeds the team switcher */
   teams: TeamSummary[]
+  /** WHO IS ASKING — the same answer `/api/auth/me` gives, carried here so the
+   * agency app boots on ONE request instead of two. The tenancy door already
+   * resolved the caller through auth to answer at all; handing that answer back
+   * costs nothing and saves the browser a full round trip on every cold open
+   * (MAX_REQUESTS_BEFORE_FIRST_PAINT, shared/workers/limits.ts). */
+  user: SessionUser
+  /** YOUR OWN RIGHTS in the current team — the same sheet `/api/tenancy/
+   * my-permissions` answers, read in the same wave as the fence that decides
+   * whether you may see this context at all. Null when there is no team to have
+   * rights in. The web app primes its `my-perms` cache from this, so the one
+   * hook nothing can render without is warm before the first screen asks. */
+  permissions: PermissionValue | null
 }
 
 /** One row of a record's Activity tab (and the team-wide feed). The same row

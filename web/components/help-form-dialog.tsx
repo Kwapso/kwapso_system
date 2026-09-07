@@ -187,13 +187,22 @@ export function HelpFormDialog({
   //
   // The apps this ticket could be about stay a loaded list: apps are BOUNDED (a
   // team's systems, not a feed), so the browser can match them for nothing.
-  const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
+  //
+  // AND BOTH WAIT FOR THE DIALOG TO BE OPEN. This component is MOUNTED by the
+  // screens that can raise a ticket — the write panels, the tickets collection,
+  // an app's own screen — whether or not anybody has pressed the button, so its
+  // two option lists were read on arrival at any of those screens. On a cold
+  // deep link that put two requests for a form nobody had opened in front of the
+  // record a person came for (`MAX_REQUESTS_BEFORE_FIRST_PAINT`,
+  // shared/workers/limits.ts). Both are bounded, cached and live, so the first
+  // press pays at most one round trip and every press after that pays none.
+  const appsQ = useCached<AppRow[]>(teamId && open ? appsKey(teamId) : null, () =>
     listFetch.apps(teamId as string)
   )
   // EVERY MODULE THE TEAM HAS, narrowed below to the app in hand. One bounded
   // read held whole, so changing the app above re-filters instantly instead of
   // putting a spinner inside a form somebody is halfway through.
-  const modulesQ = useCached<AppModule[]>(teamId ? appModulesKey(teamId) : null, () =>
+  const modulesQ = useCached<AppModule[]>(teamId && open ? appModulesKey(teamId) : null, () =>
     tenancy.appModules().then((r) => r.modules)
   )
   const initialValues = {

@@ -117,7 +117,7 @@ import { configReport, healthBody, probeWorkerHealth } from "@shared/workers/con
  * be inconvenienced to run. */
 const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
-import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { recordWorkerError, tickId } from "@shared/workers/error-log"
 import { beatCron, reportStaleCrons } from "@shared/workers/cron-heartbeat"
@@ -472,7 +472,11 @@ export default {
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
       // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // …and the CORE database counted, so the slow-door line below can see the
+      // trips this worker actually makes. `beginD1Timing` only ever saw the D1
+      // REST door, so a native `env.DB` statement was invisible and a worker that
+      // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)

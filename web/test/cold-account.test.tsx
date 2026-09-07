@@ -79,6 +79,11 @@ const ctx: ActiveContext = {
   role: { id: "r1", title: "Admin" },
   memberCount: 1,
   teams: [],
+  // The boot answer carries the caller and their rights now (shared/types.ts).
+  // Not used by this suite — it renders the screen with a stubbed `active` — but
+  // the fixture has to BE an ActiveContext or it is not testing the same shape.
+  user: null as unknown as ActiveContext["user"],
+  permissions: null,
 }
 
 const active = {
