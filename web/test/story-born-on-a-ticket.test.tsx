@@ -106,7 +106,7 @@ proto.setPointerCapture ??= () => undefined
 proto.releasePointerCapture ??= () => undefined
 proto.scrollIntoView ??= () => undefined
 
-import { HelpDetailScreen } from "@/components/help-detail"
+import { HelpDetailScreen } from "@/components/tickets/help-detail"
 
 afterEach(cleanup)
 beforeEach(() => {

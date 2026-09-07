@@ -370,7 +370,7 @@ export function PortalDoor({ children }: { children: React.ReactNode }) {
           the same as every other kwapso surface." Seeing the AGENCY door
           flush-left in an empty 840px column, he ruled the opposite — but the
           agency has no photography and collapses to one full-width column
-          (`web/components/auth-card.tsx` has the same note). THIS door keeps
+          (`web/components/shell/auth-card.tsx` has the same note). THIS door keeps
           its two panels and its real, client-supplied photograph
           (`AuthPhotograph`, see the header comment above) — there is nothing
           empty here to react to. So only the half of the ruling that still

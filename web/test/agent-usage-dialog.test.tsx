@@ -9,7 +9,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { AgentUsageDialog } from "@/components/agent-usage-dialog"
+import { AgentUsageDialog } from "@/components/assistant/agent-usage-dialog"
 import { formatActivityWhen } from "@shared/web/format"
 
 const CREATED_AT = "2026-08-09T10:00:00Z"

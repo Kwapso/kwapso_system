@@ -73,8 +73,13 @@ export const D1_MAX_ACCOUNT_BYTES = 1024 * 1024 * 1024 * 1024
 /** 80% of the account ceiling — the same fraction as the per-database line, for
  * the same reason: the mover takes a while and needs a person, and at an account
  * level the relief (an owner deciding what to archive, or a second Cloudflare
- * account) takes longer than that. */
-export const ACCOUNT_ALERT_THRESHOLD_BYTES = Math.floor(D1_MAX_ACCOUNT_BYTES * 0.8)
+ * account) takes longer than that.
+ *
+ * NOT EXPORTED, unlike its per-database sibling: the nightly size check in this
+ * same file is its only reader, and OPERATIONS.md quotes the 80% rather than the
+ * name. `ALERT_THRESHOLD_BYTES` above is exported because the mover's own suite
+ * reads it. */
+const ACCOUNT_ALERT_THRESHOLD_BYTES = Math.floor(D1_MAX_ACCOUNT_BYTES * 0.8)
 
 /** THE ACCOUNT'S OWN ROW in `db_alerts` and `db_growth`, so the estate-wide
  * ceiling is watched by the mechanism that already exists rather than by a second

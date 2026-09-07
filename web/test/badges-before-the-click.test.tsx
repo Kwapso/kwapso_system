@@ -215,7 +215,7 @@ const COMPONENTS = join(__dirname, "..", "components")
  * covered by a paragraph. (Commenting the real call out and watching this stay
  * green is how that was found.) */
 function detailSources(): { name: string; src: string }[] {
-  return sourceFiles(COMPONENTS, { extensions: [".tsx"], recursive: false })
+  return sourceFiles(COMPONENTS, { extensions: [".tsx"] })
     .filter((f) => /-detail\.tsx$/.test(f.rel))
     .map((f) => ({ name: f.rel, src: stripComments(f.source) }))
 }

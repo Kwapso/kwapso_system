@@ -321,7 +321,7 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   //
   // A server-side loop was added here on 20 Aug 2026 and taken out the same
   // morning, because the screen has looped since the day it was written
-  // (`MAX_SYNC_PASSES` in web/components/google-sync.tsx). Two loops around the
+  // (`MAX_SYNC_PASSES` in web/components/knowledge/google-sync.tsx). Two loops around the
   // same work meant one press did twelve passes of up-to-forty passes, and each
   // HTTP call ran for over five minutes before answering — long enough that the
   // owner watched a spinner and reasonably concluded the button was broken.

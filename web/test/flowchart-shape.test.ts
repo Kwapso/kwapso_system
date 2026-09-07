@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { armsOf, ranksOf, numbersOf } from "@/components/process-flowchart"
+import { armsOf, ranksOf, numbersOf } from "@/components/process/process-flowchart"
 import type { ProcessStep } from "@shared/types"
 
 const step = (name: string, position: number, extra: Partial<ProcessStep> = {}): ProcessStep => ({

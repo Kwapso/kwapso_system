@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest"
 
 import { AGENT_BLOCKS, BLOCK_LIMITS, parseAgentBlock } from "@shared/agent-blocks"
 import { splitReply } from "@/lib/agent-segments"
-import { AgentMarkdown } from "@/components/agent-markdown"
+import { AgentMarkdown } from "@/components/assistant/agent-markdown"
 
 /** A reply carrying one block of `kind` with `body` as its JSON. */
 const fenced = (kind: string, body: string) => ["Here you go.", "```kwapso:" + kind, body, "```", "That's the lot."].join("\n")

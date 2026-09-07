@@ -6,7 +6,7 @@
 // an empty one: everything the team actually did that week lived one tap away on
 // five other pages, so the first thing anybody saw every morning was navigation.
 //
-// Now it opens with THE PULSE (components/pulse.tsx): the handful of numbers
+// Now it opens with THE PULSE (components/screens/pulse.tsx): the handful of numbers
 // worth aggregating and the two things worth drawing — where requests are
 // sitting, and how the hours went. One read, gated section by section, so a
 // person sees exactly the parts their role can read and nothing is reserved for
@@ -30,7 +30,7 @@ import { List } from "@shared/web/list-compat"
 import { Briefcase, Chat, CaretRight, PuzzlePiece, Tray, CheckSquare, Gear, Timer, UploadSimple, Users } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 
-import { PulseBand, pulseIsQuiet, usePulse } from "@/components/pulse"
+import { PulseBand, pulseIsQuiet, usePulse } from "@/components/screens/pulse"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { usePermissions, type Can } from "@/lib/perms"
@@ -48,7 +48,7 @@ import { useT } from "@shared/web/language"
  * got the same treatment.
  *
  * WHEN IT DRAWS, AND WHY IT IS NOT ALWAYS ON. It is gated on `pulseIsQuiet`
- * (components/pulse.tsx) — nothing open, nothing due, no hours in eight weeks,
+ * (components/screens/pulse.tsx) — nothing open, nothing due, no hours in eight weeks,
  * nothing in the diary — read off the SAME cache key the band below already
  * holds, so it costs no request. The moment the team has anything at all this
  * block is gone for good, because a permanent getting-started panel on the
@@ -144,7 +144,7 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
   const { can, perms } = usePermissions(teamId)
   // THE IMPORT SCREEN'S OWN GATE, asked here rather than restated: `canImport`
   // is character-for-character the predicate `ImportScreen` uses to decide
-  // whether to draw the wizard at all (web/components/import-screen.tsx), so
+  // whether to draw the wizard at all (web/components/screens/import-screen.tsx), so
   // the link on this screen and the screen it lands on can never disagree
   // about who may import.
   const canImport = perms ? Object.values(perms).some((m) => m?.create) : false

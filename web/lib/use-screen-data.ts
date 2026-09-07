@@ -167,7 +167,7 @@ export function useScreenData({
   // through these same keys — an app's detail comes out of the bounded set the
   // list already holds — which is why they are keyed by team here rather than by
   // record, and why a slice narrowed to one record gets a key of its own instead
-  // (see sliceKey in components/work-panels.tsx).
+  // (see sliceKey in components/work/work-panels.tsx).
   const storiesQ = useCached(enabled && onScreen("stories") ? storiesKey(teamId as string) : null, () =>
     listFetch.stories(teamId as string)
   )

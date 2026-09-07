@@ -881,7 +881,7 @@ function injectSources(
 
 /** THE CHIP'S OWN WORD, for the sentence the assistant repeats.
  *
- * A DELIBERATE SECOND COPY of the four labels in `web/components/agent-panel.tsx`,
+ * A DELIBERATE SECOND COPY of the four labels in `web/components/assistant/agent-panel.tsx`,
  * and not a shared one: a sentence a person reads is the front door's to say and
  * to translate (R28/R33), and an English string in `shared/knowledge-chips.ts`
  * would be extracted into the catalogue from a file with no translator in it.

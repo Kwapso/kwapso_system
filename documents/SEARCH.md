@@ -48,7 +48,7 @@ newest fifty" while the exact count above (R16) still says 3,677. Two numbers,
 both true, neither about what was asked. Reported from staging, in a manager's
 words, as *"it only searches on loaded screen"*.
 
-The host owns this, in **one** component, `web/components/paged-find.tsx`:
+The host owns this, in **one** component, `web/components/records/paged-find.tsx`:
 
 - the recipe turns the frame's own search box OFF (`listCollection(…, { paged: true })`
   sets `searchable: false`), so a paged screen has exactly one box and it is the
@@ -262,7 +262,7 @@ and where that ordering is decided.
 | --- | --- | --- |
 | **Six paged list screens** — accounts, tickets, the knowledge base, process maps, the backlog, the meetings list | recipe → `CollectionFrame` (+ a table on the meetings list's *All*) | **the DOOR**, `<PagedFind sorts=…>` · five to six named orders each |
 | **Eight bounded list recipes** — members, roles, invites, sprints, apps, tasks, the brand library, meeting purposes | recipe → `CollectionFrame` | **the browser**, honestly: the whole collection is loaded. Options are DERIVED from the recipe's own first field + surviving facets (`frameSortOptions`), so a new column brings its own sort and a list with one sortable column gets no control at all |
-| **The two tables** — Tasks (all views but Calendar), the meetings list's *All* | recipe `display:"table"` → the host's `RecordTable` (`web/components/record-table.tsx`) | by **clicking a column header**, and *which side* decides follows the same split as the search box: Tasks is BOUNDED so the browser orders all of it; the meetings list PAGES so a header asks the DOOR, through the same `found.order` handle the picker above the table holds. A header REPLACES the door's default order (asc → desc → back to it). Two of the meetings list's six columns (App, Where) have no name in `MEETING_SORTS`, so they draw a plain header rather than a control that cannot work. **Corrected 2026-08-18** — see below |
+| **The two tables** — Tasks (all views but Calendar), the meetings list's *All* | recipe `display:"table"` → the host's `RecordTable` (`web/components/records/record-table.tsx`) | by **clicking a column header**, and *which side* decides follows the same split as the search box: Tasks is BOUNDED so the browser orders all of it; the meetings list PAGES so a header asks the DOOR, through the same `found.order` handle the picker above the table holds. A header REPLACES the door's default order (asc → desc → back to it). Two of the meetings list's six columns (App, Where) have no name in `MEETING_SORTS`, so they draw a plain header rather than a control that cannot work. **Corrected 2026-08-18** — see below |
 | **Three calendars** — sprints, tasks, the meetings list | `CalendarView` | **not sortable, and must not be**: a month grid is ordered by the calendar |
 | **Activity feeds** (every record's Activity tab, the team feed, account activity, assistant usage) | `ActivityFeed` | **not sortable**: a chronological history whose order IS its meaning. The profile screen's own feed runs oldest-first deliberately |
 | **Conversations** — a ticket's thread, a process's comments, the assistant's chat | `TicketThread` / `Comments` / `AgentChat` | **not sortable**: reordering a conversation destroys it |
@@ -460,7 +460,7 @@ of the five turns the build red.
   - **Fixed the same day** (§ *The correction*): the two tables' column headers
     were drawing an active sort indicator and reordering nothing at all, on every
     column, because the library's frame reads its sort from config only at mount.
-    The host now owns those headers (`web/components/record-table.tsx`) — the
+    The host now owns those headers (`web/components/records/record-table.tsx`) — the
     bounded one orders in the browser, the paged one asks its door — and
     `web/test/table-header-sorts.test.tsx` asserts the RENDERED ROW ORDER changes
     when a header is pressed, which is the one thing none of the lane's original

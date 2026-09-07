@@ -134,7 +134,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // The host half: the strip reads the glyph out of the TEAM'S vocabulary
     // rather than a map in the component, which is what makes an emoji edited on
     // the Dropdown values screen reach the tab without a deploy.
-    const strip = readFileSync(join(ROOT, "web", "components", "tickets-collection.tsx"), "utf8")
+    const strip = readFileSync(join(ROOT, "web", "components", "tickets", "tickets-collection.tsx"), "utf8")
     expect(
       /icon:\s*ticketMarks\.get\(/.test(strip),
       "the ticket type tabs no longer carry the team's own mark"
@@ -194,7 +194,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // the second. Either carries a mark, so the slot exists.
     expect(/support\?:|chart\?:/.test(item), "StatItem no longer has a glyph slot (support/chart)").toBe(true)
 
-    const panel = readFileSync(join(ROOT, "web", "components", "work-logs-panel.tsx"), "utf8")
+    const panel = readFileSync(join(ROOT, "web", "components", "work", "work-logs-panel.tsx"), "utf8")
     expect(
       (panel.match(/icon:\s*<Icon name=\{CONCEPT_ICON\./g) ?? []).length,
       "the numbers band's cards no longer carry their concept icons"

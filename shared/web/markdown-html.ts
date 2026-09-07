@@ -12,7 +12,7 @@
 // function (`mdBlocks`), and `toHtml` is the string renderer over it. The reason
 // is the assistant's citation marks: a `<Cite>` is a REACT element that has to
 // sit inside the sentence it belongs to, and a component cannot be injected into
-// an HTML string, so web/components/agent-markdown.tsx renders the same blocks
+// an HTML string, so web/components/assistant/agent-markdown.tsx renders the same blocks
 // into React instead. Splitting `toHtml`'s OUTPUT at the marker was the obvious
 // alternative and it tears paragraphs in half — a `<p>` opened in one fragment
 // and closed in the next is two block elements to the browser, so every citation

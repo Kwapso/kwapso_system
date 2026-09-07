@@ -30,7 +30,7 @@ import * as React from "react"
  * red), and the kit's `Title` deliberately sets `min-w-0` and does not clamp —
  * a section header is not always a record's name. So the clamp is applied
  * APP-SIDE, on the node the app hands the kit, in the two places the app has a
- * record heading at all: `web/components/record-chrome.tsx` (the twelve bespoke
+ * record heading at all: `web/components/records/record-chrome.tsx` (the twelve bespoke
  * detail screens) and `shared/web/screen-engine/screen-renderer.tsx` (every
  * recipe-driven detail, on both front doors).
  *

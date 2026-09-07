@@ -1061,7 +1061,7 @@ These three are machine-checked; write them the house way so the build stays gre
   back. Every response for that collection goes through `pagedJson`, a
   hand-built `json({ rows, total })` is how a door ships half the contract. A
   malformed cursor is a clean 400, never a silent restart at page one. On the
-  client, `<LoadMore>` (`web/components/load-more.tsx`) appends the next page and
+  client, `<LoadMore>` (`web/components/records/load-more.tsx`) appends the next page and
   is the only place the cursor is touched; a paged list's tabs must be SERVER
   scopes, because filtering a loaded page client-side disagrees with the exact
   count above it (R16).

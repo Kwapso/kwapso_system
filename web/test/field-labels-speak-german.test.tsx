@@ -22,7 +22,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import { translate } from "@shared/i18n"
 import { LanguageProvider } from "@shared/web/language"
 
-import { ProfileDialog } from "@/components/profile-dialog"
+import { ProfileDialog } from "@/components/team/profile-dialog"
 
 afterEach(cleanup)
 

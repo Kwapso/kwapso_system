@@ -8,7 +8,7 @@
 // of both: a client on a phone would wait on a charting library to be told what
 // the figure is made of. So the picture is behind a `dynamic()` in impact-screen,
 // and every static reference to the library module lives in here — the same
-// split, and the same reasoning, as web/components/pulse-charts.tsx.
+// split, and the same reasoning, as web/components/screens/pulse-charts.tsx.
 // (Neither front door imports the other's; the two share `shared/` and nothing
 // else, which is why this is a second small file rather than one shared one.)
 //

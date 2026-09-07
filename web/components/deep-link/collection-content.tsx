@@ -25,32 +25,32 @@ import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Download, UploadSimple, Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
-import { WavesScreen } from "@/components/waves-screen"
-import { ProcessesScreen } from "@/components/processes-screen"
-import { AppsScreen } from "@/components/apps-screen"
-import { SprintsScreen } from "@/components/sprints-screen"
-import { StoriesScreen } from "@/components/stories-screen"
-import { TasksScreen } from "@/components/tasks-screen"
-import { TimeScreen } from "@/components/time-screen"
-import { MeetingsScreen } from "@/components/meetings-screen"
-import { TicketsCollection } from "@/components/tickets-collection"
+import { WavesScreen } from "@/components/work/waves-screen"
+import { ProcessesScreen } from "@/components/process/processes-screen"
+import { AppsScreen } from "@/components/apps/apps-screen"
+import { SprintsScreen } from "@/components/work/sprints-screen"
+import { StoriesScreen } from "@/components/work/stories-screen"
+import { TasksScreen } from "@/components/work/tasks-screen"
+import { TimeScreen } from "@/components/work/time-screen"
+import { MeetingsScreen } from "@/components/meetings/meetings-screen"
+import { TicketsCollection } from "@/components/tickets/tickets-collection"
 import {
   BrandLibraryScreen,
   PurposesScreen,
-} from "@/components/internal-screens"
+} from "@/components/team/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
-import { CollectionHeading } from "@/components/collection-heading"
-import { ContactsScreen } from "@/components/contacts-screen"
-import { AskTheAssistant } from "@/components/ask-the-assistant"
-import { LoadMore } from "@/components/load-more"
-import { PagedFind } from "@/components/paged-find"
+import { CollectionHeading } from "@/components/records/collection-heading"
+import { ContactsScreen } from "@/components/accounts/contacts-screen"
+import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
+import { LoadMore } from "@/components/records/load-more"
+import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
-import { GoogleSyncButton } from "@/components/google-sync"
-import { CountedAbove } from "@/components/counted-tabs"
+import { GoogleSyncButton } from "@/components/knowledge/google-sync"
+import { CountedAbove } from "@/components/records/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
   shapeAccountsList,
@@ -571,7 +571,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       </CountedAbove>
     )
   }
-  // CONTACTS — its own file (`@/components/contacts-screen`), not a branch
+  // CONTACTS — its own file (`@/components/accounts/contacts-screen`), not a branch
   // drawn out here — see that file's own header for why: `web/test/
   // rules.test.ts`'s tab-nesting census counts how many times the TabsView
   // element appears PER FILE, and Accounts (above) already carries one in

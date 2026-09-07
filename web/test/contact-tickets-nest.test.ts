@@ -39,10 +39,10 @@ import { stripComments } from "@shared/rules/source-scan"
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), "..")
 const panels = stripComments(
-  readFileSync(join(WEB, "components", "contact-panels.tsx"), "utf8")
+  readFileSync(join(WEB, "components", "accounts", "contact-panels.tsx"), "utf8")
 )
 const detail = stripComments(
-  readFileSync(join(WEB, "components", "contact-detail.tsx"), "utf8")
+  readFileSync(join(WEB, "components", "accounts", "contact-detail.tsx"), "utf8")
 )
 
 describe("a contact's own Tickets/Meetings tabs nest, never rebuild a flat base", () => {

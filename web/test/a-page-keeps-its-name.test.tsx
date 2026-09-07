@@ -20,8 +20,8 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { CollectionHeading } from "@/components/collection-heading"
-import { CountedAbove } from "@/components/counted-tabs"
+import { CollectionHeading } from "@/components/records/collection-heading"
+import { CountedAbove } from "@/components/records/counted-tabs"
 
 afterEach(cleanup)
 

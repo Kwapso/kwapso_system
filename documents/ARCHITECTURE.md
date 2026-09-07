@@ -536,7 +536,7 @@ on top follows [CACHING.md](CACHING.md).
   manifest (`web/app/manifest.ts`, name/description from `shared/brand.ts`) +
   brand-monogram icons (`web/public/icons/*`, swappable via `brand.logoUrl`) +
   per-mode `theme-color`, so it is installable to a home screen / dock. A library
-  bottom `Sheet` (`web/components/install-prompt.tsx`) drives it: Chrome / Edge /
+  bottom `Sheet` (`web/components/shell/install-prompt.tsx`) drives it: Chrome / Edge /
   Android use the captured `beforeinstallprompt` (a real "Install" button); iOS
   Safari (which fires no such event) gets the guided "Share → Add to Home Screen"
   walkthrough. **Trigger rules:** never when already installed; never on a

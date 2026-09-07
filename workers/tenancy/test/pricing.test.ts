@@ -25,17 +25,36 @@ import { describe, expect, it } from "vitest"
 import {
   aiCostUsd,
   aiNeurons,
+  D1_USD_PER_GB_MONTH,
+  D1_USD_PER_M_ROWS_WRITTEN,
   emailCostUsd,
+  FREE_NEURONS_PER_DAY,
+  INCLUDED_D1_ROWS_WRITTEN,
+  INCLUDED_D1_STORAGE_GB,
+  INCLUDED_R2_CLASS_A,
+  INCLUDED_R2_STORAGE_GB,
+  INCLUDED_WORKERS_REQUESTS,
   MODEL_PRICES,
   NEURON_USD_PER_1000,
+  PLAN_USD_PER_MONTH,
   PRICES_READ_ON,
   r2StorageUsdPerMonth,
   R2_USD_PER_GB_EGRESS,
+  R2_USD_PER_GB_MONTH,
+  R2_USD_PER_M_CLASS_A,
+  R2_USD_PER_M_CLASS_B,
   RESEND_FREE_PER_DAY,
+  RESEND_FREE_PER_MONTH,
+  RESEND_OVERAGE_USD_PER_1000,
+  RESEND_PRO_EMAILS,
+  RESEND_PRO_USD_PER_MONTH,
   UNPRICED_MODEL,
   usd,
+  VECTORIZE_USD_PER_100M_STORED_DIMS,
+  VECTORIZE_USD_PER_M_QUERIED_DIMS,
   vectorizeQueryCostUsd,
   vectorizeStorageUsdPerMonth,
+  WORKERS_USD_PER_M_REQUESTS,
 } from "@shared/workers/pricing"
 
 const KIMI = "@cf/moonshotai/kimi-k2.6"
@@ -106,6 +125,59 @@ describe("the arithmetic", () => {
     // ever disagree by more than rounding, one of them was mistyped.
     const viaNeurons = (86_364 / 1_000) * NEURON_USD_PER_1000
     expect(viaNeurons).toBeCloseTo(MODEL_PRICES[KIMI].inPerM, 2)
+  })
+
+  // EVERY OTHER PUBLISHED CONSTANT, against the exact figure COSTS.md quotes.
+  //
+  // This file's header has claimed since it was written that it "pins every
+  // constant here against the figures COSTS.md quotes". It pinned eleven of
+  // thirty. The other nineteen were exported, imported by nothing, asserted by
+  // nothing, and quoted in prose two files away — which is the shape the whole
+  // pricing table exists to prevent: a number that governs money living only in
+  // a sentence. A rate nobody reads is not harmless; it is the rate the next
+  // person copies. Line numbers are given because the point is that a change to
+  // ONE of the two files goes red.
+  it("pins the rates COSTS.md quotes but no code path reads yet", () => {
+    // COSTS.md §1 row 1 + §2: "10,000 neurons/day free".
+    expect(FREE_NEURONS_PER_DAY).toBe(10_000)
+
+    // COSTS.md §2, Vectorize: "$0.01 / M queried dims · $0.05 / 100M stored dims".
+    expect(VECTORIZE_USD_PER_M_QUERIED_DIMS).toBe(0.01)
+    expect(VECTORIZE_USD_PER_100M_STORED_DIMS).toBe(0.05)
+
+    // COSTS.md §2, Resend: "free 3,000/mo and 100/day; Pro $20/mo → 50,000;
+    // overage $0.90 / 1,000". The per-day figure is already pinned above; the
+    // other four were not, and emailCostUsd's $0.0004 is computed from two of
+    // them — so the arithmetic test below was standing on unpinned inputs.
+    expect(RESEND_FREE_PER_MONTH).toBe(3_000)
+    expect(RESEND_PRO_USD_PER_MONTH).toBe(20)
+    expect(RESEND_PRO_EMAILS).toBe(50_000)
+    expect(RESEND_OVERAGE_USD_PER_1000).toBe(0.9)
+    expect(RESEND_PRO_USD_PER_MONTH / RESEND_PRO_EMAILS).toBeCloseTo(0.0004, 10)
+
+    // COSTS.md §2, Workers Paid plan: "$5/mo; requests $0.30/M over 10M;
+    // D1 writes $1.00/M over 50M; D1 storage $0.75/GB-mo over 5 GB".
+    expect(PLAN_USD_PER_MONTH).toBe(5)
+    expect(WORKERS_USD_PER_M_REQUESTS).toBe(0.3)
+    expect(INCLUDED_WORKERS_REQUESTS).toBe(10_000_000)
+    expect(D1_USD_PER_M_ROWS_WRITTEN).toBe(1.0)
+    expect(INCLUDED_D1_ROWS_WRITTEN).toBe(50_000_000)
+    expect(D1_USD_PER_GB_MONTH).toBe(0.75)
+    expect(INCLUDED_D1_STORAGE_GB).toBe(5)
+
+    // COSTS.md §2, R2: "$0.015/GB-mo over 10 GB; Class A $4.50/M over 1M;
+    // Class B $0.36/M over 10M; egress $0". The egress zero is load-bearing —
+    // §5 leans on it — and is pinned separately below as well.
+    expect(R2_USD_PER_GB_MONTH).toBe(0.015)
+    expect(INCLUDED_R2_STORAGE_GB).toBe(10)
+    expect(R2_USD_PER_M_CLASS_A).toBe(4.5)
+    expect(INCLUDED_R2_CLASS_A).toBe(1_000_000)
+    expect(R2_USD_PER_M_CLASS_B).toBe(0.36)
+    expect(R2_USD_PER_GB_EGRESS).toBe(0)
+
+    // …and r2StorageUsdPerMonth, already tested below, must be computing with
+    // the constant rather than a literal of its own.
+    expect(r2StorageUsdPerMonth(1024 ** 3)).toBeCloseTo(R2_USD_PER_GB_MONTH, 10)
   })
 
   it("prices email, Vectorize and R2 the way COSTS.md does", () => {

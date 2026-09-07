@@ -19,7 +19,7 @@
 // React events still bubble through the React tree, so nothing else changes.
 //
 // ONE SLOT, NEVER TWO. The store holds a single node because the app draws a
-// single `ScreenShell` (web/components/app-shell.tsx, the one call site). A
+// single `ScreenShell` (web/components/shell/app-shell.tsx, the one call site). A
 // second mount would overwrite the first, and the unmount check below makes
 // that self-correcting rather than silent: only the node that is still
 // published clears it.

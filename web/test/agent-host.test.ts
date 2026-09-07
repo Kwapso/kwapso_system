@@ -17,17 +17,17 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
   it("the root layout mounts the persistent AgentHost", () => {
     const layout = read("app/layout.tsx")
     expect(layout, "root layout must render <AgentHost /> above the routed screens").toContain("<AgentHost")
-    expect(layout).toContain('from "@/components/agent-host"')
+    expect(layout).toContain('from "@/components/assistant/agent-host"')
   })
 
   it("AppShell no longer owns the panel (it would remount per route)", () => {
-    const shell = read("components/app-shell.tsx")
+    const shell = read("components/shell/app-shell.tsx")
     expect(shell, "AppShell must NOT mount AgentPanel — it lives at the root now").not.toContain("<AgentPanel")
     expect(shell, "AppShell must NOT own the screen-trace engine — it moved to the stable root host").not.toContain("useScreenTraceEngine")
   })
 
   it("AgentHost holds the panel + the trace engine, gated by agent:create + a team", () => {
-    const host = read("components/agent-host.tsx")
+    const host = read("components/assistant/agent-host.tsx")
     expect(host).toContain("<AgentPanel")
     expect(host).toContain("useScreenTraceEngine")
     // Only a signed-in person with a team + the agent right gets the co-pilot.
@@ -63,10 +63,10 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     // The whole reason the panel is mounted at the root is that it drives navigation.
     // Docking it into ScreenShell's `aside` must not move it into the routed shell — the
     // DOM moves, the React tree does not.
-    const panel = read("components/agent-panel.tsx")
+    const panel = read("components/assistant/agent-panel.tsx")
     expect(panel, "the column is reached through a portal").toContain("createPortal")
     expect(panel, "into the shell's published dock node").toContain("useAgentDock")
-    const shell = read("components/app-shell.tsx")
+    const shell = read("components/shell/app-shell.tsx")
     expect(shell, "the shell passes an empty slot, never the panel").toContain("<AgentDockSlot />")
     expect(shell, "and the slot is the kit's own third column").toMatch(/aside=\{/)
   })
@@ -75,7 +75,7 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     // The kit holds the aside's open state itself unless it is given one. It must be
     // given one: otherwise the column's state could not be persisted, and the phone's
     // floating panel and the desktop column would be two answers to one question.
-    const shell = read("components/app-shell.tsx")
+    const shell = read("components/shell/app-shell.tsx")
     expect(shell).toContain("asideOpen={assistantOpen}")
     expect(shell).toContain("onAsideOpenChange={setAgentOpen}")
     expect(shell, "the flag is the panel's own store").toContain('from "@/lib/agent-open"')
@@ -86,7 +86,7 @@ describe("the AI co-pilot survives navigation (mounted at the root, not per-rout
     // screen that already has its own create button is exactly what SHELL.md forbids.
     // The launcher branch must be UNREACHED when docked, not merely CSS-hidden — an
     // invisible trigger holding an open Popover beside a docked column is two assistants.
-    const host = read("components/agent-host.tsx")
+    const host = read("components/assistant/agent-host.tsx")
     expect(host, "the width decides, once, against the kit's own breakpoint").toContain("useShellColumns")
     expect(host, "docked returns before the launcher is built").toMatch(
       /if \(docked\) return <AgentPanel[^\n]*docked \/>/

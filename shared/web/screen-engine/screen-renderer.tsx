@@ -139,7 +139,7 @@ export interface ScreenRendererProps {
    *
    * A record's history is the same thing on a recipe screen as on a bespoke
    * one, and the app already has ONE component for it —
-   * `web/components/activity-panel.tsx` (`<ActivityPanel>`): the feed, its
+   * `web/components/records/activity-panel.tsx` (`<ActivityPanel>`): the feed, its
    * empty/loading/error registers, the note composer, and — the part that
    * matters most — the "Load more activity" pager INSIDE the tab. Law R2's own
    * check names that component by hand for every bespoke detail.
@@ -504,7 +504,7 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
     // `RecordDetail`, which already wraps the whole panel in ONE `Card` at
     // the DEFAULT variant (`bg-surface-panel`); that OUTER seam is the real
     // fix, and it stands. A second `Card` here, added 2026-08-31 as the
-    // app-side twin of `web/components/overview-list.tsx`'s same-night
+    // app-side twin of `web/components/records/overview-list.tsx`'s same-night
     // change, put a white `variant="raised"` box INSIDE that panel — a
     // container inside a container, which the client's screenshot rejected
     // outright the same night. The fact list's `<dl>` renders straight onto
@@ -546,7 +546,7 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
     // `VENDORED_UI` in scripts/lib/i18n-source.mjs). Somebody reading the app in
     // German was told in English that there was nothing to read. The three
     // sentences here are the app's own, word for word the ones
-    // `web/components/activity-panel.tsx` already says, so the two feeds cannot
+    // `web/components/records/activity-panel.tsx` already says, so the two feeds cannot
     // drift apart and the catalogue gains nothing new.
     case "activity": {
       if (ctx.renderActivity) return ctx.renderActivity(block.source)
@@ -939,7 +939,7 @@ function renderDetail(
   // member's photo on `members.detail`), so the app's own landing screen and
   // every member page kept drawing one for days after the ruling — because the
   // ruling was implemented in the BESPOKE path only, where
-  // `web/components/record-chrome.tsx` marks its `mark`/`leading` props "NO
+  // `web/components/records/record-chrome.tsx` marks its `mark`/`leading` props "NO
   // LONGER READ BY THIS COMPONENT" and hands the kit nothing. Same ruling, same
   // outcome, both paths.
   //

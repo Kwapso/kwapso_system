@@ -6,7 +6,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 
-import { ShellLoading } from "@/components/app-shell"
+import { ShellLoading } from "@/components/shell/app-shell"
 import { useActiveTeam } from "@/lib/use-active-team"
 
 export default function MembersRedirect() {

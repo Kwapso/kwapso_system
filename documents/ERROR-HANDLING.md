@@ -226,7 +226,7 @@ place:
   boundary is the only thing in the tree that sees it. `componentDidCatch` reports
   first (the beacon survives an unload, so the row is kept: "how often does a
   deploy strand an open tab" needs an answer), then hands the error to
-  `healStaleShell` from `web/components/version-watch.tsx`, which reloads once
+  `healStaleShell` from `web/components/shell/version-watch.tsx`, which reloads once
   behind a 30-second cooldown; `render` says "A new version of the app is ready."
   rather than printing a chunk id at a manager. Earned by three rows on staging on
   2026-08-17, forty seconds apart, the middle one carrying a hand-typed `?v=2` —

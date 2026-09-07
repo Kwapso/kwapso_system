@@ -159,7 +159,7 @@ export function isUserVisible(text) {
  * exactly that shape. They were in no catalogue, so they were translated
  * nowhere, so they reached a German reader in English on a screen that looked
  * finished. The only fix available at the call site was to wrap each branch in
- * `t(...)` by hand (web/components/account-form-dialog.tsx says so in a comment),
+ * `t(...)` by hand (web/components/accounts/account-form-dialog.tsx says so in a comment),
  * which works for the four somebody remembered and for none written afterwards.
  *
  * The two operands of `&&` are NOT treated alike: `cond && "Saved"` renders its

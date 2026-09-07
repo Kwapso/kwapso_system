@@ -46,11 +46,11 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   AccountFormDialog,
   type AccountFormValues,
-} from "@/components/account-form-dialog"
+} from "@/components/accounts/account-form-dialog"
 import {
   ContactCreateDialog,
   type ContactCreateValues,
-} from "@/components/contact-link-dialog"
+} from "@/components/accounts/contact-link-dialog"
 
 // The form fetches the team's own Country / Industry words through the shared
 // store. Nothing here is about those pickers, so they answer with no words.
@@ -95,7 +95,7 @@ const PERSON: AccountFormValues = {
 
 describe("the account form no longer asks what kind of account it is making", () => {
   it("has no Type control in its source — not merely none on screen", () => {
-    const text = source("account-form-dialog.tsx")
+    const text = source("accounts/account-form-dialog.tsx")
     // The three shapes the control could take, dead. A picker with those two
     // options; a field config labelled Type; anything that WRITES the value from
     // an interaction. If a fourth shape is ever invented it will still have to
@@ -109,7 +109,7 @@ describe("the account form no longer asks what kind of account it is making", ()
   })
 
   it("has no Parent control in its source either, and no value to carry", () => {
-    const text = source("account-form-dialog.tsx")
+    const text = source("accounts/account-form-dialog.tsx")
     // The picker, the label, the write, and the value itself. The fourth line is
     // the one that separates this from the Type ruling: `accountType` is still on
     // the form's shape because the door reads it on an update and a missing key

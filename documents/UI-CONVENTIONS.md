@@ -55,7 +55,7 @@ renamed, so the move was purely an address change — but the old addresses do n
 resolve, and copying one gets you a module-not-found:
 
 ```ts
-// web/components/app-shell.tsx — real imports, copied from the file
+// web/components/shell/app-shell.tsx — real imports, copied from the file
 import { Separator } from "@shared/ui/components/separator/separator"
 import { toast }     from "@shared/ui/components/sonner/sonner"
 import { Timer }     from "@shared/ui/foundations/icons"
@@ -135,6 +135,30 @@ If you find yourself building something that *feels* like a primitive (a generic
 reusable, app-agnostic control), that's a signal it belongs in the library, surface
 it. If it's this-app-specific assembly, it belongs in `web/components/`.
 
+### Where in `web/components/` — one folder per module or kind
+
+`web/components/` has **no top-level files**. Every component sits in a folder named
+for the module it serves (`tickets/`, `work/`, `accounts/`, `apps/`, `process/`,
+`money/`, `team/`, `knowledge/`, `meetings/`, `choices/`) or for the kind of thing
+it is (`shell/` the chrome, `records/` the parts every record screen reuses,
+`deep-link/` the one client-resolved host, `assistant/` the agent column,
+`screens/` the whole-page screens with no module of their own). A new component
+joins the folder its module already has; a new module gets a folder. Basenames are
+unchanged and still kebab-case — `<module>-detail.tsx`, `<module>-form-dialog.tsx`,
+`<module>s-screen.tsx` — so every census that finds a screen by its NAME still
+finds it (R2's `*-detail.tsx` walk among them).
+
+It was one flat folder of 148 files until 7 Sep 2026, which is worth knowing for
+two reasons. Every law that reads components off disk goes through
+`sourceFiles()`, which **recurses by default** (`shared/rules/source-scan.ts` says
+why), so the fold was invisible to all of them — the counts before and after are
+identical, and `web/test/source-scan.test.ts` now asserts the walk reaches more
+than a hundred nested files, so a walk that stopped at the top level would enforce
+the UI laws on *nothing* and go red rather than green. And a test that named a
+component by PATH (`join(WEB, "components", "app-shell.tsx")`) failed loudly with
+an ENOENT; a test that had guarded that read with `existsSync` would have gone
+green and blind. Name a component by basename through the walk, never by folder.
+
 ---
 
 ## 2. Two ways to build a screen, the engine vs. bespoke
@@ -145,7 +169,7 @@ express it?**
 ### 2a. Engine-expressible → a recipe (the default)
 
 A screen is described as **data** (a `ScreenRecipe`) in `web/lib/screens.ts`, and the
-library `ScreenRenderer` draws it. The host (`web/components/deep-link-screen.tsx`)
+library `ScreenRenderer` draws it. The host (`web/components/deep-link/deep-link-screen.tsx`)
 shapes app types into the flat rows/records the recipe references, supplies the
 per-module rights, dispatches named actions, and owns the router.
 
@@ -457,7 +481,7 @@ Any `placement: "tab"` section that leads with a collection must declare a
 *iterating* that field:
 
 ```ts
-// web/components/deep-link-screen.tsx
+// web/components/deep-link/deep-link-screen.tsx
 for (const s of TEAM_SECTIONS) {
   if (!s.countCacheKey) continue
   const total = totalByCacheKey[s.countCacheKey]     // the door's exact COUNT(*), never rows.length
@@ -873,7 +897,7 @@ with the word and is not a unit.
 
 **The seven rules you will actually reach for.**
 
-1. **One width.** `max-w-[1600px]` lives in `web/components/deep-link-screen.tsx` and
+1. **One width.** `max-w-[1600px]` lives in `web/components/deep-link/deep-link-screen.tsx` and
    nowhere else. A screen never sets its own width. Gutters are `px-4 sm:px-6 lg:px-10`,
    once, in `app-shell.tsx`. Card padding `p-4`, panel padding `p-6`. (N8)
 2. **Five gaps, each with a meaning.** `gap-1` parts of one thing · `gap-2` siblings in a
@@ -923,7 +947,7 @@ Every screen that shows a collection shows its count **exactly once**:
   curator-only tab strip. Learning has since been removed from the app; the rule it
   taught has not, and sidebar collections carry a heading so their count no longer
   depends on a strip a reader may not be allowed to see.
-- **The arbitration** is the React context in `web/components/counted-tabs.tsx`
+- **The arbitration** is the React context in `web/components/records/counted-tabs.tsx`
   (`CountedTabs` marks a badged tab's panel; `CountedAbove` marks a counted sibling
   strip). The `CollectionHeading` calls the hook ABOVE its early return and renders
   null when a tab already carries the count, so the same number never shows twice.

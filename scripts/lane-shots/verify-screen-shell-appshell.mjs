@@ -1,5 +1,5 @@
 // PROTOTYPE verification for the ScreenShell/AppShell experiment
-// (experiment/screen-shell-appshell branch, web/components/app-shell.tsx).
+// (experiment/screen-shell-appshell branch, web/components/shell/app-shell.tsx).
 // Not for commit to the lane branch — screenshots + the navigation-identity
 // check the planner asked for, before any merge.
 // KW_SESSION=<cookie value> node scripts/lane-shots/verify-screen-shell-appshell.mjs
