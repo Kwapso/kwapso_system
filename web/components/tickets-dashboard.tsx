@@ -879,6 +879,53 @@ function ClosureSpread({
  * single-column case). It is the same height as the distribution because it is
  * measured from it, rather than agreeing with it until either one changes.
  *
+ * ── AND THEN IT WAS THE OTHER ONE TOO TALL (client, 7 Sep 2026) ─────────────
+ *
+ * "the how long it takes evolution is way too high - make take same height as
+ * available per the left container."
+ *
+ * `flex-1` DID claim the leftover space, and the sentence above was still
+ * wrong, because a grid row is stretched to whichever sibling is INTRINSICALLY
+ * taller and this panel had quietly become that sibling. An in-flow `<svg>`
+ * with a `viewBox` is a replaced element with that viewBox's aspect ratio, and
+ * `size-full` against a parent whose height is `auto` resolves to `auto` — so
+ * the plot was as tall as it was WIDE. Measured at a 1440px viewport: plot
+ * 827.5 × 827.5, both cards 992.3 tall, with the distribution's own content
+ * ending at 252.6 and 740px of stretched nothing under it. The panel that was
+ * supposed to be measured FROM the distribution was setting the distribution's
+ * height.
+ *
+ * SO THE PLOT NOW CONTRIBUTES NO INTRINSIC HEIGHT WHERE THERE IS A SIBLING.
+ * The `<svg>` is `absolute inset-0` inside its `relative` box, exactly as the
+ * hit areas over it already are and exactly as `AppsStackedByType`'s rows are
+ * one panel up, so the box has nothing in flow to be sized by; and `min-h-40`
+ * is released at `lg` (`lg:min-h-0`), because that floor is for the STACKED
+ * case, where the grid is one column and there is no sibling to measure from.
+ * Above `lg` the row's height is the distribution's and this box takes it
+ * through the row's `items-stretch`.
+ *
+ * WHAT THAT COSTS, SAID RATHER THAN PADDED AROUND, because it depends on
+ * something neither panel controls: HOW MANY KINDS CLOSED ANYTHING. The
+ * distribution draws one row per kind with a closure in the window (no floor,
+ * unlike the trend), so its height is the team's vocabulary, and the plot is
+ * whatever that leaves. Measured at 1440px, on the Tickets screen:
+ *
+ *   4 kinds → row 282.6, plot 117.8   (the distribution decides)
+ *   3 kinds → row 233.3, plot  68.5   (the distribution decides)
+ *   2 kinds → row 195.2, plot  30.4   (this panel still decides, by 11.1px)
+ *   1 kind  → row 195.2, plot  30.4   (this panel still decides, by 60.4px)
+ *
+ * BELOW THREE KINDS THE PANEL IS ITS OWN FLOOR AGAIN, and the floor is not a
+ * number anybody typed: this panel's furniture is 164.8px of card before a
+ * pixel of picture, and the SCALE COLUMN beside the plot — the two axis
+ * figures, `justify-between` — is 30.4px of intrinsic height in the same row,
+ * so the plot cannot go under it. A 30px plot is a squashed picture and it is
+ * said here rather than fixed with a minimum, because a minimum in this box is
+ * this panel deciding the row's height again, which is the thing that was
+ * wrong. If it reads as squashed on a young team, the ruling belongs to the
+ * ROW — fewer kinds is a shorter distribution, and matching it is what was
+ * asked for.
+ *
  * THAT STILL HOLDS NOW THAT THEY ARE TWO PANELS RATHER THAN TWO HALVES OF ONE
  * (client, 6 Sep 2026: "the how long, split in 2 containers same row" · "the
  * how long 1/3, the graph 2/3"). Two cards in one `lg:grid-cols-3`, spanning
@@ -969,21 +1016,43 @@ function ClosureTrend({
           <span>{Math.round(top)}</span>
           <span>0</span>
         </div>
-        {/* `relative`, because the month hit areas below are HTML laid OVER the
-            plot rather than shapes inside it — the same argument this file's
-            header makes about every other mark here: an element hit area keeps
-            its own geometry under `preserveAspectRatio="none"`, where an SVG
-            `<rect>` would be stretched with everything else. `min-h-40` is the
-            old fixed height, demoted to a FLOOR: it is what the plot falls back
-            to when the panel stacks into one column and there is no sibling to
-            match. */}
-        <div className="bg-muted relative min-h-40 min-w-0 flex-1 overflow-hidden rounded">
+        {/* `relative`, because EVERYTHING inside this box is laid over it
+            rather than flowing through it — the plot itself and the month hit
+            areas both — and that is now two separate arguments.
+
+            THE HIT AREAS are HTML over the picture, the same argument this
+            file's header makes about every other mark here: an element hit
+            area keeps its own geometry under `preserveAspectRatio="none"`,
+            where an SVG `<rect>` would be stretched with everything else.
+
+            THE PLOT IS `absolute` FOR A DIFFERENT REASON — so this box
+            contributes NO INTRINSIC HEIGHT, which is what lets the panel
+            beside it decide the row. An in-flow `<svg>` with a viewBox is a
+            replaced element carrying that viewBox's ASPECT RATIO, and
+            `size-full` against an auto-height parent resolves to `auto`, so
+            the plot sized itself to its own WIDTH: measured on 2026-09-07 at a
+            1440px viewport it was 827.5px tall, being 827.5px wide, and the
+            row it shares stretched the distribution beside it to the same
+            992.3px. `min-h-40` was never what made it tall and demoting it
+            would not have helped — the client's "the how long it takes
+            evolution is way too high" is a 1:1 ratio nobody asked for.
+
+            SO THE FLOOR IS ONLY WHERE THERE IS NOTHING TO MEASURE FROM.
+            `min-h-40` holds below `lg`, where the grid has stacked into one
+            column and this panel has no sibling; at `lg` and up it is released
+            (`lg:min-h-0`) and the row's height is the distribution's, which
+            the row then hands to this box through `items-stretch`. It is the
+            same shape `AppsStackedByType` above uses, and for the same reason:
+            a panel that contributes no height is a panel that can be measured
+            FROM another one rather than agreeing with it until either
+            changes. */}
+        <div className="bg-muted relative min-h-40 min-w-0 flex-1 overflow-hidden rounded lg:min-h-0">
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
             role="img"
             aria-label={t("The middle ticket, month by month")}
-            className="block size-full"
+            className="absolute inset-0 block size-full"
           >
             {/* THE MONTHS, AS RULES BEHIND THE WORK. Drawn first so every area
                 and every line sits on top of them — a gridline over a filled
