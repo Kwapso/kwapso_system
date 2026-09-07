@@ -123,11 +123,16 @@ const ENOUGH_TO_CHART = 4
 function Numbers({ summary }: { summary: WorkLogSummary }) {
   const t = useT()
   const items = [
-    // THE GLYPH BESIDE EACH NUMBER (library v0.11.0: `StatItem.icon`). Until it
-    // shipped, a stat card's only graphic was the trend arrow — and the delta is
-    // OFF here, so these three carried no mark at all while every concept they
-    // name owns one in `CONCEPT_ICON`. Writing a glyph into the LABEL is the one
-    // shape UI-CONVENTIONS §5 refuses, so they went without.
+    // THE GLYPH UNDER EACH NUMBER. The kit's StatItem (v1.2.63) has no `icon`
+    // and no `trend`: a stat's one graphic is its `support` slot, which the kit
+    // draws under the value. That is Aurora's decision and it is adopted here
+    // as drawn — the owner's ruling of 7 Sep 2026: "adopt the kit … reflect it
+    // downstream". Until that day this call site also passed `trend: "flat"`
+    // and `delta: ""`, props the kit had dropped at some tag between v1.2.44
+    // and v1.2.63; TypeScript never objected because the objects pass through
+    // a `.map` before they meet the typed prop, so both were discarded in
+    // silence. Gone now, on purpose, so the shape on the page is the shape in
+    // the code.
     //
     // `aria-hidden`: the label says the same thing in words, right beside it.
     {
@@ -135,31 +140,24 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       label: t("Hours logged"),
       value: hoursSpoken(summary.totalSeconds),
       icon: <Icon name={CONCEPT_ICON.time as IconName} className="size-4" aria-hidden />,
-      delta: "",
-      trend: "flat" as const,
     },
     {
       id: "entries",
       label: t("Entries"),
       value: formatCount(summary.total) || "0",
       icon: <Icon name={CONCEPT_ICON.dropdowns as IconName} className="size-4" aria-hidden />,
-      delta: "",
-      trend: "flat" as const,
     },
     {
       id: "people",
       label: t("Members on it"),
       value: formatCount(summary.peopleTotal) || "0",
       icon: <Icon name={CONCEPT_ICON.members as IconName} className="size-4" aria-hidden />,
-      delta: "",
-      trend: "flat" as const,
     },
   ]
   return (
-    // The delta line stays off: these are the record's numbers as they stand
-    // and nothing on the door claims to know last week's, so an arrow beside
-    // them would be an assertion nobody made. The kit's grid sizes its own
-    // columns.
+    // No trend and no delta: the kit draws neither, and nothing on the door
+    // claims to know last week's numbers anyway, so an arrow would be an
+    // assertion nobody made. The kit's grid sizes its own columns.
     <StatGrid items={items.map((s) => ({ id: s.id, label: s.label, value: s.value, support: s.icon }))} />
   )
 }
