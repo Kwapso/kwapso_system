@@ -16,6 +16,8 @@
 // re-run. So the test that matters here is the one where the LATER task rejects
 // SOONER, which is exactly the case a plain `Promise.all` gets wrong.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { describe, expect, it, vi } from "vitest"
 import { beginD1Timing, beginRequest, countedDb, logIfSlow, noteTeam, withTiming } from "@shared/workers/timing"
 import { LATENCY_BUDGET_MS, MAX_D1_TRIPS_PER_DOOR, budgetForKind } from "@shared/workers/limits"
@@ -226,6 +228,22 @@ describe("the CORE database's own trips are counted too", () => {
     await expect(db.prepare("SELECT id FROM users").bind("x").first()).rejects.toThrow("no")
     expect(stats).toHaveLength(1)
     expect(stats[0].op).toBe("SELECT users")
+  })
+
+  it("and every dispatcher that builds a per-request env actually hands it over", () => {
+    // THE OTHER HALF, WITHOUT WHICH THE FOUR TESTS ABOVE PROVE A LIBRARY NOBODY
+    // CALLS. `countedDb` is only worth anything where a handler receives the
+    // wrapped binding, and that happens in exactly one place per worker: the
+    // shallow `{...env}` copy the dispatcher already builds for DEFER. Read off
+    // the disk, because a wiring fact cannot be tested by importing anything.
+    const root = join(__dirname, "..", "..", "..")
+    for (const w of ["auth", "tenancy", "content", "data-ops"]) {
+      const src = readFileSync(join(root, "workers", w, "src", "index.ts"), "utf8")
+      expect(
+        src.includes("DB: countedDb(request, env.DB)"),
+        `workers/${w} builds a per-request env and does not count its core-DB trips`
+      ).toBe(true)
+    }
   })
 
   it("the label carries a verb and a table and NOTHING a caller supplied", async () => {
