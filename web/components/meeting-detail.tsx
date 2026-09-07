@@ -50,7 +50,7 @@ import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-
 import { OverviewList } from "@/components/overview-list"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { ActivityPanel } from "@/components/activity-panel"
-import { EmptyLine } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { useConfirm } from "@shared/web/use-confirm"
 import { ApiFailure, content, tenancy } from "@/lib/api"
@@ -596,9 +596,14 @@ export function MeetingDetailScreen({
                 <h2 className="text-muted-foreground text-sm font-medium">{t("Notes")}</h2>
                 {canEdit && item.active ? (
                   <>
-                    {/* Uncontrolled, and keyed on the ROW so the editor re-seeds
-                        when the saved notes change under it (a colleague typing
-                        into the same meeting) but not on every keystroke. */}
+                    {/* Uncontrolled, and keyed on the row's ID — which does NOT
+                        change when a colleague saves the same meeting, so their
+                        save never re-seeds under what you are typing. That is
+                        the owner's ruling (2026-09-07; web/test/last-save-wins.
+                        test.tsx locks the same rule for every form): the row
+                        takes their save, the editor keeps yours, and whoever
+                        saves last is what the record says. This comment used to
+                        claim the opposite; the key never did it. */}
                     <Notes
                       key={item.id}
                       defaultValue={item.notes ?? ""}
@@ -816,7 +821,9 @@ function CalendarPanel({
       <section className="flex flex-col gap-2">
         <h2 className="text-muted-foreground text-sm font-medium">{t("Who was invited")}</h2>
         {people.length === 0 ? (
-          <EmptyLine concept="members">{t("Nobody else is on the invitation.")}</EmptyLine>
+          // The kit's register (27.21) rather than a bare line — owner ruling,
+          // 2026-09-07. No act: the invitation is Google's, edited there.
+          <CollectionEmptyState title={t("Nobody else is on the invitation.")} />
         ) : (
           <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
             {people.map((g) => {

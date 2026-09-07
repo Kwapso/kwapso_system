@@ -21,6 +21,7 @@ import type { AgentThread } from "@shared/types"
 import { dataOps } from "@/lib/api"
 import { formatActivityWhen } from "@shared/web/format"
 import { useT } from "@shared/web/language"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 export function AgentHistoryDialog({
   open,
@@ -96,7 +97,10 @@ export function AgentHistoryDialog({
             </ul>
           </ScrollArea>
         ) : (
-          <p className="text-muted-foreground py-6 text-center text-sm">{t("No conversations yet.")}</p>
+          // The kit's register (27.21), like every other empty collection on
+          // both front doors (owner ruling, 2026-09-07). No act: the first
+          // conversation starts in the box this dialog opened from.
+          <CollectionEmptyState title={t("No conversations yet.")} />
         )}
       </DialogContent>
     </Dialog>

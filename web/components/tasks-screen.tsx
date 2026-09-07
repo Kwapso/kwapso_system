@@ -33,6 +33,7 @@ import type {
   ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { type CollectionConfig } from "@shared/web/screen-engine/config"
 import { ClipboardText } from "@shared/ui/foundations/icons"
 
@@ -451,6 +452,20 @@ export function TasksScreen({
             {tasksLoading ? (
               // ROWS ONLY — the toolbar above is already real.
               <Skeleton variant="list" lines={4} />
+            ) : !hasDueDated ? (
+              // GENUINELY EMPTY (the same `hasDueDated` R50 hid the toolbar
+              // on): the other five tabs reach the engine's own
+              // `CollectionEmptyState` through `RecordTable`; this grid never
+              // touches `CollectionFrame`, so a new team was shown a month
+              // with "Nothing due this month." under it — true, and no help.
+              // The title says what THIS tab's collection is (tasks with a
+              // deadline), because a team with undated tasks lands here too
+              // and "no tasks yet" would be false for them. No `onImport`:
+              // tasks have no import target.
+              <CollectionEmptyState
+                title={t("No tasks with a deadline yet.")}
+                onCreate={canCreate ? () => setTaskOpen(true) : undefined}
+              />
             ) : (
               <>
                 <RecordCalendar

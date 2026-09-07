@@ -32,6 +32,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
 import { EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
 import { useT } from "@shared/web/language"
@@ -78,12 +79,18 @@ function Group({
   title,
   people,
   empty,
+  narrowed,
   concept,
   mainLabel,
 }: {
   title: string
   people: Side[]
   empty: string
+  /** a search is on — `empty` is then "nobody matched", which stays a line
+   * (the same split every find bar in the app makes); at rest it is the
+   * kit's own empty register (27.21), like every other empty collection on
+   * both front doors (owner ruling, 2026-09-07). */
+  narrowed: boolean
   /** the CONCEPT_ICON key this side's people are — see `EmptyLine`'s own doc:
    * a bare grey line here reads as a screen that FAILED rather than one with
    * nothing on it yet, which is exactly the state a brand-new system's own
@@ -95,7 +102,12 @@ function Group({
     <section className="flex flex-col gap-2">
       <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
       {people.length === 0 ? (
-        <EmptyLine concept={concept}>{empty}</EmptyLine>
+        narrowed ? (
+          <EmptyLine concept={concept}>{empty}</EmptyLine>
+        ) : (
+          // No act: who is on a system is set on the system's own form.
+          <CollectionEmptyState title={empty} />
+        )
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (
@@ -178,6 +190,7 @@ export function StakeholdersPanel({
         <Group
           title={t("Ours")}
           people={shownOurs}
+          narrowed={query.trim() !== ""}
           empty={
             query.trim()
               ? t("Nobody on our side matches that.")
@@ -191,6 +204,7 @@ export function StakeholdersPanel({
         <Group
           title={t("Theirs")}
           people={shownTheirs}
+          narrowed={query.trim() !== ""}
           empty={
             query.trim()
               ? t("Nobody on the client's side matches that.")

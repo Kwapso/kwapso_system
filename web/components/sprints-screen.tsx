@@ -31,6 +31,7 @@ import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { useRemembered } from "@shared/web/remembered"
@@ -542,9 +543,25 @@ export function SprintsScreen({
       open: s.openStoryCount,
     }))
 
+  // GENUINELY EMPTY, on the two bespoke tabs. The "All sprints" tab reaches
+  // the engine's own `CollectionEmptyState` through `ScreenRenderer`; these
+  // two bodies never touch `CollectionFrame`, so until 2026-09-07 the tab a
+  // new team LANDS on drew a bare `EmptyLine` — a title, no sentence, nothing
+  // to press — while the helpful register sat one tab over. The 2026-09-06
+  // cold walk found it; no static check could have, because the recipe was
+  // fine. The same title the recipe carries (`sprintsListRecipe`'s own
+  // `emptyText`), the shared default sentence, and the one act — so all three
+  // tabs say one thing. No `onImport`: sprints have no import target.
+  const sprintsEmpty = (
+    <CollectionEmptyState
+      title={t("No sprints yet.")}
+      onCreate={canCreate ? () => setAddOpen(true) : undefined}
+    />
+  )
+
   const overview = (
     <div className="flex flex-col gap-12">
-      {sprints.length === 0 && <EmptyLine concept="sprints">{t("No sprints yet.")}</EmptyLine>}
+      {sprints.length === 0 && sprintsEmpty}
       {/* NOTHING MATCHED is a different, and truer, sentence than "no sprints
           yet" once a search or a filter is on — see the identical split
           `<PagedFind>`'s own `emptyText` makes for a paged collection. Every
@@ -657,6 +674,11 @@ export function SprintsScreen({
               {sprintToolbar}
               {sprintsLoading ? (
                 <Skeleton variant="list" lines={4} />
+              ) : sprints.length === 0 ? (
+                // A month grid over a team with no sprints at all is a picture
+                // of nothing with "No sprints start this month." under it —
+                // true, and no help. The register above, same as Overview.
+                sprintsEmpty
               ) : (
                 <RecordCalendar
                   entries={calendarEntries}

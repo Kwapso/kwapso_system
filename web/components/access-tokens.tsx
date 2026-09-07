@@ -43,6 +43,7 @@ import { formatActivityWhen, formatDate } from "@shared/web/format"
 import { useCached, primeCache } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { AddButton } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** Past its deadline (or missing one — the server treats that as expired too).
  * A token that has run out is not "active": it stops working the same way a
@@ -159,7 +160,9 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
       ) : tokensQ.data === undefined ? (
         <Skeleton variant="list" lines={2} />
       ) : tokens.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("No tokens yet.")}</p>
+        // The kit's register (27.21) with the one act, rather than a bare
+        // line under a button in the header — owner ruling, 2026-09-07.
+        <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
       ) : (
         <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
           {tokens.map((token) => (

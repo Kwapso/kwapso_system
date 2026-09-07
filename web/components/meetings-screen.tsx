@@ -31,7 +31,7 @@ import {
   type ScreenActionContext,
   type ScreenIntent,
 } from "@shared/web/screen-engine/screen-renderer"
-import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import { CollectionCreateActionProvider, CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
@@ -542,7 +542,22 @@ export function MeetingsScreen({
                   : null
               }
             >
-              {view === "calendar" ? (
+              {view === "calendar" && !found.active && total === 0 ? (
+                // GENUINELY EMPTY — the door's exact COUNT(*) (R16) says the
+                // team has no meetings at all, and nothing is being asked.
+                // The week and list tabs reach the engine's own register
+                // through `ScreenRenderer`/`RecordTable`, which read the
+                // create action published above; this grid never touches
+                // `CollectionFrame`, so a new team was shown a month with
+                // "Nothing in Meetings this month." under it — true, and no
+                // help. The same two acts the provider above carries, said
+                // directly, so all three tabs offer the same thing.
+                <CollectionEmptyState
+                  title={t("Nothing in Meetings yet.")}
+                  onCreate={canCreate ? () => setOpen(true) : undefined}
+                  onImport={canCreate && onImport ? onImport : undefined}
+                />
+              ) : view === "calendar" ? (
                 // NO `unloaded` SENTENCE ANY MORE. It said "earlier meetings
                 // haven't been loaded yet, so this month may not be the whole
                 // of it", which was true of a grid reading the paged prefix and

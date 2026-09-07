@@ -28,6 +28,7 @@ import { dataOps, type UsageLogRow } from "@/lib/api"
 import { nameInitials } from "@/lib/identity"
 import { formatActivityWhen } from "@shared/web/format"
 import { useT } from "@shared/web/language"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** A redacted row's stand-in line: the row is real (who + when + credits), only
  * the TEXT is theirs. Never a blank bubble with a teammate's name on it. */
@@ -94,7 +95,10 @@ export function AgentUsageDialog({
             </div>
           </ScrollArea>
         ) : (
-          <p className="text-muted-foreground py-6 text-center text-sm">{t("No usage yet today.")}</p>
+          // The kit's register (27.21), like every other empty collection on
+          // both front doors (owner ruling, 2026-09-07). No act: usage is
+          // what the assistant records, not something a person adds.
+          <CollectionEmptyState title={t("No usage yet today.")} />
         )}
       </DialogContent>
     </Dialog>
