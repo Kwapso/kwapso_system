@@ -1,7 +1,10 @@
 "use client"
 
-// APP DETAIL — one system at /apps/<id>, as a tabbed record (Law R2): Overview /
-// Sprints / Stories / Process maps / Activity.
+// APP DETAIL — one system at /apps/<id>, as a tabbed record: Overview /
+// Sprints / Stories / Process maps. Its history is not the last tab any more —
+// it is reached from the ink footer's Latest activity column, on the client's
+// 2026-09-06 ruling; web/components/activity-panel.tsx carries the ruling and
+// the argument.
 //
 // THIS SCREEN IS THE CROSS-LINK the owner named as mattering more than any single
 // path: from an app to its account, from an app to its other stories. So the
@@ -47,7 +50,6 @@ import { DeliverablesPanel } from "@/components/deliverables-panel"
 import { AskTheAssistant } from "@/components/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/app-money-panel"
 import { OverviewList } from "@/components/overview-list"
-import { ActivityPanel } from "@/components/activity-panel"
 import { content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -520,13 +522,9 @@ export function AppDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a system's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -692,7 +690,14 @@ export function AppDetailScreen({
             return (
               <AppTicketsTab
                 teamId={teamId}
-                marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
+                // NO `marks` — client ruling, 2026-09-07, "for type, kill the
+                // emojis. this is legacy. in current system we use colors."
+                // This handed the panel the team's own glyph per TICKET type;
+                // the panel's rows draw the kind as a coloured pill like every
+                // other ticket surface. `MARK_GROUP.ticket` no longer exists,
+                // so there is nothing to pass — web/lib/type-marks.ts carries
+                // the ruling. The sprint and story marks below are untouched:
+                // her sentence is about tickets.
                 // The same vocabulary the create dialog below already fetches
                 // (gated the same way, on `canRaiseTicket`) — a reader who may
                 // only READ tickets here simply gets no Kind facet, rather than
@@ -731,14 +736,6 @@ export function AppDetailScreen({
                 ]
                   .filter(Boolean)
                   .join(", ")}
-              />
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("processes", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
               />
             )
           return <OverviewList items={overviewItems} />

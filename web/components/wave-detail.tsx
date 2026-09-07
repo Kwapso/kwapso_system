@@ -1,7 +1,9 @@
 "use client"
 
-// WAVE DETAIL — one package a client bought, at /waves/<id>, as a tabbed record
-// (Law R2): Overview / Sprints / Activity.
+// WAVE DETAIL — one package a client bought, at /waves/<id>, as a tabbed record:
+// Overview / Sprints. Its history is not a third tab any more — it is reached
+// from the ink footer's Latest activity column, on the client's 2026-09-06
+// ruling; web/components/activity-panel.tsx carries the ruling and the argument.
 //
 // THE SPRINTS TAB IS THE WHOLE SCREEN, really. A wave IS its sprints: putting
 // one in or taking one out is the only thing that changes what the package runs
@@ -34,7 +36,6 @@ import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { PencilSimple, Power, ArrowCounterClockwise, UserMinus } from "@shared/ui/foundations/icons"
 
-import { ActivityPanel } from "@/components/activity-panel"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { OverviewList } from "@/components/overview-list"
@@ -237,13 +238,9 @@ export function WaveDetailScreen({
         badge: formatCount(wave.sprintCount),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a package's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -495,14 +492,6 @@ export function WaveDetailScreen({
                   </ul>
                 )}
               </div>
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("work", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
             )
           return <OverviewList items={overviewItems} />
         }}

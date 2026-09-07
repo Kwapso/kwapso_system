@@ -54,6 +54,7 @@ import { safeHref } from "@shared/web/rich-text"
 
 import { isFollowable, MAX_SIZE_LABEL, spellSize } from "@/lib/attachments"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { primeCache, useCached } from "@shared/web/store"
 import { helpAttachmentsKey } from "@/lib/live-resources"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
@@ -199,7 +200,13 @@ export function HelpAttachmentsPanel({
               {/* Wraps below `sm` so the filename keeps its width — the story
                 * panel's note carries the whole reason. */}
               <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
-                {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t, lang)]
+                {/* R54: a ticket's files come from both sides. A colleague is named by
+                  * their first name; the contact who sent us the file keeps theirs. */}
+                {[
+                  spellSize(a.sizeBytes),
+                  a.addedByIsClient ? a.addedByName : staffNameFromSnapshot(a.addedByName),
+                  formatRelative(a.createdAt, t, lang),
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </span>

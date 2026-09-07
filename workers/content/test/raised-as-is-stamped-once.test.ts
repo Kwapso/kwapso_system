@@ -44,7 +44,6 @@ import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { storedWordColumns } from "@shared/selectable-homes"
 import { workingDaysAgo } from "@shared/business-days"
-import { CLOSURE_TREND_MIN_CLOSURES } from "@shared/types"
 import { TRIAGE_AFTER_DAYS } from "../src/lib/triage"
 
 const ROOT = join(__dirname, "..", "..", "..")
@@ -400,13 +399,29 @@ describe("the dashboard door only counts what it can stand behind", () => {
     ).toBe(0)
   })
 
-  it("the twelve-month trend refuses a month too thin to have a middle", async () => {
-    // The floor is the whole reason this is a read of its own: a median exists
-    // for a bucket of one, is drawn at the same weight as a median of a hundred,
-    // and a chart cannot refuse to be read. So the thin buckets never leave the
-    // database.
-    const enough = CLOSURE_TREND_MIN_CLOSURES
-    for (let i = 0; i < enough; i++)
+  it("the twelve-month trend keeps a month with a single closure in it", async () => {
+    // THIS ASSERTION IS INVERTED, AND THE INVERSION IS THE RECORD.
+    //
+    // It used to prove the opposite: a `(kind, month)` bucket under
+    // `CLOSURE_TREND_MIN_CLOSURES` (eight) never left this read, because a
+    // median exists for a bucket of one, is drawn at the same weight as a median
+    // of a hundred, and a chart cannot refuse to be read.
+    //
+    // The client, 2026-09-07: "Only months with at least 8 of a kind are thrown.
+    // No, even if it's only 1, it should appear there." She has heard the
+    // argument and ruled the other way — a month she knows something closed in,
+    // drawn as a gap, reads as the app having lost her work. The constant is
+    // deleted rather than left as an unused pin, and the whole reasoning behind
+    // it is kept where it used to be defined, in `shared/types.ts`.
+    //
+    // SO THIS IS THE FLOOR'S OWN CASE, TURNED ROUND, and it is deliberately the
+    // same shape: one kind closing several tickets and one kind closing exactly
+    // ONE, in the same month. The thin bucket used to be the proof the floor
+    // worked; it is now the proof nothing threshold it. `n` still travels with
+    // every row, which is the only thing standing between a thin month and a
+    // misread one — the screen prints it in the month's hover readout.
+    const many = 8
+    for (let i = 0; i < many; i++)
       seed({
         id: `T${i}`,
         helpType: "Request",
@@ -415,25 +430,30 @@ describe("the dashboard door only counts what it can stand behind", () => {
         createdAt: raisedFor(3),
         resolvedAt: closedAt.toISOString(),
       })
-    for (let i = 0; i < enough - 1; i++)
-      seed({
-        id: `S${i}`,
-        helpType: "Extra",
-        raisedAs: "Extra",
-        status: "resolved",
-        createdAt: raisedFor(3),
-        resolvedAt: closedAt.toISOString(),
-      })
+    seed({
+      id: "S0",
+      helpType: "Extra",
+      raisedAs: "Extra",
+      status: "resolved",
+      createdAt: raisedFor(5),
+      resolvedAt: closedAt.toISOString(),
+    })
 
     const { closureTrend } = await dashboard()
     const month = closedAt.toISOString().slice(0, 7)
     const requests = closureTrend.find((r) => r.helpType === "Request" && r.month === month)
-    expect(requests?.n).toBe(enough)
+    expect(requests?.n).toBe(many)
     expect(requests?.medianDays).toBeCloseTo(3, 6)
+    const extras = closureTrend.find((r) => r.helpType === "Extra" && r.month === month)
     expect(
-      closureTrend.some((r) => r.helpType === "Extra"),
-      "a month with fewer than the floor is one ticket wearing a statistic — it must not reach the screen at all"
-    ).toBe(false)
+      extras,
+      "a month with a single closure was dropped — the floor is back, or something else is thresholding this read"
+    ).toBeTruthy()
+    expect(
+      extras?.n,
+      "the count a thin median was taken over did not travel, so the screen cannot say what the point is standing on"
+    ).toBe(1)
+    expect(extras?.medianDays).toBeCloseTo(5, 6)
   })
 
   it("the unopened count is the triage queue's own line, in working days", async () => {

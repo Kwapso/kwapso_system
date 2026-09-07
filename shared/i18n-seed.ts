@@ -1752,6 +1752,11 @@ export const SEED: Catalogue = {
   "Choose a part of your system": { de: "Wählen Sie einen Teil Ihres Systems", es: "Elige una parte de tu sistema", ca: "Tria una part del teu sistema"},
   "Choose an app first": { de: "Wählen Sie zuerst eine App", es: "Elige primero una aplicación", ca: "Tria primer una aplicació"},
   "Choose an app first.": { de: "Wählen Sie zuerst eine App.", es: "Elige primero una aplicación.", ca: "Tria primer una aplicació."},
+  /* The ticket form's "Raised by" row, when no client has been named yet — the
+   * exact sibling of the line above it, one field further down the same form,
+   * so it is deliberately the same sentence with one noun changed. Written by
+   * hand rather than sent to the model for that reason: the two have to match. */
+  "Choose a client first.": { de: "Wählen Sie zuerst einen Kunden.", es: "Elige primero un cliente.", ca: "Tria primer un client."},
   "Colour": { de: "Farbe", es: "Color", ca: "Color"},
   "Compare with": { de: "Vergleichen mit", es: "Comparar con", ca: "Compara amb"},
   "Connect everything": { de: "Alles verbinden", es: "Conectar todo", ca: "Connecta-ho tot"},
@@ -1905,15 +1910,34 @@ export const SEED: Catalogue = {
     es: "Nada en esta fase.",
     ca: "Res en aquesta fase.",
   },
-  "Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.": {
-    de: "Die Karten sind die Treffer, so weit sie geladen sind. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. Fes clic en una targeta per obrir el tiquet.",
+  /* THE BOARD'S TWO FOOTNOTES, REWORDED 2026-09-07 — and reseeded in the same
+     edit, which is the whole point of doing it here. The client asked for a
+     fifth column ("in open, include status ready and waiting"), and Waiting is
+     a PREDICATE rather than a stage, so its cards are repeats of cards in the
+     four columns beside it. Both sentences now say so. A reader who adds five
+     columns up would otherwise get a number larger than the tab's own badge,
+     and the alternative — hiding a waiting ticket from the stage it is really
+     in — would make the four stage columns lie about the work.
+     The two sentences these replace were seeded, so the ceiling does not move:
+     `TRANSLATION_CEILING` counts strings with NO answer, and each of these has
+     three. Rewording seeded copy costs nothing but the rewording. */
+  "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket.": {
+    de: "Die Karten sind die Treffer, so weit sie geladen sind. Wartend wiederholt Karten aus den Phasen davor. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. En espera repite tarjetas de las fases anteriores. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. En espera repeteix targetes de les fases anteriors. Fes clic en una targeta per obrir el tiquet.",
   },
-  "Each column counts every open ticket at that stage. Click a card to open the ticket.": {
-    de: "Jede Spalte zählt alle offenen Tickets in dieser Phase. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
-    es: "Cada columna cuenta todos los tickets abiertos en esa fase. Haz clic en una tarjeta para abrir el ticket.",
-    ca: "Cada columna compta tots els tiquets oberts en aquesta fase. Fes clic en una targeta per obrir el tiquet.",
+  "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket.": {
+    de: "Jede der ersten vier Spalten zählt alle offenen Tickets in dieser Phase. Wartend wiederholt dieselben Tickets — die, bei denen ein Kunde uns eine Antwort schuldet — deshalb ergeben die Spalten zusammen nicht die Gesamtzahl. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada una de las primeras cuatro columnas cuenta todos los tickets abiertos en esa fase. En espera repite esos mismos tickets — aquellos en los que un cliente nos debe una respuesta — así que las columnas no suman el total. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cadascuna de les quatre primeres columnes compta tots els tiquets oberts en aquesta fase. En espera repeteix aquests mateixos tiquets — aquells en què un client ens deu una resposta — així que les columnes no sumen el total. Fes clic en una targeta per obrir el tiquet.",
+  },
+  /* THE FIFTH COLUMN'S EMPTY LINE. Not "Nothing at this stage." above, because
+     waiting is not a stage — the honest empty sentence here is that no client
+     owes us an answer, which is good news rather than an absence of rows. */
+  "Nothing is waiting on a client.": {
+    de: "Es wartet nichts auf einen Kunden.",
+    es: "No hay nada a la espera de un cliente.",
+    ca: "No hi ha res a l'espera d'un client.",
   },
   "Open the ticket": { de: "Ticket öffnen", es: "Abrir el ticket", ca: "Obre el tiquet" },
   "Ready tickets": { de: "Fertige Tickets", es: "Tickets listos", ca: "Tiquets llestos" },
@@ -3330,6 +3354,31 @@ export const SEED: Catalogue = {
   "My work": { de: "Meine Arbeit", es: "Mi trabajo", ca: "La meva feina" },
   "Build": { de: "Aufbau", es: "Construcción", ca: "Construcció" },
 
+  /* THE RECORD FOOTER'S ACTIVITY COLUMN AND THE DOOR ON ITS EYEBROW ROW
+   * (7 Sep 2026 — record-chrome.tsx, screen-renderer.tsx, activity-rail.tsx).
+   *
+   * "Latest activity" is the column's own heading, and it was said in ENGLISH
+   * to every reader until this line: nothing passed `activityLabel`, so the
+   * heading fell through to the vendored `RecordDetail`'s own default, and the
+   * translation walk never opens `shared/ui/` (R28). It is passed and
+   * translated now because the door beside it had to be built into the same
+   * node — see record-chrome.tsx's `activityEyebrowRow`.
+   *
+   * "All activity · {count}" is the door. The MIDDOT and the HOLE are both
+   * load-bearing: the count is `formatCount`'s output (R16 — "48", "1.3k",
+   * "1m+"), and it goes in a hole rather than being concatenated so a
+   * translator can put the number where their language wants it. The German
+   * takes "Aktivität" rather than the vocabulary block's "Verlauf" for
+   * consistency with every other activity sentence already in the catalogue
+   * ("Noch keine Aktivität.", "Weitere Aktivitäten laden"), which is what a
+   * reader of this rail actually sees around it. */
+  "Latest activity": { de: "Letzte Aktivität", es: "Actividad reciente", ca: "Activitat recent" },
+  "All activity · {count}": {
+    de: "Gesamte Aktivität · {count}",
+    es: "Toda la actividad · {count}",
+    ca: "Tota l'activitat · {count}",
+  },
+
   /* THE RECORD FOOTER'S ADD-A-NOTE FIELD (ch27.8), record-chrome.tsx /
    * use-record-activity.ts. */
   "Add a note": { de: "Notiz hinzufügen", es: "Añadir una nota", ca: "Afegir una nota" },
@@ -3567,15 +3616,42 @@ export const SEED: Catalogue = {
     es: "El ticket central, mes a mes",
     ca: "El tiquet central, mes a mes",
   },
-  "Only a month where at least {count} of a kind closed is drawn — a middle ticket out of six is one ticket wearing a statistic.": {
-    de: "Gezeichnet wird nur ein Monat, in dem mindestens {count} einer Art abgeschlossen wurden — ein mittleres Ticket aus sechs ist ein einzelnes Ticket im Gewand einer Statistik.",
-    es: "Solo se dibuja un mes en el que se cerraron al menos {count} de un tipo: un ticket central de seis es un solo ticket disfrazado de estadística.",
-    ca: "Només es dibuixa un mes en què es van tancar almenys {count} d'un tipus: un tiquet central de sis és un sol tiquet disfressat d'estadística.",
+  /* THE FLOOR'S TWO SENTENCES WERE RETIRED HERE, 7 Sep 2026 — client: "Only
+     months with at least 8 of a kind are thrown. No, even if it's only 1, it
+     should appear there."
+
+     They were "Only a month where at least {count} of a kind closed is drawn —
+     a middle ticket out of six is one ticket wearing a statistic." and "No kind
+     has closed at least {count} tickets in two of the last months, so there is
+     no trend to draw yet." The first explained a subtraction the door no longer
+     makes; the second named the floor as the reason a young team has no trend,
+     when the real reason is that a line needs two points. Both went with the
+     rule rather than being left behind to be translated on every build for a
+     screen that no longer says them — R28's ORPHAN clause, applied on this side
+     of the pipeline, and the same disposal the "working days only" caption got
+     one block up. The reasoning the first one carried is not lost: it is kept in
+     full where `CLOSURE_TREND_MIN_CLOSURES` used to be defined, in
+     `shared/types.ts`. Both were seeded in all three languages, so retiring them
+     moves no ceiling (R44). */
+  "Nothing has closed in two different months yet, so there is no trend to draw.": {
+    de: "In zwei verschiedenen Monaten wurde noch nichts abgeschlossen — es gibt also noch keinen Verlauf zu zeichnen.",
+    es: "Todavía no se ha cerrado nada en dos meses distintos, así que aún no hay tendencia que dibujar.",
+    ca: "Encara no s'ha tancat res en dos mesos diferents, així que encara no hi ha tendència a dibuixar.",
   },
-  "No kind has closed at least {count} tickets in two of the last months, so there is no trend to draw yet.": {
-    de: "Keine Art hat in zwei der letzten Monate mindestens {count} Tickets abgeschlossen — es gibt also noch keinen Verlauf zu zeichnen.",
-    es: "Ningún tipo ha cerrado al menos {count} tickets en dos de los últimos meses, así que aún no hay tendencia que dibujar.",
-    ca: "Cap tipus no ha tancat almenys {count} tiquets en dos dels darrers mesos, així que encara no hi ha tendència a dibuixar.",
+  /* ONE ROW OF A RANKED CHART, said twice from one string — inside the hover
+     card the client asked for ("i want that when i hover on client i see the
+     details of the numbers of tickets") and, joined with the row's name and its
+     kind, as the accessible NAME of the bar that opens it. Both ranked panels
+     use it, so "Which app" and "Who has more" cannot become two readings of one
+     gesture. Seeded in all three in the same change that adds it, so R44's
+     ceiling does not move: this screen has no rows on it, so its sentences are
+     the whole of what a reader gets. {count} is what is still open and {total}
+     is everything ever raised — both names must survive intact, and the order
+     matters to the sentence in every language here. */
+  "{count} open of {total}": {
+    de: "{count} von {total} offen",
+    es: "{count} abiertos de {total}",
+    ca: "{count} oberts de {total}",
   },
   "Couldn't load the dashboard.": {
     de: "Das Dashboard konnte nicht geladen werden.",

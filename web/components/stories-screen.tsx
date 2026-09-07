@@ -42,6 +42,7 @@ import { appsKey, helpKey, listFetch, processesKey, sprintsKey, storiesKey } fro
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -83,7 +84,8 @@ function shapeStories(stories: Story[], lang: Language, marks?: Map<string, stri
       detail:
         [
           STORY_STATUS_LABEL[s.status],
-          s.assigneeName ?? "unassigned",
+          // R54: a story is agency work; the assignee is one of ours.
+          staffNameFromSnapshot(s.assigneeName) || "unassigned",
           s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
         ]
           .filter(Boolean)

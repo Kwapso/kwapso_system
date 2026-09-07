@@ -11,6 +11,7 @@ import {
   portalActivityClause,
   type AccountScope,
 } from "@shared/workers/account-scope"
+import { clientUserIds } from "./accounts"
 import type { MemberGuard } from "./permissions"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 
@@ -20,6 +21,9 @@ type ActivityRow = {
   description: string
   created_at: string
   creator_name: string | null
+  /** WHOSE name `creator_name` is — resolved against the fenced `portal_users`
+   * door after the page is read, never as a subselect here. See below. */
+  creator_id: string | null
 }
 
 /** The fixed-table scopes, as what they actually are: the generic (table, id)
@@ -135,7 +139,28 @@ export async function getActivity(
     d1Query<ActivityRow>(
       cfg,
       guard.databaseId,
-      `SELECT id, type, description, created_at, creator_name FROM activity${pageWhere}
+      // R54: `creator_id` rides along so the row's NAME can be attributed to a
+      // population. A client login is an ordinary team member and `toActor` is
+      // the estate's only actor constructor, so a portal-authored row — a
+      // process comment, a raised ticket, a completed to-do — sits in this feed
+      // under the CONTACT's own name. Staff are named by their first name on
+      // screen and contacts are not, and nothing else on the row can tell the
+      // two apart.
+      //
+      // THE ANSWER IS FETCHED, NOT SUBSELECTED. This first shipped as an
+      // `EXISTS` subselect against the portal-login table right here, which is
+      // one statement fewer and reads well — and puts a query against the
+      // customer spine outside `lib/accounts.ts`, the one file that carries the
+      // caller's account stamp. `test/account-leak.test.ts` refused it,
+      // correctly. The question is now asked through `clientUserIds`, the fenced
+      // door, once for the whole page.
+      //
+      // AND THE FENCE READS THE RAW SOURCE, COMMENTS INCLUDED — deliberately, so
+      // a statement cannot hide inside a string or a disabled block. Which means
+      // this very paragraph re-tripped it while naming the table it was
+      // explaining. Naming it in prose instead is the fix, and the cost of the
+      // fence being that blunt is one sentence written the long way.
+      `SELECT id, type, description, created_at, creator_name, creator_id FROM activity${pageWhere}
        ORDER BY created_at DESC, id DESC LIMIT ${PAGE_SIZE + 1}`,
       [...params, ...after.params]
     ),
@@ -146,6 +171,18 @@ export async function getActivity(
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM activity${where}`, params),
   ])
   const page = toPage(rows, PAGE_SIZE, (r) => [r.created_at, r.id])
+  // R54, one statement for the whole page: ask the fenced door which of THIS
+  // page's actors hold a portal login. Asked after `toPage` rather than before,
+  // so the extra row the keyset read fetches to detect `hasMore` is never one of
+  // the ids we ask about. An id the door says nothing about is treated as staff,
+  // which leaves a name whole — the safe direction, since the opposite truncates
+  // a customer.
+  const clients = await clientUserIds(
+    cfg,
+    guard,
+    accountScope,
+    page.rows.map((r) => r.creator_id ?? "")
+  )
   return {
     ...page,
     rows: page.rows.map((r) => ({
@@ -153,6 +190,7 @@ export async function getActivity(
       type: r.type,
       description: r.description,
       actorName: r.creator_name,
+      actorIsClient: r.creator_id !== null && clients.has(r.creator_id),
       createdAt: r.created_at,
     })),
     total: counted,

@@ -266,11 +266,13 @@ export type TicketDashboard = {
   /** 3B — the same middle ticket, month by month, by the month it CLOSED in.
    * The rows a chart draws a line from.
    *
-   * A (kind, month) bucket with fewer than `CLOSURE_TREND_MIN_CLOSURES` closures
-   * is NOT HERE — the floor is applied at the door, not dimmed by the chart,
-   * because a median of six is one ticket wearing a statistic and a chart cannot
-   * refuse to be read. That is why the picture shows the kinds that close in
-   * real numbers rather than one line per kind. */
+   * EVERY (kind, month) BUCKET IS HERE, however few closed in it. Until
+   * 2026-09-07 a floor of eight was applied at the door and the thin buckets
+   * never reached this type at all; the client removed it ("even if it's only 1,
+   * it should appear there") and the argument that had been made for it is kept
+   * where the constant used to live, in `shared/types.ts`. `n` is what a reader
+   * is given instead: a month's median may have been taken over one ticket, and
+   * the screen says so in the hover readout rather than hiding the month. */
   closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
   /** 6A — open work by system, with the KIND inside each system, ordered with
    * the busiest system first (and every one of a system's kinds kept together,

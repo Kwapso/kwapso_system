@@ -2,6 +2,17 @@
 node_modules/
 .next/
 out/
+# …AND THE SIBLING BUILD CACHES `NEXT_DIST_DIR` MAKES. `web/next.config.ts`
+# documents that escape hatch as the way several agent sessions run `next dev`
+# against one checkout at once ("set to a scratch path for a throwaway
+# verification server"), and a scratch path beside the default one is named
+# `.next-<something>` — which `.next/` above does not match. So a sibling
+# session's verification build sat untracked in `web/`, one `git add -A` from
+# a commit of several thousand generated files, and `oxlint` read every one of
+# them: `npm run lint` runs FIRST in `npm run check`, so ANY session's check
+# went red for as long as ANY other session had a verify server up. Ignored
+# here and in `.oxlintrc.json`, because oxlint carries its own list.
+.next-*/
 
 # Local secrets + OS noise
 .env*

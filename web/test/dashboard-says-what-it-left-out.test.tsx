@@ -32,7 +32,7 @@ import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { TicketDashboard } from "@/lib/api/content"
-import { CLOSURE_TREND_MIN_CLOSURES, CLOSURE_WINDOW_MONTHS } from "@shared/types"
+import { CLOSURE_WINDOW_MONTHS } from "@shared/types"
 
 const holder = vi.hoisted(() => ({ view: undefined as TicketDashboard | undefined }))
 
@@ -151,14 +151,40 @@ function showForApp(view: TicketDashboard | undefined, total: number | undefined
 }
 
 describe("the tickets dashboard says what it left out", () => {
-  it("names the floor under the trend, so two missing kinds are not read as perfect", () => {
+  it("no longer names a floor under the trend, because there is no longer a floor", () => {
+    // THIS ASSERTION IS INVERTED ON PURPOSE, exactly like the one below it, and
+    // the inversion is the record.
+    //
+    // It used to require the sentence "Only a month where at least 8 of a kind
+    // closed is drawn — a middle ticket out of six is one ticket wearing a
+    // statistic", because the door DROPPED any (month, kind) bucket under
+    // `CLOSURE_TREND_MIN_CLOSURES` and a picture that silently omits two of four
+    // kinds is the exact failure this file is named after.
+    //
+    // The client, 2026-09-07: "Only months with at least 8 of a kind are thrown.
+    // No, even if it's only 1, it should appear there." The floor is gone from
+    // the SQL, so the sentence had to go with it — a caption saying something
+    // was left out, on a chart that now leaves nothing out, is a subtraction
+    // announced where none was made, which is this file's own rule read
+    // backwards. The reasoning behind the floor is not lost: it is kept whole in
+    // `shared/types.ts` where the constant used to be defined, and the constant
+    // itself is deleted rather than left as an unused pin.
+    //
+    // THE DISCLOSURE THAT SURVIVES is per-month rather than per-screen, and it
+    // is asserted two describes down ("every month keeps its own count"): each
+    // point's hover readout still carries the count its median was taken over,
+    // which is what tells a reader a month is standing on one ticket. That is
+    // the whole of what replaced the floor — no second threshold under another
+    // name, and no mark that would need one.
     show(FULL)
     expect(
-      screen.getByText(
-        new RegExp(`at least ${CLOSURE_TREND_MIN_CLOSURES} of a kind closed`, "i")
-      ),
-      "the trend drew two kinds and never said why the other two are absent"
-    ).toBeTruthy()
+      screen.queryByText(/at least .* of a kind closed/i),
+      "the retired floor caption is back, on a chart that no longer drops anything"
+    ).toBeNull()
+    expect(
+      screen.queryByText(/one ticket wearing a statistic/i),
+      "the floor's explanation outlived the floor"
+    ).toBeNull()
   })
 
   it("no longer names the tickets the flow cannot speak for — she asked for the line gone", () => {
@@ -412,19 +438,20 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
       "Tendency",
     ])
       expect(screen.getByText(heading), `the ${heading} panel is missing from the app's dashboard`).toBeTruthy()
-    // The subtractions the panels have to keep announcing — a "mini version"
-    // that stopped saying what it left out would be the worse half of this
-    // feature. There were three; the unrecorded count left on 2026-09-07 at the
-    // client's word ("remove all this text"), and its own test one suite up
-    // records the cost. The trend's floor stays, because a chart drawing two
-    // kinds and silently dropping two others is the exact failure this file is
-    // named after.
+    // THERE ARE NO SUBTRACTIONS LEFT FOR THESE PANELS TO ANNOUNCE, and that is
+    // a fact about the code rather than a gap in this test. There were three.
+    // The unrecorded count left on 2026-09-07 at the client's word ("remove all
+    // this text"), and its own test one suite up records the cost. The trend's
+    // floor left the same day at her word too, and the sentence went with it —
+    // so what is asserted here is the ABSENCE, in the app's own dashboard as
+    // well as the whole-team one, because a caption surviving in one host and
+    // not the other is how a "mini version" quietly becomes a second screen.
+    // The six-month closing window is the one that remains, and it is asserted
+    // by its own case above.
     expect(
-      screen.getByText(
-        new RegExp(`at least ${CLOSURE_TREND_MIN_CLOSURES} of a kind closed`, "i")
-      ),
-      "the app's own dashboard drew the trend without naming the floor under it"
-    ).toBeTruthy()
+      screen.queryByText(/at least .* of a kind closed/i),
+      "the app's own dashboard kept the floor caption the whole-team one retired"
+    ).toBeNull()
   })
 
   it("offers no Client filter, because an app is built for one client", () => {
@@ -759,6 +786,196 @@ describe("the trend is as tall as the panel beside it, ruled by month, and answe
     // exactly the lie `CLOSURE_TREND_MIN_CLOSURES` exists to prevent.
     const august = screen.getByRole("button", { name: /^2026-08/ })
     expect(august.getAttribute("aria-label")).toBe("2026-08 · Issue: 4 days, from 38 closed")
+  })
+})
+
+// ── THE CLIENT'S FOUR, 7 SEPTEMBER 2026 ─────────────────────────────────────
+//
+// Names as links, figures on hover, the legend above the plot, and no floor
+// under the trend. Every one of them is invisible to every other check here: an
+// anchor, a focusable readout, a DOM ORDER and a DRAWN POINT all render words a
+// text search cannot tell from their broken twins.
+
+describe("a name on a ranked chart goes to its record", () => {
+  // "on which app and who has more i want the name apps as links" — her second
+  // time asking. R37 rules HOW (an `InAppLink`, a real anchor the shell
+  // intercepts), so what is asserted here is that the anchor exists, where it
+  // points, and — the half that has bitten before — that a row naming NO record
+  // is not given one anyway.
+  it("links a system's name to the app record", () => {
+    show(FULL)
+    const link = screen.getByRole("link", { name: "Bergmann Portal" }) as HTMLAnchorElement
+    expect(link.getAttribute("href"), "the system's name points somewhere else").toBe(
+      "/t/T1/apps/p1"
+    )
+  })
+
+  it("links a client's name to the account record, on every row that names them", () => {
+    show(FULL)
+    // ONE CLIENT, TWO ROWS. "Who has more" is a ranking PER KIND, so a client
+    // with open Extras and open Requests appears under both — which is the
+    // panel working, and it means the assertion has to be about all of them.
+    // A link built per-row could differ per row; it must not.
+    const links = screen.getAllByRole("link", {
+      name: "Bergmann Group",
+    }) as HTMLAnchorElement[]
+    expect(links.length, "the client is ranked under one kind only").toBe(2)
+    for (const link of links)
+      expect(link.getAttribute("href"), "the client's name points somewhere else").toBe(
+        "/t/T1/accounts/a1"
+      )
+  })
+
+  it("leaves a row that names no record as plain text, never as a dead link", () => {
+    // TWO ROWS, TWO DIFFERENT NOTHINGS, one ruling. `openByApp` keeps the bar
+    // for work nobody has said which system it is about (`appId: null`) — the
+    // most useful bar on that chart and the reason it is not dropped — and
+    // `byAccountAndType` can answer with a client id whose account row no longer
+    // gives a name. Neither has a record worth sending a reader to, and a link
+    // that lands on nothing reads as the app losing the record rather than as a
+    // row that never had one.
+    show(FULL)
+    expect(
+      screen.queryByRole("link", { name: "No system named" }),
+      "the no-system bar became a link to nothing"
+    ).toBeNull()
+    expect(screen.getByText("No system named"), "the no-system bar vanished").toBeTruthy()
+    expect(
+      screen.queryByRole("link", { name: "Unnamed client" }),
+      "a client with no name became a link to an account that does not answer"
+    ).toBeNull()
+    expect(screen.getByText("Unnamed client"), "the unnamed client row vanished").toBeTruthy()
+  })
+})
+
+describe("a bar on a ranked chart answers with its own figures", () => {
+  // "on dashboard tickets, which app / i want that when i hover on client i see
+  // the details of the numbers of tickets."
+  //
+  // THE SPLIT BEING LOCKED HERE is the one the component's own header argues
+  // for: the NAME is the link and the BAR is the readout, so a row is two tab
+  // stops and neither gesture has to guess what the other meant. A regression
+  // that put the hover on the name — or the link on the bar — would render the
+  // identical row and is exactly what these two cases catch.
+  it("names the whole breakdown on the bar, so it is heard without the card opening", () => {
+    show(FULL)
+    // WHICH APP — the system's kinds, in the client's order, each as open out of
+    // everything ever raised. `total` has ridden this door since it was written
+    // and nothing read it until now: 8 open is a different fact on a system that
+    // has closed twelve and on one that has closed nothing.
+    expect(
+      screen.getByRole("button", {
+        name: "Bergmann Portal · Issue: 8 open of 20 · Request: 3 open of 7",
+      }),
+      "the per-system bar is not a focusable readout of its own segments"
+    ).toBeTruthy()
+    // WHO HAS MORE — the CLIENT's whole line, not the one row hovered. The row's
+    // own figure is already printed beside it, so repeating it would be no
+    // detail at all; the detail is the other kinds this client has open.
+    // The same client is ranked under two kinds, so there are two bars — and
+    // both say the same thing, because the readout is about the CLIENT and not
+    // about the row it was opened from.
+    expect(
+      screen.getAllByRole("button", {
+        name: "Bergmann Group · Request: 5 open of 11 · Extra: 4 open of 9",
+      }).length,
+      "the per-client bar answers about one row instead of about the client"
+    ).toBe(2)
+  })
+
+  it("keeps the link and the readout on two different controls", () => {
+    show(FULL)
+    // The name is an anchor and nothing else; the readout is a button and
+    // nothing else. If either grew the other's job, one of these would fail.
+    const name = screen.getByRole("link", { name: "Bergmann Portal" })
+    expect(
+      name.getAttribute("aria-label"),
+      "the name took the readout's job as well as its own"
+    ).toBeNull()
+    const bar = screen.getByRole("button", {
+      name: "Bergmann Portal · Issue: 8 open of 20 · Request: 3 open of 7",
+    })
+    expect(bar.closest("a"), "the readout sits inside the link, so a press navigates").toBeNull()
+  })
+
+  it("uses no browser tooltip for a figure", () => {
+    // The native `title` is the affordance she asked this screen to move OFF
+    // when the closing-time readout went to a hover card. The per-segment
+    // "{kind}: {n}" title on the stacked bar went with this change; the only
+    // `title` left on these rows is on the truncated NAME, where it reveals text
+    // the column clipped rather than a number.
+    show(FULL)
+    for (const el of Array.from(document.querySelectorAll("[title]")))
+      expect(
+        el.getAttribute("title"),
+        `a figure is being shown through the browser's own tooltip: ${el.getAttribute("title")}`
+      ).not.toMatch(/^\w+: \d+$/)
+  })
+})
+
+describe("the tendency legend sits above the plot, at the right", () => {
+  // "put the tendency legend on the top right, above the graphic."
+  it("draws the legend before the plot, right-aligned", () => {
+    showWith(TYPES)
+    const panel = screen.getByText("Tendency").closest('[data-slot="card"]') as HTMLElement
+    const plot = panel.querySelector("svg") as SVGElement
+    // The legend is the strip holding a swatch per kind. Find it by the first
+    // kind's word inside the panel and walk to the strip that holds them all.
+    const legend = Array.from(panel.querySelectorAll("div")).find(
+      (d) => d.className.includes("flex-wrap") && d.className.includes("justify-end")
+    ) as HTMLElement
+    expect(legend, "the trend's legend is no longer a right-aligned strip").toBeTruthy()
+    expect(legend.textContent, "the legend lost the kinds it is a key to").toContain("Issue")
+    // DOCUMENT ORDER IS THE ASSERTION. "Above the graphic" is a position, and a
+    // position is exactly what a text search cannot see — the old legend said
+    // the identical words under the month labels.
+    expect(
+      legend.compareDocumentPosition(plot) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the legend is drawn after the plot again"
+    ).toBeTruthy()
+  })
+})
+
+describe("every month is drawn, however few closed in it", () => {
+  // "Only months with at least 8 of a kind are thrown. No, even if it's only 1,
+  // it should appear there." The floor was applied in SQL, so the proof that it
+  // is gone lives in the worker's own suite
+  // (`workers/content/test/raised-as-is-stamped-once.test.ts`). What is proved
+  // HERE is the other half: handed a month standing on one ticket, the screen
+  // draws it and says so, rather than dropping it or dressing it up.
+  const THIN: TicketDashboard = {
+    ...FULL,
+    closureTrend: [
+      { helpType: "Issue", month: "2026-07", n: 40, medianDays: 5 },
+      // ONE TICKET. Under the retired floor this bucket never left the door.
+      { helpType: "Issue", month: "2026-08", n: 1, medianDays: 22 },
+      { helpType: "Issue", month: "2026-09", n: 41, medianDays: 3 },
+    ],
+  }
+
+  it("draws the thin month and says what it is standing on", () => {
+    show(THIN)
+    expect(
+      screen.getByRole("button", { name: "2026-08 · Issue: 22 days, from 1 closed" }),
+      "a month with one closure is missing from the plot, or is not saying so"
+    ).toBeTruthy()
+  })
+
+  it("marks it no differently — the disclosure is the count, not a second floor", () => {
+    // JUDGEMENT ON THE RECORD. With the floor gone the line jumps on a thin
+    // month, and the reflexes for that (a hollow point, a dashed run, a dimmed
+    // area) all need a NUMBER to decide what "thin" means — which is the floor
+    // again under another name, in a change made to remove one. So a thin month
+    // is drawn exactly like a fat one and the count in the readout is the whole
+    // of what a reader is given. This asserts the RESTRAINT, so somebody adding
+    // a threshold later has to come here and argue with it.
+    show(THIN)
+    const points = document.querySelectorAll('[data-slot="trend-point"]')
+    const runs = document.querySelectorAll("polyline")
+    // Three consecutive months of one kind is one unbroken run and no lone dot;
+    // the thin month is a vertex on it like any other.
+    expect(points.length, "a thin month grew a mark of its own").toBe(0)
+    expect(runs.length, "the run broke around the thin month").toBe(1)
   })
 })
 

@@ -109,18 +109,20 @@ const REF_AS_STRING_OK: Record<string, string> = {
     "its name from this one field. A ticket option leads with its number " +
     "because that is what somebody types to find it.",
   "web/lib/picker-sources.ts:89": "same slot, a story option — see the ticket one above.",
-  "web/components/stories-screen.tsx:137":
+  "web/components/stories-screen.tsx:139":
     "the ticket picker on the story form, building the same `PickerOption.label` " +
     "the two lines in picker-sources.ts build.",
-  "web/components/help-detail.tsx:918":
+  "web/components/help-detail.tsx:945":
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
-    "a row of its own.",
-  "web/components/help-detail.tsx:1053":
+    "a row of its own. (Re-pinned from :931 on 7 Sep 2026, when the activity " +
+    "rail's `activityHead` and its ruling landed above this line.)",
+  "web/components/help-detail.tsx:1088":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
-    "string slot as picker-sources.ts, for the ticket the form is pinned to.",
+    "string slot as picker-sources.ts, for the ticket the form is pinned to. " +
+    "(Re-pinned from :1074 on 7 Sep 2026, same edit as :945 above.)",
   "web/components/story-detail.tsx:420":
-    "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:918.",
+    "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:931.",
   "web/components/sprints-screen.tsx:522":
     "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
     "the chip would be wrong even if the slot allowed it: a day cell is a few " +

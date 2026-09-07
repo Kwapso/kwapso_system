@@ -1117,6 +1117,117 @@ export interface ScreenShellProps
   /** The aside handle's two accessible names. */
   asideOpenLabel?: string;
   asideCloseLabel?: string;
+  /**
+   * ── THE NODE THAT STANDS ON THE ASSISTANT'S ROW, AT ITS LEADING SIDE.
+   * CLIENT-ORDERED 2026-09-07, and the whole sentence is the specification:
+   *
+   *     "Back to overall design: I want the timer out of the main body. I
+   *      want it exactly at the same level on the left of the assistant
+   *      button opener, and of course, if I open the assistant, they should
+   *      also move. Do you understand what I mean?"
+   *
+   * Three requirements in one breath, and this prop answers all three:
+   * OUT OF THE BODY (it is chrome on the screen, not a row in the card and
+   * not a line in the header band); AT THE SAME LEVEL (one block offset,
+   * `--shell-gutter`, and one height, `--control-height-button` — the same
+   * two numbers the shut opener spends, so "level" is a derivation and not
+   * an eyeballed literal); AND IT TRAVELS WITH THE COLUMN.
+   *
+   * IT IS NAMED FOR THE PLACE, NOT FOR THE TIMER. The screenshot that
+   * prompted it is a running-timer pill, and the second caller will not be:
+   * a save state, an unsaved-changes count, a "recording" mark, a live
+   * connection dot — anything a screen needs to keep beside the one control
+   * that is always in the same corner. A prop called `timer` would have made
+   * every one of those callers wonder whether it was allowed, and would have
+   * put product vocabulary in a kit file (PATTERN §9). `Lead` is already the
+   * kit's word for "the node placed at the leading end of a bar" — see
+   * `navLead` on the phone's own top row — and this is the aside's.
+   *
+   * A PLACEMENT AND NOTHING ELSE. The shell paints no fill, no radius, no
+   * hairline and no ink here; it positions the caller's node and constrains
+   * how wide it may grow. Exactly what `rail`, `aside`, `ambient` and
+   * `navLead` already do, and the same reason: a slot that styled its
+   * contents would be a second, invisible designer of them.
+   *
+   * ── WHAT IT DOES IN THE THREE STATES, WHICH IS THE WHOLE OF THE DESIGN.
+   *
+   * ASIDE OPEN. The row is anchored to the assistant dock's LEADING EDGE
+   * (`end-full`), so as the column's inline size grows the row is carried
+   * inland with it. That is the client's "if I open the assistant, they
+   * should also move", and it is not a second animation: the dock's width is
+   * already transitioned by `.motion-column-collapse` (motion.css §7), and a
+   * percentage inset against a box whose width is animating resolves
+   * continuously. This file names no duration and no curve — law 6.1 — and
+   * does not need to.
+   *
+   * ASIDE SHUT. The dock collapses to its own leading gutter, so the same
+   * anchor lands the row in the screen's trailing corner, one `--space-2h`
+   * short of the shut opener. Immediately to its left, in LTR; immediately
+   * to its right in RTL, because every inset here is logical.
+   *
+   * AND THE PLACEMENT STRING IS THE SAME IN BOTH — there is no `isAsideOpen`
+   * branch in it, which is the point rather than an economy. A branch would
+   * make the travel a JUMP between two class lists on the frame the state
+   * flips; one anchor makes it a GLIDE driven by the column itself. The
+   * price is a trailing reserve of `--control-height-button + --space-2h`
+   * that is paid in both states — so the gap to the assistant's own tab is
+   * wider, when open, than the gap to the shut circle. That is deliberate:
+   * the reserved band is the opener's own footprint, the opener stands in it
+   * in one of the two states, and a constant reserve is the only way to
+   * leave the corner clear without writing a transition in a component.
+   *
+   * NO ASIDE AT ALL (`aside` is `null`). The row is STILL DRAWN, and it
+   * takes the row's end — `--shell-gutter` in from the trailing edge, which
+   * is the exact corner the shut opener would have occupied and is flush
+   * with the content column's own trailing inset. It does NOT go unrendered.
+   * A timer that vanished on the one screen that happens to have no
+   * assistant would be a clock that stopped existing while it was still
+   * running, and a slot whose contents depend on a control the CALLER did
+   * not ask about is a slot nobody can reason about. The trailing reserve is
+   * dropped with the opener, because there is no longer anything to clear.
+   *
+   * ── BELOW `md` IT IS NOT DRAWN, AND THAT IS THE SAME COLLISION RULE THE
+   * SHUT OPENER ALREADY OBEYS. On a phone the assistant's opener is not in
+   * the corner at all: it is in a TOP BAR — this shell's own (`narrowTopBar`)
+   * or the consuming application's, which turns the kit's off — and the shut
+   * `EdgeHandle` stands down there (`max-md:hidden`) precisely so there is
+   * one opener and not two stacked on each other. A row anchored to a
+   * control that is not drawn has nothing to be level with, and below 45rem
+   * the dock is a full-bleed bottom sheet, so `end-full` would carry the row
+   * clean off the leading edge of the window.
+   *
+   * SO THE APPLICATION IS NOT FORCED TO DRAW ITS PILL TWICE. It keeps its
+   * own narrow copy inside its own top bar, where it already is, and hands
+   * the wide copy to this slot instead of to `header`. One drawing at each
+   * width, with the breakpoint doing the choosing — which is what
+   * `max-md:hidden` here and `md:hidden` on the bar together mean.
+   *
+   * ── WIDTH. The row is `max-content` wide, capped at 40vw, and it never
+   * wraps. The cap is the assistant column's OWN cap (`lg:max-w-[40vw]` on
+   * the panel), reused rather than invented: the kit already rules that no
+   * chrome on the trailing edge may take more than two fifths of the window
+   * from the card, and this row is chrome on the trailing edge. It cannot
+   * push the opener anywhere — the opener is positioned independently, from
+   * the other edge — so what the cap actually protects is the BREADCRUMB,
+   * which shares this line from the leading side and keeps at least three
+   * fifths of it. Inside the cap the caller's own node truncates: the row
+   * hands its children `min-width: 0` (the same enabler
+   * `.motion-column-collapse` gives its own child, and for the same reason)
+   * so a `truncate` in the caller's pill actually engages instead of
+   * overflowing a min-content floor.
+   *
+   * ── ONE THING THIS SLOT DOES NOT DO, AND IT IS A FINDING RATHER THAN A
+   * SILENT FIX. The kit rules ONE MANGO PER VIEW (docs/RULES.md §2.5). The
+   * shut opener is `--btn-primary-fill`; the `Stopwatch` pill the client is
+   * placing here paints its action disc `--surface-brand` and its own source
+   * calls it "the one mango in the pill". Both are #FED069, and this slot
+   * puts them 10px apart on one line. The shell does not restyle either —
+   * neither is its to restyle, and a kit that quietly demoted a client's
+   * control to keep its own law would be hiding the collision rather than
+   * reporting it. See CHANGELOG.md, this release, for the question that goes
+   * back to her.
+   */
+  asideLead?: React.ReactNode;
 
   /* ---- THE NARROW NAVIGATION — SECTIONS FIRST, THEN THAT SECTION'S PAGES.
      CLIENT, 2026-09-04, AND IT REVERSES A STANDING KIT LAW. ------------- */
@@ -2089,6 +2200,165 @@ function EdgeHandle({ edge, open, label, icon, onToggle, placement }: EdgeHandle
 }
 
 /* ----------------------------------------------------------------------------
+   THE ASSISTANT'S ROW — THE BAND OF GROUND THE OPENER STANDS ON, AND THE ONE
+   SLOT BESIDE IT. CLIENT-ORDERED 2026-09-07.
+
+   HER SENTENCE, WHOLE, BECAUSE EACH CLAUSE IS A SEPARATE REQUIREMENT:
+   *"I want the timer out of the main body. I want it exactly at the same
+   level on the left of the assistant button opener, and of course, if I open
+   the assistant, they should also move."*
+
+   WHICH OPENER SHE IS POINTING AT, ESTABLISHED BEFORE ANYTHING WAS DRAWN.
+   This shell has two drawings of one control and they never coexist:
+
+     · `screen-shell-assistant-trigger` — a `Button variant="secondary"` in
+       the phone's top bar. It is `md:hidden`'s child, so it exists only
+       below 768, and `variant="secondary"` is PAPER (see its own block: two
+       mango circles in one phone corner is what forced it off the brand
+       fill).
+     · `EdgeHandle` with `edge="aside"` — `HANDLE_HIT`, which is
+       `bg-[var(--btn-primary-fill)]`, i.e. MANGO, and which when SHUT takes
+       `top-[var(--shell-gutter)] end-[var(--shell-gutter)]`: the screen's
+       true top-trailing corner, on the client's own earlier instruction
+       ("move the open assistant button to the top right corner of the
+       screen, real top right corner").
+
+   Her screenshot is a wide ticket screen with a MANGO circle at the TOP
+   RIGHT. Paper is not mango and the narrow trigger cannot paint there at
+   that width, so the control in the picture is the shut `EdgeHandle` and the
+   row this file has to build is the row that circle stands on. (The
+   consuming application is further proof from the other direction: it passes
+   `narrowTopBar={false}` and draws its own phone bar, so the kit's narrow
+   trigger is not even mounted in the product she photographed.)
+
+   AND THE SHUT CORNER IS THE ROW, NOT THE OPEN MID-EDGE POSITION. Open, the
+   handle leaves the corner for `top-1/2` — a close grab on the column's own
+   edge — and what stands at the top of the trailing side instead is the
+   assistant's FOLDER TAB, which the dock's `pb-`-only padding deliberately
+   seats level with the breadcrumb at one `--shell-gutter` down. So both
+   states put an assistant control on the SAME horizontal band, and that band
+   is one gutter from the top of the screen. One block offset answers both.
+
+   WHY THE ROW IS ANCHORED TO THE DOCK AND NOT TO THE HANDLE. The handle
+   moves between states; the dock's LEADING EDGE is the thing the client is
+   actually describing when she says they should move together — it is the
+   boundary the column pushes inland as it opens, and everything on the
+   screen's trailing side is arranged around it. Anchoring to the moving
+   button would need a class swap per state and would jump; anchoring to the
+   dock needs no branch at all and glides, because `.motion-column-collapse`
+   is already transitioning that box's inline size and a percentage inset
+   against it resolves on every frame. The whole argument, including the
+   constant trailing reserve that buys it, is at the `asideLead` prop.
+   -------------------------------------------------------------------------- */
+
+/**
+ * THE ROW ITSELF. It paints NOTHING — no fill, no radius, no shadow, no ink —
+ * so there is no ground here to name a utility class for, and the two-radii
+ * rule is untouched: the only radius on this line belongs to the caller's own
+ * node and to the opener beside it.
+ *
+ * `absolute` AND `z-10`, THE SAME RUNG AS `HANDLE_HIT`, because it is the
+ * same problem and they are one row. Above `lg` the dock is an ordinary
+ * in-flow flex item at `z-auto`, and this row hangs out of it over the card
+ * — which is `relative z-[2]` (see `CARD`). At the default stack level the
+ * card would paint over the caller's node and the client would see nothing
+ * at all. Ten is what the handle already spends for exactly this overhang,
+ * so the row and the button it stands beside resolve at one level rather
+ * than at two that have to be kept in agreement. Below `lg` the dock takes
+ * `z-[3]` and becomes a stacking context of its own, which contains this 10
+ * harmlessly and still leaves the row over the card (3 > 2).
+ *
+ * `pointer-events-auto` TAKES THE EVENTS BACK from the dock's
+ * `max-lg:pointer-events-none`, exactly as the panel and the handle do, and
+ * for the same reason and with the same unconditional spelling: it is a
+ * no-op above `lg`, and one class that is always true beats two that have to
+ * agree. Without it the caller's node would be a control you can see and
+ * cannot press between 768 and 1024 — the precise defect the phone's top bar
+ * already found and fixed once, and it is not being reintroduced here.
+ *
+ * `max-md:hidden` IS `display: none`, so below `md` the caller's node is out
+ * of the tab order and out of the accessibility tree rather than merely
+ * unpainted. Which is the point: the application draws its own copy in its
+ * own phone bar, and two reachable copies of one live clock is what this
+ * suppression exists to prevent. The full ruling is at the prop.
+ *
+ * THE HEIGHT AND THE INSET ARE THE OPENER'S OWN TWO NUMBERS.
+ * `h-[var(--control-height-button)]` is what `HANDLE_HIT` sizes the circle
+ * with; `top-[var(--shell-gutter)]` (in `placement`) is what its shut branch
+ * insets by. Same tokens, so "exactly at the same level" is a shared centre
+ * line by derivation and cannot drift when the density scale moves both.
+ * `items-center` is what makes the two centres meet rather than the two tops.
+ *
+ * `w-max`, AND IT IS NOT DECORATION. An absolutely positioned box with an
+ * `end` inset and `width: auto` is shrink-to-fit against the space left
+ * between that inset and the containing block's other edge — and this row's
+ * inset is `100%` of a box that is one gutter wide when the assistant is
+ * shut, so the available width computes NEGATIVE and the box collapses to
+ * its min-content floor: a pill folded onto three lines. `max-content` opts
+ * out of that computation entirely and lets `max-w` do the constraining.
+ *
+ * `max-w-[40vw]` IS THE ASSISTANT'S OWN CAP, borrowed rather than invented —
+ * the panel below takes `lg:max-w-[40vw]` so a docked column can never eat
+ * the card, and this row is the same kind of trailing-edge chrome making the
+ * same promise to the same card. What it protects here is the BREADCRUMB,
+ * which shares this line from the leading side; three fifths of the row is
+ * always the trail's. A viewport unit rather than a percentage because a
+ * percentage would resolve against the DOCK, which is one gutter wide when
+ * shut and would cap the row at nothing.
+ *
+ * `[&>*]:min-w-0` IS THE TRUNCATION ENABLER AND IT IS THE ONE THING THIS ROW
+ * IMPOSES ON ITS CONTENTS. A flex item's default `min-width: auto` is its
+ * min-content size, so a caller's `truncate` never engages and the node
+ * overflows the cap instead of ellipsing inside it. This is the identical
+ * one-line concession `.motion-column-collapse > *` already makes in
+ * motion.css §7, for the identical reason, and it is layout rather than
+ * style: it sets no colour, no size and no type, and a node that does not
+ * truncate is unaffected by it.
+ */
+const ASIDE_LEAD = cn(
+  "absolute z-10 pointer-events-auto max-md:hidden",
+  "flex h-[var(--control-height-button)] w-max max-w-[40vw] items-center justify-end",
+  "[&>*]:min-w-0",
+);
+
+interface AsideLeadProps {
+  /**
+   * WHERE IT STANDS, chosen by the caller from whether there is an assistant
+   * to stand beside — one string carrying both axes and the trailing
+   * reserve, the same shape and the same argument as `EdgeHandle.placement`
+   * ("no second prop, no boolean meaning 'but not centred'"). There are
+   * exactly two values and both are written out at the two call sites below.
+   */
+  placement: string;
+  children: React.ReactNode;
+}
+
+function AsideLead({ placement, children }: AsideLeadProps) {
+  return (
+    <div
+      data-slot="screen-shell-aside-lead"
+      /* `data-level="ground"` — THE SPINE'S OWN PAPER IS WHAT IS BEHIND THIS
+         ROW, in both of its positions, and the attribute says so for the
+         harnesses that read levels off the DOM. Shut, it stands in the
+         screen's trailing gutter, which is ground by construction. Open, it
+         stands over the card's trailing corner — but it is not IN the card,
+         it does not scroll with the body and it takes none of the card's
+         tone; it is chrome pinned to the screen, which is the whole of the
+         client's "out of the main body". The one condition worth naming: a
+         screen that passes NO breadcrumb starts its card at this same gutter,
+         so the row overhangs the card's top corner there. That is not new and
+         it is not this slot's — the shut opener has overhung exactly that
+         corner since it moved there, and the screens the client is looking at
+         all carry a trail. */
+      data-level="ground"
+      className={cn(ASIDE_LEAD, placement)}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------------------
    THE PHONE'S TOP BAR — THE ASSISTANT AND THE READER'S OWN FACE, IN THAT
    ORDER, ON THE GROUND, AT EVERY MOMENT. CLIENT-ORDERED 2026-09-04.
 
@@ -2887,6 +3157,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
       onAsideOpenChange,
       asideOpenLabel = "Open the assistant",
       asideCloseLabel = "Close the assistant",
+      asideLead,
       navGroups,
       navCurrent,
       onNavSelect,
@@ -4255,17 +4526,18 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 own reference for how dim is the drawer scrim the kit already
                 draws on a desktop.
 
-                SO IT IS THAT SCRIM, TO THE CHARACTER. The colour expression
-                is copied from `components/sheet/sheet.tsx`'s own `SCRIM`
-                const — `color-mix(in srgb, var(--kw-charcoal) 28%,
-                transparent)` — rather than re-derived, because the kit's
-                drawer scrim is a stated value (`.kw-scrim--drawer`, charcoal
-                at 28%, GAPS-A.md OVL-2) and two places computing it is two
-                places for it to drift. `--kw-charcoal` is the raw palette
-                layer and is reached deliberately for that file's reason: no
-                semantic token stays charcoal in both palettes. Measured
-                against a `Sheet` at 380 and it is the same colour and the
-                same 28%.
+                SO IT IS THAT SCRIM, BY NAME. This used to COPY the colour
+                expression out of `components/sheet/sheet.tsx`'s own `SCRIM`
+                const so the two could not drift — the right instinct with
+                the wrong mechanism, since a copied expression drifts the
+                moment somebody edits one of the two. Since 2026-09-07 the
+                drawer scrim is a token (`--scrim-drawer`, tokens.css §3,
+                bridged in §10) and both files consume the same NAMED
+                utility, which is what GAPS-A.md OVL-2 asked for. Same
+                `.kw-scrim--drawer` value, charcoal at 28%, identical in both
+                palettes. Measured against a `Sheet` at 380 before the change
+                and it was the same colour and the same 28%; the token
+                substitutes the same expression, so it still is.
 
                 `.motion-scrim` AND `data-state`, WHICH IS THE WHOLE OF ITS
                 MOTION. motion.css §3 fades it in over `--duration-overlay`
@@ -4328,7 +4600,7 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                 className={cn(
                   "hidden max-[45rem]:block",
                   "absolute inset-0",
-                  "bg-[color-mix(in_srgb,var(--kw-charcoal)_28%,transparent)]",
+                  "bg-scrim-drawer",
                   "motion-scrim",
                   isAsideOpen && "pointer-events-auto",
                 )}
@@ -4779,7 +5051,105 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                   : "max-md:hidden top-[var(--shell-gutter)] end-[var(--shell-gutter)]",
               )}
             />
+
+            {/* THE ASSISTANT'S ROW, FILLED — the client's timer, or whatever
+                the next caller needs beside the one control that is always in
+                the same corner. The whole ruling is at the `asideLead` prop
+                and the mechanism is at `ASIDE_LEAD`; what is decided HERE is
+                only the anchor, and it is ONE STRING FOR BOTH STATES.
+
+                `top-[var(--shell-gutter)]` — the shut handle's own block
+                inset, from the same token, so the two share a centre line.
+                It is also the line the assistant's folder tab sits on when
+                the column is open (the dock pays its top gutter inside the
+                tab), so the row is level with an assistant control in both
+                states rather than in one.
+
+                `end-full` — THE ANCHOR, AND THE ANSWER TO "if I open the
+                assistant, they should also move". `inset-inline-end: 100%`
+                against this dock puts the row's trailing margin edge exactly
+                on the dock's leading edge. The dock's width IS the column's
+                width plus its gutters, and that width is transitioned by
+                `.motion-column-collapse` — so opening the assistant carries
+                this row inland on every frame of the same easing, with no
+                second animation, no duration named in this file (law 6.1)
+                and no class swapped on the frame the state flips.
+
+                IT WORKS AT EVERY WIDTH BECAUSE IT ASKS THE DOCK RATHER THAN
+                THE FLOW. Above `lg` the dock is an in-flow flex item and the
+                card genuinely shrinks beside it; between `md` and `lg` the
+                dock is `absolute` and OVERLAYS the card instead. A row that
+                had been anchored to the content column's own trailing edge
+                would have been correct above `lg` and buried under the open
+                panel below it — the column does not move down there. This
+                anchor is the same distance from the same edge in both.
+
+                `me-[calc(var(--control-height-button)+var(--space-2h))]` —
+                THE OPENER'S OWN FOOTPRINT, RESERVED IN BOTH STATES. Shut,
+                the handle occupies exactly `--control-height-button` inside
+                the corner this row would otherwise run into, and `--space-2h`
+                is the gap `Stopwatch` itself sets between the parts of a
+                pill, so the client's own component supplies the air between
+                her timer and her circle. Open, the handle has left for the
+                mid-edge and the band is empty, which makes the row sit a
+                little further from the tab than it sits from the circle —
+                and that asymmetry is the price of the glide. Branching the
+                reserve on `isAsideOpen` would recover ~47px of tightness and
+                turn a continuous travel into a jump on the state frame; a
+                CSS transition on the margin would be this component writing
+                motion, which is law 6.1 with the sign flipped. Both were
+                rejected. A constant reserve of a band the opener stands in
+                half the time is the honest third answer.
+
+                LOGICAL INSETS THROUGHOUT — `end`, `me`, and a `top` that is
+                on the axis that does not mirror. The row is on the reading
+                end in LTR and on the reading end in RTL, which is what "on
+                the left of the assistant button" means to a reader of
+                Arabic, and it is the same rule the phone's top bar states for
+                its own cluster. */}
+            {asideLead ? (
+              <AsideLead
+                placement={cn(
+                  "top-[var(--shell-gutter)] end-full",
+                  "me-[calc(var(--control-height-button)+var(--space-2h))]",
+                )}
+              >
+                {asideLead}
+              </AsideLead>
+            ) : null}
           </div>
+        ) : asideLead ? (
+          /* NO ASSISTANT ON THIS SCREEN, AND THE ROW IS STILL DRAWN — the
+             decision is argued in full at the `asideLead` prop and the short
+             version is that a clock which disappears because a screen has no
+             assistant is a clock that stopped existing while it was still
+             running.
+
+             IT MOVES TO THE ROW'S END rather than to nothing. There is no
+             dock to anchor to — `hasAside` false renders none — so this
+             instance is a child of the SCREEN itself (`relative isolate`,
+             see `SCREEN`), and it takes the corner the shut opener would have
+             taken: `top-[var(--shell-gutter)] end-[var(--shell-gutter)]`, the
+             same two tokens, which is also flush with the content column's
+             own trailing inset on a screen with no aside (that column keeps
+             its `pe-[var(--shell-gutter)]` at every width when nothing is
+             there to pay it — see the column's own block).
+
+             AND THE TRAILING RESERVE IS GONE WITH THE OPENER. There is no
+             circle in this corner to clear, so reserving its footprint would
+             leave the row floating 47px short of an edge with nothing beside
+             it — a gap that pointed at an absent control. The reserve exists
+             to make room for something; where there is nothing, there is no
+             room to make.
+
+             `max-md:hidden` STILL APPLIES, from `ASIDE_LEAD` and not from
+             here: the rule is "this row is the wide screen's", one sentence
+             for the caller to remember, and it does not acquire an exception
+             on the screens that happen to have no assistant. The application
+             draws its own narrow copy in its own phone bar either way. */
+          <AsideLead placement="top-[var(--shell-gutter)] end-[var(--shell-gutter)]">
+            {asideLead}
+          </AsideLead>
         ) : null}
       </div>
     );

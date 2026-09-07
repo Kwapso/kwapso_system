@@ -158,13 +158,47 @@
 // own stable `data-slot`, applied from a wrapper the kit never sees. It lands
 // on the ONE scrolling body div every form's fields already flow through
 // (below), which is why one selector reaches every field of every one of
-// this shell's 37 callers rather than 37 edits. `order-first` moves the
-// marker to the row's leading edge (flex `order` matches on the element
-// itself regardless of which ancestor's class named the selector); `me-auto`
-// (margin-inline-end, so it mirrors correctly in Arabic, Urdu and Persian)
-// pushes the label away to the row's trailing edge instead of leaving the two
-// glued together at `gap-2` — "total left", genuinely separated from the
-// title, not just swapped to its other side.
+// this shell's 37 callers rather than 37 edits.
+//
+// ── AND THE SAME RULING, REVERSED, 2026-09-07 ───────────────────────────────
+//
+// CLIENT, verbatim, on the ticket form: "title always left, required always
+// right." That is the mirror image of point 3 above, from the same person
+// eight days later, and it is why the sentence above is KEPT rather than
+// rewritten: the shape she asked for in August is what she is now correcting,
+// and a note that pretends the first ruling never happened is a note that
+// invites somebody to "fix" this back next month.
+//
+// SEEN, NOT INFERRED (localhost against staging, 2026-09-07). Every required
+// field in every one of this shell's dialogs was drawing its label row as
+// `Required` hard against the left edge and the label pushed to the far
+// right — computed `order: -9999`, `margin-right: 160.9px` on the marker of a
+// field whose label read "What do you need help with?". On the ticket form
+// that put the word `Required` directly under the TITLE box and 169px away
+// from the word `Module` it actually belongs to, which is the "the module
+// selector is broken" the client reported and attached a screenshot of. It
+// was never the module picker: it was this one selector, on every field of
+// every form, and the module row is simply where she happened to be looking.
+//
+// So the pair flips and nothing else changes. `order-last` puts the marker at
+// the row's TRAILING edge (flex `order` matches on the element itself
+// regardless of which ancestor's class named the selector); `ms-auto`
+// (margin-inline-START, the mirror of the `me-auto` it replaces, so it still
+// reverses correctly in Arabic, Urdu and Persian) claims the free space
+// BEFORE the marker, which pushes it to the far end and leaves the label
+// alone at the leading edge — "always left" and "always right", the two ends
+// of one row, rather than the two glued together at `gap-2`.
+//
+// THE HONEST FIX IS UPSTREAM, and it is one line: the kit Field's own label
+// header row (the `flex items-baseline gap-2` div that holds the Label and this
+// marker) wants `justify-between`, with `min-w-0` on the label and `shrink-0`
+// on the marker so a long label truncates instead of shoving it off the end.
+// (The path is deliberately not spelt out — `wrapped-strings.test.ts` bans that
+// substring from every file but the seam that imports it.) That
+// is a change to a VENDORED file, which is Aurora's to make in
+// Kwapso/kwapso-ui-ux and pull; until it lands the override below is the app
+// saying the same thing from outside, which is the only place the app is
+// allowed to say it.
 //
 // ── THE ✕ WAS A SECOND CANCEL, AND THE SUBTITLE WENT WITH IT, 2026-08-31 ────
 //
@@ -358,17 +392,21 @@ export function FormShell({
           `border-t` names no colour token and Tailwind resolves that to
           `currentColor` (ink), not the pale `--hair` every other hairline in
           the kit draws.
-          THE REQUIRED-MARKER OVERRIDE (same note, point 3): every `Field` in
-          every form flows through this one div, so the descendant selector
-          reaches all of them from here rather than at 37 call sites. It
-          targets the vendored kit's own stable `data-slot="field-required"`
-          and touches nothing else — the hand-edit ban
-          (`web/test/vendored-kit.test.ts`) is on `shared/ui/`'s own files,
-          never on a selector reaching them from outside. */}
+          THE REQUIRED-MARKER OVERRIDE (same note, point 3, and its 2026-09-07
+          reversal): every `Field` in every form flows through this one div, so
+          the descendant selector reaches all of them from here rather than at
+          37 call sites. It targets the vendored kit's own stable
+          `data-slot="field-required"` and touches nothing else — the hand-edit
+          ban (`web/test/vendored-kit.test.ts`) is on `shared/ui/`'s own files,
+          never on a selector reaching them from outside.
+          `order-last` + `ms-auto` = label at the leading edge, marker at the
+          trailing one ("title always left, required always right"). This pair
+          was `order-first` + `me-auto` — the August ruling — and flipping the
+          two words is the whole of the fix. */}
       <div
         className={cn(
           "overflow-y-auto overscroll-contain px-6 py-5 shadow-[var(--hairline-over)]",
-          "[&_[data-slot=field-required]]:order-first [&_[data-slot=field-required]]:me-auto",
+          "[&_[data-slot=field-required]]:order-last [&_[data-slot=field-required]]:ms-auto",
         )}
       >
         <div className="flex flex-col gap-4">{children}</div>

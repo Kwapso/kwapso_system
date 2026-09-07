@@ -14,6 +14,7 @@ import {
 } from "@/lib/live-resources"
 import {
   HELP_STATUSES,
+  OPEN_TAB_STATUSES,
   TICKET_TYPE_KEPT_FOR_MIGRATION,
   type HelpStatus,
 } from "@shared/types"
@@ -223,7 +224,7 @@ describe("which filters a ticket tab offers", () => {
        an ordinary row rather than as an exception. */
     const HERS: Record<string, string[]> = {
       "status:ready": ["accountId", "appId", "helpType"], // Ready — derived, not named
-      "status:triaged,scheduled,in_progress": ["accountId", "appId", "helpType", "status"], // "On open …"
+      [OPEN_FACET]: ["accountId", "appId", "helpType", "status"], // "On open …"
       waiting: ["accountId", "appId", "helpType"], // "On waiting, client, app, and type"
       "status:resolved": ["accountId", "appId", "helpType"], // "On closed client app type"
       all: ["accountId", "appId", "helpType", "status"], // "On all client app type status"
@@ -238,13 +239,26 @@ describe("which filters a ticket tab offers", () => {
       ].filter(Boolean)
       expect(got, `the tab \`${token}\` does not offer what the client asked for`).toEqual(fields)
     }
-    // The Open tab's Status offers the three stages it spans and NOT the four
-    // it does not. "Resolved" is the one that would be most obviously wrong.
-    expect(helpTabFacets("status:triaged,scheduled,in_progress").statuses).toEqual([
-      "triaged",
-      "scheduled",
-      "in_progress",
-    ])
+    /* The Open tab's Status offers exactly the stages it SPANS and none of the
+       ones it does not. "Resolved" is the one that would be most obviously
+       wrong, and `new` the one that would be quietly wrong.
+
+       READ OFF `OPEN_TAB_STATUSES` RATHER THAN TYPED OUT, and 2026-09-07 is why:
+       the client ruled "in open, include status ready and waiting", `ready`
+       joined that array (shared/types.ts carries the ruling and what it cost),
+       and this line had spelled the old three — so it would have failed while
+       being perfectly correct about a set nobody uses any more. A test that
+       copies the constant it is checking measures the copy. What is worth
+       asserting here is the RELATIONSHIP: the facet's options are the tab's own
+       span, in the tab's own order, with the stages outside it absent. */
+    expect(helpTabFacets(OPEN_FACET).statuses).toEqual([...OPEN_TAB_STATUSES])
+    for (const outside of HELP_STATUSES.filter(
+      (st) => !(OPEN_TAB_STATUSES as readonly string[]).includes(st)
+    ))
+      expect(
+        helpTabFacets(OPEN_FACET).statuses,
+        `the Open tab offers "${outside}", a stage its own list cannot contain`
+      ).not.toContain(outside)
     expect(helpTabFacets("all").statuses).toEqual([...HELP_STATUSES])
   })
 
@@ -282,7 +296,7 @@ describe("which filters a ticket tab offers", () => {
       expect(fields, `${name}'s toolbar draws the wrong set of filters`).toEqual(want)
     }
 
-    const open = built("status:triaged,scheduled,in_progress")
+    const open = built(OPEN_FACET)
     // EVERY OPTION WEARS A MARK, and none of them is the whole answer: the word
     // is the label and the mark rides beside it. A menu with a face on four rows
     // and nothing on the fifth reads as the broken row.
@@ -453,5 +467,145 @@ describe("which filters a ticket tab offers", () => {
       code.includes("waiting: TriageWaiting[],"),
       "narrowTriage no longer takes the queue's own bounded list — if the triage door started paging, its facets must move to the door too"
     ).toBe(true)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE OPEN TAB'S BOARD — five columns, and the two of them that are not the
+   same KIND of thing as the other three.
+
+   CLIENT, 2026-09-07, verbatim: "in open, include status ready and waiting /
+   add them after / with this 5 columns, use all width available in screen".
+
+   WHY THIS IS A SOURCE SCAN AND NOT A RENDER. Everything worth locking here is
+   about where a number and a set of cards COME FROM, and both of those are
+   invisible to a rendered board: a column fed from the loaded page and a column
+   fed from the door's own count look identical on screen and identical in the
+   DOM. The failure this guards is R16's founding one — a column counting rows
+   the screen will not show — and it is a wiring fault, so it is read off the
+   wiring. `tickets-collection.tsx` does not export `OpenBoard`, and exporting a
+   component so a test can mount it would be widening the file's surface to
+   check something the file's own text already states.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("the Open tab's board", () => {
+  /** The `<Kanban …>` tag, sliced out so an assertion about the BOARD cannot be
+   * satisfied by something else on this 3,600-line screen. */
+  const board = (() => {
+    const at = code.indexOf("<Kanban")
+    expect(at, "the Open tab no longer draws the kit's board").toBeGreaterThan(-1)
+    const end = code.indexOf("\n    />", at)
+    expect(end, "the Kanban tag is not closed where this slice expects").toBeGreaterThan(at)
+    return code.slice(at, end)
+  })()
+
+  it("takes its stage columns from OPEN_TAB_STATUSES, so it cannot show one the tab's list denies", () => {
+    /* THE WHOLE OF 2026-09-07's TENSION, IN ONE ASSERTION. `ready` could have
+       been added as a COLUMN while the Open tab's own list kept refusing ready
+       tickets — the board would then have counted rows the screen underneath it
+       does not have, which is R16's founding defect. It was added to
+       `OPEN_TAB_STATUSES` instead, and this is what holds that: the columns are
+       MAPPED off that array rather than written out, so the board, the tab's
+       query, its badge and its Status facet are one fact. A future stage joins
+       all five surfaces or none. */
+    expect(
+      /columns=\{\[\s*\.\.\.OPEN_TAB_STATUSES\.map\(/.test(board),
+      "the board's stage columns are no longer mapped off OPEN_TAB_STATUSES — a hand-written column can show a stage the Open tab's own list refuses"
+    ).toBe(true)
+    for (const stage of OPEN_TAB_STATUSES)
+      expect(
+        helpTabFacets(OPEN_FACET).statuses,
+        `the board would draw a "${stage}" column for a stage the Open tab does not span`
+      ).toContain(stage)
+  })
+
+  it("adds Waiting as a fifth column, AFTER the stages, fed by its own door read", () => {
+    /* WAITING IS NOT A `GROUP BY status` BUCKET. There is no waiting column in
+       the database and no flag on a loaded row (`waitingClause`,
+       workers/content/src/lib/help.ts), so the cards cannot be a slice of the
+       Open page and the count cannot be a term of `byStatus`. Both come from
+       the door's own answer to the Waiting question — the SAME cache key the
+       Waiting tab rests on, so the tab and the column can never disagree. */
+    const stages = board.indexOf("...OPEN_TAB_STATUSES.map(")
+    const waiting = board.indexOf("id: WAITING")
+    expect(waiting, "the board has no Waiting column — the client asked for five").toBeGreaterThan(-1)
+    expect(
+      waiting > stages,
+      'the Waiting column is drawn before the stages — the client said "add them after"'
+    ).toBe(true)
+    expect(
+      /count:\s*narrowed \? undefined : waitingTotal/.test(board),
+      "the Waiting column's number is not the door's own total for the waiting question — `.length` there would be page one under a badge counting all of them (R14/R16)"
+    ).toBe(true)
+    expect(
+      /helpFacetKey\(teamId, "all", WAITING\)/.test(code),
+      "the board's waiting cards no longer come from the Waiting tab's own cache key — the column and the tab can now disagree about who is waiting"
+    ).toBe(true)
+  })
+
+  it("repeats cards rather than moving them, and says so where the reader is", () => {
+    /* A waiting ticket is ALSO triaged / scheduled / in progress / ready, so it
+       is drawn twice: once in the stage it is genuinely in, once here. The
+       alternative ("waiting wins") would take it out of its stage column and
+       make the four stage columns lie about the work.
+       THAT COSTS NO TOTAL, and this is the half that has to be checked rather
+       than reasoned about: nothing adds the columns up. The kit's only summary
+       is `footnoteMeta` and it is deliberately not passed, and the Open TAB's
+       badge sums the STAGES only — so the collection is still counted exactly
+       once on this screen. The footnote carries the sentence a reader needs,
+       because five columns beside each other read as five buckets. */
+    expect(
+      board.includes("footnoteMeta"),
+      "the board passes the kit's own summary line — with a repeating column that number would double-count"
+    ).toBe(false)
+    expect(
+      code.includes("formatCount(OPEN_TAB_STATUSES.reduce("),
+      "the Open tab's badge is no longer the sum of its stages' own disjoint counts"
+    ).toBe(true)
+    expect(
+      /badge: formatCount\(OPEN_TAB_STATUSES\.reduce[\s\S]{0,120}waiting/i.test(code),
+      "the Open tab's badge has taken a waiting term — waiting overlaps the stages, so adding it counts tickets twice"
+    ).toBe(false)
+    for (const half of ["Waiting repeats cards from the stages before it", "Waiting repeats those same tickets"])
+      expect(
+        code.includes(half),
+        `the board's footnote no longer tells the reader that the last column repeats the ones before it: "${half}"`
+      ).toBe(true)
+  })
+
+  it("stays READ-ONLY — the kit makes that a property of the API, not a promise", () => {
+    /* No `onMove` means no card is draggable, no card takes the move keys and
+       no drop target lights up (the kit's own doc). Two reasons, and the second
+       one arrived with the fifth column: `scheduled`, `in_progress` and `ready`
+       are flipped by work landing in a sprint, a timer starting and the last
+       story closing — a drop would assert a fact by geometry — and "waiting" is
+       not a status at all, so a drop into that column has no field to write. */
+    expect(
+      board.includes("onMove"),
+      "the board took an onMove — dragging a card would assert a lifecycle fact by geometry, and the Waiting column has no field a drop could write"
+    ).toBe(false)
+    expect(
+      board.includes("onCardSelect"),
+      "a card no longer opens its ticket, which is the one thing this board does"
+    ).toBe(true)
+  })
+
+  it("fills the width by SHARING it, never by escaping the card it sits in", () => {
+    /* "use all width available in screen". Nothing on the path caps the board —
+       `app-shell.tsx`'s one page container is `max-w-none` (R29) and
+       `CollectionCard` sets no measure — so the constraint was the kit's own
+       fixed 18rem column, which neither grows nor shrinks. The fix is the kit's
+       `columnWidth` prop carrying a fluid value, floored at the kit's own
+       stated minimum. NOT a negative margin and NOT a width of this screen's
+       own: either would be a second page measure, which is exactly what R29
+       exists to stop, and the first would also be a lie about where the card
+       ends. */
+    expect(
+      /columnWidth="max\(18rem, calc\(\(100% - 4 \* var\(--space-2h\)\) \/ 5\)\)"/.test(code),
+      "the board's columns no longer share the row's width — five fixed columns overflow a laptop and leave a wide display two-thirds empty"
+    ).toBe(true)
+    expect(
+      /-m[xlrs]?-/.test(board),
+      "the board pulls itself out of its card with a negative margin — nothing on this path sets a width to escape (R29)"
+    ).toBe(false)
   })
 })

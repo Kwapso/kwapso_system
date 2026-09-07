@@ -1,11 +1,14 @@
 "use client"
 
 // Ticket detail — one ticket as a tabbed record: a status STEPPER (the hero control)
-// above Conversation / Overview / Activity tabs. Conversation = the chat (library
-// TicketThread), Overview = audit metadata (OverviewList), Activity = the
-// ticket's history (the GENERIC record-activity feed). Edit + every status move are
-// gated PURELY by help:edit. Replies echo instantly (optimistic) and reconcile with
-// the server reply. Host-composed, like role-detail.
+// above Conversation / Overview tabs. Conversation = the chat (library
+// TicketThread), Overview = audit metadata (OverviewList). The ticket's history
+// (the GENERIC record-activity feed) is not a tab any more — it is reached from
+// the ink footer's Latest activity column, on the client's 2026-09-06 ruling, and
+// web/components/activity-panel.tsx carries that ruling and the argument. Edit +
+// every status move are gated PURELY by help:edit. Replies echo instantly
+// (optimistic) and reconcile with the server reply. Host-composed, like
+// role-detail.
 
 import * as React from "react"
 
@@ -56,9 +59,10 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/record-chrome"
-import { MARK_GROUP, markMap, typeMark } from "@/lib/type-marks"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
 import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -75,12 +79,11 @@ import { ResolveDialog, type ResolveFormValues } from "@/components/resolve-dial
 import { StoryFormDialog } from "@/components/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work-panels"
+import { TicketStages } from "@/components/ticket-stages"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
 import { RecordTimerButton } from "@/components/timer-bar"
 import { ReplyComposer, useReplySend } from "@/components/reply-composer"
 import { OverviewList } from "@/components/overview-list"
-import { ActivityPanel } from "@/components/activity-panel"
-import { TicketStages } from "@/components/ticket-stages"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -422,6 +425,9 @@ export function HelpDetailScreen({
       isAgent: false,
       authorId: myUserId ?? "",
       authorName: "You",
+      // The optimistic echo is always the signed-in staff member, so this is
+      // never a contact (R54) — and "You" has no surname to lose either way.
+      authorIsClient: false,
       createdAt: new Date().toISOString(),
     }
     // ~instant echo (WhatsApp-style). It takes over from the pending bubble at
@@ -549,7 +555,11 @@ export function HelpDetailScreen({
 
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
-    author: r.authorName || "Member",
+    // R54: a thread in the agency app has BOTH sides on it. A colleague is named
+    // by their first name; a contact who replied about their own question keeps
+    // their name whole. `authorIsClient` is the row's own answer — the same
+    // `from_client` subselect the portal's redaction already runs.
+    author: (r.authorIsClient ? r.authorName : staffNameFromSnapshot(r.authorName)) || "Member",
     time: formatRelative(r.createdAt, t, lang),
     // The reply as the reader asked for it: what was typed, or the translation
     // they pressed for. Never both, and never a stored rewrite of somebody's
@@ -643,22 +653,21 @@ export function HelpDetailScreen({
         badge: stakeholderBadge,
         badgeVariant: "" as const,
       },
-      /* ACTIVITY LAST, THE FURTHEST RIGHT — client, 2026-09-06: "in all the
-         screens across the app, Activity is always the last tab". It sat third
-         here, with Related stories, Work logs, Files and links and Stakeholders
-         to its right, which made the ticket the one record where the log
-         interrupted the record. Activity is the only tab that is ABOUT the
-         record rather than part of it, so it belongs where a person stops
-         looking. `web/test/activity-is-the-last-tab.test.ts` holds the rule for
-         every screen, because appending a new tab — the ordinary way to add one
-         — is also the way to break it. */
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      /* NO ACTIVITY TAB. It was the last tab here for exactly one day. The
+         client, 2026-09-06: "in all the screens across the app, Activity is
+         always the last tab" — it had sat third, with Related stories, Work
+         logs, Files and links and Stakeholders to its right, which made the
+         ticket the one record where the log interrupted the record. Moving it
+         to the end was the right answer to the question she was asking, and the
+         SAME day she answered a bigger one: "I don't want to have activity as a
+         tab anywhere but on the footer, on top of the dates. On the right
+         column, on Latest Activity, I would like some view or expand or
+         whatever, and this would open a slide-in with all the activity." A tab
+         that is ABOUT the record rather than part of it does not belong at the
+         end of the strip; it belongs off the strip. Ruled again 2026-09-07:
+         "kill all old activity tabs." web/components/activity-panel.tsx carries
+         the argument, and the feed itself is unchanged — see `activity` on
+         `RecordScreen` below. */
     ],
   }
 
@@ -780,9 +789,15 @@ export function HelpDetailScreen({
 
   return (
     <RecordScreen
-      // The glyph the team set beside this ticket type on the Dropdown values
-      // screen, in the square the header band keeps for it (G3).
-      mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
+      // NO MARK — client ruling, 2026-09-07, "for type, kill the emojis. this
+      // is legacy. in current system we use colors." The square the header band
+      // keeps for a glyph (G3) held the team's own emoji for this ticket's
+      // kind, read off the Dropdown values screen. The kind is drawn by
+      // `chips` below instead, as the coloured pill every other ticket surface
+      // in the app already uses (`Swatch` + `ticketTypeColour`), so nothing
+      // about this header stopped saying what kind of ticket it is.
+      // `web/lib/type-marks.ts` carries the whole ruling and what it did NOT
+      // touch (the stored glyphs, and the other record kinds).
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself
@@ -860,8 +875,31 @@ export function HelpDetailScreen({
         createdAt: ticket.createdAt,
         editedByName: ticket.editorName,
         updatedAt: ticket.updatedAt,
+        // R54, and this is the ONE record detail in the app whose creator may be
+        // a client: staff raise 220 of every 221 tickets on a contact's behalf,
+        // but a contact raising their own question through the portal is the
+        // whole point of the portal. The row already knows which, so the footer
+        // is told rather than left to guess.
+        createdByIsClient: ticket.raiserIsClient,
+        editedByIsClient: ticket.editorIsClient,
       }}
       activity={activity}
+      // THE STAGE STRIP, AT THE TOP OF THE ACTIVITY RAIL — the client asked to
+      // read a ticket's stage history "in activity" ("closed on x, reopen on y,
+      // closed again on z", 2026-09-06, "keep it in activity"). That placement
+      // ruling never changed; what moved is where "in activity" IS. It was the
+      // Activity tab, above the feed; the tab is gone (2026-09-06 · 2026-09-07)
+      // and the slide-in off this footer's Latest activity column is the room
+      // that replaced it, so the strip goes there — above the same feed it was
+      // always written to sit above (ticket-stages.tsx's own header argues why
+      // it belongs beside that feed and not instead of it: the feed cannot say
+      // the SEQUENCE or the arithmetic, and this cannot say what was said).
+      //
+      // THE ONE RECORD TYPE THAT PASSES THIS. `activityHead` is a slot on
+      // `RecordScreen` rather than something the rail knows about, because a
+      // stage ladder is true of a ticket and of none of the other thirteen
+      // details — the rail must not learn what a ticket is.
+      activityHead={<TicketStages ticketId={helpId} />}
       onAddNote={can("help", "create") ? activity.addNote : undefined}
       notePlaceholder={t("Add a note")}
     >
@@ -873,25 +911,14 @@ export function HelpDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return (
-              /* THE SEQUENCE, THEN THE STORY. The client asked to read a
-                 ticket's stage history "in activity" — "closed on x, reopen on
-                 y, closed again on z" (2026-09-06) — and the feed below already
-                 writes a sentence for every status move. So the strip is not a
-                 second telling of those sentences: it is the three things a
-                 feed structurally cannot say (which rungs, in what order, for
-                 how long each), above the feed that says everything else.
-                 web/components/ticket-stages.tsx carries the argument. */
-              <div className="flex flex-col gap-4">
-                <TicketStages ticketId={helpId} />
-                <ActivityPanel
-                  activity={activity}
-                  onAddNote={can("help", "create") ? activity.addNote : undefined}
-                  notePlaceholder={t("Add a note")}
-                />
-              </div>
-            )
+          /* NO ACTIVITY PANEL HERE, AND NO STAGE STRIP EITHER. This branch
+             drew `<TicketStages>` above `<ActivityPanel>` while there was an
+             Activity TAB to draw them in. There is not: the client killed the
+             tab across the app (2026-09-06 · 2026-09-07) and both moved
+             together into the slide-in off the footer's Latest activity
+             column, which is where `activityHead` and `activity` (above) send
+             them now. Neither was re-homed onto some other tab in between,
+             which is the placement nobody asked for. */
           // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
           // answer many tickets and one ticket may need many stories, so this is
           // a collection with its own create action — and the button is the
@@ -968,7 +995,15 @@ export function HelpDetailScreen({
                   {
                     id: "description",
                     side: "theirs",
-                    author: ticket.raisedByContactName || ticket.raiserName || undefined,
+                    // The CONTACT this was raised for wins, whole — they are the
+                    // person the question belongs to. Failing that it is whoever
+                    // typed it, named by the R54 rule for their own population.
+                    author:
+                      ticket.raisedByContactName ||
+                      (ticket.raiserIsClient
+                        ? ticket.raiserName
+                        : staffNameFromSnapshot(ticket.raiserName)) ||
+                      undefined,
                     body: <RichText html={translation.of(ticket.description)} />,
                   },
                   /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE

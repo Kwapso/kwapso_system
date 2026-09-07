@@ -34,6 +34,7 @@ import { Prohibit, Key, LinkSimple, Power, UserMinus } from "@shared/ui/foundati
 import type { AccountDetail } from "@shared/types"
 import { tenancy } from "@/lib/api"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { useLanguage, useT } from "@shared/web/language"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -408,7 +409,11 @@ export function PortalAccessPanel({
               </span>
               <span className="text-muted-foreground text-xs">
                 {p.active ? t("Can sign in") : t("Access taken away")}
-                {p.grantedByName ? ` · by ${p.grantedByName}` : ""}
+                {/* R54: whoever granted a portal login is one of ours — the grant door
+                    is not on the portal's surface. The SEARCH above deliberately
+                    still reads the stored name, so a colleague remains findable
+                    by surname while the line says one word. */}
+                {p.grantedByName ? ` · by ${staffNameFromSnapshot(p.grantedByName)}` : ""}
                 {p.grantedAt ? ` · ${formatDate(p.grantedAt, lang)}` : ""}
               </span>
               {canRevoke &&

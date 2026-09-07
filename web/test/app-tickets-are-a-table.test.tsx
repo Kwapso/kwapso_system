@@ -77,7 +77,15 @@ function show() {
     <AppTicketsTab
       teamId="T1"
       appId="AP_1"
-      marks={new Map([["Issue", "🐛"]])}
+      /* NO `marks`, and no such prop to pass one to any more. This call site
+         and `app-detail.tsx`'s stopped passing them on 2026-09-07 — client,
+         over the ticket list's Type column: "for type, kill the emojis. this is
+         legacy. in current system we use colors." `MARK_GROUP.ticket` is gone
+         (web/lib/type-marks.ts carries the ruling and what it left alone), and
+         both ticket panels have since dropped the prop and the mark they drew
+         with it: a ticket row's kind is the coloured pill alone. The story and
+         sprint panels in work-panels.tsx still take `marks` and still draw
+         them — those record kinds kept their glyphs. */
       helpTypeOptions={["Issue", "Question"]}
       host={{ base: "/t/T1" }}
       ticketTotal={2}

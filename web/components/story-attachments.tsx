@@ -62,6 +62,7 @@ import { safeHref } from "@shared/web/rich-text"
 
 import { isFollowable, MAX_SIZE_LABEL, spellSize } from "@/lib/attachments"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { primeCache, useCached } from "@shared/web/store"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import { useLanguage } from "@shared/web/language"
@@ -320,7 +321,13 @@ export function StoryAttachmentsPanel({
                     * Below `sm` the size, the person and the date take a line of
                     * their own and the name gets the width it needs. */}
                   <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
-                    {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t, lang)]
+                    {/* R54: a story is ours end to end — the portal has no story door at
+                      * all, so whoever attached this is a colleague. */}
+                    {[
+                      spellSize(a.sizeBytes),
+                      staffNameFromSnapshot(a.addedByName),
+                      formatRelative(a.createdAt, t, lang),
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>

@@ -44,6 +44,7 @@ import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
 import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -325,7 +326,8 @@ function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket", lang: Langu
   return (
     [
       STORY_STATUS_LABEL[s.status],
-      s.assigneeName ?? "unassigned",
+      // R54: an assignee is always one of ours — a story is agency work.
+      staffNameFromSnapshot(s.assigneeName) || "unassigned",
       s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
       // THE OWNER IS NOT A FACT ABOUT THE ROW. This list hangs off a sprint, an
       // app or a ticket, and it used to name the sprint and the ticket on every
@@ -950,18 +952,12 @@ export function AppMeetingsPanel({
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
 export function AppTicketsPanel({
   appId,
-  marks,
   helpTypeOptions,
   host,
   onNew,
   view,
 }: {
   appId: string
-  /** THE TEAM'S GLYPH FOR EACH TYPE (R35), handed in rather than fetched.
-   * A panel hangs off three different records and has no team id of its own;
-   * the screens that mount it all hold the vocabulary already, so passing it
-   * costs nothing and fetching it here would cost a round trip per panel. */
-  marks?: Map<string, string>
   /** the team's live `Ticket type` values (the same list `tickets-collection.tsx`
    * builds its own strip from) — what the Kind facet below offers. Absent
    * draws no such facet at all, rather than one with nothing in it. */
@@ -1068,10 +1064,16 @@ export function AppTicketsPanel({
           >
             <TableCell>
               <span className={REF_LEADS_NAME}>
-                <RecordMark
-                  mark={marks?.get(ticket.helpType ?? "") ?? null}
-                  name={ticket.helpType ?? "?"}
-                />
+                {/* NO GLYPH LEADS THE NUMBER HERE. A `<RecordMark>` for the
+                    ticket's TYPE used to sit in front of the ref, fed by a
+                    `marks` prop off the mounting record. Client, 2026-09-07:
+                    "for type, kill the emojis. this is legacy. in current
+                    system we use colors." `MARK_GROUP.ticket` is gone
+                    (web/lib/type-marks.ts carries the ruling and what it
+                    deliberately left alone), so the kind is carried by the
+                    coloured pill in the Type column below and by nothing else.
+                    The story and sprint panels in this file still draw theirs:
+                    her sentence was about tickets. */}
                 {/* THE NUMBER LEADS THE TITLE, in "the usual black chip design",
                     through the ONE component that draws one
                     (shared/web/record-ref.tsx). This cell used to spell the
@@ -1249,7 +1251,6 @@ export function AppTicketsPanel({
 export function AppTicketsTab({
   teamId,
   appId,
-  marks,
   helpTypeOptions,
   host,
   onNew,
@@ -1257,7 +1258,6 @@ export function AppTicketsTab({
 }: {
   teamId: string
   appId: string
-  marks?: Map<string, string>
   helpTypeOptions?: string[]
   host: PanelHost
   onNew?: () => void
@@ -1325,7 +1325,6 @@ export function AppTicketsTab({
   return (
     <AppTicketsPanel
       appId={appId}
-      marks={marks}
       helpTypeOptions={helpTypeOptions}
       host={host}
       onNew={onNew}
@@ -1493,7 +1492,12 @@ export function TodosPanel({
           meta:
             todo.completedByName || todo.fileName ? (
               <>
-                {todo.completedByName}
+                {/* R54: a to-do is finished by the client's own person or by one
+                    of ours on the phone with them — `completedByIsClient` is the
+                    row's own answer to which. */}
+                {todo.completedByIsClient
+                  ? todo.completedByName
+                  : staffNameFromSnapshot(todo.completedByName)}
                 {todo.completedByName && todo.fileName ? " · " : null}
                 {todo.fileName &&
                   (fileLink ? (

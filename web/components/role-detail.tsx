@@ -1,8 +1,10 @@
 "use client"
 
-// Role detail — one role at /t/<teamId>/roles/<id>, with the standard record
-// tabs (Law R2): Permissions (the matrix — the main tab), Overview (the audit
-// block), Activity (the generic record feed). The matrix has no screen-engine
+// Role detail — one role at /t/<teamId>/roles/<id>, with two tabs: Permissions
+// (the matrix — the main tab) and Overview (the audit block). Its history is not
+// a third tab any more — it is reached from the ink footer's Latest activity
+// column, on the client's 2026-09-06 ruling; web/components/activity-panel.tsx
+// carries the ruling and the argument. The matrix has no screen-engine
 // block (it's bespoke), so the host composes it from the library
 // PermissionMatrix while the roles LIST is engine-driven. Self-contained: it
 // fetches the role + its permissions cache-first, owns the draft + Save (with
@@ -38,11 +40,9 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import type { PermissionValue, RightSet, RolePermissions, TeamRole } from "@shared/types"
 import { RoleFormDialog } from "@/components/role-form-dialog"
 import { OverviewList } from "@/components/overview-list"
-import { ActivityPanel } from "@/components/activity-panel"
 import { ApiFailure, tenancy } from "@/lib/api"
 import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
 import { RecordMark } from "@shared/web/record-mark"
-import { formatCount } from "@shared/web/format-count"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -71,8 +71,9 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
 
   // The generic record feed (Law R5): every role action lands here — created,
   // details edited, permissions changed, deactivated — including imported roles.
-  // `total` is the door's exact COUNT(*), badged on the tab (R8) through the one
-  // formatCount seam (R16) — never the loaded page's length.
+  // It feeds the ink footer's Latest activity column (and the note composer
+  // beside it), which is where this record's history is read now that there is
+  // no Activity tab — the read itself did not move.
   const activity = useRecordActivity("member_roles", roleId)
 
   // A deactivated role's permissions are frozen + not fetchable (the server 404s
@@ -214,13 +215,9 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     tabs: [
       { value: "permissions", label: t("Access rights"), icon: "shield-check", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a role's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -294,14 +291,6 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("member_roles", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
           // Permissions — the main tab.
           return !role.active ? (
             // Deactivated: permissions frozen (holders keep access); offer reactivate.

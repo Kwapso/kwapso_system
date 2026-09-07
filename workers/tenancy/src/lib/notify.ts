@@ -13,6 +13,7 @@ import { recordWorkerError } from "@shared/workers/error-log"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import { type Audience, recordLink } from "@shared/workers/record-link"
 import type { Env } from "../env"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 
 /** A member's role was changed by someone else.
  *
@@ -41,7 +42,11 @@ export async function notifyRoleChanged(
     })
     await send(env, to, `Your role in ${name} changed`, {
       heading: `Your role in ${name} changed`,
-      intro: `${actorName || "An admin"} changed your role in ${name} on ${brand.name} to ${roleTitle}.`,
+      // R54: these two sentences name a COLLEAGUE — both doors are members
+      // doors and the portal opens neither, so whoever acted is one of ours and
+      // is named by their first name here exactly as on screen. An email is a
+      // render seam like any other; nothing stored changes.
+      intro: `${staffNameFromSnapshot(actorName) || "An admin"} changed your role in ${name} on ${brand.name} to ${roleTitle}.`,
       ctaLabel: link?.label,
       ctaUrl: link?.url,
       footnote: "If you weren't expecting this, reach out to a team admin.",
@@ -64,7 +69,7 @@ export async function notifyRemoved(
     const name = await teamName(env, teamId)
     await send(env, to, `You were removed from ${name}`, {
       heading: `You were removed from ${name}`,
-      intro: `${actorName || "An admin"} removed you from ${name} on ${brand.name}. You no longer have access to it.`,
+      intro: `${staffNameFromSnapshot(actorName) || "An admin"} removed you from ${name} on ${brand.name}. You no longer have access to it.`, // R54
       footnote: "If you think this was a mistake, a team admin can invite you back.",
     })
   } catch (e) {

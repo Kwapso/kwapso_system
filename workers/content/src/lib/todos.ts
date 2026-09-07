@@ -39,6 +39,8 @@ type TodoRow = {
   due_on: string | null
   completed_at: string | null
   completer_name: string | null
+  /** 1 when the completer holds a portal login — see TODO_COLS. */
+  completer_is_client: number
   file_url: string | null
   file_name: string | null
   cancelled_at: string | null
@@ -49,6 +51,11 @@ type TodoRow = {
 }
 
 const TODO_COLS = `t.id, t.ref, t.title, t.detail, t.due_on, t.completed_at, t.completer_name,
+  -- R54: the paragraph below says this name is one of TWO populations — the
+  -- client's own person, or a staff member doing it on the phone with them.
+  -- Both keep their name; only ours is shortened to a first name on screen,
+  -- and this is the only thing that can tell the screen which it is holding.
+  EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = t.completer_id) AS completer_is_client,
   t.file_url, t.file_name, t.cancelled_at, t.account_id, t.ticket_id, t.created_at,
   (SELECT a.name FROM accounts a WHERE a.id = t.account_id) AS account_name`
 
@@ -65,6 +72,7 @@ function toTodo(r: TodoRow): Todo {
     // the client's own (it is their job) or a staff member doing it on the phone
     // with them. Neither is a disclosure about who is doing the WORK.
     completedByName: r.completer_name,
+    completedByIsClient: r.completer_is_client === 1,
     fileUrl: r.file_url,
     fileName: r.file_name,
     cancelled: r.cancelled_at != null,

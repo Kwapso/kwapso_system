@@ -245,6 +245,15 @@ export type ActivityItem = {
   description: string
   /** who did it (name snapshot), or null if unknown */
   actorName: string | null
+  /** WHICH POPULATION THE ACTOR BELONGS TO (R54). A client login is an ordinary
+   * `team_members` row and `toActor` is the only actor constructor in the estate,
+   * so a row a contact authored through the portal — a process comment, a ticket,
+   * a rating, a completed to-do — carries THEIR name in `creator_name` and lands
+   * in this feed beside ours. Staff are shown by first name and a contact is not,
+   * and this is the only thing on the row that can tell the screen which it is
+   * looking at. `false` for a staff actor and for an unknown one, which is the
+   * safe direction: it leaves a name whole rather than truncating one. */
+  actorIsClient: boolean
   createdAt: string
 }
 
@@ -423,12 +432,38 @@ export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
  * one answers "is this ticket still ours to do something about" — everything
  * that is not `resolved`, `new` and `awaiting_validation` included — and it is
  * read by the dashboard and by every "how much is open" figure in the product.
- * THIS one is a TAB: the pile of work that has been sorted and is under way,
- * which deliberately excludes the two stages that sit on either side of it and
- * have tabs of their own. `new` is Triage (nobody has read it yet) and `ready`
- * is Ready (every story is closed and nobody has sent it), so folding either in
- * here would put the same ticket under two tabs and make each one's badge a
- * count of the other's pile as well.
+ * THIS one is a TAB: the pile of work that has been sorted and is not finished.
+ *
+ * ── `ready` JOINED IT, 2026-09-07, AND THE PARAGRAPH IT REPLACED IS WHY ─────
+ *
+ * The client's next sentence about this screen was *"in open, include status
+ * ready and waiting / add them after / with this 5 columns, use all width
+ * available in screen"* — she was describing the Open tab's Kanban, and a board
+ * column is a slice of the tab it is drawn on. So `ready` is in the SET, not
+ * only in the board: a column counting rows the tab's own list refuses to show
+ * is the exact defect R16 exists for, and the two must agree by construction
+ * rather than by two lists that happen to match today. Everything downstream is
+ * derived from this array — the tab token (`OPEN_FACET`), the door's `status
+ * IN (…)` clause, the tab's badge, the Status facet's option list and the
+ * board's columns — so the ruling is one edit here and the five surfaces cannot
+ * disagree about what Open means.
+ *
+ * WHAT THAT COSTS, SAID PLAINLY, BECAUSE THIS COMMENT USED TO FORBID IT. The
+ * paragraph here read: folding `ready` in "would put the same ticket under two
+ * tabs and make each one's badge a count of the other's pile as well". Both
+ * halves are still TRUE; what changed is that they stopped being objections.
+ * Ready is now a SUBSET of Open, in exactly the shape Waiting already was
+ * (`waitingClause`, workers/content/src/lib/help.ts: "a subset of Open, not a
+ * sibling of it"), and a strip whose tabs nest is what this strip already is —
+ * All contains Closed contains nothing else, and nobody reads those badges as a
+ * partition. Each badge stays an exact `COUNT(*)` of its OWN tab's own
+ * question, no badge is a sum of two others, and no number is taken off a
+ * loaded page. That is the whole of R16; overlapping questions were never the
+ * part it forbade.
+ *
+ * `new` STAYS OUT. Triage is the one pile that is not work-in-progress at all —
+ * nobody has read those tickets, so they are not "sorted and under way" by any
+ * reading, and the client's own sentence names `ready` and `waiting` and stops.
  *
  * `awaiting_validation` IS ALSO OUT, and that is a decision rather than an
  * omission: it means "the client has not approved a request yet", which is a
@@ -440,7 +475,12 @@ export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
  * DERIVED-CHECKED RATHER THAN RETYPED: every entry is asserted to be a real
  * `HelpStatus`, so a stage renamed in `HELP_STATUSES` cannot leave a dead word
  * behind here that would silently narrow the tab to nothing. */
-export const OPEN_TAB_STATUSES = ["triaged", "scheduled", "in_progress"] as const satisfies readonly HelpStatus[]
+export const OPEN_TAB_STATUSES = [
+  "triaged",
+  "scheduled",
+  "in_progress",
+  "ready",
+] as const satisfies readonly HelpStatus[]
 
 /** HOW FAR BACK THE CLOSING-TIME DISTRIBUTION LOOKS, on the tickets dashboard.
  * A distribution taken over all time is dominated by tickets closed under a way
@@ -467,22 +507,36 @@ export const CLOSURE_WINDOW_MONTHS = 6
  * repeats once and a reader can tell a trend from a summer. */
 export const CLOSURE_TREND_MONTHS = 12
 
-/** THE FLOOR UNDER A MONTHLY MEDIAN, and the reason the trend draws two lines
- * rather than four.
+/* THE FLOOR UNDER A MONTHLY MEDIAN WAS REMOVED ON 2026-09-07, BY THE CLIENT,
+ * AND THE REASONING IS KEPT HERE RATHER THAN DELETED WITH THE CODE.
  *
- * A median is the middle VALUE, so it exists for any count at all — including
- * one — and that is exactly the trap: a median of six closed tickets is one
- * ticket wearing a statistic, and it is drawn at the same weight, in the same
- * colour, on the same axis as a median of a hundred and eighteen. So a
- * (month, kind) bucket with fewer than this many closures is DROPPED by the
- * door rather than dimmed by the chart — a chart cannot refuse to be read, and
- * a reader who can see a line will read a line.
+ * `CLOSURE_TREND_MIN_CLOSURES` was 8. A (month, kind) bucket with fewer
+ * closures than that never left the door, so the twelve-month trend drew the
+ * kinds that close in real numbers and dropped the ones that trickle.
  *
- * EIGHT is the design's own number and the sentence beside it on screen says so
- * in words. Shared rather than typed twice, because a floor the SQL applies and
- * a caption the screen writes are one fact: the day this moves, the sentence
- * moves with it or it starts lying. */
-export const CLOSURE_TREND_MIN_CLOSURES = 8
+ * THE ARGUMENT FOR IT WAS NOT WRONG, and that is why it is written down instead
+ * of being quietly forgotten. A median is the middle VALUE, so it exists for
+ * any count at all — including one — and a median of one closed ticket is that
+ * ticket's own duration drawn at the same weight, in the same colour, on the
+ * same axis as a median of a hundred and eighteen. A chart cannot refuse to be
+ * read, and a reader who can see a line will read a line.
+ *
+ * SHE OVERRULED IT, KNOWING THAT: "Only months with at least 8 of a kind are
+ * thrown. No, even if it's only 1, it should appear there." Her reading of the
+ * same fact is the opposite one and it is hers to make — a month she knows
+ * something closed in, drawn as a gap, tells her the app lost her data, which
+ * costs more than a jumpy line does. So the floor is gone from the SQL
+ * (`workers/content/src/lib/help.ts`, 3B) and the sentence that explained it is
+ * gone from the screen with it, because a caption describing a rule that no
+ * longer applies is worse than no caption.
+ *
+ * WHAT REPLACED IT IS NOT A SECOND FLOOR. Nothing thresholds a month now. What
+ * the thin months rest on is DISCLOSURE: every point's own count already rides
+ * the hover readout and the hit area's accessible name ("{median} days, from
+ * {count} closed"), so "how much is this point standing on" is answerable per
+ * month, by anybody, without the chart deciding for them. See
+ * `ClosureTrend` in `web/components/tickets-dashboard.tsx` for why nothing else
+ * was added. */
 
 /** A support ticket (team-wide; the My/All tabs filter by raiser). The built-in
  * `status` is the source of truth; `helpType` is a cosmetic selectable value. */
@@ -550,6 +604,14 @@ export type HelpTicket = {
   raiserId: string | null
   raiserName: string | null
   editorName: string | null
+  /** WHOSE SIDE OF THE FENCE EACH OF THOSE TWO IS ON (R54). Already computed on
+   * the row for the redaction above (`raiser_is_client` / `editor_is_client`,
+   * an EXISTS over `portal_users`) and, until 7 Sep 2026, thrown away on the way
+   * out — which left the AGENCY app holding one field carrying two populations
+   * with nothing to tell them apart. Staff are named by their first name only;
+   * a contact who raised their own question is named in full. */
+  raiserIsClient: boolean
+  editorIsClient: boolean
   createdAt: string
   updatedAt: string | null
   /** The account this question was raised FOR — the company a client contact was
@@ -677,6 +739,10 @@ export type HelpAttachment = {
   /** null on the way OUT to a client login when the person is on the agency's
    * side of the fence — the same redaction `toTicket` makes about a raiser. */
   addedByName: string | null
+  /** R54: which population `addedByName` belongs to, from the same `from_client`
+   * subselect the redaction above already runs. Staff by first name, a contact
+   * in full. */
+  addedByIsClient: boolean
 }
 
 /** ONE THING A STORY SHOWS FOR ITSELF — a file in the shared media bucket, or a
@@ -713,6 +779,11 @@ export type HelpMessage = {
   isAgent: boolean
   authorId: string | null
   authorName: string | null
+  /** R54, and the same sentence `raiserIsClient` carries: a thread in the agency
+   * app has both sides on it, `listReplies` already computes `from_client` for
+   * the portal's own redaction, and the agency screen needs the answer too —
+   * a colleague is named by their first name, a contact in full. */
+  authorIsClient: boolean
   createdAt: string
 }
 
@@ -1874,6 +1945,12 @@ export type Todo = {
   dueOn: string | null
   completedAt: string | null
   completedByName: string | null
+  /** R54: which population the name above belongs to. `toTodo`'s own paragraph
+   * says a to-do is completed either by one of the client's people or by a staff
+   * member doing it on the phone with them — two populations in one field, named
+   * two different ways on screen, and until 7 Sep 2026 nothing on the row said
+   * which. */
+  completedByIsClient: boolean
   /** what they sent us, and what it was called on their machine. One file: the
    * request is "send us the logo", and a second attachment is a second to-do. */
   fileUrl: string | null

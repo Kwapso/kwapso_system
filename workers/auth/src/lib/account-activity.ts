@@ -90,6 +90,10 @@ export async function listAccountActivity(
     type: r.type,
     description: r.description,
     actorName: null, // always you — the feed doesn't show an actor line
+    // …so there is no name to shorten and no population to decide (R54). False
+    // is the safe answer here as everywhere: it leaves a name whole, and there
+    // is none.
+    actorIsClient: false,
     createdAt: r.created_at,
   }))
 }

@@ -26,6 +26,7 @@ import {
   RADIUS_EXCEPTION,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_NOT,
+  RECORD_TABS_SINGLE_PANEL,
   PALETTE_LITERAL_OK,
   SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
@@ -171,16 +172,25 @@ function portalDoorList(): string[] {
  *   BY NAME       `web/components/**\/*-detail.tsx` — the convention every one of
  *                 them already follows, and the one the hand-rolled-feed check
  *                 below has always used.
- *   BY BEHAVIOUR  it renders an `<ActivityPanel>` — a record's own history feed,
+ *   BY BEHAVIOUR  it renders a `<RecordScreen>` — `record-chrome.tsx`'s own host,
  *                 which nothing but a record detail has any business drawing. This
  *                 catches the detail screen that arrives under some other name.
  *
+ * THE BEHAVIOURAL SIGNAL WAS `<ActivityPanel>` UNTIL 7 Sep 2026, and what replaced
+ * it is the more honest of the two rather than a repair. The client retired the
+ * Activity TAB — "kill all old activity tabs", the history reached from the ink
+ * footer's Latest activity column instead — so no detail renders that panel any
+ * more, and a signal nothing matches is a census gone blind: it would have caught
+ * exactly one file, `activity-rail.tsx`, and held the RAIL to a record detail's
+ * obligations. `<RecordScreen>` is what those thirteen screens actually have in
+ * common, it is the app's own detail host (R52 censuses the same two paths for the
+ * title treatment), and — the property that matters — it is still not one of the
+ * obligations.
+ *
  * AND THE SIGNALS ARE DELIBERATELY NOT THE OBLIGATIONS, so nothing here is
- * circular. R2 demands TabsView *and* ActivityPanel; a file caught by NAME is held
- * to both with neither assumed, which is the case that actually bites — a new
- * `foo-detail.tsx` shipped without tabs turns this red. A file caught only by
- * BEHAVIOUR has satisfied one of the two by definition, and is still held to the
- * other, and to every per-tab count R8 asks for.
+ * circular. A file caught by NAME is held to the tab strip with nothing assumed,
+ * which is the case that actually bites — a new `foo-detail.tsx` shipped without
+ * tabs turns this red. A file caught only by BEHAVIOUR is held to the same.
  *
  * `RECORD_DETAIL_NOT` (registry) is the reasoned residue, rot-checked below.
  *
@@ -194,7 +204,7 @@ function portalDoorList(): string[] {
 function recordDetailComponents(): { name: string; source: string }[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
     .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
-    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<RecordScreen"))
     .filter((c) => !RECORD_DETAIL_NOT[c.name])
 }
 
@@ -310,10 +320,70 @@ describe("RULES — the laws of the base", () => {
     ).toBeGreaterThanOrEqual(9)
 
     for (const c of details) {
+      // A DETAIL WITH ONE PANEL DRAWS NO STRIP, and says so once. A tab strip
+      // over a single panel is chrome that carries no choice — it names the
+      // thing you are already looking at. This became reachable on 7 Sep 2026:
+      // `selectable-detail` had exactly Overview + Activity, so retiring the
+      // Activity tab left it with one panel and its strip was removed with it.
+      // The alternative — keeping a one-tab strip so a law stays literally
+      // true — is the law demanding a worse screen, which is the failure mode
+      // R2's own history is a list of. Rot-checked below, so it can only shrink.
+      if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
       expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
-      expect(c.source, `${c.name} must render the Activity tab through <ActivityPanel>`).toContain(
-        "<ActivityPanel"
-      )
+    }
+  })
+
+  // R2's SECOND HALF, AND IT MOVED FROM THE SCREENS TO THE HOST — 7 Sep 2026.
+  //
+  // Until today this law demanded `<ActivityPanel>` of each of the thirteen
+  // details, because each of them drew its own Activity tab. The client retired
+  // that tab ("kill all old activity tabs"; the history now opens from the ink
+  // footer's Latest activity eyebrow), and the replacement is wired ONCE per
+  // host rather than thirteen times — which is a better arrangement and a worse
+  // thing to check per screen, because there is now nothing per screen to see.
+  //
+  // So the obligation follows the code. A record's history must still be
+  // REACHABLE — that is the sentence R2 has always been making, and it is the
+  // one the client's own ruling never touched — and the place to prove it is the
+  // two hosts every detail goes through, plus the rail they both mount. If any
+  // link here breaks, every record in the base silently loses its history again,
+  // which is exactly the state this file caught between the removal and the
+  // wiring: thirteen screens with no way to reach page two of anything.
+  it("record-detail-tabs: a record's history is reachable, through the rail its two hosts mount", () => {
+    const chrome = stripComments(read(join(WEB, "components", "record-chrome.tsx")))
+    expect(
+      chrome,
+      "record-chrome.tsx is the host all thirteen bespoke details draw through — it must mount the <ActivityRail>"
+    ).toContain("<ActivityRail")
+
+    // The recipe path is the other host, and it reaches the footer through the
+    // engine rather than through `RecordScreen`, so it is proved at its own end.
+    const engine = stripComments(
+      read(join(ROOT, "shared", "web", "screen-engine", "screen-renderer.tsx"))
+    )
+    expect(
+      engine,
+      "the screen engine draws the OTHER detail path — it must forward an activityAction to RecordDetail"
+    ).toContain("activityAction")
+
+    // …and the rail is the panel's new home, so the pairing R14 rests on is
+    // unbroken: the feed and its pager are inside the thing the door opens.
+    const rail = stripComments(read(join(WEB, "components", "activity-rail.tsx")))
+    expect(rail, "the rail must render the one <ActivityPanel>").toContain("<ActivityPanel")
+    expect(rail, "the rail must be the kit's EdgePanel — the client's shape 06").toContain("EdgePanel")
+  })
+
+  // …and the single-panel exemptions can't rot either. An entry naming a detail
+  // that HAS a strip is a line nobody can justify and nobody can safely delete.
+  it("record-detail-tabs: every RECORD_TABS_SINGLE_PANEL entry is a real exemption", () => {
+    for (const [name, why] of Object.entries(RECORD_TABS_SINGLE_PANEL)) {
+      expect(why.trim(), `RECORD_TABS_SINGLE_PANEL["${name}"] must say WHY it draws one panel`).not.toBe("")
+      const c = recordDetailComponents().find((d) => d.name === name)
+      expect(c, `RECORD_TABS_SINGLE_PANEL lists ${name}, which the census does not catch — delete the line`).toBeDefined()
+      expect(
+        c?.source.includes("TabsView"),
+        `RECORD_TABS_SINGLE_PANEL lists ${name}, but it draws a TabsView — delete the line`
+      ).toBe(false)
     }
   })
 
@@ -323,7 +393,7 @@ describe("RULES — the laws of the base", () => {
   it("record-detail-tabs: every RECORD_DETAIL_NOT entry is a real exemption", () => {
     const caught = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
       .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
-      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<RecordScreen"))
       .map((c) => c.name)
     for (const [name, why] of Object.entries(RECORD_DETAIL_NOT)) {
       expect(why.trim(), `RECORD_DETAIL_NOT["${name}"] must say WHY it is not a record detail`).not.toBe("")
@@ -771,11 +841,15 @@ describe("RULES — the laws of the base", () => {
     // those. Run the seam rather than reading it: a badge the seam fails to apply
     // is the whole bug, and source text can't tell us it applied.
     let countedRecipeTabs = 0
+    // Every detail tab the scan READ, badged or not — the blindness measure, now
+    // that a legitimate base can declare no collection tab at all.
+    let walkedRecipeTabs = 0
     for (const [key, recipe] of Object.entries(BASE_RECIPES)) {
       if (recipe.type !== "detail" || !recipe.tabs) continue
       const collections = recipe.tabs.map(tabCountKey).filter((k): k is string => k !== null)
       const badged = withTabCounts(recipe, Object.fromEntries(collections.map((k) => [k, 42])))
       for (const tab of badged.tabs ?? []) {
+        walkedRecipeTabs++
         if (tabCountKey(tab) === null) {
           expect(
             RECORD_TAB_COUNT_EXCEPTIONS[`${key}.${tab.key}`],
@@ -790,9 +864,47 @@ describe("RULES — the laws of the base", () => {
         ).toBe(formatCount(42))
       }
     }
-    // Tripwire: a scan that finds no counted tabs has gone blind, and a blind
-    // check reports "all clear" exactly like a passing one.
-    expect(countedRecipeTabs, "the recipe-tab scan found no collection tabs — it has gone blind").toBeGreaterThan(2)
+    // THE TRIPWIRE MEASURES THE WALK, NOT THE VERDICT — changed 7 Sep 2026, and
+    // the change is forced by the client's ruling rather than chosen.
+    //
+    // It used to demand more than two COUNTED tabs, on the reasoning that a scan
+    // finding no badge to check has gone blind. That reasoning was sound while
+    // every recipe detail carried an Activity tab; it counted them. The client
+    // retired that tab, and with it the last collection tab any recipe declared
+    // — so `countedRecipeTabs` is legitimately 0, and the old tripwire could
+    // only be satisfied by putting a collection back on a strip she asked to
+    // empty. A law that can only be made green by undoing the ruling is a law
+    // that has stopped describing the base.
+    //
+    // What must not be lost is the thing the tripwire actually guards: that this
+    // scan still WALKS the recipes. So it now asserts on the walk. A detail
+    // recipe whose tabs stop being read reports the same all-clear as one with
+    // nothing wrong, which is the failure the original was written for, and that
+    // failure is caught here exactly as it was before.
+    expect(
+      walkedRecipeTabs,
+      "the recipe-tab scan walked no detail tabs at all — it has gone blind"
+    ).toBeGreaterThan(2)
+
+    // …AND THE COUNT ITSELF DID NOT GO AWAY, IT MOVED. R8's sentence is that a
+    // collection a reader can open carries its size before they open it. The
+    // record's history is still such a collection; what changed is that the door
+    // to it is the footer's `All activity · N ›` rather than a tab. So the badge
+    // obligation follows the door, and this is where it is proved.
+    //
+    // THROUGH `formatCount`, which is R16's seam and not a formatting detail: it
+    // renders the door's EXACT SERVER TOTAL, never the loaded page's length —
+    // the same guarantee the retired tab badge carried, and the reason a record
+    // with 143 events cannot show 50 on the way in.
+    const rail = stripComments(read(join(WEB, "components", "activity-rail.tsx")))
+    expect(
+      rail,
+      "the activity door must carry the history's own count, through formatCount (R16's exact server total)"
+    ).toContain("formatCount(")
+    expect(
+      rail,
+      "the activity door must PRINT that count — a count computed and not shown is R8's fault with extra steps"
+    ).toMatch(/All activity ·/)
 
     // …and the HOST must actually badge every detail it renders — a seam nothing
     // calls is dead code wearing a law's clothes. One withTabCounts per rendered
@@ -832,6 +944,23 @@ describe("RULES — the laws of the base", () => {
     // half above already uses.
     let scannedTabs = 0
     for (const c of recordDetailComponents()) {
+      // …AND THE FLOOR OF TWO MET THE SAME WALL ITS OWN NOTE DESCRIBES, one
+      // ruling later — 7 Sep 2026. The paragraph above records this assertion
+      // being walked down from three to two, because "every bespoke detail has
+      // a third tab" was an accident of the base rather than a law. Two was the
+      // floor R2 justified: Overview + Activity. The client then retired the
+      // Activity tab everywhere, and `selectable-detail` — the same dropdown
+      // value that forced the last correction — was left with ONE panel and no
+      // strip at all, turning this red for obeying the newer ruling exactly.
+      //
+      // Rather than walk the floor down a second time to one (where it would
+      // stop being a blindness guard, since a dead regex yields nought or one),
+      // the single-panel details are named. `RECORD_TABS_SINGLE_PANEL` is the
+      // same list R2's own strip obligation skips, read from the same registry,
+      // so the two halves of the law cannot disagree about which screens draw a
+      // strip — and it is rot-checked there, so a screen that grows a second
+      // panel loses its line and lands back under this floor.
+      if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
       const tabs = [...c.source.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
       expect(
         tabs.length,
@@ -1296,6 +1425,18 @@ describe("RULES — the laws of the base", () => {
         [...pager.matchAll(/<ActivityPanel[\s\S]{0,1200}?\/>/g)].some((m) =>
           m[0].includes(c.pagerKey)
         ) ||
+        // `<ActivityRail>` IS THE PANEL'S NEW HOME, 7 Sep 2026 — same branch,
+        // same reason, one component further out. The client retired the
+        // Activity tab and the feed moved into the slide-in the footer's door
+        // opens; the rail mounts the unchanged `<ActivityPanel>`, so a caller
+        // that hands the rail a real listKey has reached the same real pager it
+        // always did. The branch is separate for the identical reason the panel's
+        // is: the key arrives INSIDE the tag, in an `activity={{ listKey: … }}`
+        // object literal, so walking back to the enclosing function would look
+        // in the wrong place and report a wired pager as missing.
+        [...pager.matchAll(/<ActivityRail[\s\S]{0,1200}?\/>/g)].some((m) =>
+          m[0].includes(c.pagerKey)
+        ) ||
         [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
           const tagAt = m.index ?? 0
           const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
@@ -1306,6 +1447,23 @@ describe("RULES — the laws of the base", () => {
         wired,
         `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> (directly, or through a shared paged body) whose listKey is built from ${c.pagerKey}`
       ).toBe(true)
+      // THE THIRD LINK, where the collection declares one. `pagerKey` above
+      // proved a VARIABLE reached the pager; this proves that variable is the
+      // collection's own cache key rather than any value that happened to be in
+      // scope. Only the team feed has three links today — its key moved into a
+      // seam when the history left the tab strip — and a two-link collection is
+      // asked nothing extra, so this cannot quietly become a formality.
+      if (c.keyBuiltIn !== undefined) {
+        const seam = stripComments(read(join(ROOT, c.keyBuiltIn)))
+        expect(
+          seam,
+          `${name} names ${c.keyBuiltIn} as where its key is composed, but the literal ${c.webKey} is not there — the chain is broken between the key and the pager`
+        ).toContain(c.webKey)
+        expect(
+          seam,
+          `${name}'s pager is handed ${c.pagerKey}, which ${c.keyBuiltIn} must be what exports — otherwise the two halves are about different values`
+        ).toContain(c.pagerKey)
+      }
       // …and the collection's cache key is NAMED by a component, which on the
       // record feed is the second half of the pairing rather than a restatement of
       // the first: its control reads `listKey={activity.listKey}`, a value the
@@ -3643,6 +3801,7 @@ describe("RULES — the laws of the base", () => {
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
       "record-title-treatment", // R52: the both-detail-paths title census above
       "toolbar-slot-set", // R53: the row-owns-its-slots guard + the who-builds-a-control and sort-is-a-default censuses above
+      "staff-names-are-first-names", // R54: web/test/staff-names-are-first-names.test.ts — the twice-derived staff-name census (columns off the workers' writes, fields off the mappings + the *IsClient siblings) walked to every render in web/
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

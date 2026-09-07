@@ -56,6 +56,7 @@ import { recordTimeCountKey } from "@shared/record-counts"
 import type { WorkLog, WorkLogSummary } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDayMonth } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 
@@ -182,7 +183,9 @@ function Pictures({ summary }: { summary: WorkLogSummary }) {
     hours: Math.round((w.seconds / 3600) * 10) / 10,
   }))
   const people = summary.people.map((p) => ({
-    label: p.userName ?? t("Someone who has left"),
+    // R54: only staff log hours. The bar's label and the picker below say the
+    // same word for the same person, which is why both go through the seam.
+    label: staffNameFromSnapshot(p.userName) || t("Someone who has left"),
     hours: Math.round((p.seconds / 3600) * 10) / 10,
   }))
   // A kind nobody set is the honest majority of logged time, so it is a bar with
@@ -399,7 +402,7 @@ export function WorkLogsPanel({
                 <SelectItem value="all">{t("Everyone")}</SelectItem>
                 {summaryQ.data.people.map((p) => (
                   <SelectItem key={p.userId} value={p.userId}>
-                    {p.userName ?? t("Someone who has left")}
+                    {staffNameFromSnapshot(p.userName) || t("Someone who has left")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -471,7 +474,7 @@ export function WorkLogsPanel({
                     story, a ticket, a task and a meeting, which is the whole
                     reason the list was written once. */}
                 <span className="min-w-0 flex-1 truncate text-sm">
-                  {[l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
+                  {[staffNameFromSnapshot(l.userName), l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")}
                 </span>
                 {l.kind && (
                   <Badge variant="secondary" className="shrink-0 text-badge">

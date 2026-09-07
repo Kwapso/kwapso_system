@@ -99,9 +99,13 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * `shared/web/` is read by BOTH front doors (`web/` and `web-portal/`), and
  * nothing in this directory imports an app-side `@/...` module — the
  * established shape is a render prop, exactly the reason
- * `shared/web/screen-engine/screen-renderer.tsx` takes `renderActivity`
- * instead of importing `web/components/activity-panel.tsx` directly: `@/`
- * resolves to two different folders depending on which door is compiling.
+ * `shared/web/screen-engine/screen-renderer.tsx` used to take a
+ * `renderActivity` prop instead of importing
+ * `web/components/activity-panel.tsx` directly: `@/` resolves to two different
+ * folders depending on which door is compiling. (That particular prop is gone —
+ * it existed for the Activity tabs the client killed on 2026-09-06 — but the
+ * REASON it had that shape is the reason these three are props, and it is the
+ * clearest worked example of it in the codebase.)
  * `Swatch` (the type's coloured dot), `ticketTypeColour` (the map from a
  * type's name to that colour) and `InAppLink` (the only legal way to write a
  * link inside the app, R37) all live under `web/` today, so a caller hands in

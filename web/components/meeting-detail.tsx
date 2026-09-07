@@ -1,7 +1,10 @@
 "use client"
 
-// ONE MEETING, as a tabbed record: Notes / Overview / Activity (the standard
-// every record gets, R2).
+// ONE MEETING, as a tabbed record: Notes / Overview (plus Guests and Work logs
+// where the meeting has them). Its history is not a tab any more — it is
+// reached from the ink footer's Latest activity column, on the client's
+// 2026-09-06 ruling; web/components/activity-panel.tsx carries the ruling and
+// the argument.
 //
 // NOTES IS THE FIRST TAB, not Overview, and that is the whole argument for this
 // module existing. Somebody opening a meeting from six months ago is not looking
@@ -49,7 +52,6 @@ import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meeting-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work-logs-panel"
-import { ActivityPanel } from "@/components/activity-panel"
 import { EmptyLine } from "@/components/deep-link/screen-bits"
 import { TranslateAction, useHumanTranslation } from "@/components/translate-human-text"
 import { useConfirm } from "@shared/web/use-confirm"
@@ -183,8 +185,8 @@ export function MeetingDetailScreen({
     primeCache(`meeting:one:${meetingId}`, next)
     const cur = meetingsQ.data
     if (cur) primeCache(meetingsKey(teamId), cur.map((m) => (m.id === meetingId ? next : m)))
-    // The Activity tab's rows AND its badge come from one fetcher, so dropping
-    // the key re-primes both.
+    // The footer's Latest activity rows AND the total come from one fetcher, so
+    // dropping the key re-primes both.
     invalidate(recordActivityKey("meetings", meetingId))
   }
 
@@ -355,13 +357,9 @@ export function MeetingDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a meeting's history
+      // is reached from the ink footer's Latest activity column now, and opens in
+      // a slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -537,14 +535,6 @@ export function MeetingDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("meetings", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
           if (panel.value === "time")
             return (
               <WorkLogsPanel

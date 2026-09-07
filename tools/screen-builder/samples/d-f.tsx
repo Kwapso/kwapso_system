@@ -2,6 +2,8 @@
  * and may not do. Keys are the kit's folder names; each `render` draws the real
  * export with made-up content and spreads `p.of("<Export>")` onto every export
  * the properties panel offers options for. */
+import { useState } from "react"
+
 import { Badge } from "../../../shared/ui/components/badge/badge"
 import { Button } from "../../../shared/ui/components/button/button"
 import { DataPreviewTable } from "../../../shared/ui/components/data-preview-table/data-preview-table"
@@ -20,6 +22,7 @@ import {
   DialogTrigger,
 } from "../../../shared/ui/components/dialog/dialog"
 import { Donut } from "../../../shared/ui/components/donut/donut"
+import { EdgePanel } from "../../../shared/ui/components/edge-panel/edge-panel"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -57,7 +60,7 @@ import {
   Power,
   Prohibit,
 } from "../../../shared/ui/foundations/icons"
-import type { Samples } from "./index"
+import type { PartProps, Samples } from "./index"
 
 const noop = () => {}
 
@@ -114,6 +117,43 @@ const PROCESS_RECORDS: FlowStepRecord[] = [
   { id: "internal", label: "Mark internal", actor: "System", role: "Account manager", description: "The ticket is tagged as retainer work and nothing is charged.", tool: "Kwapso", time: "Instant", cost: "—" },
   { id: "close", label: "Close ticket", actor: "Tom Lindqvist", role: "Developer", description: "The developer closes the ticket and the client is told.", tool: "Kwapso", time: "2 min", cost: "€3" },
 ]
+
+/* THE RAIL IS CONTROLLED AND IT PORTALS, so it cannot be drawn inline the way
+ * a card or a table can: `open` lives outside the component (edge-panel.tsx
+ * says why there is no uncontrolled twin) and everything it paints is `fixed`
+ * against the viewport, inside `document.body`. It therefore needs the same two
+ * things the dialog above it needs — something to press, and somewhere to hold
+ * "is it open" — and gets them the same way, without a className, a style or a
+ * wrapper touching the part itself.
+ *
+ * The content is the shape the app actually opens it with: a record's history,
+ * off the ink footer's Latest activity column. */
+function EdgePanelSample({ p }: { p: PartProps }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        All activity · 48
+      </Button>
+      <EdgePanel
+        {...p.of("EdgePanel")}
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Activity"
+      >
+        <DescriptionList
+          layout="rows"
+          items={[
+            { id: "a1", label: "Sarah Whitfield", value: "moved T-0412 to in progress · 2d ago" },
+            { id: "a2", label: "Tom Lindqvist", value: "replied to the client · 3d ago" },
+            { id: "a3", label: "Maya Okafor", value: "logged 45m against T-0412 · 4d ago" },
+            { id: "a4", label: "Sarah Whitfield", value: "raised T-0412 · 6d ago" },
+          ]}
+        />
+      </EdgePanel>
+    </>
+  )
+}
 
 export const samples: Samples = {
   "data-preview-table": {
@@ -321,6 +361,10 @@ export const samples: Samples = {
       </DropdownMenu>
     ),
     note: "Opens over the page: the menu portals to the outer document, so it is drawn on press rather than inline.",
+  },
+  "edge-panel": {
+    render: (p) => <EdgePanelSample p={p} />,
+    note: "Opens over the page: the rail fixes itself to the reading edge inside the outer document, so it is drawn on press rather than inline. Narrow the window under 720px and press again — it becomes a bottom sheet, with a scrim and a grabber.",
   },
   field: {
     render: (p) => (

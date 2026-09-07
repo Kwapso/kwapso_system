@@ -934,6 +934,32 @@
         "read-only"
       ]
     },
+    "edge-panel": {
+      "file": "components/edge-panel/edge-panel.tsx",
+      "exports": [
+        "EdgePanel",
+        "edgePanelVariants"
+      ],
+      "props": {
+        "side": [
+          "left",
+          "right"
+        ]
+      },
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error",
+        "selected",
+        "read-only"
+      ],
+      "note": "Client ruling 2026-09-07, shape 06 of the record-activity artifact: 'let's do a a 6 - but make it slide in in desktop and slide up in phone'. A panel that is NOT a sheet - non-modal beside the page above 45rem, and the drawer's own bottom sheet, scrim and focus trap below it. Motion is foundations/motion/motion.css section 3b's `.motion-edge-panel`; the geometry above 45rem is components/sheet/sheet.tsx's."
+    },
     "field": {
       "file": "components/field/field.tsx",
       "exports": [

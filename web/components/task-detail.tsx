@@ -1,7 +1,9 @@
 "use client"
 
-// TASK DETAIL — one piece of the agency's own admin, as a tabbed record (Law R2):
-// Overview / Work logs / Activity.
+// TASK DETAIL — one piece of the agency's own admin, as a tabbed record:
+// Overview / Work logs. Its history is not a third tab any more — it is reached
+// from the ink footer's Latest activity column, on the client's 2026-09-06
+// ruling; web/components/activity-panel.tsx carries the ruling and the argument.
 //
 // IT USED TO BE A RECIPE, and the note that made it one was true when it was
 // written: a task is "a title, a date and a tick", and there was no control on it
@@ -14,7 +16,8 @@
 //
 // WHAT CARRIES OVER UNCHANGED: the same fields the description block showed, the
 // same tick-and-untick door through the same `onAction` seam the recipe used, and
-// the same generic (table, id) activity feed (R5). The timer on the header is the
+// the same generic (table, id) activity feed (R5) — which is still read here, for
+// the footer's Latest activity column and its note field. The timer on the header is the
 // one the recipe already had, moved from the `above` slot to where a record's
 // secondary action belongs.
 
@@ -28,7 +31,6 @@ import { useRemembered } from "@shared/web/remembered"
 import { Check, PencilSimple, ArrowUUpLeft } from "@shared/ui/foundations/icons"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
 
-import { ActivityPanel } from "@/components/activity-panel"
 import { TaskFormDialog, type TaskFormValues } from "@/components/task-form-dialog"
 import { OverviewList } from "@/components/overview-list"
 import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/record-chrome"
@@ -45,6 +47,7 @@ import type { Task } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RichText } from "@shared/web/rich-text-view"
 import { safeHref } from "@shared/web/rich-text"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -113,7 +116,8 @@ export function TaskDetailScreen({
   const FileGlyph = fileTypeIcon(task.fileName)
   const overviewItems = [
     { label: t("Status"), value: done ? t("Done") : t("Open") },
-    { label: t("Who has it"), value: task.assigneeName || t("Nobody yet") },
+    // R54: a task is assigned to one of ours.
+      { label: t("Who has it"), value: staffNameFromSnapshot(task.assigneeName) || t("Nobody yet") },
     // DEADLINE, the same word the tasks table, the sort control and the form
     // all use for this column (CHECKLIST 2.5). It read "Due" here, which is a
     // second word for one fact on the record whose table says the first.
@@ -179,13 +183,9 @@ export function TaskDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a task's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -294,14 +294,6 @@ export function TaskDetailScreen({
                 canEdit={canEdit}
                 canLog={canLogTime}
                 onActivityChanged={() => invalidate(`activity:record:tasks:${taskId}`)}
-              />
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("work", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
               />
             )
           return <OverviewList items={overviewItems} />

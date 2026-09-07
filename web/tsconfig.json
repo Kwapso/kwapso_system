@@ -75,6 +75,7 @@
     ".next-borderfix-verify/types/**/*.ts",
     ".next-breadcrumbs-verify/types/**/*.ts",
     ".next-empty-collection-verify/types/**/*.ts",
+    ".next-filters-sort-verify/types/**/*.ts",
     ".next-hoverfill-verify/types/**/*.ts",
     ".next-list-mark-verify/types/**/*.ts",
     ".next-member-row-verify/types/**/*.ts",
@@ -87,8 +88,7 @@
     ".next-verify-toolbars/types/**/*.ts",
     ".next-verify/types/**/*.ts",
     ".next/types/**/*.ts",
-    "next-env.d.ts",
-    ".next-filters-sort-verify/types/**/*.ts"
+    "next-env.d.ts"
   ],
   "exclude": [
     "node_modules",

@@ -39,8 +39,10 @@
 // Host-composed rather than a recipe, for the reason the account screen is: three
 // of these tabs are collections with their own actions, and no engine block draws
 // one. Its counts are exact server totals through the one formatCount seam (R16),
-// its tabs are the library TabsView (R2/R3), and its history is the shared
-// ActivityPanel (R5).
+// its tabs are the library TabsView (R3), and its history is read through the
+// generic record path (R5) and shown in the ink footer's Latest activity column
+// — not a tab, on the client's 2026-09-06 ruling
+// (web/components/activity-panel.tsx carries it).
 
 import * as React from "react"
 
@@ -65,7 +67,6 @@ import { TodosPanel } from "@/components/work-panels"
 import { OverviewList } from "@/components/overview-list"
 import { RecordMark } from "@shared/web/record-mark"
 import { RichText } from "@shared/web/rich-text-view"
-import { ActivityPanel } from "@/components/activity-panel"
 import { tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -351,13 +352,9 @@ export function ContactDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a person's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -569,15 +566,6 @@ export function ContactDetailScreen({
 
           if (tabItem.value === "meetings")
             return <ContactMeetingsPanel accountId={accountId} host={host} />
-
-          if (tabItem.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("accounts", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
 
           // THE LOGIN SWITCH — a person's, and only a person's. Granting it is
           // one button here rather than a picker, because there is nobody to

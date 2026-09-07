@@ -19,8 +19,17 @@
  * the same reason node_modules is: it is a DEPENDENCY. Its own repo lints it;
  * linting a vendored copy we may not edit would only produce unactionable red.
  *
- * Cloning needs the `alaap-kwapso` GitHub identity (the machine's default
- * credential is a different account), which the REPO URL below carries.
+ * CLONING USES THE PLAIN REPOSITORY URL, and that is a fix rather than a
+ * simplification. This carried `https://alaap-kwapso@github.com/…` on the
+ * reasoning that the kit needs a different GitHub identity from the machine's
+ * default. A username in the URL does not SELECT a credential — it forces git
+ * to look one up for that exact user, and when the helper has nothing filed
+ * under it git falls through to an interactive password prompt. There is no
+ * terminal on this path, so the prompt failed as `could not read Password …
+ * Device not configured` and the vendor step died at `git clone`, on 7 Sep
+ * 2026, with the tag sitting correctly on the remote. The plain URL lets the
+ * configured helper answer, which it does — the same URL the kit's own
+ * checkout pushes through.
  */
 
 import { execSync } from "node:child_process"
@@ -32,7 +41,7 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const TARGET = join(ROOT, "shared", "ui")
-const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
+const REPO = "https://github.com/Kwapso/kwapso-ui-ux.git"
 
 /** The kit's deliverable surface. demo/, verify/, mini-app/ and the GAPS
  * paper trail stay upstream — they are the workshop, not the product. */

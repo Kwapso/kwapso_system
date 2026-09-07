@@ -6,7 +6,16 @@
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
 import { formatDate, formatDateTime, formatRelative } from "@shared/web/format"
+// The ROW SHAPE, named rather than restated. `use-record-activity.ts` declares
+// what a dressed activity row is for the bespoke record path; this function has
+// always produced exactly that object (the header above is the record of two
+// fixes that landed in one copy and not the other), and saying so in the return
+// type is what lets the deep-link host hand this straight to `<ActivityRail>`
+// without a cast. `ScreenData.sets` still takes it: a `Record<string, unknown>`
+// accepts an object type with these six known fields.
+import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
+import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
 import { ticketTitle } from "@shared/web/ticket-chips"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
@@ -57,12 +66,26 @@ export const INVITE_STATUS: Record<Invite["status"], string> = {
  * them already has. `dateTime` carries the raw instant alongside it, for the
  * kit's own `<time datetime>` slot — the same pairing added at the other
  * activity feed's fix. */
-export function shapeActivity(items: ActivityItem[], lang: Language): Record<string, unknown>[] {
+export function shapeActivity(items: ActivityItem[], lang: Language): ActivityFeedRow[] {
   const t = translator(lang)
   return items.map((a) => ({
     id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
+    // R54, and the same two lines `use-record-activity.ts` carries — this is the
+    // OTHER activity shaper, and the file's own header above is a list of fixes
+    // that landed in one of the two and not the other. The sentence is where the
+    // name is visible; `actor` is only the avatar's accessible name.
+    description: a.actorIsClient
+      ? a.description
+      : describeWithStaffName(a.description, a.actorName),
+    // `|| undefined`, NOT `?? undefined`. `staffNameFromSnapshot` answers ""
+    // for a row with no actor (a system write), and "" is not "no actor" here:
+    // the kit draws this field as `aria-label={item.actor}` on the avatar
+    // fallback (shared/ui/components/activity-feed/activity-feed.tsx), and an
+    // EMPTY aria-label is worse than an absent one — it overrides the initials
+    // underneath it with nothing, so a screen reader announces an unnamed
+    // element instead of the "?" mark. `??` only catches null/undefined and
+    // let the empty string straight through.
+    actor: (a.actorIsClient ? a.actorName : staffNameFromSnapshot(a.actorName)) || undefined,
     initials: nameInitials(a.actorName),
     timestamp: formatRelative(a.createdAt, t, lang),
     dateTime: a.createdAt,
@@ -83,7 +106,10 @@ export function shapeTeamDetail(opts: {
       name: opts.name,
       image: opts.logoUrl ?? "",
       created: formatDateTime(opts.meta.createdAt, opts.lang),
-      createdBy: opts.meta.creatorName || opts.meta.creatorEmail || "",
+      // R54 — the team's own audit line. The creator is the colleague who made
+      // the team; the email fallback is handed to the seam too, which returns an
+      // address whole rather than cutting it at the "@".
+      createdBy: staffNameFromSnapshot(opts.meta.creatorName) || opts.meta.creatorEmail || "",
       updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
     },
     sets: { activity: shapeActivity(opts.activity, opts.lang) },
@@ -478,7 +504,9 @@ export function shapeInviteDetail(
       email: invite.email,
       role: invite.roleTitle,
       status: INVITE_STATUS[invite.status],
-      invitedBy: audit?.inviterName || audit?.inviterEmail || "—",
+      // R54: whoever sent the invite is one of ours by definition — an invite
+      // door is not on the portal's surface.
+      invitedBy: staffNameFromSnapshot(audit?.inviterName) || audit?.inviterEmail || "—",
       invited: formatDate(invite.createdAt, lang),
       expires: formatDate(invite.expiresAt, lang),
       accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "—",
@@ -537,7 +565,7 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[], la
       // construction: the migration cleared `file_url` on every row it converted.
       file: asset.colorHex || asset.fileUrl || "No file yet",
       created: formatDateTime(asset.createdAt, lang),
-      createdBy: asset.creatorName || "—",
+      createdBy: staffNameFromSnapshot(asset.creatorName) || "—", // R54
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity, lang) },
@@ -566,7 +594,7 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       department: purpose.department || "—",
       description: purpose.description || "—",
       created: formatDateTime(purpose.createdAt, lang),
-      createdBy: purpose.creatorName || "—",
+      createdBy: staffNameFromSnapshot(purpose.creatorName) || "—", // R54
       updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity, lang) },

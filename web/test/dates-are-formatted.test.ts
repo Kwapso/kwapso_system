@@ -133,22 +133,28 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:139":
+  "web/lib/use-record-activity.ts:160":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
     "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
-    "is the one that is.",
-  "web/components/deep-link/shape.tsx:68":
-    "same shape as use-record-activity.ts:139 — `dateTime: a.createdAt` " +
+    "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
+    "actor's trim and its reasoning above this line.)",
+  "web/components/deep-link/shape.tsx:91":
+    "same shape as use-record-activity.ts:160 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
-    "line up, for the same `<time dateTime>` attribute.",
-  "web/components/work-panels.tsx:1492":
+    "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
+    "on 7 Sep 2026, when `shapeActivity` gained a named return type — " +
+    "`ActivityFeedRow` — and the import and its note landed above this line.)",
+  "web/components/work-panels.tsx:1491":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
     "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
     "from a `ref · title` string into the black reference chip beside the " +
-    "title, which is thirteen lines of JSX where there was one.)",
+    "title, which is thirteen lines of JSX where there was one; from " +
+    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; and " +
+    "back to :1491 the same day again, when the ticket panel above lost its " +
+    "`marks` prop and the `<RecordMark>` it drew — three lines net.)",
 }
 
 describe("no screen shows a raw timestamp", () => {

@@ -59,6 +59,9 @@
      make a whole component unusable without a mouse, so a card is focusable
      and moves with the arrow keys while a live region says where it went. No
      kit ruling exists for this; the behaviour is built and logged as KAN-3.
+   · A CARD READS CHIPS, THEN TITLE, THEN META — ONE ORDER, NO SWITCH. Ruled
+     by the client 2026-09-07 ("in cards put chips above title"), applied
+     here and not offered as a prop. The argument is at `BoardCard`.
    · Focus is ONE global rule (tokens.css §8). A card is focusable and rings
      at its own 24 radius; nothing here sets a ring or an `outline`.
    · Disabled is a fill and an ink. A locked card takes `--btn-disabled-fill`
@@ -126,11 +129,24 @@ function ColumnDot({ dot }: { dot: KanbanColumnDot }) {
 export interface KanbanCard {
   /** Stable id. The React key, and the handle every callback is given. */
   id: string;
-  /** The card's name. Caption step in Saans Medium — the kit's `.kw-list__title`. */
+  /**
+   * The card's name. Caption step in Saans Medium — the kit's `.kw-list__title`.
+   *
+   * Typed as required because a nameless card is not a card, but `ReactNode`
+   * admits `null`, so the render GUARDS it rather than trusting the type: an
+   * unguarded `<p>` holding nothing still draws its own 17.55 line box, and
+   * since 2026-09-07 that hole would sit between the chips and the meta line
+   * where every reader can see it. Guarded, a card with chips and no title is
+   * chips and a meta line, closed up.
+   */
   title: React.ReactNode;
   /** A quiet line under it. Caption in tertiary ink — `.kw-list__meta`. */
   description?: React.ReactNode;
-  /** Chips along the foot — `Badge`s from the call site. */
+  /**
+   * Chips ABOVE the title — `Badge`s from the call site. They were along the
+   * foot until 2026-09-07; see the card's head in `BoardCard` for the ruling
+   * and the rhythm.
+   */
   badges?: React.ReactNode;
   /** Anything else inside the card — a mark, a bar, a row of avatars. */
   content?: React.ReactNode;
@@ -890,6 +906,13 @@ function BoardCard({
   const dragging = carrying === card.id;
   const pressable = onCardSelect !== undefined && card.disabled !== true;
   const reachable = draggable || pressable;
+  /* Both are guarded, and for the same reason: after 2026-09-07 the chips and
+     the title are ONE block, and a block has to know which of its two parts it
+     actually has. `badges` is optional and always was; `title` is typed
+     required but `ReactNode` admits `null`, and an empty `<p>` is not nothing
+     — it is a 17.55px line box. See the head below. */
+  const hasBadges = card.badges !== undefined && card.badges !== null;
+  const hasTitle = card.title !== undefined && card.title !== null;
 
   return (
     <Card
@@ -965,12 +988,117 @@ function BoardCard({
       )}
     >
       <CardContent className="flex min-w-0 flex-col gap-2">
-        {/* No weight. CH19 view 02 draws the card title
-            `font-size: 13px; line-height: 1.35` and writes no `font-weight`,
-            so it inherits the demo's 300 — the id above it and the meta
-            below carry the hierarchy, not the title. The RECORD NAME in
-            view 01 is 500; a board card's title is not. */}
-        <p className="min-w-0 text-caption leading-[var(--leading-h3)]">{card.title}</p>
+        {/* ---- THE CARD'S HEAD — CHIPS, THEN THE TITLE ---------------------
+            CLIENT, 2026-09-07, over a screenshot of a board card reading
+            title-then-chips, verbatim: "in cards put chips above title."
+
+            APPLIED HERE AND NOT OFFERED AS A PROP, which is the decision
+            worth arguing rather than the swap. A `badgesPosition` would let
+            two boards in the same app disagree about what a card is, and a
+            kit whose components hold both answers to a question the client
+            has answered is a kit that has stopped ruling. It is also the
+            wrong shape for THIS component in particular: CH27.24 draws a
+            board card as "only number, title, owner and age" and states "no
+            status pill", so the `badges` slot is ALREADY past what the
+            chapter draws. Giving an unruled affordance a second axis of
+            variation is the one move a kit cannot afford. A caller who
+            genuinely needs another arrangement has `content`, which is the
+            documented hole for "anything else inside the card"; the ordered
+            parts are not a menu.
+
+            THE OBJECTION, AND IT IS A REAL ONE. On the RECORD page the
+            client ruled the other way — 2026-08-26, KWAPSO-SPEC row 73: the
+            identity chips move from above the title to "directly underneath
+            the title", reversing CH27.8's own stated reason that "keys sit
+            above because they tell you which record this is before you read
+            what it's called". A board card now restores exactly the reason
+            27.8 discarded. That is not a contradiction to reconcile, and it
+            is not reconciled here: a record page is one object read at full
+            size with a heading that can carry the page on its own, and a
+            board card is a 13-step line in a column of twenty, where the
+            chips ARE how you find the card you are looking for before you
+            read any of them. Both rulings are the client's, both are
+            recorded, and neither is generalised over the other.
+
+            THE RHYTHM — WHY THE STACK'S OWN STEP IS NOT LEFT HERE.
+            `CardContent` is `gap-2`, and gap is directionless, so nothing
+            "breaks" when two children swap: the chips would simply keep 7.5
+            (`--spacing` is 0.25rem and the root is 15px, ruling 18). Keeping
+            it is still wrong, because the ROLE changed. Along the foot the
+            chip row was a PEER of the meta line — last in a stack, equally
+            spaced from everything, which is what it was. Above the title it
+            is the title's OVERLINE, and an overline that sits at the stack's
+            own step tells the reader all four rows are equally related,
+            while the strongest mark on the card (a filled pill) sits at the
+            top out-shouting the title it is supposed to introduce.
+
+            SO THE NUMBER IS THE KIT'S ONE STATED NUMBER FOR A MARK ABOVE A
+            TITLE — `--space-1h`, written in `title.tsx` as "6 under the
+            eyebrow, and nothing at all without one" — and it is taken rather
+            than a new one chosen. What it buys, measured at the 15px root
+            and counting each text line's half-leading, because a filled pill
+            has none (its border-box IS its edge):
+
+              chips → title   5.625 + (15.234 - 12.1875)/2  =  7.15
+              title → meta    7.5 + 1.52 + (14.953 - 10.3125)/2 = 11.34
+
+            7.15 against 11.34 is a head and a body. At the old 7.5 it would
+            have been 9.02 against 11.34 — a difference too small to group
+            anything, which is the "gap sized for the old order" this avoids.
+
+            AND THE `mt` NEEDS THE WRAPPER. A margin inside a flex column ADDS
+            to the gap (7.5 + 6), so the only way to get UNDER the stack's
+            step without a negative margin is to make the head one flex item
+            and space it internally. That is precisely how `title.tsx`
+            builds its own eyebrow-and-heading pair, so the construction is
+            borrowed too, not just the number.
+
+            BOTH PARTS ARE GUARDED, AND THE WHOLE HEAD IS.
+              · chips, no title — chips then the meta line, closed up. The
+                title's `<p>` is not drawn, so there is no empty 15.234 line
+                box sitting in the middle of the card. (Before today an empty
+                title drew that hole at the TOP, where it was easy to miss;
+                the reorder would have moved it into plain view, which is why
+                the guard is added now rather than left.)
+              · title, no chips — no `mt`, no chip row, and the head is one
+                `<p>` in a `<div>` whose box is identical to the bare `<p>`
+                this used to be. Preflight zeroes the paragraph's margins, so
+                a card with no chips renders at exactly the metrics it did
+                before this change.
+              · neither — no head at all, rather than an empty div taking a
+                gap on both sides.
+
+            THE ORDER IS THE DOM'S, NOT `order:`. A CSS reorder would leave a
+            pressable card (`role="button"`) announcing its name in the old
+            sequence while the eye reads the new one. So the spoken name of a
+            card DOES change with this ruling — chips first, then title —
+            and that is correct: what is seen first is what is said first.
+            No `aria-label` is invented to paper over it; this file's law is
+            that every user-facing string is a prop, and a label here would
+            be the component writing one. */}
+        {hasBadges || hasTitle ? (
+          <div data-slot="kanban-card-head" className="min-w-0">
+            {hasBadges ? (
+              <div className="flex flex-wrap items-center gap-2">{card.badges}</div>
+            ) : null}
+            {hasTitle ? (
+              /* No weight. CH19 view 02 draws the card title
+                 `font-size: 13px; line-height: 1.35` and writes no
+                 `font-weight`, so it inherits the demo's 300 — the chips
+                 above it and the meta below carry the hierarchy, not the
+                 title. The RECORD NAME in view 01 is 500; a board card's
+                 title is not. */
+              <p
+                className={cn(
+                  "min-w-0 text-caption leading-[var(--leading-h3)]",
+                  hasBadges && "mt-[var(--space-1h)]",
+                )}
+              >
+                {card.title}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {card.description !== undefined && card.description !== null ? (
           /* 11, the artifact's meta step. `text-micro` is the eyebrow rung
              and drags 0.08em with it; a meta line is not an eyebrow, so the
@@ -979,10 +1107,10 @@ function BoardCard({
             {card.description}
           </p>
         ) : null}
+        {/* `content` stays the LAST drawn thing — a mark, a bar, a row of
+            avatars is a body, and the chips moving to the head did not make
+            it one. Only the chips moved. */}
         {card.content}
-        {card.badges !== undefined && card.badges !== null ? (
-          <div className="flex flex-wrap items-center gap-2">{card.badges}</div>
-        ) : null}
         {/* Read once when the card takes focus. A prop, because the key names
             and the sentence around them both have to reach Arabic, Urdu and
             Persian. */}

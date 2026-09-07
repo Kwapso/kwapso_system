@@ -485,6 +485,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "toolbar-slot-set",
     status: "enforced",
   },
+  {
+    id: "R54",
+    dimension: "ui",
+    law: "THE AGENCY'S OWN PEOPLE ARE NAMED BY THEIR FIRST NAME, AND NOBODY ELSE IS. One seam, `shared/staff-name.ts`, turns a staff person into the word a screen shows — `staffName` from the structured `first_name`/`last_name` pair (exact, so a two-word given name survives) and `staffNameFromSnapshot` from the frozen \"First Last\" a row stored at write time, plus `describeWithStaffName`, which rewrites an activity SENTENCE against that same row's own actor snapshot by exact prefix. THE TRIM HAPPENS AT THE RENDER SEAM AND NEVER IN A WORKER, and the file's header carries the three findings that decided it. The census is DERIVED TWICE, never hand-listed: the actor-snapshot COLUMNS are read off the workers' own writes (the column `actor.name` is stamped into — as an interpolated `sqlString`, as an `insertRow` property, positionally out of an `INSERT … VALUES` list, or through a `?` aligned to its own bind), the PAYLOAD FIELDS are read off the mappings that carry those columns onto the wire, and a second source adds any `*Name` field that declares a `*IsClient` sibling in `shared/types.ts`, because a field that has to say which population it holds is a field that holds a person. THE CENSUS ITSELF KEEPS ONLY THE `*Name` FIELDS, because the reader scan matches a field by name and a name has to be specific enough to mean one thing — `.by` is how every sort state in the app spells its own column. That narrowing is not silent: a mapping whose field is not `*Name` must be named in `NON_NAME_PAYLOAD` with the one file that renders it, that file is checked for the seam by name, and the list is rot-checked, so the boundary is declared rather than quietly dropped. Every `web/` file that READS one of those fields must resolve it through the seam at least once, judged positionally the way R20 judges a checked body field: a pure FORWARD into another census field is not a rendering, and neither is a MATCH position (`.toLowerCase()`, `.localeCompare(`) — which is the point of trimming late, since the stored string stays a search and sort key. `STAFF_NAME_RAW` is the reasoned residue, rot-checked so it can only shrink, and a tripwire fails the build if either derivation goes blind.",
+    why: "The client's ruling, 7 Sep 2026, verbatim: \"upwise, when it's staff who records activity, only use the first name, so not Audora Alasa, only Audora. Do this across all the app. We only record name and surname for the contacts and the customers.\" TWO SENTENCES, TWO POPULATIONS, and the second is what makes this a law rather than a find-and-replace. A CLIENT LOGIN IS AN ORDINARY TEAM MEMBER and `toActor` (shared/workers/gating.ts) is the only actor constructor in the estate — the portal gateway builds none of its own — so a row a CONTACT authored through the portal carries THEIR name in the same `creator_name` column ours do: a process comment, a raised ticket, a reply, an attachment, a completed to-do. Three read seams already answered that question per row for the portal's own redaction (`raiser_is_client`, `from_client`, `is_staff`) and then threw the answer away, which left the agency app holding one field with two populations in it and nothing to tell them apart; those flags now ride the wire, and the activity feed and the to-do grew the one they had never had. THE TRIM IS AT THE RENDER SEAM FOR THREE MEASURED REASONS, not one aesthetic one: `work_logs.user_name` is written from `actor.name` and then used as a LIKE search term, as a sort expression AND as the keyset cursor key (workers/content/src/lib/work-logs.ts), so a worker-side trim would change which rows a search finds and where a page boundary falls; `assignableMembers` (web/lib/members.ts) appends an email to a name that is not unique in a picker, and first names collide where full names do not, so that de-duplication has to run on the word the reader actually sees; and `actorName` is on the machine surface too (the activity tool's own contract), where the ruling — about what a PERSON reads — has no business. AND THE SENTENCE, WHICH IS WHERE SHE ACTUALLY SAW IT. The kit's ActivityFeed draws `actor` only as an avatar's accessible name; the visible line is `description`, a sentence 140 writers across the workers compose with `${actor.name}` inside it and store. Shortening the actor field alone would have changed nothing on the screen she was pointing at. `describeWithStaffName` replaces an EXACT PREFIX match against the row's own snapshot — the row is telling us which characters are its actor's name, so this is a fact the row carries rather than a guess about English — and it therefore fixes HISTORY as well as everything written from today, which no change to a writer could do. THE RESIDUE IS NAMED RATHER THAN HIDDEN: a description that puts a SECOND person inside its prose (\"X changed Y's role to Admin\", \"X removed Y from the team\", \"X invited Y as Admin\") keeps that person's full name, because no column on the row names the second person and guessing which run of characters in a stored sentence is a surname is the prose parsing this seam refuses to do. INITIALS ARE UNTOUCHED, also on purpose: an initial is a MARK, not a name — R35's own word for the case where a record has neither picture nor glyph — and \"AA\" is not \"Audora Alasa\".",
+    checkId: "staff-names-are-first-names",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -494,6 +502,21 @@ export const RULES_REGISTRY: Rule[] = [
  * assistant cannot reach is the exact failure this law exists to make visible.
  * Rot-checked — a module here that gains a kind or a tool turns the build red,
  * so the list can only shrink. */
+/** R54 — A STAFF-NAME FIELD READ ON A SCREEN THAT NEVER PUTS IT THROUGH THE SEAM.
+ *
+ * Keyed `<repo-relative file>::<field>`, because the law asks per SCREEN whether
+ * that screen resolves that name — the same shape R20's per-door census takes.
+ * Rot-checked in both directions: an entry the census would no longer catch is a
+ * line nobody can justify and nobody can safely delete, so it turns the build red
+ * and the list can only ever shrink.
+ *
+ * Empty is the goal, and empty is where it stands. The one line it ever held was
+ * the two triage banners in `web/components/tickets-collection.tsx`, deferred on
+ * the day this law landed only because a concurrent lane owned that file; both
+ * call sites now resolve through `staffNameFromSnapshot`, exactly as
+ * `triage-strip.tsx` — the third copy of the same sentence — always did. */
+export const STAFF_NAME_RAW: Record<string, string> = {}
+
 export const ASSISTANT_BLIND_MODULES: Record<string, string> = {
   agent:
     "THE MODULE IS THE SWITCH, and both of its rights are about the assistant rather than about anything the assistant could read: `read` is 'see your own threads with it' and `create` is 'say something to it' (shared/team-modules.ts). There is no third act and no record type behind it — a thread is the conversation the assistant is standing in, not material about the agency. Filing past conversations as a corpus would be worse than useless: the assistant would retrieve its own earlier answers as evidence for new ones, which is how a wrong answer becomes a cited fact. DELETE THIS LINE if the agent ever grows a record somebody could ask a question ABOUT.",
@@ -2082,6 +2105,22 @@ export const GROWING_COLLECTIONS: Record<
      * so each has to be pointed at. */
     pagerFile: string
     pagerKey: string
+    /** THE THIRD LINK, and only where the chain genuinely has three — 7 Sep 2026.
+     *
+     * `pagerKey` names the value the pager is handed. Usually that value is the
+     * cache key itself, written in the pager's own file, and two links are the
+     * whole chain. The TEAM feed stopped being two links today: its door moved
+     * out of a tab and into the footer's `All activity ·` rail, so
+     * `module-content.tsx` now hands the rail an `activityKey` VARIABLE that
+     * `web/lib/use-screen-data.ts` composed — the literal `activity:team:` is
+     * no longer written in the file that renders the pager.
+     *
+     * Naming this file is what stops the pin weakening into "some variable
+     * reached the rail". With it, the check still walks the whole way: the
+     * literal key is composed HERE, that variable reaches the pager THERE, and
+     * neither half can be satisfied alone. Absent, a collection is the ordinary
+     * two-link kind and nothing extra is asked of it. */
+    keyBuiltIn?: string
     why: string
   }
 > = {
@@ -2125,7 +2164,17 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "activity",
     webKey: "activity:team:",
     pagerFile: "components/deep-link/module-content.tsx",
-    pagerKey: "activity:team:",
+    /* THE PAGER IS INSIDE THE RAIL NOW, so this names the value handed to it
+       rather than the literal key, and `keyBuiltIn` below names where that
+       literal still lives. The client retired the Activity tab on 7 Sep 2026
+       ("kill all old activity tabs") and the feed moved into the slide-in the
+       footer's Latest activity door opens — `<ActivityRail>`, which mounts the
+       same `<ActivityPanel>` and therefore the same `<LoadMore>`. The substance
+       of this line never changed: page two of the team's history is reachable.
+       What changed is which file writes the key, which is why the pin grew a
+       third link instead of simply moving. */
+    pagerKey: "activityKey",
+    keyBuiltIn: "web/lib/use-screen-data.ts",
     why: "the fastest-growing table in the base — EVERY mutation writes a row",
   },
   // The SAME door and the SAME rows, read through the generic (table, id) scope —
@@ -2273,8 +2322,44 @@ export const MUTATING_WORKERS = ["tenancy", "content", "data-ops"] as const
  * components opens with its own comment saying why it is host-composed rather than
  * a recipe, which is where a reader looks for it. */
 export const RECORD_DETAIL_NOT: Record<string, string> = {
-  "module-content":
-    "The RECIPE HOST, not a record detail. It is caught by the behavioural half of the census (it renders `<ActivityPanel>`, since 2026-09-03, so the recipe-driven details finally get the app's own empty/loading/error copy and an in-tab pager instead of the kit's hardcoded English and a pager hung under the whole screen). But it draws no tabs of its own: it hands recipes to `ScreenRenderer`, and the kit's `RecordDetail` draws the strip. So the bespoke half's demands — a literal `TabsView` and inline `{ value, badge }` tab objects — describe a shape this file correctly does not have. It is NOT unchecked: the SAME test's recipe half already holds it, by name, to one `withTabCounts(` per detail recipe it renders, which is R2/R8 for exactly these screens.",
+  /* EMPTIED 7 Sep 2026, and the emptying is the point rather than a loss.
+   *
+   * Its one entry was `module-content`, the RECIPE HOST — caught by a census
+   * whose behavioural signal was "renders `<ActivityPanel>`", which that file
+   * did from 2026-09-03 so the recipe-driven details would get the app's own
+   * empty/loading/error copy instead of the kit's hardcoded English. It is not
+   * a record detail and never was: it hands recipes to `ScreenRenderer`, and
+   * the kit's `RecordDetail` draws the strip, so the bespoke half's demands
+   * described a shape that file correctly does not have.
+   *
+   * The client retired the Activity tab, the census's behavioural signal moved
+   * to `<RecordScreen>` (the app's own detail host), and `module-content`
+   * renders none — so it is no longer caught and the exemption became a line
+   * naming a file nobody was excusing. The rot check demanded its deletion,
+   * which is exactly what that check is for. `module-content` remains held by
+   * the SAME test's recipe half, by name, to one `withTabCounts(` per detail
+   * recipe it renders.
+   *
+   * Kept as an empty map rather than deleted: the census still subtracts it,
+   * and an exemption list that has to be re-created to be used again is one
+   * somebody re-creates without its history. */
+}
+
+/** R2 — record details that draw ONE panel, and therefore no tab strip.
+ *
+ * A tab strip over a single panel carries no choice: it names the thing already
+ * on screen. This list became necessary on 7 Sep 2026, when the client retired
+ * the Activity tab ("kill all old activity tabs") and the one detail whose tabs
+ * were exactly Overview + Activity was left holding a strip with one item.
+ *
+ * Each entry says why that screen has one panel — not "it has no tabs", which is
+ * the observation, but what the record IS such that a second panel would be
+ * invented to fill the strip. Rot-checked in `record-detail-tabs`: an entry
+ * naming a screen the census does not catch, or one that has since grown a
+ * `TabsView`, turns the build red. The list can only shrink. */
+export const RECORD_TABS_SINGLE_PANEL: Record<string, string> = {
+  "selectable-detail":
+    "A DROPDOWN VALUE — a word, its colour or glyph, and whether it is active. There is no second thing about it: it owns no collection, nothing is filed against it, and its whole record fits the Overview panel it already draws. Its strip was Overview + Activity until 7 Sep 2026 and became one item when the Activity tab was retired; a strip was then removed rather than a second panel invented to justify one. Its history is still reachable, from the footer's Latest activity door like every other record's.",
 }
 
 /** R8 — reviewed bypasses: placement:"tab" sections that DON'T lead with a

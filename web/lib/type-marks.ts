@@ -17,7 +17,37 @@ import type { SelectableValue } from "@shared/types"
 /** The groups a record type can come from. Written out so a caller cannot pass a
  * group that carries no marks and quietly get nothing back for ever. */
 export const MARK_GROUP = {
-  ticket: "Ticket type",
+  /* NO `ticket` HERE, AND ITS ABSENCE IS THE RULING — client, 2026-09-07, over
+   * a screenshot of the ticket list's Type column: *"for type, kill the emojis.
+   * this is legacy. in current system we use colors"*. She is describing the
+   * app's own history: the design kit stopped shipping pictographs after her
+   * 2026-08-31 ruling ("i said no emojis. why are there still emojis? kill
+   * them!"), and these survived it because they are the TEAM'S DATA rather than
+   * the kit's art — a `mark` on a `Ticket type` row in `selectable_data`, set
+   * on the Dropdown values screen.
+   *
+   * THE DATA IS UNTOUCHED. Not one row was migrated, cleared or deprecated; a
+   * team can still edit those glyphs and `Ticket type` is still an ordinary
+   * vocabulary group. What was retired is the READ, on every surface that drew
+   * a ticket's kind: the list's Type cell and the Ready split pane
+   * (tickets-collection.tsx), the ticket's own header band (help-detail.tsx)
+   * and an app's Tickets panel (app-detail.tsx). The colour is the mark now —
+   * `Swatch` + `ticketTypeColour`, web/lib/type-colours.ts — which is what her
+   * "we use colors" names and what the type facet, the picker option and the
+   * chip line have drawn all along.
+   *
+   * WHY THE KEY IS DELETED RATHER THAN LEFT UNUSED. A display ruling that lives
+   * as a habit ("don't call this one") is undone by the next person who needs a
+   * glyph and finds the group sitting here. With the key gone there is no group
+   * name to look a ticket's mark up under, and `MarkGroup` is a closed union —
+   * so a screen that tries fails its own type check rather than quietly
+   * shipping the emoji back. Restoring it is a deliberate act with a ruling
+   * behind it, which is the only way it should come back.
+   *
+   * THE OTHER THREE GROUPS ARE UNAFFECTED and still draw their glyphs: stories
+   * (stories-screen.tsx, sprint-detail.tsx, help-detail.tsx's story panel,
+   * app-detail.tsx), sprints (app-detail.tsx) and the sprint STATUS labels. Her
+   * ruling names tickets and stops there, so this stops there too. */
   story: "Story type",
   sprint: "Sprint type",
   /** The three states a sprint is IN, as opposed to the kind of block it is. A

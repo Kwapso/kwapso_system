@@ -340,11 +340,28 @@ export function useScreenData({
         return r.activity
       })
   )
-  // R8: the number the DETAIL's Activity tab badges — the same exact, already-
+  // R16: the number the DETAIL's activity door prints — the same exact, already-
   // permission-filtered total the fetch above primed, read as a sidecar so the
-  // tab and the feed can never disagree. Undefined until page one lands, which
-  // formatCount renders as nothing.
+  // door and the feed can never disagree. Undefined until page one lands, which
+  // formatCount renders as nothing. It badged an Activity TAB until the client
+  // killed those (2026-09-06); the number and its argument are unchanged by the
+  // move, only the place it is printed.
   const activityTotal = useCachedValue<number>(activityKey ? `total:${activityKey}` : null)
+  // R14 — PAGE TWO OF WHICHEVER SCOPE FEED IS IN VIEW, spending the cursor the
+  // fetch above parked. It lives here rather than at the host because the door
+  // it is asked through (`<ActivityRail>`, off the record footer's Latest
+  // activity column) must page THE SAME feed under THE SAME key: a fetcher
+  // built beside the control could quietly ask a different scope, and the
+  // reader would get somebody else's history appended to their own. Same three
+  // arguments as page one, plus the cursor, from the one call.
+  const activityFetchPage = (cursor: string) =>
+    tenancy
+      .activity(
+        activityScope ?? "team",
+        activityScope === "team" ? undefined : (recordId ?? undefined),
+        cursor
+      )
+      .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
   // THE GENERIC (table, id) RECORD FEED — Law R5, for the four agency-internal
   // details. The three scopes above (team / user / invite) are the base's older
   // fixed ones, named at the door; a module written today reads its history the
@@ -388,6 +405,7 @@ export function useScreenData({
     activityKey,
     activityQ,
     activityTotal,
+    activityFetchPage,
     internalActivity,
     inviteAuditQ,
   }

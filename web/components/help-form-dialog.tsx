@@ -1,9 +1,11 @@
 "use client"
 
 // Ticket form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
-// Description is required; Type is an optional DROPDOWN drawn from the team's
-// "Ticket type" dropdown values (selectable_data). Every member can see every ticket
-// (the My/All tabs are just a raiser filter), so there's no audience picker.
+// Description is required. Type and "Raised by" are optional and are LINES OF
+// CHIPS, not dropdowns (the client, 2026-09-07) — the type's words come from the
+// team's own "Ticket type" dropdown values (selectable_data), the people from the
+// chosen client's own contacts. Every member can see every ticket (the My/All
+// tabs are just a raiser filter), so there's no audience picker.
 // Library primitives.
 //
 // WHO IT IS FOR. A staff ticket may NAME the client it is raised on behalf of, and
@@ -49,6 +51,9 @@ import { useFormDraft } from "@shared/web/use-form-draft"
 import { useCached } from "@shared/web/store"
 import { ManageDropdownsLink } from "@/components/manage-dropdowns-link"
 import { RecordPicker } from "@/components/record-picker"
+import { NEUTRAL_TYPE_COLOUR, orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
+import { appStageMark } from "@shared/app-stages"
+import { ticketTypeKeptForMigration } from "@shared/types"
 import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useT } from "@shared/web/language"
@@ -66,7 +71,25 @@ import { useT } from "@shared/web/language"
  * tickets have no English title and a portal caller still cannot send one. A
  * required field here would refuse tickets the door accepts. */
 const titleField = { ...defaultFieldConfig, label: "Title", required: false }
-const descField = { ...defaultFieldConfig, label: "What do you need help with?", required: true }
+/** THE PARAGRAPH, AND IT IS CALLED WHAT IT IS.
+ *
+ * CLIENT, 2026-09-07: "remove the 'what do you need help with'" — and, two
+ * lines later in the same list, "6. Description". So the question is not
+ * deleted, it is RENAMED to the word she used, which is also the word the rest
+ * of the app already uses for the same thing (`Description` is a field label on
+ * the module form, the app form and the story form, and it is already in the
+ * catalogue in all three languages — so this rename costs no translation).
+ *
+ * THE QUESTION SURVIVES AS THE PLACEHOLDER. "What do you need help with?" was
+ * doing two jobs — naming the field and telling somebody what to type — and only
+ * the first is being taken off it. The worked example underneath ("e.g. I can't
+ * invite a new member, the button is greyed out") already says the second thing
+ * better, in the box, where a person is looking when they need it, and it is
+ * left exactly as it was. A label that asks a question is also the one label
+ * shape that cannot be reused: every other field on this form is a NOUN, and a
+ * column of nouns with one question in it reads as a form that changed its mind
+ * halfway down. */
+const descField = { ...defaultFieldConfig, label: "Description", required: true }
 const typeField = { ...defaultFieldConfig, label: "Type", required: false }
 const accountField = {
   ...defaultFieldConfig,
@@ -132,7 +155,6 @@ export function HelpFormDialog({
   onOpenChange,
   onSubmit,
   helpTypeOptions,
-  typeMarks,
   fixedApp,
   initial,
   draftKey,
@@ -159,11 +181,19 @@ export function HelpFormDialog({
   }) => Promise<string | void>
   /** The team's active "Ticket type" dropdown values. */
   helpTypeOptions: string[]
-  /** THE GLYPH BESIDE EACH WORD (R35). A map rather than richer options,
-   * because the words come from the door and the marks come from the team's
-   * own vocabulary cache — two reads the screen already holds, and joining
-   * them here would make the dialog fetch. */
-  typeMarks?: Map<string, string>
+  /* `typeMarks` USED TO SIT HERE — the two-letter glyph beside each word, as a
+     `Map<string, string>` a caller could pass instead of richer options. It is
+     gone as of 2026-09-07 rather than left accepted-and-ignored, and the reason
+     is that BOTH halves of it stopped being true on the same day: not one of
+     this dialog's five call sites ever passed it (a census of all of them, not
+     an absent grep), and the control it fed is now a line of chips whose mark is
+     the type's COLOUR — the client's own ruling, "horizontal chips with the
+     color". `RowChip` draws a picture or a glyph in PREFERENCE to a swatch, so a
+     prop nobody passed would have silently replaced the four colours she asked
+     for with two-letter codes the first time somebody did pass it. The glyph is
+     not lost: `web/lib/type-marks.ts` still supplies it to the tab strip, the
+     list rows and the ticket's own header band, which is where a code is read
+     rather than compared. */
   /** Set when the form is opened FROM an app's own screen — the system the
    * request is about is then a fact about where you are standing rather than a
    * question, so the picker is replaced by its name. Separate from `initial`,
@@ -266,6 +296,144 @@ export function HelpFormDialog({
     ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this client") }
     : null
 
+  /* ── THE TYPE CHIPS ────────────────────────────────────────────────────────
+     CLIENT, 2026-09-07: "The type: I also don't want it as a dropdown, but I
+     want it as horizontal chips with the color, in the order that we
+     predetermine. Remember, with issue first."
+
+     Three separate rulings in one sentence, and all three already have a home
+     in this codebase, which is why none of them is decided here:
+
+       · THE SHAPE is `RecordPicker layout="row"` — the chip line she approved
+         on the triage card the day before, on the SAME vocabulary. A second
+         chip row written by hand here would be the two drifting apart by the
+         end of the month; `TriageChips` and this field are now one component
+         drawing one list.
+       · THE ORDER is `orderTicketTypes` (issue, question, request, extra, then
+         anything the order has never heard of, in the order it arrived) —
+         `web/lib/type-colours.ts` holds it for every chart, the tab strip and
+         the list's own facet, and its header explains at length why a fifth
+         type is one line there rather than a decision on five screens. "Issue
+         first" is that function's first element and this call site does not
+         restate it.
+       · THE COLOUR is `ticketTypeColour`, which resolves through the CHART
+         SERIES rather than the raw palette (R32; the same file argues it out).
+         It is drawn as `swatch` — a small dot before the word — and never as a
+         `mark`: a 24px filled box with no content reads as a picture that
+         failed to load, and the word beside the dot is what actually carries
+         the meaning for a reader who cannot tell poppy from forest.
+
+     RETIRED WORDS ARE SUBTRACTED, not special-cased. `ticketTypeKeptForMigration`
+     is the one predicate that knows which words are being retired and still sit
+     on old rows ("Requirements", "General"); every other screen that offers this
+     vocabulary already filters through it, and a chip line that offered a word
+     the rest of the app has stopped showing would be the one place a retired
+     type could be freshly assigned. */
+  const typeChoices = React.useMemo(() => {
+    const live = helpTypeOptions.filter((v) => !ticketTypeKeptForMigration(v))
+    /* AND THE TICKET'S OWN WORD, WHEN THE LIST NO LONGER HAS IT. Only on an
+     * EDIT, and only when it is genuinely missing — a ticket filed last March as
+     * "Requirements", or under a type somebody has since switched off on the
+     * Choices screen. Without this the row would draw five chips none of which
+     * is pressed, which reads as "this ticket has no type" about a ticket that
+     * plainly does; the value would survive a save (nothing here clears it) and
+     * the SCREEN would still have lied about it, which is the worse half.
+     *
+     * It is the same ruling `orderTicketTypes` makes one file over about a word
+     * its order has never heard of, and the same one migration 0034 made about
+     * "Bug" and "Feedback": deactivate the row, never orphan the record that
+     * already says it. It is added for THIS ticket only — a create never sees a
+     * retired word, so nothing new can be filed under one. */
+    const held = initial?.helpType?.trim()
+    const missing = !!held && !live.some((v) => v.trim().toLowerCase() === held.toLowerCase())
+    return orderTicketTypes(missing ? [...live, held as string] : live)
+  }, [helpTypeOptions, initial?.helpType])
+  /** The chips, with "no type" as the LAST of them.
+   *
+   * WHAT "NO TYPE" LOOKS LIKE, and it is a real chip rather than an absence.
+   * The row layout has no clear X and no `emptyOption` by design — a chip line
+   * commits on the click, so "leave it off" has to be one of the choices or it
+   * is not reachable at all, and a type set by a mis-click would then be
+   * permanent for the length of the form. So it is a chip, it wears the neutral
+   * (`ticketTypeColour`'s own answer for a word it does not know, so every chip
+   * in the line has a dot and none of them reads as the broken one), and when
+   * nothing is chosen it is the one drawn BLACK — which is how "no type" says
+   * itself out loud instead of being four unlit chips a person has to interpret.
+   *
+   * LAST, not first, and that is the client's ruling deciding it: "in the order
+   * that we predetermine … with issue first". Issue is first. Anything that is
+   * not one of the four sorts after them, and "no type" is the most not-one-of-
+   * the-four thing on the row. */
+  const typeOptions = [
+    ...typeChoices.map((v) => ({ value: v, label: v, swatch: ticketTypeColour(v) })),
+    { value: NONE, label: t("No type"), swatch: NEUTRAL_TYPE_COLOUR },
+  ]
+
+  /* ── THE PEOPLE CHIPS ──────────────────────────────────────────────────────
+     CLIENT, 2026-09-07: "the raise by, no dropdown but visible all chips."
+
+     THE FENCE DOES NOT MOVE. These are the chosen client's OWN contacts, read
+     from `listAccountLinks` through the account detail — one BOUNDED, hard-capped
+     read the browser holds whole — and the door refuses a contact who is not on
+     that account. A chip line that offered anybody else would be a control whose
+     only possible outcome is a refusal, which is the shape this app removes on
+     sight. So the chips are exactly the list the old picker filtered to; only the
+     presentation changed.
+
+     AND ALL OF THEM, WITH NO CAP, which is the part worth defending because a
+     hundred chips would be a wall. Three reasons it is not one here: this is ONE
+     COMPANY's contacts and not the team's address book (the fence above is what
+     makes the number small — the report that named "a hundred and four contacts"
+     was counting every contact in the agency, across every client); the row wraps
+     by itself, so a long one costs height in a dialog that already scrolls rather
+     than becoming unreachable; and the alternative — chips up to some N and a
+     dropdown above it — reintroduces at an unpredictable threshold the exact
+     control she asked to remove, which is worse than a tall row and impossible to
+     explain. If a real account ever does make a wall of this, the honest fix is a
+     cap she can SEE ("and 40 more"), not a control that changes shape behind her.
+
+     NO FACE ON THESE CHIPS, and that is the data's limit rather than a choice:
+     `AccountLink` carries `personName` and no picture at all, so R35's face has
+     nothing to draw from here. `shape: "round"` rides anyway — it is what the
+     row will draw a person WITH the day the link row carries a photo, and it is
+     already what the closed picker passed. */
+  const contactChoices = (detailQ.data?.links ?? []).filter((l) => l.active)
+  /** The chips, and the TWO empty states this field has that the type row does
+   * not — which is why "Not said" is appended only when there is somebody to
+   * say it instead of.
+   *
+   * NOBODY CHOSEN YET is the first, and the field is no longer HIDDEN for it.
+   * It used to disappear until a client was picked, on the reasoning that a
+   * contact belongs to a company and the question has no possible answer before
+   * one is named. That reasoning is still true and the answer to it has changed:
+   * this form now has a FIXED ORDER the client dictated field by field, and a
+   * row that appears and disappears inside a fixed order moves every field under
+   * it as somebody fills the form in. So the field keeps its place and SAYS why
+   * it is empty ("Choose a client first.", the same sentence the module picker
+   * has always said one field up about its app), which is a reason rather than a
+   * vanishing act — and it is honest about the agency's own tickets, which have
+   * no client on purpose and will read that line for good.
+   *
+   * A CLIENT WITH NO CONTACTS is the second, and it gets the sentence rather
+   * than a lone "Not said" chip: one black chip on an otherwise empty line looks
+   * like a row that failed to load its options, which is precisely the reading
+   * `RecordPicker`'s own empty-row note exists to prevent. */
+  const contactOptions =
+    !chosenAccountId || contactChoices.length === 0
+      ? []
+      : [
+          ...contactChoices.map((l) => ({
+            value: l.personAccountId,
+            label: l.personName,
+            hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
+            shape: "round" as const,
+          })),
+          // "Not said" is the same escape hatch "No type" is, in the same place
+          // for the same reason: the row commits on the click, so naming the
+          // wrong person has to be undoable without closing the form.
+          { value: NONE, label: t("Not said"), shape: "round" as const },
+        ]
+
   /** ONE FILE AT A TIME, and a failure here never fails the ticket.
    *
    * The ticket is already raised by the time this runs. Turning a rejected
@@ -352,11 +520,29 @@ export function HelpFormDialog({
         disabled: !richTextValue(values.description) || moduleMissing,
       }}
     >
-      {/* THE ORDER IS THE CLIENT'S, 2026-09-06: client, app, module, title,
-          description, author, screenshots. It is also the order the data
-          depends in — the app list is the team's, the module list belongs to
-          the app above it, the contact list belongs to the client at the top —
-          so answering downward never asks a question that has no answer yet. */}
+      {/* THE ORDER IS THE CLIENT'S, 2026-09-07, and it is her own list of seven
+          verbatim: 1. Client 2. App 3. Module 4. Type 5. Title 6. Description
+          7. Attachments. The one change from her 2026-09-06 ordering is TYPE,
+          which moves from last — where the note below this form used to argue
+          it belonged, because "most of the times tickets always come in as
+          issue, so I recategorize them" — into FOURTH. That argument is not
+          being overruled by anybody here: she asked for the chips and she
+          placed them, and a screen that keeps a field where an old comment
+          reasoned it should be is a screen arguing with its owner.
+
+          IT IS STILL THE ORDER THE DATA DEPENDS IN, which is the property worth
+          not losing: the app list is the team's, the module list belongs to the
+          app above it, and the contact list belongs to the client at the top —
+          so answering downward never asks a question that has no answer yet.
+          Type sitting fourth costs nothing there, because a ticket's type
+          depends on none of the three above it.
+
+          RAISED BY IS NOT IN HER SEVEN, and it has not been dropped. She asked
+          for it as CHIPS (item 5 of her list of asks) and then did not place it
+          in the ordering, so it is put where the previous ordering had "author"
+          — directly after Description, before Attachments — and said out loud
+          here so she can move it in one line rather than discover it somewhere
+          she did not expect. */}
       {/* The picker reads `values.accountId || NONE` rather than the bare value:
           a draft saved in this tab before this field existed restores an object
           without it, and an undefined value would quietly make the control
@@ -389,6 +575,17 @@ export function HelpFormDialog({
           client's ordering (2026-09-06) puts markup and meaning in the same
           direction, so the four read top to bottom as one sentence and the note
           has nothing left to apologise for. */}
+      {/* AND EACH APP WEARS ITS OWN MARK (client, 2026-09-07: "when I select the
+          app, I want to see the icons"). The list screen's app facet answers the
+          same ask with `<AppMark app={a} size="choice" />`; a picker OPTION
+          cannot be handed that node, because `PickerOption.mark` is the GLYPH
+          STRING `RecordMark` takes rather than a component — so the two fields
+          `AppMark` reads are passed straight through instead, and the picker
+          builds the identical `RecordMark` at the identical `choice` size on the
+          other side. Same component, same size, same fallback chain (the
+          client's logo where there is one, the stage mark where there is not,
+          the name's own initial where there is neither) — one treatment drawn
+          from two call sites, not a second treatment invented here. */}
       <Field config={appField} htmlFor="help-app" className={fieldSpacing}>
         <RecordPicker
           id="help-app"
@@ -396,7 +593,19 @@ export function HelpFormDialog({
           onChange={(appId) => setValues((v) => ({ ...v, appId, moduleId: NONE }))}
           options={(appsQ.data ?? [])
             .filter((a) => a.active)
-            .map((a) => ({ value: a.id, label: a.name }))}
+            .map((a) => ({
+              value: a.id,
+              label: a.name,
+              picture: a.logoUrl,
+              mark: appStageMark(a.stage),
+              // ALWAYS, even for an app with no logo AND no stage —
+              // `appStageMark` answers "" for a stage nobody has written down,
+              // and without this flag that app would be the one blank line in a
+              // list of icons. `AppMark` on the ticket LIST has no such hole
+              // because it hands `RecordMark` the job unconditionally; `face`
+              // is how a picker option says the same thing.
+              face: true,
+            }))}
           emptyOption={{ value: NONE, label: t("No app") }}
           placeholder={t("No app")}
           searchPlaceholder={t("Search apps…")}
@@ -421,6 +630,48 @@ export function HelpFormDialog({
           emptyText={chosenAppId ? t("This app has no modules yet.") : t("Choose an app first.")}
           disabled={busy || !chosenAppId}
         />
+      </Field>
+      {/* THE TYPE, AS A LINE OF COLOURED CHIPS, AND FOURTH (client, 2026-09-07).
+          It was the last field on this form and a searchable dropdown; it is now
+          the fourth and a chip row, which is two of her rulings in one block.
+          The list itself — which words, in what order, wearing which colour — is
+          built above beside the reasoning for each of the three; nothing about
+          the vocabulary is decided here.
+
+          NO `leadValue`, AND THAT IS THE ONE PLACE THIS ROW DIFFERS FROM THE
+          TRIAGE CARD'S. There the lead is the ticket's CURRENT type, promoted to
+          the front of the line with a divider after it, because triage is a
+          person re-reading one ticket and "start from what it says now" is the
+          honest first offer. Here the client has just ruled the order fixed and
+          named its first element — "in the order that we predetermine … with
+          issue first" — so promoting the ticket's existing type would reorder
+          the row per ticket and Issue would stop being first the moment somebody
+          edited a Question. A fixed order and a promoted lead are two different
+          promises about the same line, and she made the first one. The chosen
+          chip is still drawn BLACK wherever it sits, which is what actually
+          answers "which one is it" without moving anything. */}
+      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
+        <RecordPicker
+          id="help-type"
+          layout="row"
+          // The row is a `div role="group"`, not a labelable control, so the
+          // Field's `<label for>` above cannot name it — the same wall the
+          // description editor hits two fields down, answered the same way and
+          // out of the same config, so the visible label and the spoken one
+          // cannot drift.
+          ariaLabel={t(typeField.label)}
+          value={values.helpType}
+          onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
+          options={typeOptions}
+          searchPlaceholder={t("Search types…")}
+          // A ROW CANNOT SAY "nothing matched" — there is no search box in it —
+          // so this is the state where the team's own `Ticket type` list is
+          // EMPTY, every word deactivated on the Choices screen. The same
+          // sentence the triage card's row says about the same vocabulary.
+          emptyText={t("Your team has no ticket types set up yet.")}
+          disabled={busy}
+        />
+        <ManageDropdownsLink teamId={teamId ?? null} />
       </Field>
       {/* WHAT TO CALL IT, above the paragraph rather than below it: this is the
           line the triage card, the list's title column and the ticket's own
@@ -459,45 +710,36 @@ export function HelpFormDialog({
           className="min-h-32"
         />
       </Field>
-      {/* WHO ASKED (CHECKLIST 5.9), narrowed to that account's own contacts —
-          which is also what the door enforces, so the picker can never offer a
-          person the server would refuse. Hidden until a client is chosen: a
-          contact belongs to a company, and offering the field first would be a
-          question with no possible answer. */}
-      {chosenAccountId && (
-        <Field config={contactField} htmlFor="help-contact" className={fieldSpacing}>
-          {/* CLIENT-SIDE on purpose, and this is the picker where that is the
-              SAFE answer rather than the lazy one. A company's contact list is
-              BOUNDED (`listAccountLinks`, one hard-capped read), so the browser
-              holds all of it — nothing is hidden past a cursor. And it must stay
-              this list: the narrowing to one company's own people is the fence
-              the door enforces, so searching a wider one would offer names the
-              server would refuse. Search finds a contact faster; it does not
-              widen who may be named. */}
-          <RecordPicker
-            id="help-contact"
-            value={values.raisedByContactId || NONE}
-            onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
-            // A CONTACT IS A PERSON (R35's "round" shape) — the same face
-            // `StakeholdersPanel` already draws a client-side stakeholder
-            // with. No photo comes through `listAccountLinks` today, so this
-            // falls back to their initial like every unphotographed person.
-            options={(detailQ.data?.links ?? [])
-              .filter((l) => l.active)
-              .map((l) => ({
-                value: l.personAccountId,
-                label: l.personName,
-                hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
-                shape: "round" as const,
-              }))}
-            emptyOption={{ value: NONE, label: t("Not said") }}
-            placeholder={t("Not said")}
-            searchPlaceholder={t("Search contacts…")}
-            emptyText={t("Nobody here matched.")}
-            disabled={busy}
-          />
-        </Field>
-      )}
+      {/* WHO ASKED (CHECKLIST 5.9), AS CHIPS (client, 2026-09-07: "the raise by,
+          no dropdown but visible all chips"), and PLACED HERE ON PURPOSE. Her
+          list of seven does not mention this field at all, so it keeps the slot
+          the previous ordering gave "author" — after the description, before the
+          attachments. Said out loud in the order note at the top of this form so
+          it is one line to move rather than a surprise.
+
+          THE FENCE IS UNCHANGED and is the reason the list stays client-side:
+          a company's contact list is BOUNDED (`listAccountLinks`, one hard-capped
+          read), the browser holds all of it, and the narrowing to one company's
+          own people is what the DOOR enforces — so a wider list would offer names
+          the server refuses. Removing the search box removes a convenience, never
+          a limit. The options themselves, the no-cap decision and the two empty
+          states are worked out above. */}
+      <Field config={contactField} htmlFor="help-contact" className={fieldSpacing}>
+        <RecordPicker
+          id="help-contact"
+          layout="row"
+          // Same wall, same answer as the type row above: a group of chips is
+          // not a labelable control, so the name a screen reader reads comes
+          // from the field's own config rather than from the `<label for>`.
+          ariaLabel={t(contactField.label)}
+          value={values.raisedByContactId || NONE}
+          onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
+          options={contactOptions}
+          searchPlaceholder={t("Search contacts…")}
+          emptyText={chosenAccountId ? t("No contacts yet.") : t("Choose a client first.")}
+          disabled={busy}
+        />
+      </Field>
       {/* THE SCREENSHOT, BESIDE THE WORDS THAT DESCRIBE IT — and on BOTH halves
           of this dialog, which is the whole of the owner's ask: "while adding or
           editing them, just like we have at the story level." One field, one
@@ -536,30 +778,10 @@ export function HelpFormDialog({
           </div>
         </Field>
       )}
-      {/* TYPE IS LAST AND OUTSIDE THAT SEQUENCE. It is not in the client's
-          list of seven, and triage is where a type is actually decided — "most
-          of the times tickets always come in as issue, so I recategorize them".
-          Kept rather than deleted because a person who already knows the answer
-          should not be made to walk through triage to give it; moved out of the
-          way because they usually don't. One line to remove if she wants it
-          gone. */}
-      {/* The type vocabulary is the team's own and grows on the Dropdown values
-          screen, so it gets the search box too — and the picker's own clear X
-          replaces the one this field used to draw by hand. */}
-      <Field config={typeField} htmlFor="help-type" className={fieldSpacing}>
-        <RecordPicker
-          id="help-type"
-          value={values.helpType}
-          onChange={(helpType) => setValues((v) => ({ ...v, helpType }))}
-          options={helpTypeOptions.map((v) => ({ value: v, label: v, mark: typeMarks?.get(v) ?? null }))}
-          emptyOption={{ value: NONE, label: t("No type") }}
-          placeholder={t("Choose a type (optional)")}
-          searchPlaceholder={t("Search types…")}
-          emptyText={t("No type matched.")}
-          disabled={busy}
-        />
-        <ManageDropdownsLink teamId={teamId ?? null} />
-      </Field>
+      {/* TYPE USED TO BE HERE, last and outside the sequence, with a note
+          arguing that triage is where a type is actually decided — "most of the
+          times tickets always come in as issue, so I recategorize them". The
+          client put it fourth on 2026-09-07 and it is drawn there now. */}
     </FormShellDialog>
   )
 }

@@ -74,12 +74,31 @@ describe("assignableMembers — our people, and only ours", () => {
       person({ userId: "u-3", firstName: "Aurora", lastName: "Thalassa" }),
     ])
     expect(out.map((p) => p.name)).toEqual([
-      "Alaap Kanchwala (alaap@kwapso.app)",
-      "Alaap Kanchwala (ak@kwapso.app)",
+      // R54: the word in the picker is the FIRST NAME, and the email that makes
+      // it pickable is appended to THAT — not to a full name nobody now sees.
+      "Alaap (alaap@kwapso.app)",
+      "Alaap (ak@kwapso.app)",
       // Untouched: most of the time a name is a name, not a record.
-      "Aurora Thalassa",
+      "Aurora",
     ])
     expect(new Set(out.map((p) => p.name)).size).toBe(3)
+  })
+
+  it("tells two people apart who only collide once the surname is gone", () => {
+    // THE CASE R54 CREATED, and the reason `shared/staff-name.ts` argues the trim
+    // has to happen BEFORE this list is built rather than in a worker. These two
+    // are not the screenshot's pair: they are two different people with two
+    // different surnames, who were never ambiguous while the picker said "Alaap
+    // Kanchwala" and "Alaap Mehta" and are ambiguous the moment it says "Alaap"
+    // twice. First names collide far more often than full names do, so a
+    // de-duplication that ran on the STORED name would count these as unique and
+    // hand the reader two identical rows to guess between.
+    const out = assignableMembers([
+      person({ userId: "u-1", firstName: "Alaap", lastName: "Kanchwala", email: "alaap@kwapso.app" }),
+      person({ userId: "u-2", firstName: "Alaap", lastName: "Mehta", email: "am@kwapso.app" }),
+    ])
+    expect(out.map((p) => p.name)).toEqual(["Alaap (alaap@kwapso.app)", "Alaap (am@kwapso.app)"])
+    expect(new Set(out.map((p) => p.name)).size).toBe(2)
   })
 
   it("counts duplicates AFTER the clients are gone", () => {
@@ -90,7 +109,7 @@ describe("assignableMembers — our people, and only ours", () => {
       person({ userId: "u-staff", firstName: "Alaap", lastName: "Kanchwala" }),
       person({ userId: "u-client", firstName: "Alaap", lastName: "Kanchwala", isClient: true }),
     ])
-    expect(out.map((p) => p.name)).toEqual(["Alaap Kanchwala"])
+    expect(out.map((p) => p.name)).toEqual(["Alaap"])
   })
 
   it("falls back to the email when there is no name yet, and survives no list", () => {

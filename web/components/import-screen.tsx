@@ -52,6 +52,7 @@ import type { ImportableTarget, ImportBatchReport, ImportBatchSummary, ImportBat
 import { ApiFailure, dataOps } from "@/lib/api"
 import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { formatActivityWhen } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -646,7 +647,11 @@ function PastImports({ teamId }: { teamId: string }) {
       <div className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {batches.map((b) => (
           <div key={b.id} className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-xs">
-            <span className="font-medium">{b.by}</span>
+            {/* R54 — an import is ours by construction (a client login cannot
+                reach this wizard), and `by` is `creator_name ?? "Someone"` off
+                the batch row: a frozen "First Last" snapshot, so the seam's
+                snapshot path. The fallback survives it unchanged. */}
+            <span className="font-medium">{staffNameFromSnapshot(b.by)}</span>
             <span className="text-muted-foreground">{formatActivityWhen(b.at)}</span>
             <span className="text-muted-foreground min-w-0 flex-1 truncate">
               {b.files.map((f) => f.name).join(", ")}

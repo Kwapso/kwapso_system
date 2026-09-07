@@ -163,7 +163,6 @@ import { TriageStrip } from "@/components/triage-strip"
 import { TicketsDashboard } from "@/components/tickets-dashboard"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { tenancy } from "@/lib/api/tenancy"
-import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import type { HelpAccountFacet, TriageWaiting } from "@/lib/api/content"
 import { AppMark } from "@/components/app-tiles"
@@ -175,6 +174,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { helpStatusDotTone } from "@shared/status-tones"
 import type { DotTone } from "@shared/app-stages"
 import type { TriageGap } from "@shared/triage-readiness"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { HelpFormDialog } from "@/components/help-form-dialog"
 import {
   accountsKey,
@@ -203,7 +203,6 @@ import type {
   AppRow,
   HelpAttachment,
   HelpTicket,
-  SelectableValue,
   TeamMember,
 } from "@shared/types"
 import { richTextPlain } from "@shared/web/rich-text"
@@ -246,13 +245,22 @@ import { richTextPlain } from "@shared/web/rich-text"
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** WORK THAT IS FINISHED AND UNSENT. One status, and the one tab whose whole
- * point is that somebody has to do something about it today. */
+ * point is that somebody has to do something about it today.
+ *
+ * A SUBSET OF OPEN SINCE 2026-09-07 ("in open, include status ready"), which is
+ * the same relationship Waiting has always had and needs no code here: the
+ * token is unchanged, the door is unchanged, and what moved is what OPEN means
+ * (shared/types.ts). Ready keeps its own tab because it is the pile that needs
+ * one person TODAY; Open now contains it because it is unfinished work. */
 const READY: HelpFacet = "status:ready"
-/** WORK UNDER WAY — THREE stages in one tab, and the reason `helpFacetFilter`
- * grew a set grammar (`web/lib/live-resources.ts`) and the door grew a
- * `status IN (…)` clause (`workers/content/src/lib/help.ts`). Built from
- * `OPEN_TAB_STATUSES` rather than spelled here, so the tab, its cache key, its
- * query and the door's own vocabulary are one fact written once. */
+/** WORK UNDER WAY — the stages `OPEN_TAB_STATUSES` names, in one tab, and the
+ * reason `helpFacetFilter` grew a set grammar (`web/lib/live-resources.ts`) and
+ * the door grew a `status IN (…)` clause (`workers/content/src/lib/help.ts`).
+ * Built from that array rather than spelled here, so the tab, its cache key,
+ * its query, its badge, the Status facet's options and the board's own columns
+ * are one fact written once — which is what let the client's 2026-09-07 ruling
+ * ("in open, include status ready") be a single-line edit in `shared/types.ts`
+ * with nothing on this screen able to disagree with it. */
 const OPEN = OPEN_FACET
 /** …AND THE PART OF OPEN THAT IS NOT MOVING. Derived at the door from the
  * ticket's own conversation, never stored — `waitingClause` in
@@ -868,14 +876,29 @@ export function TicketsCollection({
   // itself at all, and only `TriageQueue` — which fetches the queue — ever
   // knows that. See its own header comment.
 
-  // The team's own glyphs, scanned once for the whole strip rather than once
-  // per tab. The vocabulary is a cache this screen's siblings already hold and
-  // the live registry keeps current, so an emoji edited on the Dropdown values
-  // screen repaints these tabs on the next ping.
-  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
-    tenancy.selectable().then((r) => r.values)
-  )
-  const ticketMarks = markMap(selectableQ.data, MARK_GROUP.ticket)
+  /* THE TEAM'S OWN GLYPH PER TICKET KIND IS GONE FROM THIS SCREEN — client
+     ruling, 2026-09-07, over a screenshot of the Type column: *"for type, kill
+     the emojis. this is legacy. in current system we use colors"*.
+     THE STORED VALUES ARE UNTOUCHED. A `mark` still sits on every `Ticket type`
+     row in `selectable_data`, a team can still edit it on the Dropdown values
+     screen, and every other record kind still draws its own (`MARK_GROUP.story`
+     and `MARK_GROUP.sprint` — stories, sprints and their panels). This is a
+     DISPLAY ruling about one record type, so nothing was migrated and nothing
+     was deleted; what was removed is the READ. `MARK_GROUP.ticket` is gone from
+     `web/lib/type-marks.ts` with it, which is what makes this structural rather
+     than a habit: there is no longer a group name a future screen could look a
+     ticket's glyph up under, so the ruling cannot be undone by somebody
+     re-adding one call.
+     WHAT CARRIES THE KIND NOW is the colour, and it always did — `Swatch` +
+     `ticketTypeColour` (web/lib/type-colours.ts) on the row's pill, the chip
+     line, the picker option and the Type facet, one map so a kind's colour
+     cannot be decided twice. Her own earlier sentence for the same cell: "Type
+     with the colors, same as we have with the chips."
+     THE WHOLE `selectable:` READ WENT WITH IT rather than being left standing:
+     the vocabulary was fetched on this screen for the glyphs and for nothing
+     else, so keeping it would be a door call per visit feeding nothing. The
+     type WORDS the toolbar and the create dialog need arrive as
+     `helpTypeOptions` from the host, as they always have. */
   /* ── WHERE THE TOOLBAR'S FOUR FACETS GET THEIR OPTIONS ────────────────────
      Client, App, Type, Status — the client's own four, 2026-09-07. WHICH tabs
      may ask each of them is `helpTabFacets`' rule (web/lib/live-resources.ts,
@@ -983,6 +1006,29 @@ export function TicketsCollection({
   const facetTotal = useCachedValue<number>(
     totalKey(`help-facet:all:${facet}`, teamId)
   )
+  /* THE OPEN BOARD'S FIFTH COLUMN, AND WHY IT IS A READ RATHER THAN A FILTER.
+     Client, 2026-09-07: "in open, include status ready and waiting". `ready` is
+     a STATUS and joined `OPEN_TAB_STATUSES` (shared/types.ts), so it costs
+     nothing here — the Open tab already asks the door for it and the rows
+     arrive in `scopedQ`. `waiting` is not a status and never becomes one: it is
+     derived at the door from the ticket's own conversation (`waitingClause`,
+     workers/content/src/lib/help.ts) and no row in `scopedQ` carries a flag
+     saying so, so there is nothing in the browser to filter on. The column is
+     fed by the door's own answer to its own question instead.
+     THE SAME CACHE KEY THE WAITING TAB RESTS ON, deliberately: opening the
+     board and then the Waiting tab is one read, the live registry keeps one
+     entry current, and the tab and the column can never disagree about who is
+     waiting. `listFetch.helpFacet` primes this read's exact `total` into
+     `help-facet:all:waiting`, which is what the column's number reads — never
+     `waitingRows.length`, which is page one (R14/R16).
+     CONDITIONAL, so a reader who never opens the board never pays for it:
+     `useCached` with a null key fetches nothing. */
+  const onOpenBoard = facet === OPEN && openView === "board"
+  const waitingQ = useCached<HelpTicket[]>(
+    onOpenBoard ? helpFacetKey(teamId, "all", WAITING) : null,
+    () => listFetch.helpFacet(teamId, "all", WAITING)
+  )
+  const waitingTotal = useCachedValue<number>(totalKey(`help-facet:all:${WAITING}`, teamId))
   const scopeTotal = totals.help
   const shownTotal = narrowed ? facetTotal : scopeTotal
 
@@ -1415,18 +1461,15 @@ export function TicketsCollection({
                         teamId={teamId}
                         rows={rows}
                         counts={byStatus}
+                        waitingRows={waitingQ.data}
+                        waitingTotal={waitingTotal}
                         narrowed={found.active}
                         onOpen={openTicket}
                       />
                     ) : facet === READY && readyView === "split" ? (
-                      <ReadySplit teamId={teamId} rows={rows} marks={ticketMarks} onOpen={openTicket} />
+                      <ReadySplit teamId={teamId} rows={rows} onOpen={openTicket} />
                     ) : (
-                      <TicketRowsTable
-                        rows={rows}
-                        marks={ticketMarks}
-                        onOpen={openTicket}
-                        label={t("Tickets")}
-                      />
+                      <TicketRowsTable rows={rows} onOpen={openTicket} label={t("Tickets")} />
                     )}
                     <LoadMore
                       listKey={
@@ -1544,17 +1587,11 @@ type TicketFace = {
  * and the caller decides what goes in them. */
 function TicketRowsTable<T extends TicketFace>({
   rows,
-  marks,
   onOpen,
   label,
   decide,
 }: {
   rows: readonly T[]
-  /** THE TEAM'S OWN GLYPH PER TICKET KIND (`markMap`, web/lib/type-marks.ts) —
-   * an emoji somebody set on the Dropdown values screen, arriving without a
-   * deploy. Absent for a team that has set none, which is most of them, and the
-   * cell simply has one fewer thing in it. */
-  marks?: Map<string, string>
   onOpen: (id: string) => void
   /** The table's own accessible name, for a reader who arrives out of context. */
   label: string
@@ -1652,27 +1689,21 @@ function TicketRowsTable<T extends TicketFace>({
               </TableCell>
               <TableCell>
                 <span className="flex items-center gap-2">
-                  {/* THE TEAM'S OWN GLYPH FOR THE KIND, BESIDE THE PILL RATHER
-                      THAN INSIDE IT. This is the seam `markMap` exists for — an
-                      emoji a team sets on the Dropdown values screen, reaching
-                      every ticket surface without a deploy — and it used to
-                      arrive through `shapeHelpList`'s leading slot on the
-                      recipe-drawn list this table replaced. Keeping it costs one
-                      span; dropping it would have quietly deleted a capability
-                      nobody asked to lose.
+                  {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
+                      screenshot of this exact column: "for type, kill the
+                      emojis. this is legacy. in current system we use colors."
 
-                      OUTSIDE the badge, because the badge is the client's own
-                      design (dot, then the word) and a third thing inside it
-                      crowds a cell she has already reviewed twice. `aria-hidden`
-                      because the word beside it is the whole accessible name —
-                      two people who both see "no glyph" is a design that has
-                      already failed for one of them. */}
-                  {marks?.get(w.helpType ?? "") && (
-                    <span aria-hidden className="shrink-0">
-                      {marks.get(w.helpType ?? "")}
-                    </span>
-                  )}
-                  {/* THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
+                      WHAT STOOD HERE was the team's own glyph for the kind, read
+                      off the `Ticket type` dropdown value through `markMap` and
+                      drawn beside the pill. The stored glyphs are untouched (see
+                      the note beside the facets above); the READ is gone, and
+                      with it the argument this comment used to make — that
+                      dropping it "would have quietly deleted a capability nobody
+                      asked to lose". Somebody asked. A pictograph in front of a
+                      coloured pill was two marks for one fact, and the ruling
+                      picks the one the rest of the app already uses.
+
+                      THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
                       the triage card's chips and the type picker draw — client:
                       "Type with the colors, same as we have with the chips."
                       `Swatch` + `ticketTypeColour` rather than a second lozenge
@@ -1754,14 +1785,19 @@ function TicketRowsTable<T extends TicketFace>({
  * this is a decision rather than a gap, and it turns on two things a pass that
  * is redrawing a tab strip should not decide by itself:
  *
- *   1 · A DROP WOULD BE A LIFECYCLE MOVE MADE BY GEOMETRY. These three stages
- *       are not free-form columns a person owns: `scheduled` is flipped when
- *       work lands in a sprint and `in_progress` when a timer starts, by
- *       `lib/ready-flip` (shared/types.ts's `HELP_STATUSES` says so status by
- *       status). Dragging a card into "In progress" would assert that a timer is
- *       running when none is, and the flip that owns that column would move it
- *       back the next time anything touched the ticket. A board that undoes your
- *       drag an hour later is a board nobody trusts twice.
+ *   1 · A DROP WOULD BE A LIFECYCLE MOVE MADE BY GEOMETRY. These stages are
+ *       not free-form columns a person owns: `scheduled` is flipped when work
+ *       lands in a sprint, `in_progress` when a timer starts and `ready` when
+ *       the last story on the ticket closes, by `lib/ready-flip`
+ *       (shared/types.ts's `HELP_STATUSES` says so status by status). Dragging
+ *       a card into "In progress" would assert that a timer is running when
+ *       none is, and the flip that owns that column would move it back the next
+ *       time anything touched the ticket. A board that undoes your drag an hour
+ *       later is a board nobody trusts twice.
+ *       AND THE FIFTH COLUMN COULD NOT ACCEPT A DROP AT ALL, which is the
+ *       cleanest statement of why this board stays read-only: "waiting" is not
+ *       a status, so there is no field a drop into it could write. Nothing
+ *       makes a ticket waiting except the client not having replied yet.
  *   2 · THE BOARD IS A PAGE, NOT THE COLLECTION. The list pages (R14), so the
  *       cards are the fifty rows in hand while the column counts below are the
  *       door's exact `COUNT(*)` — honest as a READING (the count says how many
@@ -1773,9 +1809,19 @@ function TicketRowsTable<T extends TicketFace>({
  *
  * ── WHAT THE COLUMNS AND THE CARDS CARRY ──────────────────────────────────
  *
- * THE COLUMNS ARE `OPEN_TAB_STATUSES`, the same closed vocabulary the Open
- * facet sends to the door — so the board cannot show a column the tab does not
- * contain, and a stage added to that list appears here without an edit.
+ * THE FIRST FOUR COLUMNS ARE `OPEN_TAB_STATUSES`, the same closed vocabulary
+ * the Open facet sends to the door — so the board cannot show a stage column
+ * the tab does not contain, and a stage added to that list appears here without
+ * an edit. That property is what settled 2026-09-07's ruling ("in open, include
+ * status ready and waiting"): `ready` was added to the ARRAY rather than to
+ * this board, so the tab's list, its badge, its Status facet and this board all
+ * moved together. A `ready` column over a tab whose list refused to show ready
+ * tickets would have been a column counting rows the screen denies, which is
+ * R16's founding defect wearing a board's clothes.
+ *
+ * THE FIFTH IS NOT A STAGE AT ALL — see the column itself, below. It is the
+ * waiting PREDICATE, fed by its own door read, and its cards are repeats of
+ * cards in the four beside it. Nothing on this screen adds the five together.
  *
  * THE COUNT UNDER EACH HEAD IS THE DOOR'S, not `cards.length` — but only while
  * the toolbar is RESTING, and that condition is the whole R16 argument.
@@ -1807,6 +1853,8 @@ function OpenBoard({
   teamId,
   rows,
   counts,
+  waitingRows,
+  waitingTotal,
   narrowed,
   onOpen,
 }: {
@@ -1814,13 +1862,22 @@ function OpenBoard({
   rows: readonly HelpTicket[]
   /** the door's own grouped tally per status — never `cards.length` */
   counts: Record<string, number> | undefined
+  /** THE FIFTH COLUMN'S OWN PAGE. Not a slice of `rows`: waiting is DERIVED at
+   * the door from the ticket's conversation and no row carries a flag for it,
+   * so this is the door's own answer to its own question, read through the same
+   * facet cache the Waiting TAB rests on. Undefined while it is in flight. */
+  waitingRows: readonly HelpTicket[] | undefined
+  /** …and that read's own exact `total`. Never `waitingRows.length` (R16: the
+   * facet read is page one) and never a term of `counts`, which groups by
+   * status and has no term for a predicate. */
+  waitingTotal: number | undefined
   /** is the toolbar asking anything? `counts` is the RESTING collection's tally
    * and answers a different question the moment it is. See the header. */
   narrowed: boolean
   onOpen: (id: string) => void
 }) {
   const t = useT()
-  /** THE THREE STAGES IN THE READER'S OWN LANGUAGE, and the one dot each takes.
+  /** THE STAGES IN THE READER'S OWN LANGUAGE, and the one dot each takes.
    *
    * WRITTEN OUT AS LITERALS INSIDE THE COMPONENT rather than read off
    * `HELP_STATUS` (web/components/deep-link/shape.tsx). That map is a copy TABLE
@@ -1828,35 +1885,128 @@ function OpenBoard({
    * position (R28's `property` position only looks at named copy props) — a
    * `t(HELP_STATUS[s])` here would look up keys the catalogue does not hold and
    * hand every non-English reader the English word, silently, on a screen that
-   * looks finished. Three `t("…")` literals are three catalogue entries.
+   * looks finished. Each `t("…")` literal is a catalogue entry.
+   *
+   * A `Record` OVER `OPEN_TAB_STATUSES` RATHER THAN A LOOKUP WITH A FALLBACK,
+   * and 2026-09-07 is what that bought: `ready` joined the Open tab (shared/
+   * types.ts says why) and this map failed its own type check until the fourth
+   * entry was written, instead of the board quietly drawing a fourth column
+   * with no name and no dot.
    *
    * THE DOTS ARE A PROGRESSION, not a decoration: grey while nothing has started
    * (`archived` is `--ink-disabled`), blue once it is booked into a sprint
    * (`review` is `--info`), charcoal while somebody is actually on it
    * (`building`, and the kit's own token comment for it reads "in build / with
-   * us"). The kit rules that the dot never carries the state alone; the column's
-   * name in words is beside it, which is what it is there for. */
+   * us"), green once every story is closed and only the sending is left
+   * (`done` — `shared/status-tones.ts` gives `ready` exactly that tone, and the
+   * split between `done` and `shipped` is its own note: the work is finished,
+   * the record is not). Taken from that file's reading rather than re-decided
+   * here, because a stage's colour cannot be chosen twice. The kit rules that
+   * the dot never carries the state alone; the column's name in words is beside
+   * it, which is what it is there for. */
   const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string; dot: KanbanColumnDot }> = {
     triaged: { title: t("Triaged"), dot: "archived" },
     scheduled: { title: t("Scheduled"), dot: "review" },
     in_progress: { title: t("In progress"), dot: "building" },
+    ready: { title: t("Ready"), dot: "done" },
   }
   return (
     <Kanban
-      columns={OPEN_TAB_STATUSES.map((stage) => ({
-        id: stage,
-        title: COLUMN[stage].title,
-        dot: COLUMN[stage].dot,
-        count: narrowed ? undefined : counts?.[stage],
-        cards: rows
-          .filter((r) => r.status === stage)
-          .map((r) => ({
+      /* USE ALL THE WIDTH THERE IS — client, 2026-09-07: "with this 5 columns,
+         use all width available in screen".
+         WHAT WAS ACTUALLY CONSTRAINING IT WAS NOT A MAX-WIDTH. There is none on
+         the path: `app-shell.tsx`'s one page container is `max-w-none` (R29,
+         and `PAGE_WIDTH_OWNER` pins that string), `CollectionCard` is a plain
+         `Card` with `p-4` and sets no measure, and the kit's `ScreenShell` card
+         is `flex-1` inside the ground's gutter. The board already had the whole
+         screen. What it did with it was the problem: the kit lays its columns
+         out as a scrolling flex row of `w-[var(--kw-kanban-col)] shrink-0`
+         items at a default 18rem, so three columns used 54rem of a 2,000px
+         display and five columns overflowed a laptop into a horizontal
+         scroller. Fixed-width columns do not grow and do not shrink.
+         SO THE FIX IS THE KIT'S OWN PROP, not a negative margin and not a
+         wrapper: `columnWidth` is spent straight into that custom property, so
+         a fluid value makes the five columns SHARE the row. `100%` resolves
+         against the flex container's content box — the card's inside — and the
+         four gaps are the kit's own `--space-2h`, subtracted so five columns
+         land exactly on the edge instead of one column past it.
+         `max(18rem, …)` IS THE FLOOR AND IT IS THE KIT'S OWN NUMBER (`.kw-laws`,
+         "the kit's own smallest stated column minimum"). Below about 90rem of
+         card the columns stop shrinking and the board scrolls, which is what
+         the kit's inline-axis rule already says should happen — a five-column
+         board squeezed to 10rem a column is the "80px each" render CH27.24
+         forbids. Above it they stretch to the edge, which is what she asked
+         for. Below 45rem the kit switches to its own single-stage picker and
+         this value is not used at all. */
+      columnWidth="max(18rem, calc((100% - 4 * var(--space-2h)) / 5))"
+      columns={[
+        ...OPEN_TAB_STATUSES.map((stage) => ({
+          id: stage,
+          title: COLUMN[stage].title,
+          dot: COLUMN[stage].dot,
+          count: narrowed ? undefined : counts?.[stage],
+          cards: rows
+            .filter((r) => r.status === stage)
+            .map((r) => ({
+              id: r.id,
+              title: ticketTitle(r),
+              badges: <TriageChips teamId={teamId} ticket={r} />,
+            })),
+          emptyLabel: t("Nothing at this stage."),
+        })),
+        /* THE FIFTH COLUMN, AND IT IS NOT A `GROUP BY status` BUCKET — client,
+           2026-09-07: "in open, include status ready and waiting / add them
+           after". `ready` IS a status and joined `OPEN_TAB_STATUSES` above, so
+           it needed no clause of its own. `waiting` is not one and never will
+           be: it is a PREDICATE over the ticket's conversation, derived at the
+           door on every read (`waitingClause`, workers/content/src/lib/help.ts
+           — "we spoke last and nobody has answered"), stored nowhere.
+           THREE CONSEQUENCES, EACH DECIDED RATHER THAN INHERITED:
+           1 · THE CARDS COME FROM A SECOND READ. `rows` is the Open page and
+               carries no waiting flag, so filtering it in the browser is not
+               merely wrong-by-paging (R14) — it is impossible. This column is
+               fed by the door's own answer to `{status: …, waiting: "only"}`,
+               the identical read the Waiting TAB rests on, so the tab and the
+               column cannot disagree about who is waiting.
+           2 · A CARD APPEARS TWICE, ON PURPOSE, and this is the decision worth
+               reading twice. A waiting ticket is also `triaged`/`scheduled`/
+               `in_progress`/`ready`, so it is drawn in its stage column AND
+               here. Waiting is not a later stage a ticket MOVES to — it is a
+               property of a ticket that is sitting in one — so "waiting wins"
+               would take a ticket out of the stage it is genuinely in and make
+               the four stage columns lie about the work. The overlap IS the
+               information, which is the same sentence `waitingClause` and the
+               `WAITING` tab constant above already make about the tabs.
+           3 · NOTHING SUMS THE COLUMNS, so the repetition costs no total. The
+               kit adds nothing up (`footnoteMeta`, its only summary, is the
+               caller's and is deliberately not passed). Each column's number is
+               its own exact server `COUNT(*)` of its own question: the four
+               stages are disjoint terms of one `GROUP BY`, and this one is the
+               waiting read's own `total`. The Open TAB's badge stays the sum of
+               the four stages ONLY, so the collection is still counted exactly
+               once on this screen (R16). The footnote says all of this in the
+               reader's own words, because a fifth column beside four is read as
+               a fifth bucket unless something says otherwise.
+           `blocked` IS THE DOT, and it is the app's own existing answer rather
+           than a new one: `shared/status-tones.ts` defines that tone as "stuck
+           on somebody OUTSIDE the team", which is this column exactly.
+           NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
+           columns give: the waiting read is a RESTING one and carries none of
+           the toolbar's narrowing, so a searched board would put an
+           un-narrowed total over the cards that matched. */
+        {
+          id: WAITING,
+          title: t("Waiting"),
+          dot: "blocked" as KanbanColumnDot,
+          count: narrowed ? undefined : waitingTotal,
+          cards: (waitingRows ?? []).map((r) => ({
             id: r.id,
             title: ticketTitle(r),
             badges: <TriageChips teamId={teamId} ticket={r} />,
           })),
-        emptyLabel: t("Nothing at this stage."),
-      }))}
+          emptyLabel: t("Nothing is waiting on a client."),
+        },
+      ]}
       // A CARD OPENS THE TICKET, and that is the board's only act. The kit makes
       // a card a target only when this is passed, so the affordance and the
       // behaviour are one decision.
@@ -1867,10 +2017,22 @@ function OpenBoard({
       // component cannot keep on its own". This board keeps no such promise, so
       // it says what is true instead: what the numbers mean, and that a card
       // opens rather than moves.
+      /* THE LINE UNDER THE BOARD, AND THE WAITING COLUMN IS WHY IT CHANGED.
+         Both sentences now say that the last column REPEATS cards from the four
+         before it. That is not politeness: five columns side by side are read
+         as five buckets, and a reader who adds them up gets a number larger
+         than the tab's own badge. Saying it here is the honest fix — the
+         alternative was to pull waiting tickets out of their stage columns,
+         which would make the four stages lie about the work (see the column
+         itself for that decision). */
       footnote={
         narrowed
-          ? t("Cards are the tickets that matched, as far as they have loaded. Click a card to open the ticket.")
-          : t("Each column counts every open ticket at that stage. Click a card to open the ticket.")
+          ? t(
+              "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket."
+            )
+          : t(
+              "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket."
+            )
       }
       emptyColumnLabel={t("Nothing at this stage.")}
     />
@@ -1922,12 +2084,10 @@ function OpenBoard({
 function ReadySplit({
   teamId,
   rows,
-  marks,
   onOpen,
 }: {
   teamId: string
   rows: readonly HelpTicket[]
-  marks?: Map<string, string>
   onOpen: (id: string) => void
 }) {
   const { t, lang } = useLanguage()
@@ -1951,12 +2111,16 @@ function ReadySplit({
         title: ticketTitle(r),
         // ONE METADATA LINE, which is all the 300px column has room for and all
         // CH27.27 draws. The kind and the day it was raised: the two facts that
-        // tell you which of forty finished tickets this one is. The team's own
-        // glyph leads it where they have set one, the same seam the table's Type
-        // cell reads.
-        meta: [marks?.get(r.helpType ?? ""), r.helpType ?? t("No type"), formatDate(r.createdAt, lang)]
-          .filter(Boolean)
-          .join(" · "),
+        // tell you which of forty finished tickets this one is.
+        //
+        // THE TEAM'S OWN GLYPH USED TO LEAD IT and no longer does — client,
+        // 2026-09-07, "for type, kill the emojis". This is a plain STRING slot
+        // (the kit joins it into one quiet line), so unlike the table's Type
+        // cell there is no colour to fall back on here: the kind is carried by
+        // its word, which is condition three of a type mark anyway ("a missing
+        // mark is never a missing fact", web/lib/type-marks.ts). A `Swatch` in a
+        // string slot would render as nothing at all, so it is not attempted.
+        meta: [r.helpType ?? t("No type"), formatDate(r.createdAt, lang)].join(" · "),
       }))}
       selectedId={current?.id}
       onSelectionChange={(id) => setSelected(id)}
@@ -2528,8 +2692,9 @@ function TriageQueue({
             duty was the one branch of this sentence shipping in English to
             every non-English reader. */}
         {view.onDuty?.userName
-          ? t("{name} is on triage this week, so the queue is theirs.", {
-              name: view.onDuty.userName,
+          ? // R54: whoever is on triage is one of ours.
+            t("{name} is on triage this week, so the queue is theirs.", {
+              name: staffNameFromSnapshot(view.onDuty.userName),
             })
           : t("Nobody is on triage this week.")}
       </p>
@@ -2554,8 +2719,9 @@ function TriageQueue({
         <EmptyLine concept="triage">{t("Nothing waiting.")}</EmptyLine>
         <p className="text-muted-foreground text-sm">
           {view.onDuty?.userName
-            ? t("No new tickets to sort. {name} is on triage this week.", {
-                name: view.onDuty.userName,
+            ? // R54: whoever is on triage is one of ours.
+              t("No new tickets to sort. {name} is on triage this week.", {
+                name: staffNameFromSnapshot(view.onDuty.userName),
               })
             : t("No new tickets to sort. Nobody is on triage this week.")}
         </p>

@@ -292,6 +292,62 @@
                                                     is exempt from contrast   */
   --hair-faint:           rgba(26, 25, 24, .06); /* ! GAP-4 role disputed */
 
+  /* ---- The two scrims — GAPS-A.md OVL-2, CLOSED 2026-09-07 --------------
+     The kit states both as literals and explicitly declines to draw a dark
+     twin ("kept identical"):
+
+         .kw-scrim         { background: rgba(26, 25, 24, .36); z-index: 60; }
+         .kw-scrim--drawer { background: rgba(26, 25, 24, .28); z-index: 55; }
+
+     OVL-2 logged the problem and named the fix in its own words: "A component
+     may not write a colour, so the value has to come from a token — but the
+     ruling is charcoal in BOTH palettes, and every semantic token that is
+     charcoal in light flips to off-beige in dark (--foreground,
+     --surface-inverse, --focus). Mixing from any of them produces a WHITE
+     scrim in dark mode." There was no token that could hold it, so four
+     files — dialog, alert-dialog, sheet and the shell's narrow aside — each
+     wrote the mix out by hand against the raw palette layer, each with its
+     own paragraph explaining the exception.
+
+     THESE TWO NAMES ARE THAT TOKEN. They are the ONLY names in §3 that are
+     deliberately not re-declared in either dark block, and that is the whole
+     ruling: a scrim is charcoal at both ends of the palette, so a dark
+     override would be the bug rather than the completeness. `--kw-charcoal`
+     is reached HERE, which is where §8.2 says a colour is decided and the
+     one place §8.3's "the raw palette is internal" does not apply.
+
+     THE KIT'S OWN LITERAL, AND NOT A `color-mix` OFF `--kw-charcoal` —
+     MEASURED, NOT PREFERRED. The first draft of these two lines mixed the
+     raw charcoal, which reads better and keeps the 36 and the 28 visible as
+     percentages. Compiled, it does not survive: Tailwind rewrites a
+     `color-mix` in a custom property into a PAIR — the un-mixed colour, then
+     an `@supports (color: color-mix(in lab, red, red))` block with the real
+     value — so a browser without `color-mix` gets FULLY OPAQUE CHARCOAL
+     where a 36% dim was asked for. A scrim is the one value where that
+     fallback is not a graceful degradation but a black screen over the
+     record. (The same pair was already being emitted for all four
+     hand-mixed call sites — verified by compiling the old arbitrary class
+     against this file — so this is a trap being REMOVED, not one being
+     avoided.)
+
+     `rgba(26, 25, 24, …)` is also what the kit literally states, and it is
+     how every other alpha-on-a-ground value in this file is already written:
+     `--border`, `--hair-faint`, `--hair-inverse`. The value is identical
+     either way — `color-mix(in srgb, #1A1918 36%, transparent)` resolves to
+     exactly `rgba(26, 25, 24, .36)`, premultiplied against a transparent
+     black — so nothing renders differently and one failure mode is gone.
+
+     Bridged in §10 as `bg-scrim` and `bg-scrim-drawer`, because an element
+     that paints a ground uses a NAMED utility — the law the record footer's
+     arbitrary background was written to enforce.
+
+     A FIFTH CONSUMER IS WHAT FINALLY FORCED IT: `edge-panel.tsx`, whose
+     narrow presentation is the drawer and therefore wants the drawer's 28%.
+     Adding a fifth hand-mixed exception was the alternative and was
+     declined.                                                              */
+  --scrim:                rgba(26, 25, 24, .36);
+  --scrim-drawer:         rgba(26, 25, 24, .28);
+
   /* ---- The record's ink footer, CH27.8 ----------------------------------
      THE ONE PLACE IN THE SYSTEM WHERE A BLOCK IS A DIFFERENT KIND OF SURFACE
      IN EACH PALETTE, so it needs names of its own rather than a component
@@ -2304,6 +2360,14 @@
      to be misused. */
   --color-surface-record-footer:    var(--surface-record-footer);
   --color-ink-on-record-footer:     var(--ink-on-record-footer);
+  /* The two scrims (§3). Bridged for the same reason the footer's ground is:
+     a scrim PAINTS A GROUND, and the four files that used to mix it by hand
+     each did so with an arbitrary background — the form `cn` merges by the
+     wrong group and the DEAD SELECTOR guard exists to catch from the other
+     direction. `bg-scrim` and `bg-scrim-drawer` are now real classes, so the
+     value is stated once and consumed by name.                             */
+  --color-scrim:                    var(--scrim);
+  --color-scrim-drawer:             var(--scrim-drawer);
   --color-ink-on-inverse-secondary: var(--ink-on-inverse-secondary);
   --color-ink-on-accent-secondary:  var(--ink-on-accent-secondary);
   --color-surface-brand:        var(--surface-brand);

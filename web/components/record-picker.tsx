@@ -212,6 +212,30 @@ export type PickerOption = {
    * — the one map that supplies these today — is where that discipline is kept
    * and reasoned. Never drawn as a `RecordMark`: see this type's own header. */
   swatch?: string | null
+  /** THIS OPTION IS A RECORD AND ALWAYS WEARS ITS FACE — even when it has
+   * neither a picture nor a glyph, in which case `RecordMark` draws the name's
+   * own initial, which is its whole last-resort branch.
+   *
+   * WHY IT HAS TO BE SAID RATHER THAN INFERRED. Both places below draw the mark
+   * only `if (o.picture || o.mark)`, and that gate is right for most of the
+   * thirty-three pickers: a role, a meeting purpose and a process version are
+   * words rather than records, and a column of letter tiles beside them would be
+   * inventing an identity none of them has. But it makes the face conditional on
+   * the DATA, so the same record type draws one on a row that happens to have a
+   * logo and nothing at all on the row beside it — which is exactly the "a card
+   * with a dot on four rows and none on the fifth reads as the broken one"
+   * failure `type-colours.ts` argues out for colour, in a bigger box.
+   *
+   * Added 2026-09-07 for the ticket form's APP picker (client: "when I select
+   * the app, I want to see the icons"), because the ticket LIST's app facet
+   * hands its own options a whole `<AppMark>` and therefore always draws one —
+   * an app with no logo and no stage shows its initial there and showed blank
+   * here. One flag makes the two identical instead of nearly identical.
+   *
+   * `shape` was the tempting inference and is deliberately not used: a dozen
+   * call sites already pass `shape: "round"` for people, so reading it as "draw
+   * a face" would change what those pickers look like without anybody asking. */
+  face?: boolean
 }
 
 /** THE DOT ITSELF, drawn in one place so the closed control, the open list and
@@ -428,7 +452,7 @@ export function RecordPicker({
           prop for the same box, exactly the drift `RecordMark`'s own header
           warns a caller-supplied size class causes; that bug is fixed, this is
           a size decision on top of it. */}
-      {(o.picture || o.mark) && (
+      {(o.picture || o.mark || o.face) && (
         <RecordMark
           picture={o.picture}
           mark={o.mark}
@@ -541,7 +565,18 @@ export function RecordPicker({
       // ACT (each one commits and closes the row) rather than a set of states
       // being toggled before a submit, and announcing them as radios would
       // promise a confirm step the client explicitly refused.
-      <div role="group" aria-label={ariaLabel ?? searchPlaceholder} className={className}>
+      //
+      // `id` IS CARRIED HERE TOO, added 2026-09-07 when the ticket form put a
+      // row INSIDE a `Field` for the first time. The kit's Field mints an id and
+      // clones it onto its single child; the control layout below spends it on
+      // the trigger button, and this branch used to drop it on the floor — so a
+      // `<label for="help-type">` pointed at nothing at all. It still does not
+      // ASSOCIATE (a label's `for` binds only to a labelable control, and this
+      // is a div — the same wall the description field's `aria-label` works
+      // around one file over), which is exactly why the name a screen reader
+      // reads comes from `ariaLabel` and the call site must pass it. What the id
+      // buys is that the attribute names a real element instead of a ghost.
+      <div id={id} role="group" aria-label={ariaLabel ?? searchPlaceholder} className={className}>
         {/* A ROW WITH NOTHING IN IT IS A REAL STATE AND SAYS SO. The control
             layout has the same sentence inside its palette (`CommandEmpty`);
             here there is no palette to put it in, so it takes the chips' own
@@ -819,7 +854,7 @@ function RowChip({
           UI-CONVENTIONS §5's reason: it is a pictograph, and the row's own
           ordering already says what it says. */}
       {offering && <Sparkle aria-hidden className="size-3.5 shrink-0" />}
-      {(option.picture || option.mark) && (
+      {(option.picture || option.mark || option.face) && (
         <RecordMark
           picture={option.picture}
           mark={option.mark}
@@ -828,7 +863,7 @@ function RowChip({
           size="choice"
         />
       )}
-      {!option.picture && !option.mark && option.swatch && <Swatch colour={option.swatch} />}
+      {!option.picture && !option.mark && !option.face && option.swatch && <Swatch colour={option.swatch} />}
       <span className="truncate">{option.label}</span>
     </Button>
   )

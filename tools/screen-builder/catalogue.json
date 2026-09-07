@@ -1,25 +1,25 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.65",
-  "sha": "e96a6d3986959e685a01eb66baddc2240546ebb5",
+  "tag": "v1.2.67",
+  "sha": "d7c28b92ff8bd8f1a5515b57b6e9bef8d8d08887",
   "syncedAt": "2026-09-07"
  },
- "generatedAt": "2026-09-07T09:28:33.066Z",
+ "generatedAt": "2026-09-07T18:10:49.130Z",
  "counts": {
-  "components": 117,
+  "components": 118,
   "hooks": 2,
-  "withVariants": 40,
+  "withVariants": 41,
   "withoutVariants": 77,
-  "cvaSites": 49,
-  "variantGroups": 75,
-  "variantOptions": 244,
+  "cvaSites": 50,
+  "variantGroups": 76,
+  "variantOptions": 246,
   "typedEnumProps": 42,
-  "typedBooleanProps": 310,
+  "typedBooleanProps": 312,
   "compositions": 47,
   "icons": 1512,
-  "tokens": 359,
-  "tokenDeclarations": 561,
+  "tokens": 363,
+  "tokenDeclarations": 565,
   "unresolved": 0
  },
  "components": [
@@ -3570,6 +3570,76 @@
    "description": "DropdownMenu — the record menu (35 direct call sites). DESIGN SOURCE design-mothership/specimens/_fragments/t12.css + t12-overlaysmall.html (chapter 12) → `.kw-menu`, `.kw-menu__head`, `.kw-menu__item`, `.kw-menu__item--danger`, `.kw-keyhin"
   },
   {
+   "name": "edge-panel",
+   "kind": "component",
+   "files": [
+    "components/edge-panel/edge-panel.tsx"
+   ],
+   "exports": [
+    {
+     "name": "EdgePanel",
+     "file": "components/edge-panel/edge-panel.tsx"
+    }
+   ],
+   "cva": [
+    {
+     "file": "components/edge-panel/edge-panel.tsx",
+     "name": "edgePanelVariants",
+     "line": 230,
+     "base": "fixed z-[50] flex flex-col bg-popover text-popover-foreground shadow-xl motion-edge-panel",
+     "groups": [
+      {
+       "name": "side",
+       "options": [
+        {
+         "name": "left",
+         "classes": "inset-y-0 start-0 h-full w-[26.25rem] max-w-full rounded-e-[var(--radius)] max-[45rem]:inset-x-0 max-[45rem]:top-auto max-[45rem]:bottom-0 max-[45rem]:h-auto max-[45rem]:w-full max-[45rem]:max-h-[85dvh] max-[45rem]:rounded-t-[var(--radius)] max-[45rem]:rounded-b-none",
+         "note": "The reading-start edge. 420 and `max-w-full` are the kit drawer's."
+        },
+        {
+         "name": "right",
+         "classes": "inset-y-0 end-0 h-full w-[26.25rem] max-w-full rounded-s-[var(--radius)] max-[45rem]:inset-x-0 max-[45rem]:top-auto max-[45rem]:bottom-0 max-[45rem]:h-auto max-[45rem]:w-full max-[45rem]:max-h-[85dvh] max-[45rem]:rounded-t-[var(--radius)] max-[45rem]:rounded-b-none",
+         "note": "The reading-end edge — where the client's shape 06 puts the rail."
+        }
+       ]
+      }
+     ],
+     "defaults": {
+      "side": "right"
+     },
+     "compound": [],
+     "unresolved": [],
+     "usedBy": [
+      "EdgePanel"
+     ]
+    }
+   ],
+   "typedProps": [
+    {
+     "file": "components/edge-panel/edge-panel.tsx",
+     "type": "EdgePanelProps",
+     "variantsFrom": [
+      "edgePanelVariants"
+     ],
+     "props": [
+      {
+       "name": "open",
+       "optional": false,
+       "kind": "boolean",
+       "note": "Whether the panel is shown. CONTROLLED, with no uncontrolled twin: a rail is opened from somewhere else on the screen — a footer's action, a toolbar, a keyboard shortcut — and the thing that opens it is the thing that has to know it is open, so a second copy of that state inside here could only ever disagree with it."
+      },
+      {
+       "name": "showClose",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Draw the built-in close chip. Default `true` — the kit's drawer head has one, and below 45rem this panel covers 85dvh, where an exit you can see is not optional. It is suppressed anyway when no `onClose` is given."
+      }
+     ]
+    }
+   ],
+   "description": null
+  },
+  {
    "name": "field",
    "kind": "component",
    "files": [
@@ -6271,7 +6341,7 @@
     {
      "file": "components/sheet/sheet.tsx",
      "name": "sheetVariants",
-     "line": 155,
+     "line": 158,
      "base": "fixed z-[55] flex flex-col bg-popover text-popover-foreground shadow-xl motion-sheet [&>*:not([data-slot^=sheet-])]:min-h-0 [&>*:not([data-slot^=sheet-])]:flex-1 [&>*:not([data-slot^=sheet-])]:overflow-y-auto [&>*:not([data-slot^=sheet-])]:p-[var(--space-6)]",
      "groups": [
       {

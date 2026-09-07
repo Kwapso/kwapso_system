@@ -1018,8 +1018,12 @@ export const WAITING_FACET: HelpFacet = "waiting"
               Client, app and type are unpinned → all three. ✓ her list.
      READY    `status:ready`. ONE status. No Status. ✓ (she did not name this
               tab at all — see below.)
-     OPEN     `status:triaged,scheduled,in_progress`. THREE. Status, offering
-              exactly those three. ✓ her list.
+     OPEN     `OPEN_FACET`, the `status:` token built from `OPEN_TAB_STATUSES`.
+              FOUR since 2026-09-07 ("in open, include status ready and
+              waiting"), and this paragraph deliberately no longer spells them:
+              the set is one array in shared/types.ts and a count typed out here
+              is a second copy of it that can go stale silently. Status, offering
+              exactly the stages the tab spans. ✓ her list.
      WAITING  see clause two. ✓ her list.
      CLOSED   `status:resolved`. ONE. No Status. ✓ her list.
      ALL      pins nothing, so it spans the whole lifecycle. Status, offering
@@ -1031,17 +1035,24 @@ export const WAITING_FACET: HelpFacet = "waiting"
    the rule gives Closed and Triage, which she DID name, so Ready is not being
    treated as a special case — it is being treated as the ordinary case it is.
 
+   AND IT STAYS THE ORDINARY CASE NOW THAT OPEN CONTAINS IT (2026-09-07). The
+   Ready TAB is still `status:ready` and still spans one stage, so it still
+   offers no Status facet; what changed is that the same tickets ALSO appear
+   under Open, where the reader can narrow to them with the Status control. Two
+   ways to the same pile is what a nesting strip is, and the rule above needed
+   no clause for it: it reads each tab's own token and neither token moved.
+
    ── CLAUSE TWO: A DERIVED TAB'S STATUS CLAUSE IS NOT ITS SPAN ─────────────
 
    WAITING is the one tab the span clause alone would get wrong. Its query is
-   `{ status: "triaged,scheduled,in_progress", waiting: "only" }` — three
-   statuses, so clause one would hand it a Status facet, and the client
-   explicitly did not ask for one.
+   `{ status: <OPEN_TAB_STATUSES>, waiting: "only" }` — several statuses, so
+   clause one would hand it a Status facet, and the client explicitly did not
+   ask for one.
 
    She is right, and the reason is structural rather than a preference. Waiting
    is not a range of stages; it is a PREDICATE (`waitingClause`,
    workers/content/src/lib/help.ts — the last word on the conversation was
-   ours). The three statuses in its query are not a description of the tab, they
+   ours). The statuses in its query are not a description of the tab, they
    are SCAFFOLDING it borrows from Open so the predicate has a sensible pile to
    run over: `helpFacetFilter` writes them out precisely so the door never has
    to know what "Open" means on this screen. A facet built off borrowed

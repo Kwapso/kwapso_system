@@ -2,13 +2,20 @@
 // a display name, two-letter initials, or a single-letter avatar fallback, so
 // every screen renders the same person the same way (no per-component drift).
 
-/** A person's display name: "First Last", falling back to their email, else "". */
-export function personName(p: {
-  firstName?: string | null
-  lastName?: string | null
-  email?: string | null
-}): string {
-  return [p.firstName, p.lastName].filter(Boolean).join(" ") || (p.email ?? "")
+import { staffName, type StaffIdentity } from "@shared/staff-name"
+
+/** A STAFF person's display name — their FIRST NAME, falling back to their email,
+ * else "". R54, and the decision is not this file's: `shared/staff-name.ts` owns
+ * it and carries the client's ruling, the two populations and every awkward input.
+ *
+ * This is the structured path, so it is the EXACT one — a two-word given name
+ * survives here and cannot survive the snapshot path beside it. It stayed named
+ * `personName` because fifteen call sites read better with that word in them and
+ * every one of them is a member, a colleague or the signed-in person; the seam it
+ * delegates to is where the rule is stated, and R54 checks that this stays a
+ * delegation rather than growing a second answer. */
+export function personName(p: StaffIdentity): string {
+  return staffName(p)
 }
 
 /** Two-letter initials for a person-avatar fallback (e.g. "AK"); "?" if unknown. */

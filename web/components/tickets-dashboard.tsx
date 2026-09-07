@@ -96,13 +96,23 @@ import { useT } from "@shared/web/language"
 import { Sankey } from "@shared/ui/components/sankey/sankey"
 import { ToolbarRow, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { HELP_STATUS } from "@/components/deep-link/shape"
+// THE ONLY LEGAL WAY TO WRITE A LINK INSIDE THE APP (R37). Read its own header
+// before writing one here — and read `shared/web/ticket-chips.tsx`'s app chip
+// too, because the alignment trap it names is exactly the one a chart row walks
+// into: `InAppLink` forwards `className` onto a BARE anchor and adds nothing, so
+// an anchor in a row of `items-center` is centred by its LINE BOX rather than by
+// its text and sits visibly low beside the bar next to it. Every link below
+// carries `inline-flex items-center` for that reason and no other.
+import { InAppLink } from "@/components/in-app-link"
+// THE URL SEAM, called where the anchor is written — see `RowName` below for
+// why it is called again there even though `InAppLink` also calls it.
+import { safeHref } from "@shared/web/rich-text"
 import { content as contentApi, tenancy } from "@/lib/api"
 import type { TicketDashboard } from "@/lib/api/content"
 import { accountsKey, helpDashboardKey } from "@/lib/live-resources"
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import type { Account, HelpStatus } from "@shared/types"
 import {
-  CLOSURE_TREND_MIN_CLOSURES,
   CLOSURE_WINDOW_MONTHS,
   OPEN_HELP_STATUSES,
   ticketTypeWaitsForValidation,
@@ -176,10 +186,15 @@ function StackedBar({
 }) {
   return (
     <div className="bg-muted flex h-5 min-w-0 flex-1 overflow-hidden rounded">
+      {/* NO `title` ON A SEGMENT ANY MORE. It used to carry "{kind}: {n}", which
+          is the browser's own tooltip — the affordance the client asked this
+          screen to move OFF for the closing-time readout. The figures behind
+          this bar are the hover card `TallyBar` opens instead: reachable by
+          focus, coloured beside the word, and complete rather than one segment
+          at a time. */}
       {segments.map((s) => (
         <div
           key={s.type}
-          title={`${s.type}: ${s.n}`}
           style={{ width: `${(s.n / scale) * 100}%`, backgroundColor: ticketTypeColour(s.type) }}
         />
       ))}
@@ -202,6 +217,169 @@ function TypeKey({ type }: { type: string }) {
       />
       {type}
     </span>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE ROW OF A RANKED CHART — a name you can follow, and a bar you can ask.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** TWO THINGS THE CLIENT ASKED FOR ON THE SAME ROW, AND HOW THEY WERE SPLIT.
+ *
+ * "on which app and who has more i want the name apps as links" (2026-09-07,
+ * her second time asking) and "on dashboard tickets, which app / i want that
+ * when i hover on client i see the details of the numbers of tickets" are two
+ * requests about one line of pixels, and a row that is BOTH a link and a hover
+ * target is a row where the reader does not know what a press will do.
+ *
+ * SO THE NAME IS THE LINK AND THE BAR IS THE READOUT. The split is not
+ * arbitrary; it is the one arrangement where each gesture lands on the thing it
+ * is about:
+ *
+ *   · THE NAME IS THE RECORD. It is the only part of the row that names an app
+ *     or an account, and following a name to its record is the most ordinary
+ *     thing a name does in this app — it is what `TicketChips`' app chip, the
+ *     breadcrumbs and the relationship map all already do.
+ *   · THE BAR IS THE FIGURE. It is the mark the numbers were drawn as, and the
+ *     numbers are what the hover card holds. It is also the largest hit area on
+ *     the row and the one a pointer lands on without aiming — the same argument
+ *     `ClosureSpread` makes one panel down, where "the bar IS the button".
+ *
+ * A link that also opened a panel would have to choose between navigating and
+ * explaining on one press; a bar that also navigated would send a reader to a
+ * record they had only meant to read a number off.
+ *
+ * BOTH ARE REACHABLE FROM THE KEYBOARD, and that is the half that decides
+ * whether this split is honest or just tidy. The name is a real anchor and the
+ * bar is a real `<button>`, so a row is two tab stops: the first opens the
+ * record on Enter, the second opens the hover card on FOCUS (Radix does hover
+ * and focus, which is the whole reason this screen uses the kit's hover card
+ * rather than a mouse-only tooltip). And because a floating panel is a poor
+ * place to keep the only copy of a fact, the button carries the whole readout as
+ * its accessible NAME, so a screen reader hears the figures whether or not the
+ * card ever opens — the same rule `ClosureSpread` and `ClosureTrend` already
+ * follow, from the same reasoning in this file's own hover-card import note.
+ *
+ * NOT THE BROWSER'S `title`. That is the affordance she was looking at when she
+ * asked for the closing-time readout to move off hover, and the per-segment
+ * `title` this file's `StackedBar` used to carry went with this change for the
+ * same reason. A native tooltip cannot be reached by focus, cannot be styled to
+ * put the colour beside the word, and arrives about a second late. */
+function RowName({
+  path,
+  name,
+  width,
+}: {
+  /** WHERE THIS ROW'S RECORD LIVES, or undefined when the row names no record —
+   * the "work nobody has said which system it is about" bar, and a client row
+   * whose account row no longer answers with a name. Undefined draws plain
+   * text: a dead link is worse than no link, because it looks like the app
+   * losing the record rather than the row never having had one.
+   *
+   * A PATH, NOT AN `href`, and the name is the whole point: it is a string until
+   * this component binds it to an attribute, and the binding below is where the
+   * URL seam is called. Naming the prop `href` would put an unchecked URL
+   * attribute at every call site for `web/test/rich-text.test.ts` to read,
+   * which is that rule doing its job on a value that had not become a URL yet.
+   * (Written in words rather than in markup on purpose: that check scans the
+   * SOURCE, comments included, so an example of the shape it forbids, written
+   * inside a comment explaining why this avoids it, is itself an offender.) */
+  path?: string
+  name: string
+  /** the row's own label column, the one thing the caller decides */
+  width: string
+}) {
+  if (!path)
+    return (
+      <span className={`${width} shrink-0 truncate text-xs`} title={name}>
+        {name}
+      </span>
+    )
+  return (
+    // `inline-flex items-center` IS THE ALIGNMENT FIX, not a layout preference —
+    // see this section's header and `shared/web/ticket-chips.tsx`. The underline
+    // is on hover only: fourteen permanently underlined names down a chart is a
+    // page of rules where the eye is meant to be reading bar lengths, and the
+    // kit's own focus ring carries the keyboard half.
+    // THROUGH THE SEAM, at the one line that makes this a URL — the positional
+    // rule in `web/test/rich-text.test.ts`, and the same shape `record-chrome`
+    // already writes. `InAppLink` checks again inside itself, which is not
+    // redundancy worth removing: the rule is that a URL is checked where it is
+    // BOUND, not that somebody downstream can be trusted to have done it. The
+    // fallback is Home rather than nothing, for that component's own reason —
+    // a link that renders with no destination is a dead control.
+    <InAppLink
+      href={safeHref(path) ?? "/home"}
+      className={`${width} inline-flex shrink-0 items-center text-xs underline-offset-2 hover:underline`}
+    >
+      <span className="truncate" title={name}>
+        {name}
+      </span>
+    </InAppLink>
+  )
+}
+
+/** ONE KIND'S SHARE OF A ROW: what is open, out of everything ever raised. */
+type KindTally = { type: string; open: number; total: number }
+
+/** THE BAR, AS THE THING YOU ASK FOR THE BREAKDOWN — the hover half of the split
+ * above, written once and used by both ranked panels so the two cannot become
+ * two different readings of one gesture.
+ *
+ * The readout is BUILT ONCE and said twice, as the button's accessible name and
+ * as the lines inside the card, exactly as `ClosureSpread` and `ClosureTrend` do
+ * — one translation read two ways, so what a screen reader hears and what a
+ * sighted reader sees can never be two different claims about one row.
+ *
+ * WHY "OPEN OF TOTAL" RATHER THAN JUST THE OPEN COUNT. Both panels rank OPEN
+ * work, and the open number alone cannot tell a system nobody has finished
+ * anything on from one that has closed two hundred tickets and has four left.
+ * The door already carries both figures per (row, kind) and has since it was
+ * written; this is the first thing on the screen that reads the second one. */
+function TallyBar({
+  name,
+  tallies,
+  t,
+  children,
+}: {
+  /** the row's own name, so the card says which row it is about */
+  name: string
+  /** the kinds behind this row, already in the client's order */
+  tallies: KindTally[]
+  t: (s: string, vars?: Record<string, string | number>) => string
+  /** the mark itself — the row's bar, which this makes the hit area of */
+  children: React.ReactNode
+}) {
+  const lines = tallies.map((k) => ({
+    type: k.type,
+    said: t("{count} open of {total}", { count: k.open, total: k.total }),
+  }))
+  const said = [name, ...lines.map((l) => `${l.type}: ${l.said}`)].join(" · ")
+  return (
+    <HoverCard openDelay={60} closeDelay={60}>
+      <HoverCardTrigger asChild>
+        {/* THE BAR IS THE BUTTON, rather than a button beside one: the mark is
+            what a pointer is already on. It draws nothing of its own — no ring
+            of its own either, the kit's stylesheet owns that one rule — so the
+            row looks exactly as it did before it could be asked a question. */}
+        <button
+          type="button"
+          aria-label={said}
+          className="flex min-w-0 flex-1 items-center rounded"
+        >
+          {children}
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent className="flex flex-col gap-2">
+        <p className="text-sm">{name}</p>
+        {lines.map((l) => (
+          <div key={l.type} className="flex flex-col gap-0.5">
+            <TypeKey type={l.type} />
+            <span className="text-muted-foreground text-xs tabular-nums">{l.said}</span>
+          </div>
+        ))}
+      </HoverCardContent>
+    </HoverCard>
   )
 }
 
@@ -440,17 +618,38 @@ function OpenWork({
 function AppsStackedByType({
   rows,
   types,
+  teamId,
   t,
 }: {
   rows: TicketDashboard["openByApp"]
   types: string[]
+  /** WHERE A SYSTEM'S NAME GOES WHEN IT IS PRESSED — the team-scoped address of
+   * the app record, built here rather than passed in from the host, because
+   * this panel only ever draws on the Tickets SCREEN (inside an app record it
+   * stands down entirely; see the call sites). */
+  teamId: string
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
   // The door already ordered these — busiest system first, every one of a
   // system's kinds kept together — so the grouping preserves that order rather
   // than sorting again. Re-sorting here would be a second opinion about a
   // question the door already answered, and the two would drift.
-  const systems: { appId: string | null; name: string; open: number; byType: Map<string, number> }[] = []
+  //
+  // `named` IS NOT `appName !== undefined`, AND THE DIFFERENCE IS THE LINK. The
+  // door LEFT JOINs `apps`, so a null name means one of two things — the bar
+  // where `app_id` itself is null (the work nobody has said which system it is
+  // about, kept on purpose) or an `app_id` pointing at a row that no longer
+  // answers. Neither has a record worth sending a reader to, so both draw plain
+  // text: the fallback label is what makes the bar readable, and hanging a link
+  // off a placeholder would advertise a record that is not there.
+  const systems: {
+    appId: string | null
+    name: string
+    named: boolean
+    open: number
+    byType: Map<string, number>
+    totalByType: Map<string, number>
+  }[] = []
   for (const row of rows) {
     if (row.open === 0) continue
     let system = systems.find((s) => s.appId === row.appId)
@@ -458,13 +657,20 @@ function AppsStackedByType({
       system = {
         appId: row.appId,
         name: row.appName ?? t("No system named"),
+        named: Boolean(row.appId && row.appName),
         open: 0,
         byType: new Map(),
+        totalByType: new Map(),
       }
       systems.push(system)
     }
     system.open += row.open
     system.byType.set(row.helpType, (system.byType.get(row.helpType) ?? 0) + row.open)
+    // EVERYTHING EVER RAISED against this system and kind, open or closed. It is
+    // not drawn as a mark anywhere — the bars rank open work — and it exists
+    // only for the hover readout, which needs it to tell "nothing finished here"
+    // from "four left out of two hundred".
+    system.totalByType.set(row.helpType, (system.totalByType.get(row.helpType) ?? 0) + row.total)
   }
   const scale = Math.max(1, ...systems.map((s) => s.open))
 
@@ -479,20 +685,34 @@ function AppsStackedByType({
           sibling to claim it from. */}
       <div className="relative min-h-40 min-w-0 flex-1">
         <div className="absolute inset-0 flex flex-col gap-2 overflow-y-auto">
-          {systems.map((s) => (
-            <div key={s.appId ?? "none"} className="flex min-w-0 shrink-0 items-center gap-2">
-              <span className="w-28 shrink-0 truncate text-xs" title={s.name}>
-                {s.name}
-              </span>
-              <StackedBar
-                scale={scale}
-                segments={types
-                  .map((type) => ({ type, n: s.byType.get(type) ?? 0 }))
-                  .filter((seg) => seg.n > 0)}
-              />
-              <span className="w-6 shrink-0 text-right text-xs tabular-nums">{s.open}</span>
-            </div>
-          ))}
+          {systems.map((s) => {
+            // ONE ORDER FOR THE MARK AND THE WORDS, taken from `types` — the
+            // same array the legend below is drawn from, which is the whole
+            // reason `StackedBar` obeys its caller's order rather than sorting.
+            const tallies = types
+              .map((type) => ({
+                type,
+                open: s.byType.get(type) ?? 0,
+                total: s.totalByType.get(type) ?? 0,
+              }))
+              .filter((k) => k.open > 0)
+            return (
+              <div key={s.appId ?? "none"} className="flex min-w-0 shrink-0 items-center gap-2">
+                <RowName
+                  path={s.named ? `/t/${teamId}/apps/${s.appId}` : undefined}
+                  name={s.name}
+                  width="w-28"
+                />
+                <TallyBar name={s.name} tallies={tallies} t={t}>
+                  <StackedBar
+                    scale={scale}
+                    segments={tallies.map((k) => ({ type: k.type, n: k.open }))}
+                  />
+                </TallyBar>
+                <span className="w-6 shrink-0 text-right text-xs tabular-nums">{s.open}</span>
+              </div>
+            )
+          })}
         </div>
       </div>
       {/* THE LEGEND STAYS OUT OF THE SCROLLER, always visible: it is the key to
@@ -523,10 +743,15 @@ function AppsStackedByType({
 function WhoHasMore({
   rows,
   types,
+  teamId,
   t,
 }: {
   rows: TicketDashboard["byAccountAndType"]
   types: string[]
+  /** WHERE A CLIENT'S NAME GOES WHEN IT IS PRESSED — the team-scoped address of
+   * the account record. Built here for the same reason `AppsStackedByType`
+   * builds its own: this panel draws on the Tickets screen only. */
+  teamId: string
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
   const scoped = types.filter(ticketTypeWaitsForValidation)
@@ -549,15 +774,50 @@ function WhoHasMore({
         return (
           <div key={list.type} className="flex min-w-0 flex-col gap-1.5">
             <TypeKey type={list.type} />
-            {list.clients.map((c) => (
-              <div key={c.accountId} className="flex min-w-0 items-center gap-2">
-                <span className="w-24 shrink-0 truncate text-xs" title={c.accountName ?? undefined}>
-                  {c.accountName ?? t("Unnamed client")}
-                </span>
-                <Bar fraction={c.open / scale} colour={ticketTypeColour(list.type)} />
-                <span className="w-6 shrink-0 text-right text-xs tabular-nums">{c.open}</span>
-              </div>
-            ))}
+            {list.clients.map((c) => {
+              // WHAT THE HOVER SAYS IS THE CLIENT'S WHOLE LINE, NOT THIS ROW'S.
+              //
+              // Client: "i want that when i hover on client i see the details of
+              // the numbers of tickets." A row here is one (client, kind) pair —
+              // the bar's own figure is already printed at the end of it — so a
+              // card repeating that one number would be the same fact twice and
+              // no detail at all. The DETAIL is the kinds: this client's Issues
+              // and Questions beside the Extras they are ranked here for, which
+              // is what "the numbers of tickets" means about a client.
+              //
+              // Every kind, not just the scoped ones the panel ranks. The panel
+              // narrows to the kinds that wait for a client to confirm because
+              // that is what it is a ranking OF; a reader asking what a client
+              // has open is asking about the client, and answering with a subset
+              // would be this panel's own filter leaking into a readout about
+              // somebody's whole account.
+              const tallies = types
+                .map((type) => {
+                  const hit = rows.find((r) => r.accountId === c.accountId && r.helpType === type)
+                  return { type, open: hit?.open ?? 0, total: hit?.total ?? 0 }
+                })
+                .filter((k) => k.total > 0)
+              // NAMED, OR IT IS NOT A LINK. `accountId` is never null on this
+              // read (the door's own `WHERE account_id IS NOT NULL`), but the
+              // name comes off a LEFT JOIN, so a missing one means the account
+              // row does not answer — which is a record not worth sending a
+              // reader to. Same ruling as the per-system panel above, for the
+              // same reason.
+              const name = c.accountName ?? t("Unnamed client")
+              return (
+                <div key={c.accountId} className="flex min-w-0 items-center gap-2">
+                  <RowName
+                    path={c.accountName ? `/t/${teamId}/accounts/${c.accountId}` : undefined}
+                    name={name}
+                    width="w-24"
+                  />
+                  <TallyBar name={name} tallies={tallies} t={t}>
+                    <Bar fraction={c.open / scale} colour={ticketTypeColour(list.type)} />
+                  </TallyBar>
+                  <span className="w-6 shrink-0 text-right text-xs tabular-nums">{c.open}</span>
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -837,13 +1097,32 @@ function ClosureSpread({
 /** THE MONTH A TICKET CLOSED IN, filled to the baseline so the height is the
  * wait.
  *
- * WHAT IS NOT DRAWN, AND WHY IT IS SAID RATHER THAN LEFT OUT QUIETLY. A
- * (month, kind) bucket with fewer than `CLOSURE_TREND_MIN_CLOSURES` closures
- * never leaves the door — a median of six is one ticket wearing a statistic, and
- * a chart cannot refuse to be read. In a normal team that means the two kinds
- * that close in real numbers are drawn and the two that trickle are not, so the
- * sentence under the chart explains the absence rather than leaving a reader to
- * assume those kinds are perfect.
+ * EVERY MONTH IS DRAWN NOW, HOWEVER FEW CLOSED IN IT (client, 2026-09-07):
+ * "Only months with at least 8 of a kind are thrown. No, even if it's only 1,
+ * it should appear there."
+ *
+ * WHAT WENT, AND WHAT WENT WITH IT. A (month, kind) bucket under eight closures
+ * used to be dropped by the door, and a sentence under this chart explained the
+ * absence so a reader would not read the missing kinds as perfect. The floor is
+ * gone from the SQL and THE SENTENCE IS GONE WITH IT — a caption explaining a
+ * rule the code no longer follows is worse than no caption, because it tells a
+ * reader that something was left out when nothing was. The reasoning behind the
+ * floor is not deleted: it is kept whole where the constant used to live, in
+ * `shared/types.ts`, so the argument survives its own defeat.
+ *
+ * AND NOTHING MARKS A THIN MONTH, WHICH IS A DECISION AND NOT AN OVERSIGHT.
+ * With the floor gone this line will jump wherever one ticket closed, and the
+ * obvious reflexes — a hollow point, a dashed run, a dimmed area — all need a
+ * NUMBER to decide what counts as thin, which is the floor again wearing a
+ * different word. She removed a threshold; adding one back to draw with instead
+ * of to hide with would be answering her request with the thing she refused.
+ * What a reader gets instead is already here and always was: every point's own
+ * count rides the hover card and the hit area's accessible name ("{median}
+ * days, from {count} closed"), so "how much is this point standing on" is
+ * answerable month by month, by the reader, rather than pre-judged by the
+ * chart. If she later says the line is unreadable, the fix she has not asked
+ * for is one of those treatments — and it will still need a number, and the
+ * number will still be hers.
  *
  * THE SVG HOLDS NO TEXT. Its months and its scale are HTML beside it, at the
  * reader's own size — see this file's header for why a scaled `<svg>` is the
@@ -964,13 +1243,15 @@ function ClosureTrend({
   )
   const series = orderTicketTypes(paint)
 
+  // THE ONE THING THAT IS STILL NOT DRAWABLE, and it is arithmetic rather than a
+  // policy: a trend needs two points. The old sentence here named the floor
+  // ("no kind has closed at least 8 tickets in two of the last months"), which
+  // is now a rule that does not exist — so it says what is actually true, that
+  // nothing has closed in two different months yet.
   if (months.length < 2 || series.length === 0)
     return (
       <p className="text-muted-foreground text-xs">
-        {t(
-          "No kind has closed at least {count} tickets in two of the last months, so there is no trend to draw yet.",
-          { count: CLOSURE_TREND_MIN_CLOSURES }
-        )}
+        {t("Nothing has closed in two different months yet, so there is no trend to draw.")}
       </p>
     )
 
@@ -981,11 +1262,13 @@ function ClosureTrend({
   const y = (v: number) => 100 - (v / top) * 100
 
   /** WHAT ONE MONTH SAYS, as the lines a person reads — in the client's fixed
-   * kind order, and only for the kinds that actually cleared the floor that
+   * kind order, and only for the kinds that actually closed something that
    * month. A kind with no point in a month is ABSENT from its card rather than
-   * written as a zero: the door dropped that bucket because a median of six is
-   * one ticket wearing a statistic, and printing "0 days" would be the chart
-   * telling exactly the lie the floor exists to prevent. */
+   * written as a zero, and that has outlived the floor it was first written for:
+   * a kind nothing closed in did not take nought days, it has no answer, and
+   * "0 days" is the one reading the chart must never offer. With the floor gone
+   * this is the only reason a bucket can be missing, which makes the rule
+   * simpler than it was rather than obsolete. */
   const monthLines = (m: string) =>
     series
       .map((type) => ({ type, hit: rows.find((r) => r.helpType === type && r.month === m) }))
@@ -995,6 +1278,34 @@ function ClosureTrend({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-2">
+      {/* THE LEGEND, AT THE TOP RIGHT, ABOVE THE PLOT (client, 2026-09-07: "put
+          the tendency legend on the top right, above the graphic").
+
+          It used to sit under the whole picture, below the month row, which is
+          where `AppsStackedByType`'s legend still sits — and on this panel that
+          was the wrong end. The plot claims every spare pixel of the row
+          (`flex-1`), so a legend below it is separated from the marks it
+          explains by the full height of the picture plus the month labels; a
+          reader who forgets which colour is which has to travel the whole panel
+          to find out. Above the plot it is the first thing read after the
+          heading and the last thing seen before the marks.
+
+          `justify-end` is the "top right" half, and it is the only reason this
+          is not simply the same strip moved: the heading occupies the top left
+          of the card, so a full-width legend here would collide with it in the
+          eye even though `Panel` draws them on separate lines. Right-aligned it
+          reads as the key TO the picture rather than as a second title.
+
+          It stays inside this component rather than becoming the `Panel`'s
+          `chip`, because it is derived from `series` — the kinds that actually
+          have points, in the client's order — and only this component knows
+          that. A legend assembled at the call site would list kinds the plot
+          does not draw. */}
+      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+        {series.map((type) => (
+          <TypeKey key={type} type={type} />
+        ))}
+      </div>
       <div className="flex min-w-0 flex-1 items-stretch gap-2">
         <div className="text-muted-foreground flex w-8 shrink-0 flex-col justify-between text-right text-xs tabular-nums">
           <span>{Math.round(top)}</span>
@@ -1066,9 +1377,12 @@ function ClosureTrend({
                 const hit = rows.find((r) => r.helpType === type && r.month === m)
                 return hit ? `${x(i)},${y(hit.medianDays)}` : null
               })
-              // A month a kind did not clear the floor in is a HOLE, not a zero:
-              // the line stops and starts again rather than diving to the
-              // baseline and claiming that month was instant.
+              // A month a kind closed NOTHING in is a HOLE, not a zero: the
+              // line stops and starts again rather than diving to the baseline
+              // and claiming that month was instant. (It used to be a month
+              // under the floor as well; the floor is gone and this is not,
+              // because "nothing closed" was never the same fact as "not many
+              // closed".)
               const runs: string[][] = []
               for (const p of points) {
                 if (p === null) runs.push([])
@@ -1084,7 +1398,11 @@ function ClosureTrend({
                         // A MONTH WITH NEITHER NEIGHBOUR still has to be drawn,
                         // or a kind sits in the legend with nothing on the plot
                         // — which reads as "this kind has no wait" rather than
-                        // "this kind cleared the floor once". A zero-length line
+                        // "this kind closed something in exactly one month".
+                        // There are MORE of these now that no month is dropped:
+                        // a kind that closes one ticket in an odd month is a
+                        // lone dot, which is exactly what the client asked to
+                        // see rather than to have hidden. A zero-length line
                         // with a round cap is a DOT in SVG, and it is the one
                         // dot shape that survives `preserveAspectRatio="none"`:
                         // `vector-effect` makes the cap a true circle in device
@@ -1200,17 +1518,11 @@ function ClosureTrend({
           <span>{months[months.length - 1]}</span>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {series.map((type) => (
-          <TypeKey key={type} type={type} />
-        ))}
-      </div>
-      <p className="text-muted-foreground text-xs">
-        {t(
-          "Only a month where at least {count} of a kind closed is drawn — a middle ticket out of six is one ticket wearing a statistic.",
-          { count: CLOSURE_TREND_MIN_CLOSURES }
-        )}
-      </p>
+      {/* NOTHING BELOW THE MONTHS ANY MORE. Two things used to live here and
+          both left in the same change: the legend moved to the top right at the
+          client's word, and the floor's caption went with the floor itself —
+          see this component's header for why a caption outliving its rule is
+          worse than no caption at all. */}
     </div>
   )
 }
@@ -1665,11 +1977,28 @@ export function TicketsDashboard({
               {/* 6A — the reading the client picked. See `AppsStackedByType` for
                   the two she did not, and for why swapping one in is a change at
                   this line rather than a rewrite of the panel. */}
+              {/* THE TWO PANELS THAT LINK, AND THE ONE HOST THEY LINK FROM.
+                  Both take `teamId` because both now write an in-app address
+                  (R37's `InAppLink`) — and both are inside the `appId` branch's
+                  ELSE, which is the whole answer to "does this still make sense
+                  inside an app record?": inside one they do not draw at all,
+                  for the reasons written above, so neither ever offers a link
+                  to the record the reader is already standing on. */}
               <Panel title={t("Which app")}>
-                <AppsStackedByType rows={data?.openByApp ?? []} types={types} t={t} />
+                <AppsStackedByType
+                  rows={data?.openByApp ?? []}
+                  types={types}
+                  teamId={teamId}
+                  t={t}
+                />
               </Panel>
               <Panel title={t("Who has more")}>
-                <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} t={t} />
+                <WhoHasMore
+                  rows={data?.byAccountAndType ?? []}
+                  types={types}
+                  teamId={teamId}
+                  t={t}
+                />
               </Panel>
               <Panel title={t("Raised as, then triaged as")}>
                 <RaisedAsFlow

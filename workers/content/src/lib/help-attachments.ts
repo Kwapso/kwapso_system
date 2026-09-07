@@ -71,6 +71,10 @@ function toAttachment(r: AttachmentRow, scope: AccountScope): HelpAttachment {
     sizeBytes: r.size_bytes,
     createdAt: r.created_at,
     addedByName: hide ? null : r.creator_name,
+    // R54: the same `from_client` the redaction above turns on, kept rather than
+    // dropped — the agency's own screen draws both populations in this one field
+    // and shows a colleague by first name only.
+    addedByIsClient: r.from_client === 1,
   }
 }
 

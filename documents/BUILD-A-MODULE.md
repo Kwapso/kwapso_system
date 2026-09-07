@@ -839,6 +839,25 @@ again, which is the only property that matters here.
   `shared/web/field.tsx`. **R44 `translation-ceiling`** — a catalogued string is
   answered in every language, up to a ceiling that only falls.
 - **R34 `glossary-in-copy`** — the glossary's word, never a synonym for it.
+- **R54 `staff-names-are-first-names`** — the agency's own people are named by
+  their FIRST NAME on screen, and nobody else is. If your module renders a
+  person's name off a row — a `creatorName`, an `editorName`, an `actorName`, a
+  `userName`, or anything else the actor snapshot stamps — put it through
+  `shared/staff-name.ts` and never through a `split(" ")[0]` of your own:
+  `staffName` where you still hold the structured `first_name`/`last_name` pair
+  (exact, so a two-word given name survives), `staffNameFromSnapshot` where a
+  frozen "First Last" string is all there is, and `describeWithStaffName` for an
+  activity SENTENCE, which is where a reader actually meets the name. **The trim
+  happens at the render seam and never in a worker**: the stored string is a
+  search term, a sort expression and a keyset cursor key, and one column holds
+  BOTH populations, because a client-portal login is an ordinary team member. So
+  if your row can have been written by a client, carry the flag that says so —
+  a `*Name` field beside a `*IsClient` sibling — and leave a contact's or a
+  customer's name at its full length, which is the second half of the ruling and
+  as binding as the first. A field you forward untouched into another field is
+  not a rendering and the law will not ask you about it; a match position
+  (`.toLowerCase()`, `.localeCompare(`) is not one either, which is the whole
+  point of trimming late.
 
 **The machine surfaces**
 

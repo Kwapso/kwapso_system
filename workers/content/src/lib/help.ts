@@ -23,7 +23,6 @@ import { countCollection, countCollectionWith, reportedTotal } from "@shared/wor
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import {
-  CLOSURE_TREND_MIN_CLOSURES,
   CLOSURE_TREND_MONTHS,
   CLOSURE_WINDOW_MONTHS,
   HELP_STATUSES,
@@ -180,6 +179,15 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     raiserId: hideRaiser ? null : r.creator_id,
     raiserName: hideRaiser ? null : r.creator_name,
     editorName: hideEditor ? null : r.editor_name,
+    // R54, AND IT IS THE SAME FACT THE TWO LINES ABOVE ARE ALREADY STANDING ON.
+    // The row has always known whether each of these two people is one of the
+    // client's or one of ours; the portal used it and then it was dropped. The
+    // AGENCY app needs the same answer for the opposite reason — it draws both
+    // names, and a colleague is shown by first name where a contact is shown in
+    // full. Not redacted for a client login: it says nothing the name beside it
+    // (present, or null) does not already say.
+    raiserIsClient: r.raiser_is_client === 1,
+    editorIsClient: r.editor_is_client === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
@@ -230,7 +238,11 @@ type ReplyRow = {
   created_at: string
 }
 
-function toMessage(r: ReplyRow): HelpMessage {
+/** `fromClient` is passed rather than read off the row because the row type is
+ * shared with writers that have no such column — the reader that HAS the
+ * subselect (`listReplies`) hands the answer in, and the one that does not says
+ * so by passing false, which is the direction that leaves a name whole (R54). */
+function toMessage(r: ReplyRow, fromClient: boolean): HelpMessage {
   return {
     id: r.id,
     ticketId: r.help_id,
@@ -239,6 +251,7 @@ function toMessage(r: ReplyRow): HelpMessage {
     isAgent: r.is_agent === 1,
     authorId: r.creator_id,
     authorName: r.creator_name,
+    authorIsClient: fromClient,
     createdAt: r.created_at,
   }
 }
@@ -986,11 +999,13 @@ export type TicketDashboard = {
    * One row per (kind, month) over the last `CLOSURE_TREND_MONTHS`, carrying the
    * median and the count it was taken over.
    *
-   * BUCKETS BELOW `CLOSURE_TREND_MIN_CLOSURES` ARE NOT HERE, and that is the
-   * whole reason this is a separate read rather than a grouping of the one
-   * above: the floor is applied where the rows are, so a kind that closes six
-   * tickets in a typical month never reaches the screen at all. `n` still
-   * travels, so a reader can see how much each point is standing on.
+   * EVERY BUCKET IS HERE, however few closed in it (client, 2026-09-07: "even if
+   * it's only 1, it should appear there"). Until that day a floor of eight was
+   * applied in this read and the thin months never reached the screen; the
+   * retired constant's note in `shared/types.ts` keeps the argument for it. `n`
+   * still travels with every row, and it now carries more weight than it used
+   * to: it is the only thing that tells a reader a month's median was taken over
+   * one ticket rather than a hundred.
    *
    * `month` is `YYYY-MM`, the month a ticket was CLOSED in and never the month
    * it was raised in — this line answers "are we getting faster", which is a
@@ -1244,13 +1259,25 @@ export async function readTicketDashboard(
     // would be built out of the fastest tickets and every trend would look like
     // an improvement.
     //
-    // THE FLOOR IS APPLIED HERE, IN THE ROWS, and that is the load-bearing part
-    // of this read. A median exists for a bucket of one, is drawn at the same
-    // weight as a median of a hundred, and a chart cannot refuse to be read.
-    // Dropping the thin buckets at the door is why the picture on screen shows
-    // the two kinds that close in real numbers and not four lines, two of them
-    // noise. `CLOSURE_TREND_MIN_CLOSURES` is shared with the sentence the screen
-    // writes under the chart, so the rule and its explanation cannot drift.
+    // THERE IS NO FLOOR ON THIS READ ANY MORE (client, 2026-09-07): "Only
+    // months with at least 8 of a kind are thrown. No, even if it's only 1, it
+    // should appear there."
+    //
+    // WHAT USED TO BE HERE, so the removal is a decision on the record rather
+    // than a line that went missing: `WHERE n >= CLOSURE_TREND_MIN_CLOSURES`,
+    // eight, applied in the rows precisely because a median exists for a bucket
+    // of one and is then drawn at the same weight as a median of a hundred. That
+    // objection is still true and the constant's own retirement note in
+    // `shared/types.ts` keeps the whole argument. She has heard it and ruled the
+    // other way: a month she knows something closed in, drawn as a gap, reads as
+    // the app having lost her work, and that costs her more than a line that
+    // jumps.
+    //
+    // SO EVERY BUCKET LEAVES THE DOOR, and `n` still travels with each one — it
+    // is what the screen's hover readout says per month, which is now the only
+    // thing standing between a thin month and a misread one. Nothing here
+    // thresholds anything; a filter reintroduced under another name would be the
+    // same refusal wearing a different word.
     //
     // BOUNDED BY ITS GROUPING: at most (kinds × twelve months) rows, and the cap
     // is said anyway (R14). No ORDER BY for the cap to protect, because there is
@@ -1273,7 +1300,6 @@ export async function readTicketDashboard(
        SELECT t AS help_type, mo AS month, n AS n,
               AVG(CASE WHEN rn IN ((n + 1) / 2, (n + 2) / 2) THEN days END) AS median_days
          FROM ranked
-        WHERE n >= ${CLOSURE_TREND_MIN_CLOSURES}
         GROUP BY t, mo, n
         ORDER BY mo ASC
         LIMIT ${cap}`,
@@ -1540,7 +1566,10 @@ export async function listReplies(
   // promise; both are kept now, and this is the half that makes the linkage
   // worthless even if a name escapes somewhere else.
   return rows.map((r) =>
-    toMessage(scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r)
+    toMessage(
+      scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r,
+      r.from_client === 1
+    )
   )
 }
 

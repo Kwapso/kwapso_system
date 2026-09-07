@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { ScreenRecipe } from "@shared/web/screen-engine/recipe"
+import type { RecipeTab, ScreenRecipe } from "@shared/web/screen-engine/recipe"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
@@ -104,10 +104,32 @@ describe("withoutActions", () => {
 // proves every base recipe's collection tab gets badged; these lock the EDGES
 // the happy path never shows — the ones a count badge actually gets wrong.
 describe("tabCountKey / withTabCounts", () => {
-  const memberDetail = BASE_RECIPES["members.detail"] as ScreenRecipe
-  const tabs = memberDetail.tabs ?? []
-  const overview = tabs.find((t) => t.key === "overview")!
-  const activity = tabs.find((t) => t.key === "activity")!
+  // THE FIXTURE IS BUILT HERE NOW, AND THAT IS THE INTERESTING PART.
+  //
+  // It used to read `members.detail` off BASE_RECIPES and reach for its Activity
+  // tab, because every detail recipe in the app shipped one. None does any more:
+  // the client killed the Activity tab across the app on 2026-09-06 (a record's
+  // history is read from the footer's Latest activity column and opens in a
+  // slide-in off it — web/components/activity-panel.tsx carries the ruling), so
+  // the five detail recipes are a single `description` block each.
+  //
+  // The SEAM did not go with them. `withTabCounts` is what badges whatever
+  // collection tab a detail recipe declares, derived from each tab's own block
+  // rather than from a list of tab keys, and the host still runs every detail
+  // through it (rules.test.ts holds that, one call per rendered recipe). So the
+  // edges below — a real total, a zero, an absent total, a missing key, and the
+  // no-mutation guarantee — are exactly as worth locking as they were; what
+  // changed is that the input has to be written down instead of borrowed. The
+  // base recipe is still the starting point, so a change to its shape still
+  // reaches this test.
+  const base = BASE_RECIPES["members.detail"] as ScreenRecipe
+  const overview = (base.tabs ?? []).find((t) => t.key === "overview")!
+  const activity: RecipeTab = {
+    key: "activity",
+    label: "Activity",
+    block: { kind: "activity", source: "activity" },
+  }
+  const memberDetail: ScreenRecipe = { ...base, tabs: [overview, activity] }
 
   it("names the collection a tab reveals, and null for the record's own fields", () => {
     expect(tabCountKey(activity)).toBe("activity") // the feed the block names
@@ -121,8 +143,8 @@ describe("tabCountKey / withTabCounts", () => {
   })
 
   it("renders NOTHING for zero or a total that hasn't loaded yet", () => {
-    // A "0" beside Activity reads as "nothing ever happened here" — which, while
-    // page one is still in flight, is a lie the badge tells for free.
+    // A "0" beside a history reads as "nothing ever happened here" — which,
+    // while page one is still in flight, is a lie the badge tells for free.
     for (const total of [0, undefined]) {
       const next = withTabCounts(memberDetail, { activity: total })
       expect(next.tabs?.find((t) => t.key === "activity")?.badge).toBe("")

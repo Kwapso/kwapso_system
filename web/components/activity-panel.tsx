@@ -1,22 +1,47 @@
 "use client"
 
-// THE ACTIVITY PANEL (R2 · R14) — the Activity tab every record detail carries.
+// THE ACTIVITY PANEL (R14) — one record's history: the feed, its three
+// registers, the note composer, and the pager under all of it.
 //
-// R2 says every record detail exposes Overview + Activity. R14 says the feed
-// under a badge that counts the WHOLE history must be able to REACH all of it —
-// page one, then Load more — because a record with 143 events truthfully badging
-// 143 over its newest 50, forever, is the exact bug that clause was written for.
+// WHERE IT IS DRAWN, AND WHY IT MOVED. It was the body of the Activity TAB that
+// every record detail carried. There is no such tab anywhere in the app any
+// more. The client, 2026-09-06, verbatim: "I don't want to have activity as a
+// tab anywhere but on the footer, on top of the dates. On the right column, on
+// Latest Activity, I would like some view or expand or whatever, and this would
+// open a slide-in with all the activity." Restated as a ruling on 2026-09-07:
+// "record activity — implement 'A · in the eyebrow row' across the app. kill all
+// old activity tabs."
 //
-// Both sentences used to be spelled out in ten detail components, comment and
+// So the history is reached from the ink footer's own Latest activity column —
+// the summary that was already there, beside the dates — and the whole feed
+// opens in a slide-in off it. This component is what goes INSIDE that slide-in;
+// the rail itself is the design kit's, and is wired in a later pass. Nothing
+// about the panel changed for the move: same feed, same registers, same
+// composer, same pager, same `useRecordActivity` read behind it
+// (web/lib/use-record-activity.ts, which every detail still calls for the footer
+// column and the composer). A tab was a PLACE, not the thing.
+//
+// R14 IS WHY THE PAGER IS IN HERE AND NOT BESIDE IT. A feed shown under a count
+// of the WHOLE history must be able to REACH all of it — page one, then Load
+// more — because a record with 143 events showing its newest 50, forever, under
+// the number 143, is the exact bug that clause was written for. The count now
+// rides the footer's own column rather than a tab badge, and the reachability
+// argument is unchanged by that: it is about the feed, not about the label
+// above it.
+//
+// That sentence used to be spelled out in ten detail components, comment and
 // all. Ten copies of "the badge counts more than the feed can reach" is ten
-// chances for the eleventh detail to ship with a feed and no way to page it, and
-// the check could only ever catch that by looking for the same two strings in
-// every file. It now looks for THIS component in the details, and for the feed
-// and the pager in here — same guarantee, one place to get it right.
+// chances for the eleventh detail to ship with a feed and no way to page it. It
+// lives here, once — which is also why the thirteen details now carry a
+// one-line pointer back to this file rather than thirteen copies of the ruling
+// above.
 //
 // THE COMPOSER (2026-08-31). The client, reviewing CH27.8's add-a-note field on
 // the kit's ink footer: "same on activity tab, i want to be able to write
-// (replicate what's in footer)". `onAddNote` is the SAME function each caller
+// (replicate what's in footer)". The tab that request named is gone (above), and
+// the request itself survives it word for word: wherever the whole feed is
+// shown, you can write into it, not only in the footer's summary. `onAddNote` is
+// the SAME function each caller
 // already built for `RecordScreen`'s footer (`activity.addNote`, gated behind
 // that module's own `can(module, "create")`) — passed here a second time, never
 // recomputed, so the two composers can never disagree about who may write. The

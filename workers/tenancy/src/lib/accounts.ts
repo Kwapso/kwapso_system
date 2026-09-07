@@ -1209,6 +1209,51 @@ export async function countPortalUsers(
   return rows[0]?.n ?? 0
 }
 
+/** WHICH OF THESE PEOPLE HOLD A PORTAL LOGIN — R54's question, asked through the
+ * fence rather than around it.
+ *
+ * The activity feed carries a frozen actor name per row, and a client login is an
+ * ordinary `team_members` row, so a portal-authored row sits in that feed under a
+ * CONTACT's own name. Staff are named on screen by their first name and contacts
+ * are named in full, and this is the only thing that can tell the reader's screen
+ * which of the two it is holding.
+ *
+ * IT LIVES HERE BECAUSE `portal_users` IS A FENCED TABLE. The first version of
+ * this asked the question as an `EXISTS` subselect inside the activity read
+ * itself, which is one statement fewer and reads perfectly well — and walks a
+ * query against the customer spine out of the one file that carries the caller's
+ * stamp. `test/account-leak.test.ts` caught it. The fence is not tidiness: it is
+ * why "did this query carry the scope?" has one place to look.
+ *
+ * ONE STATEMENT, NOT ONE PER ROW. The caller hands the page's distinct actor ids
+ * and gets back the subset that are clients, so a fifty-row page costs a second
+ * query rather than fifty. An empty input asks nothing at all. The ids are
+ * interpolated through `idList`'s `sqlString`, the same escaping every other
+ * membership read in this file uses.
+ *
+ * The answer is deliberately NEGATIVE-SAFE: an id this returns nothing for is
+ * treated by the caller as staff, which leaves a name whole. Getting it wrong in
+ * that direction shows a full name where a first name would have done; getting it
+ * wrong in the other truncates a customer, which is the half of the client's
+ * ruling that says do not. */
+export async function clientUserIds(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  userIds: string[]
+): Promise<Set<string>> {
+  const wanted = [...new Set(userIds.filter((id) => id !== ""))]
+  if (wanted.length === 0) return new Set()
+  const fence = accountScopeClause(scope, "account_id")
+  const rows = await d1Query<{ user_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT DISTINCT user_id FROM portal_users${where([fence.sql, `user_id IN (${idList(wanted)})`])}`,
+    [...fence.params]
+  )
+  return new Set(rows.map((r) => r.user_id))
+}
+
 /** Grant a login on an account. The person must already be an account row here —
  * a login is a switch on somebody we know, never a way to invent one. */
 export async function grantPortalAccess(

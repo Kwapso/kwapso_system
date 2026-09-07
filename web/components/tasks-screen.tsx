@@ -61,6 +61,7 @@ import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -87,7 +88,8 @@ function shapeTasks(tasks: Task[], lang: Language) {
           [
             t.status === "done" ? "Done" : "Open",
             PRIORITY_LABEL[t.priority],
-            t.assigneeName ?? "nobody yet",
+            // R54: a task is ours, so its assignee is named by first name.
+            staffNameFromSnapshot(t.assigneeName) || "nobody yet",
             t.dueOn ? `deadline ${formatDate(t.dueOn, lang)}` : null,
           ]
             .filter(Boolean)
@@ -117,7 +119,10 @@ function shapeTasks(tasks: Task[], lang: Language) {
         closed: t.completedAt ? formatDate(t.completedAt, lang) : "—",
         // Facet columns (read by the filter engine, not the renderer).
         status: t.status === "done" ? "Done" : "Open",
-        assignee: t.assigneeName ?? "Nobody yet",
+        // R54 — and this cell is also the "Who has it" FACET's source, so the
+        // filter menu offers the same word the rows show (the facet derives its
+        // options from the column values, `screen-engine/collection.ts`).
+        assignee: staffNameFromSnapshot(t.assigneeName) || "Nobody yet",
         // ── THE RAW FACTS, RIDING BESIDE THE SHAPED CELLS ──────────────────
         //
         // Four values a COLUMN ABOVE shows in a shaped form and the table has
@@ -432,7 +437,9 @@ export function TasksScreen({
       // NO REFERENCE PREFIX — see the same note on the list row above.
       title: r.title,
       accent: r.department ?? "",
-      detail: [PRIORITY_LABEL[r.priority], r.assigneeName].filter(Boolean).join(" · "),
+      detail: [PRIORITY_LABEL[r.priority], staffNameFromSnapshot(r.assigneeName)] // R54
+        .filter(Boolean)
+        .join(" · "),
     }))
 
   return (

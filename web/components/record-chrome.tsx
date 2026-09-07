@@ -51,12 +51,14 @@ import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/
 import type { RecordDetailAuditEntry } from "@shared/ui/components/record-detail/record-detail"
 import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activity-feed"
 
+import { ActivityRail, type RailActivity } from "@/components/activity-rail"
 import { InAppLink } from "@/components/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef } from "@shared/web/record-ref"
 import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 import { defaultTabsConfig, type TabsConfig } from "@shared/web/screen-engine/tabs-view"
@@ -238,6 +240,24 @@ export type RecordAudit = {
   createdAt?: string | null
   editedByName?: string | null
   updatedAt?: string | null
+  /** WHICH POPULATION EACH NAME BELONGS TO (R54). A staff person is shown by
+   * their first name and a client contact is shown in full, and this is the ONE
+   * component that draws the audit line for every record detail in the app — so
+   * the decision is made here, once, instead of at fourteen call sites that
+   * would each have to remember it.
+   *
+   * They default to FALSE, i.e. staff, because thirteen of the fourteen records
+   * this footer sits under cannot be created by anybody else: the portal has no
+   * create door for an account, a story, a sprint, an app, a role, a wave, a
+   * dropdown value, a meeting, a knowledge item or a task. The fourteenth is the
+   * ticket, which a contact raises for themselves, and `help-detail.tsx` passes
+   * the row's own `raiserIsClient` / `editorIsClient`. A default that is right
+   * for every screen but one, with that one saying so out loud, is the shape
+   * this codebase already uses for a redaction (`toTicket`'s `hideRaiser`) —
+   * except that here the unsafe direction is TRUNCATING a name, so the default
+   * is the one that leaves a name whole when nobody has answered. */
+  createdByIsClient?: boolean
+  editedByIsClient?: boolean
 }
 
 /** `audit` → the ink footer's Record column, two rows: Created, Last edited.
@@ -258,15 +278,24 @@ function recordAuditEntries(
 ): RecordDetailAuditEntry[] {
   const created = audit.createdAt ? formatRelative(audit.createdAt, t, lang) : null
   const edited = audit.updatedAt ? formatRelative(audit.updatedAt, t, lang) : null
+  // R54 — one place, and the names below are the ONLY ones this function reads.
+  // A colleague is named by their first name; a client contact keeps theirs
+  // whole, because the ruling's second sentence is as binding as its first.
+  const createdBy = audit.createdByIsClient
+    ? audit.createdByName
+    : staffNameFromSnapshot(audit.createdByName) || null
+  const editedBy = audit.editedByIsClient
+    ? audit.editedByName
+    : staffNameFromSnapshot(audit.editedByName) || null
   const rows: RecordDetailAuditEntry[] = []
-  if (audit.createdByName && created)
-    rows.push({ id: "created", label: t("Created by {name}", { name: audit.createdByName }), children: created })
-  else if (audit.createdByName) rows.push({ id: "created", children: t("Created by {name}", { name: audit.createdByName }) })
+  if (createdBy && created)
+    rows.push({ id: "created", label: t("Created by {name}", { name: createdBy }), children: created })
+  else if (createdBy) rows.push({ id: "created", children: t("Created by {name}", { name: createdBy }) })
   else if (created) rows.push({ id: "created", children: t("Created {when}", { when: created }) })
-  if (audit.editedByName && edited)
-    rows.push({ id: "edited", label: t("Last edited by {name}", { name: audit.editedByName }), children: edited })
-  else if (audit.editedByName)
-    rows.push({ id: "edited", children: t("Last edited by {name}", { name: audit.editedByName }) })
+  if (editedBy && edited)
+    rows.push({ id: "edited", label: t("Last edited by {name}", { name: editedBy }), children: edited })
+  else if (editedBy)
+    rows.push({ id: "edited", children: t("Last edited by {name}", { name: editedBy }) })
   else if (edited) rows.push({ id: "edited", children: t("Last edited {when}", { when: edited }) })
   return rows
 }
@@ -287,6 +316,80 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
     time: item.timestamp,
     dateTime: item.dateTime,
   }))
+}
+
+/* --------------------- the door on the Latest activity row -----------------
+   THE SUMMARY ABOVE IS NOW THE ONLY ACTIVITY ON A RECORD PAGE, so the way to
+   the rest of it has to be somewhere, and the client said where. 2026-09-06,
+   verbatim: "On the right column, on Latest Activity, I would like some view
+   or expand or whatever, and this would open a slide-in with all the
+   activity." 2026-09-07: "implemet 'A · in the eyebrow row' across the app."
+   The rail itself — the link, the count and the `EdgePanel` behind them — is
+   `web/components/activity-rail.tsx`, drawn once for all thirteen bespoke
+   details by the single call below.
+
+   AND IT RIDES `activityLabel` BECAUSE THE KIT'S OWN TEMPLATE DROPS THE REAL
+   SLOT. This is a logged gap, not a preference. `RecordDetail` (the vendored
+   primitive, shared/ui/components/record-detail/record-detail.tsx) grew
+   `activityAction` on 2026-09-07 for exactly this door: a trailing node on the
+   eyebrow's own line, `items-baseline`, at a derived leading so it costs no
+   vertical space. But this file does not reach `RecordDetail` — it goes
+   through `RecordChrome`, the kit's own composition template
+   (shared/ui/compositions/templates/record-chrome.tsx), and that file forwards
+   twenty-odd props into `RecordDetail` and `activityAction` is not one of
+   them. `shared/ui/` is vendored and pinned (CLAUDE.md, `vendored-kit.test.ts`
+   recomputes its content hash), so the template cannot be hand-edited here;
+   the fix belongs upstream in Kwapso/kwapso-ui-ux, and it is one line in that
+   file's prop list and one in its render. THE RECIPE PATH ALREADY USES THE
+   REAL PROP (shared/web/screen-engine/screen-renderer.tsx renders
+   `RecordDetail` directly), so the two halves of this app prove the slot works
+   and prove the template is what is missing.
+
+   WHAT THE STAND-IN COSTS, EXACTLY. `RecordChrome` DOES forward
+   `activityLabel`, and it is a `ReactNode`, so the whole row can be built here
+   and handed over as the label. The kit puts its action BESIDE
+   `RecordFooterEyebrow`; this puts the row INSIDE it — and that one span is
+   `text-micro font-[var(--font-weight-medium)] uppercase text-ink-tertiary`,
+   every one of which inherits. So the action carries three resets the kit's
+   own version does not need (`normal-case`, `tracking-normal`, and the ink),
+   and `ActivityRail`'s own control carries the other three on the button
+   itself (see its comment: `Button` would otherwise impose `text-sm`,
+   `leading-none` and the medium weight). Everything else is copied off
+   `record-detail.tsx` verbatim rather than re-derived: the flex row's
+   `items-baseline justify-between gap-[var(--space-3)]`, the
+   `--footer-eyebrow-line` declaration (`--text-micro × --text-micro--line-
+   height` = 13.406px at the shipped root, so the two boxes are identical and
+   the row's height is the height the lone eyebrow already had), and
+   `flex-none whitespace-nowrap` on the action so the LABEL wraps first and the
+   door never does. The day the template grows the prop, this whole function is
+   deleted and replaced by `activityAction={<ActivityRail …/>}`, with no visual
+   difference — which is the same shape of swap this file already documented
+   for `eyebrow`, and the reason it is written to be measured rather than eyed.
+
+   IT ALSO TRANSLATES THE EYEBROW, WHICH NOTHING DID BEFORE. `activityLabel`
+   was never passed, so the column's heading fell through to `RecordDetail`'s
+   own hardcoded English "Latest activity" — a word the translation walk cannot
+   see, because it never opens `shared/ui/` (R28, `VENDORED_UI`). Passing the
+   label at all is forced by the row above; passing it through `t` is what
+   stops a German reader being told "Latest activity" in English over three
+   German sentences. */
+function activityEyebrowRow(
+  t: ReturnType<typeof useT>,
+  rail: React.ReactNode
+): React.ReactNode {
+  return (
+    <span
+      className={
+        "flex min-w-0 items-baseline justify-between gap-[var(--space-3)] " +
+        "[--footer-eyebrow-line:calc(var(--text-micro)*var(--text-micro--line-height))]"
+      }
+    >
+      <span className="min-w-0">{t("Latest activity")}</span>
+      <span className="flex-none whitespace-nowrap normal-case tracking-normal text-ink-on-record-footer">
+        {rail}
+      </span>
+    </span>
+  )
 }
 
 /* ------------------------------ the type mark ----------------------------- */
@@ -741,6 +844,7 @@ export function RecordScreen({
   children,
   audit,
   activity,
+  activityHead,
   onAddNote,
   notePlaceholder,
   state,
@@ -875,12 +979,27 @@ export function RecordScreen({
    */
   audit?: RecordAudit
   /**
-   * The Latest activity column — the SAME rows `useRecordActivity` already
-   * fetched for this record's Activity tab. Pass `activity.items` straight
-   * through (`ActivityFeedRow[]`); the slice to "short" and the shape
-   * conversion to the kit's `ActivityFeedItem` happen here, once.
+   * THE WHOLE `useRecordActivity` BUNDLE, and it always was — every one of the
+   * thirteen call sites has passed `activity={activity}` (the hook's own return)
+   * since this prop existed, so widening the TYPE from `{ items }` to the six
+   * fields the hook already hands over changed no call site at all.
+   *
+   * It feeds two things that must not be able to disagree. The footer's own
+   * Latest activity column takes `items` — sliced to the newest three here,
+   * once, and converted to the kit's `ActivityFeedItem` shape (CH27.8: "the
+   * footer is a summary"). And the DOOR beside that column's eyebrow takes the
+   * rest: `total` is the exact server COUNT(*) it prints (R16 — never the
+   * loaded page's length), `listKey`/`fetchPage` are what let the rail behind
+   * it reach page two of the same feed (R14). One read, one number, one feed;
+   * a second fetch here is what would let the summary and the history drift.
    */
-  activity?: { items: readonly ActivityFeedRow[] }
+  activity?: RailActivity
+  /**
+   * Anything that belongs above the feed INSIDE the activity rail. One caller:
+   * the ticket's stage strip. Forwarded to `ActivityRail`'s `head` and argued
+   * there; a record that passes nothing gets a rail holding the feed alone.
+   */
+  activityHead?: React.ReactNode
   /**
    * CH27.8's add-a-note field on the ink footer, backed by `useRecordActivity`'s
    * `addNote` (web/lib/use-record-activity.ts) over `POST
@@ -1110,6 +1229,36 @@ export function RecordScreen({
            of its two columns. */
         audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
         activity={activity ? footerActivityItems(activity.items) : undefined}
+        /* THE DOOR TO THE FULL HISTORY, ON THE EYEBROW'S OWN LINE — wired ONCE
+           here for all thirteen bespoke details rather than thirteen times.
+           `activityEyebrowRow` (above) says why it rides `activityLabel`
+           rather than the kit's real `activityAction` slot, and `ActivityRail`
+           itself decides whether there is a door to draw at all: a record with
+           no history gets the bare eyebrow this label has always been.
+
+           NOT GATED ON `state` — a record whose PANEL is still loading has
+           already loaded its footer's own facts or it would not be drawing a
+           footer, and `ActivityRail` waits for the exact total either way. */
+        activityLabel={activityEyebrowRow(
+          t,
+          /* NO BUNDLE, NO DOOR — and the ROW is still passed, so the heading is
+             still translated. A record screen that hands `RecordScreen` no
+             activity at all has nothing to open; the rail decides the rest for
+             itself once there is a bundle to read (a record with no history
+             yet draws no door either, `activity-rail.tsx` argues why). */
+          activity === undefined ? null : (
+            <ActivityRail
+              activity={activity}
+              /* The SAME handler the footer's own composer is given, gated by
+                 the SAME `can(module, "create")` at the same call site — never
+                 recomputed here, so the two fields cannot end up disagreeing
+                 about who may write. */
+              onAddNote={onAddNote}
+              notePlaceholder={notePlaceholder}
+              head={activityHead}
+            />
+          )
+        )}
         onAddNote={onAddNote}
         notePlaceholder={notePlaceholder}
         state={state}
