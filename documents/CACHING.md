@@ -238,6 +238,13 @@ input lived only in component state. **Rule: every form dialog persists its draf
   (`clearAllFormDrafts`).
 - Machine-enforced: every dialog in `FORM_DIALOGS` (`shared/rules/registry.ts`) must
   route its state through `useFormDraft`, checked by `web/test/rules.test.ts`.
+- **And a live patch cannot reach an open form.** `useFormDraft` seeds from
+  `initial` on the inactive→active edge and at no other time, so when a colleague
+  saves the record you have open, the ROW moves to theirs (rule 3's `patchRow`) and
+  your typing does not. That is the owner's last-save-wins ruling of 7 Sep 2026, it
+  is the reason never to add `useEffect(() => setValues(initial), [initial])` to a
+  dialog, and CONCURRENCY.md § *Two people editing the same record* is where it is
+  written down and named.
 
 ## The agent-modules resources (BUILT 2026-06-23)
 
