@@ -53,7 +53,6 @@ import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activ
 
 import { InAppLink } from "@/components/shell/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
-import { RecordMark } from "@shared/web/record-mark"
 import { clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage, useT } from "@shared/web/language"
@@ -290,27 +289,17 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
 
 /* ------------------------------ the type mark ----------------------------- */
 
-/** THE TYPE MARK, in the slot a lucide icon would have taken (UI-CONVENTIONS §5,
- * amended 17 Aug 2026). `aria-hidden`, never inside a sentence, and always
- * beside the type WORD — the group heading or the TYPE column on a
- * collection.
+/* THERE IS NO `TypeMark` HERE ANY MORE, and its deletion is the note.
  *
- * NOT CALLED FROM THIS FILE'S OWN HEADER BAND ANY MORE — client ruling,
- * 2026-09-01, verbatim: "for now there are no - under no case - images on
- * title. remove it everywhere" (see `RecordScreen`'s own `mark`/`leading`
- * prop docs, below, and "THE MARK IS GONE FROM THIS HEADER TOO" further down
- * this file). Left defined and exported rather than deleted: it is a general
- * "a type word may carry a glyph" primitive (UI-CONVENTIONS §5's own scope
- * says a collection's own group heading or TYPE column, neither of them a
- * title), not itself a violation of "no images on title" — only a CALLER
- * putting it beside a title would be, and this file no longer has one. */
-export function TypeMark({ mark, size = "row" }: { mark: string; size?: "row" | "band" }) {
-  // The one mark, with no picture to show — the box, the sizes and the
-  // `aria-hidden` are the same decision everywhere and are made once
-  // (shared/web/record-mark.tsx). This kept its name because a type mark is what
-  // a reader of this file is looking for.
-  return <RecordMark mark={mark} size={size} />
-}
+ * It was a seven-line wrapper round `RecordMark` (shared/web/record-mark.tsx),
+ * kept "defined and exported rather than deleted" when the client's 2026-09-01
+ * ruling — "for now there are no - under no case - images on title. remove it
+ * everywhere" — took its last caller away. Nothing called it after that, in this
+ * file or any other, for six days; `dead_end_review` reported it twice as a
+ * component rendered nowhere, and `web/test/dead-exports.test.ts` found it as an
+ * export nothing names. A wrapper kept for a future caller is a decision the
+ * future caller can make for itself in one line, and `RecordMark` — which every
+ * list row, tile and picker still draws — is where that line goes. */
 
 /* --------------------------- the band and the body ------------------------ */
 
@@ -773,9 +762,11 @@ export function RecordScreen({
    * `mark={kindMark}`…) and none of the thirteen of them needs to change for
    * a ruling stated "for now" — removing the prop from this type would force
    * a matching edit at every one of them to delete an argument that is
-   * already inert. `RecordMark`/`TypeMark`, the components a caller builds
-   * this value FROM, are untouched: they still draw a mark in every list row,
-   * tile and picker that isn't a title, which this ruling never reached.
+   * already inert. `RecordMark` (shared/web/record-mark.tsx), the component a
+   * caller builds this value FROM, is untouched: it still draws a mark in every
+   * list row, tile and picker that isn't a title, which this ruling never
+   * reached. (`TypeMark`, named here until 7 Sep 2026, was a wrapper round it
+   * with no callers left — see the note where it used to be, above.)
    */
   mark?: string | null
   /**

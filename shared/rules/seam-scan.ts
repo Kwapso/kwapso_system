@@ -292,8 +292,12 @@ export function gatingSeam(worker: Worker & {
  *
  * So this indexes both, and slices between top-level declarations rather than
  * between exports. Same file walk, same stripComments contract; a different
- * question, and one where a private helper is exactly what is being looked for. */
-export function indexAllFunctions(dir: string): Map<string, string> {
+ * question, and one where a private helper is exactly what is being looked for.
+ *
+ * NOT EXPORTED. It was, and nothing outside this file ever imported it — the
+ * activity seam below is its only caller. An export nothing imports is a
+ * contract nobody agreed to. */
+function indexAllFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const file of sourceFiles(dir, { extensions: [".ts"] })) {
     const starts = [...file.source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)/gm)]

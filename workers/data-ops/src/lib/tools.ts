@@ -953,14 +953,19 @@ export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
 
 /** THE SENTENCE THAT TURNS A LIST OF NAMES INTO A CAPABILITY.
  *
- * Exported, and the bench imports it, because a second copy of this paragraph is
- * a second definition of what a step sends — and the whole point of
- * `agent-routing-bench.mjs` is to measure the shape the assistant really uses.
- * A bench carrying its own hand-typed preface would drift from the app the first
- * time either was reworded, and the drift would be invisible: the run would still
- * produce a number. Same reasoning that keeps the fold in one file for the error
- * digest and the resolve door. */
-export const MORE_TOOLS_PREFACE =
+ * ONE COPY, because a second copy of this paragraph is a second definition of
+ * what a step sends — and the whole point of `agent-routing-bench.mjs` is to
+ * measure the shape the assistant really uses. A bench carrying its own
+ * hand-typed preface would drift from the app the first time either was
+ * reworded, and the drift would be invisible: the run would still produce a
+ * number. Same reasoning that keeps the fold in one file for the error digest
+ * and the resolve door.
+ *
+ * NOT EXPORTED. This comment said "the bench imports it" and the bench does not:
+ * it imports `stageOneSystem` below, which is the sentence PLUS the index, and is
+ * the thing a step actually carries. Exporting the fragment as well offered a
+ * second, narrower contract that nobody took up. */
+const MORE_TOOLS_PREFACE =
   "MORE TOOLS, BY NAME. Beyond the ones you have been given in full, these exist and you can use any of them — call load_tools with the names you need (several at once) and their full instructions arrive for the rest of this conversation. The names say what they do; if none of them fits, answer with what you have rather than guessing at one."
 
 /** THE SYSTEM MESSAGE A STEP ACTUALLY CARRIES: the prompt plus the index of every
