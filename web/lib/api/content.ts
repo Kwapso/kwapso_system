@@ -460,10 +460,6 @@ export const content = {
       byStatus?: Record<string, number>
       byAccount?: HelpAccountFacet[]
     }>("/api/content/help/triage-read", post({ id })),
-  /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
-   * by phone; a client presses it in their own portal. */
-  validateHelp: (id: string) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/validate", post({ id })),
   /** ANSWER IT AND TELL THEM (5.6 + 5.7). The resolution is REQUIRED — the door
    * refuses without it, which is the whole of 5.6 — and the send goes to whoever
    * raised it and that client's main stakeholder.

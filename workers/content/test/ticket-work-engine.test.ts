@@ -128,36 +128,36 @@ describe("the seven states", () => {
     expect(historyFor(id).filter((h) => h.type === "Ticket resolved")).toHaveLength(1)
   })
 
-  // CHECKLIST 5.13, and Aurora's ap2 is the load-bearing half: only an extra, a
-  // request or feedback waits for the client. A question or an issue is somebody
-  // stuck, and making them ask their own colleague for permission first is the
-  // version of this rule that gets it switched off.
-  it("holds an extra for the client to confirm, and lets a question straight in", async () => {
-    const waits = (await ticketIds(
+  // NOTHING WAITS FOR A CONFIRMATION ANY MORE — the client's ruling, 7 Sep 2026,
+  // "kill awaiting_validation" (shared/types.ts, `HELP_STATUSES`, carries the
+  // argument).
+  //
+  // THIS TEST IS INVERTED, NOT DELETED, and that is deliberate. It used to assert
+  // the FORK: an extra held in `awaiting_validation` for the client to confirm
+  // (CHECKLIST 5.13, Aurora's ap2) while a question went straight in. The fork is
+  // what was removed, so the same two tickets now prove the opposite sentence —
+  // that the kind of a ticket no longer decides where it starts. Deleting the
+  // case instead would have left nothing at all asserting a birth status, which
+  // is the one thing `createTicket` still decides.
+  it("lets every kind straight in, whether or not it is scoped work", async () => {
+    const scoped = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", {
         description: "Could we also add a second dashboard",
         helpType: "Extra",
         accountId: IDS.victimAccount,
       })
     ))[0]
-    const straight = (await ticketIds(
+    const stuck = (await ticketIds(
       await call(IDS.staffUser, "POST /api/content/help", {
         description: "How do I export this",
         helpType: "Question",
         accountId: IDS.victimAccount,
       })
     ))[0]
-    expect(row(waits).status).toBe("awaiting_validation")
-    expect(row(straight).status).toBe("new")
-
-    // …and the confirm moves it into the ordinary queue, once.
-    expect((await call(IDS.staffUser, "POST /api/content/help/validate", { id: waits })).status).toBe(200)
-    expect(row(waits).status).toBe("new")
-    const stamp = row(waits).updated_at
-    // R17: a second confirm moves zero rows — no second history line, no re-sort.
-    await call(IDS.staffUser, "POST /api/content/help/validate", { id: waits })
-    expect(historyFor(waits).filter((h) => h.type === "Ticket validated")).toHaveLength(1)
-    expect(row(waits).updated_at).toBe(stamp)
+    // An Extra is still scoped work (`isScopedTicketType` — the dashboard ranks
+    // clients by exactly these kinds). What it is no longer is a lifecycle fork.
+    expect(row(scoped).status).toBe("new")
+    expect(row(stuck).status).toBe("new")
   })
 
   // The agency's own extra has nobody outside the building to ask, so it must not

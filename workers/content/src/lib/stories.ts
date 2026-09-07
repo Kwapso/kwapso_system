@@ -49,7 +49,13 @@ import { STORY_STATUSES, type Sprint, type Story, type StoryStatus } from "@shar
 
 import type { Env } from "../env"
 import { teamMemberNames } from "./notify"
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import {
+  nextTeamRef,
+  refAliasesColumnSql,
+  refAliasMatchSql,
+  TEAM_REF_KINDS,
+  TEAM_REF_TABLES,
+} from "@shared/workers/refs"
 import { inOrder } from "@shared/workers/parallel"
 
 export { STORY_STATUSES, type StoryStatus }
@@ -240,11 +246,18 @@ function storyWhere(filter: StoryFilter): { sql: string; params: string[] } {
     // because a search box is not a pattern box: `%` and `_` are LIKE's own
     // wildcards, and an alternating `%a%a%…` needle is a handful of bytes that
     // costs the worker exponential time over the whole table.
+    //
+    // AND THE REFERENCE IT USED TO HAVE. Story numbers were the worst hit by
+    // migration 0068's renumbering — all 275 on staging collided into 34
+    // distinct numbers under the old per-account scheme, so 241 of them wear a
+    // different number today than the one somebody may have been quoted. The
+    // alias is what makes that survivable, and this is where it is answered.
     parts.push(
-      `(LOWER(s.title) LIKE ? ESCAPE '\\' OR LOWER(s.ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(s.detail, '')) LIKE ? ESCAPE '\\')`
+      `(LOWER(s.title) LIKE ? ESCAPE '\\' OR LOWER(s.ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(s.detail, '')) LIKE ? ESCAPE '\\'
+        OR ${refAliasMatchSql(TEAM_REF_TABLES.story, "s.id")})`
     )
     const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
-    params.push(needle, needle, needle)
+    params.push(needle, needle, needle, needle)
   }
   return { sql: parts.length ? parts.join(" AND ") : "1 = 1", params }
 }
@@ -961,6 +974,7 @@ type SprintRow = {
   open_story_count: number
   created_at: string
   creator_name: string | null
+  ref_was: string | null
 }
 
 const SPRINT_COLS = `sp.id, sp.ref, sp.name, sp.goal, sp.sprint_type, sp.account_id, sp.app_id,
@@ -973,7 +987,21 @@ const SPRINT_COLS = `sp.id, sp.ref, sp.name, sp.goal, sp.sprint_type, sp.account
   -- without a second lookup, and an old sprint still says the wave it was in.
   (SELECT w.name FROM waves w WHERE w.id = sp.wave_id) AS wave_name,
   (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id) AS story_count,
-  (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id AND s.status <> 'done') AS open_story_count`
+  (SELECT COUNT(*) FROM stories s WHERE s.sprint_id = sp.id AND s.status <> 'done') AS open_story_count,
+  -- EVERY NUMBER THIS SPRINT HAS EVER BEEN CALLED, so the SEARCH BOX can find it
+  -- by one. It rides the row rather than being answered by the door, and that is
+  -- forced rather than chosen: the sprints door takes no q at all (SprintFilter
+  -- has none), because the collection is bounded and the browser narrows it --
+  -- sprints-screen.tsx and work-panels.tsx both match on the reference in
+  -- memory. An EXISTS clause cannot help a search that happens after the rows
+  -- have arrived, so the names have to arrive with them.
+  --
+  -- IT IS THE ONE KIND THAT NEEDED THIS. Migration 0068 reissued 75 of the 100
+  -- sprint references on staging (the old shape counted per account and packed
+  -- 100 sprints into 25 distinct numbers), so for three sprints in four the old
+  -- string is the only one anybody wrote down. Tickets, stories, inputs and
+  -- meetings are all answered by their own door instead.
+  ${refAliasesColumnSql(TEAM_REF_TABLES.sprint, "sp.id")} AS ref_was`
 
 function toSprint(r: SprintRow): Sprint {
   return {
@@ -998,6 +1026,7 @@ function toSprint(r: SprintRow): Sprint {
     openStoryCount: r.open_story_count,
     createdAt: r.created_at,
     createdByName: r.creator_name,
+    refWas: r.ref_was,
   }
 }
 

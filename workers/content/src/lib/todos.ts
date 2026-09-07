@@ -29,7 +29,7 @@ import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared
 import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
 import type { Todo, TodoViewName } from "@shared/types"
 
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 
 type TodoRow = {
   id: string
@@ -146,8 +146,9 @@ function todoSearchClause(q: string | undefined): { sql: string | null; params: 
   if (!q) return { sql: null, params: [] }
   const needle = `%${likeLiteral(q.toLowerCase())}%`
   return {
-    sql: `(LOWER(t.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.detail, '')) LIKE ? ESCAPE '\\')`,
-    params: [needle, needle, needle],
+    sql: `(LOWER(t.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(t.detail, '')) LIKE ? ESCAPE '\\'
+       OR ${refAliasMatchSql(TEAM_REF_TABLES.input, "t.id")})`,
+    params: [needle, needle, needle, needle],
   }
 }
 

@@ -46,7 +46,7 @@ import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/
 import { optionalMoment, optionalText, requireMoment, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import type { Meeting, MeetingAttachment, MeetingGuest, MeetingPersonLink } from "@shared/types"
 
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 
 type MeetingRow = {
   id: string
@@ -376,11 +376,17 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     // list and never mentions `ref`, which the row has always carried back
     // (`MEETING_COLS`). A visible id that finds nothing is worse than a hidden
     // one. `COALESCE` because a meeting with no client mints no reference.
+    // AND THE REFERENCE IT USED TO HAVE, since migration 0068 — the same
+    // sentence one paragraph up, about the number a person reads off a list.
+    // 31 of the 45 meeting references on staging changed number in that
+    // backfill, so for those rows the alias is the only string a person who
+    // wrote one down last month still has.
     where.push(
-      "(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(m.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\' OR LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')"
+      `(LOWER(m.title) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(m.ref, '')) LIKE ? ESCAPE '\\' OR LOWER(m.agenda) LIKE ? ESCAPE '\\' OR LOWER(m.notes) LIKE ? ESCAPE '\\' OR LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\'
+        OR ${refAliasMatchSql(TEAM_REF_TABLES.meeting, "m.id")})`
     )
     const needle = `%${likeLiteral(filter.q.toLowerCase())}%`
-    params.push(needle, needle, needle, needle, needle)
+    params.push(needle, needle, needle, needle, needle, needle)
   }
   return { sql: where.length ? where.join(" AND ") : "1 = 1", params }
 }

@@ -281,15 +281,10 @@ export type ApiError = {
  * four edits and TypeScript caught none of them. Now it's one edit.
  *
  * A STATUS IS A FACT, NOT A BUTTON (the tester's sentence, 17 Aug 2026). Five of
- * these seven are now reached by something HAPPENING rather than by somebody
- * choosing them, and the two that a person does reach are doors of their own
- * with their own words, not a dropdown:
+ * these six are reached by something HAPPENING rather than by somebody choosing
+ * them, and the one a person does reach is a door of its own with its own words,
+ * not a dropdown:
  *
- *   awaiting_validation  the client's main stakeholder has not said yes yet, and
- *                        only for the kinds that wait (Aurora's ap2: extras,
- *                        requests and feedback wait; questions and issues go
- *                        straight in). Set by `createTicket`, cleared by
- *                        `/help/validate`;
  *   new                  raised, nobody here has read it;
  *   triaged              somebody on duty read it (`/help/triage-read`);
  *   scheduled            work exists AND some of it is in a sprint — flipped by
@@ -299,9 +294,31 @@ export type ApiError = {
  *   ready                every story closed — flipped by `readyFlipForTicket`;
  *   resolved             a PERSON sent the answer (`/help/resolve`), which is
  *                        refused until a resolution is written.
- */
+ *
+ * ── SIX, AND IT WAS SEVEN UNTIL 7 SEP 2026 ──────────────────────────────────
+ *
+ * `awaiting_validation` — "the client's main stakeholder has not said yes yet" —
+ * was the seventh, and the client retired it on 7 Sep 2026 in one sentence:
+ * "kill awaiting_validation". It is NOT gone from the world, only from this
+ * list: see `RETIRED_HELP_STATUSES` below, which is what a ticket that really
+ * passed through it is still read back through.
+ *
+ * The reasoning, because a retirement with no reason recorded gets re-litigated.
+ * It was the only stage with no home on the five-column Open board, and the
+ * WAITING it was reaching for is said far better as a PREDICATE than as a
+ * stored word: `waitingClause` (workers/content/src/lib/help.ts) asks whether
+ * the last reply on the thread came from somebody who is not a portal user —
+ * "we spoke last and nobody has answered" — which needs no column, no door to
+ * clear it, and cannot go stale the way a stored stage can. A status that only
+ * a second write can correct is a fact with an expiry date on it.
+ *
+ * What went with it: the ONE lifecycle door a client could push
+ * (`POST /api/content/help/validate`, `validate_help_ticket`) and the gate that
+ * opened tickets into it. An extra, a request or a piece of feedback now opens
+ * in `new` like everything else — we stop asking permission before we read the
+ * thing. `help.validated_at` and every `help_status_events` row survive
+ * untouched: what a ticket went through is not this list's to edit. */
 export const HELP_STATUSES = [
-  "awaiting_validation",
   "new",
   "triaged",
   "scheduled",
@@ -311,20 +328,62 @@ export const HELP_STATUSES = [
 ] as const
 export type HelpStatus = (typeof HELP_STATUSES)[number]
 
-/** THE KINDS THAT WAIT FOR THE CLIENT TO CONFIRM (Aurora's ap2, over the owner's
- * "everything waits"). Matched case-insensitively against the team's OWN editable
- * `Ticket type` vocabulary — the words are a team's to rename, and a rule that
- * hard-matched the seeded spelling would silently stop waiting the day somebody
- * typed "Requests". A question or an issue is somebody stuck; making them ask
- * their own colleague for permission first is the version of this rule that gets
- * the feature switched off. */
-const VALIDATED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+/** THE STAGES A TICKET MAY NO LONGER ENTER, AND STILL WENT THROUGH.
+ *
+ * A vocabulary that has been retired is not a vocabulary that has been undone.
+ * `help_status_events` (team migration 0066) holds rows naming stages that were
+ * real when they were written, team migration 0069 deliberately does not touch
+ * them, and a ticket that genuinely waited on a client still waited on one. So
+ * the WRITING vocabulary narrows and the READING one does not: `HELP_STATUSES`
+ * is what a ticket may be in NOW — every door, filter, facet, board column and
+ * validator stands on it — and `HelpStatusEver` is every word this column has
+ * ever legitimately held, which is what the stage-history types are cut from
+ * (`TicketStageEvent`, `TicketStageSpan`).
+ *
+ * WHY A SECOND LIST RATHER THAN LEAVING THE WORD IN THE FIRST ONE. Because
+ * every one of those doors would then still accept it: the status door would
+ * take it off a request body, the tab facets would offer it, the board would
+ * grow a column for it, and `set_help_status` would tell the agent it is a
+ * place a ticket can be sent. A retirement that only removes the BUTTON is the
+ * shape that leaves a stage reachable by anybody who types its name.
+ *
+ * AND WHY NOT SIMPLY DROP IT EVERYWHERE. Because `stageLabel`
+ * (web/components/ticket-stages.tsx) would then have no case for it, and a
+ * timeline row on a real ticket would draw either nothing or the raw enum. A
+ * person reading their own ticket's history is owed the same words we used at
+ * the time — "Waiting on you" — for ever. */
+export const RETIRED_HELP_STATUSES = ["awaiting_validation"] as const
+export type RetiredHelpStatus = (typeof RETIRED_HELP_STATUSES)[number]
 
-/** Does a ticket of this type wait for the account's main stakeholder? */
-export function ticketTypeWaitsForValidation(helpType: string | null | undefined): boolean {
+/** Every word `help.status` has ever legitimately held — live or retired. The
+ * HISTORY reads this; nothing that WRITES may. */
+export type HelpStatusEver = HelpStatus | RetiredHelpStatus
+
+/** THE KINDS THAT ARE SCOPED WORK — an extra, a request, a piece of feedback:
+ * somebody asking for MORE, as against a question or an issue, which is somebody
+ * stuck. Matched case-insensitively against the team's OWN editable `Ticket type`
+ * vocabulary — the words are a team's to rename, and a rule that hard-matched
+ * the seeded spelling would silently stop matching the day somebody typed
+ * "Requests".
+ *
+ * IT USED TO BE `ticketTypeWaitsForValidation`, AND THE RENAME IS THE POINT.
+ * Until 7 Sep 2026 this predicate decided which kinds opened in
+ * `awaiting_validation` and waited on the client to confirm. That stage is
+ * retired (see `HELP_STATUSES` above) and nothing waits any more — but the
+ * DIVISION it draws outlived the gate that used it, because it was never really
+ * about permission: these are the kinds that cost money, which is why the
+ * tickets dashboard ranks clients by exactly this set ("who has more scoped
+ * work", web/components/tickets-dashboard.tsx). Keeping the old name over the
+ * surviving half would have left an identifier promising a wait that no longer
+ * happens. */
+const SCOPED_TICKET_TYPES = ["extra", "request", "feedback"] as const
+
+/** Is a ticket of this kind scoped work — an ask for more, rather than somebody
+ * stuck? */
+export function isScopedTicketType(helpType: string | null | undefined): boolean {
   if (!helpType) return false
   const word = helpType.trim().toLowerCase().replace(/s$/, "")
-  return (VALIDATED_TICKET_TYPES as readonly string[]).includes(word)
+  return (SCOPED_TICKET_TYPES as readonly string[]).includes(word)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -382,7 +441,7 @@ const KEPT_FOR_MIGRATION_SPELLINGS: readonly string[] = [
 
 /** Is this the kind that is kept but never shown?
  *
- * THE SAME IDIOM AS `ticketTypeWaitsForValidation` ABOVE, on purpose and not by
+ * THE SAME IDIOM AS `isScopedTicketType` ABOVE, on purpose and not by
  * coincidence: trim, lowercase, drop one trailing "s". `help_type` holds a
  * team's OWN editable word, so a rule that hard-matched the seeded spelling
  * would start showing these rows again the day somebody retyped the value as
@@ -430,8 +489,8 @@ export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
  *
  * IT IS NOT `OPEN_HELP_STATUSES` ABOVE, AND THE TWO MUST NOT BE MERGED. That
  * one answers "is this ticket still ours to do something about" — everything
- * that is not `resolved`, `new` and `awaiting_validation` included — and it is
- * read by the dashboard and by every "how much is open" figure in the product.
+ * that is not `resolved`, `new` included — and it is read by the dashboard and
+ * by every "how much is open" figure in the product.
  * THIS one is a TAB: the pile of work that has been sorted and is not finished.
  *
  * ── `ready` JOINED IT, 2026-09-07, AND THE PARAGRAPH IT REPLACED IS WHY ─────
@@ -465,12 +524,14 @@ export const OPEN_HELP_STATUSES = HELP_STATUSES.filter((s) => s !== "resolved")
  * nobody has read those tickets, so they are not "sorted and under way" by any
  * reading, and the client's own sentence names `ready` and `waiting` and stops.
  *
- * `awaiting_validation` IS ALSO OUT, and that is a decision rather than an
- * omission: it means "the client has not approved a request yet", which is a
- * different sentence from the Waiting tab's ("we said something, they have not
- * answered"). Retiring that status is a separate ruling somebody else is
- * holding; nothing here touches it, and until it is settled a ticket in it
- * appears under All and nowhere else.
+ * `awaiting_validation` USED TO BE OUT OF THIS TAB TOO, and the paragraph that
+ * said so is worth one sentence of epitaph rather than a silent deletion: it
+ * meant "the client has not approved a request yet", which is a DIFFERENT
+ * sentence from the Waiting column's ("we said something, they have not
+ * answered"), and that difference was the whole reason it sat outside. The
+ * client settled it on 7 Sep 2026 by retiring the stage entirely, so the two
+ * sentences are now one — the surviving one is the predicate, derived from the
+ * conversation on every read and never stored.
  *
  * DERIVED-CHECKED RATHER THAN RETYPED: every entry is asserted to be a real
  * `HelpStatus`, so a stage renamed in `HELP_STATUSES` cannot leave a dead word
@@ -640,10 +701,16 @@ export type HelpTicket = {
    * record has to be able to say both. */
   raisedByContactId: string | null
   raisedByContactName: string | null
-  /** WHEN THE CLIENT'S MAIN STAKEHOLDER CONFIRMED THEY WANT IT. Only the kinds
-   * that wait ever carry one (see `ticketTypeWaitsForValidation`); null on a
-   * ticket that never had to wait, which is why the STATUS and not this column
-   * is what a screen reads. */
+  /** WHEN THE CLIENT'S MAIN STAKEHOLDER CONFIRMED THEY WANTED IT, back when we
+   * asked. Nothing sets it any more: the confirmation gate was retired with
+   * `awaiting_validation` on 7 Sep 2026 (see `HELP_STATUSES`), and an extra now
+   * goes straight into the queue like everything else.
+   *
+   * IT IS KEPT, NOT DROPPED, and read-only from here on. The rows that carry
+   * one recorded a real act by a real person on a real date; a column emptied
+   * because the feature behind it ended is a fact deleted, not a feature
+   * removed. No screen reads it today and none has to — it is the answer to
+   * "did they ever say yes", for as long as anybody asks. */
   validatedAt: string | null
 }
 
@@ -654,11 +721,20 @@ export type HelpTicket = {
  * `createTicket` stamps there genuinely was nothing (the ticket did not exist),
  * and 0066 names the one race that shares the value. It is stored rather than
  * inferred from the previous event because the FIRST event has no previous
- * event, and whether the sequence is whole is exactly what it answers. */
+ * event, and whether the sequence is whole is exactly what it answers.
+ *
+ * `HelpStatusEver` AND NOT `HelpStatus`, WHICH IS THE WHOLE OF HOW A RETIRED
+ * STAGE STAYS READABLE. These two fields are the one place in the codebase that
+ * reports what a ticket WAS rather than what it IS, and the two questions stop
+ * having the same answer the moment a stage is retired. Narrowing them to the
+ * live vocabulary would not delete the stored rows — nothing deletes from
+ * `help_status_events` — it would only make the type LIE about them, and the
+ * exhaustive `switch` in `stageLabel` would then fall through to `undefined` on
+ * a real ticket's real history. Widen the reader, never the writer. */
 export type TicketStageEvent = {
   id: string
-  fromStatus: HelpStatus | null
-  toStatus: HelpStatus
+  fromStatus: HelpStatusEver | null
+  toStatus: HelpStatusEver
   at: string
   /** Who moved it. Null on a row whose actor was not recorded. */
   byName: string | null
@@ -671,9 +747,13 @@ export type TicketStageEvent = {
  * `to` is null on the stage the ticket is in NOW, and `workingDays` is then
  * measured to the moment the door answered — which is why it is computed on the
  * server beside the rows rather than in a browser that may have the tab open all
- * week. */
+ * week.
+ *
+ * `HelpStatusEver` for the reason `TicketStageEvent` above gives at length: a
+ * span is cut from a stored event, so it inherits that event's vocabulary and
+ * not the live one. */
 export type TicketStageSpan = {
-  status: HelpStatus
+  status: HelpStatusEver
   from: string
   to: string | null
   workingDays: number
@@ -1851,6 +1931,13 @@ export type Story = {
 export type Sprint = {
   id: string
   ref: string | null
+  /** EVERY REFERENCE THIS SPRINT HAS EVER WORN, space separated, or null for the
+   * ordinary case of one that has never been renumbered. Not for display — it is
+   * what the browser's own search matcher looks in, because the sprints door
+   * takes no `q` and cannot answer an old number on the server the way the ticket
+   * and story doors do. See `refAliasesColumnSql` (shared/workers/refs.ts) and
+   * migration 0068, which reissued three sprint numbers in four. */
+  refWas: string | null
   name: string
   goal: string | null
   sprintType: string | null

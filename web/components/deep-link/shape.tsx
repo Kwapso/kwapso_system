@@ -165,12 +165,14 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
  * One source for the list detail line; the thread's own status badge uses the
  * library's hyphen labels.
  *
- * SEVEN NOW, and every one of them is a FACT rather than a choice: two arrived on
- * 17 Aug 2026 for the two things a person could previously only assert by hand.
- * "Waiting on you" is deliberately not "Awaiting validation" — the client reads
- * the same word we do, and the plain sentence is the one that gets answered. */
+ * SIX NOW, and every one of them is a FACT rather than a choice. It was seven
+ * until the client retired `awaiting_validation` on 7 Sep 2026 (shared/types.ts,
+ * `HELP_STATUSES`); its label, "Waiting on you", is deliberately not gone from
+ * the app — a ticket that really passed through that stage still draws those
+ * words on its stage history (`stageLabel`, web/components/ticket-stages.tsx).
+ * It is gone from HERE because this map is keyed by the LIVE vocabulary and a
+ * list row can only show a stage a ticket is currently in. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
-  awaiting_validation: "Waiting on you",
   new: "New",
   triaged: "Triaged",
   scheduled: "Scheduled",

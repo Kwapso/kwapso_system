@@ -197,19 +197,14 @@ export const support = {
       post({ id, attachmentId })
     ),
 
-  /** YES, GO AHEAD (CHECKLIST 5.13) — the ONE lifecycle move a client ever makes,
-   * and the deliberate exception to "the portal never moves a ticket along".
-   *
-   * The door is narrow by construction rather than by this function being careful:
-   * the account fence rides its UPDATE, and R17's predicate means the only
-   * transition it can make is awaiting_validation → new. Sent at a ticket in any
-   * other state it moves zero rows. It answers with the ticket PAGE, the same
-   * shape `raise` and `edit` do. */
-  validate: (id: string) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      "/api/content/help/validate",
-      post({ id })
-    ),
+  /* `validate` — "YES, GO AHEAD" (CHECKLIST 5.13) — WAS HERE, and it was the ONE
+   * lifecycle move a client ever made: the deliberate exception to "the portal
+   * never moves a ticket along". The client retired the `awaiting_validation`
+   * stage on 7 Sep 2026 (shared/types.ts, `HELP_STATUSES`) and the door went
+   * with it, so the exception is gone and the sentence is now unqualified —
+   * NOTHING on this surface moves a ticket along its lifecycle. The client's own
+   * acts on a ticket are raising it, correcting it while it is still theirs,
+   * attaching to it, replying, re-ranking, and rating it once it is answered. */
 
   /** HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
    * portal for how did we do it to see if client is happy", then "sentiment they

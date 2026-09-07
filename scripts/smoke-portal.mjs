@@ -426,9 +426,10 @@ const THEIRS = await account(FIX.theirs, { accountType: "entity" })
 const CONTACT = await account(FIX.contact, { accountType: "individual", email: CLIENT_EMAIL })
 ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
 
-// The contact is the MAIN STAKEHOLDER of their company — which is what makes the
-// validate door (below) a real move rather than a call that answers politely and
-// changes nothing.
+// The contact is the MAIN STAKEHOLDER of their company. That used to be what made
+// the validate door a real move rather than a polite no-op; that door is gone
+// (the client retired `awaiting_validation` on 7 Sep 2026), and the link is still
+// made here because the portal's own reads are fenced on it.
 {
   const detail = await agency(`/api/tenancy/accounts/detail?id=${MINE}`, {}, staffCookie)
   const linked = (detail.body?.links ?? []).some((l) => l.personAccountId === CONTACT && l.active)
@@ -726,8 +727,11 @@ section("their own world")
   ok("their to-dos answer", todos.ok && typeof todos.body?.total === "number", `status ${todos.status}`)
 }
 
-// A request of their own: raised as a kind that WAITS for the company to
-// confirm, so `validate` below is a real move rather than a polite no-op.
+// A request of their own. It used to be raised as a kind that WAITED for the
+// company to confirm it; nothing waits any more (the `awaiting_validation`
+// retirement, 7 Sep 2026), and the kind is kept because the rest of this section
+// asserts what a client may do to their OWN request — correct it, re-rank it,
+// attach to it, rate it — which is unchanged.
 let MY_TICKET
 {
   const before = await allTickets(client, portal)
@@ -787,10 +791,12 @@ let MY_TICKET
   const ranked = await portalPost("/api/content/help/rank", { id: MY_TICKET.id }, client)
   ok("they can drag their company's requests into order", ranked.ok || ranked.status === 403, `status ${ranked.status}`)
 
-  // The one lifecycle door a client may push, and R17 makes it idempotent: on
-  // the second run the ticket is already `new` and the call moves nothing.
-  const validated = await portalPost("/api/content/help/validate", { id: MY_TICKET.id }, client)
-  ok("they can confirm a request should go ahead", validated.ok, `status ${validated.status}`)
+  // "they can confirm a request should go ahead" was asserted here, against
+  // `POST /api/content/help/validate` — the one lifecycle door a client could
+  // push. The door is gone with the stage it moved tickets out of (7 Sep 2026),
+  // so there is nothing to knock on; the portal now opens no door at all that
+  // moves a ticket along its lifecycle, which the gateway's own allow-list is
+  // what proves.
 
   // HOW DID WE DO — the rating doors (migration 0067). The door refuses a
   // rating on a ticket that is not RESOLVED, and this smoke ticket is
@@ -929,7 +935,6 @@ section("the account fence")
     ["reply to", "/api/content/help/reply", { helpId: THEIR_TICKET.id, body: "PORTAL SMOKE · this must never land" }],
     ["reword", "/api/content/help/update", { id: THEIR_TICKET.id, description: "PORTAL SMOKE · this must never land" }],
     ["re-rank", "/api/content/help/rank", { id: THEIR_TICKET.id }],
-    ["confirm", "/api/content/help/validate", { id: THEIR_TICKET.id }],
     ["attach a file to", "/api/content/help/attachments", { id: THEIR_TICKET.id, kind: "link", label: "PORTAL SMOKE · never", url: "https://example.com/never" }],
     ["remove a file from", "/api/content/help/attachments/remove", { id: THEIR_TICKET.id, attachmentId: "whatever" }],
   ]) {

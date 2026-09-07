@@ -858,6 +858,25 @@ again, which is the only property that matters here.
   not a rendering and the law will not ask you about it; a match position
   (`.toLowerCase()`, `.localeCompare(`) is not one either, which is the whole
   point of trimming late.
+- **R55 `refs-match-the-formula`** — if your module's record carries a
+  REFERENCE (the short code a client quotes: `T0412`, `B0188`, `S0012`), it is
+  minted through `nextTeamRef` in `shared/workers/refs.ts` and nowhere else,
+  and your table is named in `TEAM_REF_TABLES` beside its kind — `tsc` will
+  refuse the file until it is, and the law's census reads the team schema for
+  every `ref` column and fails on any table the map does not claim. Three
+  things follow and none of them is optional. **Never build the string
+  yourself**: `canonicalRef` is the formula and `canonicalRefSql` is its twin
+  inside SQLite, so a migration and a door can both ask what a reference should
+  look like — that they could not is exactly how the whole estate spent six
+  days holding a shape the code said was gone. **Never `UPDATE … SET ref`**: a
+  reference is minted once, and the one act allowed to rewrite one is a team
+  migration that keeps the old string in `ref_aliases` and raises the kind's
+  counter with `MAX()` so it can only go up. And **if your door SEARCHES the
+  reference, OR in `refAliasMatchSql(table, alias)`** and push one more needle,
+  or a number a client was quoted last year stops finding the record — which
+  the client ruled on directly ("alias yes", 7 Sep 2026). A table with a `ref`
+  column and no kind is a reasoned `REF_TABLES_WITHOUT_A_KIND` line, not a
+  silence.
 
 **The machine surfaces**
 

@@ -8,11 +8,13 @@
 //
 // ── WHY THE WRITER IS A SEAM AND NOT SIX INSERTS ────────────────────────────
 //
-// There are EIGHT places in this codebase that move a ticket's `status`:
+// There are SEVEN places in this codebase that move a ticket's `status`:
 // `createTicket` (the initial state), `setStatus` (which the single-status door,
-// the resolve door and `bulkSetStatus` all go through), `validateTicket`,
-// `markTriaged`, `bulkSetStatusByFilter`, and the three flips in
-// `lib/ready-flip.ts` (`readyFlipForTicket`, `scheduledFlip`, `progressFlip`).
+// the resolve door and `bulkSetStatus` all go through), `markTriaged`,
+// `bulkSetStatusByFilter`, and the three flips in `lib/ready-flip.ts`
+// (`readyFlipForTicket`, `scheduledFlip`, `progressFlip`). It was EIGHT until
+// 7 Sep 2026: `validateTicket` — the client's own "yes, go ahead" — went with
+// the `awaiting_validation` stage it moved tickets out of.
 // A history missing any ONE of them is worse than no history at all: the gap is
 // invisible, the durations either side of it silently merge into one long stage,
 // and every number computed from it looks exactly as finished as a true one. So
@@ -60,7 +62,7 @@ import { type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { TICKET_STAGE_EVENT_CAP } from "@shared/workers/limits"
 import { workingDaysBetween } from "@shared/business-days"
-import type { HelpStatus, TicketStageEvent, TicketStageHistory, TicketStageSpan } from "@shared/types"
+import type { HelpStatusEver, TicketStageEvent, TicketStageHistory, TicketStageSpan } from "@shared/types"
 
 /** ONE MOVE, AS A STATEMENT — the single place the row's shape is written down.
  *
@@ -182,10 +184,21 @@ export async function readTicketStages(
     [ticketId]
   )
 
+  // THE CAST IS TO `HelpStatusEver`, NOT `HelpStatus`, AND THAT IS THE WHOLE OF
+  // HOW A RETIRED STAGE STAYS READABLE. These columns are free TEXT holding
+  // whatever the vocabulary was ON THE DAY THE MOVE HAPPENED, and this table is
+  // append-only — nothing here is ever rewritten, which is what makes the
+  // durations trustworthy and also what guarantees a stored word can outlive
+  // the list of words a ticket may currently be in. `awaiting_validation` is
+  // the first to do it (retired 7 Sep 2026); `RETIRED_HELP_STATUSES` is where
+  // the next one goes. Casting to the LIVE vocabulary here would not delete a
+  // single row, it would only tell every reader downstream that a value it will
+  // really be handed cannot occur — and `stageLabel`'s exhaustive switch would
+  // then quietly return `undefined` on a real ticket's real history.
   const events: TicketStageEvent[] = rows.map((r) => ({
     id: r.id,
-    fromStatus: (r.from_status as HelpStatus | null) ?? null,
-    toStatus: r.to_status as HelpStatus,
+    fromStatus: (r.from_status as HelpStatusEver | null) ?? null,
+    toStatus: r.to_status as HelpStatusEver,
     at: r.created_at,
     byName: r.creator_name,
   }))

@@ -53,11 +53,14 @@ import { richTextPlain } from "@shared/web/rich-text"
 
 /** Plain words for each state, and a colour that means the same thing every time.
  *
- * ALL SEVEN, and the record type is what makes that a promise rather than an
- * intention: `Record<HelpTicket["status"], …>` means an eighth state added to
+ * ALL SIX, and the record type is what makes that a promise rather than an
+ * intention: `Record<HelpTicket["status"], …>` means a seventh state added to
  * HELP_STATUSES fails the type check here instead of rendering `undefined` in a
  * badge. It already caught two — `awaiting_validation` and `scheduled` arrived
- * with CHECKLIST 5.13 and 5.3 and this map still held the old five.
+ * with CHECKLIST 5.13 and 5.3 and this map still held the old five. It caught a
+ * third going the other way, which is the same guarantee read backwards: when
+ * the client retired `awaiting_validation` on 7 Sep 2026 this map still held
+ * "Waiting for your go-ahead", and the type check said so.
  *
  * C7: a status is a BADGE. It is a fact about the request, never a control — the
  * one thing a client can DO about a state lives on the ticket screen as its own
@@ -78,10 +81,13 @@ export const STATUS_WORDS: Record<
   // them it is us about to come back with an answer. SCOPE ch.06: the portal
   // shows work status, and it says it the way the person reading it would.
   //
-  // Amber on the first one alone, and that is the whole of what the colour means
-  // here: this is the one state where nothing moves until the person reading the
-  // screen does something.
-  awaiting_validation: { label: "Waiting for your go-ahead", variant: "warning" },
+  // NO AMBER LEFT, AND THAT IS THE RETIREMENT SHOWING THROUGH. "Waiting for your
+  // go-ahead" led this map and was the one entry drawn in the attention colour,
+  // because it was the one state where nothing moved until the person reading
+  // the screen did something. The stage is retired (shared/types.ts,
+  // `HELP_STATUSES`) and no surviving state asks anything of the reader — every
+  // one of the six below is a report on where their request stands. A client's
+  // ticket now starts at "With us" the moment they raise it.
   new: { label: "With us", variant: "secondary" },
   triaged: { label: "Looked at", variant: "secondary" },
   scheduled: { label: "Booked in", variant: "secondary" },

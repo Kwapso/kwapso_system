@@ -185,8 +185,15 @@ export type StatusFlip = { moved: boolean; accountId: string | null }
  * has, and one already scheduled (which moves zero rows). Never `in_progress`,
  * `ready` or `resolved` — work that has started is a stronger fact than work that
  * is merely booked in, and re-announcing the weaker one would walk the ticket
- * backwards in front of the client watching it. */
-const SCHEDULABLE = ["awaiting_validation", "new", "triaged"] as const
+ * backwards in front of the client watching it.
+ *
+ * IT LED WITH `awaiting_validation` UNTIL 7 SEP 2026, when the client retired
+ * that stage (shared/types.ts, `HELP_STATUSES`). Booking work for a ticket the
+ * client had not yet confirmed was a real case then — somebody sold it on the
+ * phone and scheduled it before the portal button was pressed — and there is no
+ * such case now: every ticket opens in `new`. Nothing else about this list
+ * moves. */
+const SCHEDULABLE = ["new", "triaged"] as const
 
 /** The states IN PROGRESS may claim: everything that is not already in progress,
  * finished or answered. `ready` is excluded for the same reason — every story

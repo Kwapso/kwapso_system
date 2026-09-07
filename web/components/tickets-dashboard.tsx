@@ -115,36 +115,35 @@ import type { Account, HelpStatus } from "@shared/types"
 import {
   CLOSURE_WINDOW_MONTHS,
   OPEN_HELP_STATUSES,
-  ticketTypeWaitsForValidation,
+  isScopedTicketType,
 } from "@shared/types"
 
-/** THE ORDER THE PIPELINE IS READ DOWN, which is not quite the order the
- * lifecycle is DEFINED in — and the difference is one stage, moved on purpose.
+/** THE ORDER THE PIPELINE IS READ DOWN, which is now exactly the order the
+ * lifecycle is DEFINED in — and it took a retirement to make that true.
  *
- * CLIENT, 6 Sep 2026: "in the open work add waiting before ready".
+ * THIS USED TO REORDER ONE STAGE, and the reason is worth keeping because it
+ * explains why the reorder is gone rather than broken. Client, 6 Sep 2026: "in
+ * the open work add waiting before ready". `awaiting_validation` ("Waiting on
+ * you") led `OPEN_HELP_STATUSES`, because that array is `HELP_STATUSES` minus
+ * the closed one and `HELP_STATUSES` is written in the order the STATE MACHINE
+ * names its states. Read top to bottom as a journey, that put the stage where a
+ * ticket sits waiting for the client ABOVE "New" — before anybody had looked at
+ * it — so this file lifted it out and put it back immediately above "Ready",
+ * where a reader expects the step just before a thing can be sent.
  *
- * `awaiting_validation` ("Waiting on you") leads `OPEN_HELP_STATUSES`, because
- * that array is `HELP_STATUSES` minus the closed one and `HELP_STATUSES` is
- * written in the order the STATE MACHINE names its states. Read as a pipeline
- * top to bottom, that put the stage where a ticket sits waiting for the client
- * ABOVE "New" — before the ticket has been looked at — and left "Ready" at the
- * bottom on its own. Down a stage axis a person reads as a journey, waiting on
- * the client is the step just before a thing can be sent, so it belongs
- * immediately above Ready.
+ * The client retired that stage on 7 Sep 2026 (shared/types.ts,
+ * `HELP_STATUSES`), so there is nothing left to lift: the five remaining open
+ * stages already read as a journey in their own lifecycle order. The shared
+ * array is taken unchanged, which is what the old note said it wanted anyway —
+ * "a stage added to the shared list tomorrow appears here in its own lifecycle
+ * place without anybody editing this file".
  *
- * IT IS A REORDER OF THE VIEW AND NEVER A RENAME OR A NEW STATE. Nothing about
- * the lifecycle moves: `OPEN_HELP_STATUSES` is still the source of WHICH stages
- * exist, this only lifts one out and puts it back in front of `ready`, so a
- * seventh stage added to the shared list tomorrow appears here in its own
- * lifecycle place without anybody editing this file. If `ready` ever leaves the
- * lifecycle the shared order is used unchanged, rather than the waiting stage
- * being silently dropped or shunted to the end. */
-const PIPELINE_STAGES: HelpStatus[] = (() => {
-  const rest = OPEN_HELP_STATUSES.filter((s) => s !== "awaiting_validation")
-  const beforeReady = rest.indexOf("ready")
-  if (beforeReady === -1) return [...OPEN_HELP_STATUSES]
-  return [...rest.slice(0, beforeReady), "awaiting_validation", ...rest.slice(beforeReady)]
-})()
+ * WAITING ITSELF DID NOT LEAVE THE PRODUCT, and it is deliberately not a row
+ * here: it is a PREDICATE over the ticket's conversation (`waitingClause`,
+ * workers/content/src/lib/help.ts), so it has no `byStatus` bucket for this
+ * panel to count. The Open board's fifth column is where it is drawn, off a
+ * read of its own. */
+const PIPELINE_STAGES: HelpStatus[] = [...OPEN_HELP_STATUSES]
 
 /* ══════════════════════════════════════════════════════════════════════════
    The small marks every panel is built from.
@@ -736,10 +735,16 @@ function AppsStackedByType({
  * WHICH KINDS ARE RANKED IS NOT HARD-CODED, and it cannot be: the ticket
  * vocabulary is the team's to rename on the Choices screen. The kinds drawn here
  * are the ones the product already calls scoped work — the ones that WAIT FOR
- * THE CLIENT to confirm (`ticketTypeWaitsForValidation`, shared/types.ts), which
- * matches case-insensitively against whatever the team has typed. That is the
- * same predicate the ticket lifecycle itself uses, so this panel and the
- * lifecycle can never disagree about which kinds are the ones that cost money. */
+ * SCOPED WORK — an ask for more rather than somebody stuck (`isScopedTicketType`,
+ * shared/types.ts), which matches case-insensitively against whatever the team
+ * has typed.
+ *
+ * THAT PREDICATE USED TO BE THE LIFECYCLE'S TOO, under the name
+ * `ticketTypeWaitsForValidation`: the same three kinds waited for the client to
+ * confirm them before triage. The client retired that gate on 7 Sep 2026 with
+ * the `awaiting_validation` stage, and the DIVISION outlived it — these are the
+ * kinds that cost money, which is what this panel ranks clients by and always
+ * was. The rename is the whole of what changed here. */
 function WhoHasMore({
   rows,
   types,
@@ -754,7 +759,7 @@ function WhoHasMore({
   teamId: string
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
-  const scoped = types.filter(ticketTypeWaitsForValidation)
+  const scoped = types.filter(isScopedTicketType)
   const lists = scoped
     .map((type) => ({
       type,

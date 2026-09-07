@@ -72,9 +72,13 @@ const DESCRIPTION_VOCABULARY: Record<string, string> = {
     "the count of tickets NOT resolved, on each entry of `list_help_tickets`' `byAccount` tally — computed in the GROUP BY itself (`SUM(CASE WHEN h.status = 'resolved' THEN 0 ELSE 1 END)`) in workers/content/src/lib/help.ts and mapped as `open:`. Underivable for the same reason `runaway` is, plus one: it is NESTED a level inside a response field, and the response-key derivation reads the keys a door hands over rather than the shape of the objects inside them. Delete this line when that census learns to walk one level down, or when `byAccount` goes.",
   runaway:
     "the flag on a running timer that has been going longer than RUNAWAY_HOURS — computed at read time in workers/content/src/lib/work-logs.ts (`runaway: elapsed > …`), so it is a real row field the row-mapper derivation cannot see: no column is copied, the value is arithmetic over one.",
-  awaiting_validation:
-    "the stage a ticket OPENS in when its kind is one that waits for the client (CHECKLIST 5.13). It is a VALUE of the `status` column, not a field: `createTicket` computes it and no door reads it off a body, so neither the schema census nor the response-key derivation can see it. The list it belongs to is HELP_STATUSES in shared/types.ts.",
-  new: "the other stage `createTicket` may open a ticket in — the same HELP_STATUSES value, and named beside its sibling for the same reason: a description that said one and not the other would describe half a decision.",
+  // `awaiting_validation` had a line here — "the stage a ticket OPENS in when
+  // its kind is one that waits for the client (CHECKLIST 5.13)". The client
+  // retired that stage on 7 Sep 2026 and no description names it any more, so
+  // the rotting-entry rule below took the line out: an entry nothing uses is a
+  // standing licence for a word that means nothing. `new` outlived it and is
+  // now the ONLY stage a ticket opens in, which is what its line says.
+  new: "the one stage `createTicket` opens a ticket in — a HELP_STATUSES value in shared/types.ts, not a field: `createTicket` computes it and no door reads it off a body, so neither the schema census nor the response-key derivation can see it. It had a sibling here (`awaiting_validation`, for the kinds that waited on the client) until that stage was retired on 7 Sep 2026, and the birth status stopped being a decision at all.",
   // `yours` was here, apologising for a blind spot instead of removing it: the
   // shorthand pattern in `literalKeys` used to EAT the comma it matched, so only
   // every other shorthand property was seen. The lookbehind fixed that and this

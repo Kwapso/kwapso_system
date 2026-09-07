@@ -27,6 +27,15 @@
 // (POST /api/tenancy/admin/migrate-teams) rolls it out to every team.
 
 import { sqlString } from "@shared/workers/d1-rest"
+import {
+  canonicalRefSql,
+  REF_ALIAS_TABLE,
+  refNumberSql,
+  staleRefSql,
+  TEAM_REF_KINDS,
+  TEAM_REF_TABLES,
+  type TeamRefKind,
+} from "@shared/workers/refs"
 import { TASK_DEPARTMENTS } from "@shared/departments"
 import { APP_STAGES } from "@shared/app-stages"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
@@ -4289,4 +4298,419 @@ CREATE TABLE help_ratings (
 CREATE INDEX idx_help_ratings_ticket ON help_ratings (help_id, created_at DESC, id DESC);
 `,
   },
+  {
+    // THE REFERENCE THE CLIENT ALREADY QUOTED KEEPS WORKING — the 2026-09-07
+    // ruling, in one word: "alias yes".
+    //
+    // ── WHAT WAS ACTUALLY WRONG ───────────────────────────────────────────
+    //
+    // 0059 and 0060 moved the MINT to the team-wide shape and rewrote NOT ONE
+    // STORED ROW. `shared/workers/refs.ts` said the old account-coded shape
+    // "is GONE" and it was gone only from the code: measured against staging
+    // on 7 Sep 2026, the Kwapso team held 1,896 ticket references, 275 story,
+    // 100 sprint, 45 meeting and 1 input, and every single one of them was
+    // still \`<account name>-<letters><digits>\` — "VU Solutions-T1183",
+    // "196+ awards-SPR0001", "TEST-D0001". The client was reading those off
+    // her own screens for six days while the file describing them claimed
+    // they did not exist. That gap is why R55 exists; this migration is the
+    // half that fixes the data.
+    //
+    // ── WHY AN ALIAS AND NOT JUST A REWRITE ───────────────────────────────
+    //
+    // A reference's whole job is to be QUOTED — in an email, on a call, in a
+    // client's own spreadsheet. Rewriting the column alone would break every
+    // one of those retrospectively: a client types the number we gave her and
+    // the search says there is no such ticket. So the string a record used to
+    // wear is kept and stays findable. That is the client's own answer to the
+    // choice she was shown, and it is also what makes the renumbering below
+    // defensible at all — see "WHOSE NUMBER SURVIVES".
+    //
+    // ── WHY A TABLE AND NOT A COLUMN ──────────────────────────────────────
+    //
+    // A \`ref_was TEXT\` on each row was the smaller change and it is wrong on
+    // three counts, in rising order of seriousness. It holds exactly ONE
+    // previous name, and a record can be renumbered more than once over its
+    // life (this migration renumbers 202 tickets that were ALREADY renumbered
+    // once, by the Glide import). It would be eight columns across eight
+    // tables, so "where do we look up an old reference" would have eight
+    // answers. And it records a fact about the ROW when the fact is about a
+    // MOMENT: which name, retired when, replaced by what, by which act. A
+    // column can hold the string; it cannot hold the sentence.
+    //
+    // NO \`id\` COLUMN, which is the one place this table breaks the house
+    // shape. Every other table here has a ULID primary key, and a ULID is
+    // generated in TypeScript — there is no \`ulid()\` inside SQLite, and this
+    // table is populated entirely by \`INSERT … SELECT\` from rows that already
+    // exist. Its natural key is real and it is unique: one alias per table.
+    //
+    // ── WHOSE NUMBER SURVIVES, WHICH IS THE HARD PART ─────────────────────
+    //
+    // The old scheme counted PER ACCOUNT, so every client's tickets started at
+    // 1. Strip the account off and keep the digits — the obvious reading of
+    // "preserve the numbers" — and two clients' "T0001" become the same string,
+    // which is precisely the cross-account collision refs.ts says the whole
+    // team-wide shape exists to make impossible. It is not merely unwise: the
+    // partial unique indexes (\`idx_help_ref\` and its six siblings) are live,
+    // so most of those writes would simply fail.
+    //
+    // Measured on staging, this is not a corner case. Tickets reformat to 1,694
+    // distinct numbers out of 1,896 rows. STORIES reformat to 34 distinct
+    // numbers out of 275 — every story in the team collides with a sibling, so
+    // "preserve the numbers" is not merely risky there, it is arithmetically
+    // impossible.
+    //
+    // So the rule is per ROW and not per kind, and it is the same rule
+    // everywhere: KEEP THE NUMBER WHERE THE NUMBER IS FREE, REISSUE WHERE IT
+    // IS NOT. On staging that preserves 1,694 of 1,896 ticket numbers (89%),
+    // 25 of 100 sprints, 14 of 45 meetings, 1 of 1 input, and 34 of 275
+    // stories. One rule, and it produces "almost everything kept" for tickets
+    // and "almost everything reissued" for stories because those are the two
+    // true answers about that data, not because two rules were written.
+    //
+    // THE SEAT GOES TO THE OLDEST ROW, tie-broken on \`id\`. Not the biggest
+    // account, not the busiest — \`created_at\` is objective, it needs no
+    // judgement about which client matters more, it is stable across re-runs
+    // (which is what makes this idempotent), and the oldest row is the one
+    // whose number has had the longest time to end up in somebody's inbox.
+    //
+    // AND THE LOSERS ARE NOT HARMED THE WAY THEY LOOK, which is the whole
+    // reason the alias had to come first: a reissued row's old string still
+    // finds it. Renumbering without the alias would have been a data change
+    // nobody could undo; renumbering WITH it is a change to what we print
+    // next time.
+    //
+    // Reissued numbers go ABOVE the high-water mark, in creation order, so the
+    // sequence a client sees stays chronological and no reissue can land on a
+    // number some other row already holds.
+    //
+    // ── THE COUNTER, WHICH IS THE QUIET WAY THIS COULD HAVE GONE WRONG ────
+    //
+    // \`team_ref_counters\` mints the next number. Renumber a ticket to T3447 and
+    // leave the counter at 168 — which is exactly what staging reads, 168 with
+    // not one row to show for it — and the next 3,279 tickets each try to mint
+    // a number a row already has, against a live unique index. So every
+    // counter is raised to the high-water mark this migration leaves behind.
+    //
+    // WITH \`MAX()\`, so it can only ever go UP. The Kwapso team's T counter is
+    // ahead of every row it has: 167 numbers were minted and the rows are gone
+    // (deleted, or replaced by a Glide re-import). Lowering it to match the
+    // rows would re-mint numbers that have already been handed out. A counter
+    // that is too high costs a gap in the sequence; a counter that is too low
+    // costs a collision, and only one of those is a fault.
+    //
+    // \`nextTeamRef\` IS NOT TOUCHED. It is still the single
+    // \`INSERT … ON CONFLICT DO UPDATE … RETURNING\` CONCURRENCY.md rule 1 asks
+    // for; this only moves where it starts counting from.
+    //
+    // ── IDEMPOTENT, AND SAFE ON A TEAM THAT IS ALREADY DONE ───────────────
+    //
+    // A migration that rewrites identifiers is very close to irreversible, so
+    // it is built to be run twice with no second effect:
+    //
+    //   · the plan selects only STALE rows — a reference that does not equal
+    //     what the formula would make of the number it carries. After one run
+    //     nothing is stale, so a second run plans nothing.
+    //   · the alias insert is \`INSERT OR IGNORE\` against the unique key.
+    //   · the UPDATE reads its answer out of \`ref_aliases\` rather than out of
+    //     a CTE over the table it is writing to. That is not tidiness: a
+    //     correlated subquery over the SAME table would have rows changing
+    //     under the window function that is seating them, and the seat numbers
+    //     would depend on the order SQLite happened to visit rows in. And it
+    //     still carries the staleness predicate, so a completed row is skipped
+    //     rather than rewritten to the value it already has.
+    //   · the counter is a \`MAX\`, so applying it again cannot move it.
+    //
+    // A FRESH DATABASE replays this whole ledger, and there every one of these
+    // statements matches zero rows. The table and its indexes are the only
+    // thing a newborn team takes from here.
+    //
+    // ── WHAT IT DELIBERATELY LEAVES ALONE ─────────────────────────────────
+    //
+    // \`tasks\` has a \`ref\` column, a unique index and 109 old \`<account>-K####\`
+    // strings, and it is NOT in this migration. A task mints no reference at
+    // all — \`createTask\` writes a literal NULL and the 2026-08-31 ruling is
+    // explicit that a task is the agency's own admin, in the same category as
+    // a process or a dropdown value. There is no kind to carry those strings
+    // to. Rewriting them would mean inventing a scheme the client never asked
+    // for; NULLing them would be destroying data to make a law look tidier.
+    // So they stay, and \`REF_TABLES_WITHOUT_A_KIND\` in the registry is where
+    // that decision is written down and rot-checked — the day \`tasks\` gains a
+    // kind, that entry has to go and R55 covers the table automatically.
+    //
+    // \`apps\` and \`waves\` hold no reference at all (0059 gave them the column
+    // and said existing rows get none). There is nothing here to rewrite, and
+    // MINTING one for 28 existing apps is a different decision the client
+    // half-made on 1 Sep 2026 with an exact 29-name order that did not match
+    // live data. Not folded in here.
+    version: "0068_the_reference_keeps_its_old_name",
+    sql: refBackfillSql("0068_the_reference_keeps_its_old_name"),
+  },
+  {
+    // THE STAGE THE CLIENT RETIRED — 7 Sep 2026, in her own words: "kill
+    // awaiting_validation".
+    //
+    // A ticket used to open in `awaiting_validation` when its kind was an extra,
+    // a request or a piece of feedback, and waited there for the company paying
+    // for it to confirm they wanted it (CHECKLIST 5.13). The stage is gone from
+    // `HELP_STATUSES` (shared/types.ts carries the full argument), the door that
+    // cleared it is gone, and every ticket now opens in `new`. This is the
+    // stored half of that: the rows still sitting in the retired word.
+    //
+    // ── WHERE THE ROWS GO, AND WHY `new` IS NOT AN ARBITRARY PICK ───────────
+    //
+    // MEASURED FIRST, because "where do they go" is a different question when
+    // the answer turns out to be "there are none". Counted across all eleven
+    // team databases on 7 Sep 2026 (two of which have no `help` table at all):
+    // ZERO rows in `awaiting_validation`. The live client team holds 2,051
+    // tickets — 1,597 resolved, 437 new, 11 triaged, 3 in progress, 3 ready —
+    // and not one of them is waiting. The gate was barely exercised in
+    // production: 343 tickets of the kinds that were supposed to wait sit in
+    // `new` because they were imported rather than raised through the door, and
+    // `validated_at` is set on exactly one row in the whole estate.
+    //
+    // So this moves nothing today, and it is written anyway, because "nothing to
+    // migrate" is a fact about the databases that existed at the moment it was
+    // measured — not about one somebody creates between now and the deploy, or a
+    // staging team seeded from an older path. A row left behind in the retired
+    // word would render as a badge with no label on BOTH front doors: every
+    // status map is a closed `Record<HelpStatus, …>` and the word is no longer
+    // one of its keys.
+    //
+    // `new` IS THE DESTINATION, and it is the same move the client would have
+    // made herself. `validateTicket` moved a confirmed ticket
+    // `awaiting_validation` → `new`; retiring the gate means we stop asking
+    // permission before we look at the thing, so a ticket that was still waiting
+    // on permission is simply in the queue. `triaged` was the alternative and it
+    // would be a lie: it asserts that a person here READ and sorted the ticket,
+    // which is a judgement nobody made, and the triage door has a pre-triage
+    // gate of its own these rows have never been through.
+    //
+    // ── WHAT IT DOES NOT TOUCH ─────────────────────────────────────────────
+    //
+    // `help_status_events` IS NOT REWRITTEN. A ticket that genuinely passed
+    // through that stage passed through it, and 0066's whole ethic is that the
+    // record of what happened is not editable by a later opinion about the
+    // vocabulary. The reader keeps drawing those rungs in the words we used at
+    // the time — "Waiting on you" (`stageLabel`,
+    // web/components/ticket-stages.tsx, typed on `HelpStatusEver` for exactly
+    // this reason).
+    //
+    // `validated_at` IS NOT CLEARED. It records a real act by a real person on a
+    // real date. A column emptied because the feature behind it ended is a fact
+    // deleted, not a feature removed.
+    //
+    // `updated_at` IS NOT STAMPED. A migration is not a person, and touching it
+    // would push every moved ticket to the top of "recently updated" on both
+    // front doors as though somebody had edited it.
+    //
+    // ── THE EVENT ROW, AND WHY IT IS WRITTEN BEFORE THE MOVE ───────────────
+    //
+    // The move is REAL — a row really does leave one stage for another — so it
+    // gets a rung like every other move (0066: one seam, and a history missing
+    // one writer is worse than no history, because the gap is invisible and the
+    // durations either side of it silently merge). Its actor columns are NULL,
+    // which is the shape 0066 already defines for "a move whose actor was not
+    // recorded" and is the honest answer here: no person pressed anything.
+    //
+    // It is written BEFORE the UPDATE, which INVERTS the rule the runtime seam
+    // follows (help-stages.ts: always after, so a failed UPDATE cannot leave a
+    // phantom event). The inversion is forced — after the UPDATE there is no row
+    // matching `status = 'awaiting_validation'` left to select from — and it is
+    // safe here for a reason the runtime does not have: a migration RE-RUNS. The
+    // `NOT EXISTS` guard means a second run inserts nothing, and if a run dies
+    // between the two statements the next one completes the move the event
+    // already claims. The runtime's worst case is a permanent lie; this one's is
+    // a temporary one the next run repairs.
+    //
+    // IDEMPOTENT BOTH WAYS: once this has run, the INSERT's SELECT finds no rows
+    // and the UPDATE matches none.
+    //
+    // `status IN ('awaiting_validation')` RATHER THAN `status = …` ON THE MOVE,
+    // for a single value — the same sentence, and the spelling the ticket module
+    // uses everywhere (`validateTicket` carried that note verbatim before it was
+    // removed). R17's census reads this file: web/test/rules.test.ts scans every
+    // worker source for a status move on this table and accepts exactly three
+    // spellings of a current-status predicate, of which a bare `=` is not one.
+    // The law is right to be narrow — a status move with no predicate is the
+    // double-click bug — and a migration is not exempt from it just because it
+    // is meant to run once.
+    //
+    // AND THE CENSUS READS COMMENTS TOO, WHICH IS WHY THIS ONE IS WORDED AROUND
+    // THE PHRASE IT MATCHES. The first draft of this note quoted the scanned
+    // string verbatim to explain the rule, and turned the build red against
+    // prose. Worth leaving as a warning rather than silently avoiding: a
+    // source-scanning law cannot tell an example from an instance.
+    version: "0069_the_stage_the_client_retired",
+    sql: `
+INSERT INTO help_status_events (id, help_id, from_status, to_status, created_at, creator_id, creator_email, creator_name)
+SELECT lower(hex(randomblob(16))), h.id, 'awaiting_validation', 'new',
+       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NULL, NULL, NULL
+  FROM help h
+ WHERE h.status = 'awaiting_validation'
+   AND NOT EXISTS (
+     SELECT 1 FROM help_status_events e
+      WHERE e.help_id = h.id
+        AND e.from_status = 'awaiting_validation'
+        AND e.to_status = 'new'
+        AND e.creator_id IS NULL
+   );
+
+UPDATE help SET status = 'new' WHERE status IN ('awaiting_validation');
+`,
+  },
 ]
+
+/** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
+ *
+ * Seven kinds, three statements each, and the only thing that differs between
+ * one kind's three and another's is a table name and a letter. Typed out, that
+ * is 21 statements holding the same arithmetic 21 times, and the failure mode is
+ * not "somebody makes a typo" — it is the one this whole migration is repairing:
+ * a rule spelled in several places, one of which is later edited alone. So the
+ * kinds come from `TEAM_REF_TABLES` and the arithmetic from `refs.ts`'s own SQL
+ * twins, which are the same functions R55 checks the TypeScript formula against.
+ *
+ * A GENERATED MIGRATION IN AN APPEND-ONLY LEDGER, said plainly, because it is a
+ * real trade and the header two hundred lines up forbids editing history. Adding
+ * an eighth kind to `TEAM_REF_TABLES` tomorrow WOULD change this string, and a
+ * team that already ran 0068 would never see the new kind's clauses. That is
+ * survivable and it is not luck: an eighth kind is a table that has just gained a
+ * `ref` column, so it has no old-shaped rows to carry, and its own migration is
+ * where its own backfill would belong. What must NOT happen is the eighth kind
+ * arriving unnoticed, and that is R55's census — a table with a `ref` column and
+ * no place in the map turns the build red.
+ *
+ * @param version the migration's own name, stamped on every alias row so the
+ *   act that retired a reference is recoverable from the data rather than from
+ *   a changelog.
+ */
+function refBackfillSql(version: string): string {
+  const now = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`
+  const kinds = (Object.keys(TEAM_REF_TABLES) as (keyof typeof TEAM_REF_TABLES)[]).map((name) => ({
+    table: TEAM_REF_TABLES[name],
+    kind: TEAM_REF_KINDS[name],
+  }))
+
+  /** THE PLAN FOR ONE TABLE: every stale row, and the number it ends up with.
+   *
+   * `src`    every row that has a reference at all, with the trailing number it
+   *          carries — see `refNumberSql` for why that is read off the END of
+   *          the string and the account prefix is never parsed.
+   * `canon`  the rows already wearing the shape the formula makes. On staging
+   *          this is empty everywhere except the smoke team, but a team that has
+   *          minted since 0059 has some, and their numbers are TAKEN.
+   * `stale`  everything else — what this migration is for.
+   * `seated` stale rows ranked within their wanted number, oldest first. The
+   *          window function is the collision resolver: seat 1 is the one row
+   *          that may keep that number.
+   * `kept`   seat 1, where the number is real (> 0, so a reference with no
+   *          digits at all cannot claim "0") and not already taken by a
+   *          canonical row.
+   * `mark`   the high-water mark nothing may be reissued below: the highest
+   *          canonical number, the highest kept number, and the counter's own
+   *          position, whichever is greatest. The counter is in there because a
+   *          team can have minted numbers whose rows are gone — staging's ticket
+   *          counter reads 168 with no row to show for it — and reissuing under
+   *          it would hand out a number twice.
+   * `lost`   everyone else, numbered from the mark upwards in creation order.
+   */
+  const plan = (table: string, kind: TeamRefKind) => `
+WITH src AS (
+  SELECT id, ref, created_at, ${refNumberSql("ref")} AS n
+    FROM ${table} WHERE ref IS NOT NULL AND ref <> ''
+),
+canon AS (SELECT n FROM src WHERE ref = ${canonicalRefSql(kind, "ref")}),
+stale AS (SELECT * FROM src WHERE ref <> ${canonicalRefSql(kind, "ref")}),
+seated AS (
+  SELECT s.*, ROW_NUMBER() OVER (PARTITION BY s.n ORDER BY s.created_at ASC, s.id ASC) AS seat
+    FROM stale s
+),
+kept AS (SELECT id, ref, n FROM seated WHERE n > 0 AND seat = 1 AND n NOT IN (SELECT n FROM canon)),
+mark AS (
+  SELECT MAX(hw) AS hw FROM (
+    SELECT COALESCE((SELECT MAX(n) FROM canon), 0) AS hw
+    UNION ALL SELECT COALESCE((SELECT MAX(n) FROM kept), 0)
+    UNION ALL SELECT COALESCE((SELECT next_no - 1 FROM team_ref_counters WHERE kind = '${kind}'), 0)
+  )
+),
+lost AS (
+  SELECT id, ref,
+         (SELECT hw FROM mark) + ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) AS n
+    FROM seated WHERE id NOT IN (SELECT id FROM kept)
+),
+plan AS (
+  SELECT id, ref AS was, ('${kind}' || printf('%04d', n)) AS becomes FROM kept
+  UNION ALL
+  SELECT id, ref AS was, ('${kind}' || printf('%04d', n)) AS becomes FROM lost
+)`
+
+  const perKind = kinds
+    .map(
+      ({ table, kind }) => `
+-- ${table} · kind ${kind} ────────────────────────────────────────────────────
+-- 1 · REMEMBER THE NAME FIRST. Nothing below may run before this: once the
+--     column is overwritten the old string is gone, and it is the only thing
+--     that makes the rewrite reversible in the sense that matters — a person
+--     can still find the record by what they were told to quote.
+${plan(table, kind)}
+INSERT OR IGNORE INTO ${REF_ALIAS_TABLE}
+  (entity_table, alias, row_id, kind, replaced_by, retired_at, source)
+SELECT '${table}', was, id, '${kind}', becomes, ${now}, '${version}' FROM plan;
+
+-- 2 · CARRY THE REFERENCE. Reads its answer out of the alias rows written a
+--     statement ago rather than recomputing the plan over the table it is
+--     writing to — a window function seating rows in a table that is changing
+--     underneath it has no defined answer. Still guarded on staleness, so a
+--     re-run after a half-finished one skips what is already done.
+UPDATE ${table} SET ref = (
+    SELECT ra.replaced_by FROM ${REF_ALIAS_TABLE} ra
+     WHERE ra.entity_table = '${table}' AND ra.row_id = ${table}.id AND ra.source = '${version}'
+  )
+ WHERE ${staleRefSql(kind, "ref")}
+   AND id IN (SELECT row_id FROM ${REF_ALIAS_TABLE}
+               WHERE entity_table = '${table}' AND source = '${version}');
+
+-- 3 · MOVE THE COUNTER UP TO THE ROWS. \`MAX\` both ways: never below the highest
+--     number now stored (which would mint a duplicate against the unique index)
+--     and never below where the counter already stands (which would re-mint a
+--     number already handed out). \`HAVING COUNT(*) > 0\` so a team with no rows
+--     of this kind — every newborn database replaying this ledger — is left
+--     without a counter row rather than given one that says nothing.
+INSERT INTO team_ref_counters (kind, next_no)
+SELECT '${kind}', MAX(${refNumberSql("ref")}) + 1
+  FROM ${table} WHERE ref = ${canonicalRefSql(kind, "ref")}
+ HAVING COUNT(*) > 0
+    ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
+`
+    )
+    .join("")
+
+  return `
+-- WHAT A RECORD USED TO BE CALLED. One row per retired reference: which table
+-- and row it belongs to, the kind it wears now, what replaced it, when, and the
+-- act that did it. Rows accumulate — a record renumbered twice has two — which
+-- is the half a \`ref_was\` column could not have held.
+--
+-- THE UNIQUE KEY IS (entity_table, alias) and it is doing two jobs. It makes the
+-- alias insert above idempotent, and it is the promise the doors rely on: one
+-- old string names at most one record in a table, so a search on it cannot
+-- multiply a row (R16 — the count on a paged list has to agree with its page).
+--
+-- The second index is the one every read actually uses: the doors ask "what has
+-- THIS row been called", per row, so (entity_table, row_id) is a seek to the
+-- nothing-at-all most rows have. No index on \`alias\` alone: nothing looks a
+-- reference up without knowing which collection it is searching, and the
+-- ruling of 0061 stands: an index nothing reads is a write cost with no reader.
+CREATE TABLE IF NOT EXISTS ${REF_ALIAS_TABLE} (
+  entity_table TEXT NOT NULL,
+  alias TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  kind TEXT,
+  replaced_by TEXT,
+  retired_at TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ref_aliases_alias ON ${REF_ALIAS_TABLE} (entity_table, alias);
+CREATE INDEX IF NOT EXISTS idx_ref_aliases_row ON ${REF_ALIAS_TABLE} (entity_table, row_id);
+${perKind}`
+}

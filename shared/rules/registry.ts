@@ -493,6 +493,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "staff-names-are-first-names",
     status: "enforced",
   },
+  {
+    id: "R55",
+    dimension: "arch",
+    law: "A STORED REFERENCE IS WHAT THE FORMULA MAKES, AND THE FORMULA IS ONE PLACE. `canonicalRef` (shared/workers/refs.ts) is the shape of a reference as a FUNCTION, with a SQL twin (`canonicalRefSql`) beside it, and the two are proved to agree by RUNNING both over the same numbers rather than by reading them — including either side of 9,999, where a pad that truncated would start minting duplicates against a live unique index. `nextTeamRef` must RETURN that function's answer and may not build the string itself. Nothing else in any worker may write a `ref` column: an `INSERT` naming `ref` on a kind's table must be in a file that mints through the shared door, and NO code anywhere may `UPDATE … SET ref = …` — a reference is minted once, and the one act allowed to rewrite one is a team migration that keeps the old string in `ref_aliases`. Every door that SEARCHES a reference must also search that alias, through the one `refAliasMatchSql` seam. WHICH TABLES THESE ARE IS DERIVED TWICE AND HAND-LISTED NOWHERE: the schema's own answer (every `ref TEXT` in a `CREATE TABLE` and every `ALTER TABLE … ADD COLUMN ref` in `TEAM_MIGRATIONS` — two shapes, each of which finds tables the other does not) against `TEAM_REF_TABLES`, which `tsc` refuses to let fall behind `TEAM_REF_KINDS`. A ref-bearing table with no kind is a reasoned `REF_TABLES_WITHOUT_A_KIND` line, rot-checked so it can only shrink. And the DATA half is proved rather than asserted: the real migration ledger is replayed into a real SQLite handle over rows in the shapes staging actually held, and every surviving reference must read back through the formula, every retired string must resolve to its row, no counter may be able to mint a number a row already holds, a second run must change nothing, and a newborn team must come out untouched. A blindness tripwire fails the build if either schema scan stops answering or the replay stops moving rows.",
+    why: "The formula lived inside `nextTeamRef` as a template literal, which means the rule \"a reference looks like this\" existed only during the instant one was minted — there was nothing afterwards to ask. So when the client's 2026-08-31 ruling changed the MINT and migrations 0059/0060 rewrote NOT ONE STORED ROW, the data and the rule came apart in silence and stayed apart for six days under a green build. refs.ts said in its own header that the old account-coded shape \"is GONE\"; the client was reading `VU Solutions-T1183` and `FluClinic-T0001` off her own screens, and a probe on 7 Sep 2026 found every one of the 2,317 stored references in the team holding real data still account-coded. NOTHING IN THE REPOSITORY COULD HAVE CAUGHT IT, and that is the point: `npm run check` builds its database by replaying the whole ledger, so the schema it tests is current by construction and only an environment with a HISTORY can drift. THE COUNTER CLAUSE IS THE ONE THAT WOULD HAVE BITTEN NEXT. The backfill preserves a number where the number is free and reissues where it is not — 1,694 of 1,896 ticket numbers kept, but stories collapsed to 34 distinct numbers across 275 rows, so most of those had to move — which pushes rows far past where the counters stand. Renumber and leave the counter alone and the next record minted collides on `idx_help_ref`; \"reconcile\" it downwards to match the rows and it re-mints numbers already handed out (staging's ticket counter reads 168 with no row to show for it). Both are one-line mistakes and only a law that reads the counter against the rows can tell them apart. AND THE ALIAS CLAUSE IS THE CLIENT'S OWN RULING, 7 Sep 2026, shown the choice between a plain rewrite and a rewrite that keeps the old string resolvable: \"alias yes\". A reference exists to be QUOTED, so a search that finds only today's number breaks every email a client has ever been sent — which makes \"does the search look in both\" a property of the product and not of the database.",
+    checkId: "refs-match-the-formula",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -1745,10 +1753,6 @@ export const PORTAL_VISIBLE_WRITES: Record<string, { fence: string | null; why: 
     fence: "callerScope",
     why: "the same door in reverse, and the same resolution first. Deactivate-never-delete: the row keeps its audit block and the object stays in the bucket, so taking a file off is reversible in the only sense that matters — nothing is destroyed.",
   },
-  "POST /api/content/help/validate": {
-    fence: "callerScope",
-    why: "THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2), and the deliberate exception to this module's every-other-status-move-refuses-a-portal-caller rule. It is narrow by CONSTRUCTION rather than by a condition somebody could invert: the account fence rides the UPDATE, so it can only reach a ticket their own company raised, and R17's predicate is `status = 'awaiting_validation'`, so the only transition in it is into `new`. It cannot reopen, cannot resolve, and moves zero rows against a request somebody here has already started.",
-  },
 
   "POST /api/content/help/rating": {
     fence: "callerScope",
@@ -2360,6 +2364,34 @@ export const RECORD_DETAIL_NOT: Record<string, string> = {
 export const RECORD_TABS_SINGLE_PANEL: Record<string, string> = {
   "selectable-detail":
     "A DROPDOWN VALUE — a word, its colour or glyph, and whether it is active. There is no second thing about it: it owns no collection, nothing is filed against it, and its whole record fits the Overview panel it already draws. Its strip was Overview + Activity until 7 Sep 2026 and became one item when the Activity tab was retired; a strip was then removed rather than a second panel invented to justify one. Its history is still reachable, from the footer's Latest activity door like every other record's.",
+}
+
+/** R55 — tables that store a `ref` and have no KIND minting one for them.
+ *
+ * The census in `web/test/refs-match-the-formula.test.ts` reads the team schema
+ * for every `ref` column and `TEAM_REF_TABLES` (shared/workers/refs.ts) for every
+ * kind. A table in the first and not the second stores strings that no formula
+ * describes, which is the entire fault R55 exists for — so it has to be here, in
+ * writing, or the build is red.
+ *
+ * Rot-checked both ways and the list can only shrink: an entry for a table that
+ * has since been given a kind fails as loudly as an unlisted one, because an
+ * excuse that has stopped being true reads as a handled exception while
+ * describing nothing. */
+export const REF_TABLES_WITHOUT_A_KIND: Record<string, string> = {
+  tasks:
+    "A TASK IS THE AGENCY'S OWN ADMIN AND MINTS NOTHING. `createTask` " +
+    "(workers/content/src/lib/tasks.ts) writes a literal NULL into this column and has since the " +
+    "2026-08-31 ruling, which put a task in the same category as a process, a role or a dropdown " +
+    "value — none of which carries a reference either. The column and its unique index are a " +
+    "fossil of the scheme before that: 109 rows on staging still hold an old `<account>-K####` " +
+    "string, minted by a counter that no longer exists and shown on no screen then or now (the " +
+    "task doors take no `q`, and nothing renders `Task.ref`). " +
+    "THEY ARE DELIBERATELY LEFT ALONE by migration 0068. There is no kind to carry them to, so " +
+    "rewriting them would mean inventing a scheme the client never asked for; NULLing them would " +
+    "be destroying data to make this law look tidier, and 0068's own header says a migration that " +
+    "rewrites identifiers is close to irreversible. The day a task is given a kind, this entry has " +
+    "to go and R55 covers the table with no further edit.",
 }
 
 /** R8 — reviewed bypasses: placement:"tab" sections that DON'T lead with a

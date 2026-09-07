@@ -171,7 +171,7 @@ import { assignableMembers, staffedOn } from "@/lib/members"
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
-import { helpStatusDotTone } from "@shared/status-tones"
+import { helpStatusDotTone, waitingDotTone } from "@shared/status-tones"
 import type { DotTone } from "@shared/app-stages"
 import type { TriageGap } from "@shared/triage-readiness"
 import { staffNameFromSnapshot } from "@shared/staff-name"
@@ -760,7 +760,7 @@ function narrowTriage(
  * `Ticket type` is the team's own editable vocabulary (the Dropdown values
  * screen), so there is no enum and no id here — only the word somebody typed.
  * Lower-cased with a trailing "s" forgiven, which is the technique
- * `ticketTypeWaitsForValidation` (shared/types.ts) already uses on this very
+ * `isScopedTicketType` (shared/types.ts) already uses on this very
  * field and for this very reason: a rule that hard-matched the seeded spelling
  * would stop firing the day somebody typed "Issues".
  *
@@ -2112,20 +2112,21 @@ function OpenBoard({
            ("status (th header) have no color associated"). `waiting` has no row
            in `helpStatusDotTone` because it is a predicate, so the honest
            question is not "which of the six do I like here" but "what colour
-           does this app already give the state where the client owes us an
-           answer" — and it has one: `awaiting_validation`, the stage
-           `shared/status-tones.ts` singles out with the note "waiting on the
-           CLIENT to say yes — nothing here moves until they do", which is this
-           column's own sentence. So the tone is ASKED FOR by naming that stage
-           rather than typed as `"blocked"`, and the two cannot come apart: if
-           the app ever re-tones waiting-on-the-client, this column follows
-           without an edit. It resolves to `blocked` today.
-           IT IS NOT A FILTER, AND THE NAMED STAGE IS NOT WHAT FILLS THIS
-           COLUMN. `awaiting_validation` is deliberately OUT of
-           `OPEN_TAB_STATUSES` (shared/types.ts says why) and no card here is
-           read by status at all — the cards come from the door's waiting
-           predicate, below. The stage is named here for its COLOUR and for
-           nothing else.
+           does this app give the state where the client owes us an answer" —
+           and `shared/status-tones.ts`, the file that owns what a status colour
+           MEANS, now answers it directly through `waitingDotTone()`. It
+           resolves to `blocked`, the tier that file defines as "stuck on
+           somebody OUTSIDE the team", which is this column's own sentence.
+           IT USED TO ASK `helpStatusDotTone("awaiting_validation")`, AND THE
+           CHANGE IS NOT COSMETIC. Borrowing a STAGE's tone to paint a PREDICATE
+           kept the right property — the colour was asked for rather than typed,
+           so a re-tone moved this column without an edit — by the wrong route,
+           and the route stopped existing when the client retired that stage on
+           7 Sep 2026. Hard-coding `"blocked"` here would have dropped the
+           property with the bug; a named seam keeps both, and waiting now owns
+           its colour instead of borrowing one.
+           IT IS NOT A FILTER. No card in this column is read by status at all —
+           they come from the door's waiting predicate, below.
            NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
            columns give: the waiting read is a RESTING one and carries none of
            the toolbar's narrowing, so a searched board would put an
@@ -2133,7 +2134,7 @@ function OpenBoard({
         {
           id: WAITING,
           title: t("Waiting"),
-          dot: helpStatusDotTone("awaiting_validation") satisfies KanbanColumnDot,
+          dot: waitingDotTone() satisfies KanbanColumnDot,
           count: narrowed ? undefined : waitingTotal,
           cards: (waitingRows ?? []).map(boardCard),
           emptyLabel: t("Nothing is waiting on a client."),

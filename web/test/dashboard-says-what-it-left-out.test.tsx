@@ -82,7 +82,7 @@ const FULL: TicketDashboard = {
     { helpType: "Issue", status: "triaged", n: 6 },
     { helpType: "Question", status: "new", n: 4 },
     { helpType: "Request", status: "in_progress", n: 3 },
-    { helpType: "Extra", status: "awaiting_validation", n: 7 },
+    { helpType: "Extra", status: "triaged", n: 7 },
   ],
   byAccountAndType: [
     { accountId: "a1", accountName: "Bergmann Group", helpType: "Extra", open: 4, total: 9 },
@@ -519,8 +519,13 @@ describe("the open work is one row per stage, with the kinds named on top", () =
     showWith(SCRAMBLED)
     const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
     expect(grid, "the open work no longer draws its one grid").toBeTruthy()
-    // FULL has something open at four of the six stages.
-    const stages = 4
+    // FULL has something open at three of the five open stages. It was four of
+    // six until 7 Sep 2026, when the client retired `awaiting_validation` — the
+    // fixture's fourth stage was an Extra waiting on a client, and there is no
+    // such row any more. The remaining three are the most the fixture can hold
+    // without contradicting the sibling case below, which needs `scheduled` and
+    // `ready` empty to prove an empty stage draws no row at all.
+    const stages = 3
     expect(
       grid.style.gridTemplateColumns,
       "the kind columns are not counted off the vocabulary"
@@ -550,30 +555,34 @@ describe("the open work is one row per stage, with the kinds named on top", () =
 })
 
 describe("the stage axis reads as a journey, and a stage nobody is in is not drawn", () => {
-  it("puts waiting on the client immediately above ready", () => {
-    // CLIENT, 6 Sep 2026: "in the open work add waiting before ready."
+  it("reads down the axis in lifecycle order", () => {
+    // THIS CASE USED TO BE "puts waiting on the client immediately above ready",
+    // and the paragraph it carried is worth keeping because it explains why the
+    // assertion got SHORTER rather than being deleted.
     //
-    // `OPEN_HELP_STATUSES` leads with `awaiting_validation`, because it is
-    // `HELP_STATUSES` minus the closed one and that array is written in the
-    // order the STATE MACHINE names its states. Read top to bottom as a
-    // pipeline, that put "Waiting on you" ABOVE "New" — before the ticket has
-    // been looked at — and left "Ready" alone at the bottom. The view now
-    // reorders (`PIPELINE_STAGES`); nothing about the lifecycle moved, which is
-    // why this is asserted on the SCREEN and not on the shared constant.
+    // Client, 6 Sep 2026: "in the open work add waiting before ready."
+    // `awaiting_validation` ("Waiting on you") led `OPEN_HELP_STATUSES`, because
+    // that array is `HELP_STATUSES` minus the closed one and `HELP_STATUSES` is
+    // written in the order the STATE MACHINE names its states. Read top to
+    // bottom as a journey, that put waiting ABOVE "New" — before the ticket had
+    // been looked at — so the screen reordered it (`PIPELINE_STAGES`) to sit
+    // just before "Ready".
     //
-    // The fixture has something open at four stages, so all four are drawn and
-    // the two the note is about are adjacent and in her order.
+    // She retired the stage on 7 Sep 2026 (shared/types.ts, `HELP_STATUSES`), so
+    // there is nothing left to reorder and `PIPELINE_STAGES` takes the shared
+    // array unchanged. What this case still locks is the half that outlived her
+    // ruling: the axis is read in LIFECYCLE order, on the SCREEN, and not in
+    // whatever order the door happened to return its rows in.
     showWith(TYPES)
     const grid = document.querySelector('[data-slot="open-work"]') as HTMLElement
     const stride = TYPES.length + 1
     const stages = [...grid.children]
       .filter((_, i) => i >= stride && i % stride === 0)
       .map((c) => c.textContent)
-    expect(stages, "the pipeline is not read in the client's stage order").toEqual([
+    expect(stages, "the pipeline is not read in lifecycle order").toEqual([
       "New",
       "Triaged",
       "In progress",
-      "Waiting on you",
     ])
   })
 

@@ -135,15 +135,15 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/content/help/attachments": "CONTENT",
   "POST /api/content/help/attachments": "CONTENT",
   "POST /api/content/help/attachments/remove": "CONTENT",
-  // THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2). An
-  // extra, a request or a piece of feedback waits for the company that pays for
-  // it to confirm they want it — a question or an issue never waits at all. It is
-  // the deliberate exception to the paragraph above, and it is narrow by
-  // construction rather than by this table: the account fence rides its UPDATE,
-  // and R17's predicate means the ONLY move it can make is
-  // awaiting_validation → new. It cannot reopen, resolve, or touch a request
-  // somebody here has already started.
-  "POST /api/content/help/validate": "CONTENT",
+  // NO LIFECYCLE DOOR IS ON THIS TABLE ANY MORE, AND THAT IS NEW.
+  // `POST /api/content/help/validate` stood here — "the one lifecycle door a
+  // client may push" (CHECKLIST 5.13, Aurora's ap2) — and was the deliberate
+  // exception to the paragraph above: an extra, a request or a piece of feedback
+  // waited for the company paying for it to confirm they wanted it. The client
+  // retired the `awaiting_validation` stage on 7 Sep 2026 (shared/types.ts,
+  // `HELP_STATUSES`), so the door is gone from the content worker and the
+  // paragraph above now holds without an exception — this gateway forwards no
+  // door that moves a ticket along its lifecycle.
   // HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
   // portal for how did we do it to see if client is happy"). The portal is where
   // it is GIVEN, which is why these two are the only doors on the whole feature.

@@ -114,7 +114,6 @@ import {
   postHelpAttachment,
   postRemoveHelpAttachment,
   postHelpTriageRead,
-  postValidateHelp,
   getHelpStages,
   getHelpRating,
   postHelpRating,
@@ -381,7 +380,6 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // Everything else about a ticket's status now happens by itself — a timer
   // starts, a sprint is picked, the last story closes — so these two are doors
   // with their own words rather than values in a dropdown of seven.
-  "POST /api/content/help/validate": { handler: postValidateHelp, kind: "mutation" },
   "POST /api/content/help/triage-read": { handler: postHelpTriageRead, kind: "mutation" },
   // THE DASHBOARD TAB — five grouped reads about the whole backlog, in one
   // round trip. Its own door rather than more facets on the list, because the

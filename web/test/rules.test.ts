@@ -3802,6 +3802,7 @@ describe("RULES — the laws of the base", () => {
       "record-title-treatment", // R52: the both-detail-paths title census above
       "toolbar-slot-set", // R53: the row-owns-its-slots guard + the who-builds-a-control and sort-is-a-default censuses above
       "staff-names-are-first-names", // R54: web/test/staff-names-are-first-names.test.ts — the twice-derived staff-name census (columns off the workers' writes, fields off the mappings + the *IsClient siblings) walked to every render in web/
+      "refs-match-the-formula", // R55: web/test/refs-match-the-formula.test.ts — the twice-derived ref-table census (the team schema's own `ref` columns against TEAM_REF_TABLES) plus the DATA half, which replays the real migration ledger into a real SQLite handle and reads every stored reference back through the formula that made it
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

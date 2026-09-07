@@ -172,7 +172,12 @@ export const CLIENT_READABLE_WRITE_DOORS: readonly string[] = [
   "POST /api/content/help/rank",
   "POST /api/content/help/attachments",
   "POST /api/content/help/attachments/remove",
-  "POST /api/content/help/validate",
+  // `POST /api/content/help/validate` was here — the client's own "yes, go
+  // ahead". It left the portal's allow-list on 7 Sep 2026 with the
+  // `awaiting_validation` stage it moved tickets out of (shared/types.ts,
+  // `HELP_STATUSES`), and this mirror follows it rather than leading it: the
+  // allow-list is the oracle, and R24-outbound's rot-check is what made the
+  // drift visible the moment the door went.
   // HOW WE DID, from the person we did it for (team migration 0067). On the list
   // because the mirror is the whole point and an editorial subtraction is the
   // thing that stops being true later — though this one is the least likely door

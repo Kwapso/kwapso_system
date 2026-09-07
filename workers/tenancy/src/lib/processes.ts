@@ -26,7 +26,7 @@ import { accountScopeClause, appScopeClause, requireAccountInScope, type Account
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -168,9 +168,19 @@ function appsWhere(
   // LIKE's own wildcards, so an unescaped needle answers a different question
   // than the one typed, and a pattern of alternating `%` costs SQLite
   // exponential time over the whole table for a handful of bytes.
+  //
+  // AND THE REFERENCE IT USED TO HAVE (migration 0068). No app on the estate
+  // carries an old-shape reference today — 0059 gave `apps` the column and said
+  // existing rows get none — so this clause matches nothing yet, and it is here
+  // anyway because R55 requires it of every door that searches a reference at
+  // all. A door that will silently stop finding things the day the data changes
+  // is the shape of fault this whole law exists for.
   if (opts.q) {
-    filters.push("(name LIKE ? ESCAPE '\\' OR COALESCE(ref, '') LIKE ? ESCAPE '\\')")
-    params.push(`%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`)
+    filters.push(
+      `(name LIKE ? ESCAPE '\\' OR COALESCE(ref, '') LIKE ? ESCAPE '\\'
+        OR ${refAliasMatchSql(TEAM_REF_TABLES.app, `${TEAM_REF_TABLES.app}.id`)})`
+    )
+    params.push(`%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`)
   }
   return { sql: where(filters), params }
 }

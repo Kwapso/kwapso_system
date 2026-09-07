@@ -208,13 +208,15 @@ describe("portal rules the agency app doesn't have", () => {
   // until somebody widens the type to make a build pass, so the claim is asserted
   // against HELP_STATUSES itself rather than left to the annotation.
   //
-  // NOT asserted here, deliberately: "the portal has only one lifecycle control".
-  // That promise is kept in three places that cannot be talked round — the door is
-  // absent from the portal gateway's table, every other status handler opens with
-  // refusePortalCaller, and the fence suite next door walks every /api path this
-  // app names against that table. A hand-typed list of forbidden doors here would
-  // be a fourth copy that is correct until the next door is added, which is the
-  // exact shape R21 has already been bitten by twice.
+  // NOT asserted here, deliberately: "the portal has NO lifecycle control" — it
+  // read "only one" until 7 Sep 2026, when the client retired
+  // `awaiting_validation` and the confirm door went with it. That promise is kept
+  // in three places that cannot be talked round — no such door is in the portal
+  // gateway's table, every status handler opens with refusePortalCaller, and the
+  // fence suite next door walks every /api path this app names against that
+  // table. A hand-typed list of forbidden doors here would be a fourth copy that
+  // is correct until the next door is added, which is the exact shape R21 has
+  // already been bitten by twice.
   it("every ticket state a client can be shown has words in the portal's voice", () => {
     expect(HELP_STATUSES.length, "the status list did not load").toBeGreaterThan(4)
     const labels = HELP_STATUSES.map((s) => {

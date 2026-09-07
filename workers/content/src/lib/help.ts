@@ -30,7 +30,6 @@ import {
   TICKET_TYPE_KEPT_FOR_MIGRATION,
   ticketTypeKeptForMigration,
   ticketTypeKeptForMigrationExcludedSql,
-  ticketTypeWaitsForValidation,
   type HelpMessage,
   type HelpStatus,
   type HelpTicket,
@@ -49,7 +48,7 @@ import { TRIAGE_AFTER_DAYS } from "./triage"
 // EVERY STATUS MOVE IN THIS FILE GOES THROUGH ONE SEAM (team migration 0066).
 // `createTicket` embeds the statement in its own script — one transaction, so a
 // ticket cannot exist for an instant with no first stage — while `setStatus`,
-// `validateTicket`, `markTriaged` and the set-shaped bulk write theirs after the
+// `markTriaged` and the set-shaped bulk write theirs after the
 // UPDATE that made the move. lib/help-stages.ts carries the argument for that
 // order, and for why this one seam does not swallow its own failures the way
 // `logActivity` does.
@@ -65,7 +64,7 @@ import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // The reference number lives in shared/workers/refs.ts — a ticket is TEAM-wide
 // now (no account-code prefix), and app/wave mint from the same seam over in
 // tenancy, so it moved out of this worker entirely (2026-08-31 ruling).
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 import { inOrder } from "@shared/workers/parallel"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
@@ -652,12 +651,20 @@ function waitingClause(waiting: boolean | undefined): { sql: string; params: str
   }
 }
 
+/** AND THE NUMBER IT USED TO HAVE. Migration 0068 carried every ticket from the
+ * old account-coded reference (`VU Solutions-T1183`) to the team-wide one, and
+ * kept the old string in `ref_aliases` precisely so this box still answers it —
+ * a client quoting a number from an email last year is the whole reason the
+ * client asked for the alias rather than a plain rewrite. The clause is built by
+ * `refAliasMatchSql` rather than written here, so the five doors that search a
+ * reference cannot each grow their own spelling of it. */
 function searchClause(q: string | undefined): { sql: string; params: string[] } {
   if (!q) return { sql: "", params: [] }
   const needle = `%${likeLiteral(q.toLowerCase())}%`
   return {
-    sql: `(LOWER(description) LIKE ? ESCAPE '\\' OR LOWER(ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(title_en, '')) LIKE ? ESCAPE '\\')`,
-    params: [needle, needle, needle],
+    sql: `(LOWER(description) LIKE ? ESCAPE '\\' OR LOWER(ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(title_en, '')) LIKE ? ESCAPE '\\'
+       OR ${refAliasMatchSql(TEAM_REF_TABLES.ticket, `${TEAM_REF_TABLES.ticket}.id`)})`,
+    params: [needle, needle, needle, needle],
   }
 }
 
@@ -874,12 +881,19 @@ export async function countTicketFacets(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT h.account_id AS account_id, a.name AS account_name,
-            SUM(CASE WHEN h.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+    // THE TABLE IS NOT ALIASED, and that is now load-bearing rather than a
+    // style choice. `ticketWhere` is shared by five reads, and since the search
+    // clause learned to look in `ref_aliases` (migration 0068) it correlates on
+    // `help.id` — which resolves under `FROM help` and under nothing else. A
+    // bare `id` was tried first and is ambiguous here, because `accounts` has
+    // one too. Alias this table again and the read fails loudly on the next run
+    // rather than quietly returning the wrong rows.
+    `SELECT help.account_id AS account_id, a.name AS account_name,
+            SUM(CASE WHEN help.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
             COUNT(*) AS total_n
-       FROM help h LEFT JOIN accounts a ON a.id = h.account_id
-      WHERE ${where.sql.join(" AND ")} AND h.account_id IS NOT NULL
-      GROUP BY h.account_id, a.name
+       FROM help LEFT JOIN accounts a ON a.id = help.account_id
+      WHERE ${where.sql.join(" AND ")} AND help.account_id IS NOT NULL
+      GROUP BY help.account_id, a.name
       ORDER BY open_n DESC, total_n DESC
       LIMIT ${TICKET_FACET_CAP}`,
     where.params
@@ -1786,19 +1800,25 @@ export async function createTicket(
   // create, so this is the flat refusal (see `refuseKeptForMigration`).
   refuseKeptForMigration(helpType, null)
   const now = new Date().toISOString()
-  // WHERE IT STARTS, and it is a FACT about the kind of thing being asked rather
-  // than a choice anybody makes (CHECKLIST 5.13, Aurora's ap2).
+  // WHERE IT STARTS, AND IT IS THE SAME PLACE FOR EVERYTHING NOW.
   //
-  // An EXTRA, a REQUEST or a piece of FEEDBACK is somebody asking for more work,
-  // so the person who pays for it confirms they want it before we spend a day on
-  // triage. A QUESTION or an ISSUE is somebody stuck, and making them ask their
-  // own colleague for permission first is the version of this rule that gets the
-  // feature switched off — Aurora's note, and it is the load-bearing half.
+  // This line used to fork. An EXTRA, a REQUEST or a piece of FEEDBACK opened in
+  // `awaiting_validation` and waited for the client who pays for it to confirm
+  // they wanted it before we spent a day on triage (CHECKLIST 5.13, Aurora's
+  // ap2); a QUESTION or an ISSUE went straight in, because somebody stuck should
+  // not have to ask their own colleague for permission first.
   //
-  // The agency's own tickets never wait: there is no client-side stakeholder to
-  // ask, so a ticket with no account would sit in `awaiting_validation` for ever
-  // waiting on somebody who does not exist.
-  const status = accountId && ticketTypeWaitsForValidation(helpType) ? "awaiting_validation" : "new"
+  // The client retired that stage on 7 Sep 2026 — "kill awaiting_validation" —
+  // and shared/types.ts `HELP_STATUSES` carries the argument. So there is no
+  // longer a stage to wait in and nothing left to fork on: every ticket, of
+  // every kind, with or without a client, opens in `new` and is read by a person
+  // like everything else. We stop asking permission before we look at the thing.
+  //
+  // THE KIND DIVISION SURVIVED THE GATE, and is not to be re-derived from here:
+  // `isScopedTicketType` (shared/types.ts) is the same three words, still used —
+  // by the dashboard's "who has more scoped work" ranking. What it stopped being
+  // is a lifecycle decision.
+  const status = "new"
   // The reference the client will quote, and the place in the list. Both are
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
@@ -2114,52 +2134,35 @@ export function refuseDirectResolve(status: HelpStatus): void {
   )
 }
 
-/** THE CLIENT SAYS YES (CHECKLIST 5.13). Moves a waiting ticket into the ordinary
- * queue and stamps WHEN they said so.
+/* ── `validateTicket` WAS HERE, AND IT IS GONE (7 Sep 2026) ─────────────────
  *
- * R17: `status = 'awaiting_validation'` rides the UPDATE, so a second press moves
- * zero rows — no duplicate history, no second ping. Validating a ticket that was
- * never waiting is not an error and not an event: it moves nothing.
+ * "THE CLIENT SAYS YES" (CHECKLIST 5.13): it moved a ticket out of
+ * `awaiting_validation` into `new`, stamped `validated_at`, and recorded the
+ * move as a stage event like any other —
+ * `recordStatusEvent(cfg, guard, actor, id, "awaiting_validation", "new", now)`.
+ * That call is the one WRITE anywhere in the codebase that named the retired
+ * stage, and this note exists so the next reader knows where it went rather
+ * than finding a hole where the module's most-argued-about function used to be.
  *
- * It does NOT close the wording lock. The client is confirming they want the
- * thing, not handing it over — and until somebody here reads it, the account
- * still owns what it says (SCOPE ch.07). */
-export async function validateTicket(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  scope: AccountScope,
-  actor: Actor,
-  id: string
-): Promise<{ moved: boolean; accountId: string | null }> {
-  const before = await ticketOrThrow(cfg, guard, scope, id)
-  const now = new Date().toISOString()
-  const fence = ticketFence(guard, scope, "all")
-  const changed = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    // R17: `status IN (…)` rather than `status = …`, which is the same sentence
-    // and the spelling the rest of this module uses — the states a move is
-    // allowed OUT OF, named in the statement rather than checked before it.
-    `UPDATE help SET status = 'new', validated_at = ?, updated_at = ?
-      WHERE id = ? AND status IN ('awaiting_validation')${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
-    [now, now, id, ...fence.params]
-  )
-  if (!changed[0]) return { moved: false, accountId: before.account_id }
-  // The one lifecycle move a CLIENT makes is a stage move like any other, and it
-  // is recorded like any other (0066). The `from` is written as the literal the
-  // UPDATE's own predicate names rather than as `before.status`, because here
-  // they are the same word by construction — the statement can only have moved a
-  // row that was `awaiting_validation` — and saying it that way keeps the event
-  // honest even if the read above is ever widened.
-  await recordStatusEvent(cfg, guard, actor, id, "awaiting_validation", "new", now)
-  await logActivity(cfg, guard.databaseId, actor, {
-    type: "Ticket validated",
-    description: `${actor.name} confirmed ${before.ref ?? "a ticket"} should go ahead`,
-    relatedTable: "help",
-    relatedRowId: id,
-  })
-  return { moved: true, accountId: before.account_id }
-}
+ * IT WAS REMOVED RATHER THAN LEFT AS A NO-OP, and that is the decision worth
+ * recording. With the stage retired (shared/types.ts, `HELP_STATUSES`) R17's
+ * predicate — `status IN ('awaiting_validation')` — can no longer match any row
+ * in any team database, so the function would have been a door that could only
+ * ever move zero rows: a control whose sole possible outcome is silent failure.
+ * Worse, it was the ONE exception to this module's every-other-status-move-
+ * refuses-a-portal-caller rule (R21), gated on `help:read` so a client login
+ * could reach it. An exception that has stopped buying anything is not
+ * harmless — it is a portal-reachable write door kept alive by inertia. Both
+ * halves of the safety argument for it (the account fence on the UPDATE, R17's
+ * predicate) were arguments for why a USEFUL door was narrow enough; neither is
+ * a reason to keep a useless one.
+ *
+ * WHAT SURVIVES IT. Every `help_status_events` row that recorded a real
+ * `awaiting_validation → new` move stays exactly where it is — team migration
+ * 0069 touches `help.status` and never the history — and `stageLabel`
+ * (web/components/ticket-stages.tsx) still draws those rungs as "Waiting on
+ * you". The `validated_at` values stay too. Nothing that happened is unhappened
+ * by the door that made it happen going away. */
 
 /** SOMEBODY READ IT (CHECKLIST 5.11) — the one act the triage screen performs.
  *

@@ -103,14 +103,18 @@ export const TOOL_GATES: Record<string, string> = {
   // this line.
   rank_help_ticket: "help:edit",
   archive_help_ticket: "help:edit",
-  // THE TWO ACTS ON THE LADDER A PERSON STILL PERFORMS (CHECKLIST 5.11, 5.13),
-  // and they are gated differently on purpose. Reading a request is OUR queue, so
-  // it needs the right every other move needs. CONFIRMING one is the CLIENT's
-  // answer — `help:edit` is a right the seeded Client role deliberately does not
-  // hold, so gating the confirm on it would make the door unreachable by the only
-  // people it exists for. It is narrow by construction instead: the account fence
-  // rides its UPDATE and R17's predicate limits it to awaiting_validation → new.
-  validate_help_ticket: "help:read",
+  // THE ONE ACT ON THE LADDER A PERSON STILL PERFORMS (CHECKLIST 5.11). Reading
+  // a request is OUR queue, so it needs the right every other move needs.
+  //
+  // IT WAS TWO, AND THE SECOND IS WORTH ITS EPITAPH because its gate was the
+  // odd one out here: `validate_help_ticket` (CHECKLIST 5.13) sat on
+  // `help:read` rather than `help:edit`, deliberately — confirming a request is
+  // the CLIENT's answer, and `help:edit` is a right the seeded Client role does
+  // not hold, so gating it the ordinary way would have made the door
+  // unreachable by the only people it existed for. The client retired the
+  // `awaiting_validation` stage on 7 Sep 2026 and the tool and its door went
+  // with it. The same gate choice, for the same reason, still stands one line
+  // up on `reply_help_ticket` and on the rating door.
   triage_help_ticket: "help:edit",
   // Showing somebody what you mean is the same bar as saying it — a person who
   // can see a ticket can attach to it, exactly as they can reply to it.

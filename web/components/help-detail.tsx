@@ -39,7 +39,7 @@ function mentionableTeamMembers(
 ): TicketMember[] {
   return assignableMembers(members).filter((m) => m.id !== myUserId)
 }
-import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt } from "@shared/ui/foundations/icons"
+import { TrayArrowUp, Archive, Translate, PencilSimple, PaperPlaneTilt } from "@shared/ui/foundations/icons"
 
 import type {
   HelpMessage,
@@ -51,7 +51,6 @@ import type {
 // A VALUE, not a type — it must not ride the `import type` block above.
 import { ticketTypeKeptForMigration } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
-import type { HelpAccountFacet } from "@/lib/api/content"
 import {
   RecordActionsMenu,
   RecordScreen,
@@ -282,40 +281,17 @@ export function HelpDetailScreen({
   // the ticket while it counts. Leaving the TICKET still sends it; leaving the
   // TAB is not leaving. A hook, so it sits above the three early returns below.
   const reply = useReplySend({ ticketId: helpId, onSend: sendReply })
-
-  /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
-   * happens by itself — a sprint is picked, a timer starts, the last story
-   * closes — so what a person can still DO is named rather than picked from a
-   * dropdown of seven (CHECKLIST 5.2).
+  /* `run` WAS HERE — the shared shape for "do it, say plainly if it was
+   * refused, re-prime the list cache and the record's own history", written for
+   * THREE acts a person could still perform on a ticket by hand.
    *
-   * `run` is the shape all three share: do it, say plainly if it was refused,
-   * re-prime the list cache and the record's own history. */
-  async function run(what: () => Promise<{ tickets: HelpTicket[] } | void>, done: string, fallback: string) {
-    setStatusBusy(true)
-    try {
-      const r = await what()
-      // Merge the page the door already returned — this used to prime and then
-      // invalidate the SAME key one line later, so the fresh page was thrown
-      // away and refetched (the ~1s rebuild, measured; round-two speed review).
-      if (r && "tickets" in r) {
-        mergePage(`help:${teamId}`, "id", r.tickets as unknown as Record<string, unknown>[])
-        const extras = r as {
-          byType?: Record<string, number>
-          byStatus?: Record<string, number>
-          byAccount?: HelpAccountFacet[]
-        }
-        if (extras.byType) primeCache(`help-by-type:${teamId}`, extras.byType)
-        if (extras.byStatus) primeCache(`help-by-status:${teamId}`, extras.byStatus)
-        if (extras.byAccount) primeCache(`help-by-account:${teamId}`, extras.byAccount)
-      } else invalidate(`help:${teamId}`)
-      invalidate(recordActivityKey("help", helpId))
-      toast.success(done)
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : fallback)
-    } finally {
-      setStatusBusy(false)
-    }
-  }
+   * Its last caller was the "They've confirmed it" button, and both went when
+   * the client retired `awaiting_validation` on 7 Sep 2026 (shared/types.ts,
+   * `HELP_STATUSES`). The two surviving acts on this screen — archiving and
+   * answering — each carry their own handler below and always did, because each
+   * does something `run` never modelled: archiving asks for a confirmation
+   * first, and answering has to collect the words the door refuses without. */
+
 
   /** ANSWER IT AND TELL THEM (CHECKLIST 5.6 + 5.7). The door refuses without the
    * words, which is 5.6 stated where it can be enforced; the send goes to the
@@ -743,27 +719,15 @@ export function HelpDetailScreen({
 
   const actions = (
     <>
-      {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer that
-          arrives by phone; the client presses the same door in their own portal.
-          It appears only while the request is actually waiting, and disappears
-          the moment it is not, a control that can only be refused should not be
-          a control. */}
-      {ticket.status === "awaiting_validation" && (
-        <Button
-          disabled={statusBusy}
-          onClick={() =>
-            void run(
-              () => content.validateHelp(helpId),
-              "Confirmed, it's in the queue.",
-              "Couldn't confirm that."
-            )
-          }
-          className="shrink-0 gap-1"
-        >
-          <Checks className="size-3.5" />
-          {t("They've confirmed it")}
-        </Button>
-      )}
+      {/* "THEY'VE CONFIRMED IT" WAS HERE (CHECKLIST 5.13, retired 7 Sep 2026).
+          Staff pressed it for the answer that arrived by phone; the client
+          pressed the same door in their own portal. It went with the
+          `awaiting_validation` stage it moved a ticket out of — the client
+          retired that stage, so nothing waits for a go-ahead any more and an
+          extra goes into the queue the moment it is raised (shared/types.ts,
+          `HELP_STATUSES`). The rule the old note stated still governs the two
+          buttons below it: a control that can only be refused should not be a
+          control. */}
       {/* ANSWER IT AND TELL THEM. Offered from READY onward, the stage that means
           every piece of work is done and only the telling is left, and never on a
           ticket already answered. The panel is where the words are written,

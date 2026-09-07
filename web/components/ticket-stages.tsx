@@ -51,7 +51,7 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Card } from "@shared/ui/components/card/card"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 
-import type { HelpStatus, TicketStageHistory } from "@shared/types"
+import type { HelpStatusEver, TicketStageHistory } from "@shared/types"
 import { content as contentApi } from "@/lib/api"
 import { helpStagesKey } from "@/lib/live-resources"
 import { useCached } from "@shared/web/store"
@@ -67,8 +67,16 @@ import { useT } from "@shared/web/language"
  * `tickets-collection.tsx` carries the same note about its own three literals.
  * So the sentences are written out here as literals, and five of the seven were
  * already in the catalogue because other screens say them. */
-function stageLabel(status: HelpStatus, t: (s: string) => string): string {
+function stageLabel(status: HelpStatusEver, t: (s: string) => string): string {
   switch (status) {
+    // A RETIRED STAGE STILL GETS ITS WORDS. `awaiting_validation` left the
+    // lifecycle on 7 Sep 2026 (shared/types.ts, `HELP_STATUSES`), and this case
+    // is why the parameter is `HelpStatusEver` and not `HelpStatus`: the rows
+    // behind this strip are `help_status_events`, which is append-only, so a
+    // ticket that really sat waiting on a client still has that rung and always
+    // will. The stage is unreachable going forward and perfectly readable
+    // looking back — the sentence a person is owed about their own ticket's
+    // past is the one we used at the time, not the raw enum and not a blank.
     case "awaiting_validation":
       return t("Waiting on you")
     case "new":

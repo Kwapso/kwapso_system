@@ -117,7 +117,12 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   ready: "status",
   triaged: "status",
   scheduled: "status",
-  validated: "status",
+  // `validated: "status"` was here, for the activity line "…confirmed T-0412
+  // should go ahead". Nothing writes that sentence any more: the client retired
+  // `awaiting_validation` on 7 Sep 2026 and `validateTicket` went with it
+  // (shared/types.ts, `HELP_STATUSES`). The rotting-entry rule this table is
+  // held to took the line out — a word that classifies nothing the app says is a
+  // record of what the app used to say, being consulted on every read.
   applied: "status",
   // ── archived ──────────────────────────────────────────────────────────────
   archived: "archived",

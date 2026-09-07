@@ -220,15 +220,15 @@ function sprintQueryIsActive(query: SprintQuery): boolean {
   return query.q.trim() !== "" || query.state !== "" || query.kind !== ""
 }
 
-/** SEARCH (name/app), then the two facets the view already groups by — state
- * and kind — over the whole bounded collection. */
+/** SEARCH (name/app/reference — `refWas` too, the numbers 0068 reissued, since this
+ * box is a sprint's only search), then the two facets the view groups by. */
 function selectSprints(sprints: Sprint[], query: SprintQuery, today: string): Sprint[] {
   const needle = query.q.trim().toLowerCase()
   return sprints.filter((s) => {
     if (query.state && sprintState(s, today) !== query.state) return false
     if (query.kind && (s.sprintType ?? "") !== query.kind) return false
     if (!needle) return true
-    return [s.name, s.appName ?? "", s.ref ?? ""].some((v) => v.toLowerCase().includes(needle))
+    return [s.name, s.appName ?? "", s.ref ?? "", s.refWas ?? ""].some((v) => v.toLowerCase().includes(needle))
   })
 }
 

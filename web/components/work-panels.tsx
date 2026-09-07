@@ -615,7 +615,7 @@ export function SprintsPanel({
           ],
         }}
         data={rows}
-        searchKeys={["name", "ref", "sprintType", "accountName", "appName"]}
+        searchKeys={["name", "ref", "refWas", "sprintType", "accountName", "appName"]}
         renderItems={(page) => (
           <RowList>
             {page.map((s) => (

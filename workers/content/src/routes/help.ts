@@ -31,7 +31,6 @@ import {
   setTicketArchived,
   setTicketRank,
   updateTicket,
-  validateTicket,
   type HelpStatus,
   type TicketFilter,
   type TicketInput,
@@ -623,34 +622,30 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
   return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
-/** POST /api/content/help/validate — THE CLIENT SAYS YES (CHECKLIST 5.13).
+/* ── `POST /api/content/help/validate` WAS HERE (retired 7 Sep 2026) ────────
  *
- * The one lifecycle door a portal caller may push, and the only one they ever
- * will: an extra, a request or a piece of feedback waits for the company that
- * pays for it to confirm they want it (Aurora's ap2). Questions and issues never
- * reach `awaiting_validation` at all, so this door has nothing to do to them.
+ * "THE CLIENT SAYS YES" (CHECKLIST 5.13) — the ONE lifecycle door a portal
+ * caller could push, and the deliberate exception to R21's shape on this
+ * module. It moved a waiting ticket into the ordinary queue.
  *
- * NOT `refusePortalCaller`, and it is the deliberate exception to R21's shape on
- * this module — every OTHER status move is ours. Two things keep it safe: the
- * account fence rides the UPDATE (a client can only validate a ticket their own
- * company raised), and R17's predicate means the ONLY transition it can make is
- * `awaiting_validation` → `new`. It cannot reopen, resolve, or move a started
- * request; a caller who sends it at a ticket in any other state moves zero rows.
+ * It went with the stage it moved tickets out of: the client retired
+ * `awaiting_validation` on 7 Sep 2026 (shared/types.ts `HELP_STATUSES` carries
+ * her sentence and the argument), so an extra, a request or a piece of feedback
+ * now opens in `new` like everything else and there is nothing to confirm.
  *
- * Gated by help:READ, not edit. A contact who can see their company's requests is
- * exactly the person being asked, and `help:edit` is a right the seeded Client
- * role deliberately does not hold — gating on it would make this door unreachable
- * by the only people it exists for. Staff may press it too, for the ordinary case
- * where the answer arrives by phone. */
-export async function postValidateHelp(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "read")
-  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
-  const scope = await callerScope(cfg, guard)
-  // R17: not waiting → zero rows moved → no ping, no duplicate history.
-  const { moved, accountId } = await validateTicket(cfg, guard, scope, actor, id)
-  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
-}
+ * WHY THE DOOR WAS REMOVED AND NOT KEPT AS A HARMLESS NO-OP. R17's predicate
+ * was the whole of its safety: it could only ever move a row that was
+ * `awaiting_validation`. With no such row possible, the door could only ever
+ * move zero rows — and it was gated on `help:read` rather than `help:edit`
+ * precisely so a CLIENT login could reach it. A portal-reachable write door
+ * that can no longer do the one useful thing it existed for is surface with no
+ * function, which is the definition of what should not survive a retirement.
+ * `workers/content/src/lib/help.ts` carries the same note beside where
+ * `validateTicket` used to be.
+ *
+ * The client's own act on a ticket that DOES survive is the rating door
+ * (`POST /api/content/help/rating`) — still gated on `help:read`, and still the
+ * reason that gate choice is written down. */
 
 /** POST /api/content/help/triage-read — SOMEBODY HAS READ IT (CHECKLIST 5.11).
  *

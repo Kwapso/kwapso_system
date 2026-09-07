@@ -108,12 +108,21 @@ describe("every move along the ladder leaves a row", () => {
     expect(rungs(id).map((r) => [r.from_status, r.to_status])).toEqual([[null, "new"]])
   })
 
-  it("a null `from` is the creation row's own signature, not a missing value", async () => {
+  it("a null `from` is the creation row's own signature, whatever the kind", async () => {
     // The reader leans on this: `fromStatus === null` on the FIRST row is what
-    // says the sequence is whole, so a ticket born into `awaiting_validation`
-    // has to carry it too rather than only the ordinary `new` case.
+    // says the sequence is whole.
+    //
+    // THIS CASE USED TO PROVE MORE THAN IT DOES. A Request was the kind that
+    // opened in `awaiting_validation` rather than `new`, so the assertion below
+    // said the null `from` was carried on the OTHER birth stage too, not only
+    // the ordinary one. The client retired that stage on 7 Sep 2026
+    // (shared/types.ts, `HELP_STATUSES`) and every kind now opens in `new`, so
+    // the fork this was guarding no longer exists. It is kept rather than
+    // deleted because the sentence it makes is still the one the reader leans
+    // on, and a Request is still the kind most likely to be given a birth stage
+    // of its own by somebody re-reading CHECKLIST 5.13.
     const id = await raise({ helpType: "Request" })
-    expect(rungs(id)[0]).toMatchObject({ from_status: null, to_status: "awaiting_validation" })
+    expect(rungs(id)[0]).toMatchObject({ from_status: null, to_status: "new" })
   })
 
   it("triage, a status move and a resolve are three rungs, in order", async () => {
@@ -132,14 +141,24 @@ describe("every move along the ladder leaves a row", () => {
     ])
   })
 
-  it("the client saying yes is a rung like any other", async () => {
-    const id = await raise({ helpType: "Request" })
-    await call(IDS.staffUser, "POST /api/content/help/validate", { id })
-    expect(rungs(id).map((r) => `${r.from_status ?? "-"}→${r.to_status}`)).toEqual([
-      "-→awaiting_validation",
-      "awaiting_validation→new",
-    ])
-  })
+  /* "the client saying yes is a rung like any other" WAS HERE. It raised a
+   * Request (which opened in `awaiting_validation`), pressed
+   * `POST /api/content/help/validate`, and asserted the two rungs
+   * `-→awaiting_validation` and `awaiting_validation→new`.
+   *
+   * The client retired that stage on 7 Sep 2026 and the door went with it
+   * (shared/types.ts, `HELP_STATUSES`; workers/content/src/lib/help.ts carries
+   * the note where `validateTicket` used to be). There is no transition left for
+   * this case to assert. The PROPERTY it was one instance of — every writer that
+   * moves a status leaves a rung — is not weakened by its going: that is proved
+   * structurally by the source scan at the foot of this file, which reads every
+   * worker source off disk and fails the build if a status UPDATE appears
+   * anywhere that does not reach the one seam. One writer fewer is one fewer
+   * thing for that scan to find, not a hole in it.
+   *
+   * The rows a real ticket earned through that stage are untouched — team
+   * migration 0069 moves `help.status` and never `help_status_events` — and
+   * `stageLabel` still draws them as "Waiting on you". */
 
   it("R17's silence covers the history: a re-run writes no second rung", async () => {
     const id = await raise()
@@ -347,13 +366,28 @@ describe("no status writer escapes the seam", () => {
     ).toBe(true)
   })
 
-  it("the seam is one file, and nothing else writes the table", () => {
-    const writers = workerSources().filter(({ source }) =>
-      /INSERT INTO help_status_events/i.test(stripComments(source))
-    )
+  it("the seam is one file, and nothing else writes the table at runtime", () => {
+    const writers = workerSources()
+      .filter(({ source }) => /INSERT INTO help_status_events/i.test(stripComments(source)))
+      // THE SAME EXEMPTION THE STATUS-MOVE SCAN ABOVE ALREADY MAKES, for the
+      // same reason said there: a migration is a dated one-off applied once per
+      // database and read by a person before it ships, which is precisely the
+      // review a running door does not get. Team migration 0069 — the
+      // `awaiting_validation` retirement — moves stored rows out of a stage the
+      // client killed, and records that move as a rung with NULL actor columns.
+      //
+      // EXEMPTING IT IS THE STRICTER READING, NOT THE LOOSER ONE. Without this
+      // line the law would forbid the migration from recording, and a migration
+      // that moves a status WITHOUT recording is exactly the hole the sibling
+      // scan above exists to prevent — the ticket's last rung would say
+      // "Waiting on you · Still here" for ever while its badge said New. The law
+      // is about runtime writers sharing one shape so the rows keep meaning one
+      // thing; a ledger entry that writes the same shape by hand, once, under
+      // review, is not the failure it was written against.
+      .filter(({ rel }) => !rel.endsWith("team-schema/migrations.ts"))
     expect(
       writers.map((f) => f.rel),
-      "every status writer goes through ONE statement — eight call sites and one shape, or the rows stop meaning one thing"
+      "every status writer goes through ONE statement — seven call sites and one shape, or the rows stop meaning one thing"
     ).toEqual(["workers/content/src/lib/help-stages.ts"])
   })
 

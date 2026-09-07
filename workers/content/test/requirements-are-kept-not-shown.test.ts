@@ -150,7 +150,7 @@ beforeEach(() => {
   // THE SAME KIND, SPELLED BY A HUMAN. `help_type` holds a team's own editable
   // word, so the test that recognises it has to survive a stray capital, a
   // trailing space and a dropped "s" — the identity test is the one this
-  // codebase already uses for a ticket type (`ticketTypeWaitsForValidation`),
+  // codebase already uses for a ticket type (`isScopedTicketType`),
   // and this row is what proves the SQL half agrees with the TypeScript half.
   ticket({ id: "H_REQ_TYPED", type: " requirement ", status: "triaged", created: daysAgo(25) })
 

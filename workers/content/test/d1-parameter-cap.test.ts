@@ -127,12 +127,12 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // names three stages at once), so `statusClause` binds one parameter per
       // stage asked for. The list it can be handed is not free text: the route
       // splits the `status` parameter, KEEPS ONLY words that are in
-      // HELP_STATUSES (7, fixed in code) and de-dupes what survives, so the
-      // longest possible list is every status exactly once. Seven parameters,
+      // HELP_STATUSES (6, fixed in code) and de-dupes what survives, so the
+      // longest possible list is every status exactly once. Six parameters,
       // and the only way past it is adding statuses to shared/types.ts — an edit
-      // to a `const`, ninety-three of them away from the cap.
+      // to a `const`, ninety-four of them away from the cap.
       "content/src/lib/help.ts: statuses":
-        "the stage set the ticket list narrows by — the route keeps only HELP_STATUSES members (7) and de-dupes them, so the list cannot exceed the vocabulary",
+        "the stage set the ticket list narrows by — the route keeps only HELP_STATUSES members (6) and de-dupes them, so the list cannot exceed the vocabulary",
       "content/src/lib/ready-flip.ts: FLIPPABLE":
         "a module-level constant: the ticket statuses a Ready flip may move from. " +
         "Derived from HELP_STATUSES, fixed at author time.",
