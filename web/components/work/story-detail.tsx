@@ -212,6 +212,31 @@ export function StoryDetailScreen({
     { label: t("Type"), value: story.storyType || "—" },
     { label: t("Reference"), value: story.ref || "—" },
     { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
+    // WHO REVIEWS IT, and ONLY when somebody has named one.
+    //
+    // `stories.reviewer_id`/`reviewer_name` have been settable through
+    // `create_story` and `update_story` since the work engine shipped:
+    // `memberOrThrow` resolves the person at the door, the INSERT and the UPDATE
+    // both store them, `stories.ts` selects and maps them, `shared/types.ts`
+    // types them, and the query grammar filters on them — and no screen on
+    // either front door has ever shown the answer. Somebody could tell the
+    // assistant "make Sam the reviewer on this story", get a yes, and there was
+    // nowhere the name appeared afterwards.
+    //
+    // CONDITIONAL, WHICH IS THE DECISION HERE. CHECKLIST 6.10 is the product's
+    // one ruling on the word: the Done button belongs to the APP'S TEAM LEAD,
+    // refused at the door (`refuseDoneByAnybodyElse`, stories.ts), and it reads
+    // nothing off this row. So a reviewer named here is who is expected to
+    // LOOK at the work, never who is allowed to close it — and a row printing
+    // "—" on every story would announce a concept the screens do not offer,
+    // which is a second dead end pointing the other way. Zero of the 329
+    // stories on staging carry a reviewer, so this row is invisible on the app
+    // as it stands today and appears the moment the capability is used.
+    //
+    // NOTHING WAS REMOVED to achieve that. Whether a per-story reviewer is a
+    // concept this product wants at all is a decision for the owner, not for a
+    // review lane — the reachability fix is to show what is written.
+    ...(story.reviewerName ? [{ label: t("Who reviews it"), value: story.reviewerName }] : []),
     // INHERITED, not typed. A story is due when the block it was sold inside is
     // due, so this is the SPRINT's end date — the story's own date field went on
     // 17 Aug 2026 rather than let two dates disagree about one promise. A story

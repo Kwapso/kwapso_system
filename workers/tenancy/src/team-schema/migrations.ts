@@ -1429,6 +1429,12 @@ SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now')
 CREATE TABLE google_connections (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  -- SET ONCE AND NEVER CHANGED, deliberately: \`service\` is not a property of a
+  -- connection, it is WHICH connection this is. It rides the live unique index
+  -- below (one per person per service) and the consent it was granted under, so
+  -- turning a Drive grant into a Gmail one by writing a word would leave a row
+  -- claiming a scope Google never gave it. Reconnect instead; disconnect and
+  -- connect again is already the ordinary way to fix a grant.
   service TEXT NOT NULL,
   google_email TEXT NOT NULL,
   scopes TEXT NOT NULL DEFAULT '',
@@ -1482,6 +1488,10 @@ CREATE TABLE google_sources (
   id TEXT PRIMARY KEY,
   connection_id TEXT NOT NULL REFERENCES google_connections(id),
   user_id TEXT NOT NULL,
+  -- SET ONCE, like the connection's own: a source IS a folder, or a mailbox, or
+  -- a calendar, and \`service\` says which of those \`external_id\` is an id in. An
+  -- edit here would point the same id at a different Google API and read
+  -- somebody else's material, or nothing at all. Share the thing again to move it.
   service TEXT NOT NULL,
   external_id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -3339,6 +3349,11 @@ CREATE UNIQUE INDEX idx_client_tools_name
 CREATE TABLE client_tool_prices (
   id TEXT PRIMARY KEY,
   tool_id TEXT NOT NULL REFERENCES client_tools (id),
+  -- SET ONCE, AND THAT IS THE WHOLE POINT OF THE TABLE (see client_tools above).
+  -- A price is DATED: a tool that cost EUR 240 in March and EUR 300 now must not
+  -- rewrite March's arithmetic, so a new price is a NEW ROW with a later
+  -- \`effective_on\`, never an edit to this one. Editing \`cents\` in place would
+  -- silently restate every map already drawn against it.
   cents INTEGER NOT NULL CHECK (cents >= 0),
   billing_period TEXT NOT NULL CHECK (billing_period IN ('month', 'year')),
   -- The day this price started being true. A map set to a date reads the newest

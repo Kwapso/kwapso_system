@@ -174,12 +174,14 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
   // the row names the DOOR ('owner-key') rather than inventing an actor, and
   // carries this request's own id so two top-ups a second apart are told apart.
   // `grantCredits` writes it in the same batch as the balance (db/core/0030).
-  const balance = await grantCredits(env, teamId, amount, {
+  // `lifetimeGranted` comes back with it because the operator running this
+  // command is the only reader that column has ever had — see grantCredits.
+  const { balance, lifetimeGranted } = await grantCredits(env, teamId, amount, {
     actor: "owner-key",
     requestId: requestId(request),
   })
   await publishChange(env, teamId, "agent_usage")
-  return json({ teamId, balance })
+  return json({ teamId, balance, lifetimeGranted })
 }
 
 /** POST /api/data-ops/agent/chat — run one agent turn (answer, or propose/take action).

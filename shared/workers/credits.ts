@@ -223,13 +223,22 @@ export type GrantRecord = {
  * or neither does. Same shape as the email switch and its audit row
  * (workers/auth/src/lib/email-change.ts), and the reason is the same: an audit
  * row written best-effort AFTER the change is exactly the untraceable grant this
- * exists to prevent, only now it looks fixed. */
+ * exists to prevent, only now it looks fixed.
+ *
+ * IT RETURNS `lifetimeGranted` TOO. That column has been incremented on every
+ * grant since the table shipped and read by nothing at all — its schema comment
+ * said "for admin view" and DATA-MODEL.md repeated the promise, and no admin
+ * view exists. It is not decoration: a balance is spent down, so once a team has
+ * used its credits the balance can no longer say how much they were ever given.
+ * The person who needs that number is the one running the grant, so it comes
+ * back in the same answer rather than waiting for a screen nobody is building.
+ * (db/core/0010 and DATA-MODEL.md § agent_credits were corrected to say this.) */
 export async function grantCredits(
   env: Env,
   teamId: string,
   amount: number,
   by: GrantRecord
-): Promise<number> {
+): Promise<{ balance: number; lifetimeGranted: number }> {
   const now = new Date().toISOString()
   await env.DB.batch([
     env.DB.prepare(
@@ -241,10 +250,12 @@ export async function grantCredits(
        VALUES (?, ?, ?, ?, ?, ?)`
     ).bind(ulid(), teamId, now, amount, by.actor, by.requestId),
   ])
-  const row = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
+  const row = await env.DB.prepare(
+    "SELECT balance, lifetime_granted FROM agent_credits WHERE team_id = ?"
+  )
     .bind(teamId)
-    .first<{ balance: number }>()
-  return row?.balance ?? 0
+    .first<{ balance: number; lifetime_granted: number }>()
+  return { balance: row?.balance ?? 0, lifetimeGranted: row?.lifetime_granted ?? 0 }
 }
 
 /** Where a turn's AI units came from: all free, all paid credit, or a bit of each. */
