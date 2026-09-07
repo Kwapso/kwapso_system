@@ -443,6 +443,54 @@ ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
   ok("the contact is linked to their company", true)
 }
 
+// ORDER MATTERS HERE, AND IT DID NOT USED TO SHOW.
+//
+// The grant door refuses a FIRST client login to somebody who is already an
+// active team member (`routes/accounts.ts`, `is_staff`): handing a colleague a
+// client login would fence them out of the agency app. It exempts anyone who
+// already holds a `portal_users` row, live or revoked, because presence is
+// permanent.
+//
+// This script used to invite the client to the team FIRST and grant second,
+// which only ever worked because the portal row predated every run. When
+// staging was reset on 2026-09-07 that row went with it, and the next run met
+// the refusal — on the FIRST-run path, which almost never executes, so the
+// ordering had been wrong for as long as it had existed without ever being
+// exercised.
+//
+// So the grant comes first: an ordinary contact becomes a client, and only then
+// joins the team on the client role. That is also the order a real one happens
+// in — somebody is a client before they are given a seat.
+
+// The grant that makes them a CLIENT rather than a colleague: the door looks the
+// person up by the email on their contact record, never by a typed-in id.
+{
+  // The row stores the PERSON's account id (grantPortalAccess's own note: that
+  // is what the fence walks from), so the lookup asks by the CONTACT. Asking by
+  // the company came back empty every run, so every rerun re-granted — and the
+  // grant of an already-enrolled client then refused. The deploy chain wore
+  // green anyway whenever the runner piped its output (the pipe's exit code is
+  // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
+  const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
+  if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
+    const made = await agencyPost(
+      "/api/tenancy/portal-users",
+      // THE ROLE IS NAMED, not left to be found. The door takes an explicit
+      // `roleId` or falls back to the team's own role titled "Client" — and this
+      // script deliberately does NOT use that one (see `CLIENT_RIGHTS` above: the
+      // seed's Client role is an example an owner copies, this is a probe nobody
+      // should). Leaving it unnamed meant the grant quietly rode the SEED's role,
+      // so a run only worked on a team that had been seeded. Staging was reset on
+      // 2026-09-07 and the fallback found nothing: "no role called Client", from
+      // a script that had built itself a role two hundred lines earlier.
+      { accountId: MINE, personAccountId: CONTACT, roleId: CLIENT_ROLE_ID },
+      staffCookie
+    )
+    if (!made.ok) stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
+  }
+  ok("the contact holds a client login on their company", true)
+}
+
 // The client joins the team on the client role, exactly as a real one does: an
 // invite, then their own acceptance. Only ever on the first run.
 {
@@ -472,26 +520,6 @@ const clientAtAgency = await signIn(CLIENT_EMAIL, BASE)
 await agency("/api/auth/profile", { method: "POST", body: JSON.stringify({ firstName: "Portal", lastName: "Smoke" }) }, clientAtAgency)
 await agency("/api/tenancy/bootstrap", { method: "POST" }, clientAtAgency)
 
-// The grant that makes them a CLIENT rather than a colleague: the door looks the
-// person up by the email on their contact record, never by a typed-in id.
-{
-  // The row stores the PERSON's account id (grantPortalAccess's own note: that
-  // is what the fence walks from), so the lookup asks by the CONTACT. Asking by
-  // the company came back empty every run, so every rerun re-granted — and the
-  // grant of an already-enrolled client then refused. The deploy chain wore
-  // green anyway whenever the runner piped its output (the pipe's exit code is
-  // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
-  const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
-  if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
-    const made = await agencyPost(
-      "/api/tenancy/portal-users",
-      { accountId: MINE, personAccountId: CONTACT },
-      staffCookie
-    )
-    if (!made.ok) stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
-  }
-  ok("the contact holds a client login on their company", true)
-}
 
 /** Find-or-create an app, a map, a ticket, a to-do and a deliverable on each
  * company. Everything on `THEIRS` is BAIT: it exists so the fence has something
