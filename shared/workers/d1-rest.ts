@@ -400,45 +400,127 @@ async function runNative<Row>(
   return out.results ?? []
 }
 
-/** Statement shapes a CONCATENATION of per-shard answers cannot honestly give.
+/** THE PAGE'S OWN TAIL, READ OFF THE STATEMENT — the merge's whole input.
  *
- * The three below are wrong in the same way and it is worth naming precisely,
- * because each looks like it works when there is only one database — which is
- * every environment until the mover runs:
+ * A concatenation of per-shard answers cannot page or sort, and until 7 Sep 2026
+ * this seam said so by REFUSING both. That refusal was correct and it was also
+ * the reason the relief valve above it could not be turned on: every collection
+ * read in this app is sorted at the door and paged (R14), so a merged read that
+ * "worked" would have thrown on the first list request after a move.
  *
- *   • `LIMIT n` — each shard returns up to n, so the caller gets up to n × shards
- *     rows, and they are the top n OF EACH shard rather than the top n overall.
- *     A keyset page built on that has the wrong rows in it AND takes its
- *     `nextCursor` from the last row of a concatenation, which is a position in no
- *     shard's ordering. Page two then repeats and skips, silently.
- *   • `ORDER BY` — sorted within each shard, unsorted between them. A merge sort
- *     across the results is the fix, and it has to know the sort key, which this
- *     seam does not.
- *   • `COUNT(` and the other aggregates — one row per shard. Every caller in the
- *     base reads `rows[0].n`, so a split module would report the FIRST shard's
- *     count as the whole total: R16's exact count, quietly wrong.
+ * It is a merge now, and the merge takes its keys from the STATEMENT rather than
+ * from a second argument the caller restates. That is the load-bearing decision:
+ * a caller-supplied sort key is one more copy of a fact, and a copy that
+ * disagrees with the `ORDER BY` beside it produces rows in an order nobody
+ * asked for, silently. Parsed off the tail, the two cannot differ.
  *
- * FAIL LOUD RATHER THAN ANSWER WRONG. Nothing paged is routed through
- * `queryModule` today, so this refuses nothing that currently runs — it is a
- * tripwire for the day somebody points a paged or counted read at the split path
- * and gets a plausible answer. Making it CORRECT (a per-shard cursor token and a
- * merge, an aggregate that folds) is a real piece of work with a decision in it;
- * the one thing that must not happen in the meantime is a wrong number nobody
- * questions. Single-database reads — every read today — are untouched.
+ * WHY RUNNING THE SAME `LIMIT n` ON EVERY SHARD IS SOUND. Each shard answers its
+ * own top n under the same ordering. The global top n is therefore a SUBSET of
+ * the union of those answers — a row outside every shard's top n has n rows
+ * ahead of it in its own shard alone. So merging the answers and cutting to n
+ * gives exactly the rows one database would have given. The cost is n × shards
+ * rows in flight, which is the price of the property.
+ *
+ * WHAT IT STILL REFUSES, and each for a reason that is not laziness:
+ *   • an ORDER BY it cannot read as plain columns — an expression, a `CASE`, a
+ *     `COLLATE`, a function. The merge would have to evaluate SQLite semantics
+ *     in JavaScript to place a row, and a merge that guesses is the wrong answer
+ *     wearing the right shape.
+ *   • an OFFSET. Skipping m rows per shard skips a different m in the merged
+ *     order; there is no local answer to a global skip. Keyset paging (this
+ *     app's own, R14) carries a WHERE and no OFFSET, so nothing here needs it.
+ *   • the aggregates. One row per shard, and every caller reads the first.
+ *     `countCollectionAcross` folds a count properly; the rest have no caller.
+ *   • a LIMIT with no ORDER BY across shards — "any n rows" is answerable, but
+ *     it is answerable DIFFERENTLY on every call, and a page with no order is a
+ *     bug at one database too.
  */
 const UNMERGEABLE: { pattern: RegExp; what: string }[] = [
-  { pattern: /\bLIMIT\b/i, what: "a LIMIT (each shard returns its own n, so the page is wrong)" },
-  { pattern: /\bORDER\s+BY\b/i, what: "an ORDER BY (sorted per shard, unsorted between them)" },
+  {
+    pattern: /\bOFFSET\b/i,
+    what:
+      "an OFFSET (skipping m rows per shard skips a different m in the merged order). " +
+      "Page by key instead — which is what R14 already asks of every growing collection",
+  },
   {
     pattern: /\b(COUNT|SUM|AVG|MIN|MAX|GROUP_CONCAT)\s*\(/i,
     what:
       "an aggregate (one row per shard, and every caller reads the first). " +
-      "A collection COUNT now HAS a real merge, countCollectionAcross in " +
+      "A collection COUNT has a real merge, countCollectionAcross in " +
       "shared/workers/count.ts sums the per-shard bounded counts and clamps once, " +
       "which is exact below the ceiling and an honest floor above it. Use that " +
       "rather than reaching for this seam",
   },
 ]
+
+/** One ordering term, as the statement wrote it. */
+export type MergeKey = { column: string; descending: boolean }
+
+/** What the merge needs, read off the end of a statement — or null when the tail
+ * is not one it can honestly reproduce.
+ *
+ * Deliberately strict about what an ORDER BY may contain: bare column names
+ * (optionally table-qualified), an optional direction, nothing else. Anything
+ * richer answers null and the caller refuses, which is the same conservative
+ * direction the old code took for every statement. */
+export function mergePlan(sql: string): { keys: MergeKey[]; limit: number | null } | null {
+  const tail = /\bORDER\s+BY\s+([\s\S]+?)(?:\s+LIMIT\s+(\d+))?\s*;?\s*$/i.exec(sql)
+  if (!tail) {
+    // No ORDER BY: a LIMIT alone cannot be cut deterministically (see above).
+    return /\bLIMIT\b/i.test(sql) ? null : { keys: [], limit: null }
+  }
+  const keys: MergeKey[] = []
+  for (const term of tail[1].split(",")) {
+    const m = /^\s*(?:[A-Za-z_][A-Za-z0-9_]*\.)?([A-Za-z_][A-Za-z0-9_]*)(?:\s+(ASC|DESC))?\s*$/i.exec(term)
+    if (!m) return null
+    keys.push({ column: m[1], descending: (m[2] ?? "").toUpperCase() === "DESC" })
+  }
+  // A LIMIT that did not sit at the very end of the ORDER BY tail is a shape
+  // this parse did not read, so it is not one it may claim to have read.
+  if (/\bLIMIT\b/i.test(sql) && tail[2] === undefined) return null
+  return { keys, limit: tail[2] === undefined ? null : Number(tail[2]) }
+}
+
+/** SQLITE'S OWN ORDERING, for the values a merged read actually carries.
+ *
+ * NULLs first ascending (SQLite's documented default), then numbers before text
+ * — the storage-class order — then the ordinary comparison inside a class. Rows
+ * here are database rows, so a value is a number, a string, null, or a blob this
+ * app never sorts on. */
+function compareValues(a: unknown, b: unknown): number {
+  if (a === b) return 0
+  if (a === null || a === undefined) return -1
+  if (b === null || b === undefined) return 1
+  const aNum = typeof a === "number"
+  const bNum = typeof b === "number"
+  if (aNum && bNum) return (a as number) - (b as number)
+  if (aNum !== bNum) return aNum ? -1 : 1
+  return String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0
+}
+
+/** Sort the union the way the statement asked, then cut it to the page it asked
+ * for. `Array.prototype.sort` is stable, so rows equal on every key keep the
+ * order the shards were listed in — which is `resolveModuleDatabases`'s order
+ * (override first), and therefore stable across calls rather than merely
+ * consistent within one. */
+export function mergeAndCut<Row>(
+  rows: Row[],
+  plan: { keys: MergeKey[]; limit: number | null }
+): Row[] {
+  const sorted = plan.keys.length
+    ? [...rows].sort((x, y) => {
+        for (const { column, descending } of plan.keys) {
+          const c = compareValues(
+            (x as Record<string, unknown>)[column],
+            (y as Record<string, unknown>)[column]
+          )
+          if (c !== 0) return descending ? -c : c
+        }
+        return 0
+      })
+    : rows
+  return plan.limit === null ? sorted : sorted.slice(0, plan.limit)
+}
 
 /**
  * Merged reads (the "splitter" read path): run the same query against several
@@ -454,7 +536,8 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
   sql: string,
   params: (string | number | null)[] = []
 ): Promise<Row[]> {
-  if (databaseIds.length > 1)
+  let plan: { keys: MergeKey[]; limit: number | null } | null = null
+  if (databaseIds.length > 1) {
     for (const { pattern, what } of UNMERGEABLE)
       if (pattern.test(sql))
         throw new Error(
@@ -462,6 +545,14 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
             `${databaseIds.length} databases. A concatenation of per-shard answers would be ` +
             `plausible and wrong. Read one database, or give this path a real merge.`
         )
+    plan = mergePlan(sql)
+    if (!plan)
+      throw new Error(
+        "d1QueryAcross: this statement's ORDER BY / LIMIT is not one the merge can reproduce " +
+          `(bare columns and an optional direction only), and it is being run across ${databaseIds.length} ` +
+          "databases. A concatenation would be plausible and wrong. Read one database, or simplify the ordering."
+      )
+  }
   // allSettled, not all: gather every shard's outcome so a failure names WHICH shard(s)
   // failed (Promise.all throws the first raw error and hides the rest). It still fails
   // LOUD on any error — a sharded read that silently dropped a shard's rows would be
@@ -473,7 +564,8 @@ export async function d1QueryAcross<Row = Record<string, unknown>>(
   const failed = databaseIds.filter((_, i) => settled[i].status === "rejected")
   if (failed.length)
     throw new Error(`d1QueryAcross: ${failed.length}/${databaseIds.length} shard(s) failed (${failed.join(", ")})`)
-  return settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []))
+  const rows = settled.flatMap((s) => (s.status === "fulfilled" ? s.value : []))
+  return plan ? mergeAndCut<Row>(rows, plan) : rows
 }
 
 /** Run a multi-statement script (schema/seeds — no params allowed).

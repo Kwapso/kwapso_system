@@ -354,7 +354,16 @@ export function activitySeam(worker: Worker & { silent: Record<string, string> }
       ...indexAllFunctions(join(__dirname, "..", "workers")),
     ])
 
-    /** Does this function, or anything it calls within MAX_HOPS, write a row? */
+    /** Does this function, or anything it calls within MAX_HOPS, write a row?
+     *
+     * The walk follows a call into a lib AND into another function in the same
+     * routes folder. The second half was added on 7 Sep 2026: it used to follow
+     * libs only, so a handler that shared its write with a sibling door through
+     * a helper extracted BESIDE it — the ordinary shape when one door grows a
+     * second way in — stopped one hop short and was reported as writing no
+     * history at all. The failure direction is the dangerous one: a false
+     * "silent", answered by adding a reasoned exemption for a door that does in
+     * fact log. */
     const writesActivity = (fn: string, seen = new Set<string>(), depth = 0): boolean => {
       if (depth > MAX_HOPS || seen.has(fn)) return false
       seen.add(fn)
@@ -363,7 +372,8 @@ export function activitySeam(worker: Worker & { silent: Record<string, string> }
       const code = stripComments(body)
       if (ACTIVITY_RE.test(code)) return true
       for (const call of code.matchAll(/(?<![A-Za-z0-9_$.])(\w{4,})\s*\(/g))
-        if (libFns.has(call[1]) && writesActivity(call[1], seen, depth + 1)) return true
+        if ((libFns.has(call[1]) || routeFns.has(call[1])) && writesActivity(call[1], seen, depth + 1))
+          return true
       return false
     }
 

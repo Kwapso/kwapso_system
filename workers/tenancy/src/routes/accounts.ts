@@ -18,7 +18,7 @@ import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } fr
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
-import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
+import { ownedMediaKey, reclaimMedia, storeImageDataUrl, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
@@ -103,8 +103,8 @@ async function accountImages(
   fields: { logoUrl?: string; coverUrl?: string }
 ): Promise<{ logoUrl?: string; coverUrl?: string }> {
   const [logoUrl, coverUrl] = await Promise.all([
-    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.logoUrl, REFUSE_IMAGE),
-    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.coverUrl, REFUSE_IMAGE),
+    storeImageDataUrl(env.MEDIA, teamMediaKey(guard.teamId, "accounts"), fields.logoUrl, REFUSE_IMAGE),
+    storeImageDataUrl(env.MEDIA, teamMediaKey(guard.teamId, "accounts"), fields.coverUrl, REFUSE_IMAGE),
   ])
   return { logoUrl, coverUrl }
 }

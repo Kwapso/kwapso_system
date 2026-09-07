@@ -692,7 +692,9 @@ describe("a story's attachments can be fixed, not only added and taken off", () 
     // pointing at bytes that are no longer the bytes it names — and /media is
     // served immutable, so a rewritten key is a stale picture in a cache.
     expect(all[1].url).not.toBe(wasUrl)
-    expect(all[1].url.startsWith("/media/story/")).toBe(true)
+    // `<team>/story/<ulid>` — the one shape a team's objects are named under
+    // since 7 Sep 2026 (teamMediaKey). It was `story/<team>/…` before that.
+    expect(all[1].url).toMatch(/^\/media\/[^/]+\/story\/[^/]+$/)
 
     // ONE line of history, saying what it was. A remove plus an add would read
     // as somebody deleting the evidence and then thinking better of it.

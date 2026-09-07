@@ -60,7 +60,7 @@ import { fail, json } from "@shared/workers/http"
 import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { ANY_FILE_TYPE, mediaKey, ownedMediaKey, reclaimMedia, storedContentType } from "@shared/workers/image"
+import { ANY_FILE_TYPE, ownedMediaKey, reclaimMedia, storedContentType, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
@@ -308,7 +308,7 @@ export async function postStreamDeliverableFile(request: Request, env: Env): Pro
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
-  const key = mediaKey(guard.teamId, "deliverables")
+  const key = teamMediaKey(guard.teamId, "deliverables")
   await env.INTERNAL_MEDIA.put(key, request.body, {
     httpMetadata: { contentType: storedContentType(contentType) },
   })

@@ -29,44 +29,57 @@ function interest(seed: Record<string, unknown> = {}): TeamInterest {
 const ALL_SHARDS = Array.from({ length: REALTIME_SHARDS }, (_, i) => i)
 const fresh = (resources: string[], all = false) => ({ resources, all, at: Date.now() })
 
+/** EVERY shard reporting the same thing, then whichever ones this test cares
+ * about overridden on top.
+ *
+ * Derived from `REALTIME_SHARDS` rather than written out as `s0`–`s3`, because
+ * the count is itself a derivation now (`ceil(peak ÷ watch line)`) and a fixture
+ * that seeds four shards out of nine leaves five that have NEVER reported — and
+ * "never reported" correctly answers "interested". Every narrowing assertion
+ * below would then be measuring the fixture's gaps rather than the registry. */
+const reporting = (base: ReturnType<typeof fresh>, overrides: Record<number, ReturnType<typeof fresh>> = {}) =>
+  Object.fromEntries(ALL_SHARDS.map((i) => [`s${i}`, overrides[i] ?? base]))
+
 describe("the interest registry answers which shards care", () => {
   it("narrows to the shards that declared the resource", () => {
-    const r = interest({
-      s0: fresh(["accounts"]),
-      s1: fresh(["help"]),
-      s2: fresh(["accounts", "help"]),
-      s3: fresh(["help"]),
-    })
+    const r = interest(
+      reporting(fresh(["nothing_anybody_asked_for"]), {
+        0: fresh(["accounts"]),
+        1: fresh(["help"]),
+        2: fresh(["accounts", "help"]),
+        3: fresh(["help"]),
+      })
+    )
     expect(r.shardsFor("accounts")).toEqual([0, 2])
     expect(r.shardsFor("help")).toEqual([1, 2, 3])
   })
 
   it("answers NOBODY when genuinely nobody is listening — the whole point", () => {
-    const r = interest({ s0: fresh(["accounts"]), s1: fresh(["accounts"]), s2: fresh(["accounts"]), s3: fresh(["accounts"]) })
+    const r = interest(reporting(fresh(["accounts"])))
     expect(r.shardsFor("brand_assets")).toEqual([])
   })
 
   describe("every unknown answers YES", () => {
     it("a shard that has NEVER reported — its first listener is mid-handshake", () => {
       const r = interest({ s0: fresh(["accounts"]) })
-      expect(r.shardsFor("brand_assets"), "shards 1-3 never reported").toEqual([1, 2, 3])
+      expect(r.shardsFor("brand_assets"), "every shard but 0 has never reported").toEqual(ALL_SHARDS.slice(1))
     })
 
     it("an entry older than a listener's own deadline", () => {
       const stale = { resources: ["accounts"], all: false, at: Date.now() - INTEREST_STALE_MS - 1 }
-      const r = interest({ s0: stale, s1: fresh(["accounts"]), s2: fresh(["accounts"]), s3: fresh(["accounts"]) })
+      const r = interest(reporting(fresh(["accounts"]), { 0: stale }))
       // Past the window every socket has reconnected and re-reported, so a stale
       // entry describes nobody — and is believed about nothing.
       expect(r.shardsFor("brand_assets")).toEqual([0])
     })
 
     it("a shard holding a PRE-SUBSCRIPTION client (all:true)", () => {
-      const r = interest({ s0: fresh([], true), s1: fresh(["accounts"]), s2: fresh(["accounts"]), s3: fresh(["accounts"]) })
+      const r = interest(reporting(fresh(["accounts"]), { 0: fresh([], true) }))
       expect(r.shardsFor("anything-at-all")).toEqual([0])
     })
 
     it("an event with no resource on it", () => {
-      const r = interest({ s0: fresh(["accounts"]), s1: fresh(["x"]), s2: fresh(["x"]), s3: fresh(["x"]) })
+      const r = interest(reporting(fresh(["x"]), { 0: fresh(["accounts"]) }))
       expect(r.shardsFor(null), "unclassifiable ping goes everywhere").toEqual(ALL_SHARDS)
     })
 

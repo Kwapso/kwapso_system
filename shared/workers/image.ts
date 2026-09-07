@@ -30,6 +30,28 @@ export function mediaKey(...owners: string[]): string {
   return [...owners, ulid()].join("/")
 }
 
+/** THE ONE SHAPE A TEAM'S OBJECTS ARE NAMED UNDER: `<team>/<module>/<ulid>`.
+ *
+ * `mediaKey` joins whatever it is handed, so for a year the SHAPE of a key was
+ * decided at each door: `ticket/<team>/…` here, `<team>/apps/…` there,
+ * `teams/<team>/…` for the logo. "Find, count, move or delete one tenant's
+ * objects" was therefore five prefix scans, and the answer to "which five" lived
+ * in a test table rather than in code. This function is where the shape is
+ * decided, once: the team FIRST, so one tenant's files are one prefix, and the
+ * module SECOND, so a reclaim can prove "this module" and not only "this team"
+ * (the 5 Sep 2026 bug: four modules under a bare `<team>/` prefix, and a brand
+ * asset's URL pasted into a certificate's file field passing the staff door's
+ * ownership proof).
+ *
+ * Objects written under the older shapes stay exactly where they are — a key
+ * cannot be renamed — and DATA-MODEL.md § "Where a tenant's FILES live" lists
+ * them as history. Everything minted from today is this shape. The one key with
+ * no team in it is deliberate and is not this function's: a profile photo is
+ * `users/<user>/…` because it follows the person between teams. */
+export function teamMediaKey(teamId: string, module: string): string {
+  return mediaKey(teamId, module)
+}
+
 /** The key a `/media/*` request is asking for — or null when it is not a key we
  * would ever have written. Boundary validation, in the house style: a request
  * value is checked before it reaches a store, never trusted because "R2 has no

@@ -13,14 +13,7 @@ import {
   type D1Rest,
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import {
-  dataUrlBytes,
-  MAX_IMAGE_BYTES,
-  mediaKey,
-  ownedMediaKey,
-  parseDataUrl,
-  reclaimMedia,
-} from "@shared/workers/image"
+import { dataUrlBytes, MAX_IMAGE_BYTES, ownedMediaKey, parseDataUrl, reclaimMedia, teamMediaKey } from "@shared/workers/image"
 import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import { d1ConfigFrom } from "@shared/workers/gating"
 import type { ActivityOrigin } from "@shared/workers/origin"
@@ -224,7 +217,7 @@ export async function createTeam(
 }
 
 /** Edit a team's name + optional logo (the global teams row). A new logo (data
- * URL) lands in R2 and is served by the gateway at /media/teams/<id>/<random> —
+ * URL) lands in R2 and is served by the gateway at /media/<team>/logo/<random> —
  * a capability URL (no session on that door), so the key carries a random tail.
  * Caller checks teams:edit. */
 export async function updateTeamDetails(
@@ -271,10 +264,16 @@ export async function updateTeamDetails(
     const current = await env.DB.prepare("SELECT logo_url FROM teams WHERE id = ?")
       .bind(teamId)
       .first<{ logo_url: string | null }>()
-    supersededKey = ownedMediaKey(current?.logo_url, "/media/", "teams", teamId)
+    // THE ONE TEAM SHAPE, `<team>/logo/…`, since 7 Sep 2026 (teamMediaKey says
+    // why one shape). A logo stored under the older `teams/<team>/…` shape is
+    // not this owners list and is left where it is on its first replacement —
+    // one small object, once, per team — rather than the reclaim carrying a
+    // second owners list nothing mints any more, which media-keys.test.ts
+    // rightly refuses.
+    supersededKey = ownedMediaKey(current?.logo_url, "/media/", teamId, "logo")
     // Unguessable by construction — the logo is served with no session, so the
     // key is the credential (mediaKey; see the gateway's /media/* door).
-    const key = mediaKey("teams", teamId)
+    const key = teamMediaKey(teamId, "logo")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
     logoUrl = `/media/${key}?v=${Date.now()}`
   }

@@ -235,7 +235,11 @@ describe("a changed team logo reclaims the one it replaced", () => {
   }
 
   it("deletes the superseded object — and only after the row has moved", async () => {
-    const old = "teams/01TEAM/01OLDOLDOLDOLDOLDOLDOLDOLD"
+    // The one shape a team's objects are named under since 7 Sep 2026:
+    // `<team>/logo/<ulid>` (teamMediaKey, shared/workers/image.ts). Before that
+    // day it was `teams/<team>/<ulid>`, which put one tenant's logo under a
+    // different top-level prefix from the rest of that tenant's files.
+    const old = "01TEAM/logo/01OLDOLDOLDOLDOLDOLDOLDOLD"
     const { db, calls } = fakeDb([
       { match: "logo_url FROM teams", first: { logo_url: `/media/${old}?v=1` } },
     ])
@@ -248,6 +252,27 @@ describe("a changed team logo reclaims the one it replaced", () => {
       calls.some((c) => c.sql.includes("UPDATE teams SET name = ?, logo_url = ?")),
       "the row moved"
     ).toBe(true)
+  })
+
+  // THE ONE OBJECT THE RECLAIM DELIBERATELY LEAVES BEHIND, and it is worth a
+  // test rather than a comment, because "nothing was deleted" is the same
+  // observation as a broken reclaim.
+  //
+  // A key cannot be renamed. A logo stored under the pre-7-Sep shape
+  // (`teams/<team>/…`) is not under the owners list the mint now uses, so its
+  // first replacement leaves it in the bucket — one small object, once, per
+  // team. The alternative was a second `ownedMediaKey` call proving a prefix
+  // NOTHING mints any more, which `media-keys.test.ts` refuses on purpose: a
+  // reclaim that matches no mint deletes nothing and reads as if it worked.
+  // Every logo written from today onwards is reclaimed by the test above.
+  it("leaves a pre-rename logo where it is, once, rather than proving a prefix nothing mints", async () => {
+    const { db } = fakeDb([
+      { match: "logo_url FROM teams", first: { logo_url: "/media/teams/01TEAM/01OLDOLDOLDOLDOLDOLDOLDOLD?v=1" } },
+    ])
+    const b = bucket()
+    await updateTeamDetails({ ...envWith(db), MEDIA: b.r2 }, "01TEAM", "New name", PNG)
+    expect(b.deletes).toEqual([])
+    expect(b.puts[0], "and the replacement lands under the new shape").toMatch(/^01TEAM\/logo\//)
   })
 
   it("destroys nothing when the stored logo isn't this team's own object", async () => {
