@@ -4638,12 +4638,34 @@ const ScreenShell = React.forwardRef<HTMLDivElement, ScreenShellProps>(
                     (`--folder-tab-overlap`) is the whole attachment mechanic,
                     so padding here would be subtracted from it. */}
                 <div data-slot="screen-shell-aside-tab" className={cn("min-w-0 shrink-0", ASIDE_TAB)}>
+                  {/* THE × RIDES THE TAB, not the panel's header — client,
+                      2026-09-07: "the x for the assistant is on the tab (same as
+                      the old breadcrumb tabs) not a button".
+                      
+                      She is right that this is the same affordance, and it now
+                      exists: `onClose` grew on `BreadcrumbFolders` in v1.2.59
+                      for the workspace tab set, drawing a real <button> as a
+                      SIBLING of the crumb — never nested inside its anchor,
+                      which is invalid HTML and was the workaround that left a
+                      keyboard user unable to close anything. Handing it
+                      `toggleAside` makes the assistant's own tab close the way
+                      every other closable tab in the product closes, from one
+                      drawing rather than a second control invented here.
+                      
+                      `onCurrentActivate` STAYS. The two are not duplicates: the
+                      tab body toggles (press the tab you are on and the column
+                      folds), while the × is the visible, unambiguous "shut it"
+                      the tab body cannot advertise. Chapter 27's own edge
+                      handle keeps doing the same job from the other side. */}
                   <BreadcrumbFolders
                     items={[{ label: asideLabel }]}
                     label={asideLabel}
                     onCurrentActivate={toggleAside}
                     currentActivateLabel={asideCloseLabel}
                     currentActivateExpanded={isAsideOpen}
+                    onClose={toggleAside}
+                    closeLabel={asideCloseLabel}
+                    formatCloseLabel={(_itemLabel, close) => close}
                   />
                 </div>
                 {/* THE PANEL'S OWN SLOT. Still "paper on the ground, painting

@@ -42,7 +42,6 @@ import { AssistantLimitNotice } from "@/components/assistant-limit-notice"
 import { citationPills, TurnSources } from "@/components/agent-sources"
 import { AgentUsageDialog } from "@/components/agent-usage-dialog"
 import { useAgentDock } from "@/lib/agent-dock"
-import { setAgentOpen } from "@/lib/agent-open"
 import { useAgentChat, type AgentChatItem } from "@/lib/use-agent-chat"
 import { usePermissions } from "@/lib/perms"
 import { useLanguage, useT } from "@shared/web/language"
@@ -582,45 +581,6 @@ export function AgentPanel({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t("New chat")}</TooltipContent>
-                </Tooltip>
-              )}
-              {/* THE CLOSE CONTROL IS BACK, AND ONLY WHEN DOCKED — which is not
-                  a contradiction of ITEM 1 above but the same reasoning applied
-                  to a shape that did not exist when she made it.
-
-                  Client, 2026-09-07: "add the x to close the assistant tab —
-                  that's the code assistant behaviour." On 31 Aug 2026 she asked
-                  for the opposite ("remove the x button on top right, i dont
-                  need it anymore") and it was deleted outright. Both rulings
-                  stand, because they are about two different panels.
-
-                  The 31 Aug × sat on a POPOVER. A popover is dismissed by
-                  Escape and by clicking away from it — the platform gives it
-                  two ways out — so a third was genuinely redundant, which is
-                  what the note above says. A DOCKED COLUMN has neither: Escape
-                  does nothing to a panel that is part of the layout, and there
-                  is no "away" to click. The only way out was the shell's own
-                  edge handle, which is a 3px target most people never find, and
-                  a code assistant's panel closes from its own corner. So the ×
-                  is drawn for `docked` and stays absent from the popover, where
-                  her original ruling is still exactly right.
-
-                  It calls the same store the launcher toggles, so the button
-                  that opened the column is the button that shows it is closed —
-                  one fact, not two. */}
-              {docked && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      onClick={() => setAgentOpen(false)}
-                      aria-label={t("Close the assistant")}
-                    >
-                      <X className="size-5" aria-hidden />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("Close the assistant")}</TooltipContent>
                 </Tooltip>
               )}
             </>

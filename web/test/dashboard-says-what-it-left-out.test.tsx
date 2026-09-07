@@ -161,12 +161,29 @@ describe("the tickets dashboard says what it left out", () => {
     ).toBeTruthy()
   })
 
-  it("names the tickets the matrix cannot speak for, as a number", () => {
+  it("no longer names the tickets the flow cannot speak for — she asked for the line gone", () => {
+    // THIS ASSERTION IS INVERTED ON PURPOSE, and the inversion is the record.
+    //
+    // It used to require "788 older tickets have no record of what they arrived
+    // as", because migration 0065 refused to backfill precisely so that could be
+    // TOLD rather than folded into the diagonal, where it would be a rate over a
+    // denominator that had quietly changed. That reasoning has not stopped being
+    // true.
+    //
+    // The client, 2026-09-07, quoted every line the empty panel drew back at me
+    // and said "remove all this text". There were four tellings of one nothing:
+    // this panel's own sentence, the kit's "Nothing recorded" register, its body,
+    // and this count. She is right that four is absurd. The COST, which is hers
+    // to carry and not mine to hide: with the count gone, a reader cannot tell an
+    // empty flow that means "nothing has been triaged yet" from one that means
+    // "two thousand tickets predate the column". The hidden table still carries
+    // the zeros for a screen reader, and the door still returns the number — so
+    // putting the line back is one JSX expression, not a rebuild.
     show(FULL)
-    // 0065 refused to backfill precisely so this could be TOLD rather than
-    // folded into the diagonal, where it would be a rate over a denominator
-    // that had quietly changed.
-    expect(screen.getByText(/788 older tickets have no record/i)).toBeTruthy()
+    expect(
+      screen.queryByText(/older tickets have no record/i),
+      "the unrecorded count is back on the panel — if that is deliberate, invert this test again and say why"
+    ).toBeNull()
   })
 
   it("says the closing-time spread only looks back six months, when there is nothing in it", () => {
@@ -312,7 +329,14 @@ describe("the tickets dashboard says what it left out", () => {
     // the second — the vocabulary exists from day one, the column feeding it
     // only from 2026-09-06.
     show({ ...EMPTY, openByTypeAndStatus: FULL.openByTypeAndStatus })
-    expect(screen.getByText(/nothing to compare yet/i)).toBeTruthy()
+    // NO SENTENCE ANY MORE — client, 2026-09-07, "remove all this text". The
+    // columns and their zeros are the whole answer now, which is why the
+    // assertion below got STRICTER rather than looser: the picture has to be
+    // there, because nothing else is.
+    expect(
+      screen.queryByText(/nothing to compare yet/i),
+      "the empty panel is explaining itself in words again"
+    ).toBeNull()
     const flow = document.querySelector('[data-slot="sankey"]') as HTMLElement
     expect(flow, "the flow drew nothing at all on an empty answer").toBeTruthy()
     expect(
@@ -388,10 +412,13 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
       "Tendency",
     ])
       expect(screen.getByText(heading), `the ${heading} panel is missing from the app's dashboard`).toBeTruthy()
-    // The subtractions the panels have to keep announcing — the same three the
-    // suite above proves for the whole-team screen. A "mini version" that
-    // stopped saying what it left out would be the worse half of this feature.
-    expect(screen.getByText(/788 older tickets have no record/i)).toBeTruthy()
+    // The subtractions the panels have to keep announcing — a "mini version"
+    // that stopped saying what it left out would be the worse half of this
+    // feature. There were three; the unrecorded count left on 2026-09-07 at the
+    // client's word ("remove all this text"), and its own test one suite up
+    // records the cost. The trend's floor stays, because a chart drawing two
+    // kinds and silently dropping two others is the exact failure this file is
+    // named after.
     expect(
       screen.getByText(
         new RegExp(`at least ${CLOSURE_TREND_MIN_CLOSURES} of a kind closed`, "i")

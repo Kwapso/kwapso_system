@@ -621,12 +621,10 @@ function WhoHasMore({
  * first day and the column feeding it is stamped only from 2026-09-06 onward. */
 function RaisedAsFlow({
   rows,
-  notRecorded,
   types,
   t,
 }: {
   rows: TicketDashboard["raisedVsCurrent"]
-  notRecorded: number
   types: string[]
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
@@ -647,34 +645,40 @@ function RaisedAsFlow({
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      {/* ONE SLOT, TWO SENTENCES, and never neither: what the traffic off the
-          diagonal came to, or why there is none yet. */}
-      {counted === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t(
-            "Nothing has been triaged since we started recording what a ticket arrived as, so there is nothing to compare yet."
-          )}
-        </p>
-      ) : (
+      {/* THE SENTENCE ONLY WHEN THERE IS SOMETHING TO SAY. Client, 2026-09-07,
+          quoting back every line the empty panel drew: "remove all this text".
+          She had four stacked ways of being told the same nothing — this
+          panel's own explanation, the kit's "Nothing recorded" register and its
+          body, and the count of older tickets underneath.
+          
+          The columns and their zeros already say it, and they say it in the
+          shape a reader will still be looking at once there IS data. So the
+          empty case now draws the picture alone. The FULL case keeps its
+          sentence, because "58% of what you triage is a relabel" is a finding,
+          not a status. */}
+      {counted > 0 ? (
         <p className="text-sm">
           {t("{moved} of {counted} tickets left triage as a different kind from the one they arrived as.", {
             moved,
             counted,
           })}
         </p>
-      )}
+      ) : null}
       <Sankey
         fromTitle={t("Raised as")}
         toTitle={t("Became")}
         label={t("Raised as, then triaged as")}
         nodes={types.map((type) => ({ id: type, label: type, color: ticketTypeColour(type) }))}
         flows={decided.map((r) => ({ from: r.raisedAsType, to: r.helpType as string, value: r.n }))}
+        /* NO REGISTER OVER THE EMPTY PLOT — the same ruling as the sentences
+           above. The kit offers a quiet "Nothing recorded" block for a chart
+           with categories and no traffic, which is right for a caller with
+           nothing else on the card; here it was the third telling of one fact.
+           An empty node passed deliberately, not omitted: omitting it restores
+           the default, because the prop falls back rather than being absent. */
+        unrecordedState={<></>}
       />
-      {notRecorded > 0 ? (
-        <p className="text-muted-foreground text-xs">
-          {t("{count} older tickets have no record of what they arrived as.", { count: notRecorded })}
-        </p>
-      ) : null}
+
     </div>
   )
 }
@@ -1652,8 +1656,7 @@ export function TicketsDashboard({
             <Panel title={t("Raised as, then triaged as")}>
               <RaisedAsFlow
                 rows={data?.raisedVsCurrent ?? []}
-                notRecorded={data?.raisedAsNotRecorded ?? 0}
-                types={types}
+                        types={types}
                 t={t}
               />
             </Panel>
@@ -1671,8 +1674,7 @@ export function TicketsDashboard({
               <Panel title={t("Raised as, then triaged as")}>
                 <RaisedAsFlow
                   rows={data?.raisedVsCurrent ?? []}
-                  notRecorded={data?.raisedAsNotRecorded ?? 0}
-                  types={types}
+                            types={types}
                   t={t}
                 />
               </Panel>
