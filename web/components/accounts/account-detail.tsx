@@ -112,6 +112,7 @@ import {
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
+import { useAfterPaint } from "@shared/web/after-paint"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { WaveCollection } from "@/components/work/waves-screen"
 import { useRecordActivity } from "@/lib/use-record-activity"
@@ -135,7 +136,14 @@ export function AccountDetailScreen({
   // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
   // nested panel on it. The same key the Dropdown values manager writes, so
   // an emoji changed there reaches these rows with no deploy.
-  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+  // THE SECONDARY HALF, AFTER THE RECORD IS READABLE. The glyphs, the impact panel and the
+  // apps picker are, a badge or a panel beside the record rather than the record —
+  // and until 7 Sep 2026 every one of them left the browser in front of it. The
+  // gate is the one the team-wide prewarm already sits behind
+  // (shared/web/after-paint.ts; use-screen-data.ts says why), and the census
+  // that found them is web/test/cold-screen-hops.test.tsx.
+  const painted = useAfterPaint()
+  const teamVocabulary = useCached<SelectableValue[]>(painted ? `selectable:${teamId}` : null, () =>
     tenancy.selectable().then((r) => r.values)
   )
 
@@ -153,7 +161,7 @@ export function AccountDetailScreen({
   // that is worth, from the ONE savings door (it narrows by account, so the
   // arithmetic here is the same arithmetic the maps screen shows for everybody).
   // R25: the panel renders SAVINGS_CAPTION with it, word for word.
-  const valueQ = useCached<SavingsView>(accountImpactKey(accountId), () =>
+  const valueQ = useCached<SavingsView>(painted ? accountImpactKey(accountId) : null, () =>
     tenancy.impact({ accountId })
   )
 
@@ -165,7 +173,7 @@ export function AccountDetailScreen({
   // rather than asked for again: a sprint covers one app and an app belongs to
   // one account, so offering another client's systems would be offering a row
   // the door would refuse.
-  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  const appsQ = useCached<AppRow[]>(painted ? appsKey(teamId) : null, () => listFetch.apps(teamId))
   const canReadKnowledge = can("knowledge", "read")
   const canEdit = can("accounts", "edit")
   const canArchive = can("accounts", "delete")

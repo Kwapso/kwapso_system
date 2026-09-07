@@ -44,6 +44,7 @@ import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
+import { useAfterPaint } from "@shared/web/after-paint"
 import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
@@ -125,7 +126,14 @@ export function HelpDetailScreen({
     })
   )
   const threadTotal = useCachedValue<number>(`total:help-thread:${helpId}`)
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+  // THE SECONDARY HALF, AFTER THE RECORD IS READABLE. Everything below this line
+  // is a picker, a badge or a panel beside the record rather than the record —
+  // and until 7 Sep 2026 every one of them left the browser in front of it. The
+  // gate is the one the team-wide prewarm already sits behind
+  // (shared/web/after-paint.ts; use-screen-data.ts says why), and the census
+  // that found them is web/test/cold-screen-hops.test.tsx.
+  const painted = useAfterPaint()
+  const membersQ = useCached<TeamMember[]>(painted ? `members:${teamId}` : null, () =>
     tenancy.members().then((r) => r.members)
   )
   // The generic record feed (Law R5) + the exact server total its tab badges
@@ -135,10 +143,10 @@ export function HelpDetailScreen({
   // and what is attached to it. One bounded read of both totals when the ticket
   // opens; the rows behind each tab stay lazy (lib/use-record-counts).
   useRecordCounts("help", helpId)
-  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+  const selectableQ = useCached<SelectableValue[]>(painted ? `selectable:${teamId}` : null, () =>
     tenancy.selectable().then((r) => r.values)
   )
-  const stakeholdersQ = useCached<HelpStakeholder[]>(`help-stakeholders:${helpId}`, () =>
+  const stakeholdersQ = useCached<HelpStakeholder[]>(painted ? `help-stakeholders:${helpId}` : null, () =>
     content.helpStakeholders(helpId).then((r) => r.stakeholders)
   )
 

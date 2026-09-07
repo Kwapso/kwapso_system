@@ -42,6 +42,7 @@ import { appsKey, helpKey, listFetch, processesKey, sprintsKey, storiesKey } fro
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, HelpTicket, ProcessSummary, SelectableValue, Sprint, Story, TeamMember } from "@shared/types"
 import { formatDate } from "@shared/web/format"
+import { useAfterPaint } from "@shared/web/after-paint"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -87,20 +88,34 @@ function shapeStories(stories: Story[], lang: Language, marks?: Map<string, stri
  * could be given to. Lifted out because three screens open this same form (this
  * one, a sprint's, an app's) and each of them needs the same four lists. */
 export function useStoryFormOptions(teamId: string) {
-  const sprintsQ = useCached<Sprint[]>(sprintsKey(teamId), () => listFetch.sprints(teamId))
-  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
-  // Both are caches other screens already hold, so opening this page costs a team
-  // that has been to Tickets or Apps nothing.
-  const ticketsQ = useCached<HelpTicket[]>(helpKey(teamId, "all"), () => listFetch.help(teamId))
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+  // SIX LISTS FOR A DIALOG NOBODY HAS OPENED, and until 7 Sep 2026 all six left
+  // in front of the record. A ticket's own screen calls this so that "New story"
+  // works when it is pressed, and the census (web/test/cold-screen-hops.test.tsx)
+  // found sprints, apps and processes among the twelve requests a person waits
+  // through to read one ticket.
+  //
+  // So they wait for the paint, the same gate the team-wide prewarm sits behind
+  // (use-screen-data.ts). Nothing a person can perceive moves: the form is
+  // behind a button, `useAfterPaint` is true within a beat of the screen going
+  // quiet and unconditionally within three seconds, and each of these is a
+  // cache another screen may already have warmed — a cache HIT does not wait for
+  // anything, so a team that has been to Tickets or Apps pays nothing either way.
+  const painted = useAfterPaint()
+  const on = <T,>(key: T): T | null => (painted ? key : null)
+  const sprintsQ = useCached<Sprint[]>(on(sprintsKey(teamId)), () => listFetch.sprints(teamId))
+  const appsQ = useCached<AppRow[]>(on(appsKey(teamId)), () => listFetch.apps(teamId))
+  const ticketsQ = useCached<HelpTicket[]>(on(helpKey(teamId, "all")), () => listFetch.help(teamId))
+  const membersQ = useCached<TeamMember[]>(on(`members:${teamId}`), () =>
     tenancy.members().then((r) => r.members)
   )
   // The maps a story can say it changes (CHECKLIST 6.5). Same cache key the
   // Processes screen reads, so a person who has been there pays nothing.
-  const processesQ = useCached<ProcessSummary[]>(processesKey(teamId), () => listFetch.processes(teamId))
+  const processesQ = useCached<ProcessSummary[]>(on(processesKey(teamId)), () =>
+    listFetch.processes(teamId)
+  )
   // The team's own word for the kind of work (CHECKLIST 6.2) — one cache, shared
   // with every other dropdown in the app.
-  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+  const selectableQ = useCached<SelectableValue[]>(on(`selectable:${teamId}`), () =>
     tenancy.selectable().then((r) => r.values)
   )
   return {

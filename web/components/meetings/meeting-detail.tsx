@@ -69,6 +69,7 @@ import { RecordMark } from "@shared/web/record-mark"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime, toLocalInput } from "@shared/web/format"
 import { RichText } from "@shared/web/rich-text-view"
+import { useAfterPaint } from "@shared/web/after-paint"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -150,14 +151,22 @@ export function MeetingDetailScreen({
   useRecordCounts("meetings", meetingId)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("meetings", meetingId))
 
-  const accountsQ = useCached<Account[]>(canEdit ? `accounts:${teamId}` : null, () =>
+  // THE SECONDARY HALF, AFTER THE RECORD IS READABLE. The three edit-form pickers are
+  // beside the record rather than the record, and until 7 Sep 2026 every one of them left the browser in front of it. The
+  // gate is the one the team-wide prewarm already sits behind
+  // (shared/web/after-paint.ts; use-screen-data.ts says why), and the census
+  // that found them is web/test/cold-screen-hops.test.tsx.
+  const painted = useAfterPaint()
+  const accountsQ = useCached<Account[]>(painted && canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
   // WHICH SYSTEM A MEETING WAS ABOUT. Read on the same condition as the accounts
   // above, and out of the SAME bounded cache the apps page holds — an agency has
   // tens of apps, so the picker costs nothing anybody has not already paid.
-  const appsQ = useCached<AppRow[]>(canEdit ? appsKey(teamId) : null, () => listFetch.apps(teamId))
-  const purposesQ = useCached<MeetingPurpose[]>(canEdit ? `purposes:${teamId}` : null, () =>
+  const appsQ = useCached<AppRow[]>(painted && canEdit ? appsKey(teamId) : null, () =>
+    listFetch.apps(teamId)
+  )
+  const purposesQ = useCached<MeetingPurpose[]>(painted && canEdit ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
 
