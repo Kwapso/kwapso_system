@@ -268,3 +268,43 @@ describe("the session cookie cannot be written by another host on the site", () 
     ).toBe(0)
   })
 })
+
+describe("the presence stamp does not hold the answer up", () => {
+  /** A session last seen long enough ago that the five-minute throttle lets the
+   * stamp be rewritten — the state EVERY first request of a visit is in. */
+  async function staleSession() {
+    const { setCookie } = await createSession(env(), "U1")
+    db.prepare("UPDATE sessions SET last_seen_at = ?").run(new Date(Date.now() - 3600_000).toISOString())
+    return tokenOf(setCookie)
+  }
+  const seenAt = () => (db.prepare("SELECT last_seen_at FROM sessions").get() as { last_seen_at: string }).last_seen_at
+  /** A MACROTASK, not a resolved promise. A deferral test that only awaits a
+   * microtask passes against work that was dropped on the floor. */
+  const nextTick = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it("with a lifetime to hang it on, the answer comes back BEFORE the stamp is written", async () => {
+    const token = await staleSession()
+    const deferred: Promise<unknown>[] = []
+    const stale = seenAt()
+
+    const me = await getSessionUser(
+      env({ DEFER: ((work: Promise<unknown>) => void deferred.push(work)) as never }),
+      withCookie(`${SESSION_COOKIE}=${token}`)
+    )
+
+    expect(me?.id, "the caller is identified from the read alone").toBe("U1")
+    expect(deferred, "the bookkeeping write rode the request's lifetime").toHaveLength(1)
+
+    await Promise.all(deferred)
+    await nextTick()
+    expect(seenAt() > stale, "and it still happened — deferred is not dropped").toBe(true)
+  })
+
+  it("with NO lifetime — a cron tick, this suite — it is awaited exactly as before", async () => {
+    const token = await staleSession()
+    const stale = seenAt()
+    await getSessionUser(env(), withCookie(`${SESSION_COOKIE}=${token}`))
+    // No tick, no flush: by the time the call returned the row had moved.
+    expect(seenAt() > stale, "deferrerFor returns undefined and the caller awaits").toBe(true)
+  })
+})

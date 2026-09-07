@@ -147,7 +147,13 @@ export function WritePanels({
   // this list is the server's answer rather than a second opinion formed here.
   // A caller staffed to nothing gets an empty list and the dialog leaves the
   // option out — an option that can only end in a refusal is not an option.
-  const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
+  //
+  // AND IT WAITS FOR A PANEL TO EXIST. This is the option list of a dialog, and
+  // it was read on every screen in the team area whether or not any dialog was
+  // open — on a cold deep link, one of the requests a person waited through to
+  // see a record they had not asked to edit. `query.panel` is the URL segment that
+  // decides whether any of these dialogs draws at all, so it is the honest gate.
+  const appsQ = useCached<AppRow[]>(teamId && query.panel ? appsKey(teamId) : null, () =>
     listFetch.apps(teamId as string)
   )
   const openableApps = React.useMemo(

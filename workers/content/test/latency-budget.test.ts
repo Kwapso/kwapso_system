@@ -17,7 +17,7 @@
 // SOONER, which is exactly the case a plain `Promise.all` gets wrong.
 
 import { describe, expect, it, vi } from "vitest"
-import { beginD1Timing, beginRequest, logIfSlow, noteTeam, withTiming } from "@shared/workers/timing"
+import { beginD1Timing, beginRequest, countedDb, logIfSlow, noteTeam, withTiming } from "@shared/workers/timing"
 import { LATENCY_BUDGET_MS, MAX_D1_TRIPS_PER_DOOR, budgetForKind } from "@shared/workers/limits"
 import { inOrder } from "@shared/workers/parallel"
 
@@ -154,5 +154,87 @@ describe("independent reads run together and fail in order", () => {
     })
     await expect(inOrder([boom, other])).rejects.toThrow("first")
     expect(ran).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A core database that answers instantly and remembers what it was asked. Only
+ * the four things a handler ever calls on a binding. */
+function fakeCore(): D1Database & { asked: string[] } {
+  const asked: string[] = []
+  const statement = (sql: string): D1PreparedStatement =>
+    ({
+      bind: () => statement(sql),
+      first: async () => ({ id: "u1" }),
+      run: async () => ({ success: true, meta: { changes: 1 } }),
+      all: async () => ({ success: true, results: [{ id: "u1" }, { id: "u2" }], meta: {} }),
+      raw: async () => [["u1"]],
+    }) as unknown as D1PreparedStatement
+  return {
+    asked,
+    prepare: (sql: string) => {
+      asked.push(sql)
+      return statement(sql)
+    },
+    batch: async (statements: unknown[]) => statements.map(() => ({ success: true, meta: { changes: 1 } })),
+    exec: async () => ({ count: 1, duration: 0 }),
+    dump: async () => new ArrayBuffer(0),
+  } as unknown as D1Database & { asked: string[] }
+}
+
+describe("the CORE database's own trips are counted too", () => {
+  it("a native env.DB statement lands in the same census the REST door writes to", async () => {
+    // THE BUG THIS LOCKS. `beginD1Timing` hangs its array on the D1 REST config,
+    // so it could only ever see the per-team databases. `auth` makes 42 native
+    // core-DB calls and zero REST ones, so every slow-door line it ever printed
+    // said "0 D1 trips, 0 rows" — not merely missing, but pointing away from the
+    // cause.
+    const request = agedRequest(900)
+    const db = countedDb(request, fakeCore())
+    await db.prepare("SELECT id FROM sessions WHERE token = ?").bind("t").first()
+    await db.prepare("SELECT id FROM users WHERE id = ?").bind("u1").all()
+
+    const said = warnings(() => logIfSlow(request, "GET /api/auth/me", "read"))
+    expect(said).toHaveLength(1)
+    expect(said[0]).toContain("2 D1 trips")
+    // Three rows: one from `first`, two from `all`.
+    expect(said[0]).toContain("3 rows")
+    // And the SHAPE, which is the half that says what to fix.
+    expect(said[0]).toContain("SELECT sessions")
+    expect(said[0]).toContain("SELECT users")
+  })
+
+  it("a batch is ONE trip, and D1 gets its own statements back", async () => {
+    const request = agedRequest(10)
+    const core = fakeCore()
+    const db = countedDb(request, core)
+    const stats = beginD1Timing(request)
+    await db.batch([db.prepare("INSERT INTO a VALUES (?)"), db.prepare("INSERT INTO b VALUES (?)")])
+    expect(stats).toHaveLength(1)
+    expect(stats[0].op).toBe("BATCH ×2")
+  })
+
+  it("a statement that THREW is still a trip somebody waited for", async () => {
+    const request = agedRequest(10)
+    const stats = beginD1Timing(request)
+    const broken = {
+      prepare: () =>
+        ({ bind: () => ({ first: async () => { throw new Error("no") } }) }) as unknown as D1PreparedStatement,
+    } as unknown as D1Database
+    const db = countedDb(request, broken)
+    await expect(db.prepare("SELECT id FROM users").bind("x").first()).rejects.toThrow("no")
+    expect(stats).toHaveLength(1)
+    expect(stats[0].op).toBe("SELECT users")
+  })
+
+  it("the label carries a verb and a table and NOTHING a caller supplied", async () => {
+    // Same rule as the REST door's: this count reaches a response header.
+    const request = agedRequest(10)
+    const stats = beginD1Timing(request)
+    const db = countedDb(request, fakeCore())
+    await db.prepare("SELECT * FROM users WHERE email = ?").bind("aurora@kwapso.com").first()
+    expect(stats[0].op).toBe("SELECT users")
+    expect(JSON.stringify(stats)).not.toContain("aurora@kwapso.com")
   })
 })

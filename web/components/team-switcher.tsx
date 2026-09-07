@@ -36,6 +36,7 @@ import { TEAM_CREATION_CLOSED, TEAM_SCREENS_HIDDEN } from "@shared/product"
 import { softNavigate } from "@/lib/nav"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
+import { useAfterPaint } from "@shared/web/after-paint"
 
 export function TeamSwitcher({
   active,
@@ -49,7 +50,12 @@ export function TeamSwitcher({
 }) {
   const t = useT()
   const { ctx } = active
-  const pendingInvites = useReceivedInvites().data?.length ?? 0
+  // AFTER THE PAINT. A count on a badge inside a menu nobody has opened is the
+  // definition of secondary content, and it was one of the requests a person on
+  // a cold deep link waited through to see the record they came for
+  // (`MAX_REQUESTS_BEFORE_FIRST_PAINT`, shared/workers/limits.ts).
+  const badgeReady = useAfterPaint()
+  const pendingInvites = useReceivedInvites(badgeReady).data?.length ?? 0
   const name = ctx?.team?.name ?? "No team"
   async function handleSwitch(teamId: string) {
     if (teamId === ctx?.team?.id) return

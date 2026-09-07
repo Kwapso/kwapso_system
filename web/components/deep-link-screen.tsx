@@ -62,6 +62,7 @@ import { useScreenActions } from "@/lib/use-screen-actions"
 import { useActiveTeam } from "@/lib/use-active-team"
 import { TEAM_SECTIONS, type Crumb } from "@/lib/pages"
 import { useLanguage } from "@shared/web/language"
+import { useAfterPaint } from "@shared/web/after-paint"
 
 export function DeepLinkScreen() {
   const active = useActiveTeam()
@@ -207,7 +208,14 @@ export function DeepLinkScreen() {
     tasks: tasksAllQ.data ?? tasksOpenQ.data,
     meetings: meetingsQ.data,
   }
-  const resolvedNames = useTrailNames(trail, (m, id) => !!namedByList(m, id, crumbRecords), enabled)
+  // AFTER THE PAINT. A crumb whose name is not in any loaded list is read one
+  // record at a time, and on a cold deep link that read leaves BESIDE the read
+  // of the record the person came for — the same URL twice, under two cache
+  // keys, so the store cannot join them. The crumb already draws its fallback
+  // word while the name is unknown (trail-names.ts says so), so waiting costs a
+  // word for a moment and saves a request from in front of the record.
+  const named = useAfterPaint()
+  const resolvedNames = useTrailNames(trail, (m, id) => !!namedByList(m, id, crumbRecords), enabled && named)
 
   const { go: routeTo, replace: routeToInPlace, closePanel } = useHostNav({
     router,

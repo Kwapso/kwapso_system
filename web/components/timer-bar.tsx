@@ -32,6 +32,7 @@ import {
 } from "@/lib/live-resources"
 import type { RunningTimer } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
+import { useAfterPaint } from "@shared/web/after-paint"
 import { useT } from "@shared/web/language"
 
 /** Whole seconds as a clock a person reads at a glance: 1:04:09, or 4:09 under an
@@ -112,7 +113,14 @@ function badgeName(t: RunningTimer): string {
  * `runningTimersKey` is in the registry already). `null` for the team is the
  * teamless case and reads nothing at all. */
 export function useRunningTimers(teamId: string | null): RunningTimer[] {
-  const timersQ = useCached<RunningTimer[]>(teamId ? runningTimersKey(teamId) : null, () =>
+  // AND IT WAITS FOR THE PAINT. This is shell chrome — a band that says whose
+  // timer is running — and it has nothing to do with the screen a person came
+  // for. On a cold deep link it was one of the requests in front of the record
+  // (`MAX_REQUESTS_BEFORE_FIRST_PAINT`, shared/workers/limits.ts). The band is
+  // omitted while there are no timers, which is exactly what it draws for the
+  // first moment anyway, so nothing on screen moves.
+  const ready = useAfterPaint()
+  const timersQ = useCached<RunningTimer[]>(teamId && ready ? runningTimersKey(teamId) : null, () =>
     contentApi.runningTimers().then((r) => r.timers)
   )
   return timersQ.data ?? []

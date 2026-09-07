@@ -151,7 +151,7 @@ export async function getSessionUser(
   const seenStale =
     now.getTime() - new Date(row.last_seen_at).getTime() > LAST_SEEN_THROTTLE_MS
   if (slide || seenStale) {
-    await env.DB.prepare(
+    const bookkeeping = env.DB.prepare(
       slide
         ? "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?"
         : "UPDATE sessions SET last_seen_at = ? WHERE id = ?"
@@ -166,6 +166,23 @@ export async function getSessionUser(
           : [now.toISOString(), row.session_id])
       )
       .run()
+    // NOBODY IS WAITING FOR THIS, AND EVERYBODY WAS.
+    //
+    // This is the hottest authenticated path in the product: every request that
+    // carries a cookie passes through here, at both front doors. The answer —
+    // who is asking — is already in hand on the line above; this statement only
+    // moves a presence stamp forward, and past the five-minute throttle it fires
+    // on the FIRST request of every visit, which is exactly the cold open a
+    // person feels. Measured 7 Sep 2026, `/api/auth/me` was ~280ms against a
+    // 100ms read budget, and a second sequential round trip to the core database
+    // was a third of it for a value no caller reads.
+    //
+    // So it rides the request's own lifetime instead (shared/workers/parallel.ts).
+    // `env.DEFER` is undefined where there is no request to hang work on — a cron
+    // tick, the test suites — and then it is AWAITED exactly as before, which is
+    // that seam's stated contract rather than a silent drop.
+    if (env.DEFER) env.DEFER(bookkeeping)
+    else await bookkeeping
   }
 
   return row

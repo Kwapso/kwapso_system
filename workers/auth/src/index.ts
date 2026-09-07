@@ -37,7 +37,7 @@ import { healthBody } from "@shared/workers/config-health"
 import { GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
-import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { internalLogError, internalMcpSession, internalSendEmail } from "./routes/internal"
@@ -135,7 +135,11 @@ export default {
       // sibling workers do — auth publishes on the USER channel (a profile edit,
       // an email change, a forced sign-out), and those pings held the response
       // for the same reason every other one did.
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // …and the CORE database counted, so the slow-door line below can see the
+      // trips this worker actually makes. `beginD1Timing` only ever saw the D1
+      // REST door, so a native `env.DB` statement was invisible and a worker that
+      // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), DB: countedDb(request, env.DB) })
       logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {

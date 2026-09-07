@@ -797,6 +797,32 @@ export function budgetForKind(kind: "read" | "mutation" | "housekeeping" | undef
  * now makes them in five waves. */
 export const MAX_D1_TRIPS_PER_DOOR = 12
 
+/** HOW MANY TIMES A COLD SCREEN MAY ASK THE SERVER BEFORE THE RECORD IS ON
+ * SCREEN — the hop budget on the OTHER half of the round trip, the one the
+ * browser owns.
+ *
+ * `MAX_D1_TRIPS_PER_DOOR` above bounds door → database. Nothing bounded
+ * browser → server, and that is the half a person actually feels: a deep link
+ * pasted from an email (R30 builds emails around exactly this) opens on a fresh
+ * tab with nothing cached, and on 6 Sep 2026 the process-map screen made
+ * FOURTEEN distinct requests before anything rendered — two to learn who was
+ * asking and where they stood, four warming caches the screen never read, one
+ * for the breadcrumb, one for the screen's overrides, and six for a record whose
+ * first paint needs exactly one of them. Every one was a real round trip to a
+ * worker and back, in front of a person waiting.
+ *
+ * FIVE, and the number is the budget round_trip_review already scores against
+ * ("the busiest screen costs 5 hops or fewer") — the owner's own bar since the
+ * 24 Aug 2026 report that first-time loading of a record screen was "a bit
+ * troubling". It is a ceiling on requests BEFORE FIRST PAINT, not on requests:
+ * a screen may warm every cache it likes once the person can read the record,
+ * and `web/test/cold-screen-hops.test.tsx` counts both sides of that line by
+ * rendering the shell cold and stamping each request with whether the record
+ * was already on screen when it left. The cold path today is three: the one
+ * boot call (identity, team, rights), the screen's overrides, and the record
+ * by id. */
+export const MAX_REQUESTS_BEFORE_FIRST_PAINT = 5
+
 /** WHAT THE FOUR CLASSES ACTUALLY COST, MEASURED — the other half of a budget.
  *
  * Taken 5 Sep 2026 by `scripts/speed-bench.mjs`, which runs the shipped libs in

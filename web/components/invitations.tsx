@@ -32,8 +32,11 @@ import { useT } from "@shared/web/language"
 
 /** The signed-in person's pending received invitations. Shared cache key so the
  * inbox page, the Settings section and the switcher badge stay in lock-step. */
-export function useReceivedInvites() {
-  return useCached<ReceivedInvite[]>("invitations", () =>
+export function useReceivedInvites(enabled = true) {
+  // `enabled` is for callers who are CHROME — the switcher's badge — and can
+  // honestly wait until the screen has settled. A null key fetches nothing, and
+  // the panels below pass nothing, so the inbox and Settings are unchanged.
+  return useCached<ReceivedInvite[]>(enabled ? "invitations" : null, () =>
     tenancy.receivedInvitations().then((r) => r.invitations)
   )
 }

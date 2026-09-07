@@ -263,3 +263,135 @@ export function logIfSlow(request: Request, route: string, kind?: RouteKind, cor
   // `logError` cannot throw (its own contract), so there is nothing to catch.
   if (core) afterResponse(request, logError(core, { source: "slow-door", place: route, message: line, teamId: team }))
 }
+
+/* ───────────────────────── the core database's own trips ──────────────────── */
+
+// EVERY LINE THIS FILE PRINTED ABOUT `auth` SAID "0 D1 trips, 0 rows", AND IT
+// WAS NEVER TRUE.
+//
+// `beginD1Timing` above hands its array to the D1 REST door, which is how a
+// trip gets counted: `d1-rest.ts` pushes one `D1Stat` per HTTPS call to
+// api.cloudflare.com. That is the whole census, and it can only ever see the
+// PER-TEAM databases, because the REST door is the only way to reach those.
+//
+// The GLOBAL core database is not reached that way. It is a native `env.DB`
+// binding, and `.prepare(...).first()` on a binding is invisible to a collector
+// that lives on a REST config. Counted on 7 Sep 2026: `auth` makes 42 native
+// core-DB calls and ZERO REST ones — so every slow-door line auth has ever
+// printed carried a trip count of nought and a row count of nought, on the one
+// worker every request in the product passes through. `logIfSlow`'s own second
+// clause, "a count over the ceiling is worth a line whether or not it was slow",
+// could not fire on auth at all: its census was empty by construction.
+//
+// Worse than missing: MISDIRECTING. "280ms, 0 D1 trips" reads as "the database
+// is not the problem, look at the transport", which is the opposite of what a
+// door making eight sequential statements needs somebody to conclude.
+//
+// So the binding is wrapped, per request, in the same `{...env}` copy the four
+// dispatchers already build for `DEFER` — one shallow copy, already there, and
+// the handlers below it go on writing `env.DB.prepare(...)` exactly as before.
+// The wrapper adds one `Date.now()` either side of a call that is already a
+// network round trip; it cannot change what a statement does, because it does
+// not touch the statement, only the moment it is awaited.
+//
+// IT MAY NOT CARRY MORE THAN THE HEADER MAY. `labelFor` is the same verb-and-
+// table regex the REST door uses, run over the same SQL text — never a bound
+// parameter, never a value. A statement's `.bind(...)` arguments are not read
+// here and must never be: this count reaches a response header.
+
+/** THE BINDING, DESCRIBED STRUCTURALLY. `shared/` is compiled by the two WEB
+ * workspaces as well as the workers, and `D1Database` is a Cloudflare ambient
+ * type that does not exist there — the same reason `whoAmI` in gating.ts types
+ * its fetcher by shape rather than as a `Fetcher`. Only the four members a
+ * handler ever touches are named, so a worker's real binding satisfies this and
+ * the browser build never has to know what a D1 database is. */
+type Statement = {
+  bind(...values: unknown[]): Statement
+  first(col?: string): Promise<unknown>
+  run(): Promise<unknown>
+  all(): Promise<unknown>
+  raw(options?: unknown): Promise<unknown>
+}
+type Binding = {
+  prepare(sql: string): Statement
+  batch(statements: Statement[]): Promise<unknown[]>
+  exec(query: string): Promise<{ count?: number }>
+  dump?(): Promise<unknown>
+}
+
+/** The real statement behind a counted one, so `batch` can hand D1 back its own
+ * objects. A symbol rather than a field: nothing else can collide with it, and
+ * it does not show up in anything that enumerates the wrapper. */
+const REAL = Symbol("d1.real")
+
+type Counted = Statement & { [REAL]?: Statement }
+
+/** Time one awaited call and record it. `rowsOf` turns whatever the call
+ * answered into a COUNT — the same rule as the REST door's `rowsOf`: how many,
+ * never which. */
+async function timed<T>(stats: D1Stat[], op: string, run: () => Promise<T>, rowsOf?: (out: T) => number): Promise<T> {
+  const started = Date.now()
+  let rows: number | undefined
+  try {
+    const out = await run()
+    rows = rowsOf?.(out)
+    return out
+  } finally {
+    // In `finally`, so a statement that THREW is still a trip that was made and
+    // still cost the person the time. A census that only counts successes
+    // reports a failing door as a fast one.
+    stats.push({ op, ms: Date.now() - started, rows })
+  }
+}
+
+function countedStatement(real: Statement, sql: string, stats: D1Stat[]): Statement {
+  const op = labelFor(sql)
+  const wrapper: Counted = {
+    [REAL]: real,
+    bind: (...values: unknown[]) => countedStatement(real.bind(...values), sql, stats),
+    first: (col?: string) =>
+      timed(stats, op, () => (col === undefined ? real.first() : real.first(col)), (out) => (out == null ? 0 : 1)),
+    run: () => timed(stats, op, () => real.run(), (out) => rowsOfResult(out)),
+    all: () => timed(stats, op, () => real.all(), (out) => rowsOfResult(out)),
+    raw: (options?: unknown) =>
+      timed(stats, op, () => real.raw(options), (out) => (Array.isArray(out) ? out.length : 0)),
+  }
+  return wrapper
+}
+
+/** How many rows a finished statement touched. `results` for a read, the meta's
+ * own written/changed count for a write — a number either way, and never a value. */
+function rowsOfResult(out: unknown): number {
+  const res = out as { results?: unknown[]; meta?: { rows_written?: number; changes?: number } }
+  if (Array.isArray(res?.results)) return res.results.length
+  return res?.meta?.rows_written ?? res?.meta?.changes ?? 0
+}
+
+/** The core database, counted for THIS request. Hand the result to handlers in
+ * place of `env.DB` and every native statement lands in the same census the
+ * REST door's trips do — so one slow-door line covers both databases and a
+ * worker that never touches a team DB stops reporting a truthful-looking zero.
+ *
+ * Idempotent through `beginD1Timing`: a request whose team context already
+ * started a collector shares it, so the line counts core and team trips
+ * together rather than reporting half of each. */
+export function countedDb<T>(request: Request, db: T): T {
+  const stats = beginD1Timing(request)
+  const real = db as Binding
+  const counted: Binding = {
+    prepare: (sql: string) => countedStatement(real.prepare(sql), sql, stats),
+    // ONE TRIP, because a batch IS one round trip — that is the entire reason to
+    // write one. Unwrapped first: D1 is handed back its own statements, never
+    // these wrappers.
+    batch: (statements: Statement[]) =>
+      timed(
+        stats,
+        `BATCH \u00d7${statements.length}`,
+        () => real.batch(statements.map((s) => (s as Counted)[REAL] ?? s)),
+        (out) => (Array.isArray(out) ? out.reduce((sum: number, r) => sum + rowsOfResult(r), 0) : 0)
+      ),
+    exec: (query: string) => timed(stats, "EXEC script", () => real.exec(query), (out) => out?.count ?? 0),
+    dump: () => (real.dump ? real.dump() : Promise.resolve(undefined)),
+  }
+  return counted as unknown as T
+}
