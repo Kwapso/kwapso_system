@@ -269,8 +269,9 @@ const NOT_USER_TYPED: Record<string, string> = {
   // BUNDLER — Next emits `/_next/static/media/<name>.<hash>.<ext>` — and there
   // is no path from a request body, a row or a person to any of them. `.src` is
   // there because Next resolves an asset import to a `StaticImageData` object
-  // where the kit's own bundler gives a URL string; see
-  // web-portal/components/auth-artwork.tsx, which records why.
+  // where the kit's own bundler gives a URL string; the reason is UI-GAPS.md
+  // row 23 (the file that used to record it, web-portal/components/
+  // auth-artwork.tsx, was deleted the day the kit's own fix landed).
   "logotypeBlack.src": "a bundler-emitted URL for a file in the design kit",
   "logotypeWhite.src": "a bundler-emitted URL for a file in the design kit",
   "photo1440.src": "a bundler-emitted URL for a file in the design kit",

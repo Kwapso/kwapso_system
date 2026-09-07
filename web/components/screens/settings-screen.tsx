@@ -36,8 +36,9 @@
 //                        PERSON connecting something outside the app to their
 //                        own account, which is what the word means here.
 //   4. Choices        — formerly "Dropdown values", formerly its own tab on
-//                        the team area's strip (web/components/selectable-
-//                        screen.tsx explains the rename and the move). This
+//                        the team area's strip
+//                        (web/components/choices/selectable-screen.tsx
+//                        explains the rename and the move). This
 //                        is the one door to it now; ManageDropdownsLink and
 //                        every other in-app shortcut open straight to it via
 //                        `?tab=choices`.

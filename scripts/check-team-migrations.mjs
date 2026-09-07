@@ -155,7 +155,7 @@
 //
 // The three derivations, the waiver rot check and the whole verdict are EXPORTED
 // and locked by
-// web/test/migration-gate.test.ts, which runs in `npm run check` and touches no
+// workers/tenancy/test/migration-gate.test.ts, which runs in `npm run check` and touches no
 // network. Everything this gate promises was once a manual proof somebody ran on
 // an afternoon; a proof nobody can re-run is a proof that decays.
 
@@ -206,7 +206,7 @@ export const MIGRATION_WAIVERS = [
 // ── The derivations ─────────────────────────────────────────────────────────
 //
 // Exported, and the runner below only fires when this file is EXECUTED — so
-// web/test/migration-gate.test.ts can call them without reaching the network or
+// workers/tenancy/test/migration-gate.test.ts can call them without reaching the network or
 // tripping the account guard. Every proof in this file's history was a manual
 // one somebody ran once; that suite is the part that survives.
 

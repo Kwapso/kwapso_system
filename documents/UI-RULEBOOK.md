@@ -507,7 +507,7 @@ at 12px on 18px, uppercase, letter-spacing 0.5px. `text-xs` (14px, the theme flo
 Evidence: `A-3.57.42`, `A-3.58.01`, `A-3.59.09`, `A-4.05.52`, `A-4.07.25`, `P-4.10.05`.
 Note the old app puts the type and the number together (`CHANGE #3182`) and leaves the
 title as pure prose. This app currently prefixes the ref into the title string
-(`web/components/deep-link/shape.ts:128`, `${t.ref} · ${truncate(t.description)}`), which
+(`web/components/deep-link/shape.tsx:128`, `${t.ref} · ${truncate(t.description)}`), which
 is why titles read as noise.
 
 ### D5: one status line under the title, dot-separated, three facts maximum
@@ -1754,7 +1754,7 @@ and "Created on 6 August 2026 · Paras Maroo". `A-4.00.11`: sprint rows are a na
 date range. When more facts were genuinely needed it switched to a table with column
 headers (`A-4.05.42`) rather than cramming them into a subtitle.
 
-Here, `web/components/deep-link/shape.ts:128-138` builds a ticket subtitle out of four
+Here, `web/components/deep-link/shape.tsx:128-138` builds a ticket subtitle out of four
 facts and prefixes the reference into the title as well; `stories-screen.tsx:48-59` uses
 five. The result is a wall of text with no shape. See
 [K1](#k1-a-collection-row-is-a-title-plus-one-meta-line-and-nothing-else) and

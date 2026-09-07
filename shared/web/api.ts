@@ -1,7 +1,7 @@
 // THE HTTP TRANSPORT both front doors talk to the workers through — and nothing
 // else. One fetch wrapper, one error class, one paged-response shape.
 //
-// What is deliberately NOT here: the door lists. `web/lib/api.ts` and
+// What is deliberately NOT here: the door lists. `web/lib/api/` and
 // `web-portal/lib/api.ts` each keep their OWN inventory of the endpoints they
 // call, because those inventories mean something — the portal's is checked
 // against the portal gateway's allow-list, and the agency's is the attack

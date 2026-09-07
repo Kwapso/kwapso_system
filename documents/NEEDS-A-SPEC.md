@@ -96,8 +96,11 @@ which is your definition of info word for word. But the same token also colours
 `in_progress` and `in_review` on the two status steppers, and in your own pill
 vocabulary "in build" is CHARCOAL (`--dot-building`), not sky. Changing those two
 tones is a design decision about a screen you have not drawn, so nothing was
-changed. Files: `web/components/help-status-stepper.tsx`,
-`web/components/story-status-stepper.tsx`.
+changed. The two steppers this names — `help-status-stepper.tsx` and
+`story-status-stepper.tsx` — were deleted in `a78bf532`, when the record header
+ruling dropped the hero region they drew in; the token question survives them,
+because the same tone still colours `in_progress` and `in_review` wherever a
+status is shown.
 
 **b · Badge or pill?** Your kit has two components where the app has one. A
 `.kw-badge` is a neutral or mango COUNT; a `.kw-pill` is a status, and its colour

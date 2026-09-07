@@ -40,7 +40,7 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.tsx`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
-| 5. Record detail | a `<module>.detail` recipe, or `web/components/note-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx` and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
+| 5. Record detail | a `<module>.detail` recipe, or `web/components/<module>/<module>-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx` and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
 | 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | nothing to register for the detail — the laws already walk it; pin any tab that shows no collection, with its reason |
 
 The workers involved: **content** (`workers/content`) is the right home for a
@@ -646,7 +646,7 @@ LAYER 4 — web client + screen
 [ ] web/lib/api/content.ts: add the content.<module> wrappers (each list carries `total`)
 [ ] web/lib/pages.ts: add the TeamSection (+ countCacheKey if a collection tab, R8) + CONCEPT_ICON
 [ ] web/lib/screens.ts: add <module>ListRecipe, BASE_RECIPES["<module>.list"], MODULE_PERMISSION
-[ ] web/components/deep-link/shape.ts: add shape<Module>List (name/detail + facet columns)
+[ ] web/components/deep-link/shape.tsx: add shape<Module>List (name/detail + facet columns)
 [ ] web/lib/live-resources.ts: a <module>Key(teamId) builder + a listFetch entry that primes total:
 [ ] web/lib/use-screen-data.ts: the useCached read; use-screen-actions.ts: the write callbacks
 [ ] deep-link/module-content.tsx: the list branch + the detail branch

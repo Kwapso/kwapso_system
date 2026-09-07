@@ -256,7 +256,10 @@ is deleted with this change (R45's own ratchet: an exemption for a
 composition now directly reached is stale).
 
 **`shared/ui/compositions/templates/stepper-hero.tsx`, read-only, for the
-ticket status track** (`web/components/help-status-stepper.tsx`).
+ticket status track** (drawn then by `help-status-stepper.tsx`; that component
+was deleted in `a78bf532` when the ruling below dropped `headerExtra` on every
+record screen, so the entry records a decision, not a live wiring — see the
+note in `web/components/tickets/help-detail.tsx` that says why it went).
 `RecordChrome`'s own `headerExtra` slot forwards to the kit's `hero` prop —
 named for exactly this composition. `door="system"` (7 stages) matches
 `HELP_STATUSES` exactly; no `onStageSelect` is passed, which register 10 of

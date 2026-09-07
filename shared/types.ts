@@ -95,7 +95,7 @@ export type TeamMember = {
    * list, and therefore in every dropdown built from it. That is right for the
    * admin screens (they are a member; somebody has to be able to see and remove
    * them) and wrong everywhere work is handed out, which is what the front door
-   * uses this to decide (web/lib/people.ts). The fact is a `portal_users` row in
+   * uses this to decide (web/lib/members.ts). The fact is a `portal_users` row in
    * the team's own database, the same table the account fence reads. */
   isClient: boolean
   joinedAt: string

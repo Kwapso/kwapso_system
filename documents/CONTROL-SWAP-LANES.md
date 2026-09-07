@@ -28,6 +28,15 @@ touches it.
 One conversion is not a lane. It is folded into lane C, which is also small and
 also careful, and the two file sets do not overlap. Three lanes, not four.
 
+**THE THREE FILE LISTS BELOW ARE A SNAPSHOT, AND THREE OF THE FILES ARE GONE.**
+They were counted the day the lanes were written and they are left as counted,
+because "these 34 and no others" is the instruction a lane obeyed and rewriting
+it now would falsify the record. Three names in them no longer exist:
+`web/components/knowledge-ask.tsx` (lane A) went when the Ask box became a
+conversation that quotes its passages, and `shared/web/screen-engine/`'s
+`range-facet.tsx` and `searchable-facet.tsx` (lane C) went when the filter row
+became the design kit's. A lane reading this today skips them and says so.
+
 ---
 
 ## THE SHARED RULING — every lane obeys this, and it is why they agree

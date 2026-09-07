@@ -230,7 +230,7 @@ RETURNING id`), placed BELOW every validation, and release it on failure.
 
 ## A11 · LOW, a NUL byte is a 500
 ```bash
-grep -n "safeBody(input.body)" workers/content/src/lib/learning.ts
+grep -n "safeBody(input.body)" workers/content/src/lib/knowledge.ts
 ```
 **Patch:** any hit is vulnerable. Wrap with the boundary seam first,
 `safeBody(optionalText(input.body, "Body", TEXT_LIMITS.long))`, and the same for
