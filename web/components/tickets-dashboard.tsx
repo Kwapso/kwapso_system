@@ -93,6 +93,7 @@ import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
+import { Sankey } from "@shared/ui/components/sankey/sankey"
 import { ToolbarRow, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
@@ -106,12 +107,6 @@ import {
   OPEN_HELP_STATUSES,
   ticketTypeWaitsForValidation,
 } from "@shared/types"
-
-/** THE TRACK EVERY BAR IS READ AGAINST. A comparison needs a unit, and "twice"
- * is only visible against something — `pulse-charts.tsx` makes the same argument
- * for keeping the kit chart's axis on. `--muted` is the app's quiet fill and
- * flips with the palette, so one value works on both papers. */
-const TRACK = "var(--muted)"
 
 /** THE ORDER THE PIPELINE IS READ DOWN, which is not quite the order the
  * lifecycle is DEFINED in — and the difference is one stage, moved on purpose.
@@ -603,7 +598,28 @@ function WhoHasMore({
  * there is something to count: one slot, holding whichever of the two is true.
  * The subtraction is announced either way, which is the rule this whole screen
  * is built on. */
-function RaisedAsMatrix({
+/* RAISED AS, THEN TRIAGED AS — drawn as the FLOW she asked for.
+ *
+ * Client, 2026-09-07, pointing at the chart from the approved design: "for the
+ * Raised as, then triaged as i want this graphic you proposed / also, if its not
+ * there, include in ui-ux components." It was not there; it is now
+ * (`Sankey`, kit v1.2.64), so this panel is a caller rather than a drawing.
+ *
+ * WHAT THE HEAT GRID WAS AND WHY IT GOES. A 4×4 of tinted cells answered "how
+ * many went from X to Y" one cell at a time and never showed the SHAPE — that
+ * most of what arrives as an issue leaves as something else. The flow makes that
+ * the first thing a reader sees, which is the sentence underneath it in words.
+ * Nothing is lost: the kit's own hidden table carries the identical matrix with
+ * both margins, so the cell-by-cell reading survives for a screen reader and for
+ * anyone who wants the number rather than the picture.
+ *
+ * THE COLUMNS ARE DRAWN EVEN WITH NOTHING IN THEM — her earlier ruling, "in
+ * raised as pls display the graphic already even if it's empty". The kit
+ * distinguishes the two nothings for us: no categories at all replaces the plot,
+ * while categories with no traffic keep their labels and their zeros. This
+ * screen is always the second case, because the type vocabulary exists from the
+ * first day and the column feeding it is stamped only from 2026-09-06 onward. */
+function RaisedAsFlow({
   rows,
   notRecorded,
   types,
@@ -614,11 +630,20 @@ function RaisedAsMatrix({
   types: string[]
   t: (s: string, vars?: Record<string, string | number>) => string
 }) {
-  const cell = (arrived: string, became: string) =>
-    rows.find((r) => r.raisedAsType === arrived && r.helpType === became)?.n ?? 0
-  const counted = rows.reduce((n, r) => n + r.n, 0)
-  const moved = rows.reduce((n, r) => (r.raisedAsType === r.helpType ? n : n + r.n), 0)
-  const heaviest = Math.max(1, ...rows.filter((r) => r.raisedAsType !== r.helpType).map((r) => r.n))
+  /* A TICKET THAT ARRIVED LABELLED AND STILL HAS NO KIND IS NOT AN OUTCOME.
+   * `raisedVsCurrent` groups by `(raised_as_type, help_type)` and `help_type`
+   * is nullable, so a ticket nobody has sorted yet appears with a null on the
+   * right. It has not been "triaged as" anything — it is still waiting to be —
+   * and drawing it would need a fifth column that is the absence of a decision.
+   *
+   * It is dropped from the FLOWS and from the SENTENCE together, which is the
+   * point: counting it in "180 tickets" while it is missing from the picture
+   * would make the two disagree, and the sentence is the thing a person quotes.
+   * The untyped pile is real and worth its own reading, but it belongs to the
+   * open-work panel above, which is where an unsorted ticket actually sits. */
+  const decided = rows.filter((r) => r.helpType !== null)
+  const counted = decided.reduce((n, r) => n + r.n, 0)
+  const moved = decided.reduce((n, r) => (r.raisedAsType === r.helpType ? n : n + r.n), 0)
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -638,58 +663,13 @@ function RaisedAsMatrix({
           })}
         </p>
       )}
-      <div className="min-w-0 overflow-x-auto">
-        <div
-          className="grid min-w-[18rem] gap-1 text-xs"
-          style={{ gridTemplateColumns: `6rem repeat(${types.length}, minmax(2.5rem, 1fr))` }}
-        >
-          <span className="text-muted-foreground self-end">{t("Became")}</span>
-          {types.map((type) => (
-            <span key={type} className="text-muted-foreground truncate text-center" title={type}>
-              {type}
-            </span>
-          ))}
-          {types.map((arrived) => (
-            <React.Fragment key={arrived}>
-              <span className="flex items-center gap-1.5 truncate" title={arrived}>
-                <span
-                  aria-hidden="true"
-                  className="size-2 shrink-0 rounded-pill"
-                  style={{ backgroundColor: ticketTypeColour(arrived) }}
-                />
-                {arrived}
-              </span>
-              {types.map((became) => {
-                const n = cell(arrived, became)
-                const kept = arrived === became
-                return (
-                  <span
-                    key={became}
-                    // A TWO-LAYER CELL, so the tint can be faded without fading
-                    // the number written on it. `opacity` on one element would
-                    // take the digits with it, which is how a heat grid ends up
-                    // with its strongest cells the hardest to read.
-                    className="relative flex h-8 items-center justify-center rounded tabular-nums"
-                    title={`${arrived} → ${became}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-0 rounded"
-                      style={{
-                        backgroundColor: n === 0 || kept ? TRACK : ticketTypeColour(arrived),
-                        opacity: n === 0 || kept ? 1 : 0.2 + 0.6 * Math.min(1, n / heaviest),
-                      }}
-                    />
-                    <span className={n === 0 ? "text-muted-foreground relative" : "relative"}>
-                      {n === 0 ? "–" : n}
-                    </span>
-                  </span>
-                )
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
+      <Sankey
+        fromTitle={t("Raised as")}
+        toTitle={t("Became")}
+        label={t("Raised as, then triaged as")}
+        nodes={types.map((type) => ({ id: type, label: type, color: ticketTypeColour(type) }))}
+        flows={decided.map((r) => ({ from: r.raisedAsType, to: r.helpType as string, value: r.n }))}
+      />
       {notRecorded > 0 ? (
         <p className="text-muted-foreground text-xs">
           {t("{count} older tickets have no record of what they arrived as.", { count: notRecorded })}
@@ -1670,7 +1650,7 @@ export function TicketsDashboard({
               takes us to close things on it (the spread and the trend). */}
           {appId ? (
             <Panel title={t("Raised as, then triaged as")}>
-              <RaisedAsMatrix
+              <RaisedAsFlow
                 rows={data?.raisedVsCurrent ?? []}
                 notRecorded={data?.raisedAsNotRecorded ?? 0}
                 types={types}
@@ -1689,7 +1669,7 @@ export function TicketsDashboard({
                 <WhoHasMore rows={data?.byAccountAndType ?? []} types={types} t={t} />
               </Panel>
               <Panel title={t("Raised as, then triaged as")}>
-                <RaisedAsMatrix
+                <RaisedAsFlow
                   rows={data?.raisedVsCurrent ?? []}
                   notRecorded={data?.raisedAsNotRecorded ?? 0}
                   types={types}

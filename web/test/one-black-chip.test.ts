@@ -116,7 +116,7 @@ const REF_AS_STRING_OK: Record<string, string> = {
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
     "a row of its own.",
-  "web/components/help-detail.tsx:1035":
+  "web/components/help-detail.tsx:1053":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
     "string slot as picker-sources.ts, for the ticket the form is pinned to.",
   "web/components/story-detail.tsx:420":

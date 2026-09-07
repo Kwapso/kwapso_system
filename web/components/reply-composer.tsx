@@ -330,9 +330,42 @@ export function ReplyComposer({
       ) : null}
 
       {/* The kit's own composer pill, drawn here because the kit's composer holds
-          one send and this one holds two. Same shape, same tokens, same radius. */}
+          one send and this one holds two. Same shape, same tokens, same radius.
+
+          `data-focus-shell` — THE STANDARD COMPOSITE-CONTROL SEAM (tokens.css
+          §8, "review 1A · fix 4"), not a rule invented here, and the one thing
+          this composer was missing when it shipped. A composite control is a
+          decorated shell wrapped around a BARE focusable node: the pill carries
+          the fill and the radius, and the `<input>` inside it carries neither —
+          `border-0 bg-transparent p-0`, deliberately, so the pill is what a
+          reader perceives as the field. The one global `:focus-visible` rule
+          then draws its outline around the node that actually has focus, which
+          is the bare input: 1px of `--focus` at zero offset around a
+          full-width, 24px-high, ZERO-RADIUS box — a hard rectangle with square
+          corners, sitting INSIDE the pill, over the pill's own white fill.
+          That is exactly what the client photographed and called "the select",
+          asking for it to be round; it is not a border and no CSS here asked
+          for one.
+
+          The kit had already met this three times and solved it once, in the
+          place a solution belongs: the shell takes the ring
+          (`[data-focus-shell]:has([data-focus-proxy]:focus-visible)`) and the
+          bare node hands it over. Same `--focus-width`, same zero offset, same
+          single ring — the ONLY thing that changes is which box it is drawn
+          around, so ruling 24 ("one ring spec for every control at once") is
+          obeyed rather than restated. `search-input.tsx`, `filter-bar.tsx`'s
+          facet field, `agent-chat.tsx`'s composer and `notes-editor.tsx` are
+          the four already marked; this composer is the fifth, and it is the
+          same shape as the third almost line for line.
+
+          THE PAIR IS ALWAYS A PAIR. The `outline: none` that lets the shell own
+          the ring lives in the kit's CSS, on `[data-focus-proxy]`, and it is
+          written on a node the rule above guarantees has a visible ring around
+          it. Nothing here suppresses a ring and nothing here defines a second
+          one, which is what `focus-ring.test.ts` reads this file for. */}
       <form
         data-slot="reply-composer"
+        data-focus-shell=""
         onSubmit={(event) => {
           event.preventDefault()
           start(false)
@@ -342,6 +375,8 @@ export function ReplyComposer({
         <input
           ref={field}
           type="text"
+          /* Hands its ring to the pill above. See tokens.css §8. */
+          data-focus-proxy=""
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={answered ? t("This ticket is answered. Reply anyway…") : t("Write a reply…")}

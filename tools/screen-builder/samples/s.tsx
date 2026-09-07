@@ -5,6 +5,7 @@
 import { Badge } from "../../../shared/ui/components/badge/badge"
 import { Button } from "../../../shared/ui/components/button/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../shared/ui/components/card/card"
+import { Sankey } from "../../../shared/ui/components/sankey/sankey"
 import { ScreenRenderer } from "../../../shared/ui/components/screen-renderer/screen-renderer"
 import { ScrollArea } from "../../../shared/ui/components/scroll-area/scroll-area"
 import { SearchInput } from "../../../shared/ui/components/search-input/search-input"
@@ -66,6 +67,37 @@ const WORK_LOG = [
 ]
 
 export const samples: Samples = {
+  /* THE FLOW. Dummy data with the shape that makes the chart worth drawing: most
+     of what arrives labelled one thing turns out to be another, which is the
+     whole reason a reader looks at it. A diagonal-only sample would draw four
+     straight ribbons and teach nobody what the part is for. */
+  sankey: {
+    render: (p) => (
+      <Sankey
+        {...p}
+        fromTitle="Raised as"
+        toTitle="Triaged as"
+        nodes={[
+          { id: "issue", label: "Issue" },
+          { id: "question", label: "Question" },
+          { id: "request", label: "Request" },
+          { id: "extra", label: "Extra" },
+        ]}
+        flows={[
+          { from: "issue", to: "issue", value: 68 },
+          { from: "issue", to: "question", value: 39 },
+          { from: "issue", to: "request", value: 30 },
+          { from: "issue", to: "extra", value: 12 },
+          { from: "question", to: "question", value: 3 },
+          { from: "question", to: "request", value: 15 },
+          { from: "request", to: "request", value: 3 },
+          { from: "request", to: "extra", value: 7 },
+          { from: "extra", to: "extra", value: 2 },
+        ]}
+        caption="More than half of everything changes type at triage."
+      />
+    ),
+  },
   "screen-renderer": {
     render: (p) => (
       <ScreenRenderer

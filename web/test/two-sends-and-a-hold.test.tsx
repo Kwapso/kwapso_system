@@ -140,6 +140,33 @@ describe("the ticket composer's two sends", () => {
     expect(screen.getByRole("button", { name: "Send and close" })).toBeTruthy()
   })
 
+  it("hands the focus ring to the pill, so the ring is the shape a reader sees", () => {
+    draw()
+    const field = screen.getByLabelText("Message")
+    const pill = field.closest("[data-slot='reply-composer']")
+
+    // THE CLIENT'S SECOND SCREENSHOT, 7 Sep 2026: "the select here should be
+    // round" — a hard 1px rectangle with square corners sitting inside the
+    // white pill. Nothing had drawn a border: it was the one global
+    // `:focus-visible` outline landing on the BARE input, which is the node
+    // that takes focus and the node with no box and no radius of its own.
+    //
+    // THIS IS A DOM TEST AND NOT A CSS ONE ON PURPOSE. The rule that moves the
+    // ring lives in the kit (tokens.css §8) and is not loaded here; what the
+    // app owns, and what was actually missing, is the PAIR of marks that opts
+    // this composite control into it. A ring that draws on the wrong box is
+    // invisible to every other check in this repo — `focus-ring.test.ts` reads
+    // source for a suppressed or restated ring, and neither had happened.
+    expect(
+      pill?.hasAttribute("data-focus-shell"),
+      "the pill must take the ring — see the note in reply-composer.tsx"
+    ).toBe(true)
+    expect(
+      field.hasAttribute("data-focus-proxy"),
+      "the bare field must hand its ring over, or it draws a rectangle inside the pill"
+    ).toBe(true)
+  })
+
   it("draws no close control where there is nothing left to close", () => {
     draw({ canClose: false, answered: true })
     expect(screen.queryByRole("button", { name: "Send and close" })).toBeNull()

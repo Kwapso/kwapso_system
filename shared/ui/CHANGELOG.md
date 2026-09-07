@@ -2,6 +2,110 @@
 
 ## Unreleased
 
+### Added — `Sankey`, so "what did it arrive as, and what did it turn out to be" is a component rather than a picture in a document
+
+Client, 2026-09-07, pointing at a chart in an approved design artifact: "for
+the Raised as, then triaged as i want this graphic you proposed / also, if its
+not there, include in ui-ux components". It was not there. The kit's charts
+stop at bar/line/area, the donut, the rings, the radar, the gantt, the heat map
+and the pulse band; chapter 19's flowchart draws edges between RECORDS and its
+comparison draws two records side by side. Nothing in the kit draws COUNTS
+moving between two categorisations of one population.
+
+**`components/sankey/sankey.tsx`**, and it is generic on purpose. PATTERN §9
+forbids product vocabulary in a component, so the file knows only `nodes` and
+`flows`; what the two columns MEAN is two caption props. The client's figure is
+one call site of it, not its definition.
+
+**Node totals are DERIVED, and there is no `value` on a node.** A supplied
+total and a summed one can disagree, and there is no honest drawing of a
+disagreement — a bar longer than the ribbons leaving it is a gap with no
+meaning. Her own reference is the proof the derivation is the natural one:
+`Issue 149` down the left and `71 Issue` down the right are exactly the row sum
+and the column sum of ONE matrix.
+
+**Colour is the source's, from the chart series tokens, and a caller may hand
+one per node.** `--chart-1..5` in `chart.tsx`'s own order by default; the
+consuming application passes its fixed four (poppy / orange / lavender / sky)
+and they stay put when the sort order does not. Mango is nowhere near it.
+
+**The ribbons are a COLOUR, never an alpha** — `color-mix`, the mechanism and
+the reasoning `chart.tsx` already states — at 34% for the body and 68% for the
+edge, where the kit's stated area fill is 16%. 34 because an area fill sits
+behind a curve and is read as shading, while a ribbon is read as an object and
+is crossed by others; at 16% one ribbon and two overlapping ribbons are the
+same tone.
+
+**Paint order is thickest first, thinnest last, and thickness means the
+ribbon's NARROWEST end.** The artifact's own trend chart already paid for
+getting this wrong: a small translucent area behind a large one has no findable
+edge. Order alone does not fix two ribbons of the same hue, so every ribbon
+also carries its own 1-unit outline. Measured on `verify/sankey`, light on the
+page tone: body **1.569** against its ground, edge **2.528**, edge against its
+own body **1.611**. Dark: **1.691 / 3.319 / 1.963**. All above the step
+override 77 already ships as a visible surface change (1.103 / 1.111).
+
+**The diagonal is quieter by default, and it is a prop.** "Arrived an issue,
+still an issue" is usually the biggest ribbon and the least interesting one, so
+`selfFlow="quiet"` draws it at the kit's 16% with no edge and `selfFlow="equal"`
+draws it like anything else. Measured 1.229 light / 1.225 dark against the page
+— present, and beaten by every correction crossing it (1.276 / 1.381). There is
+deliberately no `"hidden"`: totals are derived from the flows, so a hidden
+diagonal would leave every bar longer than the ribbons explaining it.
+
+**A minimum thickness, and the honesty cost written down rather than tuned
+until nobody notices.** A ribbon is never under 0.9% of the plot and a node
+band never under 8% — under three device pixels and one caption line
+respectively at the default height. THE COST: two flows whose true thickness
+both fall under the floor are drawn IDENTICALLY. On her own 180-record
+population a 1 and a 2 are the same band; a 3 clears the floor and is drawn
+true. What pays for it is that no value here is readable ONLY from a thickness
+— every flow states its exact number in the readout, in its button's accessible
+name and in the hidden table, and the floor can distort none of the three.
+Drawing a 1 to scale is honest about proportion and silent about existence.
+
+**Accessibility is answered three ways, and this shape is the hard case.** The
+figure has a name; it has a real textual equivalent — a visually-hidden
+`<table>` carrying the same matrix with both margins, because "148 flows" read
+as prose is useless and a table can be navigated cell by cell; and every ribbon
+is a REAL `<button>` carrying its whole readout as its accessible name, wrapped
+in `HoverCard` so the card opens on focus as well as hover. That is the kit's
+established pattern, reused rather than re-invented. `interactive={false}`
+removes the buttons, the cards and the hover entirely — the one thing not
+offered is the middle case, a hover-only readout on something not focusable.
+**This closes the hole `chart.tsx` and `donut.tsx` both had to log** (GAPS-COL1
+CHT-5: "the SVG is not focusable, so the tooltip is pointer-only").
+
+The hit area is exactly the mark and is NOT inflated: a comfortable 24-tall
+target over a thin ribbon would sit on top of the thick ribbon under it and
+open the wrong readout. **Built the other way round first and measured on
+verify/sankey** — the buttons were in the reverse of the paint order, so every
+thin ribbon's control sat UNDER the thick one crossing it and the ribbon you
+could see was never the one you could reach. One order for both now.
+
+**Two nothings, drawn differently, because they are different.** No categories
+at all: the quiet register stands in for the plot, since a flow figure with no
+categories has no axes to draw. Categories but nothing moved: the columns ARE
+drawn, with their labels and their zeros, and the words sit under them. An
+empty box there would throw away the one thing that is known.
+
+**Where to look.** The book: Charts → **Flow**, a new page (`demo/book.ts`),
+because a Sankey is not a plot along an axis, not circular and not a calendar
+ramp, and filing it under any of the three would make it unfindable on the one
+page a reader would open. Section in `demo/collections/data-viz.tsx` beside the
+other charts. **`verify/sankey/`** draws the seven awkward cases — the real
+figure, a 1 against a 149, the diagonal quiet beside equal, one node with
+everything, zero flows, labels far longer than the track, and no categories at
+all — each on two grounds, in both palettes, with `?only=N` to review one on
+its own.
+
+Seven decisions the artifact does not settle are logged in **`/GAPS-FLOW.md`**
+as FLW-1 … FLW-7, including one that is not this component's: `chart.tsx` and
+`donut.tsx` both still warn that `--chart-4` and `--chart-5` repeat 1 and 2,
+and `tokens.css` has said lavender and orange for some time. Two headers
+warning about a hole that is filled will make somebody avoid a colour for no
+reason. FLW-7.
+
 ### Changed — the ink footer wears no outline, in either palette, and CH27.8's dark clause is overruled
 
 Client, 2026-09-06, on a screenshot of a ticket's detail screen in dark mode:

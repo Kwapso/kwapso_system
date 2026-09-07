@@ -1,21 +1,21 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.63",
-  "sha": "5283cdee2c774a6b50e693242ea1c4cab895b227",
+  "tag": "v1.2.64",
+  "sha": "e4ed9311fdf72ab0bb3c66457bf2cdd7f85546f1",
   "syncedAt": "2026-09-07"
  },
- "generatedAt": "2026-09-07T05:17:22.524Z",
+ "generatedAt": "2026-09-07T06:33:37.096Z",
  "counts": {
-  "components": 116,
+  "components": 117,
   "hooks": 2,
   "withVariants": 40,
-  "withoutVariants": 76,
+  "withoutVariants": 77,
   "cvaSites": 49,
   "variantGroups": 75,
   "variantOptions": 244,
-  "typedEnumProps": 41,
-  "typedBooleanProps": 306,
+  "typedEnumProps": 42,
+  "typedBooleanProps": 310,
   "compositions": 47,
   "icons": 1512,
   "tokens": 359,
@@ -5822,6 +5822,64 @@
     }
    ],
    "description": "RunSteps — a sequence executing, with per-step state (1 direct call site). DESIGN SOURCE Three parts of the kit, and all three are named: · \"Kwapso UI Kit.dc.html\" → chapter 19's `checklist` view, whose own catalogue entry reads verbatim: \""
+  },
+  {
+   "name": "sankey",
+   "kind": "component",
+   "files": [
+    "components/sankey/sankey.tsx"
+   ],
+   "exports": [
+    {
+     "name": "Sankey",
+     "file": "components/sankey/sankey.tsx"
+    }
+   ],
+   "cva": [],
+   "typedProps": [
+    {
+     "file": "components/sankey/sankey.tsx",
+     "type": "SankeyProps",
+     "variantsFrom": [],
+     "props": [
+      {
+       "name": "selfFlow",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "quiet",
+        "equal"
+       ],
+       "note": "How loudly to draw a category's flow to ITSELF. `\"quiet\"` (the default) mutes it so the corrections read first; `\"equal\"` treats it as any other flow. Ruling 4 in the header says why there is no third value."
+      },
+      {
+       "name": "interactive",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Whether each ribbon is a real, focusable control carrying its own readout. `false` makes the picture inert — no button, no card, no hover — and leaves the hidden table as the whole textual equivalent. There is no middle setting: a hover-only readout is not offered."
+      },
+      {
+       "name": "loading",
+       "optional": true,
+       "kind": "boolean",
+       "note": "The data has not arrived. Cold cache only."
+      },
+      {
+       "name": "error",
+       "optional": true,
+       "kind": "boolean",
+       "note": "The request failed. Beats every other register."
+      },
+      {
+       "name": "empty",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Force the empty register even with categories present."
+      }
+     ]
+    }
+   ],
+   "description": null
   },
   {
    "name": "screen-renderer",

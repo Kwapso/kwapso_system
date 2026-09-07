@@ -85,7 +85,7 @@ import { TranslateAction, useHumanTranslation } from "@/components/translate-hum
 import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useLanguage } from "@shared/web/language"
-import { RichText } from "@shared/web/rich-text-view"
+import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
 import { richTextPlain } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
 
@@ -971,13 +971,31 @@ export function HelpDetailScreen({
                     author: ticket.raisedByContactName || ticket.raiserName || undefined,
                     body: <RichText html={translation.of(ticket.description)} />,
                   },
+                  /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
+                     TOLD. `side: "mine"` is the bubble the kit paints
+                     `bg-surface-inverse text-ink-on-inverse` — correct, and
+                     immediately overridden by the `ArticleBody` inside it,
+                     which paints its own `--ink-secondary` and its own
+                     `--foreground` on links and bold. The description above is
+                     the same component on `bg-card` and needs nothing, which is
+                     exactly why this went unnoticed: the two bodies are one
+                     line apart and only one of them changed ground. The class
+                     is the app holding the line until the kit rules on an
+                     inverse register — rich-text-view.tsx carries the argument
+                     and the measurement, and names what to delete when it
+                     does. */
                   ...replies.map((r) => ({
                     id: r.id,
                     side: "mine" as const,
                     author: r.author,
                     authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
                     time: r.time,
-                    body: typeof r.body === "string" ? <RichText html={r.body} /> : r.body,
+                    body:
+                      typeof r.body === "string" ? (
+                        <RichText html={r.body} className={ON_INVERSE_UNTIL_THE_KIT_RULES} />
+                      ) : (
+                        r.body
+                      ),
                   })),
                 ]}
                 /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.

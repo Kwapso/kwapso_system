@@ -79,6 +79,54 @@ const QUOTED_REPLY_UNTIL_THE_KIT_RULES = [
  * nothing else, because ArticleBody now supplies the prose. */
 export const PROSE = QUOTED_REPLY_UNTIL_THE_KIT_RULES
 
+/* PROSE ON AN INVERSE FILL — DELETE THIS THE DAY THE KIT SHIPS AN INVERSE
+ * REGISTER FOR `ArticleBody`, AND ADOPT HERS.
+ *
+ * The second thing this file decides for itself, and the same species as the
+ * quote override above: an `ArticleBody` that lands somewhere its author did
+ * not draw it for.
+ *
+ * WHAT GOES WRONG. `ArticleBody` PAINTS ITS OWN INK. Its variant base is
+ * `["min-w-0 text-ink-secondary", …]` and every register under it names an
+ * absolute ink too — `[&_a]`, `[&_:is(strong,b)]`, `[&_:is(h2,h3,h4)]` and
+ * `[&_dt]` all resolve to `--foreground`. Every one of those is correct on
+ * paper and wrong on the charcoal fill, because none of them inherits: a
+ * message bubble sets `bg-surface-inverse text-ink-on-inverse`, and the
+ * ArticleBody INSIDE it immediately overrides that inherited ink with an ink
+ * chosen for a different ground. Measured on the ticket's own thread: body
+ * prose rendered #4A4946 on #1A1918, a contrast ratio of 1.95:1 — under the
+ * 4.5:1 floor by a factor of two, and the "text colour is wrong" the client
+ * reported. Bold and links are worse still: #1A1918 on #1A1918 is 1.0:1,
+ * invisible rather than merely dim, and nobody had noticed because the reply
+ * that was photographed happened to be plain.
+ *
+ * WHY THE FIX IS A CALL SITE'S CLASS AND NOT A GLOBAL RULE. The kit already
+ * owns the mechanism for "everything inside an inverse surface flips": it
+ * rebinds `--focus` under `.bg-surface-inverse *` in tokens.css §8, precisely
+ * so no component has to know. Rebinding the INK tokens the same way would fix
+ * this everywhere at once — and it would also repaint every dark panel, every
+ * inverse button and every spine in both front doors, which is the design
+ * system's decision to take and not an app's. So the app states the narrow
+ * truth at the one place it is true (a rich-text body inside a `mine` bubble)
+ * and the gap is logged upstream instead of guessed at.
+ *
+ * WHAT IS NOT COVERED, SAID OUT LOUD. An `<hr>` inside a bubble stays
+ * `--hair-strong` (a charcoal wash) on charcoal and is invisible. The kit
+ * exports no `--color-hair-strong-inverse`, so there is no NAMED utility for
+ * it, and R32's answer to a missing token is to ask for the token rather than
+ * to reach for an arbitrary one. It is in the same upstream ask. `code` and
+ * `pre` need nothing: they carry `bg-surface-quiet`, a light fill, so their
+ * dark ink is already right wherever they land.
+ *
+ * WHEN THE KIT SHIPS THE REGISTER: delete this constant and every use of it,
+ * and pass the kit's own inverse variant instead. */
+export const ON_INVERSE_UNTIL_THE_KIT_RULES = [
+  "text-ink-on-inverse",
+  "[&_:is(h2,h3,h4)]:text-ink-on-inverse [&_dt]:text-ink-on-inverse",
+  "[&_a]:text-ink-on-inverse [&_:is(strong,b)]:text-ink-on-inverse",
+  "[&_blockquote]:text-ink-on-inverse-secondary",
+].join(" ")
+
 export function RichText({
   html,
   className,

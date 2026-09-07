@@ -1410,6 +1410,12 @@
         "RunSteps"
       ]
     },
+    "sankey": {
+      "file": "components/sankey/sankey.tsx",
+      "exports": [
+        "Sankey"
+      ]
+    },
     "screen-renderer": {
       "file": "components/screen-renderer/screen-renderer.tsx",
       "exports": [

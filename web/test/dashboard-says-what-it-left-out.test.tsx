@@ -299,17 +299,32 @@ describe("the tickets dashboard says what it left out", () => {
     // a new column and migration 0065 deliberately left the old rows null, so
     // an empty grid is a YOUNG COLUMN and not a quiet week. Losing that
     // sentence to make room for the picture would have been the worse trade.
+    // THE DRAWING CHANGED, THE RULING DID NOT. On 2026-09-07 she pointed at the
+    // flow from the approved design — "for the Raised as, then triaged as i want
+    // this graphic you proposed" — so the heat grid became the kit's `Sankey`
+    // and this test's grid arithmetic went with it. What it still holds is her
+    // EARLIER ruling, which the new drawing must honour just as much: the
+    // columns are there before the data is.
+    //
+    // The kit distinguishes the two nothings for us, which is why the assertion
+    // can be exact: no categories at all replaces the plot, while categories
+    // with no traffic keep their labels and their zeros. This panel is always
+    // the second — the vocabulary exists from day one, the column feeding it
+    // only from 2026-09-06.
     show({ ...EMPTY, openByTypeAndStatus: FULL.openByTypeAndStatus })
     expect(screen.getByText(/nothing to compare yet/i)).toBeTruthy()
-    const matrix = screen.getByText("Became").parentElement as HTMLElement
-    expect(matrix, "the matrix drew no grid at all on an empty answer").toBeTruthy()
-    // One heading row (the corner + a column per kind) and one row per kind
-    // (its own name + a cell per kind) — the axes and their zeros, exactly the
-    // structure a full answer draws.
+    const flow = document.querySelector('[data-slot="sankey"]') as HTMLElement
+    expect(flow, "the flow drew nothing at all on an empty answer").toBeTruthy()
     expect(
-      matrix.childElementCount,
-      "the empty matrix is not the same grid the full one draws"
-    ).toBe((TYPES.length + 1) * (TYPES.length + 1))
+      flow.getAttribute("data-state"),
+      "an empty answer replaced the plot instead of drawing its columns"
+    ).toBe("unrecorded")
+    for (const kind of TYPES) {
+      expect(
+        flow.textContent?.includes(kind),
+        `${kind} is missing from the empty flow's own axis`
+      ).toBe(true)
+    }
   })
 
   it("a team with no tickets at all gets the empty state and NO toolbar (R50)", () => {
@@ -650,8 +665,13 @@ describe("every graph reads the kinds in the client's one order", () => {
     // `Became` heads the matrix's own column strip, so the grid it sits in is
     // the one to read. Its axes are `types` — the same array the pipeline above
     // takes — which is the whole point of sorting once in the screen.
-    const matrix = screen.getByText("Became").parentElement as HTMLElement
-    order(matrix, ["Issue", "Question", "Request", "Extra"])
+    // The flow's two columns are built from `types`, the same array the pipeline
+    // takes, which is the whole point of sorting once in the screen. Reading the
+    // figure whole covers both axes at once — and it is now the kit's own
+    // element rather than a grid this file drew, so the query names the part.
+    const flow = document.querySelector('[data-slot="sankey"]') as HTMLElement
+    expect(flow, "the flow is not drawn").toBeTruthy()
+    order(flow, ["Issue", "Question", "Request", "Extra"])
   })
 
   it("orders the per-system legend the same way", () => {

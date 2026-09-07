@@ -1587,6 +1587,7 @@ export const SEED: Catalogue = {
   "Put back.": { de: "Zurückgelegt.", es: "Devuelto a la lista.", ca: "Tornat a la llista."},
   "Put somebody on duty": { de: "Jemanden in den Dienst einteilen", es: "Poner a alguien de servicio", ca: "Posar algú de guàrdia"},
   "Raise a ticket": { de: "Ein Ticket erstellen", es: "Crear un ticket", ca: "Obrir un ticket"},
+  "Raised as": { de: "Eingegangen als", es: "Recibido como", ca: "Rebut com a"},
   "Recently added": { de: "Zuletzt hinzugefügt", es: "Añadido recientemente", ca: "Afegit recentment"},
   "Recently changed": { de: "Zuletzt geändert", es: "Modificado recientemente", ca: "Modificat recentment"},
   "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted.": { de: "Wenn Sie festhalten, dass er nicht mehr stattfindet, wird seine ganze Zeit zur Ersparnis. Der Schritt behält seinen Platz in dieser und in jeder älteren Version, nichts wird gelöscht.", es: "Registrar que dejó de ocurrir es lo que convierte todo su tiempo en ahorro. El paso mantiene su sitio en esta versión y en todas las anteriores, no se borra nada.", ca: "Registrar que ha deixat de passar és el que converteix tot el seu temps en estalvi. El pas manté el seu lloc en aquesta versió i en totes les anteriors, no s'esborra res."},
