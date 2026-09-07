@@ -304,11 +304,28 @@ async function guardMaintenance(
     console.error(
       `maintenance limiter unavailable, request allowed through (fail open): ${e instanceof Error ? e.message : String(e)}`
     )
+    // AND RECORDED, for the same reason the refusal below is. This valve guards
+    // the eight `x-admin-key` doors that this file publishes to the public
+    // internet, and its failure mode is that everything keeps working: the
+    // requests go through, nothing 500s, and the only thing that changed is that
+    // the speed limit on a guessable key is off. Nobody would find that out from
+    // a log tail, because nobody goes looking at a week nothing went wrong in.
+    const note = recordMaintenanceNote(
+      env,
+      `${request.method} ${pathname}`,
+      `the maintenance-door limiter did not answer, so this call was allowed through UNCHECKED (fail open). The ${MAINTENANCE_CALLS_PER_MINUTE}-a-minute ceiling on the x-admin-key doors is OFF while this lasts — check the MAINTENANCE_LIMIT binding: ${e instanceof Error ? e.message : String(e)}`
+    )
+    if (ctx) ctx.waitUntil(note)
+    else await note
     return null
   }
   if (allowed) return null
 
-  const note = recordMaintenanceRefusal(env, caller, request.method, pathname)
+  const note = recordMaintenanceNote(
+    env,
+    `${request.method} ${pathname}`,
+    `maintenance door throttled: ${caller} exceeded ${MAINTENANCE_CALLS_PER_MINUTE} calls a minute. Repeated rows here are somebody guessing the maintenance key — rotate ADMIN_KEY and check the address.`
+  )
   if (ctx) ctx.waitUntil(note)
   else await note
   return fail(
@@ -318,26 +335,23 @@ async function guardMaintenance(
   )
 }
 
-/** The attempt, in the one store that outlives a log tail.
+/** What the maintenance door has to say, in the one store that outlives a log
+ * tail. TWO callers, and they are the two halves of one control: the refusal
+ * ("somebody at 203.0.113.9 hit the maintenance doors 400 times" — the sentence
+ * nobody could have written before, and the IP is the whole point of the row,
+ * because these doors carry no session), and the LIMITER ITSELF failing open,
+ * which is the quieter and the worse of the two.
+ *
+ * The message is the caller's, not this function's: a shared writer that also
+ * composed the sentence would have to know which of the two it was writing,
+ * which is the branch this exists to avoid.
  *
  * Best-effort by contract, like every other write through this pipe: a door that
- * cannot report is still a door that must answer. The IP is the whole point of
- * the row — "somebody at 203.0.113.9 hit the maintenance doors 400 times" is the
- * sentence nobody could have written before — and it is the only caller
- * identifier there is, because these doors carry no session. */
-async function recordMaintenanceRefusal(
-  env: Env,
-  caller: string,
-  method: string,
-  pathname: string
-): Promise<void> {
+ * cannot report is still a door that must answer. */
+async function recordMaintenanceNote(env: Env, place: string, message: string): Promise<void> {
   await env.AUTH.fetch("https://internal/internal/log-error", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-internal-key": env.INTERNAL_KEY ?? "" },
-    body: JSON.stringify({
-      source: "gateway",
-      place: `${method} ${pathname}`,
-      message: `maintenance door throttled: ${caller} exceeded ${MAINTENANCE_CALLS_PER_MINUTE} calls a minute. Repeated rows here are somebody guessing the maintenance key — rotate ADMIN_KEY and check the address.`,
-    }),
+    body: JSON.stringify({ source: "gateway", place, message }),
   }).catch(() => null)
 }

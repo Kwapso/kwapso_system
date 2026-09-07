@@ -142,4 +142,21 @@ describe("the maintenance doors are throttled at the door that publishes them", 
     expect(spy, "…and says so, rather than failing open in silence").toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it("…and the fail-open is RECORDED, not only printed", async () => {
+    // The sixth way the fix could rot, and the quietest. A limiter that has
+    // fallen over changes nothing anybody can see: every maintenance call
+    // succeeds, nothing 500s, and the only difference is that the speed limit on
+    // a guessable key is off. A console line expires in a week and nobody reads
+    // a week in which nothing went wrong.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { env: e, recorded } = env(false, { throws: true })
+    await worker.fetch(post("/api/tenancy/admin/db-sizes", { "CF-Connecting-IP": "203.0.113.9" }), e)
+    const row = recorded.find((r) => r.url.includes("/internal/log-error"))
+    expect(row, "the guard on the maintenance doors was off and the store heard nothing").toBeDefined()
+    expect(String(row!.body.message)).toMatch(/fail open/i)
+    expect(String(row!.body.message), "and it names the binding to check").toMatch(/MAINTENANCE_LIMIT/)
+    expect(row!.body.place).toBe("POST /api/tenancy/admin/db-sizes")
+    spy.mockRestore()
+  })
 })

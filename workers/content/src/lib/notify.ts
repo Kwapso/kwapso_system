@@ -83,21 +83,33 @@ const SEND_FAN_CAP = 100
  * to the first hundred would be the shape this base refuses everywhere else (a
  * short answer that looks complete); a digest is a nudge, and the honest failure
  * for a nudge nobody can deliver at that size is a loud line in the log plus a
- * decision for a person to make. */
+ * decision for a person to make.
+ *
+ * AND "NAMED" MEANS RECORDED, since 7 Sep 2026. It used to mean a console line,
+ * which is the same sentence as "nobody finds out": every send that DID go
+ * succeeded, the tick reported success, and the only trace that forty people
+ * were never emailed expired with the log tail. It is the same shape the
+ * retention sweep's `capped` already had a row for — work that stopped at a
+ * ceiling looks exactly like work that had nothing left to do. */
 async function sendToMany(
+  env: Env,
   who: string,
   people: { email: string }[],
   // `unknown`, not `void`: every caller's body is `send(...).catch(console.error)`,
   // whose value is whatever the catch returned. What comes back is discarded —
   // saying so here is what keeps the call sites free of a `void` nobody reads.
-  one: (person: { email: string }) => Promise<unknown>
+  one: (person: { email: string }) => Promise<unknown>,
+  teamId?: string
 ): Promise<void> {
   const list = people.slice(0, SEND_FAN_CAP)
-  if (people.length > list.length)
-    console.error(
+  if (people.length > list.length) {
+    const dropped = people.length - list.length
+    const said =
       `${who}: ${people.length} recipients is past the ${SEND_FAN_CAP} one send may fan out to, ` +
-        `${people.length - list.length} were NOT emailed. This wants a queue, not a bigger number.`
-    )
+      `${dropped} were NOT emailed. This wants a queue, not a bigger number.`
+    console.error(said)
+    await recordWorkerError(env.DB, "content", `notify/${who}`, new Error(said), undefined, { teamId })
+  }
   for (let i = 0; i < list.length; i += SEND_CONCURRENCY)
     await Promise.all(list.slice(i, i + SEND_CONCURRENCY).map(one))
 }
@@ -451,7 +463,7 @@ export async function notifyTodoRaised(
     // NO STAFF NAME ANYWHERE IN IT. SCOPE ch.06 — the portal never says which
     // staff member is doing the work — and an email is a surface that leaves the
     // building, which is exactly where that promise is easiest to drop.
-    await sendToMany("to-do notice", people, (p) =>
+    await sendToMany(env, "to-do notice", people, (p) =>
       send(env, p.email, `${brand.name}: we need your input`, {
         heading: "We need your input",
         intro: `${todo.title}${todo.due_on ? `, by ${todo.due_on.slice(0, 10)}` : ""}.`,
@@ -461,7 +473,8 @@ export async function notifyTodoRaised(
       }, frontDoorOrigin(env, "portal")).catch(async (e) => {
         console.error("to-do notice failed:", e)
         await recordSendFailure(env, guard.teamId, "todo-raised", e, p.email)
-      })
+      }),
+      guard.teamId
     )
   } catch (e) {
     console.error("to-do notify failed:", e)
@@ -536,7 +549,7 @@ export async function sendTriageDigest(
     // login from `to` (see morningDigest), so this is an agency link by the same
     // reasoning that makes the digest internal in the first place.
     const link = recordLink(env, "agency", { kind: "ticketList", teamId })
-    await sendToMany("triage digest", to, (p) =>
+    await sendToMany(env, "triage digest", to, (p) =>
       send(env, p.email, `${team}: this morning`, {
           heading: digest.onDutyName ? `${digest.onDutyName} is on triage this week` : "Nobody is on triage this week",
           intro: lines.join(" "),
@@ -551,7 +564,8 @@ export async function sendTriageDigest(
       }).catch(async (e) => {
         console.error("triage digest failed:", e)
         await recordSendFailure(env, teamId, "triage-digest", e, p.email)
-      })
+      }),
+      teamId
     )
   } catch (e) {
     console.error("triage digest failed:", e)
@@ -606,7 +620,7 @@ export async function notifyTicketResolved(
     // recipients were derived from that ticket's own account, so the URL says
     // nothing the body does not (R21).
     const link = recordLink(env, "portal", { kind: "ticket", id: ticketId })
-    await sendToMany("resolution notice", people, (p) =>
+    await sendToMany(env, "resolution notice", people, (p) =>
       send(env, p.email, `${name}: ${ticket.ref ? `${ticket.ref}, ` : ""}answered`, {
         heading: "We've come back to you",
         // The ANSWER in full, and what they asked in one line above it, because
@@ -619,7 +633,8 @@ export async function notifyTicketResolved(
       }, frontDoorOrigin(env, "portal")).catch(async (e) => {
         console.error("resolution notice failed:", e)
         await recordSendFailure(env, guard.teamId, "ticket-resolved", e, p.email)
-      })
+      }),
+      guard.teamId
     )
   } catch (e) {
     console.error("resolution notify failed:", e)
