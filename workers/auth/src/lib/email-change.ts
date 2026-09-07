@@ -6,6 +6,7 @@
 // a login (see db/core/0005_email_change.sql).
 
 import type { SessionUser } from "@shared/types"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { ulid } from "@shared/workers/id"
 import { publishSignOut } from "@shared/workers/realtime"
 import type { Env } from "../env"
@@ -204,9 +205,27 @@ export async function verifyEmailChange(
   // Live: push the OTHER devices to login instantly (the acting device keeps its
   // still-valid session). Best-effort.
   await publishSignOut(env, user.id)
-  await sendEmailChangedNotice(env, oldEmail, newEmail).catch((e) =>
+  // BEST-EFFORT, AND RECORDED. The switch has happened and must not be undone by
+  // its own notice, so this stays a `.catch` — but the thing that failed is the
+  // SECURITY WARNING to the address that just lost the account. That is the one
+  // email in this file somebody would come back and ask about ("nobody told me"),
+  // and until this line the only answer was a console tail that had long expired.
+  // Filed against the person, never against either address: the store is read by
+  // whoever is on call, and an old email is exactly the sort of value that should
+  // not be sitting in a diagnostics table.
+  await sendEmailChangedNotice(env, oldEmail, newEmail).catch(async (e) => {
     console.error("email-change notice failed:", e)
-  )
+    await recordWorkerError(
+      env.DB,
+      "auth",
+      "email-change/changed-notice",
+      new Error(
+        `the "your sign-in email was changed" notice was NOT delivered to the previous address — the change itself went through, so somebody's account moved and the old inbox was never warned: ${e instanceof Error ? e.message : String(e)}`
+      ),
+      undefined,
+      { userId: user.id }
+    )
+  })
 
   // Record it in the person's own account history (best-effort; the security
   // record with both addresses already went into email_change_logs above).

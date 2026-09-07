@@ -12,10 +12,49 @@
 // per-anything-else: it is the resolved user id, never a value off the request, and
 // the machine surface's budget is a different key from the app's.
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+import { DatabaseSync, type SqlValue } from "node:sqlite"
 import { describe, expect, it, vi } from "vitest"
 
-import { callerHasBudget, CALLER_REQUESTS_PER_MINUTE, TOO_FAST } from "@shared/workers/rate-limit"
+import {
+  callerHasBudget,
+  CALLER_REQUESTS_PER_MINUTE,
+  RATE_LIMIT_SOURCE,
+  TOO_FAST,
+} from "@shared/workers/rate-limit"
 import type { RateLimiter } from "@shared/workers/rate-limit"
+
+/** The core database, for real, with the real error_logs migrations — the same
+ * harness auth's error-row suite uses. A stub that "understands" the INSERT
+ * would happily agree with a row that never landed. */
+function coreDb() {
+  const CORE = join(__dirname, "..", "..", "..", "db", "core")
+  const db = new DatabaseSync(":memory:")
+  for (const m of ["0012_error_logs.sql", "0019_error_log_bound.sql", "0020_error_request_id.sql"])
+    db.exec(readFileSync(join(CORE, m), "utf8"))
+  const binding = {
+    prepare(sql: string) {
+      const stmt = db.prepare(sql)
+      let args: unknown[] = []
+      const api = {
+        bind(...a: unknown[]) {
+          args = a
+          return api
+        },
+        async run() {
+          return { meta: { changes: Number(stmt.run(...(args as SqlValue[])).changes) } }
+        },
+      }
+      return api
+    },
+  }
+  const rows = () =>
+    db
+      .prepare("SELECT source, place, message, user_id FROM error_logs ORDER BY rowid")
+      .all() as { source: string; place: string; message: string; user_id: string | null }[]
+  return { binding, rows }
+}
 
 /** A limiter that says yes, and remembers every key it was asked about. */
 function allows(): { limiter: RateLimiter; keys: string[] } {
@@ -55,6 +94,55 @@ describe("the per-caller ceiling: it fails OPEN, every way it can fail", () => {
     expect(spy).toHaveBeenCalledTimes(1)
     expect(String(spy.mock.calls[0][0])).toMatch(/fail open/i)
     expect(String(spy.mock.calls[0][0])).toMatch(/rate limiting service unavailable/)
+    spy.mockRestore()
+  })
+
+  it("a THROWING binding is RECORDED, not just printed — a valve that failed open must outlive the log tail", async () => {
+    // The whole failure mode here is that nothing goes wrong at the time. Every
+    // request succeeds, every screen works, and the only thing that changed is
+    // that per-caller throttling is OFF. A console line lives as long as somebody
+    // is watching; the day a loop hammers a team's database, "wasn't there a
+    // limiter?" needs an answer from a table.
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const core = coreDb()
+
+    expect(
+      await callerHasBudget({ CALLER_LIMIT: broken, DB: core.binding }, "u1"),
+      "recording must not change the answer — it still fails OPEN"
+    ).toBe(true)
+
+    const written = core.rows()
+    expect(written, "the limiter was down and the store heard nothing").toHaveLength(1)
+    expect(written[0].source).toBe(RATE_LIMIT_SOURCE)
+    expect(written[0].place).toBe("caller-budget/app")
+    expect(written[0].message).toMatch(/fail open/i)
+    expect(written[0].message).toMatch(/rate limiting service unavailable/)
+    expect(
+      written[0].user_id,
+      "a fact about the limiter, not about whoever happened to be asking — filing it under a user would give every user their own 120-row budget for one broken binding"
+    ).toBeNull()
+    spy.mockRestore()
+  })
+
+  it("a limiter that ANSWERS writes nothing — this table is for the unexpected", async () => {
+    const core = coreDb()
+    await callerHasBudget({ CALLER_LIMIT: refuses, DB: core.binding }, "u1")
+    await callerHasBudget({ CALLER_LIMIT: allows().limiter, DB: core.binding }, "u1")
+    expect(core.rows(), "a refusal is an answer, not a crash").toHaveLength(0)
+  })
+
+  it("no core database → still allowed, still printed (every suite in this repo, and a fresh deploy)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    expect(await callerHasBudget({ CALLER_LIMIT: broken }, "u1")).toBe(true)
+    expect(spy).toHaveBeenCalledTimes(1)
+    spy.mockRestore()
+  })
+
+  it("the machine surface files under its own place, so one broken binding is not two mysteries", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const core = coreDb()
+    await callerHasBudget({ CALLER_LIMIT: broken, DB: core.binding }, "u1", "machine")
+    expect(core.rows()[0].place).toBe("caller-budget/machine")
     spy.mockRestore()
   })
 

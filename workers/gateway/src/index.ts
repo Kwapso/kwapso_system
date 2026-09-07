@@ -305,6 +305,20 @@ async function guardMaintenance(
     console.error(
       `maintenance limiter unavailable, request allowed through (fail open): ${e instanceof Error ? e.message : String(e)}`
     )
+    // AND RECORDED, for the same reason the refusal below is. This valve guards
+    // the eight `x-admin-key` doors that this file publishes to the public
+    // internet, and its failure mode is that everything keeps working: the
+    // requests go through, nothing 500s, and the only thing that changed is that
+    // the speed limit on a guessable key is off. Nobody would find that out from
+    // a log tail, because nobody goes looking at a week nothing went wrong in.
+    const note = recordMaintenanceNote(
+      env,
+      `${request.method} ${pathname}`,
+      `the maintenance-door limiter did not answer, so this call was allowed through UNCHECKED (fail open). The ${MAINTENANCE_CALLS_PER_MINUTE}-a-minute ceiling on the x-admin-key doors is OFF while this lasts — check the MAINTENANCE_LIMIT binding: ${e instanceof Error ? e.message : String(e)}`,
+      requestId(request)
+    )
+    if (ctx) ctx.waitUntil(note)
+    else await note
     return null
   }
   if (allowed) return null
@@ -313,7 +327,12 @@ async function guardMaintenance(
   // top of `fetch` — never minted a second time (trace.ts: "the header IS the
   // memo"). Without it the one record of a throttled maintenance call landed
   // under a fresh ULID, on the one door in the product with no session behind it.
-  const note = recordMaintenanceRefusal(env, caller, request.method, pathname, requestId(request))
+  const note = recordMaintenanceNote(
+    env,
+    `${request.method} ${pathname}`,
+    `maintenance door throttled: ${caller} exceeded ${MAINTENANCE_CALLS_PER_MINUTE} calls a minute. Repeated rows here are somebody guessing the maintenance key — rotate ADMIN_KEY and check the address.`,
+    requestId(request)
+  )
   if (ctx) ctx.waitUntil(note)
   else await note
   return fail(
@@ -323,13 +342,26 @@ async function guardMaintenance(
   )
 }
 
-/** The attempt, in the one store that outlives a log tail.
+/** What the maintenance door has to say, in the one store that outlives a log
+ * tail. TWO callers, and they are the two halves of one control: the refusal
+ * ("somebody at 203.0.113.9 hit the maintenance doors 400 times" — the sentence
+ * nobody could have written before, and the IP is the whole point of the row,
+ * because these doors carry no session), and the LIMITER ITSELF failing open,
+ * which is the quieter and the worse of the two.
+ *
+ * The message is the caller's, not this function's: a shared writer that also
+ * composed the sentence would have to know which of the two it was writing,
+ * which is the branch this exists to avoid.
  *
  * Best-effort by contract, like every other write through this pipe: a door that
- * cannot report is still a door that must answer. The IP is the whole point of
- * the row — "somebody at 203.0.113.9 hit the maintenance doors 400 times" is the
- * sentence nobody could have written before — and it is the only caller
- * identifier there is, because these doors carry no session.
+ * cannot report is still a door that must answer. TWO CALLERS, and they are the
+ * two halves of one control: the refusal ("somebody at 203.0.113.9 hit the
+ * maintenance doors 400 times" — the sentence nobody could have written before,
+ * and the IP is the whole point of the row, because these doors carry no
+ * session), and the LIMITER ITSELF failing open, which is the quieter and the
+ * worse of the two. The message is the caller's, not this function's: a shared
+ * writer that also composed the sentence would have to know which of the two it
+ * was writing, which is the branch this exists to avoid.
  *
  * AND IT IS A HOP LIKE EVERY OTHER HOP, which it was not when it shipped. Two
  * things were missing and both are the same sentence one layer apart:
@@ -343,11 +375,10 @@ async function guardMaintenance(
  *     stuck auth holds the waitUntil open, and "allowed to fail" and "allowed to
  *     hang" are different permissions. Same `REPORT_HOP_MS` as this door's other
  *     three report hops (front-door.ts), imported rather than written again. */
-async function recordMaintenanceRefusal(
+async function recordMaintenanceNote(
   env: Env,
-  caller: string,
-  method: string,
-  pathname: string,
+  place: string,
+  message: string,
   traceId: string
 ): Promise<void> {
   await env.AUTH.fetch("https://internal/internal/log-error", {
@@ -357,12 +388,7 @@ async function recordMaintenanceRefusal(
       "x-internal-key": env.INTERNAL_KEY ?? "",
       ...traceHeaders(traceId),
     },
-    body: JSON.stringify({
-      source: "gateway",
-      place: `${method} ${pathname}`,
-      message: `maintenance door throttled: ${caller} exceeded ${MAINTENANCE_CALLS_PER_MINUTE} calls a minute. Repeated rows here are somebody guessing the maintenance key — rotate ADMIN_KEY and check the address.`,
-      requestId: traceId,
-    }),
+    body: JSON.stringify({ source: "gateway", place, message, requestId: traceId }),
     signal: AbortSignal.timeout(REPORT_HOP_MS),
   }).catch(() => null)
 }

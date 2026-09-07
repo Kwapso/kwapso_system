@@ -43,8 +43,9 @@
 // a way a converter can. Sending it to a conversion service would be a network
 // round-trip to be told what we already have.
 
+import { causeOf, recordWorkerError } from "@shared/workers/error-log"
 import { GuardError } from "@shared/workers/gating"
-import { readersFor, runReader } from "./source-readers"
+import { readersFor, runReader, type ReaderName } from "./source-readers"
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import type { Env } from "../env"
 
@@ -180,6 +181,12 @@ export async function extractFile(
       : { text: null, note: "This file has no text in it, so there is nothing for the assistant to read." }
   }
 
+  // WHICH READER WAS IN ITS HANDS when the whole thing fell over. Declared out
+  // here so the catch below can name it: the loop tries the declared readers in
+  // order, so "the conversion crashed" without this is a fact nobody can act on
+  // in a table (R42) whose entire purpose is that a reader failure is traceable
+  // to one reader and one format.
+  let attempted: ReaderName = readers[0]
   try {
     // EACH DECLARED READER IN ORDER — which is what buys `.docx` and `.xlsx` a
     // free fallback when the converter is unavailable, and what will buy the next
@@ -187,6 +194,7 @@ export async function extractFile(
     let text = ""
     let why = ""
     for (const reader of readers) {
+      attempted = reader
       const out = await runReader(reader, env, {
         bytes: file.bytes,
         name: file.fileName,
@@ -211,7 +219,23 @@ export async function extractFile(
     // Loud in the log, honest on the row. ERROR-HANDLING.md's rule is never to
     // swallow: the console line is what an operator finds, and the note is what
     // the person who uploaded it reads.
-    console.error("knowledge file conversion failed:", e)
+    console.error("knowledge file conversion failed:", attempted, file.fileName, e)
+    // AND THE CAUSE OUTLIVES THE TAIL. The note above is the right thing to say
+    // to the person — their file is kept, they can try again — and it is the
+    // wrong place to keep the diagnosis: it tells them it failed and tells us
+    // nothing about WHICH reader crashed on WHICH file, which is the only fact
+    // anyone can act on. R42 exists because the two doors used to disagree about
+    // readers silently; a crash that names neither the reader nor the format is
+    // the same silence one layer down. Recording cannot throw, so an honest note
+    // is still returned whatever happens here.
+    await recordWorkerError(
+      env.DB,
+      "content",
+      `knowledge/extract:${attempted}`,
+      new Error(
+        `the ${attempted} reader crashed on "${file.fileName}" (${file.contentType || "no content type"}, ${mb(file.bytes.length)}) — the file is stored and has no words, and every file of this kind will do the same until the reader is fixed: ${causeOf(e)}`
+      )
+    )
     return {
       text: null,
       note: "We couldn't read this file just now, it is kept here, and you can add it again later to try once more.",

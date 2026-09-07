@@ -6,6 +6,7 @@
 // describes. The actor is always the user themselves, so there's no Actor arg.
 
 import type { ActivityItem } from "@shared/types"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { ulid } from "@shared/workers/id"
 import { ACCOUNT_ACTIVITY_PER_HOUR } from "@shared/workers/limits"
 import { publishUserChange } from "@shared/workers/realtime"
@@ -62,6 +63,15 @@ export async function logAccountActivity(
       .run()
   } catch (e) {
     console.error("account activity log failed:", e)
+    // AND IT IS WRITTEN DOWN, because this table is the person's own security
+    // history — "you changed your sign-in email", "somebody signed in from a new
+    // device". Best-effort was always the right shape (a failed history note
+    // must not undo the change it describes) and console-only was not: a run of
+    // these means the account feed people are told to check has a hole in it,
+    // and nobody would ever know. Filed against the PERSON, so "whose history
+    // stopped being written" is the query, and `recordWorkerError` can neither
+    // throw nor change this function's answer.
+    await recordWorkerError(env.DB, "auth", "account-activity", e, undefined, { userId })
     return
   }
   if ((written.meta.changes ?? 0) === 0) {
