@@ -129,13 +129,13 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:139":
+  "web/lib/use-record-activity.ts:146":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
     "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
     "is the one that is.",
   "web/components/deep-link/shape.tsx:68":
-    "same shape as use-record-activity.ts:139 — `dateTime: a.createdAt` " +
+    "same shape as use-record-activity.ts:146 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute.",
   "web/components/work/work-panels.tsx:1178":

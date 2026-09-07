@@ -118,6 +118,13 @@ export function useRecordActivity(
   addNote: (note: string) => void
 } {
   const { t, lang } = useLanguage()
+  // NULL UNTIL THE RECORD IS IN HAND, and that is the caller's job rather than
+  // this hook's. A record's history is a TAB nobody has pressed, and censused
+  // 7 Sep 2026 it was in front of the record on every record screen but
+  // processes — so the three screens that were doing that now pass null until
+  // they have the record, which is the DETERMINISTIC gate after-paint.ts's own
+  // doc asks for ("keys on the record being in hand … exact, needs no
+  // scheduler, and cannot be flaky") rather than the scheduler itself.
   const on = Boolean(table && id)
   const key = recordActivityKey(table ?? "", id ?? "")
   const query = useCached<ActivityItem[]>(on ? key : null, () =>

@@ -125,20 +125,32 @@ export function HelpDetailScreen({
     })
   )
   const threadTotal = useCachedValue<number>(`total:help-thread:${helpId}`)
-  const membersQ = useCached<TeamMember[]>(`members:${teamId}`, () =>
+  // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND. Everything below this line
+  // is a picker, a badge or a panel BESIDE the record rather than the record —
+  // and until 7 Sep 2026 every one of them left the browser in front of it
+  // (censused by web/test/cold-screen-hops.test.tsx: a ticket cost thirteen
+  // requests before a person could read one sentence).
+  //
+  // `have` is the DETERMINISTIC gate shared/web/after-paint.ts asks callers to
+  // prefer over its own scheduler — "a secondary panel that needs the record
+  // anyway should key on the record being in hand … exact, needs no scheduler,
+  // and cannot be flaky". Every read below is about THIS record or about the
+  // form that edits it, so every one of them has that dependency already.
+  const have = ticket !== null
+  const membersQ = useCached<TeamMember[]>(have ? `members:${teamId}` : null, () =>
     tenancy.members().then((r) => r.members)
   )
   // The generic record feed (Law R5) + the exact server total its tab badges
   // (R8 for the place, R16 for the number — never the loaded page's length).
-  const activity = useRecordActivity("help", helpId)
+  const activity = useRecordActivity("help", have ? helpId : null)
   // THE BADGES, BEFORE THE CLICK — the work written down against this request,
-  // and what is attached to it. One bounded read of both totals when the ticket
-  // opens; the rows behind each tab stay lazy (lib/use-record-counts).
-  useRecordCounts("help", helpId)
-  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+  // and what is attached to it. One bounded read of both totals once the ticket
+  // is readable; the rows behind each tab stay lazy (lib/use-record-counts).
+  useRecordCounts("help", have ? helpId : null)
+  const selectableQ = useCached<SelectableValue[]>(have ? `selectable:${teamId}` : null, () =>
     tenancy.selectable().then((r) => r.values)
   )
-  const stakeholdersQ = useCached<HelpStakeholder[]>(`help-stakeholders:${helpId}`, () =>
+  const stakeholdersQ = useCached<HelpStakeholder[]>(have ? `help-stakeholders:${helpId}` : null, () =>
     content.helpStakeholders(helpId).then((r) => r.stakeholders)
   )
 

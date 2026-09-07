@@ -102,11 +102,21 @@ export function MeetingDetailScreen({
     () => content.meetingOne(meetingId)
   )
   const item = inPage ?? oneQ.data ?? null
+  // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND — a picker, a badge or a
+  // panel BESIDE the record rather than the record, and until 7 Sep 2026 every
+  // one of them left the browser in front of it (web/test/cold-screen-hops.test.tsx
+  // censused this screen before a person could read it).
+  //
+  // `have` is the DETERMINISTIC gate shared/web/after-paint.ts asks callers to
+  // prefer over its own scheduler — "exact, needs no scheduler, and cannot be
+  // flaky". Every read below is about THIS record or the form that edits it, so
+  // every one of them has that dependency already.
+  const have = item !== null
   const host = { base: `${basePath}/${meetingId}` }
 
   // The generic record feed (R5) + the exact server total its tab badges (R8 for
   // the place, R16 for the number — never the loaded page's length).
-  const activity = useRecordActivity("meetings", meetingId)
+  const activity = useRecordActivity("meetings", have ? meetingId : null)
 
   // THE TWO READS THE LIST NEVER MAKES. Both are keyed off this meeting and both
   // are asked only when there is something to ask about: a meeting that was never
@@ -147,17 +157,19 @@ export function MeetingDetailScreen({
   // Counted when the MEETING opens rather than when the tab is clicked, for the
   // reason shared/record-counts.ts gives: a badge that only arrives with the
   // panel is blank exactly when somebody is deciding whether to open it.
-  useRecordCounts("meetings", meetingId)
+  useRecordCounts("meetings", have ? meetingId : null)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("meetings", meetingId))
 
-  const accountsQ = useCached<Account[]>(canEdit ? `accounts:${teamId}` : null, () =>
+  const accountsQ = useCached<Account[]>(have && canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
   )
   // WHICH SYSTEM A MEETING WAS ABOUT. Read on the same condition as the accounts
   // above, and out of the SAME bounded cache the apps page holds — an agency has
   // tens of apps, so the picker costs nothing anybody has not already paid.
-  const appsQ = useCached<AppRow[]>(canEdit ? appsKey(teamId) : null, () => listFetch.apps(teamId))
-  const purposesQ = useCached<MeetingPurpose[]>(canEdit ? `purposes:${teamId}` : null, () =>
+  const appsQ = useCached<AppRow[]>(have && canEdit ? appsKey(teamId) : null, () =>
+    listFetch.apps(teamId)
+  )
+  const purposesQ = useCached<MeetingPurpose[]>(have && canEdit ? `purposes:${teamId}` : null, () =>
     listFetch.purposes(teamId)
   )
 

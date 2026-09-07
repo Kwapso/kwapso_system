@@ -116,6 +116,38 @@ const STORY_COLS = `s.id, s.ref, s.title, s.detail, s.status, s.ticket_id, s.spr
   -- the inherited date beside it.
   (SELECT sp.ends_on FROM sprints sp WHERE sp.id = s.sprint_id) AS sprint_ends_on`
 
+/** THE COLUMNS A LIST CARRIES — everything except the words of the work itself.
+ *
+ * `detail` is deliberately absent, and the number is why: measured 7 Sep 2026
+ * against staging's own team database ("Kwapso"), one page of fifty stories is
+ * 63,374 characters and 25,519 of them — 40.3% — are `detail`. It is rich text
+ * somebody typed into a paragraph field, so it grows with how carefully the work
+ * was written down, and every screen that shows a page of stories draws the
+ * title, the status, the assignee and the deadline. Not one of them draws this.
+ *
+ * IT IS SAFE HERE AND IT IS NOT SAFE ON A TICKET, which is the distinction worth
+ * writing down rather than rediscovering. `story-detail.tsx` reads its story BY
+ * ID, always — `useCached("story:one:<id>")` with no list fallback, which the
+ * live registry already says in writing beside `story:one:` — so the whole
+ * detail is a read the screen was making anyway. The ticket list looks like the
+ * same opportunity (`description` is 40.3% of ITS page, measured the same day)
+ * and is not: three screens render a ticket's description straight off a list
+ * row, including the record's own body until a by-id read lands.
+ *
+ * DERIVED, not typed out again, and asserted rather than trusted: a `.replace`
+ * that matches nothing returns the original string unchanged, which would ship
+ * the whole column back under a name that says it does not.
+ *
+ * The single-story read (`getStory`, the door's `?id=`) keeps `detail` whole,
+ * which is the same split `knowledge.ts` makes between `LIST_COLS` and
+ * `DETAIL_COLS` for the same reason. */
+const STORY_LIST_COLS = (() => {
+  const listed = STORY_COLS.replace("s.detail,", "NULL AS detail,")
+  if (listed === STORY_COLS)
+    throw new Error("STORY_COLS no longer selects `s.detail,` — the list/detail split is not being made")
+  return listed
+})()
+
 function toStory(r: StoryRow): Story {
   return {
     id: r.id,
@@ -267,7 +299,9 @@ export async function listStories(
     cfg,
     guard.databaseId,
     // LIMIT is PAGE_SIZE + 1 — the extra row is how hasMore is known (R14).
-    `SELECT ${STORY_COLS} FROM stories s WHERE ${clauses.join(" AND ")}
+    // STORY_LIST_COLS, not STORY_COLS: a page is titles and status, and the
+    // words of the work are 40% of it (see the constant).
+    `SELECT ${STORY_LIST_COLS} FROM stories s WHERE ${clauses.join(" AND ")}
       ${orderBy(ordering, "s.id")} LIMIT ${PAGE_SIZE + 1}`,
     [...where.params, ...after.params]
   )
