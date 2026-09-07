@@ -3536,6 +3536,26 @@ describe("offered-rights: no permission switch decides nothing", () => {
       for (const right of offeredRights(key))
         expect(RIGHTS as readonly string[], `${key} offers "${right}"`).toContain(right)
   })
+
+  // THE SCREEN READS THE SAME DATA. The door hands each module its offered
+  // rights (`getRolePermissions`, tested in workers/tenancy/test/roles.test.ts);
+  // this holds the Roles screen to three things with them: it hands the kit the
+  // subset as `rights` (the prop the next kit tag draws from), it never shows a
+  // held tick on an unoffered box, and a press on one records nothing. Read off
+  // the source, because the screen is a host-composed component with a cache
+  // and a door behind it and a render harness would prove less than it looked.
+  it("offered-rights: the Roles screen hands the kit each module's offered rights and refuses a press on any other", () => {
+    const screen = read(join(ROOT, "web", "components", "role-detail.tsx"))
+    expect(screen, "the matrix rows no longer carry `rights` from the door").toMatch(
+      /rights:\s*m\.rights\.map\(\(r\)\s*=>\s*RIGHT_TO_KIT\[r\]\)/
+    )
+    expect(screen, "a held tick is no longer filtered to the offered rights").toMatch(
+      /\.filter\(\(r\)\s*=>\s*offered\(m,\s*r\)\s*&&/
+    )
+    expect(screen, "onChange no longer refuses a press on an unoffered box").toMatch(
+      /if \(row && !offered\(row, right\)\) return/
+    )
+  })
 })
 
 /** A GROUP OF CONTROLS IS NOT ONE CONTROL, and the required ring says so.

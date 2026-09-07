@@ -50,41 +50,61 @@
 //      law that has never been pointed at a module is not a law that module
 //      passes.
 //
-//      auth, mcp and realtime are still outside it, and not by choice: they
-//      answer from a `switch` rather than an `export const ROUTES` table, and
-//      every seam scan in this repo finds its subject by parsing that table.
+//      auth, mcp and realtime are still outside THE WRITES half, and the
+//      reason this file gave until 7 Sep 2026 — "they answer from a `switch`
+//      rather than an `export const ROUTES` table" — was true of realtime and
+//      the two gateways and FALSE of auth and mcp, both of which export a
+//      ROUTES table at workers/<w>/src/index.ts. Corrected, and the real
+//      reason measured rather than guessed: pointing the WRITES census at
+//      those two reports six doors, and two of them are
+//      `POST /api/auth/email/start` and `/email/verify` — the sign-in doors
+//      every single person in the product presses, on both front ends. The
+//      matcher misses them because `web/lib/api/auth.ts` puts the verb in an
+//      options object rather than in `post(`, which is the FOURTH helper to
+//      hide a method from this check. Widening it today would buy a row of
+//      excuses in front of doors that are not gaps; the fix is the matcher.
+//      THE READS HALF DOES walk auth and mcp (invariant 4, below) — nothing
+//      there needs a verb.
 //
-// WHAT THE THIRD INVARIANT DOES NOT REACH, said plainly, because a law that
-// overstates its cover is worse than one that admits a gap. It skips GET —
-// "a read is pressed by opening the screen" — and that is right for the reads a
-// screen makes, and wrong for a read that no screen makes. FOUR SUCH DOORS ARE
-// KNOWN, all on the content worker's Google lane and all found by a dead-end
-// review on 5 Sep 2026: `GET /api/content/google/drive/file`,
-// `/gmail/message`, `/calendar/event/transcript` and `/chat/spaces`. Each is
-// gated, tested and documented; none is called by either front door and none is
-// exposed as an MCP tool. Their PLURAL siblings (`/drive/files`,
-// `/gmail/messages`) are wired to web/lib/api/content.ts, which is exactly why
-// the gap is invisible — the lane looks finished. The only caller is
-// `scripts/google-sweep.mjs`, a hand-run probe, and scripts/README.md now says
-// so beside it.
+// THE FOURTH INVARIANT IS THE READS. The third skips GET — "a read is pressed
+// by opening the screen" — which is right for the reads a screen makes and
+// wrong for a read that no screen makes. A dead-end review on 5 Sep 2026
+// found four such doors on the content worker's Google lane (`/drive/file`,
+// `/gmail/message`, `/calendar/event/transcript`, `/chat/spaces`), and this
+// header then said "none is exposed as an MCP tool". THAT SENTENCE WAS FALSE
+// THE DAY IT WAS WRITTEN: all four were already tools on the assistant's own
+// catalogue (`google_drive_file`, `google_mail_message`,
+// `google_meeting_transcript`, `google_chat_spaces` —
+// workers/data-ops/src/lib/tools.ts), reached by a person through agent_chat
+// under that person's own rights. A second review on 7 Sep 2026 read the
+// sentence, believed it, and charged three of them as the product's one real
+// dead end.
 //
-// They are NOT listed in NO_CONTROL: that register is consulted only for
-// non-GET doors, so a line there would be reported stale by the ratchet below
-// on the very next run. Closing this properly means either widening the census
-// to reads — which needs a matcher that can tell a read caller from a write
-// one, since the present `WRITES` test is write-shaped on purpose, and an
-// adjudication of roughly thirty more GET doors on content and tenancy that no
-// api method appears to name — or giving the four doors MCP tools, which is
-// where R43 would put them. Both are a piece of work rather than a line, and
-// naming them here is what stops the next reader concluding the census already
-// covers them.
-
+// AND THE CORRECTION MUST NOT OVERSHOOT THE OTHER WAY, which the first draft
+// of this paragraph did by saying "R43 mirrors them onto MCP". It does not:
+// R43 permits an asymmetry that is a named, reasoned line, and all 21 Google
+// tools are exactly that — `GOOGLE_MCP_EXCLUSION` in
+// workers/mcp/test/agent-mcp-tool-parity.test.ts, MCP.md §3, "a leaked
+// personal access token's blast radius must not include a mailbox". Agent
+// surface yes, MCP surface deliberately no. Writing a second confident,
+// unchecked sentence to replace the first one would have been the same
+// mistake wearing the opposite claim.
+//
+// A claim in a comment is read by people and checked by nothing, which is the
+// whole reason the fourth invariant exists: every GET door on the three ROUTES workers is opened by a
+// front door, is the `path` of a tool on the machine surfaces (DERIVED from
+// the catalogue, never listed here), or is a reasoned `NO_SCREEN_READ` line;
+// and the owner-key doors, GET and POST alike, each name the script or
+// runbook that reaches them, with that file re-read so the claim cannot rot
+// the way this header's did.
+//
 import { existsSync, readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 
 import { NAV, NAV_GROUP_ORDER, TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, MODULE_PERMISSION } from "../lib/screens"
@@ -376,7 +396,170 @@ describe("the screens are reachable", () => {
       `NO_CONTROL names doors that are called from a front end now — delete these lines: ${stale.join(", ")}`
     ).toEqual([])
   })
+
+  // 4 — A DOOR THAT ANSWERS SOMETHING HAS SOMETHING THAT ASKS IT.
+  //
+  // The reads. A read is a way in only if something asks it: a screen (an api
+  // method, or an <a href> straight at the door — the accounts export is one),
+  // or a tool on the machine surfaces, which is a way in for the assistant and,
+  // through R43's parity, for an MCP client. What a machine can ask for is
+  // DERIVED: the shared catalogue is imported so a path is the one the tool
+  // actually forwards to, and each surface's own file is read for its
+  // surface-only tools. Nothing here is a list of doors somebody typed.
+  //
+  // Owner-key doors are the third kind. No session reaches them, so no screen
+  // could have a button for one — they are run from a script or a runbook
+  // command with the owner's key. Each is a line in OWNER_KEY_DOORS naming the
+  // file that reaches it, and that file is re-read for the path: a runbook that
+  // stops naming a door turns this red, which is the difference between "it is
+  // documented in four places" and a check.
+  it("reads-have-a-way-in: every read door is opened by a screen, is a tool on the machine surfaces, or says who it is for", () => {
+    const frontDoors = sourceFiles(
+      [
+        join(WEB, "lib"),
+        join(WEB, "components"),
+        join(WEB, "app"),
+        join(ROOT, "web-portal", "lib"),
+        join(ROOT, "web-portal", "components"),
+        join(ROOT, "web-portal", "app"),
+      ],
+      { extensions: [".ts", ".tsx"], skipTests: true }
+    )
+      .map((f) => f.source)
+      .join("\n")
+    expect(frontDoors.length, "the front-door scan read nothing — it has gone blind").toBeGreaterThan(10000)
+
+    const toolPaths = new Set<string>(SHARED_TOOLS.map((t) => t.path))
+    for (const f of [
+      join(ROOT, "workers", "data-ops", "src", "lib", "tools.ts"),
+      join(ROOT, "workers", "mcp", "src", "lib", "tools.ts"),
+    ])
+      for (const m of read(f).matchAll(/path:\s*"(\/api\/[^"]+)"/g)) toolPaths.add(m[1])
+    expect(toolPaths.size, "the tool-path derivation found almost nothing — it has gone blind").toBeGreaterThan(30)
+
+    // A whole path, as the third invariant matches one: it ends at a quote, a
+    // backtick, the `?` of a query string, or the `${` of a builder.
+    const opens = (path: string) =>
+      new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=["\`?]|\\$\\{)`).test(frontDoors)
+
+    const unopened: string[] = []
+    const ownerKey: string[] = []
+    let doors = 0
+    // FIVE WORKERS, not the third invariant's three. auth and mcp export a
+    // ROUTES table like the other three, so their READS cost nothing extra to
+    // walk — and walking them found one undeclared owner-key door on the first
+    // run (`POST /api/auth/admin/test-login`). The writes half stays at three
+    // for a measured reason, said in this file's header: its matcher cannot see
+    // a verb that lives in an options object, which is how web/lib/api/auth.ts
+    // calls the two sign-in doors every person in the product presses.
+    for (const worker of ["content", "tenancy", "data-ops", "auth", "mcp"]) {
+      const index = read(join(ROOT, "workers", worker, "src", "index.ts"))
+      const table = /export const ROUTES[^=]*=\s*\{([\s\S]*?)\n\}/.exec(index)
+      expect(table, `workers/${worker} has no ROUTES table — did it move?`).toBeTruthy()
+      for (const [, method, path] of (table as RegExpExecArray)[1].matchAll(
+        /"([A-Z]+) (\/[^"]+)":\s*\{\s*handler:/g
+      )) {
+        if (/^\/api\/[a-z-]+\/admin\//.test(path)) {
+          ownerKey.push(`${method} ${path}`)
+          continue
+        }
+        if (method !== "GET") continue
+        doors++
+        if (opens(path) || toolPaths.has(path)) continue
+        unopened.push(`GET ${path}`)
+      }
+    }
+    expect(doors, "the read-door census found almost nothing — it has gone blind").toBeGreaterThan(60)
+
+    const unlisted = unopened.filter((d) => !(d in NO_SCREEN_READ))
+    expect(
+      unlisted,
+      `these doors answer a question nothing asks — no screen opens them and no tool forwards to them. Give each a caller, or write down here who it is for: ${unlisted.join(", ")}`
+    ).toEqual([])
+    // The same ratchet as NO_CONTROL: a reason in front of a door that now has
+    // a caller is a line nobody reread.
+    const stale = Object.keys(NO_SCREEN_READ).filter((d) => !unopened.includes(d))
+    expect(
+      stale,
+      `NO_SCREEN_READ names doors a screen or a tool reaches now — delete these lines: ${stale.join(", ")}`
+    ).toEqual([])
+
+    // The owner-key doors, both ways: every one has a line, every line is a door,
+    // and the file each line names still names the path.
+    expect(ownerKey.length, "the owner-key census found nothing — it has gone blind").toBeGreaterThan(5)
+    const unclaimed = ownerKey.filter((d) => !(d in OWNER_KEY_DOORS))
+    expect(
+      unclaimed,
+      `these owner-key doors say nothing about who runs them — add a line to OWNER_KEY_DOORS naming the script or runbook that does: ${unclaimed.join(", ")}`
+    ).toEqual([])
+    for (const [door, { reached }] of Object.entries(OWNER_KEY_DOORS)) {
+      expect(ownerKey, `OWNER_KEY_DOORS names "${door}", which is not an owner-key door any more — delete the line`).toContain(door)
+      const path = door.split(" ")[1]
+      expect(
+        read(join(ROOT, reached)).includes(path),
+        `OWNER_KEY_DOORS says ${reached} reaches "${door}", and that file no longer names the path — the way in has rotted`
+      ).toBe(true)
+    }
+  })
 })
+
+/** READ DOORS NO SCREEN OPENS AND NO TOOL FORWARDS TO. One kind of line: a
+ * caller the census cannot see, with the reason it cannot. The list is a
+ * RATCHET like NO_CONTROL below — give a door a screen or a tool and its line
+ * must go. */
+const NO_SCREEN_READ: Record<string, string> = {
+  "GET /api/content/google/callback":
+    "GOOGLE'S OWN REDIRECT TARGET. A person reaches it by finishing the consent screen: /google/start sends the browser to Google, and Google sends it back here with the code. No screen names the path because no screen ever calls it — the address is built once, in lib/google-oauth.ts (`redirectUri`), and handed to Google, which is the only caller there will ever be. A human path, then, and one the census cannot see because the literal lives in the worker that answers it.",
+}
+
+/** OWNER-KEY DOORS, AND WHO RUNS EACH ONE. `adminGuard` doors take no session
+ * — a person with the owner's key runs them from a script or a runbook
+ * command, so a screen is the wrong shape and its absence is not a gap. Every
+ * `/admin/` route on the three ROUTES workers has a line here; `reached` is the
+ * file that names the path, re-read by the check above so a runbook that drops
+ * a door turns the build red rather than leaving a door nobody can find. */
+const OWNER_KEY_DOORS: Record<string, { reached: string; why: string }> = {
+  "POST /api/tenancy/admin/migrate-teams": {
+    reached: "scripts/check-team-migrations.mjs",
+    why: "the second step of every staging deploy (OPERATIONS.md): new team tables do not appear because the code shipped, somebody has to apply them.",
+  },
+  "POST /api/tenancy/admin/create-team": {
+    reached: "scripts/seed-staging.mjs",
+    why: "team creation is closed product-wide (TEAM_CREATION_CLOSED), so the one team a product has is made by the seed with the owner's key, never from a screen.",
+  },
+  "GET /api/tenancy/admin/db-sizes": {
+    reached: "documents/OPERATIONS.md",
+    why: "how big every team database is, for the retention runbook. An operator's number, not a member's.",
+  },
+  "POST /api/tenancy/admin/move-module": {
+    reached: "documents/OPERATIONS.md",
+    why: "moves one module's rows between databases during a resharding, which is an operation on the estate rather than on a team.",
+  },
+  "POST /api/data-ops/admin/seed-targets": {
+    reached: "documents/BOOTSTRAP.md",
+    why: "refreshes the global import catalogue's labels on a fresh account (BOOTSTRAP.md step). The catalogue self-heals on read since R13, so this is a bootstrap convenience rather than a step anyone must remember.",
+  },
+  "GET /api/data-ops/admin/errors": {
+    reached: "scripts/errors.mjs",
+    why: "the central error log, read newest-first by the errors script. RUNBOOK.md is the reading order.",
+  },
+  "POST /api/data-ops/admin/errors/resolve": {
+    reached: "documents/RUNBOOK.md",
+    why: "marks ONE error row dealt with, by id, from the runbook's curl. The script resolves by signature (the line below) because a signature is what a person reads; one id is the exception.",
+  },
+  "POST /api/data-ops/admin/errors/resolve-signature": {
+    reached: "scripts/errors.mjs",
+    why: "marks every row sharing one signature dealt with — `node scripts/errors.mjs <env> --resolve <signature> --note <why>`.",
+  },
+  "POST /api/auth/admin/test-login": {
+    reached: "scripts/smoke-staging.mjs",
+    why: "mints a sign-in code for a staging address without an inbox, so a smoke run and a browser walk can get past the front door. STAGING ONLY — the handler refuses unless `TEST_LOGIN_KEY` is set, which production never sets, so there is no screen for it because on the only environment that answers it there is no person to show one to.",
+  },
+  "POST /api/data-ops/admin/grant-credits": {
+    reached: "documents/OPERATIONS.md",
+    why: "tops up a team's AI credit balance. An owner action until real payments wire into the same seam (DATA-MODEL.md § agent_credits).",
+  },
+}
 
 /** WRITE DOORS NOTHING A PERSON CAN PRESS REACHES YET. Two kinds of line, and
  * they are labelled, because pretending a gap is a decision is how a gap

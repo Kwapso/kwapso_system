@@ -21,16 +21,24 @@ const ok = (name, cond, detail = "") => {
 
 const api = makeApi(BASE)
 
-// 1 · Both workers answer through the front door.
+// 1 · Every worker with a health door answers through the front door.
 {
   const a = await api("/api/auth/health")
   const t = await api("/api/tenancy/health")
   const r = await api("/api/realtime/health")
   const m = await api("/api/mcp/health")
+  // The two heaviest workers were NOT asked until 7 Sep 2026: content and
+  // data-ops each answer a health door that nothing — not this smoke, not a
+  // monitor — had ever called, so a deploy could have left either one dead
+  // behind four green health lines. Six workers answer through the front door.
+  const c = await api("/api/content/health")
+  const d = await api("/api/data-ops/health")
   ok("auth health", a.body?.ok === true)
   ok("tenancy health", t.body?.ok === true)
   ok("realtime health", r.body?.ok === true)
   ok("mcp health", m.body?.ok === true)
+  ok("content health", c.body?.ok === true)
+  ok("data-ops health", d.body?.ok === true)
 }
 
 // 2 · Login: mint a code through the ADMIN TEST-LOGIN door (staging-only,

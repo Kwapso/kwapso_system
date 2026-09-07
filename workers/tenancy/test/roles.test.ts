@@ -130,6 +130,20 @@ describe("setRolePermissions", () => {
     // a module not in the value is written all-off
     expect(script).toContain("'knowledge', 0, 0, 0, 0")
   })
+
+  it("never stores a right the module does not offer (R36) — the box the grid draws anyway is written off", async () => {
+    roleLookup({ id: "R", title: "Editor", is_default: 0 })
+    const all = { read: true, create: true, edit: true, delete: true }
+    await setRolePermissions(cfg, guard, actor, "R", { help: all, teams: all, all_tasks: all })
+    const script = d1ExecScript.mock.calls[0][2] as string
+    // help offers read/create/edit and no delete — a ticket is archived, never deleted
+    expect(script).toContain("'help', 1, 1, 1, 0")
+    // teams offers edit alone: reading a team is whoAmI, and auto-flip-read
+    // must not smuggle an unoffered read back in
+    expect(script).toContain("'teams', 0, 0, 1, 0")
+    // all_tasks is one switch over a sight
+    expect(script).toContain("'all_tasks', 1, 0, 0, 0")
+  })
 })
 
 describe("createRole", () => {
@@ -227,6 +241,10 @@ describe("getRolePermissions", () => {
     expect(res.isDefault).toBe(false)
     expect(res.canEdit).toBe(true)
     expect(res.modules).toHaveLength(TEAM_MODULE_CATALOG.length)
+    // …and every row says which of the four it offers (R36's data, through
+    // the door, so the screen draws only the boxes that decide something)
+    expect(res.modules.find((m) => m.key === "help")?.rights).toEqual(["read", "create", "edit"])
+    expect(res.modules.find((m) => m.key === "team_members")?.rights).toEqual(["read", "create", "edit", "delete"])
     expect(res.value.team_members).toEqual({
       read: true,
       create: true,

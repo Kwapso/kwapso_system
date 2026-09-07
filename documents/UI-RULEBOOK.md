@@ -1687,8 +1687,10 @@ Here is what is achievable today without touching the library, and what is not.
   `CollectionHeading` is the host's own component
   (`web/components/collection-heading.tsx`), so this is a host change.
 - A **group heading** inside a collection may carry the type mark: the sprints overview
-  already does it (`web/components/sprints-screen.tsx`), and so does the header band
-  (`TypeMark` in `web/components/record-chrome.tsx`).
+  already does it (`web/components/sprints-screen.tsx`) through `RecordMark`
+  (`shared/web/record-mark.tsx`). The header band no longer draws one — client ruling,
+  2026-09-01, "no images on title" — and the `TypeMark` wrapper that used to sit in
+  `record-chrome.tsx` for it was deleted on 2026-09-07 once nothing rendered it.
 - Any **host-composed** row may carry a mark, because the library `List` has the slot:
   `item.leading` (`shared/ui/components/list/list.tsx`). Home and Settings use it
   today.

@@ -14,6 +14,7 @@ import {
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import { TEAM_MODULE_CATALOG } from "../team-schema"
+import { offeredRights } from "@shared/team-modules"
 import { GuardError, hasRight, type MemberGuard } from "./permissions"
 import { EXPORT_HARD_CAP } from "@shared/workers/limits"
 
@@ -135,7 +136,10 @@ export async function getRolePermissions(
   guard: MemberGuard,
   roleId: string
 ): Promise<{
-  modules: { key: string; label: string }[]
+  /** Every module row, with WHICH of the four rights it offers (R36's data,
+   * `MODULE_OFFERED_RIGHTS`), so the screen can draw only the boxes that
+   * decide something and hand the kit the same subset in one line. */
+  modules: { key: string; label: string; rights: readonly (keyof RightSet)[] }[]
   value: PermissionValue
   isDefault: boolean
   title: string
@@ -160,7 +164,7 @@ export async function getRolePermissions(
   ])
 
   return {
-    modules: TEAM_MODULE_CATALOG,
+    modules: TEAM_MODULE_CATALOG.map((m) => ({ ...m, rights: offeredRights(m.key) })),
     value: buildPermissionValue(rows),
     isDefault: role.is_default === 1,
     title: role.title,
@@ -289,9 +293,19 @@ export async function setRolePermissions(
 
   const statements = TEAM_MODULE_CATALOG.map((m) => {
     const n = normalizeRights(value?.[m.key])
-    const bit = (b: boolean) => (b ? 1 : 0)
+    // AN UNOFFERED RIGHT IS NEVER STORED AS HELD (R36). The matrix is a grid, so
+    // the kit draws four boxes on a row whose module offers fewer, and until the
+    // kit can be told which to draw (its `rights` prop, pending upstream) a
+    // person can tick one. The door is the boundary: a right no door, tool
+    // gate, activity map or import target asks for — `MODULE_OFFERED_RIGHTS`,
+    // fail-both-ways in web/test/rules.test.ts — is written off, so the sheet
+    // handed back (and the next open of the screen) says what is true rather
+    // than what was ticked. `normalizeRights` still runs first: auto-flip-read
+    // is about the rights a module HAS, and this is about the ones it does not.
+    const offered = offeredRights(m.key)
+    const bit = (right: keyof RightSet) => (n[right] && offered.includes(right) ? 1 : 0)
     return `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
-VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, ${bit(n.read)}, ${bit(n.create)}, ${bit(n.edit)}, ${bit(n.delete)})
+VALUES (${sqlString(ulid())}, ${sqlString(roleId)}, ${sqlString(m.key)}, ${bit("read")}, ${bit("create")}, ${bit("edit")}, ${bit("delete")})
 ON CONFLICT(role_id, module) DO UPDATE SET
   can_read = excluded.can_read, can_create = excluded.can_create,
   can_edit = excluded.can_edit, can_delete = excluded.can_delete;`

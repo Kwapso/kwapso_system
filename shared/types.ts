@@ -157,7 +157,9 @@ export type SelectableValue = {
  * (key + label), the saved value, the role title, and whether it's the locked
  * Admin role (shown view-only). */
 export type RolePermissions = {
-  modules: { key: string; label: string }[]
+  /** `rights` is WHICH of the four this module offers (R36, `MODULE_OFFERED_RIGHTS`),
+   * so the Roles screen draws only the boxes that decide something. */
+  modules: { key: string; label: string; rights: readonly (keyof RightSet)[] }[]
   value: PermissionValue
   isDefault: boolean
   title: string
