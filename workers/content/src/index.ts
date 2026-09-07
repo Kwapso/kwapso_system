@@ -674,7 +674,7 @@ export default {
       // unchanged; the cause stops being console-only.
       if (e instanceof GuardError) {
         if (e.detail)
-          await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+          await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
         return fail(e.status, e.code, e.message)
       }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight

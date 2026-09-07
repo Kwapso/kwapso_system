@@ -38,7 +38,7 @@
 // worse defect than the slowness it was built to explain.
 
 import { budgetForKind, MAX_D1_TRIPS_PER_DOOR } from "./limits"
-import { logError, type CoreDb } from "./error-log"
+import { logError, SLOW_DOOR_SOURCE, type CoreDb } from "./error-log"
 import { afterResponse } from "./parallel"
 
 /** THE TAG EVERY `ROUTES` TABLE ALREADY CARRIES. A door's class is read off the
@@ -261,5 +261,7 @@ export function logIfSlow(request: Request, route: string, kind?: RouteKind, cor
   // DEFERRED, because measuring a slow door must never be a reason it is slower:
   // this runs on the request's own lifetime, after the answer has gone.
   // `logError` cannot throw (its own contract), so there is nothing to catch.
-  if (core) afterResponse(request, logError(core, { source: "slow-door", place: route, message: line, teamId: team }))
+  // NO STACK, ON PURPOSE: this is a measurement, and `MEASUREMENT_SOURCES` in
+  // error-log.ts says so where a reader of the store can ask.
+  if (core) afterResponse(request, logError(core, { source: SLOW_DOOR_SOURCE, place: route, message: line, teamId: team }))
 }

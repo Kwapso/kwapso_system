@@ -34,7 +34,7 @@
 
 import { fail, json } from "@shared/workers/http"
 import { healthBody } from "@shared/workers/config-health"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, identityFor } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
 import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
@@ -144,7 +144,15 @@ export default {
       // every intended 400 would have become a 500 — and a 500 on the
       // unauthenticated sign-in door writes a row to the GLOBAL core database
       // per request. The two changes only make sense together.
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      if (e instanceof GuardError) {
+        // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx (gating.ts `detail`):
+        // the caller's answer is unchanged and the cause stops being console-only.
+        // The same branch every sibling worker carries — auth's was the odd one
+        // out, so a diagnosed refusal on a sign-in door recorded nothing.
+        if (e.detail)
+          await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
       // `console.*` sites in this codebase and not one of them named a request,
       // which made the live tail and `error_logs` two stores with no join between
@@ -156,8 +164,10 @@ export default {
       // Record the crash in the central error log (core DB) — best-effort, and
       // now literally "never blocks the response": it rides `waitUntil`, so the
       // 500 goes out while the row is written and the row is still guaranteed to
-      // land. Clean GuardError refusals never reach here.
-      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request)))
+      // land. Clean GuardError refusals never reach here. WHOSE crash it was is
+      // read off the request (`noteIdentity` in lib/sessions.ts, the moment the
+      // session row resolves) — the same WeakMap `teamContext` fills elsewhere.
+      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

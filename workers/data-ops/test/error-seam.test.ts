@@ -54,6 +54,31 @@ describe("error seam: the roster is the fleet on disk", () => {
     })
   }
 
+  // THE ROW SAYS WHOSE, AND A DIAGNOSED REFUSAL IS RECORDED — in every one of
+  // the six, not the three that happened to. Measured on staging, 7 Sep 2026:
+  // realtime, auth and mcp recorded 2,026 rows between them with neither
+  // `team_id` nor `user_id`, and none of the three recorded a GuardError that
+  // carried a `detail` (gating.ts), so a Google refusal reaching the MCP surface
+  // was the console's alone. Same shape in all six, read off the CENTRAL catch
+  // of the default export — brace-balanced, not a regex with a budget.
+  for (const w of FLEET.filter((f) => f.bindsCoreDb)) {
+    it(`${w.name}'s central catch records a diagnosed refusal, and every row it records names the caller`, () => {
+      const body = centralCatchOf(w.src)
+      expect(body, `${w.name} must have a central catch on its default export`).not.toBeNull()
+      const guard = /if \(e instanceof GuardError\)\s*\{([\s\S]*?)return fail\(e\.status/.exec(body!)
+      expect(guard, `${w.name}'s GuardError branch must be a block that can record before answering`).not.toBeNull()
+      expect(guard![1], `${w.name} must record a refusal that carries a detail`).toMatch(
+        /if \(e\.detail\)\s*await recordWorkerError\(env\.DB,/
+      )
+      const calls = recorderCalls(body!)
+      expect(calls.length, `${w.name} records in its catch`).toBeGreaterThanOrEqual(2)
+      for (const c of calls) {
+        expect(c, `${w.name}: a row without the request id:\n${c}`).toMatch(/requestId\(request\)/)
+        expect(c, `${w.name}: a row without the caller:\n${c}`).toMatch(/identityFor\(request\)/)
+      }
+    })
+  }
+
   for (const w of FLEET.filter((f) => !f.bindsCoreDb)) {
     it(`${w.name} cannot record, so it must at least answer rather than crash`, () => {
       // A public door especially: Cloudflare's raw 1101 tells a stranger the
@@ -82,6 +107,34 @@ describe("error seam: the roster is the fleet on disk", () => {
     })
   }
 })
+
+/** Every `recordWorkerError(…)` call in `region`, paren-balanced — a lazy regex
+ * stops at the first `)`, which is `new URL(request.url)`'s. */
+function recorderCalls(region: string): string[] {
+  const out: string[] = []
+  let at = region.indexOf("recordWorkerError(")
+  while (at !== -1) {
+    let depth = 0
+    let i = at + "recordWorkerError".length
+    for (; i < region.length; i++) {
+      if (region[i] === "(") depth++
+      else if (region[i] === ")" && --depth === 0) break
+    }
+    out.push(region.slice(at, i + 1))
+    at = region.indexOf("recordWorkerError(", i)
+  }
+  return out
+}
+
+/** The body of the central catch: the first `catch (…) { … }` AFTER the default
+ * export, brace-balanced — realtime's first catch in the file is inside its
+ * Durable Object, which is not the request boundary. */
+function centralCatchOf(src: string): string | null {
+  const from = src.indexOf("export default {")
+  if (from === -1) return null
+  const body = catchBodyOf(src.slice(from))
+  return body
+}
 
 /** The body of the first `catch (…) { … }` in the file, brace-balanced. */
 function catchBodyOf(src: string): string | null {

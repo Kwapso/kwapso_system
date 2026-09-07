@@ -18,6 +18,7 @@ import type { ActiveContext, SessionUser } from "@shared/types"
 // bounce it exists to prevent, in exactly the tests meant to prove it doesn't.
 import { ApiFailure } from "@shared/web/api"
 import { clearCache } from "@shared/web/store"
+import { reportError } from "@shared/web/log"
 
 import { auth, tenancy } from "@/lib/api"
 
@@ -184,12 +185,15 @@ export function useActiveTeam(): ActiveTeam {
     // /accounts — each of them minutes into a failure the worker had already
     // logged, and neither row said anything the first one hadn't.
     //
-    // Logging-only, which ERROR-HANDLING.md rule 1 allows by name for a
-    // best-effort side-effect: loud in the console, silent in the store. What
-    // is lost is a refresh, and the next ping does it again. What must NOT
-    // happen here is answering a 401 — that is the LOAD path's decision, made
-    // once with the cache in front of it, and a transient failure is not
-    // allowed to become a sign-out (use-active-team-outage.test.tsx).
+    // RECORDED, not merely logged. This was console-only under ERROR-HANDLING.md
+    // rule 1's best-effort clause, and the clause was misapplied: what is lost
+    // is a refresh, true, but a refresh that keeps failing is a person whose
+    // member count, role and team list are silently stale, and the store had
+    // no row for it (error_log review, 6 Sep 2026). `reportError` already drops
+    // a network blip on the floor, so a dropped connection stays quiet. What
+    // must NOT happen here is answering a 401 — that is the LOAD path's
+    // decision, made once with the cache in front of it, and a transient failure
+    // is not allowed to become a sign-out (use-active-team-outage.test.tsx).
     try {
       // reload both identity (profile edits) and context (member counts, etc.)
       const [me, nextCtx] = await Promise.all([auth.me(), tenancy.active()])
@@ -198,7 +202,7 @@ export function useActiveTeam(): ActiveTeam {
       setUser(me.user)
       setCtx(nextCtx)
     } catch (e) {
-      console.error("active-team refresh failed:", e)
+      reportError("active-team refresh", e)
     }
   }, [sendToOnboardingIfTeamless])
 
