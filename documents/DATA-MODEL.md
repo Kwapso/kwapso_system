@@ -271,9 +271,14 @@ created for.
 ### error_logs. KEEP (BUILT 2026-07-03, GLOBAL, `db/core/0012`)
 Purpose: the central error store (ERROR-HANDLING.md), one row per UNEXPECTED
 failure (worker crash or client-side error), never a clean GuardError refusal.
-Real data: `id`, `at`, `source`, `place`, `message`, `stack` (capped), optional
-`team_id`/`user_id`/`url`, and the resolve workflow (`status` open→resolved,
-`resolved_at`, `resolution_note`). Owner-only doors (x-admin-key):
+Real data: `id`, `at`, `source`, `place`, `message` (the CAUSE — a refusal's
+`detail` where it has one, never our own sentence), `stack` (capped; absent by
+declaration on a MEASUREMENT source such as `slow-door`, see
+`MEASUREMENT_SOURCES` in `shared/workers/error-log.ts`), optional
+`team_id`/`user_id`/`url` (the page only, query string stripped) and
+`request_id` (`db/core/0020`; the request's trace id, or on unattended work the
+tick's own `tick:<job>:<ISO>`), and the resolve workflow (`status`
+open→resolved, `resolved_at`, `resolution_note`). Owner-only doors (x-admin-key):
 `GET /api/data-ops/admin/errors` + `POST /api/data-ops/admin/errors/resolve`.
 Lives in the global core DB, system health is cross-team; each environment has
 its own core DB so staging/production histories never mix.
@@ -333,6 +338,18 @@ plus everyone else) the tables grew monotonically while a green nightly job
 reported success. 40 × 5,000 = 200,000 rows per table per night, no statement any
 larger than the one that already worked. A run that hits the PASS ceiling is
 recorded to `error_logs`, not merely logged (R12).
+
+### cron_heartbeats. KEEP (BUILT 2026-09-07, GLOBAL, `db/core/0029`). DID THE TICK COME
+Purpose: the one fact every scheduled handler could not record — that a tick
+never came. One row per job (`knowledge-sweep`, `morning-digest`, `nightly`;
+the list is `CRON_JOBS` in `shared/workers/cron-heartbeat.ts`, held equal to
+the two wranglers' cron triggers and to the rows the migration seeds):
+`last_run_at` moves on every tick that ran to its end, `last_ok_at` only on a
+tick that recorded no failure. Tenancy's nightly reads content's two beats and
+content's morning tick reads tenancy's; a beat older than twice its period is
+one `error_logs` row (`cron/watch`) the ops digest mails. Seeded at apply time
+so a schedule that never fires on a fresh environment is still noticed. Three
+rows, upserted; nothing to retain or sweep.
 
 ### db_growth. KEEP (BUILT 2026-08-14, GLOBAL, `db/core/0022`). HOW LONG HAVE I GOT
 Purpose: the half of the growth watch the size alarm never had. `db_alerts` says a

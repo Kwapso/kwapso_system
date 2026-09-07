@@ -29,6 +29,8 @@
 // CF_D1_TOKEN" is a complete diagnosis, and `ok: true` on this check means the
 // class of failure that produced those 1,848 rows is not the one you have.
 
+import { logError, type CoreDb } from "./error-log"
+
 /** What one worker cannot work without. Names only — this never reads a value. */
 export type ConfigReport = {
   ok: boolean
@@ -64,4 +66,53 @@ export function healthBody(
 ): { ok: boolean; worker: string; config: ConfigReport } {
   const config = configReport(env, required)
   return { ok: config.ok, worker, config }
+}
+
+/** THE PROBE NOBODY HAS TO RUN BY HAND.
+ *
+ * `healthBody` answers honestly — and until this, nothing asked. A person still
+ * had to open six URLs to learn that a secret had been cleared, which meant the
+ * first signal stayed what it always was: somebody's request failing. So a
+ * cron tick that already runs asks the workers its own service bindings reach,
+ * and a door that answers `ok: false`, or does not answer, becomes one row in
+ * `error_logs` naming the worker and the NAMES it is missing (never a value —
+ * the door does not carry one). The ops digest mails it that night.
+ *
+ * Bounded like every outbound call (R11): a worker that hangs on its health
+ * door is reported as not answering, not waited for. Records through
+ * `logError` directly rather than throwing, so a dead sibling can never fail
+ * the tick that was checking on it. */
+export const HEALTH_PROBE_MS = 5_000
+
+export async function probeWorkerHealth(
+  db: CoreDb,
+  source: string,
+  tick: string,
+  workers: readonly { name: string; door: { fetch(url: string, init?: RequestInit): Promise<Response> }; path: string }[]
+): Promise<{ name: string; missing: string[] }[]> {
+  const unwell: { name: string; missing: string[] }[] = []
+  for (const w of workers) {
+    let report: { name: string; missing: string[] } | null = null
+    try {
+      const res = await w.door.fetch(`https://internal${w.path}`, { signal: AbortSignal.timeout(HEALTH_PROBE_MS) })
+      const body = (await res.json().catch(() => null)) as { ok?: unknown; config?: { missing?: unknown } } | null
+      if (!res.ok || !body || body.ok !== true) {
+        const missing = Array.isArray(body?.config?.missing) ? body!.config!.missing.map(String) : []
+        report = { name: w.name, missing }
+      }
+    } catch (e) {
+      report = { name: w.name, missing: [`(no answer within ${HEALTH_PROBE_MS}ms: ${e instanceof Error ? e.message : String(e)})`] }
+    }
+    if (!report) continue
+    unwell.push(report)
+    await logError(db, {
+      source,
+      place: "cron/health-probe",
+      message:
+        `the ${report.name} worker reports itself unable to work: missing ${report.missing.join(", ") || "(the health door answered but did not say what)"}. ` +
+        `Every request that needs it is failing. Set it with a wrangler secret (a secret) or in wrangler.jsonc (a var), then redeploy ${report.name}.`,
+      requestId: tick,
+    })
+  }
+  return unwell
 }

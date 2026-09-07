@@ -66,7 +66,48 @@ environment (staging and production errors never mix), cross-team by design
   `resolution_note`.
 - **NOT captured:** clean `GuardError` refusals (4xx, working as designed).
   Recording is best-effort by contract, a logging hiccup never changes a
-  response.
+  response. **The exception is a refusal that carries a `detail`** (gating.ts):
+  the person still reads the refusal's own sentence, and the detail — which
+  call, what status, what the far side said — is what the row records. Every
+  one of the six central catches does this in the same shape (held by
+  `workers/data-ops/test/error-seam.test.ts`).
+- **The message is the CAUSE, never our own sentence (7 Sep 2026).**
+  `recordWorkerError` writes `causeOf(e)` — the `detail` where there is one, the
+  message where there is not — and keeps the thrown thing's own stack. Measured
+  on staging before this: 1,991 rows said "Google couldn't answer that just now.
+  Try again." about a token Google had revoked. `causeOf` has one definition
+  (error-log.ts; gating.ts re-exports it).
+- **Whose, and which click — on every surface.** `team_id`/`user_id` come off
+  the request through `identityFor`, which `teamContext` fills for the three
+  data workers and `noteIdentity` fills for the three that resolve a caller some
+  other way (auth from its session row, mcp from its token, realtime from its
+  socket). Every central-catch row carries `requestId(request)`.
+- **`request_id` on unattended work is the TICK's id** — `tickId(job,
+  scheduledTime)`, shaped `tick:<job>:<ISO>` so it can never be read as a click,
+  carried on every row a cron tick records, so one tick's rows join the way one
+  request's do. Held by `workers/tenancy/test/cron-heartbeat.test.ts`, which
+  reads both scheduled handlers off disk.
+- **A MEASUREMENT carries no stack, by declaration.** `MEASUREMENT_SOURCES` in
+  error-log.ts names the sources whose rows are written on purpose by a seam
+  that measured something (`slow-door`, timing.ts). The errors door announces
+  the list as `measurementSources`, and `scripts/errors.mjs` tags such a group,
+  so "stack missing" is only ever said of an exception row.
+- **`url` is the PAGE, never the query string or fragment** — stripped in
+  `logError` for every caller, because the query is where a person's search
+  words live and a sign-in landing carries a token.
+- **A dropped row is not silent everywhere.** Over the ceiling, or when the
+  table cannot be written at all, `logError` prints one console line naming the
+  source, the place and the bucket (never the message — the catch printed it),
+  so a store that stopped filling cannot look like a quiet week.
+- **The unattended work watches itself (7 Sep 2026).** Each cron tick BEATS
+  into `cron_heartbeats` (core `0029`, `shared/workers/cron-heartbeat.ts`), and
+  the two cron workers read each other's beats once a day: a schedule silent for
+  twice its period becomes one row (`cron/watch`) the ops digest mails that
+  night. Tenancy's nightly also PROBES the health doors of the workers it binds
+  (`probeWorkerHealth`, config-health.ts) and content's morning tick checks its
+  own configuration by name, so a cleared secret is a row rather than a person's
+  request failing. Nobody watches the watchers if every cron on the estate dies
+  at once; that is written down rather than hidden.
 - **BOUNDED per caller (2026-08-11, core migration `0019_error_log_bound`):**
   `MAX_ERROR_LOGS_PER_HOUR` (120) rows per bucket per trailing hour, where a
   bucket is `COALESCE(user_id, source)`, the person whose browser beaconed it,
@@ -128,6 +169,11 @@ sibling of the pre-ship trio (`lean_mean_check` · `story_checks_out` ·
 1. Every `catch` either handles the error meaningfully or calls the reporter.
    Never an empty `catch {}` that hides a failure (logging-only `catch` for
    best-effort side-effects like activity writes is fine, and is commented as such).
+   **Best-effort is about the ACTION, not the row:** a side-effect may fail
+   without failing the action, and its failure is still recorded when a person
+   would want to know — the active-team refresh was console-only under this
+   clause for a year and a person whose member list was quietly stale had no row
+   (`web/test/refresh-reports.test.ts`).
    **`logActivity` is that pattern's canonical case, and it records the gap** —
    the swallow stays (a logging hiccup must never break the action it describes)
    and the loss is durable: the catch writes an `error_logs` row naming the
