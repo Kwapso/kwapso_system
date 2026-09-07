@@ -224,6 +224,17 @@ New migrations must be applied to BOTH databases before deploying workers that n
 
 **Core migration 0029 (`cron_heartbeats`), apply BEFORE deploying tenancy or content (2026-09-07).** Each cron tick now beats into it and the two cron workers watch each other's beats for a schedule that stopped firing (`shared/workers/cron-heartbeat.ts`, DATA-MODEL.md). **WITHOUT it nothing breaks and nothing is watched:** the beat is best-effort and prints one console line per tick, and the watcher records ONE `cron/watch` row per day saying it could not read the table — which is the row telling you to apply this. The migration seeds one row per job stamped at apply time, so apply it, then deploy; a job that has not beaten within two of its periods after that is reported.
 
+**Core migration 0030 (`credit_grants`), apply BEFORE deploying data-ops (2026-09-07).**
+Every top-up through `POST /api/data-ops/admin/grant-credits` now writes one row
+saying who granted, how much, to which team and when — in the SAME `env.DB.batch`
+as the balance it moves (`shared/workers/credits.ts`, DATA-MODEL.md). Before it,
+the owner's key could add credits and leave nothing behind but a bigger number.
+**WITHOUT it the grant door fails LOUDLY and grants nothing:** the batch cannot
+insert into a table that is not there, so the balance is rolled back with it and
+the call errors. That is deliberate — the alternative, a best-effort audit row
+after the money, is the untraceable grant this exists to prevent, only looking
+fixed. Apply it to `kwapso-core` + `kwapso-core-staging` first, then deploy.
+
 **Team migration `0037_app_logo`, apply BEFORE deploying tenancy (2026-08-18).**
 `apps.logo_url`, the client's own mark on the app tile. **WITHOUT it every write
 through the apps door 500s on a missing column**, which is the loud failure; the
@@ -418,7 +429,7 @@ every answer says what it searched).
 
 - `POST /api/data-ops/admin/seed-targets`, refresh the GLOBAL `importable_databases` catalog's LABELS (display names / descriptions / schemas). **No longer a step anyone must remember**: the catalogue reconciles itself against the code on read (R13, a fresh env's picker heals on first open; a target the owner switched off stays off, and this door no longer re-activates it either).
 - `GET /api/data-ops/admin/errors?status=open|resolved|all&limit=N`. Read the central error log (newest first). `POST /api/data-ops/admin/errors/resolve` `{ id, note }`, mark one resolved with the what-went-wrong note. See ERROR-HANDLING.md.
-- `POST /api/data-ops/admin/grant-credits`, top up a team's AI credit balance (the purchasable half of the agent quota; the free half is **the app's own daily allowance**, `AGENT_FREE_DAILY`, code default 25, but both environments ship **50**). This is the seam real payments wire into later.
+- `POST /api/data-ops/admin/grant-credits`, top up a team's AI credit balance (the purchasable half of the agent quota; the free half is **the app's own daily allowance**, `AGENT_FREE_DAILY`, code default 25, but both environments ship **50**). This is the seam real payments wire into later. **Every call writes a `credit_grants` row** — who (`owner-key`, because the key proves possession and not a person), how much, which team, when, and this request's own trace id — in the same batch as the balance, so a top-up cannot happen without leaving a record (DATA-MODEL.md § credit_grants).
 
 ### Public surface (LOCKED): only the two gateways are public
 

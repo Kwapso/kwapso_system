@@ -77,6 +77,7 @@ everything that is about *identity and billing across teams*:
 | `importable_databases` | the owner-maintained import target catalogue | `db/core/0008` |
 | `agent_usage` | per-team free daily AI counter | `db/core/0009` |
 | `agent_credits` | per-team purchasable AI balance | `db/core/0010` |
+| `credit_grants` | who topped that balance up, and when (one row per grant, same batch as the balance) | `db/core/0030` |
 | `agent_usage_log` | per-command usage trail (when · who · credits · why; confirm folds in) | `db/core/0011` |
 
 **One isolated D1 database per team, reached over the D1 REST door.** Each team

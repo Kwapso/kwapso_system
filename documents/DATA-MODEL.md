@@ -14,7 +14,7 @@ scroll, so: the two tiers, in order.
 
 **GLOBAL core** (`kwapso-core`, reached by `env.DB`), identity and billing across teams:
 `users` · `teams` · `team_members` · `email_change_logs` · `account_activity` ·
-`importable_databases` · `agent_usage` · `agent_credits` · `agent_usage_log` ·
+`importable_databases` · `agent_usage` · `agent_credits` · `credit_grants` · `agent_usage_log` ·
 `mcp_tokens` · `error_logs` · the sharding machinery, `team_module_databases` +
 `team_module_moves` + `db_alerts` + `db_growth` (where a module lives, the mover's
 resumable ledger, and the size + rate watch) ·
@@ -212,6 +212,37 @@ empty the agent is blocked. Top-ups are an owner action today
 (`POST /api/data-ops/admin/grant-credits`, x-admin-key); real payments wire in
 later against this same balance (the grant action is the seam). Lives in the
 global core DB so the gate can spend a unit without opening a team database.
+**This table says what the balance IS, never who moved it** — `updated_at` is a
+timestamp and not an audit block. Who granted is `credit_grants`, below.
+
+### credit_grants. KEEP (BUILT 2026-09-07, GLOBAL, `db/core/0030`)
+Purpose: **who topped this team up, and when.** One row per grant. Real data:
+`id`, `team_id`, `granted_at`, `amount` (always positive), `actor`, `request_id`.
+Written by `grantCredits` (`shared/workers/credits.ts`) in the SAME `env.DB.batch`
+as the balance it moves, so the money and its record commit together or neither
+does — the shape `email_change_logs` and the email switch already use
+(`workers/auth/src/lib/email-change.ts`). The record is a REQUIRED ARGUMENT of
+that function rather than a follow-up call, so the payment integration that wires
+into the same seam later cannot grant silently either.
+
+**Why it is its own table and not a row in `agent_usage_log`:** that log is a
+SPEND ledger — its own migration calls a row "how many AI units that command
+consumed", and three readers sum it as spend (`readUsageLog` behind the quota
+badge, `scripts/ai-spend.mjs`, the nightly ops digest). A +500 top-up sitting in
+it would be counted as a turn and as five hundred credits spent by every one of
+them unless all three learned to subtract, which is three subtractions a future
+reader can forget. It is also why grants do NOT appear in the assistant's usage
+dialog: that view answers "where did our credits go", and an arrival is not a
+departure.
+
+**`actor` is as honest as the door can be.** `POST /api/data-ops/admin/grant-credits`
+opens on `adminGuard`, which proves possession of the owner's key and nothing
+about a person, so the row says `owner-key` and invents no name. `request_id` is
+the id the gateway minted for that click (`shared/workers/trace.ts`, the same
+value `error_logs.request_id` joins on) — it is what tells two identical grants a
+second apart apart. Before this table a leaked owner key could top a balance up
+untraceably: you could read the total ever granted and the minute the row last
+moved, and nothing else. Kept forever, like every other audit table here.
 
 ### agent_usage_log. KEEP (BUILT 2026-07-01, GLOBAL, `db/core/0011`)
 Purpose: the usage TRAIL behind the panel's "where did my credits go" view.
@@ -320,7 +351,7 @@ Sessions are judged by **expiry, not age**: `expires_at` slides forward while a
 session is in use, so an age-based sweep would sign out every long-lived user.
 
 Nothing anyone might have to answer for is touched: activity, account activity,
-`agent_usage_log`, invite audits and every audit block stay. `error_logs` is the
+`agent_usage_log`, `credit_grants`, invite audits and every audit block stay. `error_logs` is the
 one that moved, and only because it was already documented as a 90-day history
 with nothing enforcing it, a rate ceiling (`db/core/0019`) bounds how fast a
 store fills, never how full it gets. **A retention window for `account_activity`

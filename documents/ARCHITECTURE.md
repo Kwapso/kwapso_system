@@ -118,7 +118,8 @@ sequenceDiagram
 - **Per-team databases.** A GLOBAL D1 core holds identity and everything that has
   to be true across teams: `users`, `teams`, `team_members` (the card catalog:
   user → team → role id), the session and sign-in tables, the MCP tokens, the AI
-  meter (`agent_credits`, `agent_usage`, `agent_usage_log`), the error log, the
+  meter (`agent_credits`, `agent_usage`, `agent_usage_log`, and `credit_grants`,
+  who topped a balance up), the error log, the
   sharding alarms (`db_alerts`, `db_growth`, `team_module_databases`,
   `team_module_moves`), `account_activity`, `email_change_logs` and the import
   registry. Every team then gets **its own D1 database** holding its own tables:
@@ -316,7 +317,7 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/data-ops/import/sample | data-ops | a downloadable sample CSV for a target, a good-file template (AGENTIC-IMPORT §10) |
 | GET /api/data-ops/import/batches | data-ops | the team's import history, newest first, summaries only (who, when, files → tables, totals) |
 | POST /api/data-ops/admin/seed-targets | data-ops | seed the global import catalog (owner-only, x-admin-key) |
-| POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key) |
+| POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key; every grant writes a `credit_grants` row in the same batch as the balance) |
 | GET /api/data-ops/agent/usage | data-ops | the team's AI quota snapshot (free + credits) |
 | POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you); accepts attached CSVs, planned through the import batch engine, run via run_import_batch behind the confirm panel (AGENTIC-IMPORT §8.5) |
 | POST /api/data-ops/agent/confirm | data-ops | approve/decline a proposed dangerous action; resume the turn |

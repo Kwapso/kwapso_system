@@ -194,16 +194,53 @@ export async function refundAiUnits(
   }
 }
 
-/** Owner/admin top-up: add credits to a team's balance (idempotent insert/accumulate).
- * Returns the new balance. Real payment integration will call this same path later. */
-export async function grantCredits(env: Env, teamId: string, amount: number): Promise<number> {
+/** WHO ASKED FOR A TOP-UP — as honestly as the door can say it.
+ *
+ * A union of one, deliberately. `adminGuard` proves possession of the owner's
+ * key and nothing about a person, so the only value today names the DOOR and
+ * invents no name. The payment integration that wires into this same seam adds
+ * its own value here as a decision somebody makes, not as a free string a
+ * caller can fill with anything. */
+export type GrantActor = "owner-key"
+
+/** THE RECORD A GRANT LEAVES. Required, because forgetting it is the whole bug:
+ * before this, a top-up wrote a bigger number and nothing else, and a leaked
+ * owner key could add credits untraceably. An argument cannot be forgotten the
+ * way a follow-up call can. */
+export type GrantRecord = {
+  actor: GrantActor
+  /** the click this grant rode in on (`requestId(request)`, shared/workers/trace.ts).
+   * Two grants of the same size to the same team a second apart are told apart
+   * by this, and it joins to `error_logs.request_id`. */
+  requestId: string
+}
+
+/** Owner/admin top-up: add credits to a team's balance (idempotent insert/accumulate),
+ * AND write the row that says who did it. Returns the new balance. Real payment
+ * integration will call this same path later — and will have to name itself.
+ *
+ * THE TWO WRITES GO IN ONE `batch`, so the money and its record commit together
+ * or neither does. Same shape as the email switch and its audit row
+ * (workers/auth/src/lib/email-change.ts), and the reason is the same: an audit
+ * row written best-effort AFTER the change is exactly the untraceable grant this
+ * exists to prevent, only now it looks fixed. */
+export async function grantCredits(
+  env: Env,
+  teamId: string,
+  amount: number,
+  by: GrantRecord
+): Promise<number> {
   const now = new Date().toISOString()
-  await env.DB.prepare(
-    `INSERT INTO agent_credits (team_id, balance, lifetime_granted, updated_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(team_id) DO UPDATE SET balance = balance + ?, lifetime_granted = lifetime_granted + ?, updated_at = ?`
-  )
-    .bind(teamId, amount, amount, now, amount, amount, now)
-    .run()
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO agent_credits (team_id, balance, lifetime_granted, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(team_id) DO UPDATE SET balance = balance + ?, lifetime_granted = lifetime_granted + ?, updated_at = ?`
+    ).bind(teamId, amount, amount, now, amount, amount, now),
+    env.DB.prepare(
+      `INSERT INTO credit_grants (id, team_id, granted_at, amount, actor, request_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(ulid(), teamId, now, amount, by.actor, by.requestId),
+  ])
   const row = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
     .bind(teamId)
     .first<{ balance: number }>()

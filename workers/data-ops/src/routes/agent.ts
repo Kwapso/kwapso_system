@@ -169,7 +169,15 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
   const amount = Number(body.amount)
   if (!Number.isFinite(amount) || amount <= 0 || Math.trunc(amount) !== amount)
     return fail(400, "invalid_input", "teamId and a positive whole amount are required.")
-  const balance = await grantCredits(env, teamId, amount)
+  // THE GRANT LEAVES A RECORD, and it is not optional. This door creates money:
+  // it is gated by the owner's key, which proves possession and not a person, so
+  // the row names the DOOR ('owner-key') rather than inventing an actor, and
+  // carries this request's own id so two top-ups a second apart are told apart.
+  // `grantCredits` writes it in the same batch as the balance (db/core/0030).
+  const balance = await grantCredits(env, teamId, amount, {
+    actor: "owner-key",
+    requestId: requestId(request),
+  })
   await publishChange(env, teamId, "agent_usage")
   return json({ teamId, balance })
 }
