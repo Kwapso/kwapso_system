@@ -4,16 +4,32 @@
 // a streaming door decides — may you, where, how big, under what label — and
 // then hands back a signature instead of accepting the bytes.
 //
-// ── IT CHANGES NOTHING UNTIL SOMEBODY TURNS IT ON ───────────────────────────
+// ── THE THREE-STEP UPLOAD, AND WHERE THE BYTES GO ───────────────────────────
+//
+//   1. the browser asks THIS door (`/uploads/presign`) — may I, where, how big,
+//      under what label — and is handed a signed URL, a key and the headers the
+//      signature covers;
+//   2. the browser PUTs the file to R2 itself. No worker is on that path: the
+//      request goes to `<account>.r2.cloudflarestorage.com`, and the worker's
+//      request-body ceiling (100 MB on this plan, STREAM_UPLOAD_MAX_BYTES sits
+//      under it) stops being the file's ceiling;
+//   3. the browser tells the CONFIRM door below the key it was given, and the
+//      door proves the key is ours, proves the object arrived (`head`), and
+//      answers with the reference the record will keep — exactly what the
+//      streaming door used to answer after shovelling the bytes itself.
+//
+// Wired on the client side in `web/lib/api/content.ts` (`putDirect`), for the
+// four targets in `UPLOAD_TARGETS`, on 7 Sep 2026.
+//
+// ── AND IT STILL CHANGES NOTHING WHERE IT IS NOT TURNED ON ──────────────────
 //
 // With no `R2_ACCESS_KEY_ID` secret this answers `{ direct: false }` and the
-// client uses the door it uses today, bytes through the worker, byte for byte
-// unchanged. That is the whole reason the code can land while the infrastructure
-// (a write-only credential scoped to two buckets, and bucket CORS on an account
-// shared with two other companies) is still an open decision — nobody is asked
-// to approve infrastructure in order to unblock a merge. Same shape as the
-// rate-limit binding, which "FAILS OPEN if this block is missing, which is what
-// makes it safe to deploy the worker before adding the binding".
+// client uses the streaming door, bytes through the worker, byte for byte
+// unchanged. A direct PUT that R2 or the browser refuses (a bucket with no CORS
+// rule, an expired grant) falls back to the same door — a failed accelerator is
+// never a failed upload. Same shape as the rate-limit binding, which "FAILS
+// OPEN if this block is missing, which is what makes it safe to deploy the
+// worker before adding the binding".
 //
 // ── WHAT THE CALLER GETS TO DECIDE, WHICH IS ALMOST NOTHING ─────────────────
 //
@@ -44,10 +60,10 @@
 import { fail, json } from "@shared/workers/http"
 import { gated } from "@shared/workers/route"
 import { refusePortalCaller } from "@shared/workers/account-scope"
-import { mediaKey } from "@shared/workers/image"
+import { teamMediaKey } from "@shared/workers/image"
 import { presignConfigured, presignPut, PRESIGN_TTL_SECONDS } from "@shared/workers/presign"
 import { requireText, TEXT_LIMITS } from "@shared/workers/validate"
-import { uploadTarget, UPLOAD_TARGETS } from "../lib/upload-targets"
+import { presignedKey, servedAt, uploadTarget, UPLOAD_TARGETS, type UploadTarget } from "../lib/upload-targets"
 import type { Env } from "../env"
 
 /** POST /api/content/uploads/presign — a URL the browser may PUT one file to.
@@ -70,14 +86,8 @@ export async function postPresignUpload(request: Request, env: Env): Promise<Res
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
   if (!body) return fail(400, "invalid_input", "That request had no body we could read.")
 
-  const moduleName = requireText(body.module, "Module", TEXT_LIMITS.short)
-  const target = uploadTarget(moduleName)
-  if (!target)
-    return fail(
-      400,
-      "invalid_input",
-      `There is no upload target called "${moduleName}". Expected one of: ${Object.keys(UPLOAD_TARGETS).join(", ")}.`
-    )
+  const target = uploadTarget(requireText(body.module, "Module", TEXT_LIMITS.short))
+  if (!target) return noSuchTarget()
 
   const { cfg, guard } = await gated(request, env, target.right[0], target.right[1])
   await refusePortalCaller(cfg, guard)
@@ -104,9 +114,9 @@ export async function postPresignUpload(request: Request, env: Env): Promise<Res
   // "your upload failed".
   if (!presignConfigured(env)) return json({ direct: false })
 
-  // THE KEY IS OURS. `owners` comes out of the table and the ULID comes out of
-  // this isolate; nothing the caller sent contributes a byte of it.
-  const key = mediaKey(guard.teamId, ...target.owners)
+  // THE KEY IS OURS. The module comes out of the table and the ULID comes out
+  // of this isolate; nothing the caller sent contributes a byte of it.
+  const key = teamMediaKey(guard.teamId, target.module)
   const bucket = env[target.bucketVar]
   if (!bucket)
     // A credential without the bucket name it signs against is a half-configured
@@ -132,4 +142,77 @@ export async function postPresignUpload(request: Request, env: Env): Promise<Res
     headers: { "Content-Type": stored, "Content-Length": String(sizeBytes) },
     expiresInSeconds: PRESIGN_TTL_SECONDS,
   })
+}
+
+const noSuchTarget = (): Response =>
+  fail(
+    400,
+    "invalid_input",
+    `There is no upload target called that. Expected one of: ${Object.keys(UPLOAD_TARGETS).join(", ")}.`
+  )
+
+/** THE OBJECT BEHIND A KEY, once it has been proved ours — or null.
+ *
+ * Structural rather than `R2Bucket`, for the reason image.ts gives on its own
+ * bucket types: the one method this needs, and nothing that ties the file to
+ * the runtime's type package. */
+type HeadBucket = {
+  head(key: string): Promise<{ size: number; httpMetadata?: { contentType?: string } } | null>
+}
+
+/** POST /api/content/uploads/confirm — "the bytes are up; give me the reference".
+ *
+ * The third step of the direct upload, and the one that keeps R40 true: a
+ * record only ever points at an object this door has SEEN. It answers exactly
+ * what the streaming door answered — `{ url, contentType }` — so the form field
+ * that used to hold the streaming door's reply holds this one and no screen
+ * changed.
+ *
+ * Gated on the SAME right as the presign and the streaming door, from the same
+ * table. Refuses a portal caller for the same reason the presign does.
+ *
+ * NOT A MUTATION: it writes no row, no object and no counter — it looks. The
+ * row is written by the module's own door when the form is saved, which is
+ * where the publish and the activity line belong (the same argument the
+ * streaming doors make for being housekeeping). */
+export async function postConfirmUpload(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null
+  if (!body) return fail(400, "invalid_input", "That request had no body we could read.")
+
+  const target = uploadTarget(requireText(body.module, "Module", TEXT_LIMITS.short))
+  if (!target) return noSuchTarget()
+
+  const { cfg, guard } = await gated(request, env, target.right[0], target.right[1])
+  await refusePortalCaller(cfg, guard)
+
+  // THE KEY IS CALLER INPUT NOW, and it is re-proved before it reaches the
+  // bucket: this team, this module, one ULID tail (`presignedKey`). Anything
+  // else is "not one we gave you", never a lookup.
+  const key = presignedKey(guard, target, requireText(body.key, "File", TEXT_LIMITS.short))
+  if (!key) return fail(400, "invalid_input", "That file isn't one we gave you a place for. Nothing was saved.")
+
+  const found = await confirmStored(env[target.binding] as unknown as HeadBucket, target, key)
+  if (!found) return fail(404, "not_found", "That file never arrived. Nothing was saved.")
+
+  // ?v= busts caches; the file itself is served immutable by the gateway — the
+  // streaming door's own answer, shape for shape.
+  return json({ url: `${servedAt(target)}${key}?v=${Date.now()}`, contentType: found.contentType })
+}
+
+/** IS THE OBJECT REALLY THERE, AND IS IT WHAT THE GRANT ALLOWED?
+ *
+ * `head`, never `get`: the door is confirming, not reading, and a 90 MB object
+ * must not be pulled into the isolate to be counted. The signature already
+ * pinned the label and the length, so R2 refused anything else at the PUT —
+ * the size check here is the belt to that brace, and the label it answers is
+ * the one R2 is holding, never the one the caller declared. Exported for the
+ * knowledge door, which confirms the same way and then reads. */
+export async function confirmStored(
+  bucket: HeadBucket,
+  target: UploadTarget,
+  key: string
+): Promise<{ size: number; contentType: string } | null> {
+  const head = await bucket.head(key)
+  if (!head || head.size <= 0 || head.size > target.maxBytes) return null
+  return { size: head.size, contentType: head.httpMetadata?.contentType ?? target.stored("application/octet-stream") }
 }

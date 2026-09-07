@@ -18,7 +18,7 @@
 // one: a fence implies a client can reach these rows through it.
 
 import { fail, json, pagedJson } from "@shared/workers/http"
-import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
+import { ANY_FILE_TYPE, dataUrlBytes, parseUploadDataUrl, storedContentType, teamMediaKey } from "@shared/workers/image"
 import { safeExternalLink } from "../lib/internal-fields"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import {
@@ -444,7 +444,7 @@ export async function postStoryAttachment(request: Request, env: Env): Promise<R
       )
     // The key carries a ULID, which is what makes the capability URL
     // unguessable; the team id keeps one team's objects out of another's prefix.
-    const key = mediaKey("story", guard.teamId)
+    const key = teamMediaKey(guard.teamId, "story")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     url = `/media/${key}`
     contentType = parsed.contentType
@@ -534,7 +534,7 @@ export async function postStoryAttachmentUpdate(request: Request, env: Env): Pro
     // points at the old object and still says who put it there, which is the
     // whole reason the replace is two rows; and /media is served `immutable`,
     // so a key written twice is a key somebody's browser answers from cache.
-    const key = mediaKey("story", guard.teamId)
+    const key = teamMediaKey(guard.teamId, "story")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     const { moved, attachments } = await replaceStoryAttachment(cfg, guard, actor, id, current, {
       label,

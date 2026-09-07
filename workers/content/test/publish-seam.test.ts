@@ -35,6 +35,11 @@ const HOUSEKEEPING = [
   // carries a body and must not sit in a URL, not because it changes state.
   // The row is written later by the module's own door, which publishes there.
   "POST /api/content/uploads/presign",
+  // "THE BYTES ARE UP" — the third step of the same upload. It LOOKS (`head`)
+  // and answers the reference; it writes no row, no object and no counter.
+  // The module's own door writes the row and publishes there, exactly as it
+  // does after the streaming doors below.
+  "POST /api/content/uploads/confirm",
   // The agency's own housekeeping: two more byte-shovels, same reasoning. The
   // brand library re-hosts 74 legacy files that die with the Glide account, and
   // a staff photo or a certificate PDF lands the same way. Neither writes a row

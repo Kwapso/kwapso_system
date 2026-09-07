@@ -19,7 +19,36 @@ import type { Fetcher } from "@cloudflare/workers-types"
 
 import { logError, type CoreDb } from "./error-log"
 
-/** HOW MANY OBJECTS ONE TEAM'S CHANNEL IS SPREAD ACROSS.
+/** THE PEAK ONE TENANT IS BUILT FOR — the review yardstick, in code.
+ *
+ * 250,000 people in one team at ~10% peak concurrency, which is the number every
+ * other ceiling in this file is measured against. It was a sentence in a comment
+ * and in a rubric; it is a constant here so the arithmetic below can be checked
+ * rather than believed. */
+export const REALTIME_PEAK_LISTENERS_PER_TEAM = 25_000
+
+/** HOW MANY SOCKETS ONE SHARD MAY HOLD BEFORE SOMEBODY IS TOLD.
+ *
+ * A Durable Object is single-threaded and a broadcast is a serial loop, so past
+ * a few thousand sockets every publish on that team queues behind the last —
+ * and the first symptom of that is "the app feels slow", on the one team big
+ * enough to matter, pointing at nothing. Nothing measured a real team's listener
+ * count and nothing would have said a word as a team approached the number.
+ *
+ * 3,000 is the LOW end of one object's own range, deliberately — the point of a
+ * watch is to fire while there is still time to raise the shard count, and
+ * raising it re-shards new listeners (`shardFor` is a modulo of the count), so
+ * it wants a maintenance window rather than an emergency.
+ *
+ * The row it writes carries the two numbers nobody has: how many sockets that
+ * shard is holding, and how many of them the ping was actually sent to. The
+ * second is the measurement of subscription scoping — the thing the ceiling
+ * arithmetic depends on and that has never been observed on a real tenant. */
+export const REALTIME_SHARD_WATCH_SOCKETS = 3_000
+
+/** HOW MANY OBJECTS ONE TEAM'S CHANNEL IS SPREAD ACROSS — DERIVED, NOT CHOSEN.
+ *
+ * ── WHY THE CHANNEL IS SPLIT AT ALL ─────────────────────────────────────────
  *
  * A Durable Object is single-threaded and a broadcast is a serial loop over its
  * sockets, so ONE object per team made the team's socket count the ceiling: at a
@@ -39,37 +68,40 @@ import { logError, type CoreDb } from "./error-log"
  * split is shaped this way — a fan-out written at the publisher would have been a
  * hundred chances to write it differently.
  *
- * WHY FOUR. Each shard is a real object with real per-request overhead, so this
- * trades publish work for broadcast headroom and the trade only pays while the
- * broadcast is the expensive side. Four takes the ceiling from ~3–5k concurrent
- * listeners per team to ~12–20k, which clears the yardstick's 25,000 peak only
- * once combined with subscription scoping below — and it keeps a quiet team's
- * publish cost to four hibernating objects instead of one, which is nearly free
- * (an idle object is evicted). Raising it is a one-line change; the number is here
- * rather than inline so the client and the fan-out can never disagree about it. */
-export const REALTIME_SHARDS = 4
-
-/** HOW MANY SOCKETS ONE SHARD MAY HOLD BEFORE SOMEBODY IS TOLD.
+ * ── WHY IT IS AN ARITHMETIC AND NOT A NUMBER (7 Sep 2026) ───────────────────
  *
- * The paragraph above states a ceiling — four shards take a team from ~3–5k
- * concurrent listeners to ~12–20k — and then says the yardstick's 25,000 is
- * cleared "only once combined with subscription scoping". Both halves were
- * comments. Nothing measured a real team's listener count, nothing measured what
- * scoping actually removes from a broadcast, and nothing would have said a word
- * as a team approached the number: the first symptom of crossing it is every
- * publish on that team queueing behind a serial loop, which reads as "the app
- * feels slow" and points at nothing.
+ * It was `4`, with a paragraph reasoning that four "takes the ceiling from ~3–5k
+ * concurrent listeners per team to ~12–20k, which clears the yardstick's 25,000
+ * only once combined with subscription scoping". Read plainly, that says the
+ * shard count did NOT clear the yardstick on its own and leaned on a saving
+ * nobody had ever measured on a real tenant — and a hand-picked constant beside
+ * a hand-written ceiling is exactly the shape that cannot go red when the
+ * yardstick moves.
  *
- * 3,000 is the LOW end of one object's own range, deliberately — the point of a
- * watch is to fire while there is still time to raise `REALTIME_SHARDS`, and
- * raising it re-shards every listener (`shardFor` is a modulo of the count), so
- * it wants a maintenance window rather than an emergency.
+ * So the count is now the division those two comments were doing by eye: enough
+ * shards that a team at the yardstick's peak sits at or under the WATCH line on
+ * every shard. `ceil(25,000 / 3,000)` = 9, which is 27,000 sockets of watched
+ * capacity — 2,000 clear of the peak before anybody is even told, and ~45,000 at
+ * the high end of one object's own measured range. Nothing is assumed about
+ * subscription scoping; whatever it removes is now headroom on top rather than
+ * the thing the number depends on.
  *
- * The row it writes carries the two numbers nobody has: how many sockets that
- * shard is holding, and how many of them the ping was actually sent to. The
- * second is the measurement of subscription scoping — the thing the ceiling
- * arithmetic depends on and that has never been observed on a real tenant. */
-export const REALTIME_SHARD_WATCH_SOCKETS = 3_000
+ * ── WHY RAISING IT IS SAFE, AND WHAT UNLOCKED IT ────────────────────────────
+ *
+ * Sharding divides broadcast work by N and multiplies publish work by N, so a
+ * larger N used to make the fan-out the bottleneck (ARCHITECTURE.md §7's table:
+ * 128 shards fail on the publish side at ~22,000 object calls a second). The
+ * INTEREST REGISTRY below removed that: a publish now reaches the shards that
+ * declared an interest, so the publish side stops scaling with N. Its own note
+ * called raising this number "the follow-on decision this unlocks"; this is that
+ * decision, taken as a derivation so it cannot silently fall behind the
+ * yardstick again.
+ *
+ * A DEPLOY DOES NOT DROP A PING. `shardFor` is a modulo, so a listener already
+ * connected on an old shard stays there, and the fan-out reaches shards 0..N-1
+ * — a superset of where the old clients are. New connections spread over the
+ * wider set. Nothing needs draining. */
+export const REALTIME_SHARDS = Math.ceil(REALTIME_PEAK_LISTENERS_PER_TEAM / REALTIME_SHARD_WATCH_SOCKETS)
 
 /** WHICH shard a listener joins — stable per person, so their own devices land
  * together and a reconnect returns to the same object.
@@ -106,9 +138,11 @@ export function teamInterestName(teamId: string): string {
  * for that resource. The registry lets the door ask once and skip the shards
  * with nobody interested.
  *
- * At REALTIME_SHARDS = 4 this is roughly a wash and can cost one extra call:
- * 1 registry read + K interested shards, against 4 unconditional shard calls.
- * It wins at K ≤ 2 and loses at K = 4. That is not the reason it exists.
+ * At the FOUR shards this app ran until 7 Sep 2026 it was roughly a wash and
+ * could cost one extra call: 1 registry read + K interested shards, against 4
+ * unconditional ones. It won at K ≤ 2 and lost at K = 4. That was never the
+ * reason it exists — and at the derived nine it is a saving on every publish
+ * that fewer than eight shards care about.
  *
  * IT EXISTS TO REMOVE THE CEILING ON THE SHARD COUNT ITSELF. Sharding divides
  * broadcast work by N but multiplies publish work by N, so ARCHITECTURE.md §7's
@@ -116,9 +150,10 @@ export function teamInterestName(teamId: string): string {
  * a second — the fan-out becomes the bottleneck exactly when the sharding starts
  * to matter. With interest routing the publish side stops scaling with N and
  * starts scaling with how many shards actually care, which is what makes a
- * larger N worth having. Raising REALTIME_SHARDS is the follow-on decision this
- * unlocks; it is deliberately NOT taken here, because that number is a locked
- * one and this change is the prerequisite, not the change itself.
+ * larger N worth having. Raising REALTIME_SHARDS was the follow-on decision
+ * this unlocked, and it was TAKEN on 7 Sep 2026 — as a derivation from the
+ * yardstick rather than a second hand-picked number, which is the argument
+ * written out at `REALTIME_SHARDS` itself.
  *
  * FAIL OPEN, ALWAYS. Every unknown answers "interested": an unregistered shard,
  * an entry older than a listener's own deadline, an unreachable registry, a

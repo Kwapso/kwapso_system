@@ -532,7 +532,7 @@ bigger.
 - **Live updates.** The realtime layer fans a **tiny `{resource, id, op}` ping** (never
   row data), so a busy team costs bandwidth in bytes, not kilobytes. Each team's
   channel is **its own set of `TeamChannel` Durable Objects — four shard instances,
-  `team:<id>#0…3` (`REALTIME_SHARDS`), plus one `TeamInterest` registry that narrows
+  `team:<id>#0…8` (`REALTIME_SHARDS`, derived from the peak since 7 Sep 2026), plus one `TeamInterest` registry that narrows
   which shards each ping reaches** — every one hibernatable (idle instances cost
   ~nothing), so ten thousand teams don't cost fifty thousand always-on processes.
   *(Fact updated 26 Aug 2026: this bullet said one `TeamChannel` per team; the

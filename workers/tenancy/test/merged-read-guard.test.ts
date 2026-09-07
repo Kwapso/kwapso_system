@@ -1,30 +1,39 @@
-// A CONCATENATION CANNOT PAGE, SORT OR COUNT.
+// A CONCATENATION CANNOT PAGE, SORT OR COUNT — SO IT IS NOT A CONCATENATION ANY
+// MORE (7 Sep 2026).
 //
-// `d1QueryAcross` runs one statement against several databases and returns every
-// row as one list. That is exactly right for "give me the rows", and quietly wrong
-// for the three shapes below — each of which looks like it works while there is
-// only ONE database, which is every environment until the mover runs:
+// `d1QueryAcross` runs one statement against several databases. Until today it
+// returned every row as one list and REFUSED the three shapes a flat
+// concatenation gets wrong. That refusal was correct, and it was also the reason
+// the mover's relief valve could not be turned on: every collection read in this
+// app is sorted at the door and paged (R14), so a merged read that "worked"
+// would have thrown on the first list request after a move.
 //
-//   • LIMIT n     → each shard returns up to n, so the caller gets the top n OF
-//                   EACH shard, up to n × shards rows. A keyset page built on that
-//                   has the wrong rows in it and takes its `nextCursor` from the
-//                   last row of a concatenation — a position in no shard's order.
-//                   Page two repeats and skips, silently.
-//   • ORDER BY    → sorted within each shard, unsorted between them.
-//   • COUNT(…)    → one row per shard, and every caller in this base reads
-//                   `rows[0].n`. R16's exact total would report the FIRST shard's
-//                   count as the whole thing.
+// What changed, and what did not:
 //
-// Nothing paged goes through the split path today, so this refuses nothing that
-// currently runs. It is the tripwire for the day somebody points a paged or counted
-// read at it and gets a plausible answer.
+//   • LIMIT n + ORDER BY → MERGED. Each shard answers its own top n under the
+//     same ordering, so the global top n is a SUBSET of the union of those
+//     answers; the seam sorts the union by the statement's OWN keys (parsed off
+//     the tail, never restated by the caller) and cuts to n. Exactly the rows
+//     one database would have given.
+//   • COUNT(…) and the other aggregates → STILL REFUSED. One row per shard, and
+//     every caller in this base reads `rows[0].n`. `countCollectionAcross` folds
+//     a count properly and the message points there.
+//   • OFFSET → STILL REFUSED, and this one is new. Skipping m rows per shard
+//     skips a different m in the merged order, and there is no local answer to a
+//     global skip. R14's keyset paging carries no OFFSET, so nothing needs it.
+//   • an ORDER BY the parse cannot read as plain columns → STILL REFUSED. A
+//     merge that guesses at `CASE`/`COLLATE`/a function is the wrong answer
+//     wearing the right shape.
+//
+// The direction is unchanged where it is unchanged: fail loud rather than answer
+// wrong.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it, vi, afterEach } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
-import { d1QueryAcross } from "@shared/workers/d1-rest"
+import { d1QueryAcross, mergeAndCut, mergePlan } from "@shared/workers/d1-rest"
 
 import { SPLIT_READS_WIRED } from "../src/lib/sharding"
 import { moveModule } from "../src/routes/admin"
@@ -52,20 +61,68 @@ describe("one database is a plain read — nothing is refused", () => {
   })
 })
 
-describe("two or more databases refuse what a concatenation cannot answer", () => {
+describe("two or more databases MERGE what a merge can honestly reproduce", () => {
   const SHARDS = ["one", "two"]
 
-  it("refuses a LIMIT", async () => {
-    stubShards()
-    await expect(d1QueryAcross(CFG, SHARDS, "SELECT id FROM help LIMIT 51")).rejects.toThrow(/LIMIT/)
+  /** Two shards, each already sorted by `created_at DESC` — which is what a
+   * database returns for the statement below. Interleaved on purpose: a seam
+   * that concatenated would answer them in shard order and pass a test whose
+   * fixtures did not overlap. */
+  function stubTwoShards(
+    first: Record<string, unknown>[],
+    second: Record<string, unknown>[]
+  ) {
+    let call = 0
+    vi.stubGlobal("fetch", async () => {
+      const results = call++ === 0 ? first : second
+      return new Response(JSON.stringify({ success: true, errors: [], result: [{ results }] }), { status: 200 })
+    })
+  }
+
+  it("returns the top n OVERALL, not the top n of each shard", async () => {
+    stubTwoShards(
+      [{ id: "a", created_at: "2026-09-05" }, { id: "b", created_at: "2026-09-01" }],
+      [{ id: "c", created_at: "2026-09-04" }, { id: "d", created_at: "2026-09-03" }]
+    )
+    // Two shards × LIMIT 2 = four rows in flight; the merged answer is the two
+    // newest across both, in order. A concatenation would answer a, b.
+    await expect(
+      d1QueryAcross(CFG, SHARDS, "SELECT id FROM help ORDER BY created_at DESC LIMIT 2")
+    ).resolves.toEqual([{ id: "a", created_at: "2026-09-05" }, { id: "c", created_at: "2026-09-04" }])
   })
 
-  it("refuses an ORDER BY", async () => {
+  it("sorts ASCENDING when the statement does, and on several keys in order", async () => {
+    stubTwoShards(
+      [{ id: "b", rank: 1, title: "z" }],
+      [{ id: "a", rank: 1, title: "a" }, { id: "c", rank: 0, title: "m" }]
+    )
+    await expect(
+      d1QueryAcross(CFG, SHARDS, "SELECT id FROM stories ORDER BY rank ASC, title ASC")
+    ).resolves.toEqual([
+      { id: "c", rank: 0, title: "m" },
+      { id: "a", rank: 1, title: "a" },
+      { id: "b", rank: 1, title: "z" },
+    ])
+  })
+
+  it("puts NULLs where SQLite puts them, so the merged order matches one database's", async () => {
+    stubTwoShards([{ id: "a", due: "2026-01-01" }], [{ id: "b", due: null }])
+    await expect(d1QueryAcross(CFG, SHARDS, "SELECT id FROM todos ORDER BY due ASC")).resolves.toEqual([
+      { id: "b", due: null },
+      { id: "a", due: "2026-01-01" },
+    ])
+  })
+
+  it("still allows a plain row read across shards — the thing the path is FOR", async () => {
     stubShards()
     await expect(
-      d1QueryAcross(CFG, SHARDS, "SELECT id FROM help ORDER BY created_at DESC")
-    ).rejects.toThrow(/ORDER BY/)
+      d1QueryAcross(CFG, SHARDS, "SELECT id, title FROM help WHERE account_id = ?", ["A1"])
+    ).resolves.toEqual([{ n: 1 }, { n: 1 }])
   })
+})
+
+describe("and refuses what it cannot", () => {
+  const SHARDS = ["one", "two"]
 
   it("refuses an aggregate — the one that would make R16's exact count wrong", async () => {
     stubShards()
@@ -77,18 +134,78 @@ describe("two or more databases refuse what a concatenation cannot answer", () =
       await expect(d1QueryAcross(CFG, SHARDS, sql)).rejects.toThrow(/aggregate/)
   })
 
-  it("still allows a plain row read across shards — the thing the path is FOR", async () => {
+  it("refuses an OFFSET — there is no local answer to a global skip", async () => {
     stubShards()
     await expect(
-      d1QueryAcross(CFG, SHARDS, "SELECT id, title FROM help WHERE account_id = ?", ["A1"])
-    ).resolves.toEqual([{ n: 1 }, { n: 1 }])
+      d1QueryAcross(CFG, SHARDS, "SELECT id FROM help ORDER BY created_at DESC LIMIT 20 OFFSET 40")
+    ).rejects.toThrow(/OFFSET/)
+  })
+
+  it("refuses a LIMIT with nothing to order it by", async () => {
+    // "Any 20 rows" is answerable, and answerable DIFFERENTLY on every call.
+    stubShards()
+    await expect(d1QueryAcross(CFG, SHARDS, "SELECT id FROM help LIMIT 20")).rejects.toThrow(/ORDER BY/i)
+  })
+
+  it("refuses an ORDER BY it cannot read as plain columns", async () => {
+    stubShards()
+    for (const order of [
+      "CASE WHEN done THEN 1 ELSE 0 END",
+      "LOWER(title)",
+      "title COLLATE NOCASE",
+      "1",
+    ])
+      await expect(
+        d1QueryAcross(CFG, SHARDS, `SELECT id FROM help ORDER BY ${order} LIMIT 5`),
+        `${order} must not be guessed at`
+      ).rejects.toThrow(/ORDER BY \/ LIMIT is not one the merge can reproduce/)
   })
 
   it("says what to do instead, not just that it refused", async () => {
     stubShards()
-    await expect(d1QueryAcross(CFG, SHARDS, "SELECT id FROM help LIMIT 5")).rejects.toThrow(
-      /read one database, or give this path a real merge/i
+    await expect(d1QueryAcross(CFG, SHARDS, "SELECT COUNT(*) AS n FROM help")).rejects.toThrow(
+      /countCollectionAcross/
     )
+  })
+})
+
+describe("the merge plan is read off the statement, never restated", () => {
+  it("reads the keys and the cut the statement actually asked for", () => {
+    expect(mergePlan("SELECT id FROM help ORDER BY created_at DESC LIMIT 51")).toEqual({
+      keys: [{ column: "created_at", descending: true }],
+      limit: 51,
+    })
+    expect(mergePlan("SELECT id FROM t ORDER BY t.rank, t.id DESC")).toEqual({
+      keys: [
+        { column: "rank", descending: false },
+        { column: "id", descending: true },
+      ],
+      limit: null,
+    })
+    // No ordering and no cut is an ordinary row read and needs no plan at all.
+    expect(mergePlan("SELECT id FROM help WHERE account_id = ?")).toEqual({ keys: [], limit: null })
+  })
+
+  it("answers null for every tail it would have to guess at", () => {
+    for (const sql of [
+      "SELECT id FROM help LIMIT 5",
+      "SELECT id FROM help ORDER BY LOWER(title) LIMIT 5",
+      "SELECT id FROM help ORDER BY created_at DESC LIMIT 5 OFFSET 5",
+      "SELECT id FROM (SELECT id FROM a ORDER BY x) ORDER BY LOWER(y)",
+    ])
+      expect(mergePlan(sql), sql).toBeNull()
+  })
+
+  it("cuts a merged list to the page the statement asked for", () => {
+    const rows = [{ n: 3 }, { n: 1 }, { n: 2 }]
+    expect(mergeAndCut(rows, { keys: [{ column: "n", descending: false }], limit: 2 })).toEqual([
+      { n: 1 },
+      { n: 2 },
+    ])
+    // Stable: rows equal on every key keep the order the shards were listed in,
+    // which is `resolveModuleDatabases`'s (override first).
+    const tied = [{ id: "x", n: 1 }, { id: "y", n: 1 }]
+    expect(mergeAndCut(tied, { keys: [{ column: "n", descending: true }], limit: null })).toEqual(tied)
   })
 })
 

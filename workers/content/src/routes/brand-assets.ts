@@ -12,7 +12,7 @@ import { csvResponse, exportTooLarge, toCsv } from "@shared/workers/csv"
 import { EXPORT_HARD_CAP, STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import { queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { publishChange } from "@shared/workers/realtime"
-import { INLINE_SAFE_UPLOAD, mediaKey, ownedMediaKey, reclaimMedia, parseUploadDataUrl } from "@shared/workers/image"
+import { INLINE_SAFE_UPLOAD, ownedMediaKey, parseUploadDataUrl, reclaimMedia, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { gated, gatedBody } from "@shared/workers/route"
 import {
@@ -140,7 +140,7 @@ export async function postUploadBrandAsset(request: Request, env: Env): Promise<
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
-  const key = mediaKey(guard.teamId, "brand")
+  const key = teamMediaKey(guard.teamId, "brand")
   await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType: parsed.contentType })
@@ -217,7 +217,7 @@ export async function postStreamBrandAsset(request: Request, env: Env): Promise<
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
-  const key = mediaKey(guard.teamId, "brand")
+  const key = teamMediaKey(guard.teamId, "brand")
   await env.INTERNAL_MEDIA.put(key, request.body, { httpMetadata: { contentType } })
   // ?v= busts caches; the file itself is served immutable by the gateway.
   return json({ url: `/media/internal/${key}?v=${Date.now()}`, contentType })

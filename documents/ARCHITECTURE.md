@@ -213,7 +213,7 @@ platform, **what gets a DO instance, and what does NOT:**
   sign-out event pings that user's channel (their devices). Each ping is
   **row-level** (`{resource, id, op}`), NOT one-DO-per-record. *(Fact updated
   26 Aug 2026: "one channel" is no longer "one instance". Since §7's split of
-  14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (4) `TeamChannel` instances,
+  14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (9 since 7 Sep 2026, derived) `TeamChannel` instances,
   `team:<id>#0…3`, plus one `TeamInterest` registry at `team:<id>!interest`; the
   realtime worker's `/publish` door owns the fan-out, so a publisher still names
   `team:<id>` and a listener joins the shard of `shardFor(userId)`. A USER's
@@ -587,7 +587,19 @@ at. The owner then chose to raise it instead. Both were reasonable; this section
 where it ended up and what is still true.
 
 **The change (14 Aug 2026).** A team's channel is now **split across
-`REALTIME_SHARDS` (4) objects**, and listeners **declare what they want to hear**.
+`REALTIME_SHARDS` objects**, and listeners **declare what they want to hear**.
+
+**And the count stopped being a number (7 Sep 2026).** It was `4`, beside a
+comment saying four "clears the yardstick's 25,000 only once combined with
+subscription scoping" — a sentence conceding that the shard count did not clear
+the target on its own and leaned on a saving nobody had measured on a real
+tenant. It is now `ceil(REALTIME_PEAK_LISTENERS_PER_TEAM ÷
+REALTIME_SHARD_WATCH_SOCKETS)` = **9**: enough shards that a team at peak sits
+under the WATCH line on every one of them, 27,000 watched sockets against a
+25,000 peak. What made a wider fan-out affordable was the `TeamInterest`
+registry below — with it the publish side stops scaling with the shard count.
+A deploy drops no ping: `shardFor` is a modulo, listeners already connected stay
+where they are, and the fan-out reaches 0…N-1, a superset of where they sit.
 
 - **The split lives in the realtime worker's `/publish` door**, not at the publishers.
   A publisher still makes one call naming `team:<id>`; the door fans it out to
@@ -662,8 +674,10 @@ sockets, so do not go looking for that metric. These three are real:
    rather than visiting it. Either turns "occasional visitors" into "concurrent
    sessions", which is what the numbers above rest on.
 
-**When one fires, in order:** raise `REALTIME_SHARDS` (one line, and the client and the
-fan-out read the same constant so they cannot disagree); then narrow the agency's
+**When one fires, in order:** raise the peak the shard count is derived from (one line
+in `shared/workers/realtime.ts`, and the client and the fan-out read the same constant
+so they cannot disagree — since 7 Sep 2026 the count follows the peak rather than being
+chosen beside it); then narrow the agency's
 subscription, which needs the activity feed to listen for something narrower than
 "anything". The third step this list used to end with — route pings to interested
 shards rather than to all of them — was built in August 2026 (`TeamInterest`; fact

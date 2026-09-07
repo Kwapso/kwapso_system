@@ -60,6 +60,7 @@
 //   POST /api/content/knowledge           -> add a source
 //   POST /api/content/knowledge/upload    -> …or hand it a FILE, and read it
 //   POST /api/content/knowledge/upload-stream -> the same, file as the raw body
+//   POST /api/content/knowledge/upload-confirm -> the same, file already PUT straight to R2
 //   POST /api/content/knowledge/update    -> correct a source
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
@@ -89,7 +90,7 @@ import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
-import { postPresignUpload } from "./routes/uploads"
+import { postConfirmUpload, postPresignUpload } from "./routes/uploads"
 import type { Env } from "./env"
 import {
   getHelp,
@@ -161,6 +162,7 @@ import {
   postSetKnowledgeActive,
   postUpdateKnowledge,
   postStreamKnowledgeFile,
+  postConfirmKnowledgeFile,
   postUploadKnowledgeFile,
 } from "./routes/knowledge"
 import {
@@ -458,8 +460,13 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // publish and the activity line belong. Answers `{ direct: false }` in any
   // environment with no R2 credential, so it is inert until somebody turns it on.
   "POST /api/content/uploads/presign": { handler: postPresignUpload, kind: "housekeeping" },
+  // "THE BYTES ARE UP" — the third step of the direct upload. Housekeeping for
+  // the same reason as the streaming doors it stands in for: it proves an object
+  // and answers a reference; the row is the module's own door's to write.
+  "POST /api/content/uploads/confirm": { handler: postConfirmUpload, kind: "housekeeping" },
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
+  "POST /api/content/knowledge/upload-confirm": { handler: postConfirmKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
   "POST /api/content/knowledge/active": { handler: postSetKnowledgeActive, kind: "mutation" },
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a

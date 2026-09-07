@@ -7,10 +7,12 @@
 //  2. MOVER  — relocates one module's tables out of a team's database into a
 //              dedicated database, recorded in team_module_databases.
 //  3. SPLIT  — reads for a (team, module) COULD span several databases via
-//              resolveModuleDatabases() + d1QueryAcross(). NOT WIRED: neither has
-//              a caller outside this file, so valve 2 is refused at its door
-//              (SPLIT_READS_WIRED, below) rather than left able to empty a module
-//              out of the app while reporting success.
+//              resolveModuleDatabases() + d1QueryAcross(). The merged read is
+//              REAL now (7 Sep 2026: it sorts, pages and counts across shards);
+//              what is still missing is ROUTING — nothing outside this file
+//              resolves a module's databases, so valve 2 stays refused at its
+//              door (SPLIT_READS_WIRED, below) rather than left able to empty a
+//              module out of the app while reporting success.
 
 import {
   d1CreateDatabase,
@@ -764,17 +766,34 @@ async function saveMove(
  * the refusal sits where the app is asked to perform it. The door is the mover's
  * ONLY caller, and a census in the guard test asserts that it stays so.
  *
- * ── WHY THE HONEST ANSWER IS "REFUSE", NOT "WIRE IT QUICKLY" ────────────────
+ * ── WHY THE HONEST ANSWER IS STILL "REFUSE" (updated 7 Sep 2026) ────────────
  *
- * Because the wiring is not the whole job. `d1QueryAcross` deliberately REFUSES
- * `LIMIT`, `ORDER BY` and `COUNT` once more than one database is involved — a
- * concatenation cannot answer them — and every collection read in this app is
- * paged (R14), sorted at the door, and counted exactly (R16), usually all three.
- * So a merged read that "works" would throw on the first list request after a
- * move. Cross-shard paging is a cursor that encodes a position per shard, a
- * merged sort and a summed count: an architecture decision with an owner's name
- * on it, not a patch. Until that decision is taken, the relief valve is a
- * foot-gun and the safe state is a locked one. */
+ * This paragraph used to name TWO blockers and they have come apart.
+ *
+ * The first was the READ ITSELF: `d1QueryAcross` refused `LIMIT`, `ORDER BY` and
+ * `COUNT` across more than one database, and every collection read in this app
+ * is paged (R14), sorted at the door and counted exactly (R16), usually all
+ * three — so a merged read that "worked" would have thrown on the first list
+ * request after a move. THAT IS BUILT. The count folds
+ * (`countCollectionAcross`, since 5 Sep) and the page merges: each shard answers
+ * its own top n under the same ordering, so the global top n is a subset of the
+ * union, and `d1QueryAcross` sorts that union by the statement's own keys and
+ * cuts it. `merged-read-guard.test.ts` holds it, including the shapes it still
+ * refuses (an OFFSET, an ordering it cannot read as plain columns).
+ *
+ * The second is the one still standing, and it is ROUTING, not arithmetic.
+ * `requireMember` resolves ONE `guard.databaseId` out of `teams.database_id`,
+ * and 642 production reads take it from there. Nothing consults
+ * `team_module_databases`, so a moved module is invisible whatever the merge can
+ * do. Wiring it means teaching the read seam that a statement's tables may live
+ * in more than one place — a per-request routing map, keyed by table, resolved
+ * from core and carried on `cfg` the way `natives` already is. That is a change
+ * under every read in the app, and `team_module_databases` does not today record
+ * WHICH TABLES a module moved (the mover takes them as an argument), so the map
+ * has nothing to key on yet. It is an architecture decision with an owner's name
+ * on it, not a patch. Until it is taken the relief valve is a foot-gun and the
+ * safe state is a locked one — but the half that was engineering rather than
+ * decision is done. */
 // Annotated `boolean` rather than left to infer `false`: an inferred literal
 // makes the door's refusal a constant condition and the code after it
 // unreachable to TypeScript, which is a lie about a branch that is meant to come

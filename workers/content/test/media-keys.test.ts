@@ -60,8 +60,10 @@ describe("mediaKey — an uploaded object's URL is a capability, not a guess", (
         const variable = m[2]
         writes.push(`${path}: ${m[1]}.put(${variable})`)
         // The key variable must be assigned from mediaKey() in the same file.
+        // `mediaKey` or `teamMediaKey` — the second is the first with the shape
+        // decided for it (image.ts), and it is what every team-owned mint uses.
         expect(
-          new RegExp(`(const|let)\\s+${variable}\\s*=\\s*mediaKey\\(`).test(src),
+          new RegExp(`(const|let)\\s+${variable}\\s*=\\s*(team)?[mM]ediaKey\\(`).test(src),
           `${path} writes to R2 with a key that didn't come from mediaKey() — a predictable key on a door with no session check`
         ).toBe(true)
       }
@@ -216,7 +218,7 @@ describe("a reclaim is proved against the key some door actually mints", () => {
    * differ. */
   const RECLAIM = /ownedMediaKey\(\s*[^,]+,\s*"([^"]+)"\s*,\s*([^)]*)\)/g
   /** `mediaKey(<owners…>)` — the mint. */
-  const MINT = /mediaKey\(\s*([^)]*)\)/g
+  const MINT = /\b(?:mediaKey|teamMediaKey)\(\s*([^)]*)\)/g
   const tidy = (owners: string) => owners.replace(/\s+/g, " ").trim()
 
   /** Which base a file's uploads are served under, from the bucket it writes to.
@@ -315,10 +317,17 @@ describe("a reclaim is proved against the key some door actually mints", () => {
 describe("every object prefix a tenant's files live under is written down", () => {
   const PREFIXES: Record<string, string> = {
     '"users", user.id': "a person's profile photo — the ONE shape with no team in it, because a photo belongs to the person and follows them between teams (workers/auth/src/lib/profile.ts)",
-    '"teams", teamId': "the team's own logo, keyed by the team it IS rather than by a team it belongs to (workers/tenancy/src/lib/teams.ts)",
-    '"ticket", guard.teamId': "a ticket's attachments — kind-first, from before the team-first convention (workers/content/src/routes/help.ts)",
-    '"story", guard.teamId': "a story's attachments — kind-first, same vintage (workers/content/src/routes/stories.ts)",
-    '"todo", guard.teamId': "the file a CLIENT sends back through the portal to close a to-do — kind-first, same vintage (workers/content/src/routes/todos.ts)",
+    // EVERYTHING BELOW IS `<team>/<module>/<ulid>` — one shape, decided in one
+    // function (`teamMediaKey`, image.ts) since 7 Sep 2026. Before that day
+    // three conventions were live at once (kind-first `ticket/<team>`, the
+    // logo's `teams/<team>`, and team-first), so "one tenant's objects" was
+    // five prefix scans; objects written under the old shapes stay where they
+    // are and DATA-MODEL.md lists them as history. The MODULE segment is what
+    // this table pins per line, because it is the half a reclaim proves.
+    'teamId, "logo"': "the team's own logo (workers/tenancy/src/lib/teams.ts)",
+    'guard.teamId, "ticket"': "a ticket's attachments (workers/content/src/routes/help.ts)",
+    'guard.teamId, "story"': "a story's attachments (workers/content/src/routes/stories.ts)",
+    'guard.teamId, "todo"': "the file a CLIENT sends back through the portal to close a to-do (workers/content/src/routes/todos.ts)",
     'guard.teamId, "accounts"': "a client's logo and cover (workers/tenancy/src/routes/accounts.ts)",
     'guard.teamId, "apps"': "an app's logo (workers/tenancy/src/routes/processes.ts)",
     'guard.teamId, "tasks"': "the photo of the letter on a piece of our own admin (workers/content/src/routes/todos.ts)",
@@ -326,26 +335,26 @@ describe("every object prefix a tenant's files live under is written down", () =
     'guard.teamId, "brand"': "the brand library's files (workers/content/src/routes/brand-assets.ts)",
     'guard.teamId, "staff"': "staff photos and certificates — one generic upload door, two destination columns (workers/content/src/routes/staff.ts)",
     'guard.teamId, "deliverables"': "what we handed over on an app (workers/content/src/routes/deliverables.ts)",
-    // THE ONE MINT WHOSE PREFIX IS NOT A LITERAL, and the only reason it is
+    // THE ONE MINT WHOSE MODULE IS NOT A LITERAL, and the only reason it is
     // allowed to be. The presign door serves several modules from one handler,
-    // so its owners come out of `UPLOAD_TARGETS` rather than out of the call —
-    // and a spread is opaque to the scan above, which is exactly the kind of
-    // hole this table exists to refuse.
+    // so its module segment comes out of `UPLOAD_TARGETS` rather than out of the
+    // call — and a variable is opaque to the scan above, which is exactly the
+    // kind of hole this table exists to refuse.
     //
     // It is admitted here because the property is proved somewhere STRONGER
-    // instead: `upload-targets.test.ts` asserts every entry's owners are a
-    // prefix a streaming door already mints and this table already describes.
-    // So the spread can only ever produce a described prefix, and a new table
+    // instead: `upload-targets.test.ts` asserts every entry's module is a
+    // segment a streaming door already mints and this table already describes.
+    // So the variable can only ever produce a described prefix, and a new table
     // entry with a novel one goes red there rather than passing quietly here.
     // Delete this line the day the presign door mints its own key literally.
-    'guard.teamId, ...target.owners':
-      "a presigned direct upload — the prefix is whichever UPLOAD_TARGETS entry the caller named, each of which is proved to be one of the four above (workers/content/src/routes/uploads.ts)",
+    'guard.teamId, target.module':
+      "a presigned direct upload — the module is whichever UPLOAD_TARGETS entry the caller named, each of which is proved to be one of the four above (workers/content/src/routes/uploads.ts)",
   }
 
   const minted = () => {
     const found = new Set<string>()
     for (const [, src] of workerSources())
-      for (const m of src.matchAll(/mediaKey\(\s*([^)]*)\)/g))
+      for (const m of src.matchAll(/\b(?:mediaKey|teamMediaKey)\(\s*([^)]*)\)/g))
         found.add(m[1].replace(/\s+/g, " ").trim())
     return found
   }

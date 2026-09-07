@@ -401,10 +401,6 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
 
-  /* ── the door is ahead of its client, on purpose ───────────────────────── */
-  "POST /api/content/uploads/presign":
-    "THE SERVER HALF OF A TWO-HALF CHANGE, and the mirror image of the three lines above it. Those are doors kept alive for a client that has already shipped; this is a door that has to exist before its client can. It mints a time-limited signature the browser uses to PUT a file straight to R2 — so the client half is not a button, it is a rewrite of how every upload screen sends bytes, and it cannot be written against a door that is not there. Two things make landing it early honest rather than speculative. It is INERT: with no R2_ACCESS_KEY_ID it answers `{ direct: false }` in every environment that exists today, and every upload screen keeps the byte-through-the-worker path it has now. And it is PROVED: upload-targets.test.ts holds each entry to the streaming door it mirrors, and presign.test.ts reproduces AWS's own published signature, so the thing being landed early is checked rather than assumed. DELETE THIS LINE the day an upload screen calls it — the ratchet below will ask for that, and it will be right.",
-
   /* ── the control left the screen, the door did not ──────────────────────── */
   // THE PARENT DOOR IS NOT HERE ANY MORE (19 Aug 2026). Its line said, in the
   // last sentence somebody wrote before closing it, exactly what to do if this

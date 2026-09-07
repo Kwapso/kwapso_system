@@ -53,12 +53,16 @@ This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the clas
 `TeamChannel` lives in `workers/realtime/src/index.ts`. It is a **pub/sub relay
 and nothing else**:
 
-- **One channel per team or per person — and a TEAM channel is four instances.**
+- **One channel per team or per person — and a TEAM channel is nine instances.**
   A person's identity channel is one instance, addressed `user:<id>`. A team's
   data channel is addressed `team:<id>` by every PUBLISHER, but since the split
   of 14 Aug 2026 (ARCHITECTURE §7 records the decision; this section is its
-  mechanism) it is **spread across `REALTIME_SHARDS` (4) instances**, named by
-  `teamShardName` as `team:<id>#0` … `team:<id>#3`. All three names —
+  mechanism) it is **spread across `REALTIME_SHARDS` instances**, named by
+  `teamShardName` as `team:<id>#0` … `team:<id>#8`. Since 7 Sep 2026 that count
+  is DERIVED — `ceil(REALTIME_PEAK_LISTENERS_PER_TEAM ÷
+  REALTIME_SHARD_WATCH_SOCKETS)` = 9 — so it cannot silently fall behind the
+  peak it is meant to carry; `workers/realtime/test/shard-count.test.ts` locks
+  the property rather than the number. All three names —
   `REALTIME_SHARDS`, `shardFor` (a stable hash of the user id) and
   `teamShardName` — live in `shared/workers/realtime.ts`, the seam the client
   and the worker both import, so the two can never disagree about the count.
@@ -75,10 +79,12 @@ and nothing else**:
   through the door, or address a shard. *(Fact updated 26 Aug 2026: this bullet
   said "one instance per channel" from the day the doc was locked until the
   split, and for twelve days after it.)*
-- **And the shard count now has an instrument under it (5 Sep 2026).** The
-  ceiling `REALTIME_SHARDS` implies — "~12–20k concurrent listeners per team,
-  which clears the yardstick's 25,000 only once combined with subscription
-  scoping" — was a comment, and nothing measured either half. A Durable Object
+- **And the shard count now has an instrument under it (5 Sep 2026), and is
+  derived from it (7 Sep 2026).** The ceiling four shards implied — "~12–20k
+  concurrent listeners per team, which clears the yardstick's 25,000 only once
+  combined with subscription scoping" — was a comment, and nothing measured
+  either half. The count is now the division that comment was doing by eye, so
+  the watch line below is not merely an alarm: it is the input. A Durable Object
   is single-threaded and a broadcast is a serial loop, so past a few thousand
   sockets every publish on that team queues behind the last, and the first
   symptom is "the app feels slow" pointing at nothing.

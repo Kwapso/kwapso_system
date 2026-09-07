@@ -237,12 +237,14 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **274 doors, 218 with a tool, 56 with a written reason**, the
+  red build. Today: **276 doors, 218 with a tool, 58 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
-  the presign door (permission to PUT a file, which hands back a URL its caller
-  must then make an HTTP request to — what it needs is a browser rather than
-  argument room, and a model emitting a tool call is not that client),
+  the THREE doors of the direct upload (permission to PUT a file, which hands
+  back a URL its caller must then make an HTTP request to, and the two that
+  acknowledge the PUT afterwards — what all three need is a browser rather than
+  argument room, and a model emitting a tool call is not that client; a machine
+  that never made the PUT could only ever be told the file did not arrive),
   the THREE upload pairs, two media doors and the knowledge base, each a
   buffered door plus a streamed twin: the buffered half cannot be called because a
   base64 document will not fit in a tool argument, and the streamed half cannot be
