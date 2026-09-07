@@ -69,6 +69,7 @@
 import * as React from "react"
 
 import { cn } from "@shared/ui/lib/utils"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
@@ -327,7 +328,36 @@ export function PagedFind<T>({
   // moved is exactly the silent loss R14 exists to prevent. She comes back to
   // her question, freshly answered.
   //
-  // Debounced upstream by SearchInput (200ms), so a keystroke is not a request.
+  // WHAT IS REMEMBERED IS WHAT SHE TYPED. What is ASKED is `term`, below —
+  // two values, and the comment that used to stand here said otherwise.
+  //
+  // IT SAID: "Debounced upstream by SearchInput (200ms), so a keystroke is not
+  // a request." That was never true. The kit's `SearchInput`
+  // (`shared/ui/components/search-input/search-input.tsx`) holds one piece of
+  // state, whether the field is non-empty, so it knows whether to draw its own
+  // ✕; its `handleChange` calls `onChange` synchronously and there is no timer
+  // anywhere in the file. So every keystroke in this box built a new `query`,
+  // a new `findKey`, and a new `useCached` subscription — a door read per
+  // letter, each landing in a cache entry of its own. A false comment is worse
+  // than no comment: somebody read this one, reasonably believed it, and the
+  // box shipped undebounced across nine call sites for as long as it has
+  // existed. The sentence is kept, struck through, because the reason nobody
+  // noticed is worth more to the next reader than a clean file.
+  //
+  // SHOULD THE KIT OWN THE DEBOUNCE INSTEAD? No, and this is not the app
+  // working around a gap. `SearchInput` is a FIELD: it draws a pill, an icon
+  // and a clear control, and `onChange` on a text field means "the text
+  // changed", which is a fact about the keyboard and is never late. A field
+  // that fired `onChange` 200ms after the keystroke could not be used as a
+  // controlled input at all — the value prop would lag the caret and swallow
+  // letters, which is precisely the bug the two-value shape below exists to
+  // avoid. WHAT is debounced is also not the field's to decide: this box
+  // debounces the READ while the facet chips and the sort control beside it
+  // change the same question immediately, because a click is one deliberate
+  // act and a keystroke is one of five. The kit already ships the right piece
+  // for this at the right layer — `useDebouncedCallback`, its own "behaviour
+  // only, no design" primitive — and the app composes the two. Nothing is
+  // owed upstream.
   const [question, remember] = useRemembered<{
     text: string
     values: Record<string, string>
@@ -366,14 +396,81 @@ export function PagedFind<T>({
     }
   )
   const { text, values, sortBy, sortDir } = question
-  const setText = (next: string) => remember((q) => ({ ...q, text: next }))
+
+  // ── WHAT IS TYPED, AND WHAT IS ASKED ──────────────────────────────────────
+  //
+  // Two values, the same shape `record-picker.tsx` has held since its door
+  // search was built and `tickets-dashboard.tsx` copied for the same reason:
+  // the box has to keep up with the keyboard while the request does not. A
+  // single value cannot do both. Debounce the ONE value and the field lags the
+  // caret and swallows letters; debounce NEITHER and every letter is a door
+  // read — which is what this file did.
+  //
+  // WHAT IT COST. `findKey` is built from the whole question, so "Confia" was
+  // six distinct keys and six reads where one was meant, and every one of the
+  // nine call sites is genuinely door-backed (every `fetchPage` in the app is
+  // a `contentApi.*`/`tenancy.*` call; there is no in-memory one to be
+  // harmless about). On the app-record panels the same seam serves five
+  // collections, and on the ticket list a letter is a scan of the backlog.
+  //
+  // 200ms AND THE KIT'S OWN HOOK, deliberately not a third pattern: the same
+  // delay and the same `useDebouncedCallback` the picker and the dashboard
+  // use, so the app has one answer to "how long does a search box wait" rather
+  // than three that happen to agree today.
+  //
+  // ONLY THE TYPED TERM IS DEBOUNCED. The facet chips, the sort control and
+  // the tab strip's `fixed` narrowing all change `query` the instant they are
+  // clicked, and must: a click is one decided act, and delaying it would make
+  // a control feel broken rather than a search feel calm. `q` is the only part
+  // of this question a person produces five of by accident.
+  //
+  // SEEDED FROM THE REMEMBERED TEXT, not from "". `useRemembered` reads its
+  // slot once at mount, so on the second visit `question.text` is already the
+  // word she left in the box — and this initialiser runs in that same first
+  // render, so she comes back to her question ANSWERED rather than to a filled
+  // box above the unfiltered list waiting on a keystroke that never comes.
+  const [term, setTerm] = React.useState(() => question.text.trim())
+  const askDoor = useDebouncedCallback(setTerm, 200)
+
+  const setText = (next: string) => {
+    remember((q) => ({ ...q, text: next }))
+    // CLEARING IS IMMEDIATE, NEVER DEBOUNCED — client-side rule, and the one
+    // moment a debounce is felt rather than unnoticed: "show me everything
+    // again" is a single deliberate act, and making somebody wait a fifth of a
+    // second for LESS work is the wrong trade in both directions (it is also
+    // the cheapest read on the screen, and usually a cache hit, because the
+    // resting collection's own key is still warm underneath).
+    //
+    // EMPTYING THE BOX IS CLEARING, whichever way it is done. The kit's ✕ and
+    // holding backspace produce the same intent and the same empty string, so
+    // the decision is made on the VALUE here rather than in two handlers that
+    // would have to be kept agreeing.
+    //
+    // AND THE PENDING CALL IS CANCELLED, which is the half that is easy to
+    // miss: without it, clearing within 200ms of the last keystroke lets the
+    // trailing timer fire afterwards and set `term` straight back to the word
+    // that was just cleared — the full list appears and then silently
+    // re-narrows itself. `cancel()` is on the hook's own returned handle
+    // precisely for this.
+    const asking = next.trim()
+    if (asking === "") {
+      askDoor.cancel()
+      setTerm("")
+      return
+    }
+    askDoor(asking)
+  }
   const setValues = (next: Record<string, string>) => remember((q) => ({ ...q, values: next }))
   const setSortBy = (next: string) => remember((q) => ({ ...q, sortBy: next }))
   const setSortDir = (next: "asc" | "desc" | null) => remember((q) => ({ ...q, sortDir: next }))
 
   const query: FindQuery = {}
   for (const [field, value] of Object.entries(values)) if (value) query[field] = value
-  const q = text.trim()
+  // THE ASKED TERM, NEVER THE TYPED TEXT. This one line is the whole fix: it
+  // is what keeps a burst of keystrokes inside ONE `query`, therefore one
+  // `findKey`, therefore one subscription and one door read. Reading `text`
+  // here is exactly what made a five-letter word five questions.
+  const q = term
   if (q) query.q = q
   // WHAT THE PERSON IS ASKING, kept apart from what the SCREEN is asking: the
   // door is given both, but the "N accounts match" line belongs to the question
@@ -420,6 +517,20 @@ export function PagedFind<T>({
 
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
+
+  // TYPED BUT NOT YET ASKED — the same disclosure `record-picker.tsx` makes,
+  // and it is not decoration. In the gap the box runs ahead of the request, so
+  // the rows underneath and the "N accounts match" line beside it are still
+  // the PREVIOUS question's answer, sitting under new words. That looks
+  // exactly like a search that returned the wrong rows. So the field says it
+  // is still looking (the kit's own `loading`: the glyph becomes the spinner
+  // and `aria-busy` is announced, and — its one deliberate divergence from
+  // `input` — the field stays fully editable, which is the whole point here),
+  // and the match count stands down rather than confidently counting the word
+  // she has already typed past. The ROWS are deliberately left alone: blanking
+  // a list for a fifth of a second on every keystroke is a flicker, and a
+  // slightly stale list under a spinner is the honest, calm reading.
+  const typing = text.trim() !== term
 
   // R50 — GENUINELY EMPTY, READ THE SAME WAY `collection-frame.tsx`'s
   // `isEmptyState` IS: the resting list has nothing in it AND nothing is
@@ -553,8 +664,14 @@ export function PagedFind<T>({
           <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
             <SearchInput
               value={text}
+              // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
+              // keystroke, unconditionally; only the DOOR waits (`setText`
+              // above owns that decision, so the clear path and the type path
+              // cannot drift apart). `onClear` is the same call with an empty
+              // string, which `setText` reads as the deliberate act it is.
               onChange={(e) => setText(e.currentTarget.value)}
               onClear={() => setText("")}
+              loading={typing || found.loading}
               placeholder={placeholder}
               className="w-full"
             />
@@ -613,7 +730,7 @@ export function PagedFind<T>({
               own count above is exact and never does). It appears only while
               something IS being asked, so an unfiltered screen looks exactly as it
               did before. */}
-          {asked && !found.loading && (
+          {asked && !found.loading && !typing && (
             <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
               {!total
                 ? matches.none
