@@ -3,8 +3,23 @@
 // the token's team — so every tool call flows through the SAME gated doors a
 // browser uses: live membership + role re-checked per request, input validated
 // at the boundary, activity + audit written identically. Minted cookies are
-// cached per isolate (~10 min) to avoid a session INSERT per call; the token
-// itself is re-verified on EVERY request, so revocation bites immediately.
+// cached per isolate (~1 min, CACHE_MS below) to avoid a session INSERT per
+// call; the token itself is re-verified on EVERY request, so revocation bites
+// immediately.
+//
+// THIS LINE SAID "~10 min" UNTIL 6 SEP 2026, against a constant of 60 seconds —
+// wrong by a factor of ten, at the top of the file that implements it. The
+// window was shortened deliberately (CACHE_MS carries the reasoning: the right
+// measure is how long a PASSED AUTHORIZATION DECISION may stand unasked, not
+// what fits inside the session TTL) and this header was not moved with it.
+// Worth a sentence rather than a silent correction, because of WHAT it is: this
+// is the number somebody reasons about revocation exposure with, so a stale one
+// here is not a stale comment, it is a wrong answer to a security question. It
+// happened to be wrong in the SAFE direction — the real window is shorter than
+// advertised — and that is luck rather than design.
+//
+// The number now names the constant instead of repeating it, so the next change
+// to CACHE_MS cannot leave this sentence behind again.
 
 import { AUTH_UNAVAILABLE_MS, GuardError } from "@shared/workers/gating"
 import { traceHeaders } from "@shared/workers/trace"
