@@ -7,6 +7,12 @@
 CREATE TABLE agent_credits (
   team_id TEXT PRIMARY KEY REFERENCES teams (id),
   balance INTEGER NOT NULL DEFAULT 0,          -- AI credits remaining (never negative)
-  lifetime_granted INTEGER NOT NULL DEFAULT 0, -- total ever granted (for admin view)
+  -- Total ever granted. A balance is spent down, so once a team has used its
+  -- credits nothing else in the estate can say how much they were ever given.
+  -- Read back by the grant door itself (`lifetimeGranted` in the answer to
+  -- POST /api/data-ops/admin/grant-credits), which is the operator who needs it.
+  -- It said "for admin view" until 7 Sep 2026 and no admin view was ever built,
+  -- which is a comment promising a screen rather than describing a column.
+  lifetime_granted INTEGER NOT NULL DEFAULT 0,
   updated_at TEXT
 );

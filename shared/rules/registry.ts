@@ -767,6 +767,28 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 213 -> 216 in all three on 7 Sep 2026, dead-end lane. THREE new
+  // English sentences, all three of them the words a dead end needed in order
+  // to stop being one — a field the machine surface could already write, put in
+  // front of the person who owns the record:
+  //
+  //  · "Screen recording" and "Open the recording" — one row and its link on
+  //    the ticket's Overview. `help.screen_recording_link` has been settable on
+  //    `create_help_ticket`/`update_help_ticket` since the door shipped, stored,
+  //    selected and typed, and rendered by no screen on either front door: a
+  //    person could hand the assistant a Loom link, read "Screen recording: …"
+  //    on the confirm panel, press yes, and never see it again.
+  //  · "Who reviews it" — the story's own reviewer, resolved at the door
+  //    through `memberOrThrow` and shown by nothing. The row appears only when
+  //    a story HAS one (zero of 329 on staging do), so it is a sentence a
+  //    German reader meets the first time the capability is used rather than on
+  //    every story.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, for the same reason as every entry below:
+  // `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before. The next reviewed run takes all
+  // three back down together.
+  //
   // RAISED 211 -> 213 in all three on 7 Sep 2026, first-run lane, under the
   // owner's ruling that there should be empty states for everything. TWO new
   // English sentences, both the kit's own empty register (27.21) reaching a
@@ -830,9 +852,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 213,
-  es: 213,
-  ca: 213,
+  de: 216,
+  es: 216,
+  ca: 216,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

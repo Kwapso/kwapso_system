@@ -195,8 +195,23 @@ export async function refundAiUnits(
 }
 
 /** Owner/admin top-up: add credits to a team's balance (idempotent insert/accumulate).
- * Returns the new balance. Real payment integration will call this same path later. */
-export async function grantCredits(env: Env, teamId: string, amount: number): Promise<number> {
+ * Returns the new balance AND the running total ever granted. Real payment
+ * integration will call this same path later.
+ *
+ * WHY THE SECOND NUMBER IS RETURNED. `lifetime_granted` has been incremented on
+ * every grant since the table shipped and read by nothing at all — its schema
+ * comment said "for admin view" and DATA-MODEL.md repeated the promise, and no
+ * admin view exists. It is not decoration: a balance is spent down, so once a
+ * team has used its credits the balance can no longer say how much they were
+ * ever given, and nothing else records it. The person who needs that number is
+ * the one running the grant, so it now comes back in the same answer as the
+ * balance rather than waiting for a screen nobody is building. Both promises
+ * were corrected to say this instead (db/core/0010, DATA-MODEL.md § agent_credits). */
+export async function grantCredits(
+  env: Env,
+  teamId: string,
+  amount: number
+): Promise<{ balance: number; lifetimeGranted: number }> {
   const now = new Date().toISOString()
   await env.DB.prepare(
     `INSERT INTO agent_credits (team_id, balance, lifetime_granted, updated_at) VALUES (?, ?, ?, ?)
@@ -204,10 +219,12 @@ export async function grantCredits(env: Env, teamId: string, amount: number): Pr
   )
     .bind(teamId, amount, amount, now, amount, amount, now)
     .run()
-  const row = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
+  const row = await env.DB.prepare(
+    "SELECT balance, lifetime_granted FROM agent_credits WHERE team_id = ?"
+  )
     .bind(teamId)
-    .first<{ balance: number }>()
-  return row?.balance ?? 0
+    .first<{ balance: number; lifetime_granted: number }>()
+  return { balance: row?.balance ?? 0, lifetimeGranted: row?.lifetime_granted ?? 0 }
 }
 
 /** Where a turn's AI units came from: all free, all paid credit, or a bit of each. */

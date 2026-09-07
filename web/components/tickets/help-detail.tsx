@@ -20,7 +20,7 @@ import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
 type TicketMember = { id: string; name: string }
-import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt } from "@shared/ui/foundations/icons"
+import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt, MonitorPlay } from "@shared/ui/foundations/icons"
 
 import type {
   HelpMessage,
@@ -66,7 +66,7 @@ import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
-import { richTextPlain } from "@shared/web/rich-text"
+import { richTextPlain, safeHref } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
 
 /** The one map every ticket screen reads. Imported rather than retyped here: this
@@ -477,6 +477,10 @@ export function HelpDetailScreen({
     aiDrafted: r.isAgent,
   }))
 
+  // Through the one seam, so a `javascript:` address stored by anything that can
+  // write this column can never become an href (shared/web/rich-text).
+  const recordingHref = safeHref(ticket.screenRecordingLink)
+
   const overviewItems = [
     { label: t("Type"), value: ticket.helpType || "General" },
     // WHICH SYSTEM, AND WHO ASKED (CHECKLIST 5.8 + 5.9). "Who asked" is not "who
@@ -492,6 +496,45 @@ export function HelpDetailScreen({
     { label: t("Title"), value: ticket.titleDe || "" },
     { label: t("Title (English)"), value: ticket.titleEn || "" },
     { label: t("Raised from"), value: ticket.sourceScreen || "" },
+    // THE RECORDING SOMEBODY ATTACHED TO THE REQUEST, and the row that made this
+    // whole lane worth running. `help.screen_recording_link` has been settable
+    // since the ticket door shipped — the assistant offers it on `create_help_ticket`
+    // and `update_help_ticket`, `optionalText` validates it, the INSERT stores it,
+    // `TICKET_COLS` selects it and `screenRecordingLink` is on the Ticket type —
+    // and no screen on either front door read it back. So a person could hand the
+    // assistant a Loom link, read "Screen recording: …" on the confirm panel,
+    // press yes, and never see it again. Its sibling `sourceScreen` is the row
+    // directly above; the two are written by the same door, one line apart.
+    //
+    // A LINK, NOT A STRING. What is stored is an address, so it reaches the
+    // person as something they can open — through `safeHref`, like every other
+    // address on a screen in this app (task-detail, staff-panel, the two
+    // attachment panels). A row that printed the URL as text would be the same
+    // dead end wearing a longer word.
+    //
+    // BLANK RATHER THAN ABSENT when there is no recording, which is this
+    // screen's own convention (see `sourceScreen` above and the note in
+    // selectable-detail.tsx): the record's shape stays the same whichever
+    // ticket you open. Zero of the 2,051 tickets on staging carry one today —
+    // most requests arrive with an attachment instead (CHECKLIST 5.10) — so
+    // this row is blank on every ticket in the system until somebody fills it,
+    // which is exactly the state a dead end should leave behind.
+    {
+      label: t("Screen recording"),
+      value: recordingHref ? (
+        <a
+          href={recordingHref}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-primary flex w-fit max-w-full flex-wrap items-center gap-2 underline-offset-2 hover:underline"
+        >
+          <MonitorPlay className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{t("Open the recording")}</span>
+        </a>
+      ) : (
+        ""
+      ),
+    },
     // The audit rows are NOT here any more: created-by and last-edited-by moved
     // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
     // stop pushing the ticket's own facts below the fold. The status is on the

@@ -169,9 +169,11 @@ export async function postGrantCredits(request: Request, env: Env): Promise<Resp
   const amount = Number(body.amount)
   if (!Number.isFinite(amount) || amount <= 0 || Math.trunc(amount) !== amount)
     return fail(400, "invalid_input", "teamId and a positive whole amount are required.")
-  const balance = await grantCredits(env, teamId, amount)
+  // `lifetimeGranted` comes back with the balance because the operator running
+  // this command is the only reader that column has ever had — see grantCredits.
+  const { balance, lifetimeGranted } = await grantCredits(env, teamId, amount)
   await publishChange(env, teamId, "agent_usage")
-  return json({ teamId, balance })
+  return json({ teamId, balance, lifetimeGranted })
 }
 
 /** POST /api/data-ops/agent/chat — run one agent turn (answer, or propose/take action).

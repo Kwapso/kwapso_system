@@ -553,7 +553,151 @@ describe("the screens are reachable", () => {
       ).toBe(true)
     }
   })
+
+  // 5 — A FIELD THE MACHINE CAN WRITE IS A FIELD A PERSON CAN SEE.
+  //
+  // THE HOLE THE FIRST FOUR LEFT. Every reachability census in this repo walks
+  // DOORS. Invariant 3 asks whether a write door has a button, invariant 4
+  // whether a read door has an asker — and a door can pass both while a FIELD
+  // it stores reaches nobody, because the door itself is pressed all day for
+  // its other fields. A dead-end review on 7 Sep 2026 hand-censused the 114
+  // write-only columns and found three of exactly that shape, each one green
+  // under all four invariants above:
+  //
+  //   · `help.screen_recording_link` — settable on `create_help_ticket` and
+  //     `update_help_ticket`, validated, stored, SELECTed in TICKET_COLS,
+  //     mapped, typed, and rendered by NO screen on either front door. Somebody
+  //     could hand the assistant a Loom link, read "Screen recording: …" on the
+  //     confirm panel, press yes, and never see it again. Its sibling
+  //     `sourceScreen` is written by the same door one line away and has been on
+  //     the ticket's Overview since it shipped.
+  //   · `stories.reviewer_id` — resolved through `memberOrThrow`, stored,
+  //     selected, typed, filterable, and shown by nothing.
+  //   · `accounts.commercials_visible` — the owner's own ruling ("value for
+  //     everyone, prices only for the accounts he switches on") reads this
+  //     column to decide whether a client sees prices at all, and NOTHING in
+  //     either front door switches it on. See NO_SCREEN_FIELD, where it is
+  //     written down as the gap it is rather than left to be found a third time.
+  //
+  // THE PROBE THAT WAS MEANT TO CATCH THIS CANNOT. `dead_end_review`'s own
+  // `columns.writeOnlyUserFacing` counter reads 0 in every codebase there is:
+  // its `writeOnly` list is only appended when a column is NOT in client code,
+  // and its `userFacing` flag is `inClient && !structural`, so the intersection
+  // is empty by construction. A number that can only ever be zero is worse than
+  // no number, because it reads as an all-clear.
+  //
+  // WHAT IS CENSUSED, and both ends are derived. The fields come from the ONE
+  // tool catalogue, by RUNNING each write tool's `buildBody` over a probe input
+  // (the same technique R22 stands on, and for the same reason: what a tool
+  // FORWARDS is a fact about the function, not about the text of it). The
+  // screens are every `.tsx` under either front door's `components/` and
+  // `app/`. Deliberately `.tsx` ONLY: `web/lib/api/content.ts` has carried
+  // `reviewerId?: string` in its payload type the whole time nothing filled it,
+  // so counting the api layer as a reader is precisely the widening that hid
+  // one of the three.
+  //
+  // TWO WAYS A FIELD IS REACHED. Its own name in a screen, or — for a `<x>Id` —
+  // its `<x>Name` sibling, because this app stores a reference as an id/name
+  // PAIR and a screen shows the name (`assigneeId` is written, `assigneeName`
+  // is read). Anything else is a line in NO_SCREEN_FIELD, rot-checked both
+  // ways, so the list can only shrink.
+  //
+  // AND A DOOR'S OWN DECISION IS NOT REPEATED HERE: a field whose every write
+  // tool sits on a door already named in NO_CONTROL is skipped, because that
+  // door's want of a control is already written down one census up.
+  it("written-fields-are-shown: every field a write tool sends is named by a screen, or says why not", () => {
+    const screens = sourceFiles(
+      [
+        join(WEB, "components"),
+        join(WEB, "app"),
+        join(ROOT, "web-portal", "components"),
+        join(ROOT, "web-portal", "app"),
+      ],
+      { extensions: [".tsx"], skipTests: true }
+    )
+      .map((f) => f.source)
+      .join("\n")
+    expect(screens.length, "the screen scan read nothing — it has gone blind").toBeGreaterThan(10000)
+
+    /** What the door RECEIVES when a caller fills in everything the tool
+     * declares. Built from the tool's own schema, so a field added to the
+     * schema and dropped by `buildBody` is R22's failure, not this one's. */
+    const sends = (tool: (typeof SHARED_TOOLS)[number]): string[] => {
+      const props = ((tool.schema as { properties?: Record<string, { type?: string }> }).properties ??
+        {}) as Record<string, { type?: string }>
+      const probe: Record<string, unknown> = {}
+      for (const [key, spec] of Object.entries(props))
+        probe[key] =
+          spec?.type === "boolean" ? true
+          : spec?.type === "number" ? 1
+          : spec?.type === "array" ? ["probe"]
+          : spec?.type === "object" ? { probe: true }
+          : "probe"
+      return Object.keys(tool.buildBody!(probe))
+    }
+
+    /** field -> the tools that send it, and the doors they send it to. */
+    const written = new Map<string, { tools: string[]; doors: Set<string> }>()
+    for (const tool of SHARED_TOOLS) {
+      if (tool.method !== "POST" || !tool.buildBody) continue
+      for (const field of sends(tool)) {
+        const entry = written.get(field) ?? { tools: [], doors: new Set<string>() }
+        entry.tools.push(tool.name)
+        entry.doors.add(`${tool.method} ${tool.path}`)
+        written.set(field, entry)
+      }
+    }
+    expect(
+      written.size,
+      "the written-field census found almost nothing — it has gone blind"
+    ).toBeGreaterThan(100)
+
+    const shown = (field: string) =>
+      new RegExp(`\\b${field}\\b`).test(screens) ||
+      (field.endsWith("Id") && new RegExp(`\\b${field.slice(0, -2)}Name\\b`).test(screens))
+
+    const unseen = [...written]
+      // A door with no control at all is invariant 3's finding and carries its
+      // own reasoned line there; repeating it here would be one gap counted twice.
+      .filter(([, { doors }]) => ![...doors].every((d) => d in NO_CONTROL))
+      .filter(([field]) => !shown(field))
+      .map(([field]) => field)
+      .sort()
+
+    const unlisted = unseen.filter((f) => !(f in NO_SCREEN_FIELD))
+    expect(
+      unlisted,
+      `a machine can write these fields and no screen on either front door names them, so whatever is stored reaches nobody: ${unlisted.join(", ")}. Show the value on the screen that owns the record, or write down here why not.`
+    ).toEqual([])
+
+    // THE RATCHET, both ways. A line in front of a field a screen now shows is
+    // a line nobody reread; a line for a field no write tool sends any more is
+    // a record of what the app used to accept.
+    const stale = Object.keys(NO_SCREEN_FIELD).filter((f) => !unseen.includes(f))
+    expect(
+      stale,
+      `NO_SCREEN_FIELD names fields that are shown now, or that no write tool sends any more — delete these lines: ${stale.join(", ")}`
+    ).toEqual([])
+    for (const [field, why] of Object.entries(NO_SCREEN_FIELD))
+      expect(
+        why.length,
+        `NO_SCREEN_FIELD's line for ${field} needs a reason somebody can disagree with`
+      ).toBeGreaterThan(60)
+  })
 })
+
+/** FIELDS A MACHINE CAN WRITE AND NO SCREEN SHOWS. Two kinds of line, labelled,
+ * because pretending a gap is a decision is how a gap survives a review — the
+ * same two kinds NO_CONTROL uses one census down, for the same reason. */
+const NO_SCREEN_FIELD: Record<string, string> = {
+  /* ── a gap: the capability shipped and the people the app is for cannot use it ── */
+  commercialsVisible:
+    "A GAP, and the most expensive one on this list. `accounts.commercials_visible` decides whether a client sees what they were charged — the owner's own ruling, quoted in getImpact (workers/tenancy/src/routes/processes.ts): value for everyone, prices only for the accounts he switches on. `pricesVisibleFor` reads it inside the account fence and drops the whole `prices` key when it is off. The column defaults to 0 and NO screen on either front door offers the switch, so the answer is no for every account ever created unless somebody asks the assistant to flip it through `update_account`. Fixing it is a checkbox on the account form and a decision about WHICH right may tick it (accounts:edit is the door's gate today; commercials:read is the money gate) — a permission question, which is the owner's and not a review lane's. Delete this line the day the switch exists.",
+  appRestriction:
+    "A GAP. A portal login can be narrowed to named apps inside a client's world — `grant_portal_access` forwards it, the door validates every id against that account, and `accountScope` reads `app_restriction` back on every portal request — and the agency's own grant panel (contact-detail.tsx, through `tenancy.grantPortalAccess(accountId, personAccountId, notify)`) has no field for it. So the narrowing exists, is enforced, and can only be set by asking the assistant. Delete this line when the grant panel offers the list.",
+  timezone:
+    "A GAP, and a small one that is already half written down. An account carries a time zone; the account form deliberately does not send it, and says so in its own comment (account-detail.tsx `save`: \"the three fields this form doesn't carry — currency, language, time zone — survive a save\"). Nothing on either front door SHOWS it either, so a value set through `create_account` or `update_account` is stored and invisible. It is minor because nothing in the product reads it to decide anything yet; it goes red the day something does.",
+}
 
 /** EVERY SCREEN THAT DRAWS OVER THE RAIL, AND WHAT GETS A PERSON OFF IT.
  * `kind` is proved against the file by the check above, so a classification

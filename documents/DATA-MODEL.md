@@ -206,7 +206,10 @@ the global core DB so the gate can check it without opening a team database.
 ### agent_credits. KEEP (BUILT 2026-06-23, GLOBAL, `db/core/0010`)
 Purpose: the **purchasable** half of the AI agent quota (the owner's credit-based
 model). Real data: `team_id`, `balance` (AI credits remaining, never negative),
-`lifetime_granted` (total ever granted, for the admin view), `updated_at`. Once a
+`lifetime_granted` (total ever granted, returned as `lifetimeGranted` by the grant
+door itself — a balance is spent down, so nothing else records what a team was ever
+given; it said "for the admin view" until 7 Sep 2026 and no admin view was ever
+built), `updated_at`. Once a
 team's free daily allowance is used up it spends from this balance; when both are
 empty the agent is blocked. Top-ups are an owner action today
 (`POST /api/data-ops/admin/grant-credits`, x-admin-key); real payments wire in
