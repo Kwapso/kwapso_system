@@ -129,7 +129,9 @@ const WHOLE = process.argv.includes("--whole-catalogue")
  * only exercised by a paid run is one nobody checks before paying. */
 const SELF_TEST = process.argv.includes("--self-test")
 
-const { systemFor } = await import(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
+import { importTs } from "./lib/import-ts.mjs"
+
+const { systemFor } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
 const { toolSpecs, stageOneSystem, CORE_TOOL_NAMES } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
 const { DEFAULT_AGENT_MODEL } = await import(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
 // DYNAMIC, like the three above and for the same reason: the `@shared/*` hook is

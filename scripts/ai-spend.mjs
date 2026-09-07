@@ -42,7 +42,9 @@ import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..")
-const { aiCostUsd, aiNeurons, UNPRICED_MODEL, usd, PRICES_READ_ON } = await import(
+import { importTs } from "./lib/import-ts.mjs"
+
+const { aiCostUsd, aiNeurons, UNPRICED_MODEL, usd, PRICES_READ_ON } = await importTs(
   join(REPO, "shared", "workers", "pricing.ts")
 )
 
