@@ -99,7 +99,7 @@
 // the way this header's did.
 //
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
@@ -501,7 +501,78 @@ describe("the screens are reachable", () => {
       ).toBe(true)
     }
   })
+
+  // 5 — A SCREEN THAT FILLS THE WINDOW HAS A WAY OFF IT.
+  //
+  // The other half of a dead end, and the half a route census cannot see: not a
+  // door nobody can press, but a SCREEN nobody can leave. A full-height surface
+  // (`min-h-[100svh]`) has drawn over the rail, so whatever is on it is the only
+  // thing a person can press. Walked against staging on 7 Sep 2026 with a real
+  // teamless session, "You're not in a team" — where the app puts anybody whose
+  // invite expired, and anybody who was removed from a team — had exactly three
+  // controls on it and all three changed the colour scheme. The portal's own
+  // equivalent screen has had a "Sign out" since the day it was written.
+  //
+  // So every `.tsx` under the two front doors that draws one is classified,
+  // and the token that proves the classification is re-read from the file:
+  //
+  //   shell      it draws the app around `children`; the rail IS the way out
+  //   retry      a failure that can be retried, and offers it
+  //   form       a step a person completes; the submit is the way on
+  //   terminal   nothing to complete and nothing to retry — it MUST offer a
+  //              sign-out, because a person standing here with the wrong
+  //              address has no other exit but clearing a cookie
+  //
+  // Discovery is DERIVED (the census reads the disk), the classification is
+  // data, and both directions are checked: a new full-height screen with no
+  // line fails, and a line whose file no longer draws one fails too.
+  it("full-screen-escapes: a screen that draws over the rail says how to get off it", () => {
+    const roots = [join(WEB, "app"), join(WEB, "components"), join(ROOT, "web-portal", "app"), join(ROOT, "web-portal", "components")]
+    const drawn = sourceFiles(roots, { extensions: [".tsx"], skipTests: true })
+      .filter((f) => f.source.includes("min-h-[100svh]"))
+      .map((f) => relative(ROOT, f.path))
+    expect(drawn.length, "the full-height census found nothing — it has gone blind").toBeGreaterThan(3)
+
+    const unclassified = drawn.filter((f) => !(f in FULL_SCREEN_SURFACES))
+    expect(
+      unclassified,
+      `these screens fill the window, so the rail is not under them — say which kind each is in FULL_SCREEN_SURFACES, and if it is "terminal" give it a way out: ${unclassified.join(", ")}`
+    ).toEqual([])
+
+    const PROOF: Record<string, RegExp> = {
+      shell: /children/,
+      retry: /Try again/,
+      form: /onSubmit|type="submit"/,
+      terminal: /auth\.logout\(\)/,
+    }
+    for (const [file, { kind }] of Object.entries(FULL_SCREEN_SURFACES)) {
+      expect(drawn, `FULL_SCREEN_SURFACES names ${file}, which no longer draws a full-height screen — delete the line`).toContain(file)
+      expect(
+        PROOF[kind].test(read(join(ROOT, file))),
+        `${file} is classified "${kind}" and no longer carries what that promises. A "terminal" screen with no auth.logout() is a screen a person cannot leave.`
+      ).toBe(true)
+    }
+  })
 })
+
+/** EVERY SCREEN THAT DRAWS OVER THE RAIL, AND WHAT GETS A PERSON OFF IT.
+ * `kind` is proved against the file by the check above, so a classification
+ * cannot outlive the thing it claims. "terminal" is the one with teeth: it
+ * means there is nothing to submit and nothing to retry, so the only honest
+ * exit is signing out and trying another address. */
+const FULL_SCREEN_SURFACES: Record<string, { kind: "shell" | "retry" | "form" | "terminal"; why: string }> = {
+  "web/app/layout.tsx": { kind: "shell", why: "the document frame; it draws whatever page is under it and never a state of its own." },
+  "web/components/app-shell.tsx": { kind: "shell", why: "the signed-in app: the rail is on the screen, so every destination is a click away." },
+  "web/components/error-boundary.tsx": { kind: "retry", why: "the root boundary. Something broke and nothing is lost — the offer is to try again." },
+  "web/app/onboarding/page.tsx": {
+    kind: "terminal",
+    why: "THREE screens in one file and two of them end: \"You're not in a team\" (invite expired, or removed) and \"You're in the right place\" (a client login at the agency's door). Neither has anything to submit — team creation is closed, and this build cannot know the portal's address — so `SignOutEscape` is the way off both. The third face is the profile form, which submits.",
+  },
+  "web-portal/app/layout.tsx": { kind: "shell", why: "the portal's document frame, same as the agency's." },
+  "web-portal/components/portal-shell.tsx": { kind: "shell", why: "the portal's frame: it draws the nav, and hands the two states that are not the app to NoAccess and to the kit's failure screen." },
+  "web-portal/components/no-access.tsx": { kind: "terminal", why: "signed in, and the world is empty. Deliberately offers no way IN (access is a decision somebody makes), so the only control is the way OUT — the precedent the agency's onboarding screens were measured against." },
+  "web-portal/components/needs-name.tsx": { kind: "form", why: "one question with an answer only this person has; the submit finishes it." },
+}
 
 /** READ DOORS NO SCREEN OPENS AND NO TOOL FORWARDS TO. One kind of line: a
  * caller the census cannot see, with the reason it cannot. The list is a
