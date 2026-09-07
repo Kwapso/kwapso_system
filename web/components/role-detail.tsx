@@ -188,14 +188,26 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
     edit: "edit",
     delete: "delete",
   }
+  // WHICH OF THE FOUR EACH MODULE OFFERS, in the kit's words. The door says
+  // (`m.rights`, R36's own data), so this screen never learns the module list
+  // twice. `rights` is the prop the kit reads to draw only those boxes — it is
+  // in the kit's contract from the tag that carries `PermissionModule.rights`
+  // (upstream, pending) and ignored by v1.2.63, which still draws four. Until
+  // that tag lands the two guards keep the extra boxes honest rather than
+  // pretending they are not there: `held` never shows an unoffered right, and
+  // a press on one (below) changes nothing. Nothing is locked to fake it —
+  // locked means "somebody else may change this", which is a different
+  // sentence from "there is nothing here to change".
+  const offered = (m: { rights: readonly (keyof RightSet)[] }, r: keyof RightSet) => m.rights.includes(r)
   const matrixModules = perms
     ? perms.modules.map((m) => ({
         id: m.key,
         label: m.label,
         locked: perms.isDefault,
+        rights: m.rights.map((r) => RIGHT_TO_KIT[r]),
         held: {
           [roleId]: (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
-            .filter((r) => draft?.[m.key]?.[r])
+            .filter((r) => offered(m, r) && draft?.[m.key]?.[r])
             .map((r) => RIGHT_TO_KIT[r]),
         },
       }))
@@ -359,6 +371,12 @@ export function RoleDetailScreen({ teamId, roleId }: { teamId: string; roleId: s
                 disabled={!canSave}
                 onChange={(moduleId, _roleId, capabilityId, next) => {
                   const right = KIT_TO_RIGHT[capabilityId as PermissionRight]
+                  // A box the module does not offer decides nothing, so a press
+                  // on one records nothing — the door would write it off anyway
+                  // (setRolePermissions), and a draft that shows a tick the save
+                  // then removes is a lie with a delay on it.
+                  const row = perms?.modules.find((m) => m.key === moduleId)
+                  if (row && !offered(row, right)) return
                   setDraft((prev) => {
                     const cur = prev?.[moduleId] ?? {
                       read: false,
