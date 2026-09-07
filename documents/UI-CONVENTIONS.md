@@ -890,7 +890,11 @@ the same number.
 85 and up is *calm*, 70 to 84 *fine*, 55 to 69 *busy*, under 55 *overwhelming*. **An
 overwhelming screen is a defect in the same way too much code is a defect.** The app
 measured 75.9 across 53 screens on 18 Aug 2026; the table and the ordered work list are in
-`.session-notes/ui-rearrangement-plan.md`.
+`.session-notes/ui-rearrangement-plan.md` — **a session note, not a repository
+document**: `.gitignore` keeps everything under `.session-notes/` except
+`lanes/`, so it is on the owner's machine and in no clone. Do not go looking for
+it here (README item 27 says the same of `scaling-review.md`); the numbers you
+need are quoted above and in UI-RULEBOOK.md § 12.
 
 **An information unit** is one thing the eye decodes on its own: a heading, a
 label-and-value pair (one unit, not two), a badge, a button, an avatar or type mark, a

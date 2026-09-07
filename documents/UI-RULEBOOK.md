@@ -1376,8 +1376,10 @@ nothing, or told twice.
 §12 now marks Done.** 53 screens measured across both front doors, mean **75.9**
 (*fine*): 21 calm, 12 fine, 13 busy, 7 overwhelming. The agency app means 74.4 and the
 portal 84.4. The full table, and the work that followed from it, live in
-`.session-notes/ui-rearrangement-plan.md`; nothing has re-measured the estate since
-that round landed, so these are the before numbers, not today's.
+`.session-notes/ui-rearrangement-plan.md` — **a session note, not a repository
+document**: `.gitignore` keeps everything under `.session-notes/` except `lanes/`,
+so it is on the owner's machine and in no clone. Nothing has re-measured the estate
+since that round landed, so these are the before numbers, not today's.
 
 ---
 
@@ -1902,7 +1904,8 @@ implemented. Kept as the record of what landed and where:
 Section 12's turn — and, like the table above it, now history: the round landed, and
 several of its edits have since hardened into law (R29 holds the width caps out,
 R32 the ramp). Every one was ordered, with its exact diff, in
-`.session-notes/ui-rearrangement-plan.md`. Marked as of 26 Aug 2026:
+`.session-notes/ui-rearrangement-plan.md` (a session note, in no clone — see § 12's
+own note above). Marked as of 26 Aug 2026:
 
 | File | Rules | What changed |
 |---|---|---|

@@ -333,7 +333,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs. plain
     atomic D1.
 17. **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps a maintainer must
-    know (the static-export reload, the list-cache-as-detail-source, the REST-door
+    know (the static-export reload, the fat list SELECT a detail screen still needs, the REST-door
     round-trips, the confirm model, streaming, and more).
 18. **[AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md)**, the agent-driven, multi-table data
     import: dump old-system CSV exports, the agent normalizes + maps + orders

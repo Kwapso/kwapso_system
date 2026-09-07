@@ -135,42 +135,53 @@ the live stream was cut. Two consequences to respect:
 
 ---
 
-## 2 · The list cache doubles as the detail data source
+## 2 · The list cache paints a detail screen — but it does not SOURCE one
 
-**The trap.** A record-detail screen has no "get one record" fetch. It reads the
-one record **out of the cached list**. So if you trim a column out of a list
-`SELECT` to make the list "lean," you can silently blank a field on the detail
-screen (or the agent's reading copy).
+**HALF OF THIS SECTION IS NOW A LAW AGAINST IT (fact updated 7 Sep 2026).** As
+written, this said a detail screen has no "get one" fetch, that it `.find()`s its
+row out of the cached list, and that deriving detail from the list rather than
+double-fetching is *deliberate*. That is exactly the shape **R38** forbids on any
+collection R14 makes PAGE — `help`, `knowledge`, `accounts`, `activity`,
+`processes`, `meetings`, `tasks`, `todos` (`GROWING_COLLECTIONS`) — because a
+cached page is a PREFIX, so a record past the cursor was unreachable by direct
+link, from an email button and from a bookmark, and the screen said the most
+alarming thing it could: that the record was gone. The code sample this section
+used to print is not in `help-detail.tsx` any more. **The FAT-SELECT half is
+untouched and still the trap** — read on.
 
-**Why.** The client cache is keyed by collection (`help:<teamId>`,
-`members:<teamId>`, …). A detail screen subscribes to that **same key**
-and `.find()`s its row, so the first tap paints instantly from the warm list
-cache, and a row-level live patch updates detail and list together. From
-`web/components/tickets/help-detail.tsx`:
+**What a detail screen does today.** Page one first, so a record that IS loaded
+paints with no round trip (CACHING.md is still cache-first), and a by-id read
+only when it is not. From `web/components/tickets/help-detail.tsx`:
 
 ```ts
-const ticketsQ = useCached<HelpTicket[]>(`help:${teamId}`, () =>
-  content.help("all").then((r) => r.tickets)
+const inPage = ticketsQ.data?.find((t) => t.id === helpId) ?? null
+const oneQ = useCached<HelpTicket | null>(
+  ticketsQ.data !== undefined && !inPage ? `help:one:${helpId}` : null,
+  () => content.helpOne(helpId)
 )
-const ticket = ticketsQ.data?.find((t) => t.id === helpId) ?? null
+const ticket = inPage ?? oneQ.data ?? null
 ```
 
-This is deliberate (CACHING.md): **derive detail from the list, never
-double-fetch a collection for a derived value.**
+The `<module>:one:<id>` key is registered in the live registry beside the list's
+own key, or a status change would patch the list and leave the open record
+showing yesterday (R15). On a BOUNDED collection — apps, member roles — page one
+IS the collection, so the plain `.find()` is still correct and R38's positional
+check never catches it.
 
-**The rule.** The list `SELECT`s are intentionally **"fat"**, they carry every
-field the detail screen renders, not just the columns the list *shows*. Look at
-`TICKET_COLS` in `workers/content/src/lib/help.ts`: one column list serves both
-the list and the single-row read, and it carries `screen_recording_link` and
-`source_screen`, things only the detail screen renders, beside the
-`description` the list card shows. **Don't blindly trim a list SELECT to reduce payload.**
-Before removing a column, grep the matching `*-detail.tsx` for the field. If a
-column is genuinely list-only bloat, fine, but the default assumption is that
-every selected column is load-bearing for detail.
+**The trap that remains, and it is the original one.** The list `SELECT`s are
+intentionally **"fat"**: they carry every field the detail screen renders, not
+just the columns the list *shows*. `TICKET_COLS` in
+`workers/content/src/lib/help.ts` is one column list serving both the list and
+the single-row read, and it carries `screen_recording_link` and `source_screen`
+— things only the detail screen renders — beside the `description` the list card
+shows. **Don't blindly trim a list SELECT to reduce payload.** Before removing a
+column, grep the matching `*-detail.tsx` for the field. If a column is genuinely
+list-only bloat, fine; the default assumption is that every selected column is
+load-bearing for detail. One column list serving both reads is what keeps the two
+paints identical, so this matters MORE now that there are two paths in, not less.
 
-(The single-row endpoint that `patchRow` calls on a live ping is the *only* true
-"get one" read, and it exists to patch one row into the cached list, not to
-back a detail screen. See CACHING.md §3.)
+(The single-row endpoint that `patchRow` calls on a live ping is a different read
+again: it exists to patch one row into the cached list. See CACHING.md §3.)
 
 ---
 
