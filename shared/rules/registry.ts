@@ -477,6 +477,22 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "one-door-per-unit",
     status: "enforced",
   },
+  {
+    id: "R53",
+    dimension: "ui",
+    law: "web/components IS ONE FOLDER PER MODULE OR KIND, AND EVERY FOLDER SAYS WHAT BELONGS IN IT. The 7 Sep 2026 fold turned 148 flat files into fifteen folders on TWO AXES: `tickets-screen.tsx` sits in `tickets/` because it draws a module and `home-screen.tsx` in `screens/` because there is no home module; `collection-heading.tsx` in `records/` because every collection reuses it and `collection-content.tsx` in `deep-link/` because only the routing shell renders it. The rule is written once, in `web/components/README.md`, one line per folder, and the check DERIVES the permitted set from that file's own table rows rather than holding a second copy of the list — so the doc and the law cannot disagree, because there is only one of them. Three failures: a component left loose at the top level, a folder nobody described, and a described folder nobody has.",
+    why: "Both pairs above are right and neither is guessable, which is the whole reason the words exist and not just the check: a newcomer has to READ the rule, and before this there was nothing to read. The arrangement was recorded in a commit message and enforced by nobody, in a repo whose other fifty-two invariants are all machine-checked — so the next component dropped at the top level would have been green, and the one after it would have made \"the top level is empty\" untrue for good. Deriving the folder set from the README rather than from a constant is what stops the usual second failure, a list in a test that drifts from the paragraph a person actually reads.",
+    checkId: "component-folders",
+    status: "enforced",
+  },
+  {
+    id: "R54",
+    dimension: "arch",
+    law: "A PATH THIS REPO NAMES MUST RESOLVE ON DISK. Two censuses, both derived off the disk and both read through the one walker: every repo path with a real extension in `documents/**.md` and the root canon, and every path spelled out with a `.ts`/`.tsx` extension anywhere in our own source. An import specifier in this codebase never carries an extension, so the source census reads PROSE and string literals and never the module graph. The way out is a reasoned `GONE_ON_PURPOSE` line — a path a document names precisely BECAUSE it is gone (\"the clause and web/lib/use-live-refetch.ts were retired\") — rot-checked both ways, so a path that comes back and a pin nothing mentions any more both turn the build red and the list can only shrink.",
+    why: "Every law here is a source scan, and every scan reads a path it was HANDED; nothing read the paths the repo WRITES. Earned by eight dangling paths in the canon and twelve in our own source, and it is worse than untidy: FIVE of the twelve named a GUARD that does not exist. workers/auth/src/lib/sessions.ts promised the build fails if a fourth copy of the session cookie name appears and named a test file that is not there; workers/content/src/routes/triage.ts said a whole-repo census watched the triage rota and named another. Both properties are genuinely enforced, by suites under different names — so a reader who checks is reassured by a file that is not there, and a reader who does not check is reassured by nothing at all. The 7 Sep fold of web/components left one more behind, in a comment two folders away, and a human found it weeks after a green build.",
+    checkId: "named-paths",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -2460,14 +2476,14 @@ export const STORED_FILES: {
   {
     writtenIn: "workers/content/src/routes/help.ts",
     field: "HelpAttachment.url",
-    shownIn: "web/components/tickets/help-attachments.tsx",
-    why: "what somebody attached to a ticket, on the ticket's Files and links tab",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what somebody attached to a ticket, on the ticket's Files and links tab. One panel serves both records since the fold; `tickets/help-attachments.tsx` is the ticket's door and copy, and passes no `fix`",
   },
   {
     writtenIn: "workers/content/src/routes/stories.ts",
     field: "StoryAttachment.url",
-    shownIn: "web/components/work/story-attachments.tsx",
-    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for. Same panel as the ticket's; `work/story-attachments.tsx` is the story's door and copy",
   },
   {
     writtenIn: "workers/content/src/routes/todos.ts",

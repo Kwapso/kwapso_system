@@ -542,7 +542,7 @@ export async function parseOpenAiStream(
 }
 
 // The ONE-SHOT CHEAP CALL (the help-reply draft, the conversation title) used to
-// live here. It moved to shared/workers/cheap-text.ts the day a SECOND worker
+// live here. It moved to shared/workers/model-text.ts the day a SECOND worker
 // needed it — content, to write out the answer the knowledge base found (R23) —
 // because the alternative was two `env.AI.run` calls in two workers with one
 // model id between them. Import it from there; `selectModel` above is still the

@@ -7,7 +7,7 @@
 // the two agree. If a screen needs something that isn't here, that is a
 // conversation about opening a door — not an import away.
 //
-// It is NOT web/lib/api.ts with a filter. The agency client carries ~90 calls
+// It is NOT web/lib/api/ with a filter. The agency client carries ~90 calls
 // across roles, invites, imports and the assistant; this list is a fraction of
 // it. The COUNT is deliberately not written down here: it was "fourteen" for
 // long enough to become wrong, in this comment and in ARCHITECTURE.md at the

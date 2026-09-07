@@ -3437,6 +3437,8 @@ describe("RULES — the laws of the base", () => {
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
       "one-door-per-unit", // R52: the read census below, over both front doors, grouped by component and by door
+      "component-folders", // R53: web/test/component-folders.test.ts — the folder set DERIVED from web/components/README.md's own rows
+      "named-paths", // R54: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

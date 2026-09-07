@@ -20,7 +20,7 @@ import type { UserRow } from "./users"
  * RE-EXPORTED so every call site in this worker keeps its habitual import, and
  * so auth still reads as the place the session is decided. Auth remains the only
  * thing that MINTS, SLIDES or DESTROYS one — what moved is a name and two pure
- * functions. `shared/workers/test/session-cookie.test.ts` fails the build if a
+ * functions. `web/test/one-cookie-name.test.ts` fails the build if a
  * fourth copy of the literal appears anywhere. */
 export {
   LEGACY_SESSION_COOKIE,

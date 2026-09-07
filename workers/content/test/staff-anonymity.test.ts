@@ -24,7 +24,8 @@
 // for them (SCOPE ch.07): 220 of the 221 seeded historical requests are
 // staff-raised, which makes this the majority case rather than an edge. The
 // portal's own screen has carried a note about it for weeks
-// (web-portal/components/support-screen.tsx) saying the decision belonged on the
+// (web-portal/components/tickets-screen.tsx, named support-screen.tsx until the
+// section became Tickets at every address) saying the decision belonged on the
 // server, next to the one the thread already made.
 
 import type { DatabaseSync } from "node:sqlite"
