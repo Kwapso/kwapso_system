@@ -87,6 +87,18 @@ environment (staging and production errors never mix), cross-team by design
   carried on every row a cron tick records, so one tick's rows join the way one
   request's do. Held by `workers/tenancy/test/cron-heartbeat.test.ts`, which
   reads both scheduled handlers off disk.
+- **An outbound call that never answered names itself (7 Sep 2026).** A refusal
+  from a third party has always arrived carrying the service, the call and the
+  status; a TIMEOUT arrived as the raw abort — "The operation was aborted due to
+  timeout" — which names no service, no call and no deadline, and reads
+  identically wherever it came from. So each of the three doors that reach off
+  the estate says which it was in its own words: Google (`google-api.ts`, a 504
+  and a 502 with different sentences), the D1 REST door (`d1-rest.ts`, "did not
+  answer within Nms on /d1/database/…" against "could not be reached on …"), and
+  the send (`email.ts`, the same pair in Resend's name). Held by
+  `workers/content/test/google-timeout.test.ts`,
+  `workers/content/test/d1-retry.test.ts` and
+  `workers/auth/test/email-names-its-failure.test.ts`.
 - **A MEASUREMENT carries no stack, by declaration.** `MEASUREMENT_SOURCES` in
   error-log.ts names the sources whose rows are written on purpose by a seam
   that measured something (`slow-door`, timing.ts). The errors door announces
