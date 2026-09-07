@@ -141,10 +141,13 @@ build itself checks against):
 | `templates/search-results.tsx` | `[ ]` | A real finding — no global search exists anywhere; worth the owner's separate consideration. |
 | `templates/sign-in.tsx` | `[x]` | Adopted — confirmed by direct import: the portal shell's `AuthPhotograph`. |
 | `templates/stat-strip.tsx` | `[=]` | `pulse.tsx` already draws its numbers through the kit's own `StatGrid`, the primitive this file wraps; its one addition is forbidden here by house law. |
-| `templates/stepper-hero.tsx` | `[x]` | Adopted — the ticket status track, verified live at all four widths, both themes. |
+| `templates/stepper-hero.tsx` | `[?]` | Adopted as the ticket status track, then **REVERSED 31 Aug 2026** by the client's "nothing may render after the chips" ruling. It is a `COMPOSITION_EXEMPT` OWNER'S CALL in `shared/rules/registry.ts` now; the paragraph below records what was built and why it went. |
 
-**Tally: 9 adopted, 6 realized differently, 24 mismatch, 3 owner's-call, 5 real
+**Tally: 9 adopted, 7 realized differently, 23 mismatch, 3 owner's-call, 5 real
 gaps = 47.** Every one decided; none left for the next lane to re-discover.
+*(Recounted off the marks above on 7 Sep 2026 — the previous line said 6 / 24
+and had been one out in two columns since it was written. Count the rows, never
+carry the sentence.)*
 
 ---
 
@@ -256,7 +259,17 @@ is deleted with this change (R45's own ratchet: an exemption for a
 composition now directly reached is stale).
 
 **`shared/ui/compositions/templates/stepper-hero.tsx`, read-only, for the
-ticket status track** (`web/components/help-status-stepper.tsx`).
+ticket status track** — REVERSED, and the account below is what WAS built rather
+than what is on disk. *(Fact updated 7 Sep 2026: the client's absolute ruling of
+31 Aug 2026 — "chips is the last component of headers, nothing may render after
+them, ever, no exceptions" — put a status track below the chips row out of bounds
+on every record screen. Both wrappers, `web/components/help-status-stepper.tsx`
+and `story-status-stepper.tsx`, were REMOVED rather than relocated, on 1 Sep 2026;
+neither file exists, and status now reads from the record's own coloured chip
+(`shared/status-tones.ts`). The composition is a `COMPOSITION_EXEMPT` OWNER'S CALL
+in `shared/rules/registry.ts`, which carries the standing reason and the one
+condition that would reopen it. Kept, not deleted: the finding is still the best
+account of what the composition does.)*
 `RecordChrome`'s own `headerExtra` slot forwards to the kit's `hero` prop —
 named for exactly this composition. `door="system"` (7 stages) matches
 `HELP_STATUSES` exactly; no `onStageSelect` is passed, which register 10 of
@@ -269,7 +282,8 @@ Verified live at 390/768/1280/1920, both themes
 at every width including the narrowest phone wrap. No new i18n strings (no
 `copy`/label props passed). Committed `811cc5ef`.
 
-**Not** applied to `story-status-stepper.tsx`: stories have 4 stages, and
+**Not** applied to `story-status-stepper.tsx` (which no longer exists either, for
+the same 31 Aug reason): stories have 4 stages, and
 the kit's only 4-stage progression (`door="delivery"`) is a **vertical
 wizard rail**, not the horizontal record hero — the composition's own header
 says so in words: "the kit draws no four-stage record vocabulary." Forcing
@@ -373,9 +387,12 @@ highlighted" (ruling 26: never two mangos). This app already assembles
 exactly that shape, out of the same two-to-three parts, already adopted
 individually: `AppShell` is now `ScreenShell` (this file), every record
 screen composes `RecordChrome` through the `RecordScreen` host seam
-(`web/components/records/record-chrome.tsx`), and `StepperHero` is in the hero
-slot wherever a record has stages worth showing (`help-status-stepper.tsx`,
-this session). There is no additional composition to import — the shape
+(`web/components/records/record-chrome.tsx`), and `StepperHero` was in the hero
+slot wherever a record had stages worth showing (`help-status-stepper.tsx`, this
+session) — *reversed on 31 Aug 2026 by the "nothing after the chips" ruling; see
+the `templates/stepper-hero.tsx` entry above, and note that `RecordChrome`'s
+`hero` prop is now passed by no record screen*. There is no additional composition
+to import — the shape
 these two templates document is already built, from parts, under different
 file names. The one real difference is a decision already made rather than
 a gap: `AppShell`'s `ScreenShell` header carries a persistent
@@ -602,7 +619,9 @@ way, just empty. There is no escape hatch. Confirmed unchanged.
 
 `ArchiveConfirmationDialog` (the mandatory-reason sibling of
 `DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
-(the 4-stage door mismatch) are also still real, unresolved mismatches, but
+(the 4-stage door mismatch — that file was deleted on 1 Sep 2026 and the mismatch
+is now moot for a second, larger reason, above) are also still real, unresolved
+mismatches, but
 each is recorded once already — under the `[~]`/`[x]` entry for its sibling
 composition — rather than duplicated here.
 

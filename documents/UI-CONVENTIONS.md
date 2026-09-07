@@ -148,8 +148,10 @@ unchanged and still kebab-case — `<module>-detail.tsx`, `<module>-form-dialog.
 `<module>s-screen.tsx` — so every census that finds a screen by its NAME still
 finds it (R2's `*-detail.tsx` walk among them).
 
-It was one flat folder of 148 files until 7 Sep 2026, which is worth knowing for
-two reasons. Every law that reads components off disk goes through
+Until 7 Sep 2026 it was **128 files sitting flat** beside three folders that had
+already been carved out (`deep-link/`, `process/`, `screens/`) — 148 in the tree
+either way, which is the number to compare the fold against and not the number
+that was loose. That is worth knowing for two reasons. Every law that reads components off disk goes through
 `sourceFiles()`, which **recurses by default** (`shared/rules/source-scan.ts` says
 why), so the fold was invisible to all of them — the counts before and after are
 identical, and `web/test/source-scan.test.ts` now asserts the walk reaches more
@@ -888,7 +890,11 @@ the same number.
 85 and up is *calm*, 70 to 84 *fine*, 55 to 69 *busy*, under 55 *overwhelming*. **An
 overwhelming screen is a defect in the same way too much code is a defect.** The app
 measured 75.9 across 53 screens on 18 Aug 2026; the table and the ordered work list are in
-`.session-notes/ui-rearrangement-plan.md`.
+`.session-notes/ui-rearrangement-plan.md` — **a session note, not a repository
+document**: `.gitignore` keeps everything under `.session-notes/` except
+`lanes/`, so it is on the owner's machine and in no clone. Do not go looking for
+it here (README's document map says the same of `scaling-review.md`); the numbers you
+need are quoted above and in UI-RULEBOOK.md § 12.
 
 **An information unit** is one thing the eye decodes on its own: a heading, a
 label-and-value pair (one unit, not two), a badge, a button, an avatar or type mark, a

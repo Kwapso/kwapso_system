@@ -33,16 +33,19 @@ an instance and points here for what an instance IS.
 |---|---|---|---|
 | **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
 | **DO class** | A class *inside* a worker (`TeamChannel` + `TeamInterest`, both in realtime) | 2 today (26 Aug 2026) | No |
-| **DO instance** | A *runtime* entity addressed by name (`team:<id>#0…3`, `team:<id>!interest`, `user:<id>`) | Unlimited | Yes — five per team (four `TeamChannel` shards + one `TeamInterest`) **and** one `TeamChannel` per signed-in user |
+| **DO instance** | A *runtime* entity addressed by name (`team:<id>#<shard>`, `team:<id>!interest`, `user:<id>`) | Unlimited | Yes — `REALTIME_SHARDS` + 1 per team (nine `TeamChannel` shards today + one `TeamInterest`) **and** one `TeamChannel` per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
 hibernate and cost ~nothing. Exactly like OOP: one `class` (code), millions of
 objects (runtime). 10,000 teams + their members is still 8 workers + two DO
-classes, but ~50,000 team-side instances (four channel shards and one interest
-registry per team) plus one per signed-in user, almost all asleep. *(Fact
-updated 26 Aug 2026: this paragraph used to count one class and one instance
-per team. The class count moved when `TeamInterest` shipped; the instance
-arithmetic moved with the shard split §2 describes.)*
+classes, but ~100,000 team-side instances (`REALTIME_SHARDS` channel shards —
+nine today — and one interest registry per team) plus one per signed-in user,
+almost all asleep. *(Fact updated 26 Aug 2026: this paragraph used to count one
+class and one instance per team. The class count moved when `TeamInterest`
+shipped; the instance arithmetic moved with the shard split §2 describes. Fact
+updated 7 Sep 2026: the shard count became derived and went 4 → 9, so the
+team-side arithmetic went 5 → 10 per team. Read the count from
+`REALTIME_SHARDS`, never from a number written here.)*
 
 This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the class.
 

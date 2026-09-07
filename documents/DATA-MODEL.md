@@ -756,7 +756,7 @@ again. `idx_activity_feed (created_at DESC, id DESC)` serves the unfiltered page
 `related_table IN (…)` page and lets the R16 `COUNT(*)` beside it read an index
 rather than the widest table in the database. (`meetings` has carried exactly this
 index for exactly this reason since `0021`.) The count is still O(rows-it-counts),
-that is R16's price, and it is settled in [ARCHITECTURE.md §7](ARCHITECTURE.md) (the scaling decision, LOCKED). *(It used to cite `scaling-review.md`, the audit report behind that section — deleted 29 Aug 2026 and in no clone; README item 27 says so.)*
+that is R16's price, and it is settled in [ARCHITECTURE.md §7](ARCHITECTURE.md) (the scaling decision, LOCKED). *(It used to cite `scaling-review.md`, the audit report behind that section — deleted 29 Aug 2026 and in no clone; README's document map says so under that name.)*
 `idx_activity_actor_feed (creator_id, created_at DESC, id DESC)` is the third, added
 in `0062` for the question the other two cannot answer: **what has this person
 done?** None of the first three led with `creator_id` and nothing queried the table

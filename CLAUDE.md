@@ -289,7 +289,12 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   above it — the client's own words, "once again, when empty collection no
   toolbar at all — fix everywhere and set as a rule," after the same shape
   recurred eight times over. `EMPTY_TOOLBAR_EXEMPT` is the reasoned,
-  rot-checked way out; empty today. (`empty-toolbar`)
+  rot-checked way out, and it has never been empty — three entries on
+  7 Sep 2026, all of them `empty={false}` written down on purpose: two
+  panels reached only PAST their own zero-row return, and Contacts, the
+  one collection with two different first-adds where a single labelled
+  `onCreate` cannot offer both. Read the list, not this sentence.
+  (`empty-toolbar`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 
@@ -339,7 +344,7 @@ Start with **[README.md](README.md)** (the doc map), then:
 - **[CONVENTIONS.md](documents/CONVENTIONS.md)**, the code + comment house style (handler shape, data doors, gating, validation, deactivate-not-delete).
 - **[UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md)**, how screens are built (library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the voice).
 - **[DURABLE-OBJECTS.md](documents/DURABLE-OBJECTS.md)**, the realtime Durable Object (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs plain atomic D1.
-- **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps (static-export reload, list-cache-as-detail-source, REST-door round-trips, the confirm model, streaming, and more).
+- **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps (static-export reload, the fat list SELECT a detail screen still needs, REST-door round-trips, the confirm model, streaming, and more).
 - **[AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md)**, the agent-driven multi-table import (normalize → map → order interdependent tables → resolve foreign keys → reject honestly → write through the gated door). How to declare an import target + references for a new module.
 - **[MCP.md](documents/MCP.md)**, the external machine surface for developers: how an outside tool connects (token → `Bearer` on `/mcp`), the opt-in tool catalogue, the act-as-user/one-team/live-role security posture, and the cost model (reads/exports/import writes = free endpoint hits; only `agent_chat`/`agent_confirm`/`plan_import` — the import's planning step — draw the team's AI quota, a role without the agent right spends zero AI). **[mcp-quickstart.md](documents/mcp-quickstart.md)** is the one-page version to hand an outside developer.
 - **[SCOPE.html](documents/SCOPE.html)**, the product's scope of work, chapter by chapter. Every "SCOPE ch.NN" reference in these docs points here: what kwapso is for, the account fence, the two front doors, what a client may see. Product decisions live here; this file is the book the rules defer to. (**[kwapso-the-system-explained.html](documents/kwapso-the-system-explained.html)** is the plain-language owner walkthrough beside it.)

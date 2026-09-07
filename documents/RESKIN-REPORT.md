@@ -314,7 +314,7 @@ row survives, because this codebase deactivates rather than deletes. Worth tidyi
 
 `NEEDS-A-SPEC.md` is the full list. The four that matter most:
 
-1. **The icon system is the biggest unstarted piece.** Ruling 34 wants 30 filled glyphs, one per module for life. The app uses **Lucide**, which is stroke-based, and CLAUDE.md mandates a Lucide action mapping. The two sets do not overlap and the kit gives no equivalents.
+1. ~~**The icon system is the biggest unstarted piece.**~~ **DONE 2026-08-27.** As written: Ruling 34 wants 30 filled glyphs, one per module for life; the app used **Lucide**, stroke-based, with a Lucide action mapping in CLAUDE.md, and the two sets did not overlap. Every glyph now comes from the kit (`@shared/ui/foundations/icons`, Phosphor under Phosphor's own names), lucide is imported nowhere in `web/`, `web-portal/` or `shared/`, and R39 makes reaching for a second pack a red build.
 2. **Badge or pill?** Your kit has two components where the app has one — a neutral/mango COUNT, and a status whose colour lives only in a 7px dot. The app's Badge does both and carries success/warning/destructive fills. Converting is a redesign of every collection row.
 3. **A code cell cannot be both "a box" and 24px at 44 wide.** CSS clamps a corner radius to half the shorter side, so ruling 03's own numbers render as a stadium — the one shape the ruling was written to prevent.
 4. **`.kw-alert--warning` uses mango**, and `exclusions.md` says mango is never a status. One of the two is wrong.
@@ -340,4 +340,8 @@ achievable sentence: the focus ring's shape (F2-1) and the search input's height
 `lucide-react` logs `DynamicIcon: Name not found` on some screens. It is
 non-fatal (the call sites already pass a `fallback`), it comes from an icon name
 stored in team DATA rather than from code, and none of those call sites was
-touched. Worth chasing separately.
+touched. Worth chasing separately. *(Fact updated 7 Sep 2026: chased and gone.
+`lucide-react` is imported nowhere, and the runtime name lookup those six
+components used is now `shared/web/screen-engine/icon.tsx` resolving against the
+kit's own glyph set, with `web/test/icon-vocabulary.test.ts` holding the
+vocabulary to what the kit actually draws.)*
