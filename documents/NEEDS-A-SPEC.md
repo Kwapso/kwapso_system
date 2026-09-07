@@ -83,21 +83,25 @@ The ones with no specimen at all, in the order a person meets them:
 | **Ruling 09 · app icons** | mango tile + charcoal isotype (portal), charcoal tile + mango isotype (agency) | The four SVGs on both doors are still the teal Brimba "B", and `assets/app-icons/` in the kit is empty. The manifest THEME colour is done (two values, per door); the artwork is not. |
 | **Ruling 22 · splash** | mango in light, `#141310` in dark | Done. The two GLOWS in the composition (`#3a2c10` dark, `#f6b83f` light) are the composition's own and are not in the kit — left alone. |
 | **Ruling 23 · email** | "a letter, not a banner. Isotype plus one mango button, no colour band" | The template still has its tint band (`accentHex.surface`, `#FFE9B0` — not a kwapso colour). An email cannot read a token, so this is a rewrite rather than a re-tone, and it changes what every login and notification looks like. Not attempted. |
-| **Ruling 34 · icons** | 30 filled glyphs, `fill="currentColor"`, one icon per module for life, "modules are never identified by a letter" | **The app uses Lucide**, which is stroke-based, and CLAUDE.md mandates a Lucide action mapping (`Pencil` edit, `Power` deactivate, `UserMinus` remove, `Ban` revoke, `Plus` create, `Upload` import at `size-3.5`). The kit gives no Lucide equivalents and the two sets do not overlap. This is the biggest unstarted piece of the reskin. |
+| **Ruling 34 · icons** | 30 filled glyphs, `fill="currentColor"`, one icon per module for life, "modules are never identified by a letter" | **DONE — this row is history (7 Sep 2026).** It read "the app uses Lucide, which is stroke-based, and CLAUDE.md mandates a Lucide action mapping … the biggest unstarted piece of the reskin". The swap happened on 2026-08-27: every glyph now comes from `@shared/ui/foundations/icons` (the kit draws Phosphor under Phosphor's own names), lucide is imported nowhere in `web/`, `web-portal/` or `shared/`, CLAUDE.md's action mapping is the Phosphor one (`PencilSimple`, `Power`, `UserMinus`, `Prohibit`, `Plus`, `UploadSimple`), and R39 makes a second icon pack a build failure rather than a habit. |
 | **Ruling 28 · scale control** | `data-scale`, three steps at 13/15/17, both doors default to 15 | The app has its own control with a DIFFERENT value per door, because UI-RULEBOOK L5 locks the portal a step larger. `tokens.css` says CLAUDE.md overrides the kit where they disagree, so the app's stands. See `shared/scale.ts`. |
 | **Responsive** | — | `responsive.md` (a kit-repo document, not one of ours) is unwritten; the kit has no breakpoint specification at all. Both apps keep their existing responsive behaviour. |
 
 ## 4 · Questions only you can answer
 
-**a · The status stepper's middle tones.** The library had one `--warning` token
-and the kit has no warning colour, so it maps to `--info` (sky). That is right
-for the state it mostly means — "nothing moves until somebody outside answers",
-which is your definition of info word for word. But the same token also colours
-`in_progress` and `in_review` on the two status steppers, and in your own pill
-vocabulary "in build" is CHARCOAL (`--dot-building`), not sky. Changing those two
-tones is a design decision about a screen you have not drawn, so nothing was
-changed. Files: `web/components/help-status-stepper.tsx`,
-`web/components/story-status-stepper.tsx`.
+**a · The status stepper's middle tones. ANSWERED BY A LATER RULING — nothing to
+decide (7 Sep 2026).** The question was: `--warning` maps to `--info` (sky), which
+is right for "nothing moves until somebody outside answers", but the same token
+also coloured `in_progress` and `in_review` on the two status steppers, where your
+own pill vocabulary says "in build" is CHARCOAL (`--dot-building`). **Both steppers
+are gone.** Your absolute ruling of 31 Aug 2026 — "chips is the last component of
+headers, nothing may render after them, ever, no exceptions" — put a status track
+below the chips row out of bounds, and `web/components/help-status-stepper.tsx` and
+`story-status-stepper.tsx` were removed on 1 Sep 2026 rather than relocated. Status
+now reads from the record's own coloured chip, whose tones come from
+`shared/status-tones.ts`. Kept here rather than deleted because the underlying
+question — is sky right for "in build"? — comes back the moment a stage view is
+drawn anywhere OTHER than a record header.
 
 **b · Badge or pill?** Your kit has two components where the app has one. A
 `.kw-badge` is a neutral or mango COUNT; a `.kw-pill` is a status, and its colour

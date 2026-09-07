@@ -43,6 +43,16 @@ describe("the one walker every law reads source through", () => {
       nested.length,
       "web/components has subdirectories — a default walk must reach into them"
     ).toBeGreaterThan(100)
+    // ENTIRELY, which is the half this asserted for nothing. ">100 nested" stays
+    // true the moment somebody drops one file back at the top level, and
+    // UI-CONVENTIONS.md's "web/components has no top-level files" would then be a
+    // sentence nothing held. The fold is only worth keeping if it cannot leak
+    // back one file at a time.
+    const top = all.filter((f) => !f.rel.includes("/")).map((f) => f.rel)
+    expect(
+      top,
+      "web/components has no top-level files (UI-CONVENTIONS.md) — put it in its module's folder"
+    ).toEqual([])
     // …and the top level is still read where there is one: web/lib keeps its
     // files flat beside one `api/` folder, so both halves of the walk show here.
     const lib = sourceFiles(join(WEB, "lib"), { extensions: [".ts", ".tsx"] })

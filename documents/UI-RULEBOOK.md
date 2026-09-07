@@ -506,9 +506,11 @@ at 12px on 18px, uppercase, letter-spacing 0.5px. `text-xs` (14px, the theme flo
 
 Evidence: `A-3.57.42`, `A-3.58.01`, `A-3.59.09`, `A-4.05.52`, `A-4.07.25`, `P-4.10.05`.
 Note the old app puts the type and the number together (`CHANGE #3182`) and leaves the
-title as pure prose. This app currently prefixes the ref into the title string
-(`web/components/deep-link/shape.ts:128`, `${t.ref} · ${truncate(t.description)}`), which
-is why titles read as noise.
+title as pure prose. This app used to prefix the ref into the title string, which is why
+titles read as noise. *(Fact updated 7 Sep 2026: fixed, and this rule is what fixed it.
+`shapeHelpList` in `web/components/deep-link/shape.tsx` now sets `name` to the title
+alone — `truncate(richTextPlain(t.description))` — and the ref leads the eyebrow on the
+record's own screen, which is where D4 puts it.)*
 
 ### D5: one status line under the title, dot-separated, three facts maximum
 
@@ -1235,12 +1237,16 @@ reading.
 `shared/rules/registry.ts` pins it. The in-rule route, in order of preference:
 
 1. **Amend UI-CONVENTIONS.md §5** to read "no emoji **in copy**", and add the glyph to
-   §4 as a *type mark*, which is what it is: it occupies the slot a lucide icon would,
+   §4 as a *type mark*, which is what it is: it occupies the slot a kit glyph would,
    it is `aria-hidden`, it never appears inside a sentence, and it is always accompanied
    by the type word in the eyebrow or the column header. Then G2 applies as written.
-2. **Or** implement G2 with lucide glyphs from `CONCEPT_ICON` (`web/lib/pages.ts:250-305`)
+2. **Or** implement G2 with the kit's own glyphs from `CONCEPT_ICON` (`web/lib/pages.ts`)
    instead, which changes nothing in the law book but gives up the colour that makes a
-   type readable at a glance in a long list.
+   type readable at a glance in a long list. *(Fact updated 7 Sep 2026: this option used to
+   say "lucide glyphs", which R39 now forbids outright — no file in `web/`, `web-portal/`
+   or `shared/web/` may import a UI package. `CONCEPT_ICON`'s values are Phosphor names the
+   kit draws through `@shared/ui/foundations/icons`, and the line number is dropped rather
+   than corrected because it has already moved once.)*
 
 Do not ship option 1 by quietly writing emoji into components. Change the law first, or
 take option 2.
@@ -1754,9 +1760,13 @@ and "Created on 6 August 2026 · Paras Maroo". `A-4.00.11`: sprint rows are a na
 date range. When more facts were genuinely needed it switched to a table with column
 headers (`A-4.05.42`) rather than cramming them into a subtitle.
 
-Here, `web/components/deep-link/shape.ts:128-138` builds a ticket subtitle out of four
-facts and prefixes the reference into the title as well; `stories-screen.tsx:48-59` uses
-five. The result is a wall of text with no shape. See
+Here, `web/components/deep-link/shape.tsx` built a ticket subtitle out of four facts and
+prefixed the reference into the title as well; `work/stories-screen.tsx` used five. The
+result was a wall of text with no shape. *(Fact updated 7 Sep 2026: both are fixed.
+`shapeHelpList` is now a title plus two facts — status and kind — and `shapeStories` a
+title plus three — status, who has it, when it is due — with the ref, the sprint and the
+answered ticket moved onto the record. The diagnosis is kept because it is what the rule
+below is FOR.)* See
 [K1](#k1-a-collection-row-is-a-title-plus-one-meta-line-and-nothing-else) and
 [K2](#k2-a-table-is-for-scanning-a-list-is-for-reading).
 
@@ -1839,7 +1849,7 @@ ruling before they are implemented. The last two are settled, and the row says h
 
 | Rule | What it crosses | Proposed resolution |
 |---|---|---|
-| [G1](#g1-a-record-type-carries-a-glyph), [G2](#g2-the-mapping-if-option-1-is-taken) | UI-CONVENTIONS.md §5, "**No emoji.** Anywhere." | Amend §5 to "no emoji in copy" and add the type mark to §4, or fall back to lucide glyphs. Law changes first, code second. |
+| [G1](#g1-a-record-type-carries-a-glyph), [G2](#g2-the-mapping-if-option-1-is-taken) | UI-CONVENTIONS.md §5, "**No emoji.** Anywhere." | Amend §5 to "no emoji in copy" and add the type mark to §4, or fall back to the kit's own glyphs (`@shared/ui/foundations/icons`; "lucide" here until 7 Sep 2026, which R39 forbids). Law changes first, code second. |
 | [C3](#c3-the-ambient-field-never-sits-behind-a-content-surface) | UI-CONVENTIONS.md §7, "Surfaces that float over it … use the frosted `.glass`" | **SETTLED 2026-08-19 IN THE LIBRARY, not by an override.** The premise here was wrong twice: the library's comment said the opposite, and the proposed `[data-slot="dialog-content"]` selector matches nothing — `data-slot` appears zero times in the installed registry. Every floating surface is opaque at v0.13.0 and a census enforces it; a card keeps `.glass` on purpose. |
 | [F3](#f3-the-separator-becomes-the-action-bars-top-edge) | `shared/web/form-shell.tsx:43-53`, an 11-line comment defending `pt-6` as "the ONE value that governs it everywhere" | The comment documents the exact bug being fixed. Replace the value with a structure that cannot have the bug, and replace the comment with one sentence saying so. |
 | [N5](#n5-the-surface-step-is-measured-not-assumed) | [C2](#c2-cards-have-no-border-no-shadow-and-no-hover-animation) and "Do not do" #5, both of which said a card has no border | **SETTLED 18 Aug 2026 by measurement, not by preference.** The light theme's page-to-card step is ΔL\* 3.22, below the threshold at which two flat surfaces read as separate; the dark theme's is 10.32. A borderless card is therefore invisible in light mode, which is exactly the difference the owner reported between the two themes. The card keeps its hairline; the no-shadow rule is untouched. Delete this row and restore C2 the day a theme change raises the light step past ΔL\* 8. |

@@ -5,6 +5,14 @@ library, we build a clearly-marked placeholder in `web/components/temp/`, list i
 HERE, and the library absorbs it later — the placeholder is deleted the day the
 real component lands, so the temp folder never becomes a second component set.
 
+**`web/components/temp/` does not exist right now, and that is the rule working.**
+Its last file, `auth-card.tsx`, was deleted on 2026-08-29 when the kit's own sign-in
+composition was adopted (row 2), and an empty folder is not tracked. The one open
+placeholder, `code-input`, deliberately lives elsewhere — see the note below the
+table. So the folder is CREATED by the next placeholder and disappears again with
+the last one; read a reference to it here or in OPERATIONS.md as naming the
+convention, not a directory you will find on disk today.
+
 **What changed on 2026-08-22 — and again on 2026-08-25 — and it changes what this
 list IS.** The library was
 the npm package `@kwapso/ui`, built and released from a separate repository the
@@ -152,7 +160,8 @@ step — the instruction here used to be "re-run
 `npm install github:Kwapso/kwapso_ui`", and that command no longer exists; a
 hand-build under `shared/ui/` no longer exists either, the hash guard refuses it.
 
-**One placeholder is not in `web/components/temp/`, and it needs saying.**
+**The one open placeholder is not in `web/components/temp/` — which is why that
+folder is currently absent, and it needs saying.**
 `code-input` moved to `shared/web/code-input.tsx` when the client portal shipped:
 both front ends sign in with it, and a file two workspaces import cannot live
 inside one of them. So it now sits in the most permanent folder in the repo with
@@ -160,7 +169,7 @@ none of the folder's "this is a stand-in" signal, the only thing marking it as
 temporary is the comment at the top of the file and this row. It is still #1 on
 this list, and it still gets deleted the day the library ships the primitive.
 `auth-card` (#2) shipped 2026-08-29 and is out of `web/components/temp/`
-entirely — see row 2.
+entirely — see row 2. It was the last file in there, so the folder went with it.
 
 ## Composition candidates (built from primitives here; could graduate to the library)
 

@@ -425,26 +425,31 @@ ends and all eight workers, then runs every test, including the law checks that 
 source off disk, a plain `npx tsc --noEmit` proves far less.
 
 **What green looks like:** **exit code 0**, ten workspaces, every suite passing.
-For scale, that is roughly 315 test files and 4,000-odd tests; don't compare
-against those figures, compare against exit 0, because the suite grows every week.
+**Compare against exit 0 and nothing else** — no count is written down here on
+purpose, because the suite grows most weeks and a number in this file would be
+wrong before you read it. Get today's from the command below.
 **Read the run by its exit code, never by grepping the log** — a suite that fails
 to LOAD prints nothing that looks like a failure.
 
 **Two things skip on a fresh clone, and both are correct.** Anything else that
-skips is not, investigate it.
+skips is not, investigate it. Neither is counted here either; what matters is
+that these two are the only ones.
 
-1. **`workers/content/test/knowledge-backfill.test.ts`** (one file, three tests)
-   measures the knowledge base over the agency's real Glide history, and that
-   data is git-ignored customer material (INVENTORY.md § 6). It is absent from
-   every clone, so the content worker ends `Test Files 70 passed | 1 skipped`,
-   `Tests 933 passed | 3 skipped`. It is the only whole FILE that skips.
-2. **`web/test/splash.test.ts`** holds eight `it.skipIf(!REQUIRED)` rows that
-   compare the two front doors against their built static export. `npm run check`
-   does not build, so they skip and the web workspace ends `Tests 849 passed |
-   8 skipped`. `npm run check:built` builds first, sets `REQUIRE_EXPORT=1`, and
-   runs them for real.
+1. **`workers/content/test/knowledge-backfill.test.ts`** measures the knowledge
+   base over the agency's real Glide history, and that data is git-ignored
+   customer material (INVENTORY.md § 6). It is absent from every clone, so the
+   content worker reports one skipped FILE — and it is the only whole file that
+   skips.
+2. **`web/test/splash.test.ts`** compares the two front doors against their built
+   static export, through `it.skipIf` rows keyed on that export existing.
+   `npm run check` does not build, so they stand down and the web workspace
+   reports skipped TESTS. `npm run check:built` builds first, sets
+   `REQUIRE_EXPORT=1`, and runs them for real. **A `git worktree` skips them the
+   same way a fresh clone does** — `web/out` is git-ignored, so a lane's gate is
+   a few tests thinner than the primary checkout's; `shared/rules/loud-skip.ts`
+   is what makes that say so out loud instead of passing quietly.
 
-The exact count for the commit you are standing on:
+The exact counts for the commit you are standing on:
 
 ```bash
 npm run check 2>&1 | grep -E "Test Files|Tests "

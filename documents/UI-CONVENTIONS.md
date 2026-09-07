@@ -148,8 +148,10 @@ unchanged and still kebab-case — `<module>-detail.tsx`, `<module>-form-dialog.
 `<module>s-screen.tsx` — so every census that finds a screen by its NAME still
 finds it (R2's `*-detail.tsx` walk among them).
 
-It was one flat folder of 148 files until 7 Sep 2026, which is worth knowing for
-two reasons. Every law that reads components off disk goes through
+Until 7 Sep 2026 it was **128 files sitting flat** beside three folders that had
+already been carved out (`deep-link/`, `process/`, `screens/`) — 148 in the tree
+either way, which is the number to compare the fold against and not the number
+that was loose. That is worth knowing for two reasons. Every law that reads components off disk goes through
 `sourceFiles()`, which **recurses by default** (`shared/rules/source-scan.ts` says
 why), so the fold was invisible to all of them — the counts before and after are
 identical, and `web/test/source-scan.test.ts` now asserts the walk reaches more

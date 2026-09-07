@@ -425,6 +425,34 @@ every answer says what it searched).
 auth, tenancy, realtime, content, data-ops and mcp, the six domain workers, all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging, envs don't inherit, and a per-version preview URL would be another public door), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The two public addresses are the **agency gateway** (`kwapso` / `kwapso-staging`) and the **portal gateway** (`kwapso-portal` / `kwapso-portal-staging`), one per front door, and no more. That is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe: no public route can reach `/internal/*`, the agent, or the act-as-user surface. Never add a public route/`workers_dev` to a worker that isn't one of the two gateways.
 
 The two gateways set `"preview_urls": false` too, the reasoning above ("a per-version preview URL would be another public door") always applied to them and was simply never written down, so until 11 Aug 2026 every uploaded-but-undeployed version of BOTH front doors had a public address. They also set `"workers_dev": false` in production and `true` only under `env.staging`, so production is custom-domain-only. The whole posture is asserted per worker, per environment, in `workers/gateway/test/public-surface.test.ts`, a claim in this file is no longer the thing standing between a door and the internet.
+
+**A FOURTH FLOW LEAVES THE TWO GATEWAYS, AND IT IS NOT A WORKER (7 Sep 2026).** The
+sentence above stays literally true — only the two gateway WORKERS have a public
+address — but since the presigned upload landed a browser can PUT bytes to
+`<account>.r2.cloudflarestorage.com` directly, with no worker on that path at all, so
+this section would otherwise describe three flows out of four. What holds the promise
+there is not a route setting; it is the **key-minting fence** in
+`workers/content/src/routes/uploads.ts`. The presign door gates on the same right as the
+upload door it stands in for (resolved from `UPLOAD_TARGETS`, so the two cannot diverge
+into a presign that is easier to get than the upload), refuses a portal caller, and then
+**mints the key itself** — `teamMediaKey(guard.teamId, target.module)`, a ULID under the
+team's own prefix; not one byte of it comes off the request. `shared/workers/presign.ts`
+calls that the first of "the three things that make it safe", because "a caller who chose
+their own key could presign a PUT over another team's object — which is the integrity hole
+`unreferencedKeys` closes, reopened one layer down where the database check cannot see
+it". The grant
+is PUT-only, to that one key, for `PRESIGN_TTL_SECONDS` (300), with the content type and
+the byte length signed INTO it, so R2 refuses anything else; the confirm door re-proves
+the key is ours (`ownedMediaKey`) before it hands back a reference. The read path is
+unchanged: bytes still come back through `/media/<key>`.
+
+**And it is off.** `presignConfigured` is false without an `R2_ACCESS_KEY_ID` secret and
+no deployed environment has one, so every upload today still goes through the streaming
+door and the client falls back silently. Switching it on is not a deploy step — it waits
+on a **write-only credential scoped to the two buckets**, which is the condition
+`shared/workers/presign.ts` records; the account-wide key measured on 7 Sep 2026 answered
+200 to LIST and GET and 204 to DELETE across an account shared with two other companies,
+and does not qualify. Check any candidate the same way before setting the secret.
 - **Both environments are on the same commit as of 2026-08-06**, production was
   brought up from the pre-hardening build in one rollout: core migration `0014`
   applied to `kwapso-core` first, then every worker then on disk, realtime-first
@@ -679,8 +707,10 @@ both environments, 600 requests per caller per worker per minute
   the per-door `@source` list. Only the paragraph you are reading matches the
   files on disk — check `head -20 web/app/globals.css` before trusting it
   again.)
-- Missing UI components are still placeholdered in `web/components/temp/` and tracked in
-  UI-GAPS.md. Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
+- Missing UI components are placeholdered in `web/components/temp/` and tracked in
+  UI-GAPS.md — a folder that exists only while something is in it, and is absent today
+  (its last file went on 2026-08-29, and UI-GAPS.md says where the one remaining
+  placeholder lives instead). Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
   pulled with `scripts/sync-design.mjs`, then the import is swapped and the placeholder
   deleted here — never built by hand under `shared/ui/`, which turns the build red.
 

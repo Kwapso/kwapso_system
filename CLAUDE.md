@@ -289,7 +289,12 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   above it — the client's own words, "once again, when empty collection no
   toolbar at all — fix everywhere and set as a rule," after the same shape
   recurred eight times over. `EMPTY_TOOLBAR_EXEMPT` is the reasoned,
-  rot-checked way out; empty today. (`empty-toolbar`)
+  rot-checked way out, and it has never been empty — three entries on
+  7 Sep 2026, all of them `empty={false}` written down on purpose: two
+  panels reached only PAST their own zero-row return, and Contacts, the
+  one collection with two different first-adds where a single labelled
+  `onCreate` cannot offer both. Read the list, not this sentence.
+  (`empty-toolbar`)
 
 A law cannot be added without its check (`registry-integrity`). When you add a rule, add it to RULES.md **and** the registry **and** a check, or the build fails.
 

@@ -214,7 +214,8 @@ platform, **what gets a DO instance, and what does NOT:**
   **row-level** (`{resource, id, op}`), NOT one-DO-per-record. *(Fact updated
   26 Aug 2026: "one channel" is no longer "one instance". Since §7's split of
   14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (9 since 7 Sep 2026, derived) `TeamChannel` instances,
-  `team:<id>#0…3`, plus one `TeamInterest` registry at `team:<id>!interest`; the
+  `team:<id>#0` … `team:<id>#<REALTIME_SHARDS−1>`, plus one `TeamInterest` registry at
+  `team:<id>!interest`; the
   realtime worker's `/publish` door owns the fan-out, so a publisher still names
   `team:<id>` and a listener joins the shard of `shardFor(userId)`. A USER's
   channel is still one instance. This bullet used to say "one instance per team",
@@ -603,7 +604,8 @@ where they are, and the fan-out reaches 0…N-1, a superset of where they sit.
 
 - **The split lives in the realtime worker's `/publish` door**, not at the publishers.
   A publisher still makes one call naming `team:<id>`; the door fans it out to
-  `team:<id>#0…3`. All hundred-odd `publishChange` call sites are untouched, which is
+  `team:<id>#0` … `team:<id>#<REALTIME_SHARDS−1>`. All hundred-odd `publishChange` call sites
+  are untouched, which is
   the point, a fan-out written at the publisher would have been a hundred chances to
   write it differently. Listeners join the shard of `shardFor(userId)`, so one person's
   devices land together and a reconnect returns to the same object.
@@ -693,7 +695,7 @@ its largest tenant is a few hundred people or a few hundred thousand.
 
 | accepted | why it stays | the trigger |
 |---|---|---|
-| Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the 128 MB isolate budget being hit in practice |
+| ~~Base64 uploads through the worker (not presigned direct-to-R2)~~ **BUILT 2026-09-07, and OFF** | the bytes stopped being BUFFERED on 17 Aug 2026 — `/upload-stream` on knowledge, deliverables, brand-assets and staff takes the file as the request body, so the ceiling is the platform's and not a 128 MB isolate's — and on 7 Sep 2026 they stopped passing through the worker at all: `POST /api/content/uploads/presign` hands the browser a signed PUT straight to `<account>.r2.cloudflarestorage.com`, and `/uploads/confirm` (plus `knowledge/upload-confirm`) turns the key into the record's reference. The capability-URL model SCOPE ch.06 records is not widened: the grant is PUT-only, to ONE server-minted key, for `PRESIGN_TTL_SECONDS` (300), and the READ path is still `/media/<key>`. **It is built and inert** — `presignConfigured` is false with no `R2_ACCESS_KEY_ID` secret, no deployed environment has one, and the client falls back to the streaming door byte for byte (`web/lib/api/content.ts` `putDirect` → `sendFile`). | turning it ON, which waits on the write-only credential scoped to the two buckets that `shared/workers/presign.ts` makes the condition of the switch — the account-wide key measured on 7 Sep 2026 could read and delete other companies' objects and does not qualify |
 | ~~The module mover is one non-resumable request~~ **RESUMED 2026-08-17** | progress lives in `team_module_moves` (db/core/0023), not in a stack frame: bounded copy batches per call, a per-table cursor, an idempotent `INSERT OR IGNORE`, and a claim a killed Worker cannot strand. A killed call is continued by calling again, and routing is still flipped last so an interrupted move is never a doubled read. | the FIRST real move, the resumption logic is unit-proven against an in-memory D1, never against Cloudflare's |
 | No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
