@@ -764,6 +764,30 @@ let MY_TICKET
   const validated = await portalPost("/api/content/help/validate", { id: MY_TICKET.id }, client)
   ok("they can confirm a request should go ahead", validated.ok, `status ${validated.status}`)
 
+  // HOW DID WE DO — the rating doors (migration 0067). The door refuses a
+  // rating on a ticket that is not RESOLVED, and this smoke ticket is
+  // deliberately still open, so the honest live check is that the door
+  // ANSWERS A CLIENT and refuses for the stated reason rather than leaking or
+  // 500-ing. A smoke run must not resolve a client's own request to make an
+  // assertion convenient: that would move a real row on staging to please a
+  // test, and every rerun would need a new ticket.
+  const rated = await portalPost(
+    "/api/content/help/rating",
+    { id: MY_TICKET.id, score: 3 },
+    client
+  )
+  ok(
+    "the rating door answers a client, refusing one on an unanswered request",
+    rated.status === 400 || rated.status === 409 || rated.ok,
+    `status ${rated.status} ${JSON.stringify(rated.body).slice(0, 140)}`
+  )
+  const ratings = await portal(`/api/content/help/rating?id=${MY_TICKET.id}`, {}, client)
+  ok(
+    "and reads back only their own ratings",
+    ratings.ok && Array.isArray(ratings.body?.ratings),
+    `status ${ratings.status} ${JSON.stringify(ratings.body).slice(0, 140)}`
+  )
+
   // Showing us what they mean: attach a link, read it back, take it off again —
   // so the run leaves nothing behind.
   const attached = await portalPost(
