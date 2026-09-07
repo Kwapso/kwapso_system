@@ -203,8 +203,9 @@ export type RealtimeEnv = {
    * db/core/0020; shared/workers/trace.ts).
    *
    * On the env for exactly the reason `DB` and `DEFER` are, one screen up: there
-   * are 186 `publishChange` call sites, this function takes no `Request`, and a
-   * new parameter would be 186 chances to forget it. The dispatchers already
+   * are 186 publish call sites (177 `publishChange` + 9 `publishUserChange`, both
+   * of which come through here), this function takes no `Request`, and a new
+   * parameter would be 186 chances to forget it. The dispatchers already
    * build a per-request shallow copy of `env`; this rides it, and not one call
    * site changed. On an unattended tick it carries the TICK's id instead
    * (`tickId`), which is the same joinability and says plainly that nobody

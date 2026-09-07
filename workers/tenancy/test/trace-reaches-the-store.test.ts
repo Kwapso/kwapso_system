@@ -8,11 +8,12 @@
 // so that one failing click is one query; these were the two seams it could not
 // reach.
 //
-// WHY IT RIDES `env` AND NOT THE SIGNATURE. There are 186 `publishChange` call
-// sites and four `sendBrandedEmail` ones, and neither takes a `Request`. A new
-// parameter would be 190 chances to forget it; widening the TYPE reaches all of
-// them without one call site changing — the same argument `DB` and `DEFER`
-// already make in `RealtimeEnv`, and the memory `per-request-state-rides-cfg-or-env`.
+// WHY IT RIDES `env` AND NOT THE SIGNATURE. There are 186 publish call sites
+// (177 `publishChange` + 9 `publishUserChange`) and four `sendBrandedEmail`
+// ones, and neither seam takes a `Request`. A new parameter would be 190 chances
+// to forget it; widening the TYPE reaches all of them without one call site
+// changing — the same argument `DB` and `DEFER` already make in `RealtimeEnv`,
+// and the memory `per-request-state-rides-cfg-or-env`.
 //
 // FOUR THINGS HAVE TO HOLD, and the last one is the one that makes the other
 // three worth anything:

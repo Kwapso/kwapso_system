@@ -18,7 +18,8 @@ export type Env = {
    * else reads it, and nothing gates on it.
    *
    * On the env rather than in the signature for the same reason `DEFER` is:
-   * neither seam takes a `Request`, and 190 call sites already pass `env`.
+   * neither seam takes a `Request`, and 190 call sites already pass `env` (186
+   * publish + 4 mail, counted 7 Sep 2026).
    *
    * Optional because a cron tick has no request — it puts the TICK's id here
    * instead (`tickId`) — and the suites hand a bare `env`; absent means the row
