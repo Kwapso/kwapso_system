@@ -2438,14 +2438,14 @@ export const STORED_FILES: {
   {
     writtenIn: "workers/content/src/routes/help.ts",
     field: "HelpAttachment.url",
-    shownIn: "web/components/tickets/help-attachments.tsx",
-    why: "what somebody attached to a ticket, on the ticket's Files and links tab",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what somebody attached to a ticket, on the ticket's Files and links tab. One panel serves both records since the fold; `tickets/help-attachments.tsx` is the ticket's door and copy, and passes no `fix`",
   },
   {
     writtenIn: "workers/content/src/routes/stories.ts",
     field: "StoryAttachment.url",
-    shownIn: "web/components/work/story-attachments.tsx",
-    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for. Same panel as the ticket's; `work/story-attachments.tsx` is the story's door and copy",
   },
   {
     writtenIn: "workers/content/src/routes/todos.ts",
