@@ -16,11 +16,22 @@
 // outlives `cleanup()` between tests — a never-settling promise from the
 // "still loading" case would otherwise be joined by every later case asking
 // for the same key, and none of them would ever see their own answer.
+//
+// A FOURTH STATE, reported 8 Sep 2026 in the same breath as the first bug: the
+// owner opened a source that came "From an email" and pressed a "Try again"
+// that would refuse forever. `getKnowledgeMap` answers a 400 for any
+// `originTable` outside `ACTIVITY_GATE_MAP` — permanently, by design, since a
+// Google-mirrored source names a system this database has no row for — and
+// "failed" above was one bucket for that AND a dropped connection alike. Two
+// suites below hold the two halves of the fix apart: the panel tells a
+// permanent refusal from a transient one (no retry button on the former), and
+// the tab itself never renders for a table the door will never draw.
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { KnowledgeDetailScreen } from "@/components/knowledge/knowledge-detail"
+import { ApiFailure } from "@/lib/api"
 import { appsKey, knowledgeKey } from "@/lib/live-resources"
 import { primeCache } from "@shared/web/store"
 import type { KnowledgeSource } from "@shared/types"
@@ -40,7 +51,15 @@ const { door } = vi.hoisted(() => ({
 }))
 
 vi.mock("@/lib/api", () => ({
-  ApiFailure: class extends Error {},
+  ApiFailure: class extends Error {
+    status: number
+    code: string
+    constructor(status: number, code: string, message: string) {
+      super(message)
+      this.status = status
+      this.code = code
+    }
+  },
   content: {
     knowledge: async () => ({ sources: door.sourcesInPage }),
     knowledgeOne: async (id: string) =>
@@ -193,5 +212,53 @@ describe("the Connections tab — three states, not one", () => {
     // Drawn twice on purpose (relationship-map.tsx): once as a node in the
     // picture, once as the same fact said in words for a screen reader.
     expect(await screen.findAllByText("Dispatch")).toHaveLength(2)
+  })
+
+  it("permanently refused (400): the honest sentence, and no button that will only refuse again", async () => {
+    const source = makeSource({ id: "SRC-REFUSED", originTable: "accounts", originRowId: "ACC-REFUSED" })
+    primeTeam(source)
+    let calls = 0
+    door.recordMap = () => {
+      calls++
+      return Promise.reject(
+        new ApiFailure(400, "invalid_input", "That is not a kind of record this map draws.")
+      )
+    }
+    openConnectionsTab(source)
+
+    expect(await screen.findByText("This source doesn't have a map to draw.")).toBeTruthy()
+    expect(calls).toBe(1)
+
+    // MUTATION-PROVEN: revert the `ApiFailure`/`status === 400` branch back to
+    // the single "Couldn't load…" + retry render, and this goes red — the
+    // sentence disappears and a "Try again" appears in its place.
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull()
+    expect(screen.queryByText("Couldn't load this record's connections.")).toBeNull()
+  })
+})
+
+describe("the Connections tab itself — never offered for a table the door will refuse", () => {
+  it("a source mirrored from outside this database (an email) gets no Connections tab at all", () => {
+    const source = makeSource({
+      id: "SRC-GMAIL",
+      kind: "email",
+      originTable: "google_gmail",
+      originRowId: "gmail:msg-1",
+    })
+    primeTeam(source)
+    render(<KnowledgeDetailScreen teamId={TEAM} sourceId={source.id} />)
+
+    // MUTATION-PROVEN: revert `mapKey`'s `mapDrawable` check back to
+    // `item?.originTable && item?.originRowId` alone, and this goes red — the
+    // tab reappears, offering a map `getKnowledgeMap` will refuse every time.
+    expect(screen.queryByRole("tab", { name: /Connections/ })).toBeNull()
+  })
+
+  it("a source mirrored from a table the door draws still gets the tab", () => {
+    const source = makeSource({ id: "SRC-DRAWABLE", originTable: "accounts", originRowId: "ACC-DRAWABLE" })
+    primeTeam(source)
+    render(<KnowledgeDetailScreen teamId={TEAM} sourceId={source.id} />)
+
+    expect(screen.getByRole("tab", { name: /Connections/ })).toBeTruthy()
   })
 })

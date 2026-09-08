@@ -37,12 +37,13 @@ import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/know
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { content, tenancy } from "@/lib/api"
+import { ApiFailure, content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { accountKey, appsKey, knowledgeKey, listFetch, recordMapKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDateTime } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
+import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 import { usePermissions } from "@/lib/perms"
 import { invalidate, primeCache, useCached } from "@shared/web/store"
 import { recordActivityKey, useRecordActivity } from "@/lib/use-record-activity"
@@ -85,7 +86,20 @@ export function KnowledgeDetailScreen({
   // therefore no neighbourhood. Cache-first like every other read on this screen
   // (CACHING.md), keyed by the record rather than by the source, so opening the
   // same account from two of its sources is one fetch.
-  const mapKey = item?.originTable && item?.originRowId
+  //
+  // AND ONLY FOR A TABLE THE DOOR WILL DRAW. `getKnowledgeMap` refuses any
+  // `originTable` that is not a key of `ACTIVITY_GATE_MAP` — permanently, by
+  // design (R18's fence has nothing to name for a table that isn't a real row in
+  // this database) — so the four Google-derived kinds (an email, a Drive file, a
+  // calendar entry, a chat message: `google_gmail`/`google_drive`/
+  // `google_calendar`/`google_chat`) never pass. Checked against the SAME map the
+  // door reads rather than a second list kept in step by hand, so a table added
+  // to the door's fence is drawable here the moment it ships and nowhere needs
+  // editing twice.
+  const mapDrawable = item?.originTable
+    ? Object.prototype.hasOwnProperty.call(ACTIVITY_GATE_MAP, item.originTable)
+    : false
+  const mapKey = item?.originTable && item?.originRowId && mapDrawable
     ? recordMapKey(item.originTable, item.originRowId)
     : null
   const mapQ = useCached(mapKey, () =>
@@ -274,8 +288,11 @@ export function KnowledgeDetailScreen({
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // THE MAP TAB EXISTS ONLY WHERE THERE IS A RECORD TO MAP. A note somebody
       // typed into the knowledge base has no row behind it, so it has no
-      // neighbourhood — and a tab that is always empty for a whole kind of
-      // source is a tab that teaches people it is never worth pressing.
+      // neighbourhood — and neither does a source mirrored from outside this
+      // database (an email, a Drive file, a calendar entry, a chat message):
+      // `mapDrawable` above is what tells the two apart. A tab that always fails
+      // for a whole kind of source is a tab that teaches people it is never
+      // worth pressing.
       ...(mapKey
         ? [
             {
@@ -368,12 +385,28 @@ export function KnowledgeDetailScreen({
               // skeleton below on any error, four grey rows sitting there
               // forever for a door that had already answered "no". Same shape
               // as work-logs-panel.tsx's own block-level retry.
-              <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-                {t("Couldn't load this record's connections.")}
-                <Button variant="secondary" size="sm" onClick={() => mapQ.refresh()}>
-                  {t("Try again")}
-                </Button>
-              </p>
+              //
+              // BUT NOT EVERY REFUSAL IS THE SAME REFUSAL. `getKnowledgeMap`'s
+              // 400 ("that is not a kind of record this map draws") is
+              // PERMANENT — `mapDrawable` above should already keep this tab
+              // from being reached for that table, so seeing it here means the
+              // fence moved between the read that built the tab strip and this
+              // one, not that the door is having a bad moment. A "Try again"
+              // on a refusal that will refuse again forever teaches the wrong
+              // lesson, so a 400 gets the honest sentence instead and no button;
+              // anything else (a 5xx, a dropped connection) keeps the retry.
+              mapQ.error instanceof ApiFailure && mapQ.error.status === 400 ? (
+                <p className="text-muted-foreground text-sm">
+                  {t("This source doesn't have a map to draw.")}
+                </p>
+              ) : (
+                <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+                  {t("Couldn't load this record's connections.")}
+                  <Button variant="secondary" size="sm" onClick={() => mapQ.refresh()}>
+                    {t("Try again")}
+                  </Button>
+                </p>
+              )
             ) : (
               <Skeleton variant="list" lines={4} />
             )
