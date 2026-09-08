@@ -51,7 +51,7 @@ const labelField = {
   ...defaultFieldConfig,
   label: "Kind of work",
   required: true,
-  hint: "One rate per kind of work.",
+  helpText: "One rate per kind of work.",
 }
 const amountField = { ...defaultFieldConfig, label: "Rate an hour", required: true }
 const currencyField = { ...defaultFieldConfig, label: "Currency", required: false }
@@ -59,7 +59,7 @@ const defaultField = {
   ...defaultFieldConfig,
   label: "Use this when the kind of work isn't named",
   required: false,
-  hint: "Only one rate can be the fallback.",
+  helpText: "Only one rate can be the fallback.",
 }
 
 export function RateFormDialog({

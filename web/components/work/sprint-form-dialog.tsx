@@ -133,7 +133,7 @@ const appField = {
   ...defaultFieldConfig,
   label: "App",
   required: false,
-  hint: "The system this block of work covers.",
+  helpText: "The system this block of work covers.",
 }
 const goalField = { ...defaultFieldConfig, label: "What it's for", required: false }
 const startField = { ...defaultFieldConfig, label: "Starts", required: false }
@@ -142,7 +142,7 @@ const priceField = {
   ...defaultFieldConfig,
   label: "Price sold",
   required: false,
-  hint: "The flat price for this block of work. Leave it at zero if it isn't sold separately.",
+  helpText: "The flat price for this block of work. Leave it at zero if it isn't sold separately.",
 }
 
 /** What an EDIT form opens with. Money arrives in whole cents (the shape the rest

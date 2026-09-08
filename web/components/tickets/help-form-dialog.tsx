@@ -133,7 +133,7 @@ const accountField = {
   ...defaultFieldConfig,
   label: "Client",
   required: false,
-  hint: "The company this is for. Their contacts see it in their portal; leave it off for our own questions.",
+  helpText: "The company this is for. Their contacts see it in their portal; leave it off for our own questions.",
 }
 // CHECKLIST 5.8 and 5.9. Neither is `required: true` on the FORM, and that is
 // deliberate rather than a shortcut: the agency's own housekeeping questions are
@@ -145,7 +145,7 @@ const appField = {
   ...defaultFieldConfig,
   label: "App",
   required: false,
-  hint: "Which system this is about. It is what routes the request and who gets told when it is answered.",
+  helpText: "Which system this is about. It is what routes the request and who gets told when it is answered.",
 }
 // WHICH SECTION OF IT (Aurora, 19 Aug 2026). It sits directly under the app
 // because it is meaningless without one, and the hint says so rather than
@@ -167,13 +167,13 @@ const moduleField = (required: boolean) => ({
   ...defaultFieldConfig,
   label: "Module",
   required,
-  hint: "Which part of the app it is about, like Settings or Documents. Choose the app first.",
+  helpText: "Which part of the app it is about, like Settings or Documents. Choose the app first.",
 })
 const contactField = {
   ...defaultFieldConfig,
   label: "Raised by",
   required: false,
-  hint: "The person at that client who asked. Not always whoever types it in.",
+  helpText: "The person at that client who asked. Not always whoever types it in.",
 }
 
 // "NOTHING CHOSEN", as a value a control can actually hold. Radix Select can't
@@ -191,7 +191,7 @@ const fileField = {
   ...defaultFieldConfig,
   label: "Something to show",
   required: false,
-  hint: "A screenshot, a recording, a document somebody can open.",
+  helpText: "A screenshot, a recording, a document somebody can open.",
 }
 
 export function HelpFormDialog({

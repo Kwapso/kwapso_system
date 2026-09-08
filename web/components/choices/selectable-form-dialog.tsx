@@ -34,7 +34,7 @@ const markField = {
   ...defaultFieldConfig,
   label: "Emoji",
   required: false,
-  hint: "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.",
+  helpText: "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.",
 }
 
 export function SelectableFormDialog({
