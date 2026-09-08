@@ -1864,9 +1864,24 @@ const CARD_JOINED = "md:rounded-ss-none";
    the body can flip them back and get the right answer without reaching two
    levels up.
    -------------------------------------------------------------------------- */
+/* THE GROUND IS PAINTED WITH ITS NAMED CLASS, and that is not cosmetic.
+   `bg-[var(--surface-raised)]` and `bg-surface-raised` paint the identical
+   colour and are NOT the same thing to a stylesheet: Tailwind emits the
+   arbitrary form under its own escaped selector, so the element sat outside
+   every ground-keyed rebind in tokens.css §8 — which is why this constant had
+   to hand-write the secondary fill underneath it in the first place. The
+   §10 note on `--color-surface-record-footer` records the same failure from
+   the other side, in the same words: the arbitrary form "took the element out
+   of every ground-keyed rebind in §8 without rendering any differently".
+
+   With the named class the shell's whole content region is a `page` ground,
+   so §8 supplies `--btn-secondary-fill` AND `--surface-lift` — which is what
+   makes a raised part the shell was handed (an `Alert`, a `StatusStepper`)
+   stop painting this region's own colour. `--pill-fill` is still written by
+   hand: it is not one of §8's relational tokens, and adding it there is a
+   change to ruling 26's `--pill-fill-building` that nobody has asked for. */
 const BODY = cn(
-  "min-h-0 min-w-0 flex-1 overflow-y-auto bg-[var(--surface-raised)]",
-  "[--btn-secondary-fill:var(--surface-panel)]",
+  "min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface-raised",
   "[--pill-fill:var(--surface-panel)]",
 );
 

@@ -3361,8 +3361,12 @@ export const SEED: Catalogue = {
    * to every reader until this line: nothing passed `activityLabel`, so the
    * heading fell through to the vendored `RecordDetail`'s own default, and the
    * translation walk never opens `shared/ui/` (R28). It is passed and
-   * translated now because the door beside it had to be built into the same
-   * node — see record-chrome.tsx's `activityEyebrowRow`.
+   * translated now at both hosts, beside the door on its row. (Until design
+   * kit v1.2.69, vendored 8 Sep 2026, `RecordChrome` dropped `activityAction`
+   * and record-chrome.tsx had to build the label and the door as ONE node to
+   * get the door onto the row at all; the kit forwards the real slot now, so
+   * the label is a plain `t("Latest activity")` at both hosts. The reason it
+   * is passed is unchanged — the vendored default is English.)
    *
    * "All activity · {count}" is the door. The MIDDOT and the HOLE are both
    * load-bearing: the count is `formatCount`'s output (R16 — "48", "1.3k",

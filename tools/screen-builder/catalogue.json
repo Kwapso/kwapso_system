@@ -1,11 +1,11 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.68",
-  "sha": "b499ec2f08bb81f61649684ff01652e9a3cc1130",
-  "syncedAt": "2026-09-07"
+  "tag": "v1.2.69",
+  "sha": "e8c45d1be1c08032c00d88c0189946138bc82a60",
+  "syncedAt": "2026-09-08"
  },
- "generatedAt": "2026-09-07T20:48:34.796Z",
+ "generatedAt": "2026-09-08T05:57:54.944Z",
  "counts": {
   "components": 118,
   "hooks": 2,
@@ -18,8 +18,8 @@
   "typedBooleanProps": 312,
   "compositions": 47,
   "icons": 1512,
-  "tokens": 363,
-  "tokenDeclarations": 565,
+  "tokens": 365,
+  "tokenDeclarations": 569,
   "unresolved": 0
  },
  "components": [
@@ -414,7 +414,7 @@
     {
      "file": "components/alert/alert.tsx",
      "name": "alertDotVariants",
-     "line": 64,
+     "line": 73,
      "base": "mt-[0.3125rem] size-2 shrink-0 rounded-pill motion-step",
      "groups": [
       {

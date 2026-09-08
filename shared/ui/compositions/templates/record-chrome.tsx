@@ -299,6 +299,23 @@ export interface RecordChromeProps
   activityVisible?: boolean;
   /** The eyebrow over it. */
   activityLabel?: React.ReactNode;
+  /**
+   * A DOOR OUT OF THE FOOTER, beside the eyebrow — `RecordDetail`'s own slot,
+   * added there in v1.2.67 and forwarded from here since 2026-09-08.
+   *
+   * It was missing from this template's ~24-prop forward, and a missing
+   * forward is not a smaller gap than a missing prop: the consuming app was
+   * smuggling its control through `activityLabel`, which is the EYEBROW — a
+   * label slot carrying a control, so the eyebrow's own type step and ink
+   * applied to it and the two could never be styled apart. That workaround is
+   * documented as debt on the app side and this line deletes it.
+   *
+   * `RecordDetail`'s header says what it is and is not: it "writes nothing,
+   * changes no value and submits nothing", so it is not a second exception to
+   * the read-only rule — it is a link, and a page being read-only has never
+   * meant a page you cannot leave.
+   */
+  activityAction?: React.ReactNode;
   /** Accessible name for the feed. */
   activityFeedLabel?: string;
 
@@ -387,6 +404,7 @@ function RecordChrome({
   activity,
   activityVisible,
   activityLabel,
+  activityAction,
   activityFeedLabel,
   onAddNote,
   notePlaceholder,
@@ -512,6 +530,7 @@ function RecordChrome({
         activity={activity}
         activityVisible={activityVisible}
         activityLabel={activityLabel}
+        activityAction={activityAction}
         activityFeedLabel={activityFeedLabel}
         onAddNote={onAddNote}
         notePlaceholder={notePlaceholder}

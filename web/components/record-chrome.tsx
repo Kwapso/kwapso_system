@@ -51,7 +51,7 @@ import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/
 import type { RecordDetailAuditEntry } from "@shared/ui/components/record-detail/record-detail"
 import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activity-feed"
 
-import { ActivityRail, type RailActivity } from "@/components/activity-rail"
+import { ActivityRail, hasActivityDoor, type RailActivity } from "@/components/activity-rail"
 import { InAppLink } from "@/components/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
 import { RecordMark } from "@shared/web/record-mark"
@@ -316,80 +316,6 @@ function footerActivityItems(items: readonly ActivityFeedRow[]): ActivityFeedIte
     time: item.timestamp,
     dateTime: item.dateTime,
   }))
-}
-
-/* --------------------- the door on the Latest activity row -----------------
-   THE SUMMARY ABOVE IS NOW THE ONLY ACTIVITY ON A RECORD PAGE, so the way to
-   the rest of it has to be somewhere, and the client said where. 2026-09-06,
-   verbatim: "On the right column, on Latest Activity, I would like some view
-   or expand or whatever, and this would open a slide-in with all the
-   activity." 2026-09-07: "implemet 'A · in the eyebrow row' across the app."
-   The rail itself — the link, the count and the `EdgePanel` behind them — is
-   `web/components/activity-rail.tsx`, drawn once for all thirteen bespoke
-   details by the single call below.
-
-   AND IT RIDES `activityLabel` BECAUSE THE KIT'S OWN TEMPLATE DROPS THE REAL
-   SLOT. This is a logged gap, not a preference. `RecordDetail` (the vendored
-   primitive, shared/ui/components/record-detail/record-detail.tsx) grew
-   `activityAction` on 2026-09-07 for exactly this door: a trailing node on the
-   eyebrow's own line, `items-baseline`, at a derived leading so it costs no
-   vertical space. But this file does not reach `RecordDetail` — it goes
-   through `RecordChrome`, the kit's own composition template
-   (shared/ui/compositions/templates/record-chrome.tsx), and that file forwards
-   twenty-odd props into `RecordDetail` and `activityAction` is not one of
-   them. `shared/ui/` is vendored and pinned (CLAUDE.md, `vendored-kit.test.ts`
-   recomputes its content hash), so the template cannot be hand-edited here;
-   the fix belongs upstream in Kwapso/kwapso-ui-ux, and it is one line in that
-   file's prop list and one in its render. THE RECIPE PATH ALREADY USES THE
-   REAL PROP (shared/web/screen-engine/screen-renderer.tsx renders
-   `RecordDetail` directly), so the two halves of this app prove the slot works
-   and prove the template is what is missing.
-
-   WHAT THE STAND-IN COSTS, EXACTLY. `RecordChrome` DOES forward
-   `activityLabel`, and it is a `ReactNode`, so the whole row can be built here
-   and handed over as the label. The kit puts its action BESIDE
-   `RecordFooterEyebrow`; this puts the row INSIDE it — and that one span is
-   `text-micro font-[var(--font-weight-medium)] uppercase text-ink-tertiary`,
-   every one of which inherits. So the action carries three resets the kit's
-   own version does not need (`normal-case`, `tracking-normal`, and the ink),
-   and `ActivityRail`'s own control carries the other three on the button
-   itself (see its comment: `Button` would otherwise impose `text-sm`,
-   `leading-none` and the medium weight). Everything else is copied off
-   `record-detail.tsx` verbatim rather than re-derived: the flex row's
-   `items-baseline justify-between gap-[var(--space-3)]`, the
-   `--footer-eyebrow-line` declaration (`--text-micro × --text-micro--line-
-   height` = 13.406px at the shipped root, so the two boxes are identical and
-   the row's height is the height the lone eyebrow already had), and
-   `flex-none whitespace-nowrap` on the action so the LABEL wraps first and the
-   door never does. The day the template grows the prop, this whole function is
-   deleted and replaced by `activityAction={<ActivityRail …/>}`, with no visual
-   difference — which is the same shape of swap this file already documented
-   for `eyebrow`, and the reason it is written to be measured rather than eyed.
-
-   IT ALSO TRANSLATES THE EYEBROW, WHICH NOTHING DID BEFORE. `activityLabel`
-   was never passed, so the column's heading fell through to `RecordDetail`'s
-   own hardcoded English "Latest activity" — a word the translation walk cannot
-   see, because it never opens `shared/ui/` (R28, `VENDORED_UI`). Passing the
-   label at all is forced by the row above; passing it through `t` is what
-   stops a German reader being told "Latest activity" in English over three
-   German sentences. */
-function activityEyebrowRow(
-  t: ReturnType<typeof useT>,
-  rail: React.ReactNode
-): React.ReactNode {
-  return (
-    <span
-      className={
-        "flex min-w-0 items-baseline justify-between gap-[var(--space-3)] " +
-        "[--footer-eyebrow-line:calc(var(--text-micro)*var(--text-micro--line-height))]"
-      }
-    >
-      <span className="min-w-0">{t("Latest activity")}</span>
-      <span className="flex-none whitespace-nowrap normal-case tracking-normal text-ink-on-record-footer">
-        {rail}
-      </span>
-    </span>
-  )
 }
 
 /* ------------------------------ the type mark ----------------------------- */
@@ -1231,22 +1157,79 @@ export function RecordScreen({
         activity={activity ? footerActivityItems(activity.items) : undefined}
         /* THE DOOR TO THE FULL HISTORY, ON THE EYEBROW'S OWN LINE — wired ONCE
            here for all thirteen bespoke details rather than thirteen times.
-           `activityEyebrowRow` (above) says why it rides `activityLabel`
-           rather than the kit's real `activityAction` slot, and `ActivityRail`
-           itself decides whether there is a door to draw at all: a record with
-           no history gets the bare eyebrow this label has always been.
+           The client, 2026-09-06, verbatim: "On the right column, on Latest
+           Activity, I would like some view or expand or whatever, and this
+           would open a slide-in with all the activity." 2026-09-07: "implemet
+           'A · in the eyebrow row' across the app." The rail itself — the link,
+           the count and the `EdgePanel` behind them — is
+           `web/components/activity-rail.tsx`.
+
+           ── THE KIT OWNS THIS ROW NOW, v1.2.69, VENDORED 2026-09-08 ────────
+
+           `RecordDetail` grew `activityAction` in v1.2.67 for exactly this
+           door, but this file does not reach `RecordDetail` — it goes through
+           `RecordChrome`, the kit's own composition template, which forwarded
+           ~24 props and not that one. So until v1.2.69 the rail was SMUGGLED
+           through `activityLabel`, which is the EYEBROW: a label slot carrying
+           a control, so the eyebrow's own type step and ink applied to it and
+           the two could never be styled apart. v1.2.69 forwards the real prop
+           and this is the deletion its CHANGELOG asks for.
+
+           WHAT WENT WITH IT. A local `activityEyebrowRow` helper hand-copied
+           the kit's own eyebrow row — `flex min-w-0 items-baseline
+           justify-between gap-[var(--space-3)]`, the `--footer-eyebrow-line`
+           declaration, `flex-none whitespace-nowrap` on the action — PLUS
+           three resets the nesting forced, `normal-case`, `tracking-normal`
+           and the footer ink, because `RecordFooterEyebrow` is `text-micro
+           font-[var(--font-weight-medium)] uppercase text-ink-tertiary` and
+           every one of those inherits into a child. All of it is gone, and
+           none of it is still needed: the kit's own branch (record-detail.tsx,
+           `data-slot="record-detail-activity-row"`) draws the action as a
+           SIBLING of the eyebrow rather than a child — nothing to reset — and
+           declares `--footer-eyebrow-line` itself, `calc(var(--text-micro) *
+           var(--text-micro--line-height))`, the same expression the stand-in
+           carried.
+
+           MEASURED after the swap, in a browser against staging rows (a ticket
+           record, 1280×900): the eyebrow's box, the action's box and the ROW's
+           box are all 14.296875px — three numbers, one value, so the door adds
+           nothing to the height the lone eyebrow already had. THE IDENTITY IS
+           THE CLAIM, NOT THE NUMBER. The kit's own note quotes 13.406px for
+           this expression "at the shipped 15px root"; the agency door does not
+           render at 15px — `shared/web/scale-section.tsx` sets an inline
+           `style.fontSize` on <html> (16px here) and an inline style beats
+           `:root[data-scale=…]`, which `shared/scale.ts` documents as
+           deliberate. 0.6875rem × 1.3 × 16 = 14.3. Re-measured at every
+           `data-scale` step and the three boxes stay equal.
+
+           `activityLabel` IS STILL PASSED, AND STILL TRANSLATED. It is no
+           longer carrying the control, but `RecordDetail`'s own default for it
+           is the hardcoded English "Latest activity", and the translation walk
+           never opens `shared/ui/` (R28, `VENDORED_UI`) — left off, a German
+           reader is told "Latest activity" in English over three German
+           sentences. These are now the same two lines the recipe path has used
+           all along (`shared/web/screen-engine/screen-renderer.tsx`).
+
+           `undefined` — NOT `null`, AND NOT AN ELEMENT THAT WILL RENDER
+           NOTHING. `activityAction` is one of the three terms in the kit's
+           `showActivityColumn`, and that term tests the PROP (`!== undefined`),
+           which a React element satisfies even when its component returns null.
+           So the host has to ask BEFORE it builds the node, and it asks
+           `hasActivityDoor` — the same single expression `ActivityRail` itself
+           decides on (R16's `formatCount`: "" for a zero and for a total still
+           in flight), exported rather than copied. Caught by measuring: passing
+           the element unconditionally put a 14.296875px column carrying a bare
+           "LATEST ACTIVITY" and nothing under it onto a knowledge record with
+           no history and no note composer — a record that drew no column at all
+           the day before. The old smuggle could not do this, because
+           `activityLabel` is not a term in that gate.
 
            NOT GATED ON `state` — a record whose PANEL is still loading has
            already loaded its footer's own facts or it would not be drawing a
            footer, and `ActivityRail` waits for the exact total either way. */
-        activityLabel={activityEyebrowRow(
-          t,
-          /* NO BUNDLE, NO DOOR — and the ROW is still passed, so the heading is
-             still translated. A record screen that hands `RecordScreen` no
-             activity at all has nothing to open; the rail decides the rest for
-             itself once there is a bundle to read (a record with no history
-             yet draws no door either, `activity-rail.tsx` argues why). */
-          activity === undefined ? null : (
+        activityLabel={t("Latest activity")}
+        activityAction={
+          !hasActivityDoor(activity) ? undefined : (
             <ActivityRail
               activity={activity}
               /* The SAME handler the footer's own composer is given, gated by
@@ -1258,7 +1241,7 @@ export function RecordScreen({
               head={activityHead}
             />
           )
-        )}
+        }
         onAddNote={onAddNote}
         notePlaceholder={notePlaceholder}
         state={state}

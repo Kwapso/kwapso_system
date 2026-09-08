@@ -149,7 +149,19 @@ describe("each reason says a true and different thing", () => {
     const { container } = render(<AssistantLimitNotice failure="refused" />)
     const alert = container.querySelector("[data-slot='alert']") ?? container.firstElementChild
     expect(alert, "the kit's Alert must be what draws this").not.toBeNull()
-    expect(alert?.className ?? "", "the panel is neutral paper, never a fill").toContain("bg-card")
+    // EITHER NEUTRAL PAPER, and the alternation is the point rather than a
+    // loosening — 8 Sep 2026. This read `toContain("bg-card")` until kit
+    // v1.2.69 moved `Alert` to `bg-surface-lift`, because a `--card` panel
+    // inside a `Sheet` measured 1.000 against `--popover`: the same colour, no
+    // boundary. `--surface-lift` IS the neutral paper — it defaults to
+    // `var(--card)` and only lifts on a raised ground — so the sentence this
+    // assertion has always made is unchanged. What it must keep refusing is a
+    // COLOURED fill (the kit's own Don't list: the state lives in the dot), and
+    // neither of these two is one.
+    expect(
+      alert?.className ?? "",
+      "the panel is neutral paper, never a fill"
+    ).toMatch(/\bbg-(?:card|surface-lift)\b/)
     // …and it reports rather than interrupts.
     expect(container.querySelector("[role='status']")).not.toBeNull()
   })

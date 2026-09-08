@@ -780,6 +780,40 @@
   --surface-panel:   var(--kw-soft-paper);
   --surface-raised:  var(--card);
   --surface-quiet:   #E2DDD4;              /* cancel buttons, disabled wells */
+
+  /* ---- THE LIFT — the paper a raised thing takes, RELATIVE to its ground --
+     RULED BY ARITHMETIC, 2026-09-08, from the contrast law's own first run.
+
+     `--surface-raised` IS `--card`, by the line three above this one, and
+     `--popover` is the same colour again in both palettes by ch12's design.
+     So an element that paints `bg-card` to say "I am a raised thing" has NO
+     boundary at all whenever what it stands on is any of those four papers —
+     1.000, in both palettes, permanently, not by anybody's mistake but by the
+     definition of the tokens. The contrast law found three of them inside
+     this kit on its first run: `Alert`'s panel inside a `Sheet`,
+     `StatusStepper`'s pill and mark inside the shell's content region, and
+     the book's own shadow swatch.
+
+     THE PROBLEM IS THE SAME ONE RULING 01 ALREADY SOLVED FOR A BUTTON, so the
+     answer is the same and not a new one: "a band and its buttons are never
+     the same tone" is a RELATION, and a relation cannot be held by a flat
+     value. `--btn-secondary-fill` is rebound by the GROUND in §8; this is
+     that mechanism given the name a surface can use. The default is `--card`,
+     which is correct on the soft-paper panel where cards and forms live
+     (PATTERN §11), and §8 rebinds it to soft paper inside an off-beige region
+     and back to the raised paper inside a soft-paper one.
+
+     MEASURED, both directions, both palettes: 1.103 light / 1.111 dark — the
+     kit's own page/panel step, and the pair the client already ruled on in
+     register row 77. A raised thing is now one paper off whatever it is
+     standing on, with no prop and no call-site change.
+
+     IT DOES NOT REPLACE `--card`. A `Card` that knows its ground — the ones
+     the kit places on soft paper by construction — is right to name the paper
+     it wants. `--surface-lift` is for the parts that are handed to a ground
+     they cannot see: an `Alert` a call site drops into a sheet, a stepper the
+     shell puts on its content region, a swatch the book stands on either. */
+  --surface-lift:    var(--card);
   /* RULED 44, 2026-08-23 — THE PAPER A SELECTED ROW TAKES.
      Register row 40 logged this as OPEN when the K1 reversal moved the papers:
      rows now sit INSIDE a soft-paper panel, so a selection at --surface-panel
@@ -2310,6 +2344,11 @@
 .bg-surface-page,
 [data-ground="page"] {
   --btn-secondary-fill:  var(--surface-panel);
+  /* And the LIFT with it, for exactly the reason the fill is here: §4's
+     `--surface-lift`. A raised thing standing on off-beige takes soft paper,
+     or it is standing on its own colour — 1.000, the pair that put this
+     token in the file. */
+  --surface-lift:        var(--surface-panel);
 }
 
 /* Soft-paper grounds — the button takes off-beige. ch02: "Assign lifts off
@@ -2318,6 +2357,7 @@
 .bg-secondary,
 [data-ground="panel"] {
   --btn-secondary-fill:  var(--surface-raised);
+  --surface-lift:        var(--surface-raised);
 }
 
 /* ---- The ring lands on the SHAPE the reader sees ------------------------
@@ -2468,6 +2508,14 @@
      hitting it live (T3A-33); `build-tokens.mjs` now fails on the whole class
      of it. `--surface-page` rides along: same family, same risk. */
   --color-surface-raised:       var(--surface-raised);
+  /* §4's relational lift. Bridged so the parts that take it paint it with a
+     NAMED class — `bg-surface-lift` — rather than an arbitrary
+     `bg-[var(--surface-lift)]`, which `cn` merges by the wrong group and
+     which, as the note on the record footer below says in as many words,
+     takes the element out of every ground-keyed rebind in §8. A relational
+     token consumed by the one form that cannot see the ground scopes would
+     be the joke telling itself. */
+  --color-surface-lift:         var(--surface-lift);
   --color-surface-page:         var(--surface-page);
   --color-ink-secondary:        var(--ink-secondary);
   --color-ink-tertiary:         var(--ink-tertiary);

@@ -354,7 +354,7 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                     isDone && "bg-surface-inverse text-ink-on-inverse",
                     isCurrent &&
                       "bg-[var(--surface-brand)] text-ink-on-accent font-[var(--font-weight-medium)]",
-                    !isDone && !isCurrent && "bg-card text-ink-tertiary shadow-[var(--hairline)]",
+                    !isDone && !isCurrent && "bg-surface-lift text-ink-tertiary shadow-[var(--hairline)]",
                   )}
                 >
                   {isDone ? (
@@ -453,8 +453,17 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                     "bg-[var(--surface-brand)] text-ink-on-accent font-[var(--font-weight-medium)]",
                   /* Not yet reached. The paper tone IS the separation; the
                      edge is the artifact's hairline drawn as an inset shadow,
-                     never a `border` property (review 1A · fix 2). */
-                  !isDone && !isCurrent && "bg-card text-ink-tertiary shadow-[var(--hairline)]",
+                     never a `border` property (review 1A · fix 2).
+
+                     AND THE PAPER TONE HAS TO BE A TONE. This read `bg-card`
+                     until the contrast law measured it against the ground the
+                     shell actually puts a stepper on: `--surface-raised` IS
+                     `--card`, so the sentence above was false in exactly the
+                     places it mattered — 1.000 in both palettes, the hairline
+                     carrying a separation the fill was supposed to make.
+                     tokens.css §4's `--surface-lift` is the same paper,
+                     rebound by the ground it lands on. */
+                  !isDone && !isCurrent && "bg-surface-lift text-ink-tertiary shadow-[var(--hairline)]",
                 )}
               >
                 {isDone ? (
@@ -564,9 +573,45 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
                three of seven" is the sentence a client repeats back. That
                sentence is now painted in the one tier excused from being
                legible. Ruled, recorded in GAPS-CONTRAST "Resolved", and the
-               artifact's to reverse. The overflow tail below inherits it. */
-            isLater && "bg-surface-idle text-ink-disabled",
-            !isCurrent && !isLater && "bg-card text-foreground",
+               artifact's to reverse. The overflow tail below inherits it.
+
+               AND THE EDGE IS A STROKE, NOT A DARKER FILL, 2026-09-08. The
+               contrast law measured `--surface-idle` at 1.042 against
+               off-beige paper in light — under its 1.05 invisibility gate —
+               wherever a stepper is placed on a raised ground (the shell's
+               content region, a dialog). A real finding: the pill's shape
+               genuinely did not exist in light on that paper.
+
+               THE OBVIOUS FIX WAS REJECTED BECAUSE IT MAKES A RULED NUMBER
+               WORSE. CH23's specimen line says "the quiet fill", and
+               `--surface-quiet` would clear the boundary at 1.339 light /
+               1.324 dark — but the pair the client actually ruled on is
+               GAPS-CONTRAST §2 row 8, "a later pill at 2.335:1 light /
+               3.979:1 dark", and those two figures are `--ink-disabled` on
+               `--surface-idle` to three decimals. On `--surface-quiet` the
+               same label reads 1.817 / 2.508. Closing the boundary that way
+               would darken the ground under the one word CH23 insists stays
+               readable ("a record that hides its future reads as finished").
+
+               SO THE FILL STAYS AND THE BOUNDARY IS DRAWN THE KIT'S OTHER
+               SANCTIONED WAY. tokens.css forbids the `border` property
+               (review 1A · fix 2) and gives an inset stroke in its place;
+               `--hairline` is that stroke, and the mark two hundred lines up
+               already draws its not-yet-reached state with one. The ring
+               composites to 1.175 against off-beige paper in light and 1.161
+               against the unlit raised paper in dark — above the law's
+               hairline floor in both — while `--ink-disabled` on
+               `--surface-idle` is untouched at 2.335 / 3.979.
+
+               The law was taught the same thing at the same time: a fill
+               below the boundary tier passes only if the element also draws a
+               hairline that itself clears the hairline tier against that
+               ground, MEASURED, not counted. See check-contrast.mjs, "A
+               BOUNDARY IS A STEP OR A STROKE", and its DISCHARGES fixtures —
+               four of the five assert a refusal. The pair now prints in that
+               run's DISCHARGED band rather than in its findings. */
+            isLater && "bg-surface-idle text-ink-disabled shadow-[var(--hairline)]",
+            !isCurrent && !isLater && "bg-surface-lift text-foreground",
             pressable && "cursor-pointer",
             // One defined step from each fill. Never --primary itself.
             pressable && isCurrent && "hover:bg-[var(--btn-primary-hover)]",
@@ -625,11 +670,13 @@ const StatusStepper = React.forwardRef<HTMLDivElement, StatusStepperProps>(
 
         {hidden > 0 ? (
           // The kit's own tail: `--surface-idle` with disabled ink, no number
-          // span, and no gap inside it.
+          // span, and no gap inside it. It inherits the later pill's fill and
+          // therefore the later pill's edge — see the argument at `isLater`
+          // above: the fill is the ruled one, the boundary is the stroke.
           <span
             data-slot="status-stepper-overflow"
             role="listitem"
-            className={cn(pillClasses, "bg-surface-idle text-ink-disabled")}
+            className={cn(pillClasses, "bg-surface-idle text-ink-disabled shadow-[var(--hairline)]")}
           >
             {describeOverflow(hidden)}
           </span>

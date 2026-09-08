@@ -335,10 +335,32 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
         {...props}
       >
         {label !== undefined && label !== null ? (
-          <div className={cn("flex items-baseline gap-2", hideLabel && "sr-only")}>
-            <Label htmlFor={fieldId}>{label}</Label>
+          /* THE LABEL GOES LEFT AND THE MARKER GOES RIGHT — the client's
+             ruling, and the kit's job rather than a call site's.
+
+             This row was `flex items-baseline gap-2` with both children at
+             their natural width, so the marker sat immediately after the
+             label wherever the label happened to end. The consuming app was
+             pushing it to the trailing edge from OUTSIDE, with a descendant
+             selector into this component's own slot —
+             `[&_[data-slot=field-required]]:order-last` plus `ms-auto` — which
+             is an app reaching through the kit's markup to restate a layout
+             the kit should have owned. With this row settled here that
+             override is deletable; it is called out in the CHANGELOG so the
+             lead can remove it.
+
+             Three classes, and each one is doing a job. `justify-between`
+             puts the marker at the trailing edge (logical, so it follows
+             `dir="rtl"` with nothing else written). `min-w-0` on the label
+             lets a long one SHRINK — without it a flex item refuses to go
+             below its content width and a long label shoves the marker off
+             the end, which is the failure the app's `ms-auto` never fixed
+             either. `shrink-0` keeps the marker itself whole, because it is
+             three characters and there is nothing in it to give up. */
+          <div className={cn("flex items-baseline justify-between gap-2", hideLabel && "sr-only")}>
+            <Label htmlFor={fieldId} className="min-w-0">{label}</Label>
             {required ? (
-              <span data-slot="field-required" className="text-badge text-ink-tertiary">
+              <span data-slot="field-required" className="shrink-0 text-badge text-ink-tertiary">
                 {requiredLabel}
               </span>
             ) : null}

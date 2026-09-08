@@ -68,12 +68,22 @@
 // today: the eyebrow, and — where the reader may write one — the note field,
 // which is how a first entry gets made.
 //
-// AND IT RESPECTS THE COLUMN'S OWN GATE BY CONSTRUCTION. `RecordDetail` draws
-// the Latest-activity column when it has rows, a composer, or this door
-// (`showActivityColumn`). Because the door is absent exactly when the rows are,
-// this component can never force that column onto a record that had none — a
-// reader with no create right on a record with no history still sees the same
-// Record column alone that they see today.
+// AND THE COLUMN'S OWN GATE HAS TO BE TOLD, WHICH IS WHY `hasActivityDoor`
+// IS EXPORTED (2026-09-08). `RecordDetail` draws the Latest-activity column
+// when it has rows, a composer, or this door — `showActivityColumn`, and its
+// door term is `activityAction !== undefined`. That term is about the PROP, and
+// a React element whose component returns null at render time is still a
+// defined prop: the kit cannot see that this rail drew nothing. So "the door is
+// absent exactly when the rows are" is true of the PIXELS and not of the prop,
+// and a host that passes the element unconditionally hands the kit a door that
+// is not there. MEASURED, 2026-09-08, on a knowledge record with no history and
+// no composer: a 14.296875px column carrying a bare "LATEST ACTIVITY" eyebrow
+// and nothing under it.
+//
+// The gate is therefore ONE expression with TWO readers rather than two copies
+// of one rule: this component asks it to decide whether to draw, and a host
+// asks it to decide whether to pass the prop at all. A host that forgets is
+// wrong in the direction of an empty column, never a missing door.
 //
 // ── NO `description` ON THE PANEL ───────────────────────────────────────────
 //
@@ -118,6 +128,23 @@ export type RailActivity = {
   fetchPage: (cursor: string) => Promise<{ rows: unknown[]; nextCursor: string | null }>
 }
 
+/**
+ * IS THERE A DOOR TO DRAW? The one expression, named so a host can ask it
+ * before it builds the node — see "AND THE COLUMN'S OWN GATE HAS TO BE TOLD"
+ * in this file's header for why a host has to ask at all.
+ *
+ * `undefined` for the bundle itself is a record screen that was handed no
+ * activity at all; `formatCount` (R16) answers "" both for a zero total and for
+ * a total still in flight, and both are records with nothing to open.
+ *
+ * A TYPE PREDICATE rather than a `boolean`, because "there is a door" and
+ * "there is a bundle to build it from" are the same sentence, and a host that
+ * has asked should not then have to assert what it just proved.
+ */
+export function hasActivityDoor(activity: RailActivity | undefined): activity is RailActivity {
+  return activity !== undefined && formatCount(activity.total) !== ""
+}
+
 export function ActivityRail({
   activity,
   onAddNote,
@@ -148,9 +175,10 @@ export function ActivityRail({
   const [open, setOpen] = React.useState(false)
   // ONE EXPRESSION DECIDES THE NUMBER AND THE DOOR — see the header. R16's seam
   // answers "" for a zero and for a total still in flight; both are records
-  // with nothing to open.
+  // with nothing to open. `hasActivityDoor` above is that same expression,
+  // named, and it is what a host asks; this is what it decides here.
   const count = formatCount(activity.total)
-  if (count === "") return null
+  if (!hasActivityDoor(activity)) return null
   return (
     <React.Fragment>
       {/* A LINK, NOT A BUTTON WITH A BOX. The kit's ruling, and the reason is

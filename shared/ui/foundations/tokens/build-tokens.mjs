@@ -31,8 +31,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
+/* The walk over tokens.css — which blocks are which palette, and how a var()
+   chain is chased to the hex at the end of it — moved to `token-model.mjs` so
+   that `check-contrast.mjs` reads this stylesheet through the SAME eye. Two
+   resolvers that can disagree about what a token resolves to is the bug the
+   contrast law exists to catch, one level up. */
+import { readTokenModel, TOKENS_CSS as SRC } from "./token-model.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SRC = join(HERE, "tokens.css");
 const OUT = join(HERE, "tokens.json");
 const CHECK_ONLY = process.argv.includes("--check");
 
@@ -49,70 +55,18 @@ const PX_ALLOWED = [
 ];
 
 const fail = [];
-const warn = [];
 
-/* -- 1 · read and de-comment ------------------------------------------------ */
+/* -- 1/2 · read, de-comment, and pull out the blocks ------------------------
+   All of it through `token-model.mjs`, which is this function body's old
+   contents moved out whole. `structural` is the "there is no dark block"
+   class of problem: unrecoverable for a reader, and a build failure here. */
 
-const raw = readFileSync(SRC, "utf8");
-const css = raw.replace(/\/\*[\s\S]*?\*\//g, "");
-
-/* -- 2 · pull out the blocks we care about ---------------------------------- */
-
-/** Return the body of the block whose header starts at `from`. */
-function bodyAt(text, from) {
-  const open = text.indexOf("{", from);
-  if (open < 0) return null;
-  let depth = 0;
-  for (let i = open; i < text.length; i++) {
-    if (text[i] === "{") depth++;
-    else if (text[i] === "}") {
-      depth--;
-      if (depth === 0) return { body: text.slice(open + 1, i), end: i };
-    }
-  }
-  return null;
-}
-
-/** Every `--name: value;` pair in a block body, in source order. */
-function declarations(body) {
-  const out = new Map();
-  const re = /(--[A-Za-z0-9_-]+)\s*:\s*([^;}]+)[;}]?/g;
-  let m;
-  while ((m = re.exec(body))) out.set(m[1], m[2].trim().replace(/\s+/g, " "));
-  return out;
-}
-
-/** Merge every bare `:root { }` block (skipping [data-*] and nested ones). */
-function collectLight(text) {
-  const merged = new Map();
-  const re = /(^|\})\s*:root\s*\{/g;
-  let m;
-  while ((m = re.exec(text))) {
-    const blk = bodyAt(text, m.index);
-    if (!blk) continue;
-    for (const [k, v] of declarations(blk.body)) merged.set(k, v);
-  }
-  return merged;
-}
-
-function blockAfter(text, needle) {
-  const i = text.indexOf(needle);
-  if (i < 0) return null;
-  const blk = bodyAt(text, i);
-  return blk ? declarations(blk.body) : null;
-}
-
-/* The @media block: find the at-rule, then the :root selector inside it. */
-const mediaIdx = css.indexOf("@media (prefers-color-scheme: dark)");
-if (mediaIdx < 0) fail.push("no `@media (prefers-color-scheme: dark)` block found");
-const mediaBody = mediaIdx >= 0 ? bodyAt(css, mediaIdx)?.body ?? "" : "";
-
-const light = collectLight(css.slice(0, mediaIdx < 0 ? undefined : mediaIdx));
-const darkMedia = blockAfter(mediaBody, ':root:not([data-theme="light"])');
-const darkExplicit = blockAfter(css, ':root[data-theme="dark"]');
-
-if (!darkMedia) fail.push('no `:root:not([data-theme="light"])` block inside the media query');
-if (!darkExplicit) fail.push('no `:root[data-theme="dark"]` block found');
+const model = readTokenModel();
+const { raw, css, light, darkMedia, darkExplicit } = model;
+/* UNRESOLVED is raised by the shared resolver, so the warning sink is the
+   model's own. It fills during section 8's resolution pass, below. */
+const warn = model.warnings;
+for (const s of model.structural) fail.push(s);
 
 /* -- 3 · GUARD 1 — drift ---------------------------------------------------- */
 
@@ -185,29 +139,7 @@ for (const { util, token } of SELECTED_CLASSES) {
 
 /* -- 6 · resolve var() chains ----------------------------------------------- */
 
-function resolver(map) {
-  const seen = new Set();
-  return function resolve(value, key = "") {
-    if (typeof value !== "string") return value;
-    let out = value;
-    for (let pass = 0; pass < 12 && out.includes("var("); pass++) {
-      out = out.replace(/var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,([^)]*))?\)/g, (all, ref, fb) => {
-        if (ref === key || seen.has(ref + "|" + key)) return all;
-        if (map.has(ref)) return map.get(ref);
-        if (fb !== undefined) return fb.trim();
-        warn.push(`UNRESOLVED — ${key || "?"} points at ${ref}, which is not defined`);
-        return all;
-      });
-    }
-    return out.trim();
-  };
-}
-
-const darkMap = new Map(light);
-for (const [k, v] of darkExplicit ?? []) darkMap.set(k, v);
-
-const resolveLight = resolver(light);
-const resolveDark = resolver(darkMap);
+const { resolveLight, resolveDark } = model;
 
 /* -- 7 · report ------------------------------------------------------------- */
 
@@ -252,7 +184,59 @@ const doc = {
   tokens,
 };
 
-if (!CHECK_ONLY) writeFileSync(OUT, JSON.stringify(doc, null, 2) + "\n");
+const rendered = JSON.stringify(doc, null, 2) + "\n";
+
+/* -- 8b · THE STALE-ARTIFACT GUARD -------------------------------------------
+   `--check` used to run the four guards and write nothing, and "wrote
+   nothing" was quietly reported as a pass. So `tokens.json` could disagree
+   with `tokens.css` indefinitely and the gate would stay green — which is not
+   a hypothetical: on 2026-09-07 it was found still carrying BOTH of that
+   evening's colour bugs (`--surface-record-footer` dark as `#26241F`, and no
+   dark half for `--dot-building` at all) days after `tokens.css` had been
+   corrected. It had to be found by a person reading a file.
+
+   THAT IS THE SAME SHAPE OF HOLE AS THE ONE THE CONTRAST LAW EXISTS FOR: a
+   generated artifact that can contradict its source and still pass is a
+   second, silent opinion about what a token is. A consuming app that reads
+   `tokens.json` — which is the only reason it is generated — would have been
+   shipping the pre-fix colours with a green build behind it.
+
+   So `--check` now COMPARES. It still writes nothing; it renders the document
+   it would have written and fails if that is not what is on disk, naming the
+   first token that differs so the message is actionable rather than a diff
+   the reader has to go and take themselves. `npm run build:tokens` is the
+   fix, and it is one command.                                              */
+if (CHECK_ONLY) {
+  let onDisk = null;
+  try { onDisk = readFileSync(OUT, "utf8"); } catch { /* missing counts as stale */ }
+  if (onDisk !== rendered) {
+    let where = onDisk === null ? "the file does not exist" : "it is out of date";
+    if (onDisk !== null) {
+      try {
+        const was = JSON.parse(onDisk).tokens ?? {};
+        const names = new Set([...Object.keys(was), ...Object.keys(tokens)]);
+        const differing = [...names].filter(
+          (n) => JSON.stringify(was[n]) !== JSON.stringify(tokens[n]),
+        );
+        if (differing.length)
+          where =
+            `${differing.length} token(s) differ, first: ${differing.slice(0, 4).join(", ")}` +
+            (differing.length > 4 ? " …" : "");
+      } catch { where = "it is not readable as the document this generator writes"; }
+    }
+    console.error(banner("build-tokens: FAILED"));
+    console.error(`  STALE GENERATED FILE — ${OUT}`);
+    console.error(`  ${where}.`);
+    console.error(
+      "  tokens.json is generated FROM tokens.css and is the copy a consuming app reads.\n" +
+        "  A generated artifact that can disagree with its source and still pass the gate is\n" +
+        "  a second opinion about what a token is, which is the whole subject of the contrast\n" +
+        "  law next door. Regenerate it:  npm run build:tokens",
+    );
+    console.error("");
+    process.exit(1);
+  }
+} else writeFileSync(OUT, rendered);
 
 console.log(banner("build-tokens: OK"));
 console.log(`  declared on :root        ${light.size}`);

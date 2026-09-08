@@ -42,8 +42,17 @@ const alertClasses = [
   // `.kw-alert`: a leading rail for the dot, the copy taking the rest.
   "flex items-start gap-3",
 
-  // Neutral raised paper in both themes. `--surface-raised` is `--card`.
-  "bg-card text-card-foreground",
+  /* Neutral raised paper in both themes — and RELATIVE to the ground, which
+     is the whole of the fix. `--surface-raised` is `--card` and `--popover`
+     is the same colour again, so `bg-card` here measured 1.000 in BOTH
+     palettes against a `Sheet` — which is not a hypothetical placement:
+     `Form`'s error summary is this component, and `BulkEditScreen` renders
+     that form inside a sheet. An alert is handed its ground by a call site
+     and can never name it, so it takes tokens.css §4's `--surface-lift`,
+     which §8 rebinds off the ground's own class. 1.103 light / 1.111 dark on
+     every paper the kit puts one on; unchanged (`--card`) on the soft-paper
+     panel it already read correctly against. */
+  "bg-surface-lift text-card-foreground",
 
   // A box takes the box radius. There is no fifth radius.
   "rounded-[var(--radius)]",

@@ -2,6 +2,503 @@
 
 ## Unreleased
 
+### Changed — the law learns the kit's other boundary: a step **or** a stroke
+
+The two findings the entry below left red on purpose are closed, and not by
+moving anything. `npm run check` **exits 0**.
+
+**The kit has always drawn a boundary two ways and the law could only see
+one.** `tokens.css` forbids the `border` property outright — review 1A · fix
+2 — and sanctions in its place either a fill one step from the ground or an
+inset stroke; `--hairline` is `inset 0 0 0 1px var(--hair)` and exists for
+nothing else. `badge.tsx`'s `outline` variant draws with it, `card.tsx` has a
+`hairline` prop for it, and `StatusStepper`'s own not-yet-reached mark has
+used it since yesterday's fix. The contrast law measured the fill, saw 1.042,
+and reported an absent boundary for an element that draws one — while its own
+header said, in as many words, that it *"does not credit an inset hairline for
+a boundary the fill fails to make"*. Half of that sentence was wrong. The
+record-footer entry two passes ago had already written the true version:
+**the boundary is a step AND a rule.**
+
+#### The rule, and it is a derivation rather than an exemption
+
+> A fill below the boundary tier is acceptable **if and only if** the element
+> also draws a hairline whose own contrast against that same ground clears the
+> hairline tier.
+
+**Nothing about a threshold moves.** Boundary is still 1.05, quiet is still
+1.10, hairline is still 1.05, no tier is renamed, and `EXEMPT` is still the
+same two entries it has been — still rot-checked, still shrinking-only. What
+changed is that a second **measured** fact can now answer the question the
+first one asked. The law resolves the `shadow-[…]` class through the same
+token model that turns `--surface-record-footer` into `#26241F` three hops
+down, reads what comes back as a shape and a colour, composites the alpha the
+way an ink's is composited, and holds the result to the hairline tier against
+the ground the fill just failed against. A hairline that is itself invisible
+discharges nothing.
+
+| | fill vs ground | the ring, light | the ring, dark |
+|---|---|---|---|
+| later pill · overflow tail on `--popover` | **1.042** | **1.175** | **1.161** |
+| later pill · overflow tail on `--surface-raised` | **1.042** | **1.175** | **1.161** |
+
+`--ink-disabled` on `--surface-idle` is **untouched at 2.335 light / 3.979
+dark** — GAPS-CONTRAST §2 row 8, the pair the client ruled on, to three
+decimals. That is the whole point of taking this route: `--surface-quiet`
+would have cleared the boundary at 1.339 / 1.324 and dropped that ruled label
+to 1.817 / 2.508.
+
+#### Four things that keep it from being a blanket pass, each asserted on every run
+
+The regression set proves the law still catches a bad fill; it can prove
+nothing about a discharge, because a rule reading *"anything with a shadow
+class passes"* would leave all four of those fixtures red and still be a
+blanket pass wearing a measurement's clothes. So the discharge has its own
+fixtures — **five, of which four assert a REFUSAL** — checked both ways the
+way `EXEMPT` is:
+
+| stroke drawn round a 1.042 fill | verdict | why |
+|---|---|---|
+| `var(--hairline)` | **DISCHARGED** 1.175 / 1.161 | the ring the kit actually draws |
+| `inset 0 0 0 1px var(--hair-faint)`, dark | refused at **1.022** | the rule is invisible: 6% ink on that fill |
+| `var(--hairline-under)` | refused | one edge, not a shape — same ink as row 1 |
+| `0 0 0 1px var(--hair-strong)` | refused | identical but for `inset`, in a **darker** ink |
+| nothing | refused | the finding exactly as it stood |
+
+Rows 3 and 4 are the shape test and are drawn in inks that would sail past the
+floor if the shape test let them through; row 2 is the colour test and is the
+kit's own faintest hairline. **The stroke is also measured the worse of the two
+honest ways** — an inset shadow paints on the element's fill, so its true
+colour is stroke-over-fill, but a reader may as fairly ask what it measures
+over the ground alone, and the LOWER of the two is the one that has to clear.
+Picking the kinder of two defensible numbers is how a law starts negotiating
+with itself. And the stroke must be provably on WITH the fill: the same arm of
+the same `cn()`, or an unconditional group on the same element. A stroke in
+the other arm of a ternary is not a stroke this fill has.
+
+Every one of those was verified by mutation, not by reading: soften the
+hairline floor, take the max instead of the min, drop the compositing, widen
+the ring to any inset, drop the `inset` requirement, soften the boundary floor,
+or blind the walker to `shadow-[…]` altogether — **each one turns the check
+red, and each names which fixture it broke.** Blinding the walker brings back
+the original two findings verbatim, which is the proof that the discharge is
+read out of `status-stepper.tsx` and not out of a list.
+
+#### A discharged boundary is printed, not disappeared
+
+New **DISCHARGED** band in the report, beside QUIET, carrying the fill's
+number, the stroke that carries it, and the ring's figure in **both** palettes
+with the over-fill and over-ground readings shown separately. A boundary held
+by a rule rather than by a step is a thing the client should be able to count.
+And an **IDLE DISCHARGE** tripwire fails the check if the kit ever stops
+drawing one, so the machinery cannot outlive its use the way a stale exemption
+would — the same discipline `EXEMPT`'s rot check applies from the other side.
+
+Census 103 → 105 pairs: a stroke is now part of a pair's identity, so one fill
+on one ground drawn with a hairline in one place and bare in another is **two**
+boundaries and exactly one of them may be discharged. No anchor died, no floor
+moved, and the four regression fixtures still measure 1.000 / 1.000 / 1.000 /
+1.019 red-before.
+
+#### And the component
+
+`StatusStepper`'s later pill and its overflow tail take
+`shadow-[var(--hairline)]` beside the fill they already had. The fill is the
+ruled one; the boundary is the stroke. The comment at the pill, which said the
+finding was *"logged as the law's known backlog"*, now says what was actually
+done.
+
+### Fixed — the contrast law's first eleven, triaged: nine closed, two of them the law's own, two left red on purpose
+
+> **Superseded in part, 2026-09-08.** The two findings this entry left red are
+> closed by the entry above — by teaching the law that a boundary can be
+> carried by a stroke, not by moving a threshold and not by darkening the
+> ruled fill. `npm run check` exits 0.
+
+The entry below arrived deliberately RED on **11 pairs**, reported for triage
+rather than patched in the pass that found them. They have now been read one at
+a time, and the answer was not the same three times running — which is the
+whole reason they were left for a person:
+
+| # | pair | verdict |
+|---|---|---|
+| 1 | `--card` on `--popover`, both | **BUG** — `Alert` inside a `Sheet`. Fixed at the token. |
+| 2 | `--card` on `--surface-raised`, both | **BUG** — `StatusStepper` on the shell's content region. Same fix. |
+| 3 | `--background` on `--surface-raised`, light | **CALL SITE** — the book's cards on the book's raised panel. |
+| 4 | `--btn-secondary-fill` on `--background`, light | **FALSE PAIR** — the law could not see §8. Fixed in the LAW. |
+| 5 | `--surface-idle` on `--popover` / `--surface-raised`, light | **REAL, LEFT RED** — see below. |
+| 6 | `--ink-on-accent` on `--popover` / `--surface-raised`, dark | **FALSE PAIR** — a fragment and a local const. Fixed in the LAW. |
+| 7 | `--foreground` on `--surface-brand`, dark | **BUG** — off-beige ink on mango. The right token already existed. |
+
+**`npm run check` exits 1, on two findings and a written reason.** That is the
+honest state and it is the one worth having.
+
+#### The one that mattered most: two names, one colour, four papers
+
+`--surface-raised` **is** `--card` — tokens.css §4 declares it as
+`var(--card)` — and `--popover` is that colour again in both palettes by
+ch12's design. So an element painting `bg-card` to say *"I am a raised thing"*
+has **no boundary at all** whenever what it is standing on is any of those
+four papers. Not by anybody's mistake. By the definition of the tokens, in
+both palettes, permanently.
+
+The law found three of them inside the kit and one in the book:
+
+- **`Alert` in a `Sheet`.** Not hypothetical: `Form`'s error summary IS an
+  `Alert`, and `BulkEditScreen` renders that form inside a sheet. A
+  destructive alert with a coloured dot, correct copy and no panel under it.
+- **`StatusStepper`'s pill and mark** on `ScreenShell`'s content region.
+- **the book's own shadow swatch**, which is a shadow specimen with nothing
+  under the shadow.
+
+**THE PROBLEM IS THE ONE RULING 01 ALREADY SOLVED FOR A BUTTON**, so the fix
+is that answer and not a new one. *"A band and its buttons are never the same
+tone"* is a RELATION, and a relation cannot be held by a flat value:
+`--btn-secondary-fill` is rebound by the GROUND in §8. tokens.css §4 now
+carries **`--surface-lift`**, the same mechanism given a name a surface can
+use — `var(--card)` by default, which is correct on the soft-paper panel where
+cards and forms live, and rebound by §8 to soft paper inside an off-beige
+region and back to the raised paper inside a soft-paper one.
+
+| | before | after |
+|---|---|---|
+| `Alert` on a sheet / popover, light | **1.000** | **1.103** |
+| `Alert` on a sheet / popover, dark | **1.000** | **1.111** |
+| stepper pill · mark on the shell body, light | **1.000** | **1.103** |
+| stepper pill · mark on the shell body, dark | **1.000** | **1.111** |
+| the book's shadow swatch on its raised panel, light / dark | **1.000** / **1.000** | **1.103** / **1.111** |
+| `Alert` on a soft-paper panel, light / dark | 1.103 / 1.111 | **unchanged** |
+
+1.103 and 1.111 are not new numbers. They are the kit's own page/panel step
+and the pair the client ruled on in register row 77.
+
+**It does not replace `--card`.** A `Card` that knows its ground is right to
+name the paper it wants. `--surface-lift` is for the parts that are HANDED a
+ground they cannot see: an alert a call site drops into a sheet, a stepper the
+shell puts on its content region, a swatch the book stands on either.
+
+#### And one arbitrary background that took a whole region out of §8
+
+`ScreenShell`'s BODY painted `bg-[var(--surface-raised)]`. That is the
+identical colour to `bg-surface-raised` and **not the same thing to a
+stylesheet**: Tailwind emits the arbitrary form under its own escaped
+selector, so the shell's entire content region sat outside every ground-keyed
+rebind in §8 — which is exactly why that constant had to hand-write
+`[--btn-secondary-fill:var(--surface-panel)]` underneath it. §10's note on
+`--color-surface-record-footer` records the same failure from the other side,
+in the same words: the arbitrary form *"took the element out of every
+ground-keyed rebind in §8 without rendering any differently"*.
+
+Both grounds now use the named class — the shell's body and the book's
+`Panel` — and the hand-written secondary fill is deleted because §8 supplies
+it. (`--pill-fill` is still written by hand there: it is not one of §8's
+relational tokens, and adding it would be a change to ruling 26's
+`--pill-fill-building` that nobody has asked for.)
+
+#### Off-beige ink on mango — the `--dot-building` shape, again
+
+`demo/sheets/motion-sheet.tsx`'s demo box was `bg-[var(--surface-brand)]
+text-foreground`. Mango does not flip; `--foreground` does. **12.072 in light,
+1.440 in dark** — correct in the palette it was written in and all but
+invisible in the other, which is the same sentence this CHANGELOG wrote about
+`--dot-building` a day ago and has the same answer already sitting in
+tokens.css. `--ink-on-accent` is declared with the comment *"the accent law,
+as a token"* and is charcoal in both palettes because the ground it names is.
+**12.072 in light AND dark.**
+
+#### TWO OF THE ELEVEN WERE THE LAW'S OWN, AND THAT IS THE MORE USEFUL HALF
+
+A law that misses a pair leaves a hole. A law that INVENTS one costs more,
+because the first thing a person does with a false finding is stop reading the
+true ones. Two of the eleven were false, and neither was a colour problem:
+
+**§8 was invisible to it.** `--btn-secondary-fill` resolved to its `:root`
+value on every ground, so the law measured the exact pair the rebind exists to
+prevent and reported the mechanism itself as a 1.000 bug. It now reads the
+ground scopes out of tokens.css — no list, same discipline as everything else
+in the file — and resolves a relational token against **the ground being
+measured**, never a merge across an element's branches. It also reads
+Tailwind's `[--tok:value]` arbitrary-property utility, which is how the shell
+rebinds a fill on a ground §8 cannot reach. `--btn-secondary-fill` on the
+book's card: **1.000 → 1.103 light / 1.079 dark**, which is what the browser
+was drawing all along.
+
+**A fragment was not a node, and a class constant had to be at column zero.**
+`<>` carries no tag name, so `ground-map.mjs` walked past it — and with it
+past the structure that makes `const inner = (<>…</>)` a binding, so
+everything inside was reparented onto whatever element the fragment sat in.
+Separately, `const skin = cn(…)` written inside a render read as an element
+with no fill, and an element that paints nothing hands its ANCESTOR's ground
+to its children. Together those two put `StatusStepper`'s current pill's
+number — charcoal `--ink-on-accent`, sitting on the mango pill that covers
+it — against the DIALOG behind the stepper: **1.132 dark, for a pair no screen
+has ever drawn.** Both fixed in `ground-map.mjs`, with the argument beside
+each. The census moved 103 → 99 pairs and back to 103; no anchor died, no
+floor was touched.
+
+**No exemption was added.** The list is still the two that were there, and
+still rot-checked.
+
+#### LEFT RED, WITH THE REASON — the later stage's fill
+
+> **Answered 2026-09-08, and the reasoning below is why it was answered this
+> way rather than by `--surface-quiet`.** The fill stays; the boundary is now
+> drawn as an inset hairline and the law measures it. See the entry at the top
+> of Unreleased.
+
+`--surface-idle` measures **1.042** against off-beige paper in light, under
+the 1.05 invisibility gate, wherever a stepper is placed on a raised ground.
+It is a real finding: the later pill's and the overflow tail's SHAPE genuinely
+does not exist in light on that paper.
+
+**The obvious fix makes a ruled number worse, so it is not this pass's to
+take.** CH23's specimen line says *"later stages take the quiet fill"*, and
+`--surface-quiet` would clear the boundary at 1.339 light / 1.324 dark. But
+the pair the client actually ruled on is GAPS-CONTRAST §2 row 8 — *"a later
+pill at 2.335:1 light / 3.979:1 dark"* — and those two figures are
+`--ink-disabled` on `--surface-idle`, reproduced here to three decimals. On
+`--surface-quiet` the same label reads **1.817 / 2.508**. Closing the boundary
+would darken the ground under the one word CH23 insists stays readable: *"a
+record that hides its future reads as finished, and the client cannot see what
+they are waiting for."* That is a trade for the client to make with both
+numbers in front of her. **A red law with a known backlog is worth more than a
+green one that was talked into it.**
+
+#### The two regression fixtures that say STILL OPEN now say something truer
+
+`--surface-raised` on `--card` is **1.000 by design and can never go green**:
+the two names are one colour on purpose. The fixture keeps asserting exactly
+that, because it is a permanent proof that the law still catches a 1.000. What
+changed is that nothing in the kit DRAWS it any more, and the fixture now says
+so and names `--surface-lift`. If a component starts painting `bg-card` on the
+shell body again it is the FINDINGS list that will report it, not this
+fixture.
+
+### Fixed — `npm run check` now fails on a stale `tokens.json`
+
+`--check` ran the generator's four guards and wrote nothing, and *"wrote
+nothing"* was reported as a pass — so the generated file could disagree with
+`tokens.css` indefinitely behind a green build. **That is not hypothetical: it
+was found on 2026-09-07 still carrying BOTH of that evening's colour bugs**
+(`--surface-record-footer` dark as `#26241F`, and no dark half for
+`--dot-building` at all) days after the stylesheet had been corrected, and it
+had to be found by a person reading a file.
+
+`--check` now RENDERS the document it would have written and fails if that is
+not what is on disk, naming the tokens that differ. It still writes nothing.
+**What it would have caught:** both of last night's bugs, on the first `npm run
+check` after the fix landed in `tokens.css` — and, this morning, `--surface-lift`
+itself, which is how the guard was proved.
+
+`tokens.json` is the copy a consuming app reads. A generated artifact that can
+contradict its source and still pass the gate is a second, silent opinion
+about what a token is, which is the whole subject of the law next door.
+
+### Fixed — two gaps the consuming app was paying for
+
+**`RecordChrome` dropped `activityAction`.** `RecordDetail` gained that slot in
+v1.2.67; `compositions/templates/record-chrome.tsx` forwards ~24 props into it
+and that was not one of them, so the app was smuggling its control through
+`activityLabel` — which is the EYEBROW. A label slot carrying a control means
+the eyebrow's own type step and ink apply to it and the two can never be
+styled apart. One line, and **the app's documented workaround is now
+deletable.**
+
+**The required-field marker sits at the trailing edge, in the kit.** The
+client ruled the label goes left and the marker right. `Field`'s label row was
+`flex items-baseline gap-2` with both children at their natural width, so the
+marker sat wherever the label happened to end — and the app was pushing it
+over from OUTSIDE, with a descendant selector into the kit's own slot:
+`[&_[data-slot=field-required]]:order-last` plus `ms-auto`. An app reaching
+through the kit's markup to restate a layout the kit should own.
+
+Three classes, each doing a job: `justify-between` on the header row (logical,
+so it follows `dir="rtl"` with nothing else written), `min-w-0` on the label
+so a long one SHRINKS instead of shoving the marker off the end — which the
+app's `ms-auto` never fixed either — and `shrink-0` on the marker, which is
+three characters with nothing to give up. **The app's override
+(`[&_[data-slot=field-required]]:order-last`, `ms-auto`) can be removed.**
+
+### Added — a contrast law: every pair the kit draws, both palettes, measured against the surface it is actually on
+
+The entry below this one ends with a FINDING rather than a fix: *"nothing in
+this kit measures a token against the surface it is actually used on."* Three
+bugs in one evening were three shapes of that one hole —
+
+| surface | measured |
+|---|---|
+| record footer on the card it sits inside (dark) | **1.000** |
+| toolbar well on the shell's content card (**both** palettes) | **1.000** |
+| `--dot-building` bare on `--surface-panel` (dark) | **1.02** |
+
+— and not one of them could go red. This is the check that closes it:
+`foundations/tokens/check-contrast.mjs`, wired into `npm run check` as the
+last gate.
+
+**IT DERIVES EVERY PAIR. IT KEEPS NO LIST, AND THE ARGUMENT AGAINST LISTS IS
+THIS REPOSITORY'S OWN.** `GAPS-TRACK1.md` STA-2 recorded *"nothing in the kit
+consumes the six `--dot-*` tokens"* as the JUSTIFICATION for leaving those six
+values alone. It was true when it was written. It expired the day `Kanban`
+grew a column header, and nobody edited it, because nothing made them. A
+hand-kept register of "these must differ" would rot the same way and for the
+same reason.
+
+So the pairs come out of three things that cannot go stale without somebody
+editing code:
+
+- **the token values**, through `token-model.mjs` — which is
+  `build-tokens.mjs`'s own reader, lifted out so that both checks use it.
+  `--surface-record-footer` → `--surface-raised` → `--card` → `#26241F` is a
+  three-hop chain and the bug was only visible at the end of it; a check that
+  compared NAMES would have called that pair different and passed. **A second
+  resolver would have been a second opinion about what a token resolves to,
+  which is the same failure the law exists to catch, one level up.**
+- **the utility names**, out of tokens.css's own `@theme inline` bridge —
+  the same source `build-tokens.mjs`'s DEAD SELECTOR guard reads from the
+  other side.
+- **what sits on what**, out of the components — `ground-map.mjs`. The kit's
+  law is that a ground-painting element uses a NAMED utility class, so the
+  tree of those classes IS the answer. The walk crosses component boundaries
+  (a `<Card>` is its cva's fill, and a caller's `className` merges over it the
+  way tailwind-merge makes it), follows children through slots, reads class
+  TABLES (`COLUMN_DOT[dot]` — the shape that made bug three unreadable in the
+  first place), and breaks the chain at a portal, because an overlay does not
+  sit on the card its trigger happened to be in.
+
+**`demo/` IS IN SCOPE AND HAS TO BE.** `components/` says what each part
+paints; almost none of them say what they are placed ON. The book is the only
+place in this repository where several of them meet a ground at all.
+
+103 pairs, 206 measurements, 210 files, 7 809 component expansions.
+
+#### The tiers, and why not WCAG
+
+Four, because the kit draws four different things with colour and they have
+nothing in common: a word, a 7px dot, a card boundary, a hairline.
+
+| tier | floor | earned by |
+|---|---|---|
+| **ink** | **4.5** | the number this kit has spent two hexes on. `--kw-forest` moved to `#20955B` because 4.44 was *"under AA's 4.5 for the 12px badge label"*; `--kw-poppy-ink` was minted at 4.98/4.52 the same way. Its own ladder sits far above it — `--ink-tertiary`, the palest ink it writes a word in, is 6.51 light / 7.93 dark. |
+| **mark** | **1.5** | ruling 26 — *"the dot never speaks alone"* — so a dot beside a word is not text and 4.5 would be a category error. But a mark is TINY, and area is what makes a small step readable, so it needs MORE than a card's boundary. 1.5 is the smallest same-family separation this kit has ever defended in writing (the record footer's well, 1.499 / 1.587) applied as a floor to a shape a thousand times smaller. |
+| **boundary** | **1.05**, quiet at 1.10 | see below. |
+| **hairline** | **1.05** | ch13's subtitle is *"Colour separates, strokes don't"*, so a hairline that shouted would be the wrong fix. `--hair-faint` composites to 1.127; the one hairline bug this kit has had measured exactly 1.000. |
+
+**THE BOUNDARY FLOOR IS THE ONE WORTH ARGUING, AND IT IS DELIBERATELY LOWER
+THAN IT LOOKS.** Not 3:1 — WCAG's non-text threshold would fail almost every
+surface this kit ships, and the client has ruled on these exact numbers
+repeatedly (1.103/1.111 is override 77's answer for a selected row; 1.198 is
+last night's corrected footer). And **not 1.10 either**, which is the harder
+call: the kit's own page/panel alternation, which CH26.04 states as law,
+measures **1.079** in dark. *A law whose first act is to fail the foundation
+of the system it guards is a law that gets switched off within a week.* So the
+GATE is the invisibility line and nothing more, and **1.10 is kept as the
+QUIET line** — every boundary under it is printed with its number on every
+run, so the register grows and the client can rule on the band.
+
+**The bar that is not negotiable is that nothing may be INVISIBLE.** 1.000 is
+not a low-contrast surface, it is the same surface, and 1.02 is not a design
+position. Everything else in the file is a judgement a person may overturn
+with a reason; that one is arithmetic.
+
+#### Proved on the evidence, not on a clean tree
+
+**A law that passes on a FIXED tree tells you nothing, because green is also
+what a law that has stopped looking prints.** So the three bugs are kept in
+the check as fixtures, with the values `tokens.css` carried before the fix,
+and every run asserts the law calls each of them a failure — and, where a fix
+exists, that the corrected value now clears the floor:
+
+| fixture | pre-fix | today |
+|---|---|---|
+| `--surface-record-footer` on `--card`, dark | **1.000** | 1.198 |
+| `--surface-raised` on `--card`, light | **1.000** | **still open** |
+| `--surface-raised` on `--card`, dark | **1.000** | **still open** |
+| `--dot-building` on `--surface-panel`, dark | **1.019** | 17.056 |
+
+Those pre-fix figures are the check's own arithmetic, not transcriptions: the
+colour maths reproduces every number this CHANGELOG has ever published —
+1.198, 1.587, 17.386, 1.499, 17.06, 1.103, 1.111, 12.07, 4.61 — to three
+decimals. Soften a threshold, rename a tier, widen an exemption or drift the
+maths, and the fixtures go red before anything else does.
+
+#### A blindness tripwire, because silence and a clean bill of health look identical
+
+A resolver that has stopped matching reports "all clear" in the same words a
+passing check uses. That failure mode has cost this project two evenings
+already — STA-2's assumption expiring unnoticed, and `verify/out.css` going on
+resolving `--dot-building` to a colour the source had changed. So the
+derivation has to prove it is still looking, and it does it with **anchors**
+rather than a count, because a count can be met by any old rubbish while an
+anchor names a chain through named files:
+
+- `--card` on `--surface-panel` — proves component expansion and cva variants
+  still work; that pair is written in no single file.
+- `--dot-building` on `--card` — proves class TABLES are still read.
+- `--ink-on-record-footer` on `--surface-record-footer` — proves a caller's
+  `className` still wins over the component's own cva.
+
+Plus collapse floors on the census (files, components, expansions, pairs), set
+well under today's numbers: their job is to notice the walk has stopped
+working, not to freeze a count that legitimately moves.
+
+**Two exemptions, both rot-checked** — an exemption that matches nothing FAILS
+the check, so the list can only shrink and shrinking it takes a person
+deleting a line, exactly as `demo/check-book.mjs`'s `TOOLBAR_EXEMPT` works.
+They are `--ink-disabled` and its `--btn-disabled-label` sibling (tokens.css
+§3 states it in the declaration itself: *"disabled means disabled and nothing
+else, and disabled is exempt from contrast"*), and `--surface-selected` on the
+four papers it can equal — **RULED D15-B, register row 77**, where the client
+took the artifact's lift after seeing it drawn AND MEASURED in red. That one
+is exempt because it was ruled, not because it is fine.
+
+#### What it deliberately does not assert
+
+It does not say a low number is wrong; it says an invisible one is. It does
+not enter states it cannot reach — 564 `hover:` / `data-[state]` / breakpoint
+grounds are counted and printed, never measured. It does not assert
+co-occurrence it cannot prove: two conditional fills chosen inside ONE
+component are two props, and a `dot="shipped"` on a `variant="destructive"`
+badge is a product no call site writes, so 1 892 such pairs are declined and
+counted. It does not see a ground changed by a custom property (135 of them;
+`record-detail.tsx`'s footer grid rebinds `--card` with no class attached).
+And **it does not see the consuming app** — every pair here is one the KIT
+draws, and an app that composes two kit parts in a way the kit never does can
+still make an invisible one. That is exactly how bug two reached a screen. The
+answer is this same check running there, over the same tokens.
+
+#### THE CHECK ARRIVES RED, AND THAT IS THE POINT
+
+**11 pairs are below their tier's floor on today's tree and none of them has
+been touched.** A law that arrives with its own violations quietly patched is
+a law nobody can trust, so they are reported for triage rather than fixed in
+the pass that found them. The first of them is the third bug of last night,
+still live in the kit:
+
+| pair | palettes | measured | where |
+|---|---|---|---|
+| `--card` on `--surface-raised` | both | **1.000** | a `raised` card inside the shell's content region — `screen-shell.tsx`, `status-stepper.tsx:350/447` |
+| `--card` on `--popover` | both | **1.000** | a `raised` card inside a `Sheet` — `alert.tsx:157` |
+| `--background` on `--surface-raised` | light | **1.000** | `demo/sheets/*` inside the book's content card |
+| `--btn-secondary-fill` on `--background` | light | **1.000** | `demo/sheets/motion-sheet.tsx:551` |
+| `--surface-idle` on `--popover` / `--surface-raised` | light | **1.042** | `status-stepper.tsx:629`'s overflow tail |
+| `--ink-on-accent` on `--popover` / `--surface-raised` | dark | **1.132** | `status-stepper.tsx:578`'s number span |
+| `--foreground` on `--surface-brand` | dark | **1.440** | `demo/sheets/motion-sheet.tsx:504` — off-beige ink on mango, which does not flip |
+
+Three sit in the QUIET band and fail nothing: `--btn-primary-fill` on
+`--surface-quiet` (1.075 light), and the page/panel alternation at 1.079 dark,
+twice.
+
+#### One thing found on the way, and not by the law
+
+`foundations/tokens/tokens.json` was **stale in the repository** — it still
+carried `--surface-record-footer` dark as `#26241F` and no dark half for
+`--dot-building` at all, which is to say it still shipped both of last night's
+bugs. `npm run check` runs the generator with `--check`, which writes nothing,
+so nothing noticed. Regenerated here; the diff is two lines and both are the
+fix that already landed in `tokens.css`. **Flagged rather than treated as
+routine: a generated artifact that can disagree with its source and still pass
+the gate is the same shape of hole as the one this entry is about.**
+
 ### Fixed — two dark-palette colours that were not faint but absent
 
 The client, on a dark ticket screen: *"in dark mode cannot see the footer- fix

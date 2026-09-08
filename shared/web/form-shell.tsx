@@ -189,16 +189,33 @@
 // alone at the leading edge — "always left" and "always right", the two ends
 // of one row, rather than the two glued together at `gap-2`.
 //
-// THE HONEST FIX IS UPSTREAM, and it is one line: the kit Field's own label
-// header row (the `flex items-baseline gap-2` div that holds the Label and this
-// marker) wants `justify-between`, with `min-w-0` on the label and `shrink-0`
-// on the marker so a long label truncates instead of shoving it off the end.
-// (The path is deliberately not spelt out — `wrapped-strings.test.ts` bans that
-// substring from every file but the seam that imports it.) That
-// is a change to a VENDORED file, which is Aurora's to make in
-// Kwapso/kwapso-ui-ux and pull; until it lands the override below is the app
-// saying the same thing from outside, which is the only place the app is
-// allowed to say it.
+// ── AND THE KIT OWNS IT NOW, v1.2.69, VENDORED 2026-09-08 ──────────────────
+//
+// The paragraph that used to stand here said the honest fix was upstream and
+// was one line: the kit Field's own label header row wants `justify-between`,
+// with `min-w-0` on the label and `shrink-0` on the marker so a long label
+// truncates instead of shoving it off the end. (The path is deliberately not
+// spelt out — `wrapped-strings.test.ts` bans that substring from every file
+// but the seam that imports it.) That landed in design kit v1.2.69, in exactly
+// those three classes, and its CHANGELOG names this override as the thing to
+// delete. IT IS DELETED: the scrolling body div below no longer carries
+// `[&_[data-slot=field-required]]:order-last` or the `ms-auto` beside it, and
+// the app reaches into no kit slot for this any more.
+//
+// AND THE KIT'S VERSION IS STRICTLY BETTER, which is why this is not a lateral
+// move. `ms-auto` claimed the free space before the marker and did nothing
+// when there was none: a flex item refuses to shrink below its content width,
+// so a long label still shoved the marker off the end. `min-w-0` on the label
+// is the half the app could not say from outside without reaching a SECOND
+// slot, and it is what makes a long label truncate instead.
+//
+// THE TWO RULINGS ABOVE ARE KEPT, not deleted with the code they explain —
+// August's "required on the left total left" and its 7 Sep reversal, "title
+// always left, required always right". They are WHY the kit's row is shaped
+// the way it is, and a note that pretends they never happened is a note that
+// invites somebody to "fix" this back next month. What changed on 8 Sep is
+// only WHERE the sentence is said: in the component that draws the row,
+// instead of in a selector reaching it from outside.
 //
 // ── THE ✕ WAS A SECOND CANCEL, AND THE SUBTITLE WENT WITH IT, 2026-08-31 ────
 //
@@ -392,23 +409,17 @@ export function FormShell({
           `border-t` names no colour token and Tailwind resolves that to
           `currentColor` (ink), not the pale `--hair` every other hairline in
           the kit draws.
-          THE REQUIRED-MARKER OVERRIDE (same note, point 3, and its 2026-09-07
-          reversal): every `Field` in every form flows through this one div, so
-          the descendant selector reaches all of them from here rather than at
-          37 call sites. It targets the vendored kit's own stable
-          `data-slot="field-required"` and touches nothing else — the hand-edit
-          ban (`web/test/vendored-kit.test.ts`) is on `shared/ui/`'s own files,
-          never on a selector reaching them from outside.
-          `order-last` + `ms-auto` = label at the leading edge, marker at the
-          trailing one ("title always left, required always right"). This pair
-          was `order-first` + `me-auto` — the August ruling — and flipping the
-          two words is the whole of the fix. */}
-      <div
-        className={cn(
-          "overflow-y-auto overscroll-contain px-6 py-5 shadow-[var(--hairline-over)]",
-          "[&_[data-slot=field-required]]:order-last [&_[data-slot=field-required]]:ms-auto",
-        )}
-      >
+          THE REQUIRED-MARKER OVERRIDE IS GONE FROM THIS DIV (see "AND THE KIT
+          OWNS IT NOW" at the top of this file). It was a descendant selector
+          into the kit's own `data-slot="field-required"`, applied here because
+          every `Field` in every form flows through this one div and one
+          selector therefore reached all 37 callers. Design kit v1.2.69 puts
+          `justify-between` on the Field's own label row, so the marker is at
+          the trailing edge before this div sees it, and the div below is back
+          to the single class string it carried before the override — no
+          `cn()`, and no selector left reaching into a vendored component from
+          outside. */}
+      <div className="overflow-y-auto overscroll-contain px-6 py-5 shadow-[var(--hairline-over)]">
         <div className="flex flex-col gap-4">{children}</div>
       </div>
       {/* The bar's own top edge IS the hairline, nothing to collide with —
