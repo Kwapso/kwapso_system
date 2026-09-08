@@ -89,7 +89,13 @@ import {
   type TeamRefKind,
   type TeamRefKindName,
 } from "@shared/workers/refs"
+import { QUERY_MODULES } from "@shared/workers/query-grammar"
 import { TEAM_MIGRATIONS } from "../../workers/tenancy/src/team-schema"
+// THE ENGINE ITSELF, imported so this law can RUN it rather than read it — see
+// clause 6. `readWhere` is the one clause `runQuery` builds its rows, its exact
+// total and its grouped counts from, so a filter compiled here is the filter the
+// MCP `query_records` tool really executes.
+import { parseQuery, readWhere, type Fence } from "../../workers/tenancy/src/lib/query-engine"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, "..", "..")
@@ -336,20 +342,22 @@ describe("R55 — a stored reference is what the formula makes", () => {
       // `ref` (bare, table-qualified, or wrapped in the LOWER/COALESCE the doors
       // wrap it in) on a line that also says LIKE.
       //
-      // THREE THINGS IT DELIBERATELY DOES NOT CATCH, and the third is the honest
-      // boundary of this clause rather than an oversight:
+      // TWO THINGS IT DELIBERATELY DOES NOT CATCH:
       //   · an EQUALITY on a reference — that is a lookup, not a search box, and
       //     nobody types an old number into an internal join.
       //   · an identifier that merely CONTAINS the word (`ref.labelColumn`,
       //     `refAliasMatchSql`), which a bare `\bref\b` matches happily.
-      //   · THE GENERIC QUERY ENGINE (workers/tenancy/src/lib/query-engine.ts).
-      //     It builds `LOWER(${field.column}) LIKE ?` from a field TABLE, so the
-      //     column is a variable and no scan of this file's source can know that
-      //     `ref` is one of the values it takes. That surface — the MCP
-      //     `query_records` tool's `ref`/`reference` filter — genuinely does not
-      //     find an alias today. It is named here rather than left to be
-      //     rediscovered, and closing it means teaching the engine about aliases
-      //     per module, which is a change to the engine and not to a door.
+      //
+      // A THIRD used to be listed here, and it was a KNOWN GAP rather than an
+      // exclusion: the generic query engine builds `LOWER(<column>) LIKE ?` from
+      // a field TABLE, so the column is a variable and no scan of a source file
+      // can know that `ref` is one of the values it takes — which meant the MCP
+      // `query_records` filter genuinely did not find an alias, while the same
+      // string typed into the app's search box did. That surface is closed and
+      // this law now covers it, by a different means, two clauses down: the
+      // grammar DECLARES which fields have a past and the engine's own WHERE is
+      // RUN over a real backfilled database. The sentence is gone because it is
+      // no longer true, not because it stopped being worth saying.
       const REF_IN_A_LIKE =
         /(?:LOWER|COALESCE)\(\s*(?:COALESCE\()?\s*(?:\w+\.)?ref\b|(?<![\w.])(?:\w+\.)?ref\s+LIKE/
       const searches = [...code.matchAll(/^.*\bLIKE\b.*$/gm)].filter(
@@ -369,7 +377,92 @@ describe("R55 — a stored reference is what the formula makes", () => {
     ).toEqual([])
   })
 
-  // ── CLAUSE 5: the data, proved against a real database ────────────────────
+  // ── CLAUSE 5: the machine surface's own door, which has no SQL to scan ────
+  //
+  // Clause 4 reads doors. `query_records` is not a door of that kind: one engine
+  // serves sixteen modules and builds its predicate from `QUERY_MODULES`, so
+  // there is no hand-written `LOWER(ref) LIKE ?` anywhere to find. Until 8 Sep
+  // 2026 that difference was the gap — the clause above named it in its own
+  // comment and stopped there.
+  //
+  // The engine cannot have a door's `OR` bolted on, so the fact moved into the
+  // field table: a field says `renumbered` and the engine ORs in the SAME
+  // `refAliasMatchSql` seam with the module's own table. That makes the question
+  // this clause asks a DECLARATION question, and it is derived from the same
+  // oracle everything else here is derived from — `TEAM_REF_TABLES`, the map
+  // `tsc` refuses to let fall behind the kinds.
+  //
+  // IT FAILS BOTH WAYS, and the second half is the one a name-based rule would
+  // have got wrong. `tasks` has a `ref` column, a live unique index and 109 old
+  // `<account>-K####` strings, and 0068 deliberately left every one of them
+  // alone — a task mints no reference, so there was no kind to carry them to.
+  // A field there claiming a history would hang an EXISTS over a table holding
+  // nothing for it and tell a caller it had searched something it had not.
+  it("the generic query engine knows which of its fields have a past, and which do not", () => {
+    const kindTables = new Set(Object.values(TEAM_REF_TABLES))
+    const refFields: string[] = []
+    const declared: string[] = []
+    const missing: string[] = []
+    const overclaimed: string[] = []
+    const confused: string[] = []
+    for (const [name, mod] of Object.entries(QUERY_MODULES))
+      for (const f of mod.fields) {
+        // The COLUMN, not the field's published name: the grammar's whole point
+        // is that a model-facing name and a column are two different things, and
+        // this question is about the column the aliases were recorded against.
+        if (f.column !== "ref") continue
+        refFields.push(`${name}.${f.name}`)
+        const carriesAliases = kindTables.has(mod.table)
+        if (f.renumbered) declared.push(`${name}.${f.name}`)
+        if (carriesAliases && !f.renumbered) missing.push(`${name}.${f.name} → ${mod.table}`)
+        if (!carriesAliases && f.renumbered) overclaimed.push(`${name}.${f.name} → ${mod.table}`)
+        // A `ref` FIELD (one that points at another module) resolves its value
+        // against that module's NAME through a subquery of its own; an alias of
+        // THIS row is a different question and the engine refuses to mix them.
+        if (f.renumbered && f.ref) confused.push(`${name}.${f.name} → ${f.ref}`)
+      }
+
+    // THE BLINDNESS TRIPWIRE, and it needs BOTH sides: a census that found no
+    // reference fields at all, or one where every field fell on the same side of
+    // the question, would pass the three assertions below without measuring
+    // anything. Six modules publish a `ref` field; five carry aliases and
+    // `tasks` does not.
+    expect(
+      refFields.length,
+      "no queryable module publishes a `ref` field at all — either the grammar stopped exposing " +
+        "references (in which case delete this clause) or this scan has gone blind, and a blind " +
+        "scan makes every assertion below vacuous"
+    ).toBeGreaterThanOrEqual(5)
+    expect(declared, "not one queryable reference field declares a history").not.toEqual([])
+    expect(
+      refFields.filter((n) => !declared.includes(n)),
+      "every reference field now declares a history, so this census can no longer tell the two " +
+        "cases apart — `tasks` was the one that must NOT, and if it has gained a kind then " +
+        "REF_TABLES_WITHOUT_A_KIND has an entry to lose and this tripwire needs rewriting"
+    ).not.toEqual([])
+
+    expect(
+      missing,
+      "migration 0068 retired references on these tables into `ref_aliases`, and the query engine " +
+        "cannot see them: a number a client was quoted in an email finds the record through the " +
+        "app's own search box and comes back as 'no such record' through `query_records`, which is " +
+        "one question with two answers on two surfaces. Add `renumbered: true` to the field in " +
+        "shared/workers/query-grammar.ts"
+    ).toEqual([])
+    expect(
+      overclaimed,
+      "these declare a history their table does not have — 0068 wrote no alias row for them, so the " +
+        "engine would run an EXISTS against nothing and report that it had searched what a record " +
+        "used to be called. Drop `renumbered`, or give the table a kind"
+    ).toEqual([])
+    expect(
+      confused,
+      "a field cannot both point at another module and carry a history of its own: the first " +
+        "matches the REFERENCED record's name, the second matches what THIS row used to be called"
+    ).toEqual([])
+  })
+
+  // ── CLAUSE 6: the data, proved against a real database ────────────────────
   //
   // Everything above reads SOURCE. This runs the actual migration ledger into a
   // real SQLite handle — D1 *is* SQLite, the same thing the tenancy suites do —
@@ -536,6 +629,157 @@ describe("R55 — a stored reference is what the formula makes", () => {
         "a migration that rewrites identifiers is very close to irreversible, so running it twice — a " +
           "half-finished rollout, a re-run after a timeout — must be a no-op"
       ).toBe(first)
+    })
+
+    // ── AND THE GENERIC ENGINE FINDS WHAT THE BACKFILL RENAMED ──────────────
+    //
+    // The clause above proves the DECLARATION. This proves the BEHAVIOUR, and it
+    // has to: a type-check on a boolean flag says nothing about whether a row
+    // comes back. So the real migration ledger is replayed, the rows staging
+    // actually held are seeded and carried, a filter is parsed by the engine's
+    // own `parseQuery`, compiled by the engine's own `readWhere` — the ONE clause
+    // its rows, its exact total and its grouped counts are all built from — and
+    // executed against the real SQLite handle.
+    //
+    // `readWhere` is exported for exactly this. A law that read the engine's
+    // source instead would have been green on the day the engine was blind.
+    describe("the query engine's own WHERE, run over the carried data", () => {
+      const TICKETS = QUERY_MODULES.tickets
+      /** The engine's answer to one filter, as row ids. `fence` is what the
+       * caller's SECOND right leaves them — null when they hold it. */
+      function ask(
+        db: DatabaseSync,
+        where: unknown[],
+        fence: Fence = null
+      ): string[] {
+        const parsed = parseQuery(TICKETS, { where })
+        const clause = readWhere(TICKETS, parsed, QUERY_MODULES, fence)
+        const rows = db
+          .prepare(`SELECT t.id FROM ${TICKETS.table} t WHERE ${clause.sql} ORDER BY t.id`)
+          .all(...(clause.params as string[])) as { id: string }[]
+        return rows.map((r) => r.id)
+      }
+
+      function carried(): DatabaseSync {
+        const db = dbBeforeTheBackfill()
+        seed(db)
+        runBackfill(db)
+        return db
+      }
+
+      it("a filter carrying the number a client was QUOTED finds the record", () => {
+        const db = carried()
+        // H_CLASH is the row that lost its seat: it was `Beta-T0001` and the
+        // backfill reissued it as `T0101` (the older claimant kept 1). Its old
+        // string is the one most likely to be in somebody's inbox, and the one
+        // that used to come back as "no such record" on this surface alone.
+        expect(
+          db.prepare(`SELECT replaced_by FROM ${REF_ALIAS_TABLE} WHERE alias = ?`).get("Beta-T0001"),
+          "the fixture must really have retired that string, or the query below proves nothing"
+        ).toEqual({ replaced_by: "T0101" })
+
+        expect(ask(db, [{ field: "reference", op: "eq", value: "Beta-T0001" }])).toEqual(["H_CLASH"])
+        // The word the app's own prose uses, the field's own name, and a
+        // SUBSTRING of the retired string — the shape a search box sends.
+        expect(ask(db, [{ field: "ref", op: "eq", value: "beta-t0001" }])).toEqual(["H_CLASH"])
+        expect(ask(db, [{ field: "ref", op: "contains", value: "Beta-" }])).toEqual(["H_CLASH"])
+        // THE CONTROL: the number it wears NOW still answers, and a string
+        // nobody ever wore still does not.
+        expect(ask(db, [{ field: "ref", op: "eq", value: "T0101" }])).toEqual(["H_CLASH"])
+        expect(ask(db, [{ field: "ref", op: "eq", value: "Gamma-T0001" }])).toEqual([])
+      })
+
+      it("…and every kind the backfill touched, not just the one read by name", () => {
+        const db = carried()
+        const aliases = db
+          .prepare(`SELECT entity_table, alias, row_id FROM ${REF_ALIAS_TABLE} ORDER BY alias`)
+          .all() as { entity_table: string; alias: string; row_id: string }[]
+        expect(aliases.length, "nine retired strings, across four tables").toBe(9)
+        // Every module in the grammar that publishes a renumbered field, asked
+        // for every string the backfill retired on ITS table. Derived from the
+        // data rather than listed, so a kind added tomorrow is covered here the
+        // moment its migration writes an alias row.
+        let asked = 0
+        for (const [, mod] of Object.entries(QUERY_MODULES)) {
+          const field = mod.fields.find((f) => f.renumbered)
+          if (!field) continue
+          for (const a of aliases.filter((x) => x.entity_table === mod.table)) {
+            const parsed = parseQuery(mod, { where: [{ field: field.name, op: "eq", value: a.alias }] })
+            const clause = readWhere(mod, parsed, QUERY_MODULES, null)
+            const rows = db
+              .prepare(`SELECT t.id FROM ${mod.table} t WHERE ${clause.sql}`)
+              .all(...(clause.params as string[])) as { id: string }[]
+            expect(
+              rows.map((r) => r.id),
+              `${mod.table}: the string "${a.alias}" no longer finds the record it was retired from`
+            ).toEqual([a.row_id])
+            asked++
+          }
+        }
+        expect(asked, "the loop asked nothing — every renumbered module lost its aliases").toBe(9)
+      })
+
+      it("THE FENCE STILL DECIDES: an old number reaches no row a live one would not", () => {
+        const db = carried()
+        // The caller's own clause is BRACKETED before either subtraction is
+        // ANDed on (`readWhere`), so the alias `OR` widens which rows answer the
+        // QUESTION and never which rows the caller may see. Proved with the two
+        // subtractions the engine has, on the same row, with the same filter —
+        // the only thing that changes between a hit and a miss is the fence.
+        const found = [{ field: "reference", op: "eq", value: "Beta-T0001" }]
+        expect(ask(db, found), "the positive control: unfenced, the row comes back").toEqual([
+          "H_CLASH",
+        ])
+
+        // 1 · THE SECOND RIGHT. H_CLASH belongs to account A2; a caller narrowed
+        // to A1 must not reach it by the number it used to have, exactly as they
+        // cannot by the number it has now.
+        expect(ask(db, found, { column: "account_id", value: "A1" })).toEqual([])
+        expect(ask(db, [{ field: "ref", op: "eq", value: "T0101" }], { column: "account_id", value: "A1" })).toEqual([])
+        expect(
+          ask(db, found, { column: "account_id", value: "A2" }),
+          "and their OWN side of the fence is unaffected — a fence that refused everybody would " +
+            "pass the two assertions above and be a broken door rather than a fence"
+        ).toEqual(["H_CLASH"])
+
+        // 2 · WHAT THE MODULE NO LONGER ANSWERS ABOUT AT ALL, which has no escape
+        // even for a caller who names it. A requirements ticket has LEFT the
+        // tickets collection everywhere a person is answered; an alias must not
+        // be a way back in.
+        db.exec(`UPDATE help SET help_type = 'Requirements' WHERE id = 'H_CLASH';`)
+        expect(ask(db, found)).toEqual([])
+        expect(ask(db, [{ field: "ref", op: "eq", value: "T0101" }])).toEqual([])
+      })
+
+      it("a table the backfill left alone is not searched as though it had a history", () => {
+        // `tasks` holds old `<account>-K####` strings that 0068 deliberately did
+        // not carry, so `ref_aliases` has nothing for it. The engine must ask
+        // the column and nothing else — and the proof is that a row planted in
+        // the alias table under that name changes no answer.
+        const db = carried()
+        db.exec(`
+          INSERT INTO tasks (id, ref, title, status, created_at)
+            VALUES ('K1', 'K0009', 'Renew the domain', 'open', '2026-05-01T00:00:00.000Z');
+          INSERT INTO ${REF_ALIAS_TABLE} (entity_table, alias, row_id, kind, replaced_by, retired_at, source)
+            VALUES ('tasks', 'Kwapso-K0009', 'K1', 'K', 'K0009', '2026-09-07T00:00:00.000Z', 'a hand');
+        `)
+        const tasks = QUERY_MODULES.tasks
+        const idsFor = (value: string): string[] => {
+          const parsed = parseQuery(tasks, { where: [{ field: "ref", op: "eq", value }] })
+          const clause = readWhere(tasks, parsed, QUERY_MODULES, null)
+          return (
+            db
+              .prepare(`SELECT t.id FROM ${tasks.table} t WHERE ${clause.sql}`)
+              .all(...(clause.params as string[])) as { id: string }[]
+          ).map((r) => r.id)
+        }
+        expect(idsFor("K0009"), "the control: the task is really there").toEqual(["K1"])
+        expect(
+          idsFor("Kwapso-K0009"),
+          "the engine consulted the alias table for a field that declares no history — the flag " +
+            "is not what decides, and a column NAME is"
+        ).toEqual([])
+      })
     })
 
     it("is a no-op on a newborn team, which replays the whole ledger", () => {

@@ -130,7 +130,67 @@ export type QueryField = {
    * caller the rows underneath it. Filtering and grouping are untouched — a
    * `contains` on a bulky field works exactly as it does on any other. */
   bulky?: boolean
+  /** THIS FIELD'S VALUES HAVE A PAST, AND A FILTER ON IT SEARCHES THAT TOO.
+   *
+   * Migration `0068_the_reference_keeps_its_old_name` rewrote 2,317 stored
+   * references from the old account-coded shape (`VU Solutions-T1183`) to the
+   * team-wide one (`T1183`), and kept every retired string in `ref_aliases` on
+   * the client's own ruling — "alias yes" — precisely so a number she quoted in
+   * an email last year still lands on the record. Five hand-written doors were
+   * wired to that table through one seam (`refAliasMatchSql`, shared/workers/
+   * refs.ts) and R55 holds them to it.
+   *
+   * THIS DOOR WAS NOT, and could not be by the same means: the engine builds
+   * `LOWER(<column>) LIKE ?` out of THIS table, so the column is a variable and
+   * the seam has nowhere to be spelled. The consequence was concrete and was
+   * exactly the two-surface disagreement R9 exists to prevent — the same string,
+   * typed into the app's own search box, found the ticket; handed to
+   * `query_records` by the assistant or by an outside MCP client, it answered
+   * "no such record", and `unmatched` said so out loud in the reply.
+   *
+   * ── WHY A FLAG ON THE FIELD, AND WHAT WAS REJECTED ────────────────────────
+   *
+   * REJECTED: special-casing the name `ref` inside the engine. It reads as the
+   * smallest change and it is wrong twice over. It puts the fact "a reference
+   * has a history" in a second place — the engine — where the whole design says
+   * a column is a fact of this table; and it is not even TRUE of every `ref`.
+   * `tasks` has a `ref` column, a live unique index and 109 old `<account>-K####`
+   * strings, and migration 0068 deliberately left every one of them alone
+   * (a task mints no reference at all, so there was no kind to carry them to —
+   * `REF_TABLES_WITHOUT_A_KIND` in shared/rules/registry.ts is where that
+   * decision is written down). A name-based special case would hang an `EXISTS`
+   * over a history that cannot exist and quietly claim to search it.
+   *
+   * REJECTED: a general "this field has a history" notion — a per-field pointer
+   * at some table of retired values, with a column pair to join on. It is the
+   * shape a second user would want, and there is no second user: a sweep of all
+   * sixty-nine team tables finds exactly one that remembers what a value used to
+   * be, and it is `ref_aliases`. A generic mechanism with one implementation is
+   * not generality, it is an indirection that has to be read twice — and it
+   * would take the one thing the seam gives us for free, that `refAliasMatchSql`
+   * is the ONE spelling of this join anywhere in the estate, and hand it back.
+   * If a second kind of history ever lands, this flag becomes its `type` and the
+   * argument is on the record for whoever does it.
+   *
+   * TAKEN: the field says it, and NOTHING SAYS IT TWICE — the flag names no
+   * table, no column and no join. It means "this row's retired references are in
+   * `ref_aliases` under this module's own `table`", so the engine asks the same
+   * seam the five doors ask, with the module's table and the row it is already
+   * looking at. It is `narrow`'s shape one level down: a per-module fact the
+   * generic engine cannot infer, DECLARED beside the module and then
+   * derived-CHECKED so it cannot be forgotten. R55 reads `TEAM_REF_TABLES` and
+   * requires this flag on the `ref` field of every module whose table is a kind's
+   * table, and forbids it everywhere else — so `tasks` may not grow one, and a
+   * table that gains a kind tomorrow turns the build red until it does. */
+  renumbered?: boolean
 }
+
+/** WHAT `describe_module` SAYS ABOUT A RENUMBERED FIELD, in one place rather
+ * than hand-written onto five identical fields. A caller who is not told this
+ * will read a hit on an old number as a record that was never renamed — and,
+ * worse, will not know to try one. */
+export const RENUMBERED_NOTE =
+  "the numbers on these records changed shape once, and the old one still finds the record — filter by whichever number you were given, including one quoted in an old email"
 
 export type QueryModule = {
   /** the team-database table — the ONLY place a table name comes from. */
@@ -353,7 +413,19 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     },
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", identity: true, note: "the human reference, e.g. TIC-0000042" },
+      // `note` said "e.g. TIC-0000042" until 8 Sep 2026, which was the shape
+      // before the 2026-08-31 ruling and had not been minted for a week — a
+      // small instance of the exact fault R55 exists for, in prose a model
+      // reads. A ticket's reference is `T1183`, and the string it used to wear
+      // still finds it (see `renumbered`).
+      {
+        name: "ref",
+        column: "ref",
+        type: "text",
+        identity: true,
+        renumbered: true,
+        note: "the human reference, e.g. T1183",
+      },
       { name: "title", column: "title_en", type: "text" },
       { name: "description", column: "description", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: HELP_STATUSES },
@@ -391,7 +463,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", identity: true },
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: STORY_STATUSES },
@@ -418,7 +490,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "startsOn",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", identity: true },
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "name", column: "name", type: "text" },
       { name: "sprintType", column: "sprint_type", type: "enum", vocabulary: "Sprint type" },
       { name: "goal", column: "goal", type: "text", bulky: true },
@@ -481,6 +553,14 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     },
     fields: [
       ID,
+      // NOT `renumbered`, and it is the one `ref` field here that is not.
+      // Migration 0068 deliberately left `tasks` alone — a task mints no
+      // reference at all, so there was no kind to carry its 109 old
+      // `<account>-K####` strings to, and `ref_aliases` holds not one row for
+      // this table. A flag here would hang an EXISTS over a history that does
+      // not exist. R55 enforces the distinction off `TEAM_REF_TABLES` rather
+      // than off this comment: the day `tasks` gains a kind, the build goes red
+      // until this line grows the flag.
       { name: "ref", column: "ref", type: "text", identity: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
@@ -506,7 +586,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "createdAt",
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", identity: true },
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "title", column: "title", type: "text" },
       { name: "detail", column: "detail", type: "text", bulky: true },
       { name: "dueOn", column: "due_on", type: "date" },
@@ -549,7 +629,7 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     staleCheck: { refField: "accountId", textFields: ["title", "agenda", "notes", "guests"] },
     fields: [
       ID,
-      { name: "ref", column: "ref", type: "text", identity: true },
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "title", column: "title", type: "text" },
       { name: "agenda", column: "agenda", type: "text", bulky: true },
       { name: "notes", column: "notes", type: "text", bulky: true },

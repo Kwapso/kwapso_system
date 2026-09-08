@@ -43,6 +43,7 @@ import {
   MODULE_ALIASES,
   QUERY_MODULES,
   queryField,
+  RENUMBERED_NOTE,
   suggestModule,
 } from "@shared/workers/query-grammar"
 import { GROUP_CAP, MAX_CLAUSES, VALUES_PER_CLAUSE } from "../src/lib/query-engine"
@@ -1163,5 +1164,290 @@ describe("staleCheck: a client-scoped read says when more may exist, unlinked", 
     // function over, read through a new door.
     expect(body.total).toBe(0)
     expect(body.unlinked).toBeUndefined()
+  })
+})
+
+describe("R55: a filter that finds the new number finds the OLD one", () => {
+  // THE GAP THIS CLOSES, and it was left open in writing rather than by
+  // accident. Migration 0068 carried 2,317 stored references from the old
+  // account-coded shape (`VU Solutions-T1183`) to the team-wide one (`T1183`)
+  // and kept every retired string in `ref_aliases`, on the client's own ruling —
+  // "alias yes" — so a number she quoted in an email last year still lands on
+  // the record. Five hand-written search doors were wired to that table through
+  // one seam and R55 holds them to it. THIS door was not: it builds its
+  // predicate from a field TABLE, so `refAliasMatchSql` had nowhere to be
+  // spelled, and R55's own header named the engine as the honest boundary of
+  // its fourth clause.
+  //
+  // What that cost, concretely: the same string typed into the app's search box
+  // found the ticket, and handed to `query_records` — by the agency's own
+  // assistant, or by any outside MCP client — came back as "no such record",
+  // with `unmatched` saying so out loud. Two surfaces, one question, two
+  // answers, which is exactly what R9 and the interface-parity discipline exist
+  // to prevent.
+  //
+  // THE FIXTURE IS WHAT 0068 LEAVES BEHIND, not an invention: two of the book's
+  // tickets are carried to the team-wide shape and their old strings recorded,
+  // in the same columns and with the same `source` stamp the migration writes.
+  // The two strings are real ones off staging — `196+ awards-` has a plus and a
+  // space in it, which is why nothing anywhere parses the PREFIX of a reference.
+  const OLD_OPEN = "VU Solutions-T1183" // T2 — Flu Clinic, open
+  const OLD_DONE = "196+ awards-T2912" // T10 — HORSt, resolved in August
+  const RETIRED = (table: string, alias: string, rowId: string, replacedBy: string) =>
+    `INSERT INTO ref_aliases (entity_table, alias, row_id, kind, replaced_by, retired_at, source)
+       VALUES ('${table}', '${alias}', '${rowId}', 'T', '${replacedBy}', '2026-09-07T00:00:00.000Z',
+               '0068_the_reference_keeps_its_old_name');`
+
+  beforeEach(() => {
+    db().exec(`
+      UPDATE help SET ref = 'T1183' WHERE id = 'T2';
+      UPDATE help SET ref = 'T2912' WHERE id = 'T10';
+      ${RETIRED("help", OLD_OPEN, "T2", "T1183")}
+      ${RETIRED("help", OLD_DONE, "T10", "T2912")}
+    `)
+  })
+
+  it("THE FIXTURE: the rows really wear the new number and really remember the old", () => {
+    expect(db().prepare("SELECT ref FROM help WHERE id = 'T2'").get()).toEqual({ ref: "T1183" })
+    expect(
+      db().prepare("SELECT COUNT(*) AS n FROM ref_aliases WHERE entity_table = 'help'").get(),
+      "an alias-blind engine passing over an empty alias table proves nothing"
+    ).toEqual({ n: 2 })
+  })
+
+  it("an exact lookup by the number the client was quoted finds the ticket", async () => {
+    const { status, body } = await ask(
+      q({ module: "tickets", where: [{ field: "reference", op: "eq", value: OLD_OPEN }] })
+    )
+    expect(status).toBe(200)
+    expect(body.total).toBe(1)
+    expect((body.records as { id: string }[])[0].id).toBe("T2")
+    // AND THE ANSWER DOES NOT CONTRADICT ITSELF. `unmatched` is an oracle about
+    // EXISTENCE and the tool's description tells the model it MUST repeat it —
+    // so an engine that found the row and then reported the value as naming
+    // nothing would print "there is no ticket called VU Solutions-T1183"
+    // directly above the ticket.
+    expect(body.unmatched, "the row came back; the reply must not deny it exists").toBeUndefined()
+  })
+
+  it("…and the record answers with the number it wears NOW, which is what to quote back", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: OLD_OPEN }], fields: ["ref"] })
+    )
+    expect((body.records as { ref: string }[])[0].ref).toBe("T1183")
+  })
+
+  it("the CURRENT number still works, which is the control that nothing was traded away", async () => {
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: "T1183" }], countOnly: true })
+    )
+    expect(body.total).toBe(1)
+    expect(body.unmatched).toBeUndefined()
+  })
+
+  it("case does not decide it, exactly as it does not for a live reference", async () => {
+    for (const spelling of [OLD_OPEN, OLD_OPEN.toLowerCase(), OLD_OPEN.toUpperCase()]) {
+      const { body } = await ask(
+        q({ module: "tickets", where: [{ field: "ref", op: "eq", value: spelling }], countOnly: true })
+      )
+      expect(body.total, spelling).toBe(1)
+    }
+  })
+
+  it("a substring of the old number finds it too — that IS the app's search box", async () => {
+    // The ticket door's own `q` is `description OR ref OR title OR the alias`
+    // (searchClause, workers/content/src/lib/help.ts). A multi-field `contains`
+    // here is that same box, expressed in the grammar — so the two surfaces have
+    // to agree about it, not merely about an exact lookup.
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: ["ref", "title", "description"], op: "contains", value: "VU Solutions" }],
+      })
+    )
+    expect(body.total).toBe(1)
+    expect((body.records as { id: string }[])[0].id).toBe("T2")
+  })
+
+  it("the count and the page are the same collection — one clause, four reads", async () => {
+    // BOTH needles are RETIRED strings, so a count that forgot the alias would
+    // come back 0 beside a page of two. This door is asked "how many" far more
+    // often than it is asked for a page, and R16's whole sentence is that the
+    // number describes the SAME collection the rows do — which is bought here by
+    // the alias riding the one clause all four reads are built from, rather than
+    // being added beside the rows.
+    const where = [{ field: "ref", op: "contains", value: ["VU Solutions", "196+ awards"] }]
+    const rows = await ask(q({ module: "tickets", where }))
+    const count = await ask(q({ module: "tickets", where, countOnly: true }))
+    expect((rows.body.records as { id: string }[]).map((r) => r.id).sort()).toEqual(["T10", "T2"])
+    expect(count.body.total, "the total is built from the same WHERE as the rows").toBe(2)
+    expect(rows.body.total).toBe(2)
+    // …and the GROUPED read too, which is a third statement off the same clause.
+    const grouped = await ask(q({ module: "tickets", where, groupBy: ["accountId"] }))
+    expect(
+      (grouped.body.groups as { count: number }[]).reduce((n, g) => n + g.count, 0),
+      "a grouped tally that forgot the alias would disagree with its own total"
+    ).toBe(2)
+  })
+
+  it("`in` takes a mix of old and new numbers, and `notIn` subtracts the history too", async () => {
+    const both = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "ref", op: "in", value: [OLD_OPEN, "T2912"] }],
+        countOnly: true,
+      })
+    )
+    expect(both.body.total).toBe(2)
+    // "Everything except the one I was quoted" must exclude the row that used to
+    // wear that string — or the one record the caller named by its old number is
+    // the one record they get back.
+    const without = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "notIn", value: [OLD_OPEN] }], fields: ["id"] })
+    )
+    expect((without.body.records as { id: string }[]).map((r) => r.id)).not.toContain("T2")
+    expect(without.body.total).toBe(12)
+  })
+
+  it("a partial old number is not called unmatched, and a made-up one still is", async () => {
+    // The existence oracle has to know everything the predicate knows, on the
+    // SUBSTRING path as well as the exact one — otherwise a search box question
+    // comes back with the row and a correction denying it.
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "ref", op: "contains", value: ["VU Solutions", "Wanderlust"] }],
+      })
+    )
+    expect(body.total).toBe(1)
+    expect(body.unmatched).toEqual([{ field: "ref", values: ["Wanderlust"] }])
+  })
+
+  it("a number nobody has ever worn is still reported as naming nothing", async () => {
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "ref", op: "eq", value: "Wanderlust-T0001" }],
+        countOnly: true,
+      })
+    )
+    expect(body.total).toBe(0)
+    expect(body.unmatched, "the alias lookup must not turn every miss into a hit").toEqual([
+      { field: "ref", values: ["Wanderlust-T0001"] },
+    ])
+  })
+
+  /* ------------------------- and it stays inside the fence ------------------ */
+
+  it("a row the module has STOPPED ANSWERING ABOUT is not reachable by its old number", async () => {
+    // `withheld` is the one subtraction with NO escape (query-grammar.ts): a
+    // requirements ticket is kept for a migration into another database and has
+    // LEFT the tickets collection everywhere a person is answered. The alias
+    // widens which rows answer the CALLER'S question; it must not widen which
+    // rows the module answers about at all. Both wrappers bracket the caller's
+    // clause before ANDing their own term on, which is what makes that true by
+    // construction rather than by remembering.
+    db().exec(`UPDATE help SET help_type = 'Requirements' WHERE id = 'T2';`)
+    const { body } = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: OLD_OPEN }], countOnly: true })
+    )
+    expect(body.total, "an alias is not a way around the withheld clause").toBe(0)
+  })
+
+  it("a PUT-AWAY row keeps its default: not on the list, and reachable when asked for", async () => {
+    db().exec(`UPDATE help SET archived_at = '2026-08-20T00:00:00.000Z' WHERE id = 'T2';`)
+    const everyday = await ask(
+      q({ module: "tickets", where: [{ field: "ref", op: "eq", value: OLD_OPEN }], countOnly: true })
+    )
+    expect(everyday.body.total, "the everyday list is still `archived_at IS NULL`").toBe(0)
+    const asked = await ask(
+      q({
+        module: "tickets",
+        where: [
+          { field: "ref", op: "eq", value: OLD_OPEN },
+          { field: "archivedAt", op: "notNull" },
+        ],
+        countOnly: true,
+      })
+    )
+    expect(asked.body.total, "and a caller who names the field is answered exactly as asked").toBe(1)
+  })
+
+  it("an alias belonging to ANOTHER collection is not this collection's", async () => {
+    db().exec(RETIRED("stories", "VU Solutions-B0007", "T2", "B0007"))
+    const { body } = await ask(
+      q({
+        module: "tickets",
+        where: [{ field: "ref", op: "eq", value: "VU Solutions-B0007" }],
+        countOnly: true,
+      })
+    )
+    expect(body.total, "the seam keys on (entity_table, row_id), not on row_id alone").toBe(0)
+  })
+
+  it("a module that was NEVER renumbered does not consult the table — the flag decides, not the column name", async () => {
+    // `tasks` has a `ref` column, a live unique index and old `<account>-K####`
+    // strings, and migration 0068 deliberately left every one of them alone: a
+    // task mints no reference, so there was no kind to carry them to
+    // (`REF_TABLES_WITHOUT_A_KIND` in the registry is where that is written
+    // down). So a `ref` alias planted against `tasks` must find nothing — an
+    // engine that keyed off the column NAME instead of the declared flag would
+    // pass every other test here and fail this one.
+    db().exec(`
+      INSERT INTO tasks (id, ref, title, assignee_id, status, created_at)
+        VALUES ('K1', 'K0009', 'Renew the domain', '${IDS.staffUser}', 'open', '2026-05-01T00:00:00.000Z');
+      ${RETIRED("tasks", "Kwapso-K0009", "K1", "K0009")}
+    `)
+    const live = await ask(
+      q({ module: "tasks", where: [{ field: "ref", op: "eq", value: "K0009" }], countOnly: true })
+    )
+    expect(live.body.total, "the control: the task is really there and really visible").toBe(1)
+    const old = await ask(
+      q({ module: "tasks", where: [{ field: "ref", op: "eq", value: "Kwapso-K0009" }], countOnly: true })
+    )
+    expect(old.body.total).toBe(0)
+    expect(old.body.unmatched, "and it says so honestly rather than answering a bare zero").toEqual([
+      { field: "ref", values: ["Kwapso-K0009"] },
+    ])
+  })
+
+  it("TRIPWIRE: no renumbered module is fenced by a SECOND right — the day one is, prove it here", () => {
+    // The alias reaches the caller in two places and both are fenced the same
+    // way: the PREDICATE inherits `readWhere`'s brackets (proved by the withheld
+    // and put-away cases above), and the `unmatched` LOOKUP carries `fenceOn`,
+    // the one function all three lookups in the engine share — qualified with the
+    // table alias because that statement joins.
+    //
+    // That second fence cannot be exercised today, and saying so is better than
+    // implying otherwise: `narrow` exists on exactly two modules (`accounts` and
+    // `tasks`) and neither of them has a renumbered field. So this asserts the
+    // fact the gap rests on. When a renumbered module gains a second switch —
+    // or a narrowed module gains a reference — this goes red, and the honest
+    // answer is a behavioural test that a caller outside the fence is not told
+    // that a row exists just because it once had another number.
+    const both = Object.entries(QUERY_MODULES).filter(
+      ([, mod]) => mod.narrow && mod.fields.some((f) => f.renumbered)
+    )
+    expect(
+      both.map(([name]) => name),
+      "a module is now BOTH renumbered and narrowed by a second right. The alias lookup in " +
+        "findUnmatched fences through fenceOn(fenceFor, mod, 'm.') — prove behaviourally that a " +
+        "caller outside that fence gets `unmatched` for a retired number, exactly as they do for " +
+        "the live one, then replace this tripwire with that test."
+    ).toEqual([])
+  })
+
+  it("describe_module says the field has a past, so a caller knows to try the number they were given", async () => {
+    const request = new Request("https://tenancy/api/tenancy/query/describe?module=tickets", {
+      headers: { Cookie: "session=x" },
+    })
+    const res = await worker.fetch(request, makeEnv(() => holder.db as DatabaseSync, IDS.staffUser))
+    const body = (await res.json()) as { fields: { name: string; alsoFinds?: string }[] }
+    const ref = body.fields.find((f) => f.name === "ref")
+    expect(ref?.alsoFinds, "an undocumented capability is one the model never uses").toBe(RENUMBERED_NOTE)
+    expect(
+      body.fields.find((f) => f.name === "title")?.alsoFinds,
+      "and only the field it is true of"
+    ).toBeUndefined()
   })
 })
