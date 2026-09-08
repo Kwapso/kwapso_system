@@ -110,44 +110,44 @@ const minutesField = {
   ...defaultFieldConfig,
   label: "Minutes it takes, each time",
   required: true,
-  hint: "The time you agreed with them, not a measurement.",
+  helpText: "The time you agreed with them, not a measurement.",
 }
 const runsField = { ...defaultFieldConfig, label: "How often it happens", required: true }
 const roleField = {
   ...defaultFieldConfig,
   label: "Role",
   required: false,
-  hint: "Who does it. The role's hourly cost is what turns these minutes into money.",
+  helpText: "Who does it. The role's hourly cost is what turns these minutes into money.",
 }
 const toolField = {
   ...defaultFieldConfig,
   label: "Tool",
   required: false,
-  hint: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
+  helpText: "One. A step done in two systems has a handoff in the middle of it, and that is two steps.",
 }
 const shapeField = {
   ...defaultFieldConfig,
   label: "Where does this step sit?",
   required: false,
-  hint: "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.",
+  helpText: "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.",
 }
 const armField = {
   ...defaultFieldConfig,
   label: "It carries on from",
   required: false,
-  hint: "The side of the split this step continues. It hangs under that one instead of joining the two back together.",
+  helpText: "The side of the split this step continues. It hangs under that one instead of joining the two back together.",
 }
 const insteadField = {
   ...defaultFieldConfig,
   label: "It is an alternative to",
   required: false,
-  hint: "The step this one happens INSTEAD of. The two sit side by side in the picture.",
+  helpText: "The step this one happens INSTEAD of. The two sit side by side in the picture.",
 }
 const branchField = {
   ...defaultFieldConfig,
   label: "This way is taken when",
   required: false,
-  hint: "The words that decide it — written the way somebody would say it out loud.",
+  helpText: "The words that decide it — written the way somebody would say it out loud.",
 }
 const loopField = { ...defaultFieldConfig, label: "Sends the work back to", required: false }
 

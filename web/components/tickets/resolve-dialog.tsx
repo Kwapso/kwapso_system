@@ -34,7 +34,7 @@ const resolutionField = {
   ...defaultFieldConfig,
   label: "What we're telling them",
   required: true,
-  hint: "This is emailed to the client and added to the conversation.",
+  helpText: "This is emailed to the client and added to the conversation.",
 }
 
 export function ResolveDialog({

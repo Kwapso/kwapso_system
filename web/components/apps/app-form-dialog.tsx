@@ -89,52 +89,52 @@ const accountField = {
   ...defaultFieldConfig,
   label: "Whose system it is",
   required: false,
-  hint: "Set once. Leave it blank for one of our own.",
+  helpText: "Set once. Leave it blank for one of our own.",
 }
-const stageField = { ...defaultFieldConfig, label: "Stage", required: false, hint: "Where it has got to." }
+const stageField = { ...defaultFieldConfig, label: "Stage", required: false, helpText: "Where it has got to." }
 const logoField = {
   ...defaultFieldConfig,
   label: "Logo",
   required: false,
-  hint: "The client's own mark. Without one the tile shows the stage.",
+  helpText: "The client's own mark. Without one the tile shows the stage.",
 }
-const aboutField = { ...defaultFieldConfig, label: "About", required: false, hint: "What this system is, in a sentence or two." }
+const aboutField = { ...defaultFieldConfig, label: "About", required: false, helpText: "What this system is, in a sentence or two." }
 const contextField = {
   ...defaultFieldConfig,
   label: "Client context",
   required: false,
-  hint: "The situation it was built into.",
+  helpText: "The situation it was built into.",
 }
-const solutionField = { ...defaultFieldConfig, label: "Solution", required: false, hint: "What we did about it." }
+const solutionField = { ...defaultFieldConfig, label: "Solution", required: false, helpText: "What we did about it." }
 const actorsField = {
   ...defaultFieldConfig,
   label: "Key actors",
   required: false,
-  hint: "Who actually uses it, in their words.",
+  helpText: "Who actually uses it, in their words.",
 }
 const staffField = {
   ...defaultFieldConfig,
   label: "Who is on it",
   required: false,
-  hint: "Our team. Only they and an admin open this app's page.",
+  helpText: "Our team. Only they and an admin open this app's page.",
 }
 const leadField = {
   ...defaultFieldConfig,
   label: "Team lead",
   required: false,
-  hint: "The one who marks work on this app done.",
+  helpText: "The one who marks work on this app done.",
 }
 const stakeholderField = {
   ...defaultFieldConfig,
   label: "Their contacts",
   required: false,
-  hint: "The client's own contacts for this system.",
+  helpText: "The client's own contacts for this system.",
 }
 const mainStakeholderField = {
   ...defaultFieldConfig,
   label: "Main stakeholder",
   required: false,
-  hint: "Who hears back when a ticket on this app is answered.",
+  helpText: "Who hears back when a ticket on this app is answered.",
 }
 
 /** The word for nobody. A Select cannot hold an empty string as a value, so the

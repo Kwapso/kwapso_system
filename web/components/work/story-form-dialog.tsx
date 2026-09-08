@@ -107,32 +107,32 @@ const typeField = {
   ...defaultFieldConfig,
   label: "Type",
   required: true,
-  hint: "Editable on the Dropdown values screen.",
+  helpText: "Editable on the Choices screen.",
 }
 const detailField = { ...defaultFieldConfig, label: "Detail", required: false }
 const sprintField = {
   ...defaultFieldConfig,
   label: "Sprint",
   required: false,
-  hint: "Blocks on this app that are still running or still to come.",
+  helpText: "Blocks on this app that are still running or still to come.",
 }
 const ticketField = {
   ...defaultFieldConfig,
   label: "Tickets",
   required: false,
-  hint: "Open requests on this app. Most work stands on its own.",
+  helpText: "Open requests on this app. Most work stands on its own.",
 }
 const processField = {
   ...defaultFieldConfig,
   label: "Processes",
   required: true,
-  hint: "Every way of working this changes, or tick that it changes none.",
+  helpText: "Every way of working this changes, or tick that it changes none.",
 }
 const fileField = {
   ...defaultFieldConfig,
   label: "Something to show",
   required: false,
-  hint: "A recording, a page, a document somebody can open.",
+  helpText: "A recording, a page, a document somebody can open.",
 }
 const assigneeField = { ...defaultFieldConfig, label: "Who's doing it", required: false }
 

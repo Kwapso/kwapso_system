@@ -57,19 +57,19 @@ const noteField = {
   ...defaultFieldConfig,
   label: "What you did",
   required: true,
-  hint: "A line or two. It is what the reviewer reads before they look.",
+  helpText: "A line or two. It is what the reviewer reads before they look.",
 }
 const fileField = {
   ...defaultFieldConfig,
   label: "Something to show",
   required: true,
-  hint: "At least one. A screenshot, a recording, a link to the page it changed.",
+  helpText: "At least one. A screenshot, a recording, a link to the page it changed.",
 }
 const linkField = {
   ...defaultFieldConfig,
   label: "Or paste a link",
   required: false,
-  hint: "A recording, a page, a document somebody can open.",
+  helpText: "A recording, a page, a document somebody can open.",
 }
 
 export function ReviewDialog({

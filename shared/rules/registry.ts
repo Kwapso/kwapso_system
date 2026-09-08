@@ -1102,9 +1102,30 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // is older than this commit and it is unchanged in kind by it. The next
   // reviewed translation pass takes all three down together — and it can only
   // ever take them DOWN.
-  de: 246,
-  es: 246,
-  ca: 246,
+  //
+  // LOWERED 246 -> 244 in all three, the field-hints lane. 44 `FieldConfig`s
+  // across both front doors set `hint:` instead of `helpText:` — a key the
+  // type has never had, silently dropped by the excess-property check's own
+  // blind spot for named constants — so every explanation written for a
+  // person was read by nobody. Renamed and extracted (43 distinct new English
+  // sentences; one is shared verbatim by two fields), and translated by hand
+  // into de/es/ca per the owner's 8 Sep 2026 ruling that translation is the
+  // builder's own job and never spends his key. That is +0 net against this
+  // ceiling — the 43 are BRAND NEW extractions, not previously counted, and
+  // all 43 are translated the same commit they are catalogued in.
+  //
+  // The -2 is two SEPARATE, already-catalogued sentences translated in the
+  // same pass: "The system this work is on. Everything below is narrowed by
+  // it." (the New story dialog's App field, converted alone on 8 Sep 2026 to
+  // measure this exact class, and part of the 246 as an untranslated string
+  // until now), and "Choices" (the Settings tab renamed from "Dropdown
+  // values" on 2026-09-01, extracted since but never translated — caught
+  // because this lane's own `typeField` hint named the OLD screen name and
+  // had to be corrected to "the Choices screen" first, R34, which put the
+  // tab's own word in front of the same translator).
+  de: 244,
+  es: 244,
+  ca: 244,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

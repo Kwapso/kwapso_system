@@ -34,14 +34,14 @@ const legalNameField = {
   ...defaultFieldConfig,
   label: "Legal name",
   required: false,
-  hint: "What goes on a contract, if it is not the short name.",
+  helpText: "What goes on a contract, if it is not the short name.",
 }
 const addressField = { ...defaultFieldConfig, label: "Legal address", required: false }
 const numbersField = {
   ...defaultFieldConfig,
   label: "Legal numbers",
   required: false,
-  hint: "Company number, VAT number, whatever your country asks for.",
+  helpText: "Company number, VAT number, whatever your country asks for.",
 }
 const phoneField = { ...defaultFieldConfig, label: "Phone", required: false }
 
