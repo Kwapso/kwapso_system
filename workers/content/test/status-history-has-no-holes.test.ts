@@ -422,14 +422,30 @@ describe("0066 backfills nothing, on purpose", () => {
     "utf8"
   )
   const at = ledger.indexOf('version: "0066_a_ticket_remembers_its_stages"')
+  // BOUND ON THE ENTRY'S OWN END, NEVER A CHARACTER COUNT — the same fix 0065's
+  // suite carries. `ledger.slice(at, at + 600)` claimed to be 0066's SQL and was
+  // really "the next 600 characters": 0066's entry opens with a long block
+  // comment, so one more explanatory line above the CREATE — a legal, purely
+  // editorial change — pushes the statement out of the window and reddens CI.
+  // The template literal's closing "`," is the entry's real end, and the sibling
+  // assertion below already used it; both now share one bound.
+  //
+  // AND THE BOUND IS ASSERTED, because `indexOf` returns -1 when it misses and
+  // `slice(at, -1)` quietly widens to nearly the whole ledger — at which point
+  // an INSERT belonging to some other migration would be judged as 0066's.
+  const end = at === -1 ? -1 : ledger.indexOf("`,", at)
+  const entry = () => {
+    expect(at, "0066 is gone — has the table moved?").toBeGreaterThan(-1)
+    expect(end, "0066's SQL literal does not close — the ledger's shape has moved").toBeGreaterThan(at)
+    return ledger.slice(at, end)
+  }
 
   it("the migration exists and is the one that creates the table", () => {
-    expect(at, "0066 is gone — has the table moved?").toBeGreaterThan(-1)
-    expect(ledger.slice(at, at + 600)).toContain("CREATE TABLE help_status_events")
+    expect(entry()).toContain("CREATE TABLE help_status_events")
   })
 
   it("its SQL is the table, its index, and no rows at all", () => {
-    const sql = ledger.slice(at, ledger.indexOf("`,", at))
+    const sql = entry()
     expect(
       /INSERT\s+INTO\s+help_status_events/i.test(sql),
       "0066 must not invent a history: the activity feed is best-effort, is prose, folds a whole bulk into one sentence, and says nothing at all about the tickets imported from Glide. Read the migration's own comment"

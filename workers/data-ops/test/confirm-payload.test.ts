@@ -234,7 +234,34 @@ describe("the agent loop builds its proposals through that one seam", () => {
     // the expression takes, the object under it is built by the seam.
     const at = agentSrc.indexOf("needsConfirm:")
     expect(at, "the loop no longer returns needsConfirm — re-read this test").toBeGreaterThan(-1)
-    expect(agentSrc.slice(at, agentSrc.indexOf("\n      }", at))).toMatch(/pendingCall\(/)
+    // THE EXPRESSION'S OWN END, found by balancing rather than by indentation.
+    // The bound used to be the literal "\n      }" — a SIX-SPACE closing brace,
+    // which is a fact about where this object currently sits in the file, not
+    // about the property. Wrap the return in one more `if` and the indent
+    // becomes eight; `indexOf` misses, returns -1, and `slice(at, -1)` quietly
+    // widens to nearly the whole of agent.ts, where `pendingCall(` certainly
+    // appears somewhere — so the check would pass with the summary hand-rolled.
+    // Reading to the end of the property's own value cannot widen.
+    const value = valueOf(agentSrc, at + "needsConfirm:".length)
+    expect(value, "needsConfirm's value does not close — re-read this test").not.toBeNull()
+    expect(value).toMatch(/pendingCall\(/)
     expect(agentSrc).toContain('from "@shared/workers/confirm-payload"')
   })
 })
+
+/** The value of an object property, from just after its colon to the comma or
+ * closing brace that ends it — nesting balanced, so a `Promise.all(...)`, an
+ * object literal or an array in the value is read whole rather than cut at its
+ * first punctuation. Returns null if it never closes. */
+function valueOf(src: string, from: number): string | null {
+  let depth = 0
+  for (let i = from; i < src.length; i++) {
+    const c = src[i]
+    if (c === "(" || c === "[" || c === "{") depth++
+    else if (c === ")" || c === "]" || c === "}") {
+      if (depth === 0) return src.slice(from, i)
+      depth--
+    } else if (c === "," && depth === 0) return src.slice(from, i)
+  }
+  return null
+}

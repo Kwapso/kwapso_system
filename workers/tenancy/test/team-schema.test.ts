@@ -119,7 +119,14 @@ describe("the ticket vocabulary is one name, everywhere it is written down", () 
   /** The `type` values the ticket screens filter selectable_data by. */
   const filtered = ["web/lib/use-screen-data.ts", "web/components/help-detail.tsx"].map((f) => {
     const src = readFileSync(join(ROOT, f), "utf8")
-    return { file: f, match: src.match(/v\.type === "([^"]+)"/)?.[1] }
+    // THE PARAMETER'S NAME IS THE CALLER'S, not the law's. This read
+    // `/v\.type === "…"/`, hardcoding the lambda parameter both screens happen
+    // to call `v` — rename it to `value` or `option` in a filter callback,
+    // which changes nothing whatsoever, and the match goes undefined and the
+    // assertion below fails with "does not filter selectable_data by a type at
+    // all". What the law needs is the TYPE STRING being compared against, from
+    // whatever the row is called at that call site.
+    return { file: f, match: src.match(/\b\w+\.type\s*===\s*"([^"]+)"/)?.[1] }
   })
 
   it("the seed's group names are the ones the screens filter on", () => {

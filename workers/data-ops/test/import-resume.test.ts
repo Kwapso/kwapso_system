@@ -48,7 +48,17 @@ describe("a resumed import has exactly one winner", () => {
   it("only resumes a run that actually reached a checkpoint", () => {
     // No cursor means no honest place to carry on from, and "carry on from the
     // top" is the duplicate-row bug wearing the resume's clothes.
-    expect(/const resuming = b\.overall_status === "running" && cursor !== null/.test(confirmBody)).toBe(true)
+    // `\s*` at every gap. Written with its single spaces, this law asserted the
+    // LAYOUT of a boolean expression: Prettier breaks a long `&&` chain onto
+    // its own line as a matter of course, and a third condition added to it
+    // guarantees the break — at which point a law about not resuming from the
+    // top of the file would go red over a wrap. The two conditions, in order,
+    // are the assertion; drop `cursor !== null` and it still goes red.
+    expect(
+      /const\s+resuming\s*=\s*b\.overall_status\s*===\s*"running"\s*&&\s*cursor\s*!==\s*null/.test(
+        confirmBody
+      )
+    ).toBe(true)
     expect(/nothing_to_continue/.test(routes)).toBe(true)
   })
 

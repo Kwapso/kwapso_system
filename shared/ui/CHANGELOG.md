@@ -2,6 +2,112 @@
 
 ## Unreleased
 
+### Added — the kit stops shipping rules as prose: `foundations/rules/`, and a seam that runs them against somebody else's source
+
+The client's sentence on 7 Sep: *"how we will use the ui kit: as the onlly
+ui&ux input for other apps. i wanna void iteration tehre, so make sure rules
+are good set."* Until today the kit shipped **components** and shipped its
+rules as `docs/RULES.md` — 948 lines that every consumer vendors and none
+executes. The consuming app re-derived 55 machine-checked laws of its own by
+iterating with the client, and **two of them are word for word about the
+kit's own vocabulary**. A second app would have paid for those two again.
+That is the cost this removes.
+
+`npm run check` **exits 0**, with a seventh gate on the end of it.
+
+#### Three laws, chosen because the kit can check its OWN source for them
+
+| | what it holds, and what it DERIVES rather than lists |
+|---|---|
+| `radii` | Two radii and no third. The vocabulary is every `--radius*` at `:root`; the safe bare spellings are the `@theme inline` bridge. So `rounded-lg` is refused **because tokens.css re-points `--radius-lg` and does not bridge it** — the load-order trap of §4.2, stated by a check that can see both halves — and `rounded-4xl` is refused because tokens.css declares no such thing. No deny-list of Tailwind keys anywhere; ship `--radius-huge` and `rounded-[var(--radius-huge)]` is legal the same second. |
+| `palette` | Every colour resolves through a token, in all five positions one can reach the screen: an arbitrary class value, a `style={{ }}` object, a Tailwind ramp, an SVG paint attribute, and **the raw `--kw-*` ramp** (§8.3, never enforced before). The ramp clause is the derived one and the prefix is *not* the test: `--kw-kanban-col` and `--kw-dl-label` are component-local properties, not pigments, and a prefix check reports all five of them. A name is the ramp **iff tokens.css declares it** — 17 today. |
+| `borders` | §2.7, which no law anywhere has ever enforced. A boundary is a paper step, a fill (`bg-border` on a 1px element), or an inset shadow — the third of which the **contrast law can read**, which is why a stroke written as a `border` is not merely off-vocabulary but invisible to the measurement that discharged `--surface-idle` at 1.042 last week. The two are one argument. |
+
+The kit passes all three with **four reasoned exemptions**: the spinner's arc
+in `spinner.tsx` and `button.tsx` (the border *is* the shape — a rotating ring
+has no fill and no inset shadow that draws a partial arc), `file-upload.tsx`'s
+dashed drop target (§2.7's own blessed case), and one `#0000` in
+`record-detail.tsx` that is CSS's spelling of *no shadow* rather than a colour.
+Every one is rot-checked in both directions and can only shrink.
+
+#### A clause that was written, fired 24 times, and was deleted
+
+The first `radii` draft called `rounded-[var(--radius-select)]` a finding —
+the token is bridged, so `rounded-select` is already its word. It produced 24
+findings against the kit's own source, which is the right number for a real
+rule and a warning sign for an invented one. **It was invented.** §4.1's table
+reads *"`rounded-select` **or** `rounded-[var(--radius-select)]`"*, in bold. A
+law stricter than the document it claims to check has stopped being a check.
+The clause is gone, its argument is in the file's header, and the spelling
+census is printed as a number instead: **140 spelled as the word, 23 spelled
+the long way** — visible to anyone who wants to argue for one, binding on
+nobody until the client rules.
+
+#### The conformance seam — and the constraint that decided its shape
+
+`foundations/rules/conformance.mjs` takes an app's directories and an app's
+exemption file, and holds that source to the kit's rules:
+
+```bash
+node shared/ui/foundations/rules/conformance.mjs \
+     --exemptions web/test/kit-conformance.json \
+     web/components web/app web/lib web-portal/components shared/web
+```
+
+**It lives under `foundations/` because that is the only way it arrives.**
+`kwapso_system/scripts/sync-design.mjs` copies exactly nine entries out of a
+tag; a `rules/` directory at the repo root is not one of them, and a seam that
+exists upstream and is absent downstream is not a seam. For the same class of
+reason it uses **Node builtins only**: inside a consumer it sits in a vendored
+directory with no `package.json` and no `node_modules`. And the **exemptions
+stay outside the kit** — an app that hand-edits `shared/ui/` fails its own
+vendored-kit hash, so the rules are the kit's and the exceptions are the app's,
+in the app's own diff. `docs/RULES.md` §12 is the copy-pasteable version.
+
+#### Pointed at the real consuming app, because a suite nobody has aimed is a suite nobody should trust
+
+314 files across `web/`, `web-portal/` and `shared/web/`. **44 findings in 15
+files, exit 1.** Nine bare `rounded` (Tailwind's 4px, where the kit has a 4px
+token and `tickets-dashboard.tsx`'s own comment shows the author looking for
+one and not finding it); `--kw-charcoal` reached directly in
+`screen-renderer.tsx`'s overlay; Google's four brand hexes in
+`google-sign-in.tsx` (a textbook exemption, not a fault); and **30 CSS
+borders** across twelve files, which no test in that repository has ever read
+because the rule lived only in a document it vendors.
+
+#### Two bugs found by aiming it, one of them in this repo's existing law
+
+Both were found by the scan getting *quieter* where the source got more
+interesting, which is this repository's oldest tell:
+
+- **A template literal with an apostrophe desynchronised the literal
+  scanner.** `` `Couldn't list your ${noun}s.` `` is not matched by the
+  backtick arm of the obvious regex, so the walk opened a single-quoted string
+  at the apostrophe and closed it 32 lines later, hiding everything between —
+  including a real bare `rounded` in `google-source-dialog.tsx:352`. The run
+  was green on that file and the file was not clean. `source.mjs` now walks
+  instead of matching, and quotes must close on their own line or they were
+  never quotes. **`literalsIn` in `foundations/tokens/ground-map.mjs` still
+  carries the original regex and the contrast law stands on it** — left alone
+  deliberately, because that law is finished and re-reading its source would
+  move published numbers, but the blind spot is the same one and it is written
+  down now.
+- **A template literal is not one string.** Skipping an interpolated template
+  wholesale dropped both the static chunks *and* the branches — the shape the
+  app writes every conditional class in. Chunks are now literals in their own
+  right and every `${ }` is re-scanned from the top. Coverage against the app:
+  **3,006 → 4,589 class lists**, and 12 more findings.
+
+#### Proved by breaking it, not by reading it
+
+A green law measures nothing until something makes it red. Eleven planted
+violations in one file: ten caught, exit 1 (the eleventh — a bare `rounded`
+alone in a one-word literal — is the documented cost of the class-list
+heuristic, and is caught the moment it sits beside any other utility, which is
+how all nine app findings were caught). An empty directory turns every law
+**red on its blindness tripwire**, not green. A deliberately false exemption
+turns the run **red as rotted**. All three are asserted, not asserted-about.
+
 ### Changed — the law learns the kit's other boundary: a step **or** a stroke
 
 The two findings the entry below left red on purpose are closed, and not by

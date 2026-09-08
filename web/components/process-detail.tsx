@@ -603,7 +603,10 @@ export function ProcessDetailScreen({
                       {links.map((l) => (
                         <div
                           key={l.id}
-                          className="flex items-center justify-between gap-2 border-b py-2 last:border-b-0"
+                          // A row rule inside one list: an inset hairline, not
+                          // a border (kit §2.7 —
+                          // web/test/kit-conformance.test.ts).
+                          className="flex items-center justify-between gap-2 py-2 shadow-[var(--hairline-under)] last:shadow-none"
                         >
                           <div className="min-w-0">
                             <InAppLink
@@ -683,7 +686,9 @@ export function ProcessDetailScreen({
                         setVersionId(v.id === current?.id ? null : v.id)
                         setTab("steps")
                       }}
-                      className="hover:bg-muted/50 motion-hover flex flex-wrap w-full items-center justify-between gap-2 border-b p-3 text-left last:border-b-0"
+                      // The version rows' rule, as an inset hairline (kit
+                      // §2.7). The hover fill is unchanged and paints under it.
+                      className="hover:bg-muted/50 motion-hover flex flex-wrap w-full items-center justify-between gap-2 p-3 text-left shadow-[var(--hairline-under)] last:shadow-none"
                     >
                       <span className="min-w-0">
                         <span className="flex min-w-0 items-center gap-2 text-sm font-medium">

@@ -87,8 +87,21 @@ describe("gating-seam (data-ops): every read door asks a permission question", (
     const lib = stripComments(readFileSync(join(SRC, "lib", "import-batch.ts"), "utf8"))
     const start = lib.indexOf("async function loadBatch")
     expect(start, "loadBatch must exist").toBeGreaterThan(-1)
+    // THE BOUND IS PROVED, AND IT IS NOT ONE SPELLING OF "the next function".
+    // This sliced to `lib.indexOf("\nfunction ", start)`, which finds only a
+    // BARE `function` at column 0 — add `export` or `async` to loadBatch's
+    // neighbour, which changes nothing about loadBatch, and the marker is
+    // missed. `indexOf` then returns -1 and `slice(start, -1)` does not fail: it
+    // hands back nearly the whole file, the census finds `creator_id = ?` in
+    // some other statement, and the exemption passes while loadBatch has lost
+    // its fence. (Today it survives only because two of its neighbours happen to
+    // be bare `function`s — error-seam.test.ts:63 carries a comment warning
+    // against exactly this.) So the bound accepts any top-level declaration and
+    // is asserted before it is trusted.
+    const next = lib.slice(start).search(/\n(?:export\s+)?(?:async\s+)?function\s/)
+    expect(next, "loadBatch is followed by no declaration this scan can bound on").toBeGreaterThan(-1)
     expect(
-      /creator_id\s*=\s*\?/.test(lib.slice(start, lib.indexOf("\nfunction ", start))),
+      /creator_id\s*=\s*\?/.test(lib.slice(start, start + next)),
       "GET /import/batch is exempt from a right BECAUSE loadBatch is creator-scoped — keep the WHERE clause or gate the door"
     ).toBe(true)
   })

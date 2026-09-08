@@ -393,7 +393,21 @@ function RoleRateCard({ teamId }: { teamId: string }) {
   const ready = role.trim() !== "" && Number.isFinite(cents) && cents >= 0
 
   return (
-    <div className="flex flex-col gap-4 border-t pt-6">
+    // The rule above this section is an inset hairline, not a border (kit
+    // §2.7). It divides two SECTIONS of one screen, which is what picks the
+    // token: tokens.css declares `--hair-strong` (20%) as the section-rule
+    // tone and `--hair` (8%) as same-tone card separation, so the row dividers
+    // elsewhere in this app take `--hairline-under` and this takes the strong
+    // one. `--hairline-over-strong` is the kit's own NAMED shape for it, not
+    // an arbitrary inset written out — the kit names the five shapes so that
+    // the open client question, "should even the hairline go?", stays one edit
+    // in tokens.css rather than a sweep through forty call sites.
+    //
+    // The alternative weighed was the kit's `Separator`, a fill on a 1px
+    // element. The inset wins on one point: this block's own `pt-6` is
+    // measured from its box, and a separate element would have put the gap in
+    // two places to keep in step.
+    <div className="flex flex-col gap-4 pt-6 shadow-[var(--hairline-over-strong)]">
       <div className="min-w-0">
         <h2 className="text-lg font-medium">{t("Role rates")}</h2>
         <p className="text-muted-foreground mt-1 text-sm">

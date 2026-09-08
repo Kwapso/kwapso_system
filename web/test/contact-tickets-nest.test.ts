@@ -73,8 +73,23 @@ describe("a contact's own Tickets/Meetings tabs nest, never rebuild a flat base"
     // The bug's root: `basePath` handed straight through was the accounts
     // SECTION path (no id on it) — so the caller must build `host` off its
     // own record id before handing it down.
-    expect(detail).toMatch(/const host = \{ base: `\$\{basePath\}\/\$\{accountId\}` \}/)
-    expect(detail).toMatch(/<ContactTicketsPanel accountId=\{accountId\} host=\{host\} \/>/)
-    expect(detail).toMatch(/<ContactMeetingsPanel accountId=\{accountId\} host=\{host\} \/>/)
+    expect(detail).toMatch(/const host\s*=\s*\{\s*base:\s*`\$\{basePath\}\/\$\{accountId\}`\s*,?\s*\}/)
+    // PROPS ARE A SET, NOT A SEQUENCE. These pinned the two props in one
+    // literal, in one order, on one line — so swapping `accountId` and `host`,
+    // or letting the formatter break the element across lines when a third prop
+    // arrives, would have reddened a law about WHICH ADDRESS the panel is
+    // handed. JSX attaches props by name; the law is now written the same way,
+    // and it still fails if either prop is dropped or fed the wrong value.
+    for (const panel of ["ContactTicketsPanel", "ContactMeetingsPanel"]) {
+      const el = detail.match(new RegExp(`<${panel}\\b[^>]*/>`))
+      expect(el, `${panel} must still be rendered by the contact screen`).not.toBeNull()
+      expect(el?.[0], `${panel} must be told which contact it is for`).toMatch(
+        /accountId=\{accountId\}/
+      )
+      expect(
+        el?.[0],
+        `${panel} must be handed the contact's OWN address, so its rows nest under it`
+      ).toMatch(/host=\{host\}/)
+    }
   })
 })

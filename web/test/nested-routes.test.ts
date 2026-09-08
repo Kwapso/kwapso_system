@@ -398,7 +398,13 @@ describe("every screen carries its trail, and a top-level one carries a trail of
 
   it("still asks buildCrumbs for it, rather than hand-rolling a trail", () => {
     expect(
-      /const crumbs = showCrumbs\s*\n\s*\?\s*buildCrumbs\(/.test(shell),
+      // `\s*` — NOT `\s*\n\s*`. That demanded a LITERAL newline between
+      // `showCrumbs` and the `?`, so collapsing this ternary onto one line (which
+      // is what a formatter does the moment the call gets shorter) would redden a
+      // law about WHO BUILDS THE TRAIL over a line break. The assertion is that
+      // `crumbs` comes from `buildCrumbs` under the `showCrumbs` condition,
+      // wherever the lines fall.
+      /const\s+crumbs\s*=\s*showCrumbs\s*\?\s*buildCrumbs\(/.test(shell),
       "The trail must still come from `buildCrumbs`. Both historical regressions " +
         "here were in the CALLER — whether it asked, and with what — never in what " +
         "`buildCrumbs` returns when asked. A trail assembled inline in this file " +

@@ -66,6 +66,65 @@ import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 const VECTORS = join(__dirname, "..", "src", "lib", "knowledge-vectors.ts")
 const LIB = join(__dirname, "..", "src", "lib", "knowledge.ts")
 
+/** A SQL fragment matched by its TOKENS, with any whitespace between them.
+ *
+ * WHY: these fragments were pinned with their single spaces, so wrapping one
+ * clause of a statement onto the next line — which changes nothing the database
+ * is asked — broke R26's law. The tokens, in order, are the assertion; the
+ * layout is not. Everything else stays exact: drop `s.deactivated_at IS NULL`
+ * or swap the alias and it still goes red. */
+const sqlShape = (fragment: string): RegExp =>
+  new RegExp(
+    fragment
+      .trim()
+      .split(/\s+/)
+      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("\\s+")
+  )
+
+/** The body of a named function, brace-balanced — the pattern `catchBodyOf` in
+ * data-ops/test/error-seam.test.ts already uses, for the reason its comment
+ * gives.
+ *
+ * WHY, HERE: the two clauses below were `\/function readerClause[\s\S]{0,400}?
+ * ownerClause\(guard\/`, a CHARACTER BUDGET standing in for "inside this
+ * function". It lies in both directions. Grow the doc comment or the signature
+ * and the real call is pushed past 400, so the law reddens over a comment;
+ * worse, the window can run PAST the end of `readerClause` and match an
+ * `ownerClause(guard` belonging to some later function — `knowledge.ts` has six
+ * of those — so the law would pass while `readerClause` had dropped the fence
+ * entirely. Reading the function's OWN braces cannot do either. */
+const bodyOf = (src: string, decl: RegExp): string | null => {
+  const at = src.search(decl)
+  if (at === -1) return null
+  // Balance the braced groups that follow the declaration, in order. A TypeScript
+  // signature can put an OBJECT RETURN TYPE between the parameters and the body
+  // — `readerClause` does exactly that, `: { sql: string; params: string[] }` —
+  // and naively taking the first `{` reads that type as the function. A group is
+  // a type, not the body, precisely when another `{` follows it immediately; the
+  // last group in that chain is the body.
+  let i = at
+  let body: string | null = null
+  for (;;) {
+    const open = src.indexOf("{", i)
+    if (open === -1) return body
+    let depth = 0
+    let close = -1
+    for (let j = open; j < src.length; j++) {
+      if (src[j] === "{") depth++
+      else if (src[j] === "}" && --depth === 0) {
+        close = j
+        break
+      }
+    }
+    if (close === -1) return body
+    body = src.slice(open + 1, close)
+    const next = src.slice(close + 1).search(/\S/)
+    if (next === -1 || src[close + 1 + next] !== "{") return body
+    i = close + 1
+  }
+}
+
 const db = () => holder.db as DatabaseSync
 const OTHER_STAFF = "U_STAFF_2"
 
@@ -160,25 +219,43 @@ describe("R26 part 1 — tenancy is a partition, not a filter", () => {
     // The hit type is the proof that carried through: ids and scores, no text
     // field, so a future edit that returned one would not typecheck into an
     // answer without being noticed.
-    expect(src).toMatch(/export type VectorHit = \{ id: string; score: number \}/)
+    // THE TYPE'S MEMBERS, not its line. Pinned as one literal line, this law
+    // broke when the declaration was wrapped and said nothing about what it
+    // actually guards, which is that a hit carries an id and a score and NO
+    // readable field. So the members are read out of the declaration's own
+    // braces and compared as a SET: add `text`, `title` or `metadata` and it
+    // goes red wherever the formatter has put them.
+    const hit = src.match(/export type VectorHit\s*=\s*\{([^}]*)\}/)
+    expect(hit, "VectorHit must still be declared as an object type").not.toBeNull()
+    const members = (hit?.[1] ?? "")
+      .split(/[;,\n]/)
+      .map((m) => m.trim())
+      .filter(Boolean)
+      .map((m) => m.replace(/\s+/g, " "))
+    expect(
+      members.sort(),
+      "a vector hit carries an id and a score and nothing readable — a text/title/metadata field here would let index content reach an answer without passing the database's fence"
+    ).toEqual(["id: string", "score: number"])
   })
 
   it("the answer's words are read out of the database, not out of the index", () => {
     const lib = stripComments(readFileSync(LIB, "utf8"))
     // The one read that materialises a passage, and the clause that fences it.
     // A passage is built from `row`, which came from d1Query.
-    expect(lib).toMatch(/FROM knowledge_chunks c JOIN knowledge_sources s/)
+    expect(lib).toMatch(sqlShape("FROM knowledge_chunks c JOIN knowledge_sources s"))
     // ONE CLAUSE, BOTH FENCES, and it is read off the SOURCE row (`s.`) rather
     // than the chunk's denormalised copy: 12.3 added a second answer to "who may
     // read this" — the people staffed to one app — and a fence assembled from two
     // clauses at four call sites is a fence with a call site somebody forgets.
     // `readerClause` is that one place; this is the assertion that it is used here.
-    expect(lib).toMatch(/AND s\.deactivated_at IS NULL AND \$\{reader\.sql\}/)
-    expect(lib).toMatch(/const reader = readerClause\(guard, "s\."\)/)
+    expect(lib).toMatch(sqlShape('AND s.deactivated_at IS NULL AND ${reader.sql}'))
+    expect(lib).toMatch(/const reader\s*=\s*readerClause\(\s*guard,\s*"s\."\s*\)/)
     // Both halves live in it — the personal owner and the app's own staffing
     // rule — so neither can be dropped without this going red.
-    expect(lib).toMatch(/function readerClause[\s\S]{0,400}?ownerClause\(guard/)
-    expect(lib).toMatch(/function readerClause[\s\S]{0,400}?appClause\(guard/)
+    const readerBody = bodyOf(lib, /function readerClause\b/)
+    expect(readerBody, "readerClause must still be a function in knowledge.ts").not.toBeNull()
+    expect(readerBody, "the personal owner half of the fence").toMatch(/ownerClause\(\s*guard/)
+    expect(readerBody, "the app-staffing half of the fence").toMatch(/appClause\(\s*guard/)
     expect(lib).toMatch(/text: plainText\(row\.text\)/)
     // …and the search's own results are never read for anything but their id.
     expect(lib).not.toMatch(/hit\.(text|title|metadata)/)

@@ -86,8 +86,15 @@ import path from "node:path";
 
 const TAG_NAME = /^[A-Za-z][A-Za-z0-9._]*$/;
 
-/** Strip comments without eating `https://` or a `//` inside a string. */
-function decomment(src) {
+/** Strip comments without eating `https://` or a `//` inside a string.
+ *
+ * EXPORTED since 2026-09-08, for `foundations/rules/`. Every law in this repo
+ * reads de-commented source — a rule written about a component must not fire
+ * on the paragraph that explains the component — and there is no second
+ * definition of what a comment is. This one keeps every newline exactly where
+ * it was, so a finding's line number still points at the source a person
+ * opens; see the note in `parseFile` for what happened when it did not. */
+export function decomment(src) {
   let out = "";
   let i = 0;
   let quote = null;

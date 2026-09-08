@@ -151,9 +151,24 @@ const PIPELINE_STAGES: HelpStatus[] = [...OPEN_HELP_STATUSES]
 
 /** One horizontal bar on a track: the track is the scale, the fill is the value.
  *
- * `rounded` (4px) rather than either of R31's two radii, deliberately — R31's
- * own text says bare `rounded` is outside the rule, and the kit names 4px as the
- * radius of a bar. A 24px corner on a 20px-tall bar is a lozenge. */
+ * THE 4px CORNER IS THE KIT'S, AND IT HAS A NAME. This comment used to end
+ * "the kit names 4px as the radius of a bar" and then write bare `rounded`
+ * anyway — Tailwind's own 4px key, which happens to agree with the kit today
+ * and is answerable to nothing if either moves. It was written by somebody
+ * looking for the kit's 4px token and not finding it. It exists:
+ * `--radius-sm` (4px · "bars, heat cells, nodes"), and `--radius-bar` is the
+ * name pointed at it for exactly this, bridged in the kit's `@theme inline`.
+ *
+ * So every bar here is `rounded-[var(--radius-bar)]`. The value on screen is
+ * unchanged — 4px either way — and what changes is what it is answerable to:
+ * the kit's shape law reads the token, and bare `rounded` was invisible to
+ * R31 too (its own regex needs a hyphen), so this file's corners were checked
+ * by nothing at all. The bracket spelling rather than the word `rounded-bar`
+ * is R31's requirement, not the kit's — the kit blesses both (§4.1), and
+ * R31's allow-list is written around `var(--radius…)`.
+ *
+ * The original point stands and is why this is not `--radius`: a 24px corner
+ * on a 20px-tall bar is a lozenge. */
 function Bar({
   fraction,
   colour,
@@ -164,9 +179,9 @@ function Bar({
   title?: string
 }) {
   return (
-    <div className="bg-muted h-5 min-w-0 flex-1 overflow-hidden rounded" title={title}>
+    <div className="bg-muted h-5 min-w-0 flex-1 overflow-hidden rounded-[var(--radius-bar)]" title={title}>
       <div
-        className="h-full rounded"
+        className="h-full rounded-[var(--radius-bar)]"
         style={{ width: `${Math.max(fraction * 100, fraction > 0 ? 3 : 0)}%`, backgroundColor: colour }}
       />
     </div>
@@ -184,7 +199,7 @@ function StackedBar({
   scale: number
 }) {
   return (
-    <div className="bg-muted flex h-5 min-w-0 flex-1 overflow-hidden rounded">
+    <div className="bg-muted flex h-5 min-w-0 flex-1 overflow-hidden rounded-[var(--radius-bar)]">
       {/* NO `title` ON A SEGMENT ANY MORE. It used to carry "{kind}: {n}", which
           is the browser's own tooltip — the affordance the client asked this
           screen to move OFF for the closing-time readout. The figures behind
@@ -364,7 +379,7 @@ function TallyBar({
         <button
           type="button"
           aria-label={said}
-          className="flex min-w-0 flex-1 items-center rounded"
+          className="flex min-w-0 flex-1 items-center rounded-[var(--radius-bar)]"
         >
           {children}
         </button>
@@ -1048,7 +1063,7 @@ function ClosureSpread({
                   // panel, which is the shape this file's hover card was
                   // adopted specifically to avoid.
                   aria-label={said}
-                  className="bg-muted relative block h-5 w-full min-w-0 rounded"
+                  className="bg-muted relative block h-5 w-full min-w-0 rounded-[var(--radius-bar)]"
                 >
                   {/* the tail, quiet, so the middle ticket has a reason */}
                   <span
@@ -1064,7 +1079,7 @@ function ClosureSpread({
                   {/* the middle half */}
                   <span
                     aria-hidden="true"
-                    className="absolute inset-y-0 rounded"
+                    className="absolute inset-y-0 rounded-[var(--radius-bar)]"
                     style={{
                       left: pct(r.p25Days),
                       width: `calc(${pct(r.p75Days)} - ${pct(r.p25Days)} + 2px)`,
@@ -1346,7 +1361,11 @@ function ClosureTrend({
             a panel that contributes no height is a panel that can be measured
             FROM another one rather than agreeing with it until either
             changes. */}
-        <div className="bg-muted relative min-h-40 min-w-0 flex-1 overflow-hidden rounded lg:min-h-0">
+        {/* `--radius-sm`, not `--radius-bar`: the same 4px (the bar name is
+            pointed at this one), but this box is not a bar — it is the plot's
+            GROUND, the kit's "heat cells, nodes" step. A 24px corner would eat
+            the first and last month of a picture drawn to its own edges. */}
+        <div className="bg-muted relative min-h-40 min-w-0 flex-1 overflow-hidden rounded-[var(--radius-sm)] lg:min-h-0">
           <svg
             viewBox="0 0 100 100"
             preserveAspectRatio="none"
@@ -1487,7 +1506,10 @@ function ClosureTrend({
                     <button
                       type="button"
                       aria-label={said}
-                      className="absolute inset-y-0 rounded hover:bg-background/50 data-[state=open]:bg-background/50"
+                      /* The month's hit area over the plot above: the same 4px
+                         ground step, because it is a band ON that ground and
+                         not a bar of its own. */
+                      className="absolute inset-y-0 rounded-[var(--radius-sm)] hover:bg-background/50 data-[state=open]:bg-background/50"
                       style={{ left: `${left}%`, width: `${right - left}%` }}
                     />
                   </HoverCardTrigger>

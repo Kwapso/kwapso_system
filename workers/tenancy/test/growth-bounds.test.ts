@@ -143,6 +143,32 @@ describe("screen overrides have a ceiling too", () => {
     const src = readFileSync(join(__dirname, "..", "src/lib/screens-config.ts"), "utf8")
     const at = src.indexOf("FROM screens")
     expect(at, "screens-config no longer reads the screens table — re-read this test").toBeGreaterThan(-1)
-    expect(src.slice(src.lastIndexOf("SELECT", at), src.indexOf("\n", at) + 1)).toMatch(/LIMIT/)
+    // THE STATEMENT'S OWN BOUNDS, not one physical line. This used to slice from
+    // the preceding "SELECT" to the next newline, which said "the read is
+    // capped" and meant "SELECT and LIMIT are typed on the same line". The
+    // statement is a template literal and the cap is interpolated into it, so
+    // the first time somebody wraps it — or the first longer column list
+    // Prettier breaks — an unchanged, still-capped read turns the build red.
+    // A string literal ends at its own closing quote; that is the bound.
+    const sql = enclosingLiteral(src, at)
+    expect(sql, "the read is no longer written as a string literal — re-read this test").not.toBeNull()
+    expect(sql, "the page-load read must still be a SELECT").toMatch(/^\s*SELECT\b/)
+    expect(sql, "…and it must carry a hard cap (R14)").toMatch(/\bLIMIT\b/)
   })
 })
+
+/** The string literal containing position `at` — backtick, double or single.
+ *
+ * A SQL statement in this codebase is one literal, so the literal's own closing
+ * quote is where the statement ends. That is the bound to slice on: a character
+ * count and "up to the next newline" both encode the CURRENT layout, and a
+ * formatter is allowed to change the layout. Returns null when `at` is not
+ * inside a literal, so the caller can fail loudly rather than assert over the
+ * rest of the file. */
+function enclosingLiteral(src: string, at: number): string | null {
+  const open = Math.max(src.lastIndexOf("`", at), src.lastIndexOf('"', at), src.lastIndexOf("'", at))
+  if (open === -1) return null
+  const close = src.indexOf(src[open], at)
+  if (close === -1) return null
+  return src.slice(open + 1, close)
+}

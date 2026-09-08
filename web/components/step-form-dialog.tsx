@@ -551,8 +551,25 @@ export function StepFormDialog({
       {onArm && (
         /* WHICH SIDE IT CARRIES ON FROM. Indented like the split's own halves,
            because it is the same kind of answer: a shape that only means
-           something once you say which step it points at. */
-        <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
+           something once you say which step it points at.
+
+           THE LEFT RULE IS LOAD-BEARING AND IT STAYS — as an inset shadow
+           rather than a border (kit §2.7, web/test/kit-conformance.test.ts).
+           It is the only thing that says these two fields belong to the
+           question above them rather than being two more fields in the form,
+           and an indent alone does not say it: a form whose fields all sit at
+           one measure reads a 20px inset as a mistake. The rule is what makes
+           it deliberate. The same treatment is on the split's own block below,
+           written out twice rather than lifted into a constant because the two
+           are different answers that happen to be drawn alike.
+
+           2px in the primary tone at 40%, unchanged — `color-mix` is how the
+           kit itself spells an alpha of a token inside an arbitrary value
+           (`select.tsx`'s destructive ring). What DOES change by 2px is where
+           the fields sit: a border is part of the box, so the content used to
+           start 18px in and now starts 16px in. Deliberate rather than
+           compensated — `pl-4` is a scale step and `pl-[1.125rem]` is not. */
+        <div className="ml-1 flex flex-col gap-4 pl-4 shadow-[inset_0.125rem_0_0_color-mix(in_srgb,var(--primary)_40%,transparent)]">
           <Field config={armField} htmlFor="step-arm">
             <Select
               value={arm === NONE ? (armHeads[0]?.stepKey ?? NONE) : arm}
@@ -578,7 +595,7 @@ export function StepFormDialog({
         /* The two halves of a split, together and indented, because neither one
            means anything without the other: WHICH step this is an alternative
            to, and WHEN this way is taken instead. */
-        <div className="border-primary/40 ml-1 flex flex-col gap-4 border-l-2 pl-4">
+        <div className="ml-1 flex flex-col gap-4 pl-4 shadow-[inset_0.125rem_0_0_color-mix(in_srgb,var(--primary)_40%,transparent)]">
           <Field config={insteadField} htmlFor="step-place">
             <Select
               // `splitting` is only ever true when `place` names a real peer, so

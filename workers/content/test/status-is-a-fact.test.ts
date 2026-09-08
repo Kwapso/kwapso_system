@@ -342,7 +342,15 @@ describe("no automation ever unassigns the triage person (5.12)", () => {
     // upsert whose ON CONFLICT copies `excluded`, so both branches carry the
     // person the door proved against the team's membership.
     const lib = readFileSync(join(REPO, "workers", "content", "src", "lib", "triage.ts"), "utf8")
-    expect(lib).toContain("ON CONFLICT(week_start) DO UPDATE SET user_id = excluded.user_id")
+    // THE UPSERT'S CONFLICT ARM, by its tokens rather than its spacing. This was
+    // a literal substring of a statement that is already wrapped across four
+    // physical lines in triage.ts — the clause happens to sit on one of them
+    // today, and the next column added to the SET list is what moves it. What
+    // the law says is that the conflict arm keys on the week and copies the
+    // person from `excluded`; how the statement is laid out is not part of it.
+    expect(lib).toMatch(
+      /ON\s+CONFLICT\(\s*week_start\s*\)\s+DO\s+UPDATE\s+SET\s+user_id\s*=\s*excluded\.user_id/i
+    )
     expect(lib, "a rota row must never be cleared").not.toMatch(/user_id\s*=\s*NULL/i)
   })
 

@@ -1,0 +1,26 @@
+[
+  {
+    "law": "borders",
+    "where": "components/spinner/spinner.tsx",
+    "what": "*",
+    "why": "The border IS the shape here, not a boundary around one. A spinner is a ring drawn as a 2px border at 25% of currentColor with one edge (border-t-current) fully opaque, rotated by the motion layer; the arc that reads as progress is the difference between those two edges. There is no fill and no inset shadow that draws a partial ring, and a step in paper tone cannot rotate. RULES.md 2.7 rules on strokes that SEPARATE two things, which this does not."
+  },
+  {
+    "law": "borders",
+    "where": "components/button/button.tsx",
+    "what": "*",
+    "why": "The same spinner arc, inlined into the button's own busy state rather than imported, so that a busy button never depends on Spinner's own layout. Identical shape, identical reason, and the two are checked together: if one stops drawing its ring the rot check deletes that entry and leaves this one, which is the signal that they have drifted apart."
+  },
+  {
+    "law": "borders",
+    "where": "components/file-upload/file-upload.tsx",
+    "what": "*",
+    "why": "A drop target, and RULES.md 2.7's own sentence blesses it: form fields and selection controls are the two places a hairline is allowed at all. The dashed edge is also doing work no fill can do — dashed is the one stroke style that reads as PROVISIONAL, which is what an empty drop zone is saying, and the same element restates it in the destructive tone when a file is rejected."
+  },
+  {
+    "law": "palette",
+    "where": "components/record-detail/record-detail.tsx",
+    "what": "#0000",
+    "why": "Not a colour: `0 0 #0000` is CSS's way of writing a shadow that paints nothing, set on --hairline-strong to switch OFF the note field's ring for the one composer that must not look like a field. `transparent` would be a named colour, which RULES.md 2.2 refuses outright, so the four-digit hex is the least-wrong spelling of nothing available. If tokens.css ever declares a --shadow-none, this line goes with it."
+  }
+]

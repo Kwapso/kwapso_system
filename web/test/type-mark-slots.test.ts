@@ -182,12 +182,22 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
       "MARK_GROUP no longer names the story vocabulary — this check has no subject left"
     ).toBe(true)
     const stories = readFileSync(join(ROOT, "web", "components", "stories-screen.tsx"), "utf8")
+    // `.` DOES NOT MATCH A NEWLINE. `markMap\(.*MARK_GROUP\.story\)` needed the
+    // whole call typed on one physical line, so the ordinary wrap Prettier
+    // applies the moment that argument list grows would have reddened a law
+    // about which seam the screen reads. `[^)]*` crosses lines and still stops
+    // at the call's own closing paren, so it cannot drift into a later call
+    // either.
     expect(
-      /markMap\(.*MARK_GROUP\.story\)/.test(stories),
+      /markMap\(\s*[^)]*MARK_GROUP\.story\s*\)/.test(stories),
       "the stories screen no longer reads the team's own glyphs through the type-mark seam"
     ).toBe(true)
+    // The row parameter's NAME is the screen's business, not this law's: `s`
+    // here is a `.map((s) => …)` callback and renaming it to `story` changes
+    // nothing. What must hold is that the mark drawn is looked up from `marks`
+    // by that row's own storyType.
     expect(
-      /marks\?\.get\(s\.storyType/.test(stories),
+      /marks\?\.get\(\s*\w+\.storyType/.test(stories),
       "the stories screen no longer draws the team's own glyph for a row's kind"
     ).toBe(true)
 

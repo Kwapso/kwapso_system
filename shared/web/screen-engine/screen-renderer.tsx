@@ -362,16 +362,36 @@ function ScreenLayer({
       }}
     >
       <DialogPrimitive.Portal>
-        {/* The scrim colour is restated, not imported: `shared/ui/components/
-            dialog/dialog.tsx` builds the exact same expression into its own
-            module-private `SCRIM` (kit-stated as charcoal at 36%, unchanged in
-            both palettes — GAPS-A.md OVL-2), but does not export it. A literal
-            `bg-black/50` used to sit here instead — un-tokenised (R32) and
-            visibly cooler/darker than every other overlay's scrim (`Dialog`,
-            `Sheet`, `AlertDialog`) side by side. Kept at this layer's own
-            z-50, not the kit modal's z-60: only the colour is meant to match,
-            not the stacking. */}
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--kw-charcoal)_36%,transparent)] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+        {/* THE SCRIM IS A NAMED TOKEN NOW, and the two sentences that used to
+            sit here are both settled upstream.
+
+            IT USED TO BE RESTATED, NOT IMPORTED. `shared/ui/components/dialog/
+            dialog.tsx` built the identical expression into its own
+            module-private `SCRIM` and did not export it, so this layer mixed
+            its own charcoal by hand — the fourth of five call sites doing
+            exactly that. Kit v1.2.69 gave the value a NAME (`--scrim` /
+            `--scrim-drawer`, bridged as `bg-scrim` / `bg-scrim-drawer`) for
+            that reason, and tokens.css's own §3 note records the fifth
+            consumer (`edge-panel.tsx`) as what forced it. So this reads the
+            kit's name instead of re-deriving the kit's value, which is also
+            what the kit's palette law asks for: `--kw-charcoal` is the RAW
+            ramp, and §8.3 keeps the ramp to tokens.css.
+
+            AND THE HAND-MIX WAS A LIVE TRAP, not only off-vocabulary.
+            Tailwind compiles an arbitrary `color-mix` into a PAIR — the
+            un-mixed colour, then an `@supports (color: color-mix(in lab, red,
+            red))` block carrying the real value — so a browser without
+            `color-mix` got FULLY OPAQUE CHARCOAL where a 36% dim was asked
+            for: a black screen over the record rather than a graceful
+            degradation. tokens.css states the token as `rgba(26, 25, 24, .36)`
+            precisely so no call site can emit that pair, and this was one of
+            the sites it was measured against.
+
+            A literal `bg-black/50` sat here before the hand-mix — un-tokenised
+            (R32) and visibly cooler/darker than every other overlay's scrim
+            side by side. Kept at this layer's own z-50, not the kit modal's
+            z-60: only the colour is meant to match, not the stacking. */}
+        <DialogPrimitive.Overlay className="bg-scrim fixed inset-0 z-50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className={cn(

@@ -103,6 +103,16 @@ describe("the panel is wired to that step list", () => {
   const panel = readFileSync(join(HERE, "..", "components", "agent-panel.tsx"), "utf8")
 
   it("agent-panel.tsx feeds chat.confirmSteps to <RunSteps>", () => {
-    expect(panel).toMatch(/<RunSteps\s+steps=\{chat\.confirmSteps\}/)
+    // A PROP, NOT A POSITION. `<RunSteps\s+steps=` required `steps` to be the
+    // FIRST attribute on the element, so adding a `className` (or letting the
+    // formatter reorder nothing at all and simply wrap the element) would have
+    // reddened the law that proves the panel renders the real step list. The
+    // element is extracted by its own tag and the prop looked up inside it.
+    const el = panel.match(/<RunSteps\b[^>]*\/?>/)
+    expect(el, "agent-panel.tsx must still render <RunSteps>").not.toBeNull()
+    expect(
+      el?.[0],
+      "the panel must feed <RunSteps> the confirm steps themselves — an admin approving a bare label is the regression this exists for"
+    ).toMatch(/steps=\{\s*chat\.confirmSteps\s*\}/)
   })
 })
