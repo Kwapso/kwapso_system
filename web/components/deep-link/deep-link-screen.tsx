@@ -436,7 +436,23 @@ export function DeepLinkScreen() {
   // remembered name gets corrected from "Account" to the client's own name.
   const entriesRef = React.useRef(tabEntries)
   entriesRef.current = tabEntries
-  const tabsKey = tabEntries.map((entry) => `${entry.path} ${entry.label}`).join("")
+  // THE SEPARATORS ARE WRITTEN AS ESCAPES, NOT AS RAW BYTES, and that is the
+  // whole of why this line looks like this. They used to be typed literally:
+  // one NUL and one SOH sitting in the source, which is legal TypeScript, is
+  // the same string at runtime, and made THIS ENTIRE FILE — the deep-link
+  // spine — read as `data` to `file(1)`, so plain `grep` skipped it in silence
+  // rather than reporting a match. On 8 Sep 2026 that cost a whole review
+  // cycle: a session grepping for the workspace-tab call sites found ZERO,
+  // concluded the tab strip had been deleted by the merge, and filed it as a
+  // shipped regression. The wiring was here the entire time, forty lines below.
+  // Node reads the file fine, so every seam test stayed green and no law could
+  // have caught it: the blindness is in the READER, not in the build.
+  //
+  // The escapes are the identical two characters at runtime and keep the file
+  // ASCII, so a person and an agent can both still find what is in it. They are
+  // still NUL and SOH on purpose: this key exists to be compared, and a
+  // separator has to be a character a tab label cannot contain.
+  const tabsKey = tabEntries.map((entry) => `${entry.path}\u0000${entry.label}`).join("\u0001")
   // NOT WHILE THE URL IS STILL UNREAD. `route` is null until the client has
   // read `window.location` (a static export cannot prerender an id), and until
   // then `buildCrumbs` answers the only question an empty trail allows — the
@@ -485,7 +501,21 @@ export function DeepLinkScreen() {
         // middle-click and copy-address keep working on a workspace tab the way
         // they already do on a crumb (R37 — the shell intercepts the plain left
         // click and nothing else).
-        href: index === openTabs.length - 1 ? undefined : tab.path,
+        //
+        // BY ACTIVE, NOT BY POSITION — corrected 8 Sep 2026, and it is the last
+        // line in this file that had not caught up with the paragraph above
+        // `tabStripState`. That paragraph says it exactly: while activating a
+        // tab moved it to the end, "last" and "active" were ONE fact, so asking
+        // `index === openTabs.length - 1` was asking the right question in the
+        // cheaper words. The store stopped re-ordering on the same day the kit
+        // gained `activeIndex`, and this expression kept asking the old one — so
+        // on any tab but the last, the LAST tab lost its href and could not be
+        // clicked, while the tab you were already on kept a link to itself. The
+        // owner reported it as "I cannot click the last tab", which is precisely
+        // what it does. `activeTabIndex` is `tabStripState`'s own answer and is
+        // already in scope three lines up; `showTabSet` is only true when it is
+        // >= 0, so inside this branch it always names a real tab.
+        href: index === activeTabIndex ? undefined : tab.path,
         closeKey: tab.path,
       }))
     : screenCrumbs
