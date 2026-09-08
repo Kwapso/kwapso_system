@@ -52,6 +52,7 @@ import {
   GOOGLE_SWEEP_PEOPLE_PER_TICK,
   TRANSCRIPT_ATTEMPT_CAP,
   TRANSCRIPT_HORIZON_DAYS,
+  TRANSCRIPT_SETTLE_HOURS,
   TRANSCRIPT_SWEEP_PER_PERSON,
 } from "@shared/workers/limits"
 import type { Env } from "../env"
@@ -100,19 +101,30 @@ async function peopleToSweep(cfg: D1Rest, guard: MemberGuard): Promise<string[]>
  * rather than being selected and skipped. */
 async function meetingsToTry(cfg: D1Rest, guard: MemberGuard, now: Date): Promise<string[]> {
   const since = new Date(now.getTime() - TRANSCRIPT_HORIZON_DAYS * 86_400_000).toISOString()
+  const settleSince = new Date(now.getTime() - TRANSCRIPT_SETTLE_HOURS * 3_600_000).toISOString()
   const rows = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
     // R14 hard cap — TRANSCRIPT_SWEEP_PER_PERSON.
+    //
+    // THE SECOND CLAUSE IS THE ONE THAT CHANGED, and `transcript_captured_at IS
+    // NULL` alone is what let a two-minute transcript be final. Google writes a
+    // notes document while the call is still running, so a meeting read early
+    // holds a real, readable fragment — and this predicate then dropped it from
+    // the queue forever. A meeting still inside TRANSCRIPT_SETTLE_HOURS of its
+    // own start is offered again even though it HAS been captured;
+    // `captureTranscript` re-reads the document it already identified and keeps
+    // the text only if it grew (R17 — a settled document moves zero rows), and
+    // a barren look counts against the attempt cap so this drains on its own.
     `SELECT id FROM meetings
       WHERE google_event_id IS NOT NULL AND google_event_id <> ''
-        AND transcript_captured_at IS NULL
+        AND (transcript_captured_at IS NULL OR starts_at >= ?)
         AND transcript_attempts < ${TRANSCRIPT_ATTEMPT_CAP}
         AND starts_at >= ? AND starts_at <= ?
         AND deactivated_at IS NULL
       ORDER BY starts_at DESC
       LIMIT ${TRANSCRIPT_SWEEP_PER_PERSON}`,
-    [since, now.toISOString()]
+    [settleSince, since, now.toISOString()]
   )
   return rows.map((r) => r.id)
 }

@@ -144,20 +144,44 @@ async function fromAttachments(
   guard: MemberGuard,
   event: CalendarEvent
 ): Promise<FoundTranscript | null> {
-  const hit = event.attachments.find((a) => TRANSCRIPT_NAME.test(a.title) && a.fileId)
-  if (!hit) return null
+  // EVERY MATCHING ATTACHMENT, AND THE FULLEST ONE WINS. This was `.find` — the
+  // first attachment whose title looks like a transcript — and one calendar
+  // entry can carry more than one.
+  //
+  // MEASURED, 2026-09-07. `⏩ Week planning` ran as two Meet sessions on one
+  // entry, so Gemini wrote two notes documents: `…11:00 CEST` (created 09:05:24,
+  // last modified 09:05:27 — three seconds, then abandoned, 4,159 bytes) and
+  // `…11:28 CEST` (1,165,858 bytes, the whole hour). Attachment order put the
+  // abandoned one first, so that is the one this meeting claimed, and the
+  // fifty-eight minutes of conversation never arrived through this door.
+  //
+  // A FALSE START AND A TRANSCRIPT ARE THE SAME SHAPE. Both are real Google
+  // documents with the right title, readable, written after the meeting began —
+  // every test this hunt applies passes on both. The only thing that separates
+  // them is how much of the conversation is in them, so that is what decides.
+  const hits = event.attachments.filter((a) => TRANSCRIPT_NAME.test(a.title) && a.fileId)
+  if (!hits.length) return null
   // The attachment says a file id and a title; whether we can READ it is a
   // separate question (the Drive connection, and Google's own view of whether
   // this app may see that document). Asking now means a meeting never claims a
   // transcript whose words are unreachable.
   try {
-    const [file] = await driveFilesById(await driveToken(env, cfg, guard), [hit.fileId])
-    if (!file) return null
-    return await withWords(env, cfg, guard, file, {
-      name: file.name || hit.title,
-      url: file.webViewLink ?? hit.url,
-      foundBy: "attachment",
-    })
+    const token = await driveToken(env, cfg, guard)
+    // Bounded by the entry's own attachment list, which Google keeps short; one
+    // read each, and one is the ordinary case.
+    const files = await driveFilesById(token, hits.map((h) => h.fileId))
+    let best: FoundTranscript | null = null
+    for (const hit of hits) {
+      const file = files.find((f) => f.id === hit.fileId)
+      if (!file) continue
+      const found = await withWords(env, cfg, guard, file, {
+        name: file.name || hit.title,
+        url: file.webViewLink ?? hit.url,
+        foundBy: "attachment",
+      })
+      if (found && found.text.length > (best?.text.length ?? 0)) best = found
+    }
+    return best
   } catch {
     return null
   }
