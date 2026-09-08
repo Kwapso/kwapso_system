@@ -254,6 +254,11 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   }
 }
 
+/** THE ONE WORD THAT MEANS "DELIBERATELY NOBODY". Set as `ALERT_TO` when the
+ * digest should be computed and recorded but never posted. It is a value rather
+ * than an absence on purpose — see `sendOpsDigest`. */
+export const OPS_DIGEST_OFF = "off"
+
 /** Is there anything worth an envelope? Spend alone is not: a bill that is
  * simply continuing is not news, and a nightly cost email is the one people
  * filter first. It rides along WITH a reason to write, never as one. */
@@ -270,6 +275,28 @@ export async function sendOpsDigest(
   d: OpsDigest
 ): Promise<{ mailed: number; recipients: number }> {
   if (!digestHasNews(d)) return { mailed: 0, recipients: 0 }
+
+  // NOBODY WANTS THIS MAIL, AND THAT IS A DECISION SOMEBODY MADE. The owner,
+  // 8 Sep 2026: "I would just rather not have the error report... I don't
+  // really give a fuck about the emails; they do nothing but fill up my inbox."
+  // The rows are read on purpose instead, through the error_log_review and
+  // error_analyze skills, on a cadence he chooses.
+  //
+  // WHY A WORD AND NOT AN EMPTY STRING. Unset already means something here, and
+  // it means the opposite: R12 says a cron that told nobody must say so, so an
+  // absent ALERT_TO THROWS a few lines down and lands in the store as "somebody
+  // forgot to wire the alarm". Silencing the mail by deleting the address would
+  // therefore trade a nightly email for a nightly error row — the same noise in
+  // the place he has asked to keep clean, and it would also destroy the check
+  // that catches a genuinely forgotten address. So OFF is a value, absence stays
+  // a fault, and the two can never be confused for one another.
+  //
+  // NOTHING ELSE CHANGES. The digest is still computed every night, the near-
+  // allowance and spiking-signature findings are still derived, and every row is
+  // still written and still swept at 90 days. Only the envelope stops.
+  if ((env.ALERT_TO ?? "").trim().toLowerCase() === OPS_DIGEST_OFF)
+    return { mailed: 0, recipients: 0 }
+
   const to = (env.ALERT_TO ?? "")
     .split(",")
     .map((a) => a.trim())

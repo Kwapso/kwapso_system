@@ -69,13 +69,22 @@
     // where to sign in (R30 — the recipient decides which app the link opens,
     // and neither hostname is ever spelled at a call site).
     "PUBLIC_PORTAL_URL": "https://client.kwapso.app",
-    // WHO HEARS THE NIGHTLY GROWTH ALARM. Comma-separated; both of the owner's
-    // addresses, chosen 14 Aug 2026. It is a VAR rather than a secret because an
-    // address is not a credential, and it belongs in git for the reason
-    // ARCHITECTURE §7 gives: an alarm nobody receives is a table, and the thing
-    // that turns it back into a table is somebody forgetting to set this.
-    // Unset is not a crash — the cron records that nobody was told (R12).
-    "ALERT_TO": "alaap@kwapso.com"
+    // WHO HEARS THE NIGHTLY GROWTH ALARM. Comma-separated addresses, or the one
+    // word `off`. It is a VAR rather than a secret because an address is not a
+    // credential, and it belongs in git for the reason ARCHITECTURE §7 gives: an
+    // alarm nobody receives is a table, and the thing that turns it back into a
+    // table is somebody forgetting to set this. Unset is not a crash — the cron
+    // records that nobody was told (R12).
+    //
+    // OFF SINCE 8 SEP 2026, BY THE OWNER, ON BOTH ENVIRONMENTS. His words: "I
+    // would just rather not have the error report... they do nothing but fill up
+    // my inbox." The findings are read deliberately instead, through the
+    // error_log_review and error_analyze skills. `off` rather than an empty
+    // string precisely so the R12 check above keeps working: absence still means
+    // somebody forgot, and this means somebody decided. To turn it back on, put
+    // an address here — nothing else needs changing, the digest never stopped
+    // being computed.
+    "ALERT_TO": "off"
   },
   // Nightly 80%-size alarms (03:10 UTC) — the locked sharding machinery.
   "triggers": { "crons": ["10 3 * * *"] },
@@ -141,10 +150,14 @@
         "PUBLIC_APP_URL": "https://agency-staging.kwapso.app",
         // The staging portal, for the same one email.
         "PUBLIC_PORTAL_URL": "https://staging-client.kwapso.app",
-        // Staging alarms go to the same place. Deliberately not silenced: staging
-        // is where a broken alarm path is supposed to be discovered, and an
-        // environment that never mails is one nobody notices is unwired.
-        "ALERT_TO": "alaap@kwapso.com"
+        // Staging followed production to `off` on 8 Sep 2026. The old reason for
+        // keeping staging loud — that a broken alarm path should be discovered
+        // here — died with the mail itself: there is no delivery path left to
+        // break on either environment, and while there was one, staging and
+        // production sent the SAME subject line, so the owner received two
+        // indistinguishable copies of every night. Turning one back on means
+        // turning the other on too, and giving them different subjects first.
+        "ALERT_TO": "off"
       },
       "triggers": { "crons": ["10 3 * * *"] }
     }

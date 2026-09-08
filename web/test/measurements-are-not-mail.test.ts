@@ -75,3 +75,43 @@ describe("the ops digest writes to a person about exceptions only", () => {
     )
   })
 })
+
+describe("the digest can be switched off without being deleted", () => {
+  // The owner's ruling of 8 Sep 2026: no ops mail at all. The trap this guards
+  // is the obvious way to obey it — deleting the address. R12 makes an ABSENT
+  // ALERT_TO throw, on purpose, so the store records that an alarm reached
+  // nobody; obeying by deletion would have swapped a nightly email for a nightly
+  // error row in the very log he asked to keep readable, AND destroyed the check
+  // that catches an address somebody genuinely forgot to set.
+  const OPS = readFileSync(OPS_ALERT, "utf8")
+  const WRANGLER = readFileSync(
+    join(ROOT, "workers", "tenancy", "wrangler.jsonc"),
+    "utf8"
+  )
+
+  it("off is a VALUE, and absence still throws", () => {
+    expect(OPS).toMatch(/export const OPS_DIGEST_OFF = "off"/)
+    expect(OPS, "the word short-circuits the send").toMatch(/=== OPS_DIGEST_OFF/)
+    expect(OPS, "an unset address is still the R12 fault it always was").toMatch(
+      /ALERT_TO is not set, so nobody was emailed/
+    )
+  })
+
+  it("both environments are actually off, and neither was emptied", () => {
+    const values = [...WRANGLER.matchAll(/"ALERT_TO":\s*"([^"]*)"/g)].map((m) => m[1])
+    expect(values.length, "production and staging").toBe(2)
+    for (const v of values) {
+      expect(v, "off, not blank — blank means forgotten").toBe("off")
+    }
+  })
+
+  it("and the digest is still COMPUTED, so turning it back on needs no code", () => {
+    // Everything up to the envelope still runs: the findings are derived nightly
+    // whether or not anybody is told. If this ever becomes an early return in
+    // the cron instead, switching the mail back on becomes a code change and the
+    // 90 days of history behind it will be missing.
+    expect(OPS, "the off-switch sits inside the SENDER, after the digest is built").toMatch(
+      /export async function sendOpsDigest[\s\S]*?OPS_DIGEST_OFF/
+    )
+  })
+})
