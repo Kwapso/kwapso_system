@@ -448,7 +448,10 @@ export function googleIngestKinds(
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
-    const full = await hydrateText(
+    // A skipped item is already named in the log `hydrateText` writes (one
+    // unreadable file must not cost the tick the rest of its slice); the sweep
+    // itself just carries on with what each item already had.
+    const { items: full } = await hydrateText(
       env,
       cfg,
       guard,
