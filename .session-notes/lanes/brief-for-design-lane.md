@@ -36,7 +36,7 @@ kit's main, same as yours:
   scrim and panel both. The layer model stands: page drawers stay 55 under
   dialogs 60. Your Select fix's sibling: the client picker's SHEET was the
   twelfth surface, and it painted behind the Sell-a-wave form on every phone.
-  `web/components/record-picker.tsx` passes it.
+  `web/components/records/record-picker.tsx` passes it.
 
 Your `web/test/overlays-clear-the-dialog.test.ts` now derives the overlay line
 from the two dialogs alone (sheet legitimately holds TWO layers now) and gained

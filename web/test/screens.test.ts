@@ -1,7 +1,7 @@
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import type { ScreenRecipe } from "@shared/web/screen-engine/recipe"
+import type { RecipeTab, ScreenRecipe } from "@shared/web/screen-engine/recipe"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
@@ -104,10 +104,32 @@ describe("withoutActions", () => {
 // proves every base recipe's collection tab gets badged; these lock the EDGES
 // the happy path never shows — the ones a count badge actually gets wrong.
 describe("tabCountKey / withTabCounts", () => {
-  const memberDetail = BASE_RECIPES["members.detail"] as ScreenRecipe
-  const tabs = memberDetail.tabs ?? []
-  const overview = tabs.find((t) => t.key === "overview")!
-  const activity = tabs.find((t) => t.key === "activity")!
+  // THE FIXTURE IS BUILT HERE NOW, AND THAT IS THE INTERESTING PART.
+  //
+  // It used to read `members.detail` off BASE_RECIPES and reach for its Activity
+  // tab, because every detail recipe in the app shipped one. None does any more:
+  // the client killed the Activity tab across the app on 2026-09-06 (a record's
+  // history is read from the footer's Latest activity column and opens in a
+  // slide-in off it — web/components/records/activity-panel.tsx carries the ruling), so
+  // the five detail recipes are a single `description` block each.
+  //
+  // The SEAM did not go with them. `withTabCounts` is what badges whatever
+  // collection tab a detail recipe declares, derived from each tab's own block
+  // rather than from a list of tab keys, and the host still runs every detail
+  // through it (rules.test.ts holds that, one call per rendered recipe). So the
+  // edges below — a real total, a zero, an absent total, a missing key, and the
+  // no-mutation guarantee — are exactly as worth locking as they were; what
+  // changed is that the input has to be written down instead of borrowed. The
+  // base recipe is still the starting point, so a change to its shape still
+  // reaches this test.
+  const base = BASE_RECIPES["members.detail"] as ScreenRecipe
+  const overview = (base.tabs ?? []).find((t) => t.key === "overview")!
+  const activity: RecipeTab = {
+    key: "activity",
+    label: "Activity",
+    block: { kind: "activity", source: "activity" },
+  }
+  const memberDetail: ScreenRecipe = { ...base, tabs: [overview, activity] }
 
   it("names the collection a tab reveals, and null for the record's own fields", () => {
     expect(tabCountKey(activity)).toBe("activity") // the feed the block names
@@ -121,8 +143,8 @@ describe("tabCountKey / withTabCounts", () => {
   })
 
   it("renders NOTHING for zero or a total that hasn't loaded yet", () => {
-    // A "0" beside Activity reads as "nothing ever happened here" — which, while
-    // page one is still in flight, is a lie the badge tells for free.
+    // A "0" beside a history reads as "nothing ever happened here" — which,
+    // while page one is still in flight, is a lie the badge tells for free.
     for (const total of [0, undefined]) {
       const next = withTabCounts(memberDetail, { activity: total })
       expect(next.tabs?.find((t) => t.key === "activity")?.badge).toBe("")
@@ -202,11 +224,44 @@ describe("translateFields", () => {
       relativeTo: ROOT,
     })
     const offenders: string[] = []
+    /** Every spread-recipe `fields:` the scan located, offending or not — the
+     * positive control, gathered on the same pass. */
+    const seen: string[] = []
     for (const file of screens)
       for (const [line] of file.source.matchAll(/\{\s*\.\.\.recipe,[^}]*?\bfields:\s*([^,}\n]+)/g)) {
         const value = /\bfields:\s*([^,}\n]+)/.exec(line)?.[1]?.trim() ?? ""
+        seen.push(`${file.rel}: ${value}`)
         if (!value.startsWith("translateFields(")) offenders.push(`${file.rel}: fields: ${value}`)
       }
+
+    /* TWO FLOORS, BECAUSE AN EMPTY OFFENDER LIST IS THIS TEST'S PASS.
+     *
+     * The derivation is the point of the test — "covered the day it lands" —
+     * and it is also what makes it able to go quiet in two different ways, one
+     * of them likely.
+     *
+     * The WALK could collapse (a components directory renamed): 168 .tsx files
+     * across the two front doors today, so 80 is a floor with half the tree's
+     * worth of room.
+     *
+     * The PATTERN could outgrow its own shape, and this is the near one. It
+     * matches `{ ...recipe, … fields: …` with `[^}]*?` in the middle — so the
+     * first host to put an OBJECT between the spread and its fields (a nested
+     * `{…}` in a prop, a `columns` map inline) closes the character class early
+     * and the match is lost, silently, on the very screen that needed
+     * checking. Two host-composed tables today (`tasks-screen.tsx`,
+     * `meetings-screen.tsx`); if this floor ever fails, the pattern has stopped
+     * seeing them — do not lower it, teach it the new shape. */
+    expect(
+      screens.length,
+      `only ${screens.length} component files were walked — a components directory has moved`
+    ).toBeGreaterThan(80)
+    expect(
+      seen.length,
+      `the scan found ${seen.length} spread-recipe \`fields:\` in ${screens.length} files. There are host-composed tables in this app; finding none means the shape has changed and this check is watching nothing:\n  ` +
+        seen.join("\n  ")
+    ).toBeGreaterThanOrEqual(2)
+
     expect(
       offenders,
       "a host-composed table's headings are the app's own words and must be translated"

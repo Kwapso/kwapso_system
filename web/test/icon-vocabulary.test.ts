@@ -193,6 +193,26 @@ describe("the icon vocabulary", () => {
 
   it("icon-vocabulary: nothing outside the kit supplies an icon", () => {
     const offenders: string[] = []
+    /* THE ONE FLOOR THIS CENSUS CAN HAVE, AND WHY IT IS A FILE COUNT.
+     *
+     * The floors above are on the KIT's vocabulary — `vocab.size`, the tab and
+     * concept maps — and none of them touches the walk below. This scan is the
+     * other direction: it reads the two front doors looking for an import of
+     * lucide/heroicons/react-icons/tabler, and the correct answer is that there
+     * are none. So there is no positive control available: a control would have
+     * to be a foreign icon pack imported on purpose, which is the thing being
+     * forbidden. The floor therefore asks the only question left — did it OPEN
+     * anything? — because a walk over three renamed roots reports a clean app
+     * having read nothing. */
+    const walked = [
+      ...sources(join(ROOT, "web")),
+      ...sources(join(ROOT, "web-portal")),
+      ...sources(join(ROOT, "shared", "web")),
+    ]
+    expect(
+      walked.length,
+      `only ${walked.length} front-door files were read — this census is clearing an app it never opened`
+    ).toBeGreaterThan(150)
     for (const f of [
       ...sources(join(ROOT, "web")),
       ...sources(join(ROOT, "web-portal")),

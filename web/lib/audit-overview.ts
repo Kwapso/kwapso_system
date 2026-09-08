@@ -7,6 +7,7 @@
 // properties) and then rendered from the raw English anyway — translated, and
 // never asked for.
 import { formatRelative, type Translate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import type { Language } from "@shared/i18n"
 
 export type AuditMeta = {
@@ -27,12 +28,19 @@ export type AuditMeta = {
  *
  * The VALUES are not translated and must not be: four of them are a person's
  * name or a timestamp, and the fifth is a status word the caller has already put
- * through its own vocabulary. */
+ * through its own vocabulary.
+ *
+ * The two NAMES are shortened to a first name on the way through (R54). This is
+ * the record-chrome footer's twin — the same two facts, drawn into an Overview
+ * DescriptionList instead of the ink footer — and its one caller is the
+ * knowledge item, which the portal cannot create, so both people here are ours.
+ * There is no client-population prop for that reason; add one the day something
+ * a contact can author is drawn through this. */
 export function auditItems(a: AuditMeta, t: Translate, lang: Language): { label: string; value: string }[] {
   return [
-    { label: t("Created by"), value: a.createdByName || "—" },
+    { label: t("Created by"), value: staffNameFromSnapshot(a.createdByName) || "—" },
     { label: t("Created"), value: a.createdAt ? formatRelative(a.createdAt, t, lang) : "—" },
-    { label: t("Last edited by"), value: a.editedByName || "—" },
+    { label: t("Last edited by"), value: staffNameFromSnapshot(a.editedByName) || "—" },
     { label: t("Last edited"), value: a.updatedAt ? formatRelative(a.updatedAt, t, lang) : "—" },
     { label: t("Status"), value: a.status },
   ]

@@ -17,6 +17,7 @@ import type { PickablePerson } from "@/lib/members"
 import { ApiFailure } from "@/lib/api"
 import { letterMark } from "@/lib/identity"
 import { useT } from "@shared/web/language"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { RecordPicker } from "@/components/records/record-picker"
 
@@ -78,7 +79,13 @@ export function HelpStakeholders({
                 <AvatarFallback>{letterMark(s.name || s.email)}</AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1 basis-[12rem]">
-                <p className="truncate text-sm font-medium">{s.name || s.email}</p>
+                {/* R54. `origin: "raiser"` is the one value here that can be a client
+                    contact — every other way onto this list (an admin, a mention, a
+                    colleague added by hand) is one of ours. A contact keeps their
+                    name; we are named by our first. */}
+                <p className="truncate text-sm font-medium">
+                  {(s.origin === "raiser" ? s.name : staffNameFromSnapshot(s.name)) || s.email}
+                </p>
                 <p className="text-muted-foreground truncate text-xs">{s.email}</p>
               </div>
               <Badge variant="secondary" className="text-badge">

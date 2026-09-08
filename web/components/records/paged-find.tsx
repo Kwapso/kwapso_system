@@ -69,14 +69,17 @@
 import * as React from "react"
 
 import { cn } from "@shared/ui/lib/utils"
+import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-debounce"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { SortControl } from "@shared/ui/components/sort-control/sort-control"
+import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
+import type { ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -157,6 +160,7 @@ export function PagedFind<T>({
   tabs,
   wrap,
   actions,
+  view,
   restingEmpty,
   restingLoading = false,
   children,
@@ -256,6 +260,24 @@ export function PagedFind<T>({
    * default, which is every existing call site's markup, unchanged.
    */
   actions?: (ctx: { queryString: string }) => React.ReactNode
+  /** THE VIEW SWITCH, between the sort control and `actions` — R53's own fixed
+   * slot order (search → filters → sort → view → actions), which this row keeps
+   * because it IS one of the app's two toolbars rather than an exception to
+   * them (`TOOLBAR_CONTROL_OWNERS` names this file for exactly that reason).
+   *
+   * A CONFIG AND NEVER A NODE, the same type `<ToolbarRow>` takes, so the
+   * placement, the wrapper and the accessible name are this row's and there is
+   * nothing a call site could put in the wrong slot. It exists because the app
+   * record's Tickets tab grew a second body (a list and a dashboard, client
+   * ruling 6 Sep 2026) and there is no tab strip inside a record's tab to add
+   * one to — "there can never be 2 rows of tabs", her own words — so the switch
+   * has to live on the toolbar, and BOTH bodies have to draw the same control in
+   * the same place or it moves as you use it.
+   *
+   * `undefined` is every other call site, unchanged, and needs no exemption
+   * entry: `ViewSwitch` renders nothing for fewer than two views, so a
+   * single-body collection is self-exempting (R53 says so about this prop). */
+  view?: ToolbarViewSlot | false | null
   /** R50 — "never toolbar on empty collection", the same rule `ToolbarRow`
    * (screen-bits.tsx) enforces for the app's other, bounded toolbar, now
    * required here too. This file drew its own search/filters/sort/actions
@@ -306,7 +328,36 @@ export function PagedFind<T>({
   // moved is exactly the silent loss R14 exists to prevent. She comes back to
   // her question, freshly answered.
   //
-  // Debounced upstream by SearchInput (200ms), so a keystroke is not a request.
+  // WHAT IS REMEMBERED IS WHAT SHE TYPED. What is ASKED is `term`, below —
+  // two values, and the comment that used to stand here said otherwise.
+  //
+  // IT SAID: "Debounced upstream by SearchInput (200ms), so a keystroke is not
+  // a request." That was never true. The kit's `SearchInput`
+  // (`shared/ui/components/search-input/search-input.tsx`) holds one piece of
+  // state, whether the field is non-empty, so it knows whether to draw its own
+  // ✕; its `handleChange` calls `onChange` synchronously and there is no timer
+  // anywhere in the file. So every keystroke in this box built a new `query`,
+  // a new `findKey`, and a new `useCached` subscription — a door read per
+  // letter, each landing in a cache entry of its own. A false comment is worse
+  // than no comment: somebody read this one, reasonably believed it, and the
+  // box shipped undebounced across nine call sites for as long as it has
+  // existed. The sentence is kept, struck through, because the reason nobody
+  // noticed is worth more to the next reader than a clean file.
+  //
+  // SHOULD THE KIT OWN THE DEBOUNCE INSTEAD? No, and this is not the app
+  // working around a gap. `SearchInput` is a FIELD: it draws a pill, an icon
+  // and a clear control, and `onChange` on a text field means "the text
+  // changed", which is a fact about the keyboard and is never late. A field
+  // that fired `onChange` 200ms after the keystroke could not be used as a
+  // controlled input at all — the value prop would lag the caret and swallow
+  // letters, which is precisely the bug the two-value shape below exists to
+  // avoid. WHAT is debounced is also not the field's to decide: this box
+  // debounces the READ while the facet chips and the sort control beside it
+  // change the same question immediately, because a click is one deliberate
+  // act and a keystroke is one of five. The kit already ships the right piece
+  // for this at the right layer — `useDebouncedCallback`, its own "behaviour
+  // only, no design" primitive — and the app composes the two. Nothing is
+  // owed upstream.
   const [question, remember] = useRemembered<{
     text: string
     values: Record<string, string>
@@ -345,14 +396,81 @@ export function PagedFind<T>({
     }
   )
   const { text, values, sortBy, sortDir } = question
-  const setText = (next: string) => remember((q) => ({ ...q, text: next }))
+
+  // ── WHAT IS TYPED, AND WHAT IS ASKED ──────────────────────────────────────
+  //
+  // Two values, the same shape `record-picker.tsx` has held since its door
+  // search was built and `tickets-dashboard.tsx` copied for the same reason:
+  // the box has to keep up with the keyboard while the request does not. A
+  // single value cannot do both. Debounce the ONE value and the field lags the
+  // caret and swallows letters; debounce NEITHER and every letter is a door
+  // read — which is what this file did.
+  //
+  // WHAT IT COST. `findKey` is built from the whole question, so "Confia" was
+  // six distinct keys and six reads where one was meant, and every one of the
+  // nine call sites is genuinely door-backed (every `fetchPage` in the app is
+  // a `contentApi.*`/`tenancy.*` call; there is no in-memory one to be
+  // harmless about). On the app-record panels the same seam serves five
+  // collections, and on the ticket list a letter is a scan of the backlog.
+  //
+  // 200ms AND THE KIT'S OWN HOOK, deliberately not a third pattern: the same
+  // delay and the same `useDebouncedCallback` the picker and the dashboard
+  // use, so the app has one answer to "how long does a search box wait" rather
+  // than three that happen to agree today.
+  //
+  // ONLY THE TYPED TERM IS DEBOUNCED. The facet chips, the sort control and
+  // the tab strip's `fixed` narrowing all change `query` the instant they are
+  // clicked, and must: a click is one decided act, and delaying it would make
+  // a control feel broken rather than a search feel calm. `q` is the only part
+  // of this question a person produces five of by accident.
+  //
+  // SEEDED FROM THE REMEMBERED TEXT, not from "". `useRemembered` reads its
+  // slot once at mount, so on the second visit `question.text` is already the
+  // word she left in the box — and this initialiser runs in that same first
+  // render, so she comes back to her question ANSWERED rather than to a filled
+  // box above the unfiltered list waiting on a keystroke that never comes.
+  const [term, setTerm] = React.useState(() => question.text.trim())
+  const askDoor = useDebouncedCallback(setTerm, 200)
+
+  const setText = (next: string) => {
+    remember((q) => ({ ...q, text: next }))
+    // CLEARING IS IMMEDIATE, NEVER DEBOUNCED — client-side rule, and the one
+    // moment a debounce is felt rather than unnoticed: "show me everything
+    // again" is a single deliberate act, and making somebody wait a fifth of a
+    // second for LESS work is the wrong trade in both directions (it is also
+    // the cheapest read on the screen, and usually a cache hit, because the
+    // resting collection's own key is still warm underneath).
+    //
+    // EMPTYING THE BOX IS CLEARING, whichever way it is done. The kit's ✕ and
+    // holding backspace produce the same intent and the same empty string, so
+    // the decision is made on the VALUE here rather than in two handlers that
+    // would have to be kept agreeing.
+    //
+    // AND THE PENDING CALL IS CANCELLED, which is the half that is easy to
+    // miss: without it, clearing within 200ms of the last keystroke lets the
+    // trailing timer fire afterwards and set `term` straight back to the word
+    // that was just cleared — the full list appears and then silently
+    // re-narrows itself. `cancel()` is on the hook's own returned handle
+    // precisely for this.
+    const asking = next.trim()
+    if (asking === "") {
+      askDoor.cancel()
+      setTerm("")
+      return
+    }
+    askDoor(asking)
+  }
   const setValues = (next: Record<string, string>) => remember((q) => ({ ...q, values: next }))
   const setSortBy = (next: string) => remember((q) => ({ ...q, sortBy: next }))
   const setSortDir = (next: "asc" | "desc" | null) => remember((q) => ({ ...q, sortDir: next }))
 
   const query: FindQuery = {}
   for (const [field, value] of Object.entries(values)) if (value) query[field] = value
-  const q = text.trim()
+  // THE ASKED TERM, NEVER THE TYPED TEXT. This one line is the whole fix: it
+  // is what keeps a burst of keystrokes inside ONE `query`, therefore one
+  // `findKey`, therefore one subscription and one door read. Reading `text`
+  // here is exactly what made a five-letter word five questions.
+  const q = term
   if (q) query.q = q
   // WHAT THE PERSON IS ASKING, kept apart from what the SCREEN is asking: the
   // door is given both, but the "N accounts match" line belongs to the question
@@ -399,6 +517,20 @@ export function PagedFind<T>({
 
   const showFilters = facets.length > 0
   const showSort = sorts.length > 0
+
+  // TYPED BUT NOT YET ASKED — the same disclosure `record-picker.tsx` makes,
+  // and it is not decoration. In the gap the box runs ahead of the request, so
+  // the rows underneath and the "N accounts match" line beside it are still
+  // the PREVIOUS question's answer, sitting under new words. That looks
+  // exactly like a search that returned the wrong rows. So the field says it
+  // is still looking (the kit's own `loading`: the glyph becomes the spinner
+  // and `aria-busy` is announced, and — its one deliberate divergence from
+  // `input` — the field stays fully editable, which is the whole point here),
+  // and the match count stands down rather than confidently counting the word
+  // she has already typed past. The ROWS are deliberately left alone: blanking
+  // a list for a fifth of a second on every keystroke is a flicker, and a
+  // slightly stale list under a spinner is the honest, calm reading.
+  const typing = text.trim() !== term
 
   // R50 — GENUINELY EMPTY, READ THE SAME WAY `collection-frame.tsx`'s
   // `isEmptyState` IS: the resting list has nothing in it AND nothing is
@@ -487,7 +619,25 @@ export function PagedFind<T>({
         // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
         // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
         // from that file inherited the same latent mismatch.
-        "flex min-w-0 flex-col bg-[var(--surface-raised)]",
+        // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
+        // reason the toolbar's buttons had no background. The kit rebinds
+        // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
+        // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
+        // secondary button is always the other tone from whatever it stands on
+        // and no component needs a prop. `bg-[var(--surface-raised)]` paints
+        // the identical colour but is a DIFFERENT CLASS, so no selector in that
+        // list matched, the rebind never fired, and the token stayed at its
+        // base `var(--card)` — the same #FFFEF9 this container is painted with.
+        // Beige on beige: the client, twice, "the buttons in the toolbar are
+        // missing the background". `bg-surface-raised` is a real generated
+        // utility (tokens.css bridges `--color-surface-raised` precisely so it
+        // exists), paints the same colour, and IS in the list — so every
+        // secondary control inside now resolves to `--surface-panel` #F7F2EB.
+        //
+        // THE RULE, not the patch: an element that paints a GROUND uses the
+        // named utility. The `bg-[var(--token)]` escape hatch silently freezes
+        // every ground-aware token beneath it.
+        "flex min-w-0 flex-col bg-surface-raised",
         filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
       )}
     >
@@ -514,8 +664,14 @@ export function PagedFind<T>({
           <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
             <SearchInput
               value={text}
+              // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
+              // keystroke, unconditionally; only the DOOR waits (`setText`
+              // above owns that decision, so the clear path and the type path
+              // cannot drift apart). `onClear` is the same call with an empty
+              // string, which `setText` reads as the deliberate act it is.
               onChange={(e) => setText(e.currentTarget.value)}
               onClear={() => setText("")}
+              loading={typing || found.loading}
               placeholder={placeholder}
               className="w-full"
             />
@@ -552,12 +708,29 @@ export function PagedFind<T>({
               hideLabel
             />
           )}
+          {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT AND THE
+              ACTIONS — R53's fixed order, the same one `<ToolbarRow>` draws, so
+              a reader who learns the row on one screen has learned it on all of
+              them. Built HERE from the config rather than by the call site, for
+              the reason that law is a change of TYPE: a node slot accepts the
+              right control, no control, or the control belonging in a different
+              slot, and no census can tell which. */}
+          {view && (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ViewSwitch
+                views={view.views}
+                value={view.value}
+                onValueChange={view.onValueChange}
+                label={t("View")}
+              />
+            </div>
+          )}
           {/* THE FILTERED TOTAL — the exact server count of the question being
               asked, through the one seam allowed to end in a "+" (the collection's
               own count above is exact and never does). It appears only while
               something IS being asked, so an unfiltered screen looks exactly as it
               did before. */}
-          {asked && !found.loading && (
+          {asked && !found.loading && !typing && (
             <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
               {!total
                 ? matches.none

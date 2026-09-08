@@ -1,11 +1,13 @@
 "use client"
 
-// One knowledge source, as a tabbed record: Source / Overview / Activity (the
-// standard every record gets, R2). Source = the exact words the assistant reads
-// out of it, where they came from, and the two controls that matter — correct
-// it, or take it away. Overview = how it is filed, who may use it, how many
-// searchable pieces it became and when it was last indexed. Activity = its
-// history through the GENERIC record feed (R5).
+// One knowledge source, as a tabbed record: Source / Overview. Source = the
+// exact words the assistant reads out of it, where they came from, and the two
+// controls that matter — correct it, or take it away. Overview = how it is
+// filed, who may use it, how many searchable pieces it became and when it was
+// last indexed. Its history is still the GENERIC record feed (R5) and is still
+// read here — it is simply not a tab any more: it is reached from the ink
+// footer's Latest activity column, on the client's 2026-09-06 ruling, and
+// web/components/records/activity-panel.tsx carries that ruling and the argument.
 //
 // WHY THE TEXT IS SHOWN IN FULL rather than summarised: this screen is the
 // answer to "what does it actually know?", and a summary of the material is a
@@ -34,7 +36,6 @@ import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/reco
 import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
@@ -137,9 +138,9 @@ export function KnowledgeDetailScreen({
     primeCache(`knowledge:one:${sourceId}`, next)
     const cur = sourcesQ.data
     if (cur) primeCache(knowledgeKey(teamId), cur.map((s) => (s.id === sourceId ? next : s)))
-    // The Activity tab's rows AND its badge come from one fetcher, so dropping
-    // the key re-primes both — a hand-rolled refetch used to refresh the rows
-    // and leave the count behind.
+    // The footer's Latest activity rows AND the total come from one fetcher, so
+    // dropping the key re-primes both — a hand-rolled refetch used to refresh
+    // the rows and leave the count behind.
     invalidate(recordActivityKey("knowledge_sources", sourceId))
   }
 
@@ -287,13 +288,9 @@ export function KnowledgeDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a source's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -339,6 +336,13 @@ export function KnowledgeDetailScreen({
           </Button>
         )
       }
+      // THE ONE DETAIL THAT NEVER PASSED THIS, and the tab is why. Twelve of the
+      // thirteen bespoke details already hand `RecordScreen` their feed for the
+      // ink footer's Latest activity column; this one showed its history only in
+      // the Activity tab, so when the tab went (client, 2026-09-06) a source's
+      // history would have had nowhere left to be read at all. Same hook, same
+      // rows, the place every other record already puts them.
+      activity={activity}
     >
       <TabsView
         className={STICKY_TABS}
@@ -348,8 +352,6 @@ export function KnowledgeDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return <ActivityPanel activity={activity} />
           if (panel.value === "map")
             return mapQ.data ? (
               <RelationshipMap

@@ -15,15 +15,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@shared/ui/components/avata
 // see the note above `NavBrandHeader` for why this file draws the mark itself
 // instead of leaving it to Rail's own default.
 import { Isotype, Logotype, type BrandField } from "@shared/ui/components/brand/brand"
-// THE TRAIL, AS FOLDER TABS (kit v1.2.28). It used to be `Breadcrumbs` — a line
-// of text inside the card's header band. The reshaped `ScreenShell` gives the
-// trail its own slot ON THE GROUND, directly above the card, and the strip's
-// last tab is the card's own fill so the two read as one silhouette. Same
-// array, same `BreadcrumbsItem` shape, same fold rule (`collapse`, shared
-// between the two drawings); what changed is where it stands and what it is
-// made of. See the `breadcrumb` prop below for the client rule that governs
-// the strip: NAVIGATION TEXT ONLY, no controls on the ground.
-import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
+// THE TRAIL, AS FOLDER TABS (kit v1.2.28, workspace-tab props at v1.2.59). It
+// used to be `Breadcrumbs` — a line of text inside the card's header band. The
+// reshaped `ScreenShell` gives the trail its own slot ON THE GROUND, directly
+// above the card, and the strip's last tab is the card's own fill so the two
+// read as one silhouette. Same array, same fold rule (`collapse`, shared
+// between the two drawings) for an ordinary trail; what changed is where it
+// stands and what it is made of. See the `breadcrumb` prop below for the
+// client rule that governs the strip: NAVIGATION TEXT ONLY, no controls on the
+// ground — a rule the kit's own `onClose` button does not break, because a
+// close mark is not a screen action, it is the strip closing one of itself.
+import { Button } from "@shared/ui/components/button/button"
+import {
+  BreadcrumbFolders,
+  type BreadcrumbFoldersItem,
+} from "@shared/ui/components/breadcrumbs/breadcrumb-folders"
 // The rule between the phone sheet's own named blocks (`railBlocks.map`,
 // below). Used to be a hand-rolled `<div className="bg-border h-px w-full"
 // role="separator" />`, the kit's own default weight spelled out by hand and
@@ -34,6 +40,7 @@ import { BreadcrumbFolders } from "@shared/ui/components/breadcrumbs/breadcrumb-
 // itself inside one `<nav>`, so there is no seam to interleave a real node
 // into — see `RAIL_CONTENT_OVERRIDES`, below, for the same hairline painted
 // from outside instead.
+import { Sparkle } from "@shared/ui/foundations/icons"
 import { Separator } from "@shared/ui/components/separator/separator"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
@@ -348,11 +355,36 @@ export function AppShell({
   children,
   breadcrumbs,
   onNavigate,
+  onCloseCrumb,
+  activeCrumbIndex,
   activePath,
 }: {
   active: ActiveTeam
   children: React.ReactNode
   breadcrumbs?: Crumb[]
+  /** CLOSE THE TAB THIS CRUMB IS. Given only when the strip is drawing the
+   * WORKSPACE TAB SET rather than the address's own trail — see `Crumb.closeKey`
+   * in lib/pages.ts. Absent on the phone and on any screen whose set is still
+   * empty, where the strip is the ordinary trail and there is nothing to close.
+   * Wired straight to the kit's own `onClose` (`BreadcrumbFolders`, kit
+   * v1.2.59) — the button it draws is a real sibling of the crumb's link, not
+   * a mark riding inside it, so this callback fires from a genuine click or
+   * keypress on that button and needs no interception. */
+  onCloseCrumb?: (closeKey: string) => void
+  /** WHICH CRUMB IN `breadcrumbs` IS THE TAB BEING LOOKED AT — the kit's own
+   * `activeIndex` (`BreadcrumbFoldersProps`, v1.2.59), forwarded untouched.
+   * Given only alongside `onCloseCrumb`, for the same reason and never
+   * otherwise: an ordinary trail's last crumb IS the current page, always, so
+   * leaving this `undefined` there is what keeps a trail rendering exactly as
+   * it did before this prop existed (the kit's own default is `items.length -
+   * 1`). The workspace tab set is the one caller with anything else to say —
+   * since `web/lib/workspace-tabs.ts` stopped re-ordering its set on
+   * activation, the tab being looked at can sit anywhere in `breadcrumbs`, and
+   * the caller that built that array from the store (`useOpenTabs`,
+   * `useActiveTabPath`) is the one that knows where. This file does not
+   * compute it — it has no opinion of its own about which tab is open, only
+   * about how to draw one that is. */
+  activeCrumbIndex?: number
   /** How a breadcrumb / nav link navigates. The deep-link host passes its
    * History-API `go` so in-team moves don't trigger a full reload; other pages
    * fall back to the router. */
@@ -484,6 +516,45 @@ export function AppShell({
   const trail = breadcrumbs ?? []
   const navigate = onNavigate ?? softNavigate
   const here = activePath ?? pathname
+
+  // ── THE CLOSE AFFORDANCE ON A TAB — NOW THE KIT'S OWN BUTTON ────────────────
+  //
+  // The client, 2026-09-06: "then we'll need a x icon on the tabs to close
+  // them". Until kit v1.2.59 this could not be a real `<button>`: the kit
+  // drew a resting tab as `<BreadcrumbLink>` → a real `<a href>`, and
+  // interactive content inside an anchor is invalid HTML, so the × had to ride
+  // inside the crumb's own `label` as a plain, `aria-hidden` `<span>` caught by
+  // an `onClickCapture` on the strip — an affordance a keyboard or
+  // screen-reader user could not operate, and the app said so rather than
+  // pretending otherwise.
+  //
+  // THAT SPAN AND THAT INTERCEPTION ARE GONE. `BreadcrumbFolders` now draws
+  // the × itself, as a real sibling `<button>` beside the crumb's link inside
+  // the `<li>` — never nested in the anchor — with its own accessible name and
+  // its own place in the tab order. This file's only job is to say WHICH
+  // crumbs may be closed (`closable`, below) and where a close lands
+  // (`onCloseCrumb`, wired straight to the kit's `onClose` in the `breadcrumb`
+  // slot). Nothing here draws a glyph, sizes a hit region, or intercepts a
+  // click for this any more — the kit owns all three now.
+  const crumbItems: BreadcrumbFoldersItem[] = trail.map((crumb, index) => ({
+    // A STABLE KEY, WHICH THE TAB SET NEEDS AND THE TRAIL NEVER DID. Crumbs
+    // used to be keyed by position, and position is stable in a trail because
+    // the trail is rebuilt whole on every address change. A tab set is not: a
+    // close removes one item from the middle and React must move the survivors
+    // rather than relabel them, or the tab under the pointer inherits the
+    // closed one's identity. The address is that identity.
+    key: crumb.closeKey ?? `crumb-${String(index)}`,
+    href: crumb.href,
+    label: crumb.label,
+    // ONLY A CRUMB WITH ITS OWN ADDRESS TO CLOSE MAY BE SHUT. `onClose` on the
+    // strip (below) makes EVERY item closable by default (`closable ?? true`
+    // is the kit's own rule) — so a plain trail crumb with no `closeKey` has
+    // to opt out explicitly, or it would grow a × with nothing for
+    // `onCloseCrumb` to identify it by. Harmless either way when
+    // `onCloseCrumb` itself is absent: the kit ignores `closable` entirely
+    // when it is never given an `onClose` to call.
+    closable: crumb.closeKey !== undefined,
+  }))
 
   /** CLICKING A SECTION, WHICH IS NOT THE SAME AS FOLLOWING A LINK — it is the
    * one control in the app that names a section rather than a destination, so
@@ -1173,7 +1244,19 @@ export function AppShell({
           header band, because it is a full-bleed, bg-card, bordered surface
           and the header band's whole law is that it paints no fill of its
           own. */}
-      <header className="bg-card fixed inset-x-0 top-0 z-20 flex h-[var(--shell-top)] min-w-0 items-center justify-between gap-2 overflow-hidden shadow-[var(--hairline-under)] px-4 md:hidden">
+      {/* NO FILL AND NO HAIRLINE — client, 2026-09-04: "despite keeping the
+          top bar where it is fixed, with logo avatar and ai butto, merge the
+          background with the background (I dont want it being white, but no
+          difference from background)". It was `bg-card` plus
+          `shadow-[var(--hairline-under)]`, i.e. a paper plank with a rule
+          under it, and on a phone that read as a white strip pasted over the
+          spine. Both are gone; the controls now sit directly on the ground
+          and the bar is invisible AS A BAR while staying exactly where it
+          was. `--shell-top` still reserves its height, so nothing scrolls
+          underneath the logo — the content column starts below it, which is
+          what keeps "no difference from background" literally true instead
+          of merely mostly true. */}
+      <header className="fixed inset-x-0 top-0 z-20 flex h-[var(--shell-top)] min-w-0 items-center justify-between gap-2 overflow-hidden px-4 md:hidden">
         <div className="flex min-w-0 shrink items-center">
           <TeamSwitcher active={active} onCreateTeam={() => setCreating(true)} />
         </div>
@@ -1187,6 +1270,36 @@ export function AppShell({
               collapse to an icon, and on a 375px screen it pushed the avatar
               off the edge and the whole PAGE sideways with it. It lives in
               Gear, under the text size, and in the profile menu. */}
+          {/* THE ASSISTANT, IMMEDIATELY LEFT OF THE FACE — client: "in mobile,
+              put the ai assistant icon on the left of my avtara picture o
+              top, visible all times". DOM order is the reading order, so
+              placing it before `ProfileMenu` puts it left in LTR and right
+              in RTL without a single directional class.
+
+              WHY THIS BAR DRAWS IT AND NOT THE KIT'S. `ScreenShell` grew a
+              mobile top bar of its own on 2026-09-04 that carries exactly
+              this button beside a face. This app cannot use that row: its
+              face is a profile MENU, not a drawn avatar, and the kit's
+              `navMember` takes a person's data rather than a control — so
+              adopting it would have cost the profile menu its menu, and
+              rendering both bars would have put two faces on one 380px
+              screen. `narrowTopBar={false}` below turns the kit's row off
+              and this line is the duty that comes with it.
+
+              Same handler and same two strings the kit's own trigger and
+              the desktop edge handle use, so one action never grows two
+              names. It is `md:hidden`'s child, so it exists only where the
+              desktop handle does not. */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon"
+            aria-label={assistantOpen ? t("Close the assistant") : t("Open the assistant")}
+            aria-expanded={assistantOpen}
+            onClick={() => setAgentOpen(!assistantOpen)}
+          >
+            <Sparkle aria-hidden="true" />
+          </Button>
           <ProfileMenu active={active} />
         </div>
       </header>
@@ -1327,6 +1440,10 @@ export function AppShell({
            "Close the assistant" is new (R28: extracted, catalogued, and the
            ceiling moved in the same commit). */
         aside={can("agent", "create") ? <AgentDockSlot /> : undefined}
+        /* THIS APP DRAWS ITS OWN MOBILE TOP BAR — see the `<header>` above and
+           the assistant trigger inside it for why the kit's row cannot carry
+           a profile menu. Without this the two would stack. */
+        narrowTopBar={false}
         asideLabel={t("Assistant")}
         asideOpen={assistantOpen}
         onAsideOpenChange={setAgentOpen}
@@ -1355,14 +1472,87 @@ export function AppShell({
              inline form the law names. */
           trail.length === 0 ? undefined : (
             <BreadcrumbFolders
-              items={trail}
+              items={crumbItems}
+              /* WHICH CRUMB IS THE TAB BEING LOOKED AT — forwarded straight
+                 through from this file's own `activeCrumbIndex` prop (see its
+                 doc). `undefined` on every ordinary trail, which is the kit's
+                 own "last item" default and byte-for-byte what this strip drew
+                 before this prop existed. */
+              activeIndex={activeCrumbIndex}
+              /* THE CLOSE BUTTON, THE KIT'S OWN NOW. `undefined` when
+                 `onCloseCrumb` is absent — an ordinary trail — so nothing
+                 grows a × and `closable` on `crumbItems` is never even
+                 consulted. Given, every item this file marked `closable`
+                 (i.e. every one with its own `closeKey`) grows the kit's real
+                 sibling `<button>`, and a press on it calls straight back
+                 here with the same key `onCloseCrumb` has always taken —
+                 nothing left to intercept, nothing left to route by hand. */
+              onClose={
+                onCloseCrumb
+                  ? (item) => {
+                      if (item.key) onCloseCrumb(item.key)
+                    }
+                  : undefined
+              }
+              /* THE VERB IN THE CLOSE BUTTON'S OWN ACCESSIBLE NAME — "Close
+                 tab: Halloway" rather than a bare "Close", per the kit
+                 author's own note on `closeLabel`: joined with the crumb's
+                 label so a reader tabbing down a strip of six hears WHICH one
+                 each button shuts. Every crumb's `label` here is `Crumb`'s own
+                 `string` (lib/pages.ts) — never a node — so the kit's default
+                 join needs no per-item override (`BreadcrumbFoldersItem.
+                 closeLabel` is for a label the join cannot read text out of).
+                 Translated (R28): a new user-visible string, seeded in
+                 `shared/i18n-seed.ts`. Harmless to pass when `onClose` is
+                 absent — the kit draws no close button to announce it with. */
+              closeLabel={t("Close tab")}
+              /* NO `foldAfter` ANY MORE. It used to be the only lever this
+                 file had for "do not fold a set of open tabs into a `···`
+                 menu" — passing the set's own ceiling so nothing could ever
+                 exceed it — but the kit now decides that itself: `onClose`
+                 alone turns folding off (`BreadcrumbFoldersProps.onClose`'s
+                 own doc — a folded tab's × lives inside a `DropdownMenu` that
+                 PORTALS outside this `<nav>`, unreachable by keyboard and by
+                 the interception this file used to run), and a plain trail
+                 still gets the kit's own default fold at four. Passing
+                 anything here would either fight that default for no reason
+                 or restate a number the kit no longer needs restated. */
               onClickCapture={(e) => {
+                // R37: the kit renders REAL `<a href>` crumbs, and the plain
+                // left click is intercepted into the app's own soft-navigation
+                // bus. This is the strip's ENTIRE click interception now — the
+                // close mark used to ride inside the same anchor and had to be
+                // caught here FIRST, before this lookup could mistake a press
+                // on it for a press on the link; the kit's own close button is
+                // a sibling of the link rather than a descendant, so a click on
+                // it never reaches this handler carrying an `<a>` ancestor at
+                // all, and there is nothing left here to special-case.
                 const a = (e.target as HTMLElement).closest("a")
                 if (!a) return
                 const href = a.getAttribute("href")
                 if (!href || !href.startsWith("/")) return
                 e.preventDefault()
                 ;(onNavigate ?? softNavigate)(href)
+              }}
+              // MIDDLE-CLICK CLOSES A TAB, which is the gesture the client is
+              // already asking us to replicate ("the tab behaviour of chrome")
+              // and the one place where matching Chrome costs a single handler.
+              // `onAuxClick` fires for button 1 only after the browser's own
+              // auxiliary action would have opened a new window, so it is
+              // cancelled here for a tab that is ours to close; a middle-click
+              // anywhere else in the strip is left alone. Unaffected by the
+              // close button landing for real: this reads the crumb's own
+              // `href`, not the workaround's span, and always has.
+              onAuxClick={(e) => {
+                if (e.button !== 1 || !onCloseCrumb) return
+                const href = (e.target as HTMLElement).closest("a")?.getAttribute("href")
+                // Only a tab, and only one this strip is actually holding — the
+                // handler is on the whole `<nav>`, so it must not act on an
+                // href it does not recognise.
+                const tab = trail.find((crumb) => crumb.href === href && crumb.closeKey)
+                if (!tab?.closeKey) return
+                e.preventDefault()
+                onCloseCrumb(tab.closeKey)
               }}
             />
           )

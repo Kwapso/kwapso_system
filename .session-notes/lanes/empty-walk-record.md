@@ -110,7 +110,7 @@ an empty screen rather than a probe that finds nothing.
 
 1. **Sprints' landing tab draws a bare line.** The Overview tab — the one a new
    team lands on — renders `<EmptyLine concept="sprints">No sprints yet.</EmptyLine>`
-   (`web/components/sprints-screen.tsx:547`): a title, no sentence, no action.
+   (`web/components/work/sprints-screen.tsx:547`): a title, no sentence, no action.
    The helpful register exists one tab over on "All sprints", and the recipe
    itself is fine (rendering `sprints.list` empty gives "No sprints yet. /
    Whatever you add shows up here. The first one takes a minute. / Add the

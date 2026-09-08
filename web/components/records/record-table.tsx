@@ -65,6 +65,7 @@ import * as React from "react"
 import { ArrowDown, ArrowUp, ArrowsDownUp, DotsThree } from "@shared/ui/foundations/icons"
 
 import { CollectionFrame } from "@shared/web/screen-engine/collection-frame"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import type { ScreenActionContext } from "@shared/web/screen-engine/screen-renderer"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 import { gateState, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
@@ -104,7 +105,74 @@ export type TableColumn = {
   label: string
   sort?: string
   defaultDir?: "asc" | "desc"
+  /** WHAT THIS COLUMN IS, for the purpose of putting two of them in order.
+   * Absent means `"text"`, which is what every column was before this existed
+   * and is the right answer for a name, a department or a status word. See the
+   * long note on `SortType` below for why a date has to say so out loud. */
+  sortType?: SortType
+  /** WHERE THE COMPARISON VALUE COMES FROM, when it is not the cell.
+   *
+   * Given a row, hand back the value to COMPARE — the raw one the row still
+   * carries beside the shaped cell (`dueOn` beside `deadline`), never the
+   * shaped cell itself. Absent means `row[key]`, i.e. compare what is drawn,
+   * which stays correct for a column whose text IS the fact. */
+  sortKey?: (row: TableRowData) => unknown
 }
+
+/** ── WHY A COLUMN HAS TO SAY WHAT IT IS ───────────────────────────────────────
+ *
+ * A cell holds a STRING SHAPED FOR A READER and a sort holds a QUESTION ABOUT A
+ * FACT, and for a whole class of columns those two are not the same value. A
+ * date column showing "14 Apr 2025", "22 Dec 2025", "3 Jan 2026" compared as
+ * text answers April, December, January — a real answer, in the wrong order,
+ * arrived at silently: the rows MOVE, the arrow lights, and nobody looking at
+ * the screen can tell the difference between a sort that worked and one that
+ * sorted the alphabet. It is the same shape of failure the header itself had
+ * (see the top of this file) one layer in: not a dead control, a lying one.
+ *
+ * The same is true of a duration, of money rendered as text, and of a count with
+ * a label glued to it ("10 · Do it now" against "9 · …").
+ *
+ * ── TWO KNOBS, BECAUSE THERE ARE TWO QUESTIONS ────────────────────────────────
+ *
+ * `sortType` and `sortKey` are both here, and neither collapses into the other:
+ *
+ *   • `sortKey` answers WHICH VALUE. The rows a table is handed are SHAPED rows
+ *     — `deadline: "14 Apr 2025"` — and the fact behind them (`dueOn`) is a
+ *     separate field the shaper carries along. Without this there is nothing to
+ *     compare but the shaped text, which is the bug.
+ *   • `sortType` answers HOW. Two ISO strings do compare correctly as text by
+ *     luck of the format, but "2026-06-13" and "2026-06-13T09:00:00.000Z" do
+ *     not, and a raw number formatted with grouping does not either. Naming the
+ *     kind is what makes the comparison a decision instead of a coincidence.
+ *
+ * A `sortKey` with no `sortType` is legitimate (compare a raw string by text);
+ * a `sortType` with no `sortKey` is legitimate too (a column whose cell already
+ * holds the raw value). Most date columns want both, and the census test —
+ * `web/test/sorted-columns-declare-their-type.test.ts` — is what stops the next
+ * one shipping with neither.
+ *
+ * ── LOCALE ───────────────────────────────────────────────────────────────────
+ *
+ * This app ships English, German, Spanish and Catalan (`shared/i18n.ts`), and
+ * the ONE thing this seam must never do is read the date back out of the words
+ * on screen. `formatDate(iso, "de")` produces "14.04.2025" and `formatDate(iso,
+ * "en")` produces "Apr 14, 2025"; a comparison that re-parsed either would be a
+ * comparison that changes its answer when somebody changes their language, and
+ * would need a month-name table per language to do it at all. The comparison
+ * here reads the RAW ISO instant off the row, so the order of the rows is
+ * identical in all four languages and the cell is free to be as warm and as
+ * local as it likes. That freedom is the point: it is what let the two date
+ * columns stop showing "2026-04-14" to a person.
+ *
+ * ── EMPTY ────────────────────────────────────────────────────────────────────
+ *
+ * A row with nothing in the column sorts to the END, both directions — see
+ * `isBlank`. For a typed column "nothing" is wider than an empty string: a
+ * value that will not parse as a date (or as a number) is missing too, because
+ * a `NaN` in a comparator does not sort a row to one end, it SCATTERS every row
+ * it is compared against. Predictably last is the only honest place for it. */
+export type SortType = "text" | "number" | "date"
 
 /** Blanks go LAST, whichever way the column is pointing.
  *
@@ -114,28 +182,100 @@ export type TableColumn = {
  * for finding the extremes of what you HAVE. */
 const isBlank = (v: unknown) => v == null || v === "" || v === "—"
 
-/** The comparison. Text, numerically aware — `numeric: true` is what makes
- * "10 · Do it now" fall after "9 · …" and costs nothing on the columns that are
- * already lexical (a date spelled `2026-04-14` compares segment by segment, and
- * correctly, which is the whole reason `formatDateSortable` exists). */
-function compare(a: unknown, b: unknown): number {
-  if (isBlank(a)) return isBlank(b) ? 0 : 1
-  if (isBlank(b)) return -1
+/** A date column's comparison value, as a number of milliseconds — `null` when
+ * there is nothing there to compare.
+ *
+ * `Date.parse` and nothing else: it reads both shapes the doors hand back, the
+ * full instant (`2026-09-21T00:00:00.000Z`) and the bare day (`2026-09-21`),
+ * and it reads NEITHER of the shapes a person sees, which is deliberate. If a
+ * caller points `sortKey` at the formatted cell by mistake, "Apr 14, 2025"
+ * happens to parse and "14.04.2025" does not — so the German build would sort
+ * differently from the English one. The census test is what catches that; this
+ * function's job is only to be unambiguous about what it accepts. */
+function instant(v: unknown): number | null {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.getTime()
+  if (typeof v === "number") return Number.isFinite(v) ? v : null
+  if (typeof v !== "string" || v.trim() === "") return null
+  const ms = Date.parse(v)
+  return Number.isFinite(ms) ? ms : null
+}
+
+/** A number column's comparison value — `null` when there is nothing to compare.
+ *
+ * STRICT ON PURPOSE. A real number passes, and so does a string that is ENTIRELY
+ * a number; anything else — "10 · Do it now", "€1,240.00", "3 days" — is `null`
+ * and lands at the end. The tempting alternative (strip the non-digits and hope)
+ * is the same locale trap the date half is avoiding: "1,240" is one thousand two
+ * hundred and forty in English and one-point-two-four in German, and a comparator
+ * that guesses gets one of those two wrong in silence. A column declaring
+ * `sortType: "number"` is telling this file the row carries the number; if it
+ * does not, every row is equally missing and the list simply keeps the order it
+ * arrived in, which is visible rather than wrong. */
+function quantity(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null
+  if (typeof v !== "string" || v.trim() === "") return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Is there anything here to compare, for a column of this kind? Wider than
+ * `isBlank` for the two typed kinds — see the `SortType` note on empty. */
+function missing(v: unknown, type: SortType): boolean {
+  if (type === "date") return instant(v) === null
+  if (type === "number") return quantity(v) === null
+  return isBlank(v)
+}
+
+/** The comparison, per kind.
+ *
+ * TEXT is the original, unchanged: numerically aware, because `numeric: true` is
+ * what makes "10 · Do it now" fall after "9 · …" without the column having to
+ * declare anything. It stays the default so a name column costs its caller
+ * nothing.
+ *
+ * DATE and NUMBER compare the parsed value, so what is on screen has no vote. */
+function compare(a: unknown, b: unknown, type: SortType = "text"): number {
+  if (missing(a, type)) return missing(b, type) ? 0 : 1
+  if (missing(b, type)) return -1
+  if (type === "date" || type === "number") {
+    const x = (type === "date" ? instant(a) : quantity(a)) as number
+    const y = (type === "date" ? instant(b) : quantity(b)) as number
+    return x < y ? -1 : x > y ? 1 : 0
+  }
   if (typeof a === "number" && typeof b === "number") return a - b
   return String(a).localeCompare(String(b), undefined, { numeric: true })
 }
 
 /** The rows, in the asked-for order. A COPY — the caller's array is the shaped
- * list other things on the screen read. */
-function ordered<T extends TableRowData>(rows: T[], by: string, dir: "asc" | "desc"): T[] {
+ * list other things on the screen read.
+ *
+ * STABLE, and it has to be: `Array.prototype.sort` has been required to be
+ * stable since ES2019, so two rows the column cannot tell apart keep the order
+ * the door handed them in. That is what makes the same list, sorted the same
+ * way twice, look the same twice — and it is what the "two tasks share a
+ * deadline" case in `table-header-sorts.test.tsx` is pinning. */
+function ordered<T extends TableRowData>(
+  rows: T[],
+  columns: TableColumn[],
+  by: string,
+  dir: "asc" | "desc"
+): T[] {
   if (!by) return rows
+  // The COLUMN, not just its name: the type and the value-reader hang off it.
+  // Found by `sort` (the name the header writes) rather than by `key`, because
+  // those are the same string only on a bounded table. A name no column claims
+  // falls back to reading the cell, which is what this did before.
+  const col = columns.find((c) => c.sort === by)
+  const type = col?.sortType ?? "text"
+  const read = col?.sortKey ?? ((row: TableRowData) => row[col?.key ?? by])
   const sign = dir === "desc" ? -1 : 1
-  // Blanks stay last in BOTH directions, so they are pushed out of the reversal.
-  return rows
-    .slice()
-    .sort((x, y) =>
-      isBlank(x[by]) || isBlank(y[by]) ? compare(x[by], y[by]) : compare(x[by], y[by]) * sign
-    )
+  return rows.slice().sort((x, y) => {
+    const a = read(x)
+    const b = read(y)
+    // Blanks stay last in BOTH directions, so they are pushed out of the reversal.
+    const flip = missing(a, type) || missing(b, type) ? 1 : sign
+    return compare(a, b, type) * flip
+  })
 }
 
 /** A trailing ⋯ entry. */
@@ -166,6 +306,7 @@ export function RecordTable<T extends TableRowData>({
   order,
   actions = [],
   onRowClick,
+  refColumn,
   className,
   useKitPanel,
 }: {
@@ -187,6 +328,16 @@ export function RecordTable<T extends TableRowData>({
    * chrome around it is the frame's decision either way, so this component
    * needs nothing of its own to carry the flag, only a place to pass it. */
   useKitPanel?: boolean
+  /** THE ROW KEY HOLDING THIS RECORD'S REFERENCE — the short code a person
+   * quotes on the phone. Drawn as the black chip in FRONT of the first
+   * column's cell, which is the client's own instruction ("put the ID before
+   * the title to the left, with the usual black chip design") and deliberately
+   * NOT a column of its own: a table's column budget is six (N1), and the same
+   * lozenge repeated down a seventh column is furniture rather than
+   * information. The meetings list already cut a `Reference` COLUMN for that
+   * reason; this puts the number back on the row without putting it back in
+   * the header. Omit it and every cell renders exactly as before. */
+  refColumn?: string
 }) {
   const [own, setOwn] = React.useState<{ by: string; dir: "asc" | "desc" } | null>(null)
   const live: CollectionOrder = order ?? {
@@ -195,7 +346,7 @@ export function RecordTable<T extends TableRowData>({
     set: (by, dir) => setOwn(by ? { by, dir } : null),
   }
   // When somebody else owns the order, the rows they hand over ARE the order.
-  const shown = order ? rows : ordered(rows, live.by, live.dir)
+  const shown = order ? rows : ordered(rows, columns, live.by, live.dir)
 
   /** A column cycles through its TWO directions and then back to the order the
    * collection arrived in. Three presses, three different lists.
@@ -288,7 +439,16 @@ export function RecordTable<T extends TableRowData>({
                   }
                 >
                   {columns.map((c) => (
-                    <TableCell key={c.key}>{row[c.key] as React.ReactNode}</TableCell>
+                    <TableCell key={c.key}>
+                      {refColumn && c === columns[0] ? (
+                        <span className={REF_LEADS_NAME}>
+                          <RecordRef value={row[refColumn] as string | null | undefined} />
+                          <span className="min-w-0 truncate">{row[c.key] as React.ReactNode}</span>
+                        </span>
+                      ) : (
+                        (row[c.key] as React.ReactNode)
+                      )}
+                    </TableCell>
                   ))}
                   {actions.length > 0 && (
                     // Reaching the menu must not also open the record.

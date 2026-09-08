@@ -26,6 +26,7 @@ import {
   RADIUS_EXCEPTION,
   RAW_BODY_EXEMPT,
   RECORD_DETAIL_NOT,
+  RECORD_TABS_SINGLE_PANEL,
   PALETTE_LITERAL_OK,
   SCREEN_WIDTH_EXEMPT,
   PORTAL_VISIBLE_READS,
@@ -35,6 +36,8 @@ import {
   TOOLBAR_EXEMPT,
   TOOLBAR_CONTENT_GAP_EXEMPT,
   EMPTY_TOOLBAR_EXEMPT,
+  TOOLBAR_CONTROL_OWNERS,
+  TOOLBAR_SORT_EXEMPT,
   VENDORED_UI,
   UI_PACKAGE_EXEMPT,
   TAB_COUNT_EXCEPTIONS,
@@ -181,16 +184,25 @@ function portalDoorList(): string[] {
  *   BY NAME       `web/components/**\/*-detail.tsx` — the convention every one of
  *                 them already follows, and the one the hand-rolled-feed check
  *                 below has always used.
- *   BY BEHAVIOUR  it renders an `<ActivityPanel>` — a record's own history feed,
+ *   BY BEHAVIOUR  it renders a `<RecordScreen>` — `record-chrome.tsx`'s own host,
  *                 which nothing but a record detail has any business drawing. This
  *                 catches the detail screen that arrives under some other name.
  *
+ * THE BEHAVIOURAL SIGNAL WAS `<ActivityPanel>` UNTIL 7 Sep 2026, and what replaced
+ * it is the more honest of the two rather than a repair. The client retired the
+ * Activity TAB — "kill all old activity tabs", the history reached from the ink
+ * footer's Latest activity column instead — so no detail renders that panel any
+ * more, and a signal nothing matches is a census gone blind: it would have caught
+ * exactly one file, `activity-rail.tsx`, and held the RAIL to a record detail's
+ * obligations. `<RecordScreen>` is what those thirteen screens actually have in
+ * common, it is the app's own detail host (R52 censuses the same two paths for the
+ * title treatment), and — the property that matters — it is still not one of the
+ * obligations.
+ *
  * AND THE SIGNALS ARE DELIBERATELY NOT THE OBLIGATIONS, so nothing here is
- * circular. R2 demands TabsView *and* ActivityPanel; a file caught by NAME is held
- * to both with neither assumed, which is the case that actually bites — a new
- * `foo-detail.tsx` shipped without tabs turns this red. A file caught only by
- * BEHAVIOUR has satisfied one of the two by definition, and is still held to the
- * other, and to every per-tab count R8 asks for.
+ * circular. A file caught by NAME is held to the tab strip with nothing assumed,
+ * which is the case that actually bites — a new `foo-detail.tsx` shipped without
+ * tabs turns this red. A file caught only by BEHAVIOUR is held to the same.
  *
  * `RECORD_DETAIL_NOT` (registry) is the reasoned residue, rot-checked below.
  *
@@ -204,7 +216,7 @@ function portalDoorList(): string[] {
 function recordDetailComponents(): { name: string; source: string }[] {
   return sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
     .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
-    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+    .filter((c) => /-detail$/.test(c.name) || c.source.includes("<RecordScreen"))
     .filter((c) => !RECORD_DETAIL_NOT[c.name])
 }
 
@@ -320,10 +332,70 @@ describe("RULES — the laws of the base", () => {
     ).toBeGreaterThanOrEqual(9)
 
     for (const c of details) {
+      // A DETAIL WITH ONE PANEL DRAWS NO STRIP, and says so once. A tab strip
+      // over a single panel is chrome that carries no choice — it names the
+      // thing you are already looking at. This became reachable on 7 Sep 2026:
+      // `selectable-detail` had exactly Overview + Activity, so retiring the
+      // Activity tab left it with one panel and its strip was removed with it.
+      // The alternative — keeping a one-tab strip so a law stays literally
+      // true — is the law demanding a worse screen, which is the failure mode
+      // R2's own history is a list of. Rot-checked below, so it can only shrink.
+      if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
       expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
-      expect(c.source, `${c.name} must render the Activity tab through <ActivityPanel>`).toContain(
-        "<ActivityPanel"
-      )
+    }
+  })
+
+  // R2's SECOND HALF, AND IT MOVED FROM THE SCREENS TO THE HOST — 7 Sep 2026.
+  //
+  // Until today this law demanded `<ActivityPanel>` of each of the thirteen
+  // details, because each of them drew its own Activity tab. The client retired
+  // that tab ("kill all old activity tabs"; the history now opens from the ink
+  // footer's Latest activity eyebrow), and the replacement is wired ONCE per
+  // host rather than thirteen times — which is a better arrangement and a worse
+  // thing to check per screen, because there is now nothing per screen to see.
+  //
+  // So the obligation follows the code. A record's history must still be
+  // REACHABLE — that is the sentence R2 has always been making, and it is the
+  // one the client's own ruling never touched — and the place to prove it is the
+  // two hosts every detail goes through, plus the rail they both mount. If any
+  // link here breaks, every record in the base silently loses its history again,
+  // which is exactly the state this file caught between the removal and the
+  // wiring: thirteen screens with no way to reach page two of anything.
+  it("record-detail-tabs: a record's history is reachable, through the rail its two hosts mount", () => {
+    const chrome = stripComments(read(join(WEB, "components", "records", "record-chrome.tsx")))
+    expect(
+      chrome,
+      "record-chrome.tsx is the host all thirteen bespoke details draw through — it must mount the <ActivityRail>"
+    ).toContain("<ActivityRail")
+
+    // The recipe path is the other host, and it reaches the footer through the
+    // engine rather than through `RecordScreen`, so it is proved at its own end.
+    const engine = stripComments(
+      read(join(ROOT, "shared", "web", "screen-engine", "screen-renderer.tsx"))
+    )
+    expect(
+      engine,
+      "the screen engine draws the OTHER detail path — it must forward an activityAction to RecordDetail"
+    ).toContain("activityAction")
+
+    // …and the rail is the panel's new home, so the pairing R14 rests on is
+    // unbroken: the feed and its pager are inside the thing the door opens.
+    const rail = stripComments(read(join(WEB, "components", "records", "activity-rail.tsx")))
+    expect(rail, "the rail must render the one <ActivityPanel>").toContain("<ActivityPanel")
+    expect(rail, "the rail must be the kit's EdgePanel — the client's shape 06").toContain("EdgePanel")
+  })
+
+  // …and the single-panel exemptions can't rot either. An entry naming a detail
+  // that HAS a strip is a line nobody can justify and nobody can safely delete.
+  it("record-detail-tabs: every RECORD_TABS_SINGLE_PANEL entry is a real exemption", () => {
+    for (const [name, why] of Object.entries(RECORD_TABS_SINGLE_PANEL)) {
+      expect(why.trim(), `RECORD_TABS_SINGLE_PANEL["${name}"] must say WHY it draws one panel`).not.toBe("")
+      const c = recordDetailComponents().find((d) => d.name === name)
+      expect(c, `RECORD_TABS_SINGLE_PANEL lists ${name}, which the census does not catch — delete the line`).toBeDefined()
+      expect(
+        c?.source.includes("TabsView"),
+        `RECORD_TABS_SINGLE_PANEL lists ${name}, but it draws a TabsView — delete the line`
+      ).toBe(false)
     }
   })
 
@@ -333,7 +405,7 @@ describe("RULES — the laws of the base", () => {
   it("record-detail-tabs: every RECORD_DETAIL_NOT entry is a real exemption", () => {
     const caught = sourceFiles(join(WEB, "components"), { extensions: [".tsx"] })
       .map((f) => ({ name: basename(f.path, ".tsx"), source: stripComments(f.source) }))
-      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<ActivityPanel"))
+      .filter((c) => /-detail$/.test(c.name) || c.source.includes("<RecordScreen"))
       .map((c) => c.name)
     for (const [name, why] of Object.entries(RECORD_DETAIL_NOT)) {
       expect(why.trim(), `RECORD_DETAIL_NOT["${name}"] must say WHY it is not a record detail`).not.toBe("")
@@ -532,7 +604,7 @@ describe("RULES — the laws of the base", () => {
     expect(scanned, "the paged-detail census found no screens — it has gone blind").toBeGreaterThan(2)
   })
 
-  // A COMPONENT ASKS A DOOR ONCE (R52).
+  // A COMPONENT ASKS A DOOR ONCE (R56).
   //
   // round_trip_review's criterion 2 is "no question is asked twice". It scored
   // 100/100 on 5 Sep 2026 — and the day after, the same lane found `app-detail`
@@ -914,11 +986,15 @@ describe("RULES — the laws of the base", () => {
     // those. Run the seam rather than reading it: a badge the seam fails to apply
     // is the whole bug, and source text can't tell us it applied.
     let countedRecipeTabs = 0
+    // Every detail tab the scan READ, badged or not — the blindness measure, now
+    // that a legitimate base can declare no collection tab at all.
+    let walkedRecipeTabs = 0
     for (const [key, recipe] of Object.entries(BASE_RECIPES)) {
       if (recipe.type !== "detail" || !recipe.tabs) continue
       const collections = recipe.tabs.map(tabCountKey).filter((k): k is string => k !== null)
       const badged = withTabCounts(recipe, Object.fromEntries(collections.map((k) => [k, 42])))
       for (const tab of badged.tabs ?? []) {
+        walkedRecipeTabs++
         if (tabCountKey(tab) === null) {
           expect(
             RECORD_TAB_COUNT_EXCEPTIONS[`${key}.${tab.key}`],
@@ -933,9 +1009,47 @@ describe("RULES — the laws of the base", () => {
         ).toBe(formatCount(42))
       }
     }
-    // Tripwire: a scan that finds no counted tabs has gone blind, and a blind
-    // check reports "all clear" exactly like a passing one.
-    expect(countedRecipeTabs, "the recipe-tab scan found no collection tabs — it has gone blind").toBeGreaterThan(2)
+    // THE TRIPWIRE MEASURES THE WALK, NOT THE VERDICT — changed 7 Sep 2026, and
+    // the change is forced by the client's ruling rather than chosen.
+    //
+    // It used to demand more than two COUNTED tabs, on the reasoning that a scan
+    // finding no badge to check has gone blind. That reasoning was sound while
+    // every recipe detail carried an Activity tab; it counted them. The client
+    // retired that tab, and with it the last collection tab any recipe declared
+    // — so `countedRecipeTabs` is legitimately 0, and the old tripwire could
+    // only be satisfied by putting a collection back on a strip she asked to
+    // empty. A law that can only be made green by undoing the ruling is a law
+    // that has stopped describing the base.
+    //
+    // What must not be lost is the thing the tripwire actually guards: that this
+    // scan still WALKS the recipes. So it now asserts on the walk. A detail
+    // recipe whose tabs stop being read reports the same all-clear as one with
+    // nothing wrong, which is the failure the original was written for, and that
+    // failure is caught here exactly as it was before.
+    expect(
+      walkedRecipeTabs,
+      "the recipe-tab scan walked no detail tabs at all — it has gone blind"
+    ).toBeGreaterThan(2)
+
+    // …AND THE COUNT ITSELF DID NOT GO AWAY, IT MOVED. R8's sentence is that a
+    // collection a reader can open carries its size before they open it. The
+    // record's history is still such a collection; what changed is that the door
+    // to it is the footer's `All activity · N ›` rather than a tab. So the badge
+    // obligation follows the door, and this is where it is proved.
+    //
+    // THROUGH `formatCount`, which is R16's seam and not a formatting detail: it
+    // renders the door's EXACT SERVER TOTAL, never the loaded page's length —
+    // the same guarantee the retired tab badge carried, and the reason a record
+    // with 143 events cannot show 50 on the way in.
+    const rail = stripComments(read(join(WEB, "components", "records", "activity-rail.tsx")))
+    expect(
+      rail,
+      "the activity door must carry the history's own count, through formatCount (R16's exact server total)"
+    ).toContain("formatCount(")
+    expect(
+      rail,
+      "the activity door must PRINT that count — a count computed and not shown is R8's fault with extra steps"
+    ).toMatch(/All activity ·/)
 
     // …and the HOST must actually badge every detail it renders — a seam nothing
     // calls is dead code wearing a law's clothes. One withTabCounts per rendered
@@ -975,6 +1089,23 @@ describe("RULES — the laws of the base", () => {
     // half above already uses.
     let scannedTabs = 0
     for (const c of recordDetailComponents()) {
+      // …AND THE FLOOR OF TWO MET THE SAME WALL ITS OWN NOTE DESCRIBES, one
+      // ruling later — 7 Sep 2026. The paragraph above records this assertion
+      // being walked down from three to two, because "every bespoke detail has
+      // a third tab" was an accident of the base rather than a law. Two was the
+      // floor R2 justified: Overview + Activity. The client then retired the
+      // Activity tab everywhere, and `selectable-detail` — the same dropdown
+      // value that forced the last correction — was left with ONE panel and no
+      // strip at all, turning this red for obeying the newer ruling exactly.
+      //
+      // Rather than walk the floor down a second time to one (where it would
+      // stop being a blindness guard, since a dead regex yields nought or one),
+      // the single-panel details are named. `RECORD_TABS_SINGLE_PANEL` is the
+      // same list R2's own strip obligation skips, read from the same registry,
+      // so the two halves of the law cannot disagree about which screens draw a
+      // strip — and it is rot-checked there, so a screen that grows a second
+      // panel loses its line and lands back under this floor.
+      if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
       const tabs = [...c.source.matchAll(/\{\s*value: "([a-z-]+)",[\s\S]{0,300}?badge: ([^,\n]+),/g)]
       expect(
         tabs.length,
@@ -1439,6 +1570,18 @@ describe("RULES — the laws of the base", () => {
         [...pager.matchAll(/<ActivityPanel[\s\S]{0,1200}?\/>/g)].some((m) =>
           m[0].includes(c.pagerKey)
         ) ||
+        // `<ActivityRail>` IS THE PANEL'S NEW HOME, 7 Sep 2026 — same branch,
+        // same reason, one component further out. The client retired the
+        // Activity tab and the feed moved into the slide-in the footer's door
+        // opens; the rail mounts the unchanged `<ActivityPanel>`, so a caller
+        // that hands the rail a real listKey has reached the same real pager it
+        // always did. The branch is separate for the identical reason the panel's
+        // is: the key arrives INSIDE the tag, in an `activity={{ listKey: … }}`
+        // object literal, so walking back to the enclosing function would look
+        // in the wrong place and report a wired pager as missing.
+        [...pager.matchAll(/<ActivityRail[\s\S]{0,1200}?\/>/g)].some((m) =>
+          m[0].includes(c.pagerKey)
+        ) ||
         [...pager.matchAll(/<Paged(?:Find|PanelBody)(?:<[^>]*>)?[^>]*listKey=\{[^}]*\}/g)].some((m) => {
           const tagAt = m.index ?? 0
           const fnAt = [...pager.slice(0, tagAt).matchAll(/(?:^|\n)(?:export )?function [A-Za-z]/g)].pop()
@@ -1449,6 +1592,23 @@ describe("RULES — the laws of the base", () => {
         wired,
         `${name} pages on the server but nothing in web can reach page two — ${c.pagerFile} must render a <LoadMore> (directly, or through a shared paged body) whose listKey is built from ${c.pagerKey}`
       ).toBe(true)
+      // THE THIRD LINK, where the collection declares one. `pagerKey` above
+      // proved a VARIABLE reached the pager; this proves that variable is the
+      // collection's own cache key rather than any value that happened to be in
+      // scope. Only the team feed has three links today — its key moved into a
+      // seam when the history left the tab strip — and a two-link collection is
+      // asked nothing extra, so this cannot quietly become a formality.
+      if (c.keyBuiltIn !== undefined) {
+        const seam = stripComments(read(join(ROOT, c.keyBuiltIn)))
+        expect(
+          seam,
+          `${name} names ${c.keyBuiltIn} as where its key is composed, but the literal ${c.webKey} is not there — the chain is broken between the key and the pager`
+        ).toContain(c.webKey)
+        expect(
+          seam,
+          `${name}'s pager is handed ${c.pagerKey}, which ${c.keyBuiltIn} must be what exports — otherwise the two halves are about different values`
+        ).toContain(c.pagerKey)
+      }
       // …and the collection's cache key is NAMED by a component, which on the
       // record feed is the second half of the pairing rather than a restatement of
       // the first: its control reads `listKey={activity.listKey}`, a value the
@@ -3335,6 +3495,325 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  // R53 — THE COLLECTION TOOLBAR'S SLOT SET IS THE ROW'S, AND ITS SORT SLOT IS
+  // A DEFAULT.
+  //
+  // The client's own words, 2026-09-06, on two screenshots of her own main
+  // collection screens side by side — Apps (`Search apps…` / Filter / ↑ /
+  // Name / ▦ Tiles / +) and Tasks (`Search 82 tasks…` / Filter / +): "why the
+  // fuck i still have different toolbar variations??? unify joder."
+  //
+  // R48 asks whether a `search` PROP is present. R49 asks about the row's
+  // margin. R50 asks whether an `empty` prop is derived from real data. Not
+  // one of the three can see WHICH CONTROL WENT INTO WHICH SLOT, because
+  // `sort` and `view` were `React.ReactNode` and a node slot's contents are
+  // invisible to a prop census by construction. So eight of the eleven
+  // toolbars that drew a sort control handed it to `search` instead —
+  // `<>{searchInput}{statusSelect}{sortControl}</>` — where it sat inside the
+  // row's ONE GROWING slot at whatever label treatment that screen typed,
+  // while Apps and Deliverables drew the identical chip in the non-growing box
+  // beside `actions`. Same control, same app, two places, green build.
+  //
+  // THE FIX IS A CHANGE OF TYPE, NOT AN EIGHTEENTH CALL-SITE PATCH: `sort` and
+  // `view` are CONFIGS the row renders (`ToolbarSortSlot`/`ToolbarViewSlot`,
+  // screen-bits.tsx), the same move `folderTabs` already made from raw JSX to
+  // a `FolderTabStrip`, so a call site does not construct a `<SortControl>`
+  // and has nothing left to misplace. Three censuses, off the disk:
+  //
+  //   i.   THE CENTRAL GUARD — `ToolbarRow`'s own source declares both slots as
+  //        configs (never `React.ReactNode`) and renders both controls itself.
+  //   ii.  NOBODY ELSE BUILDS EITHER CONTROL — every `.tsx` under `web/`,
+  //        `web-portal/` and `shared/web/` that renders a `<SortControl` or a
+  //        `<ViewSwitch` must be named in `TOOLBAR_CONTROL_OWNERS`. That list
+  //        is where the app's OTHER toolbar-owning components are written
+  //        down, `wave-finder.tsx`'s hand-copy of this very row included.
+  //   iii. SORT IS A DEFAULT — every `<ToolbarRow>` call site passes `sort`,
+  //        or its enclosing component is named in `TOOLBAR_SORT_EXEMPT`.
+  //
+  // `view` gets no clause of its own on purpose: `ViewSwitch` draws nothing for
+  // fewer than two views, so a single-body collection is self-exempting and a
+  // registry of "this screen has one body" would be seventeen lines of noise.
+  it("toolbar-slot-set: the row owns its slots, and sort is a default (R53)", () => {
+    const SORT_TAG = /<SortControl[\s/>]/
+    const VIEW_TAG = /<ViewSwitch[\s/>]/
+
+    // ── i · THE CENTRAL GUARD ────────────────────────────────────────────────
+    const screenBits = stripComments(
+      readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8")
+    )
+    // THE PROP'S TYPE, not merely its name. A `sort?: React.ReactNode` still
+    // has a `sort` prop and would satisfy any assertion that only looked for
+    // the identifier — and it is precisely the type this law replaced, so the
+    // check has to be able to tell the two apart.
+    expect(
+      screenBits,
+      "R53 — ToolbarRow must declare `sort?: ToolbarSortSlot | false | null` (screen-bits.tsx): a config the row renders, never a ReactNode a call site can fill with anything"
+    ).toMatch(/\bsort\?:\s*ToolbarSortSlot\b/)
+    expect(
+      screenBits,
+      "R53 — ToolbarRow must declare `view?: ToolbarViewSlot | false | null` (screen-bits.tsx), for the same reason `sort` is a config"
+    ).toMatch(/\bview\?:\s*ToolbarViewSlot\b/)
+    expect(
+      /\b(?:sort|view)\?:\s*React\.ReactNode/.test(screenBits),
+      "R53 — ToolbarRow's `sort`/`view` are back to `React.ReactNode` (screen-bits.tsx). That is the type this law replaced: a node slot accepts the right control, no control, or the control belonging in a different slot, and no census can tell which"
+    ).toBe(false)
+    // AND IT ACTUALLY DRAWS THEM. A config prop nothing renders is a slot that
+    // silently disappeared — every call site would still type-check.
+    expect(
+      SORT_TAG.test(screenBits),
+      "R53 — ToolbarRow must render the `<SortControl>` itself (screen-bits.tsx), from its own `sort` config — that is what makes the placement and the label treatment the row's rather than each screen's"
+    ).toBe(true)
+    expect(
+      VIEW_TAG.test(screenBits),
+      "R53 — ToolbarRow must render the `<ViewSwitch>` itself (screen-bits.tsx), from its own `view` config"
+    ).toBe(true)
+
+    // ── ii · NOBODY ELSE BUILDS EITHER CONTROL ───────────────────────────────
+    const controlRoots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
+    const controlOffenders: string[] = []
+    const ownerUsed = new Set<string>()
+    let filesScanned = 0
+    for (const f of sourceFiles(controlRoots, {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      // COMMENTS STRIPPED FIRST (CONVENTIONS.md, and R52 learned this the hard
+      // way): every file this law touched now carries a long comment naming
+      // `<SortControl>` as the thing it stopped drawing, and on raw text each
+      // one would report itself as an offender.
+      const src = stripComments(f.source)
+      if (!SORT_TAG.test(src) && !VIEW_TAG.test(src)) continue
+      if (f.rel in TOOLBAR_CONTROL_OWNERS) {
+        ownerUsed.add(f.rel)
+        continue
+      }
+      controlOffenders.push(
+        `${f.rel}: builds its own <SortControl>/<ViewSwitch>. The toolbar row that draws it owns that control — ` +
+          `pass a \`sort\`/\`view\` config to <ToolbarRow> instead, or name this file in TOOLBAR_CONTROL_OWNERS with the reason it is a toolbar of its own`
+      )
+    }
+    // THE TRIPWIRE FOR THIS CENSUS. A scan that matched nothing agrees with
+    // itself: a renamed kit export, a moved folder or a broken `sourceFiles`
+    // root would report "nobody builds a sort control", which is the same
+    // green as "everybody does it correctly".
+    expect(
+      filesScanned,
+      "R53 — the toolbar-control census walked no files at all. The scan is blind (a moved root, a broken sourceFiles call) — fix it before trusting the result"
+    ).toBeGreaterThan(50)
+    expect(
+      ownerUsed.size,
+      "R53 — the toolbar-control census found NO file rendering a <SortControl> or a <ViewSwitch>. Either the kit renamed those exports (so this law now guards nothing) or the app stopped drawing a sort control anywhere — either way, fix the scan before trusting it"
+    ).toBeGreaterThan(1)
+    expect(
+      controlOffenders,
+      `R53 — a sort or view control is built by the toolbar that draws it, nowhere else:\n  ${controlOffenders.join("\n  ")}`
+    ).toEqual([])
+    const staleOwners = Object.keys(TOOLBAR_CONTROL_OWNERS).filter((k) => !ownerUsed.has(k))
+    expect(
+      staleOwners,
+      `these TOOLBAR_CONTROL_OWNERS entries no longer render either control — the file was folded into <ToolbarRow> or deleted, so delete the entry:\n  ${staleOwners.join("\n  ")}`
+    ).toEqual([])
+
+    // ── iii · SORT IS A DEFAULT ──────────────────────────────────────────────
+    //
+    // KEYED BY ENCLOSING COMPONENT, not by file: three of these files hold two
+    // or three separate toolbars with genuinely different answers (contact-
+    // panels.tsx alone has one panel that sorts by two columns, one that sorts
+    // by direction only, and one that cannot honestly sort at all), and a
+    // file-level pin would exempt all three on one panel's reason.
+    const sortOffenders: string[] = []
+    const sortExemptUsed = new Set<string>()
+    let rowsScanned = 0
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      // screen-bits.tsx DECLARES <ToolbarRow> — it is not a call site of it.
+      if (f.rel.endsWith("deep-link/screen-bits.tsx")) continue
+      const src = stripComments(f.source)
+      let from = 0
+      for (;;) {
+        const at = src.indexOf("<ToolbarRow", from)
+        if (at === -1) break
+        // The same brace-depth walk to this tag's OWN closing `>` that R48,
+        // R49 and R50 use, so a `search={<SearchInput onClear={() => …} />}`
+        // prop's nested braces and tags cannot end the scan early.
+        let i = at + "<ToolbarRow".length
+        let braceDepth = 0
+        while (i < src.length) {
+          const ch = src[i]
+          if (ch === "{") braceDepth++
+          else if (ch === "}") braceDepth--
+          else if (ch === ">" && braceDepth === 0) break
+          i++
+        }
+        const tag = src.slice(at, i + 1)
+        rowsScanned++
+        // TOP-LEVEL PROPS ONLY. `\bsort\s*=` over the whole tag would be
+        // satisfied by a `sort={deptSort}` sitting INSIDE a `search={…}`
+        // prop's own child — which is exactly the shape this law exists to
+        // fail (client-org-panel's `<ListToolbar sort={…}>`, handed to
+        // `search`, read as a compliant `sort` prop on the first draft of this
+        // census). So the props are split at brace depth 0 first, and the
+        // question is asked of the NAMES that survive.
+        const topLevelProps = new Set<string>()
+        {
+          const body = tag.slice("<ToolbarRow".length, tag.length - 1)
+          let j = 0
+          while (j < body.length) {
+            const m = /^\s*([A-Za-z][A-Za-z0-9]*)\s*=\s*/.exec(body.slice(j))
+            if (!m) {
+              j++
+              continue
+            }
+            topLevelProps.add(m[1])
+            let k = j + m[0].length
+            if (body[k] === "{") {
+              let d = 0
+              do {
+                if (body[k] === "{") d++
+                else if (body[k] === "}") d--
+                k++
+              } while (k < body.length && d > 0)
+            } else if (body[k] === '"') {
+              k++
+              while (k < body.length && body[k] !== '"') k++
+              k++
+            }
+            j = k
+          }
+        }
+        if (!topLevelProps.has("sort")) {
+          // The enclosing component: the last `function X` declared before
+          // this tag. Derived rather than hand-mapped, so a renamed component
+          // rots its own pin instead of silently keeping it.
+          const decls = [...src.slice(0, at).matchAll(/(?:^|\n)(?:export\s+)?(?:default\s+)?function\s+([A-Za-z0-9_]+)/g)]
+          const owner = decls.length > 0 ? decls[decls.length - 1][1] : "?"
+          const key = `${f.rel}#${owner}`
+          if (key in TOOLBAR_SORT_EXEMPT) sortExemptUsed.add(key)
+          else
+            sortOffenders.push(
+              `${key}: a <ToolbarRow> with no \`sort\` prop, and it is not in TOOLBAR_SORT_EXEMPT — ` +
+                `either hand the row a \`sort\` config (it builds the control), or name the reason this collection has no order to offer`
+            )
+        }
+        from = i + 1
+      }
+    }
+    // THE TRIPWIRE FOR THIS CENSUS. Eighteen call sites today; a scan finding
+    // none would pass every assertion below it.
+    expect(
+      rowsScanned,
+      "R53 — the <ToolbarRow> call-site census found fewer than ten rows across both front doors. Either the component was renamed (so this law now guards nothing) or the scan is blind — fix it before trusting the result"
+    ).toBeGreaterThan(9)
+    expect(
+      sortOffenders,
+      `R53 — every <ToolbarRow> call site offers an order, or says why it cannot:\n  ${sortOffenders.join("\n  ")}`
+    ).toEqual([])
+    const staleSort = Object.keys(TOOLBAR_SORT_EXEMPT).filter((k) => !sortExemptUsed.has(k))
+    expect(
+      staleSort,
+      `these TOOLBAR_SORT_EXEMPT entries match nothing any more — the component now passes \`sort\` (or was renamed/deleted), so delete the entry:\n  ${staleSort.join("\n  ")}`
+    ).toEqual([])
+  })
+
+  /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.
+   *
+   * THE SUBJECT IS DERIVED, never listed. A record detail is drawn by rendering
+   * the kit's `<RecordDetail>` (components/record-detail) or its `<RecordChrome>`
+   * template, and this app has exactly two files that do — `RecordScreen`
+   * (web/components/records/record-chrome.tsx, the thirteen hand-composed screens) and
+   * `renderDetail` (shared/web/screen-engine/screen-renderer.tsx, the five
+   * recipe-driven ones, on BOTH front doors). A third would be caught by the
+   * same census the day it is written, which is the entire point: the defect
+   * this law closes is a class that was correct on the path it was written for
+   * and invisible to the path that came after.
+   *
+   * SCOPED TO THE THREE APP ROOTS. `tools/screen-builder/samples/` also renders
+   * `<RecordDetail>` and is deliberately outside: it is the kit's own component
+   * gallery, whose job is to draw each vendored export RAW with dummy content.
+   * A record title there is not a record title, it is a specimen — so it is out
+   * by scope rather than by an exemption entry that would have to be maintained.
+   *
+   * COMMENTS STRIPPED FIRST (CONVENTIONS.md). record-chrome.tsx now carries a
+   * long comment naming `RECORD_TITLE_TREATMENT` where the constant used to be
+   * defined, and record-heading-clamps.test.tsx mentions `<RecordChrome>` in
+   * prose — on raw text the first would keep this check green after the
+   * className was deleted, and the second would report a test file as an
+   * unwired detail screen. */
+  function detailCallSites(): { rel: string; props: string; source: string }[] {
+    return sourceFiles(
+      [join(ROOT, "web"), join(ROOT, "web-portal"), join(ROOT, "shared", "web")],
+      { extensions: [".tsx"], relativeTo: ROOT }
+    ).flatMap((f) => {
+      const source = stripComments(f.source)
+      return [...source.matchAll(/<Record(?:Chrome|Detail)[\s\n]/g)].map((m) => {
+        // The props window runs to the tag's own self-closing line — a line
+        // that is nothing but `/>` — rather than a fixed character count, so a
+        // call site cannot pass by having the constant mentioned somewhere
+        // BELOW it, and a long one cannot fall out of the window and vanish.
+        const rest = source.slice(m.index)
+        const close = rest.search(/\n\s*\/>/)
+        return { rel: f.rel, props: close === -1 ? rest : rest.slice(0, close), source }
+      })
+    })
+  }
+
+  it("record-title-treatment: both detail paths set the record title the same way (R52)", () => {
+    const sites = detailCallSites()
+
+    // i · THE TRIPWIRE. A census that finds nothing agrees with itself. Two is
+    // the real number today and the law is about there being MORE than one.
+    expect(
+      sites.length,
+      "R52 — the detail-screen census found fewer than two `<RecordDetail>`/`<RecordChrome>` call sites in web/, web-portal/ and shared/web/. Either the scan went blind (a renamed tag, a moved file) or a detail path was deleted — fix the scan before trusting the result"
+    ).toBeGreaterThan(1)
+
+    // ii · EVERY ONE OF THEM APPLIES THE ONE CONSTANT, and imports it rather
+    // than declaring a same-named local — a private copy is the exact fault
+    // this law exists to stop, and it would satisfy a name-only assertion.
+    const unwired = sites.filter((s) => !s.props.includes("RECORD_TITLE_TREATMENT"))
+    expect(
+      unwired.map((s) => s.rel),
+      "R52 — these draw a record detail without `RECORD_TITLE_TREATMENT` in their className, so their record titles fall back to the kit's own `titleSize = \"h3\"` (24px) while every other detail screen is at 44px. Apply the constant from shared/web/record-heading.tsx — do NOT retype the class"
+    ).toEqual([])
+
+    const unimported = sites.filter(
+      (s) => !/import\s*\{[^}]*\bRECORD_TITLE_TREATMENT\b[^}]*\}\s*from\s*"[^"]*record-heading"/.test(s.source)
+    )
+    expect(
+      unimported.map((s) => s.rel),
+      "R52 — these name `RECORD_TITLE_TREATMENT` without importing it from shared/web/record-heading: a local constant of the same name is a second copy of the decision, which is the drift this law closes"
+    ).toEqual([])
+
+    // iii · AND NONE OF THEM ARGUES WITH IT. `titleSize` is the kit's own prop
+    // for this exact question; a call site passing one is a second answer.
+    const competing = sites.filter((s) => /\btitleSize\s*=/.test(s.props))
+    expect(
+      competing.map((s) => s.rel),
+      "R52 — these pass their own `titleSize` to a detail component. That is the kit's own answer to the same question `RECORD_TITLE_TREATMENT` answers, and two answers is how the two paths drifted apart in the first place. If the kit's `Title` has finally grown an h1 rung, change the CONSTANT and both paths follow"
+    ).toEqual([])
+
+    // iv · THE CONSTANT ITSELF IS STILL THE THING. Every assertion above is
+    // satisfied by an identifier; this is the one that says what the identifier
+    // has to BE. Matched as the whole declaration, not as a substring search
+    // for "text-4xl" — that string appears in this repo's prose and in other
+    // components, so a bare `includes` would stay green over an emptied
+    // constant.
+    const heading = readFileSync(join(ROOT, "shared/web/record-heading.tsx"), "utf8")
+    expect(
+      /export const RECORD_TITLE_SIZE\s*=\s*"\[&_\[data-slot=title-heading\]\]:text-4xl"/.test(heading),
+      "R52 — `RECORD_TITLE_SIZE` must stay the h1/44 step reached through the kit's OWN `data-slot=title-heading` hook: `[&_[data-slot=title-heading]]:text-4xl`. The kit's `Title` has no h1 rung (h2/32, h3/24, h4/20 only), so this descendant selector is the only way to the step the design kit names \"Record heading\" without hand-editing the vendored file (R39)"
+    ).toBe(true)
+    expect(
+      /export const RECORD_TITLE_TREATMENT\s*=\s*`\$\{RECORD_TITLE_SIZE\}\s\$\{TITLE_ACTIONS_SPLIT\}`/.test(heading),
+      "R52 — `RECORD_TITLE_TREATMENT` must still be built from `RECORD_TITLE_SIZE` and `TITLE_ACTIONS_SPLIT`. The two travel as ONE string on purpose: they are one decision about one row (how big the record's name is set, and how much of its row it may claim before the buttons wrap under it), and a call site that could apply one without the other is a call site that will"
+    ).toBe(true)
+  })
+
   it("aside-collapse: the assistant minimises rather than vanishing, and is inert when shut (R51)", () => {
     const shell = stripComments(
       readFileSync(join(ROOT, "shared/ui/compositions/templates/screen-shell.tsx"), "utf8")
@@ -3366,6 +3845,35 @@ describe("RULES — the laws of the base", () => {
         `R51 — the .motion-column-collapse wrapper must carry ${why}`
       ).toBe(true)
     }
+
+    // ii(b) · IT MUST END WHERE THE CARD ENDS. Two separate causes, both
+    // regressions this law has already seen once. The wrapper must be a FLEX
+    // container with `min-h-0`: the dock is a flex row, so a plain block
+    // wrapper does not stretch its child and the column sizes to its CONTENT
+    // and runs off the bottom of the window. And the dock must pay the
+    // BOTTOM shell gutter the content column has always paid, or the column
+    // ends at the window's edge instead of level with the card.
+    /* TOKENS, NOT SUBSTRINGS. A plain `includes("flex")` is satisfied by
+       `flex-none`, and a `includes("min-h-0")` is satisfied by the COLUMN's
+       own `min-h-0` a few lines further down the window — both passed while
+       the wrapper had neither, which a sabotage run caught. Read the
+       wrapper's own class attribute and compare whole class names. */
+    const wrapperClasses = shell.slice(wrapAt, shell.indexOf('"', wrapAt)).trim().split(/\s+/)
+    for (const [cls, why] of [
+      ["flex", "a block wrapper does not stretch its child, so the column grows past the viewport instead of ending level with the card"],
+      ["min-h-0", "without it the column's own overflow-y-auto grows the box instead of scrolling inside it"],
+    ] as const) {
+      expect(
+        wrapperClasses.includes(cls),
+        `R51 — the .motion-column-collapse wrapper must carry \`${cls}\`: ${why}`
+      ).toBe(true)
+    }
+    const dockAt = shell.indexOf('data-slot="screen-shell-aside-dock"')
+    expect(dockAt, "R51 — screen-shell must render an aside dock").toBeGreaterThan(-1)
+    expect(
+      shell.slice(dockAt, dockAt + 500).includes("pb-[var(--shell-gutter)]"),
+      "R51 — the aside dock must pay `pb-[var(--shell-gutter)]`, the same bottom gutter the content column pays, or the assistant ends at the window's edge instead of level with the card"
+    ).toBe(true)
 
     // iii · THE SHAPE THAT SILENTLY DOES NOTHING. `0fr` inside a flex item is
     // floored at the item's own base size, so the column stays full width and
@@ -3436,9 +3944,13 @@ describe("RULES — the laws of the base", () => {
       "toolbar-content-gap", // R49: the <ToolbarRow>-owns-its-own-margin census below
       "empty-toolbar", // R50: the ToolbarRow/PagedFind central-guard + call-site censuses above
       "aside-collapse", // R51: the assistant column collapses, stays mounted, and goes inert when shut
-      "one-door-per-unit", // R52: the read census below, over both front doors, grouped by component and by door
-      "component-folders", // R53: web/test/component-folders.test.ts — the folder set DERIVED from web/components/README.md's own rows
-      "named-paths", // R54: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
+      "record-title-treatment", // R52: the both-detail-paths title census above
+      "toolbar-slot-set", // R53: the row-owns-its-slots guard + the who-builds-a-control and sort-is-a-default censuses above
+      "staff-names-are-first-names", // R54: web/test/staff-names-are-first-names.test.ts — the twice-derived staff-name census (columns off the workers' writes, fields off the mappings + the *IsClient siblings) walked to every render in web/
+      "refs-match-the-formula", // R55: web/test/refs-match-the-formula.test.ts — the twice-derived ref-table census (the team schema's own `ref` columns against TEAM_REF_TABLES) plus the DATA half, which replays the real migration ledger into a real SQLite handle and reads every stored reference back through the formula that made it
+      "one-door-per-unit", // R56: the read census below, over both front doors, grouped by component and by door
+      "component-folders", // R57: web/test/component-folders.test.ts — the folder set DERIVED from web/components/README.md's own rows
+      "named-paths", // R58: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")

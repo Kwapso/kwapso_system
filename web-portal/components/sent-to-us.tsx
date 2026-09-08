@@ -41,6 +41,7 @@ import { delivery } from "@/lib/api"
 import { Input } from "@shared/ui/components/input/input"
 import { MagnifyingGlass, X } from "@shared/ui/foundations/icons"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 
 export function SentToUs() {
   const { t, lang } = useLanguage()
@@ -140,14 +141,18 @@ export function SentToUs() {
           return (
             <li key={todo.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
               <div className="min-w-0">
-                <p className="font-medium">{todo.title}</p>
+                {/* The number leads the title, as the black chip — see the
+                    same note in waiting-on-you.tsx. */}
+                <p className={`${REF_LEADS_NAME} font-medium`}>
+                  <RecordRef value={todo.ref} />
+                  <span className="min-w-0 truncate">{todo.title}</span>
+                </p>
                 <p className="text-muted-foreground text-sm">
                   {/* A whole sentence with a hole, never a word joined to a
                       date — see the same note in web/components/work/work-panels.tsx.
                       `completedAt` is set on every row this view can return: it
                       is what puts the row in this view. */}
                   {todo.completedAt ? t("Sent {date}", { date: formatDate(todo.completedAt, lang) }) : null}
-                  {todo.ref ? ` · ${todo.ref}` : ""}
                 </p>
               </div>
               {todo.fileName ? (

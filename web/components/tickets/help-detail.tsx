@@ -1,26 +1,45 @@
 "use client"
 
 // Ticket detail — one ticket as a tabbed record: a status STEPPER (the hero control)
-// above Conversation / Overview / Activity tabs. Conversation = the chat (library
-// TicketThread), Overview = audit metadata (OverviewList), Activity = the
-// ticket's history (the GENERIC record-activity feed). Edit + every status move are
-// gated PURELY by help:edit. Replies echo instantly (optimistic) and reconcile with
-// the server reply. Host-composed, like role-detail.
+// above Conversation / Overview tabs. Conversation = the chat (library
+// TicketThread), Overview = audit metadata (OverviewList). The ticket's history
+// (the GENERIC record-activity feed) is not a tab any more — it is reached from
+// the ink footer's Latest activity column, on the client's 2026-09-06 ruling, and
+// web/components/records/activity-panel.tsx carries that ruling and the argument. Edit +
+// every status move are gated PURELY by help:edit. Replies echo instantly
+// (optimistic) and reconcile with the server reply. Host-composed, like
+// role-detail.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { Badge } from "@shared/ui/components/badge/badge"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { TicketThread } from "@shared/ui/components/ticket-thread/ticket-thread"
+import { TicketChips } from "@shared/web/ticket-chips"
 
 // The old library's thread exported this; the kit's thread is messages-only,
 // so the app owns the word now: who can be @mentioned.
 type TicketMember = { id: string; name: string }
-import { TrayArrowUp, Archive, Checks, Translate, PencilSimple, PaperPlaneTilt, MonitorPlay } from "@shared/ui/foundations/icons"
+import { TrayArrowUp, Archive, Translate, PencilSimple, PaperPlaneTilt, MonitorPlay } from "@shared/ui/foundations/icons"
+
+/** WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
+ * ordinary team member and used to be offered here, which would have put a "you
+ * were mentioned" email in a client's inbox about our internal note — and the
+ * portal has never offered mentions in the other direction, on purpose. The one
+ * seam decides (lib/members).
+ *
+ * MODULE LEVEL, not a value computed inside the render, because the one caller
+ * left runs FIVE SECONDS after the press and on the way out of a screen that may
+ * have already returned early — see `sendReply` below. */
+function mentionableTeamMembers(
+  members: TeamMember[] | undefined,
+  myUserId: string | null
+): TicketMember[] {
+  return assignableMembers(members).filter((m) => m.id !== myUserId)
+}
 
 import type {
   HelpMessage,
@@ -29,19 +48,20 @@ import type {
   SelectableValue,
   TeamMember,
 } from "@shared/types"
+// A VALUE, not a type — it must not ride the `import type` block above.
+import { ticketTypeKeptForMigration } from "@shared/types"
 import { ApiFailure, content, dataOps, tenancy } from "@/lib/api"
-import type { HelpAccountFacet } from "@/lib/api/content"
 import {
   RecordActionsMenu,
-  RecordChipLink,
   RecordScreen,
   STICKY_TABS,
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
-import { MARK_GROUP, markMap, typeMark } from "@/lib/type-marks"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { assignableMembers } from "@/lib/members"
 import { usePermissions } from "@/lib/perms"
 import { mergePage, invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -51,28 +71,25 @@ import { useRecordCounts } from "@/lib/use-record-counts"
 import { HelpAttachmentsPanel } from "@/components/tickets/help-attachments"
 import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { HelpStakeholders } from "@/components/tickets/help-stakeholders"
-import { HELP_STATUS } from "@/components/deep-link/shape"
-import { helpStatusDotTone } from "@shared/status-tones"
+import { InAppLink } from "@/components/shell/in-app-link"
+import { Swatch } from "@/components/records/record-picker"
+import { ticketTypeColour } from "@/lib/type-colours"
 import { ResolveDialog, type ResolveFormValues } from "@/components/tickets/resolve-dialog"
 import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
+import { TicketStages } from "@/components/tickets/ticket-stages"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
+import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { helpAttachmentsKey, totalKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { useLanguage } from "@shared/web/language"
-import { RichText } from "@shared/web/rich-text-view"
+import { ON_INVERSE_UNTIL_THE_KIT_RULES, RichText } from "@shared/web/rich-text-view"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
-
-/** The one map every ticket screen reads. Imported rather than retyped here: this
- * file used to keep its own copy, and a copy is how the list and the record end
- * up calling the same fact two different things. */
-const STATUS_LABEL = HELP_STATUS
 
 export function HelpDetailScreen({
   teamId,
@@ -241,8 +258,22 @@ export function HelpDetailScreen({
   const newestReply = replyRows[replyRows.length - 1]
   useFollowNewest(newestReply?.id ?? null, Boolean(myUserId) && newestReply?.authorId === myUserId)
 
+  // THE RETIRED KIND IS NOT OFFERED HERE EITHER — the last picker that could
+  // still put a ticket INTO it. Client, 2026-09-06: "keep the existing
+  // requirements (we will use that later) but do not display them in tickets."
+  //
+  // Existing rows keep their word and stay readable; what must not happen is a
+  // NEW one, or an existing ticket being MOVED into a kind the collection then
+  // hides — which from her side would look exactly like the ticket vanishing.
+  // The door refuses it as well (`refuseKeptForMigration`), so this is the
+  // second of two fences rather than the only one; the picker exists so a
+  // person is never offered a choice the door will reject.
+  //
+  // It still does not filter `active`, deliberately: that is a separate
+  // question about the team's own vocabulary, and narrowing this dialog for a
+  // reason nobody asked for is how a screen quietly loses an option.
   const helpTypeOptions = (selectableQ.data ?? [])
-    .filter((v) => v.type === "Ticket type")
+    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
     .map((v) => v.value)
 
   // READ THIS CONVERSATION IN YOUR OWN LANGUAGE, if you ask. The whole screen's
@@ -255,39 +286,24 @@ export function HelpDetailScreen({
     ...replyRows.map((r) => r.body),
   ])
 
-  /** THE THREE ACTS THAT ARE LEFT. Everything else about this ticket's stage now
-   * happens by itself — a sprint is picked, a timer starts, the last story
-   * closes — so what a person can still DO is named rather than picked from a
-   * dropdown of seven (CHECKLIST 5.2).
+  // THE FIVE-SECOND HOLD, HELD BY THE SCREEN AND NOT BY THE COMPOSER. It lives
+  // above the tab strip on purpose: the strip unmounts the panel it is not
+  // showing, so a hold owned by the composer would be flushed by a glance at
+  // Related stories — and the client's ruling is that she can carry on reading
+  // the ticket while it counts. Leaving the TICKET still sends it; leaving the
+  // TAB is not leaving. A hook, so it sits above the three early returns below.
+  const reply = useReplySend({ ticketId: helpId, onSend: sendReply })
+  /* `run` WAS HERE — the shared shape for "do it, say plainly if it was
+   * refused, re-prime the list cache and the record's own history", written for
+   * THREE acts a person could still perform on a ticket by hand.
    *
-   * `run` is the shape all three share: do it, say plainly if it was refused,
-   * re-prime the list cache and the record's own history. */
-  async function run(what: () => Promise<{ tickets: HelpTicket[] } | void>, done: string, fallback: string) {
-    setStatusBusy(true)
-    try {
-      const r = await what()
-      // Merge the page the door already returned — this used to prime and then
-      // invalidate the SAME key one line later, so the fresh page was thrown
-      // away and refetched (the ~1s rebuild, measured; round-two speed review).
-      if (r && "tickets" in r) {
-        mergePage(`help:${teamId}`, "id", r.tickets as unknown as Record<string, unknown>[])
-        const extras = r as {
-          byType?: Record<string, number>
-          byStatus?: Record<string, number>
-          byAccount?: HelpAccountFacet[]
-        }
-        if (extras.byType) primeCache(`help-by-type:${teamId}`, extras.byType)
-        if (extras.byStatus) primeCache(`help-by-status:${teamId}`, extras.byStatus)
-        if (extras.byAccount) primeCache(`help-by-account:${teamId}`, extras.byAccount)
-      } else invalidate(`help:${teamId}`)
-      invalidate(recordActivityKey("help", helpId))
-      toast.success(done)
-    } catch (err) {
-      toast.error(err instanceof ApiFailure ? err.message : fallback)
-    } finally {
-      setStatusBusy(false)
-    }
-  }
+   * Its last caller was the "They've confirmed it" button, and both went when
+   * the client retired `awaiting_validation` on 7 Sep 2026 (shared/types.ts,
+   * `HELP_STATUSES`). The two surviving acts on this screen — archiving and
+   * answering — each carry their own handler below and always did, because each
+   * does something `run` never modelled: archiving asks for a confirmation
+   * first, and answering has to collect the words the door refuses without. */
+
 
   /** ANSWER IT AND TELL THEM (CHECKLIST 5.6 + 5.7). The door refuses without the
    * words, which is 5.6 stated where it can be enforced; the send goes to the
@@ -323,6 +339,7 @@ export function HelpDetailScreen({
    *
    * So it spreads. The door decides what it accepts; this is a courier. */
   async function editTicket(input: {
+    titleEn?: string
     description: string
     helpType?: string
     // Naming the client on a ticket that has none. Once it has one the form
@@ -353,7 +370,40 @@ export function HelpDetailScreen({
     invalidate(recordActivityKey("help", helpId))
   }
 
-  async function onReply(body: string, _files: File[], mentions: TicketMember[]) {
+  /** THE TWO SENDS, AND THEY ARE ONE FUNCTION ON PURPOSE.
+   *
+   * The client's ruling gives the composer two controls — a wordless send and
+   * "Send and close" — and the artifact is explicit that they behave identically
+   * for the five seconds before either of them happens: same delay, same toast,
+   * same pending bubble, same Undo, same restored text. The ONLY differences are
+   * the sentence the toast settles on and which door is called at zero. So they
+   * are one function with one flag, rather than two that will drift.
+   *
+   * It is called by `ReplyComposer` only when the hold reaches zero (or is cut
+   * short by her leaving), never on the press — nothing here happens during the
+   * five seconds. `leaving` rides through to `fetch` as `keepalive`, which is
+   * what lets the send outlive a tab that is closing.
+   *
+   * It returns the words the settling toast should say, because only this
+   * function knows what the door answered — a "Send and close" on a ticket
+   * somebody else already answered comes back `alreadyResolved` and emails
+   * nobody (R17 is the send guard), and that is a different sentence.
+   *
+   * IT THROWS ON A REFUSAL rather than swallowing it: the composer catches it,
+   * says so, and puts her words back in the field. A reply lost to a 500 is the
+   * one outcome worse than a slow one. */
+  async function sendReply(body: string, andClose: boolean, leaving: boolean): Promise<string> {
+    // The mention list is read OUT OF the sent text by name-match against the
+    // members we may tag, exactly as the kit composer's own call site did.
+    //
+    // Computed HERE rather than read off a value the render happened to leave
+    // lying around: this runs five seconds after the press, and on the way out
+    // of a screen that may already have returned early. A function that only
+    // works when the component got as far as its happy path is a function that
+    // throws on the one path this whole file exists to make reliable.
+    const mentions = mentionableTeamMembers(membersQ.data, myUserId).filter((m) =>
+      body.includes(`@${m.name}`)
+    )
     const prev = repliesQ.data ?? []
     const optimistic: HelpMessage = {
       id: `optimistic-${Date.now()}`,
@@ -363,20 +413,42 @@ export function HelpDetailScreen({
       isAgent: false,
       authorId: myUserId ?? "",
       authorName: "You",
+      // The optimistic echo is always the signed-in staff member, so this is
+      // never a contact (R54) — and "You" has no surname to lose either way.
+      authorIsClient: false,
       createdAt: new Date().toISOString(),
     }
-    primeCache(`help-thread:${helpId}`, [...prev, optimistic]) // ~instant echo (WhatsApp-style)
+    // ~instant echo (WhatsApp-style). It takes over from the pending bubble at
+    // the exact moment the bubble goes, so the message never blinks out of the
+    // thread between the wait ending and the door answering.
+    primeCache(`help-thread:${helpId}`, [...prev, optimistic])
     try {
+      if (andClose) {
+        // THE HOLE THIS FILLS. "Answer and close" on the title is offered only at
+        // status `ready`, and `readyFlipForTicket` returns early on a ticket with
+        // no stories — so a Question answered in one line had NO way to be closed
+        // except Archive, which is not closing it, it is hiding it. This works at
+        // every status, and it satisfies `/help/resolve` the honest way: the door
+        // refuses without a resolution, and the reply she just typed IS the
+        // resolution, sent as the `resolution` field. The door is unchanged.
+        const r = await content.resolveHelp(helpId, body, leaving)
+        invalidate(`help-thread:${helpId}`)
+        invalidate(`help:${teamId}`)
+        invalidate(recordActivityKey("help", helpId))
+        return r.alreadyResolved ? t("Already answered.") : t("Answered, and they've been told.")
+      }
       const { replies } = await content.replyHelp(
         helpId,
         body,
-        mentions.map((m) => m.id)
+        mentions.map((m) => m.id),
+        leaving
       )
       primeCache(`help-thread:${helpId}`, replies) // reconcile with server truth
       invalidate(`help:${teamId}`)
+      return t("Sent.")
     } catch (err) {
       primeCache(`help-thread:${helpId}`, prev) // rollback the echo
-      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't post your reply."))
+      throw err
     }
   }
 
@@ -469,18 +541,13 @@ export function HelpDetailScreen({
       />
     )
 
-  // WHO YOU CAN TAG. Our own people, minus yourself. A client login is an
-  // ordinary team member and used to be offered here, which would have put a
-  // "you were mentioned" email in a client's inbox about our internal note —
-  // and the portal has never offered mentions in the other direction, on
-  // purpose. The one seam decides (lib/members).
-  const mentionableMembers: TicketMember[] = assignableMembers(membersQ.data).filter(
-    (m) => m.id !== myUserId
-  )
-
   const replies = (repliesQ.data ?? []).map((r) => ({
     id: r.id,
-    author: r.authorName || "Member",
+    // R54: a thread in the agency app has BOTH sides on it. A colleague is named
+    // by their first name; a contact who replied about their own question keeps
+    // their name whole. `authorIsClient` is the row's own answer — the same
+    // `from_client` subselect the portal's redaction already runs.
+    author: (r.authorIsClient ? r.authorName : staffNameFromSnapshot(r.authorName)) || "Member",
     time: formatRelative(r.createdAt, t, lang),
     // The reply as the reader asked for it: what was typed, or the translation
     // they pressed for. Never both, and never a stored rewrite of somebody's
@@ -549,8 +616,20 @@ export function HelpDetailScreen({
     },
     // The audit rows are NOT here any more: created-by and last-edited-by moved
     // to the footer at the foot of the record (D7 / CHECKLIST 11.3), where they
-    // stop pushing the ticket's own facts below the fold. The status is on the
-    // header band's own line.
+    // stop pushing the ticket's own facts below the fold.
+    //
+    // THE STATUS ROW USED TO SAY "the status is on the header band's own
+    // line" — true while the header's chips were status/app/archived. Client
+    // ruling, 2026-09-06 (see `RecordScreen`'s own `chips` comment above):
+    // those three are gone, replaced by the same four-fact line the triage
+    // card draws (ID/type/app/date), and status is not one of the four. So as
+    // of this pass the ticket's STAGE is not shown anywhere on this screen —
+    // written down rather than discovered later, because the old comment
+    // would otherwise keep telling the next reader a true sentence about a
+    // screen that no longer exists. Not re-added here on judgement: the
+    // client asked for exactly four facts and nothing else, and where the
+    // status goes next (back here as a row, or somewhere else) is hers to
+    // decide, not a default this screen should reintroduce quietly.
     { label: t("Resolved"), value: ticket.resolvedAt ? formatRelative(ticket.resolvedAt, t, lang) : "" },
   ]
 
@@ -566,13 +645,6 @@ export function HelpDetailScreen({
         badgeVariant: "" as const,
       },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
       {
         value: "stories",
         label: t("Related stories"),
@@ -612,6 +684,21 @@ export function HelpDetailScreen({
         badge: stakeholderBadge,
         badgeVariant: "" as const,
       },
+      /* NO ACTIVITY TAB. It was the last tab here for exactly one day. The
+         client, 2026-09-06: "in all the screens across the app, Activity is
+         always the last tab" — it had sat third, with Related stories, Work
+         logs, Files and links and Stakeholders to its right, which made the
+         ticket the one record where the log interrupted the record. Moving it
+         to the end was the right answer to the question she was asking, and the
+         SAME day she answered a bigger one: "I don't want to have activity as a
+         tab anywhere but on the footer, on top of the dates. On the right
+         column, on Latest Activity, I would like some view or expand or
+         whatever, and this would open a slide-in with all the activity." A tab
+         that is ABOUT the record rather than part of it does not belong at the
+         end of the strip; it belongs off the strip. Ruled again 2026-09-07:
+         "kill all old activity tabs." web/components/records/activity-panel.tsx carries
+         the argument, and the feed itself is unchanged — see `activity` on
+         `RecordScreen` below. */
     ],
   }
 
@@ -687,27 +774,15 @@ export function HelpDetailScreen({
 
   const actions = (
     <>
-      {/* THE CLIENT SAYS YES (CHECKLIST 5.13). Staff press it for the answer that
-          arrives by phone; the client presses the same door in their own portal.
-          It appears only while the request is actually waiting, and disappears
-          the moment it is not, a control that can only be refused should not be
-          a control. */}
-      {ticket.status === "awaiting_validation" && (
-        <Button
-          disabled={statusBusy}
-          onClick={() =>
-            void run(
-              () => content.validateHelp(helpId),
-              "Confirmed, it's in the queue.",
-              "Couldn't confirm that."
-            )
-          }
-          className="shrink-0 gap-1"
-        >
-          <Checks className="size-3.5" />
-          {t("They've confirmed it")}
-        </Button>
-      )}
+      {/* "THEY'VE CONFIRMED IT" WAS HERE (CHECKLIST 5.13, retired 7 Sep 2026).
+          Staff pressed it for the answer that arrived by phone; the client
+          pressed the same door in their own portal. It went with the
+          `awaiting_validation` stage it moved a ticket out of — the client
+          retired that stage, so nothing waits for a go-ahead any more and an
+          extra goes into the queue the moment it is raised (shared/types.ts,
+          `HELP_STATUSES`). The rule the old note stated still governs the two
+          buttons below it: a control that can only be refused should not be a
+          control. */}
       {/* ANSWER IT AND TELL THEM. Offered from READY onward, the stage that means
           every piece of work is done and only the telling is left, and never on a
           ticket already answered. The panel is where the words are written,
@@ -733,71 +808,56 @@ export function HelpDetailScreen({
 
   return (
     <RecordScreen
-      // The glyph the team set beside this ticket type on the Dropdown values
-      // screen, in the square the header band keeps for it (G3).
-      mark={typeMark(selectableQ.data, MARK_GROUP.ticket, ticket.helpType)}
+      // NO MARK — client ruling, 2026-09-07, "for type, kill the emojis. this
+      // is legacy. in current system we use colors." The square the header band
+      // keeps for a glyph (G3) held the team's own emoji for this ticket's
+      // kind, read off the Dropdown values screen. The kind is drawn by
+      // `chips` below instead, as the coloured pill every other ticket surface
+      // in the app already uses (`Swatch` + `ticketTypeColour`), so nothing
+      // about this header stopped saying what kind of ticket it is.
+      // `web/lib/type-marks.ts` carries the whole ruling and what it did NOT
+      // touch (the stored glyphs, and the other record kinds).
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself
       // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
       // took the eyebrow out of the full header); the breadcrumb above this
       // header is what names the record type now.
-      // D4: THE NUMBER THE CLIENT QUOTES, above the title. The reference had
-      // existed on this record since the work engine landed and appeared on no
-      // screen — the one thing a person needs when a client rings up saying
-      // "about BERG-T0412".
-      // OVERRIDE 73: the ID in the black chip, BELOW the title. This is the
-      // record the client was looking at.
-      recordNumber={ticket.ref || undefined}
-      // NO `collectionLabel` HERE — client re-ruling, 2026-08-31, reading this
-      // exact screenshot back: "why the pill 'issue' as the first one? … the
-      // first one is black and is the id, the second is always the status
-      // (color-coded), the third is the parent item (the app)." This used to
-      // pass `ticket.helpType` ("Issue") as `collectionLabel`, which
-      // `RecordScreen` always renders in PILL TWO — ahead of `chips`, no
-      // matter what `chips` starts with. So the status dot below was really
-      // pill three the whole time, and on any ticket with no `ref` yet
-      // (`recordNumber` renders nothing) the type chip slid all the way to
-      // pill one — exactly the bug in the client's screenshot. app-detail.tsx
-      // hit the same wall for the same reason and answered it the same way:
-      // leave `collectionLabel` unset and put every pill in `chips`, in the
-      // order the client actually wants them.
+      // NO `recordNumber` HERE — client ruling, 2026-09-06, reading this screen
+      // next to the triage card: "replicate the pills that we have on the view
+      // outside. These are: ID, type, app, date. Remove the rest, and
+      // everywhere else where tickets have pills, reuse this." The triage
+      // card's own four-chip line is `TicketChips`
+      // (`shared/web/ticket-chips.tsx`), and it draws the ID chip itself — so
+      // handing the same ticket to BOTH `recordNumber` and `chips` would draw
+      // the black lozenge twice. `chips` below carries the whole line as one
+      // unit instead, ID included, which is also truer to the ask: she asked
+      // to reuse THE LINE, not to keep splitting the ID out of it the way this
+      // screen and `app-detail.tsx` split it for OTHER records that do not
+      // have a client-approved chip line of their own.
       //
-      // The type isn't lost by dropping it here — it's the glyph in the
-      // header square above (`mark`, from the same `Ticket type` vocabulary)
-      // and it's which kind-tab the ticket lives under back on the Tickets
-      // screen (`type:${v}` in tickets-collection.tsx). This row said it a
-      // second time, in the one position that pushed the status pill out of
-      // its ruled spot.
-      //
-      // THE FIRST PILL IN `chips`, WITH A COLOUR (client ruling, 2026-08-31:
-      // "the status scheme is not only for tickets, identify everywhere … and
-      // map colors"). The seven-stage → dot mapping this screen deferred is
-      // now `shared/status-tones.ts`'s `helpStatusDotTone` — reused by nothing
-      // else, because the portal draws this same status in its OWN words for
-      // a client reader (ticket-row.tsx's `STATUS_WORDS`) rather than the
-      // agency's internal stage names.
-      //
-      // THE SECOND PILL IN `chips`, "the most relevant container parent"
-      // (client ruling, 2026-08-31) — a ticket's own example, verbatim:
-      // "second the app f.e. 'Padelbase'. When I click here should take me to
-      // padelbase app."
+      // WHAT THIS REPLACES, so the removal is on the record: the status pill
+      // (`Badge variant="status" dot={helpStatusDotTone(ticket.status)}`,
+      // `STATUS_LABEL[ticket.status]`), the app pill (was `RecordChipLink`,
+      // now folded into `TicketChips`' own app chip, which draws the exact
+      // same fact through `InAppLink` instead), and the archived pill
+      // (`Badge variant="status" dot="archived"`). None of the three is a
+      // fact this line's four are — status and archived are STATE, which
+      // change while everyone is looking at the record and were never part of
+      // what the client asked to keep — and status is not shown anywhere else
+      // on this screen (the Overview list's own comment used to say "the
+      // status is on the header band's own line"; that line is now this one,
+      // narrowed to what she asked for).
       chips={
-        <>
-          <Badge variant="status" dot={helpStatusDotTone(ticket.status)}>
-            {STATUS_LABEL[ticket.status]}
-          </Badge>
-          {ticket.appId && ticket.appName && (
-            <RecordChipLink href={`${host.base}/apps/${ticket.appId}`}>
-              {ticket.appName}
-            </RecordChipLink>
-          )}
-          {ticket.archivedAt ? (
-            <Badge variant="status" dot="archived">
-              {t("Archived")}
-            </Badge>
-          ) : null}
-        </>
+        <TicketChips
+          ticket={ticket}
+          // THE SAME DOT THE TYPE PICKER DRAWS, from the same component and
+          // the same map — see `shared/web/ticket-chips.tsx`'s header for why
+          // this is a prop rather than an import.
+          typeDot={<Swatch colour={ticketTypeColour(ticket.helpType)} />}
+          appHref={ticket.appId ? `${host.base}/apps/${ticket.appId}` : undefined}
+          AppLink={InAppLink}
+        />
       }
       // The description is rich text now, and a TITLE is one line: the words,
       // without the markup they were typed with. The body renders formatted in
@@ -834,8 +894,31 @@ export function HelpDetailScreen({
         createdAt: ticket.createdAt,
         editedByName: ticket.editorName,
         updatedAt: ticket.updatedAt,
+        // R54, and this is the ONE record detail in the app whose creator may be
+        // a client: staff raise 220 of every 221 tickets on a contact's behalf,
+        // but a contact raising their own question through the portal is the
+        // whole point of the portal. The row already knows which, so the footer
+        // is told rather than left to guess.
+        createdByIsClient: ticket.raiserIsClient,
+        editedByIsClient: ticket.editorIsClient,
       }}
       activity={activity}
+      // THE STAGE STRIP, AT THE TOP OF THE ACTIVITY RAIL — the client asked to
+      // read a ticket's stage history "in activity" ("closed on x, reopen on y,
+      // closed again on z", 2026-09-06, "keep it in activity"). That placement
+      // ruling never changed; what moved is where "in activity" IS. It was the
+      // Activity tab, above the feed; the tab is gone (2026-09-06 · 2026-09-07)
+      // and the slide-in off this footer's Latest activity column is the room
+      // that replaced it, so the strip goes there — above the same feed it was
+      // always written to sit above (ticket-stages.tsx's own header argues why
+      // it belongs beside that feed and not instead of it: the feed cannot say
+      // the SEQUENCE or the arithmetic, and this cannot say what was said).
+      //
+      // THE ONE RECORD TYPE THAT PASSES THIS. `activityHead` is a slot on
+      // `RecordScreen` rather than something the rail knows about, because a
+      // stage ladder is true of a ticket and of none of the other thirteen
+      // details — the rail must not learn what a ticket is.
+      activityHead={<TicketStages ticketId={helpId} />}
       onAddNote={can("help", "create") ? activity.addNote : undefined}
       notePlaceholder={t("Add a note")}
     >
@@ -847,14 +930,14 @@ export function HelpDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("help", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
+          /* NO ACTIVITY PANEL HERE, AND NO STAGE STRIP EITHER. This branch
+             drew `<TicketStages>` above `<ActivityPanel>` while there was an
+             Activity TAB to draw them in. There is not: the client killed the
+             tab across the app (2026-09-06 · 2026-09-07) and both moved
+             together into the slide-in off the footer's Latest activity
+             column, which is where `activityHead` and `activity` (above) send
+             them now. Neither was re-homed onto some other tab in between,
+             which is the placement nobody asked for. */
           // A TAB ON THE TICKET WHERE MORE WORK CAN BE ADDED. One story may
           // answer many tickets and one ticket may need many stories, so this is
           // a collection with its own create action — and the button is the
@@ -914,40 +997,84 @@ export function HelpDetailScreen({
                   way to answer this ticket is the panel on the title); and a
                   mention is now read OUT OF the sent text by name-match against
                   the same members list the autocomplete used to offer —
-                  autocomplete itself needs a kit spec (logged for Aurora). */}
+                  autocomplete itself needs a kit spec (logged for Aurora).
+                  NO TYPE BADGE HERE ANY MORE — client ruling, 2026-09-06 (see
+                  the header pills above): the type is already the first fact
+                  in `TicketChips`, up in the record header, so a second badge
+                  saying the same word again down here is exactly the kind of
+                  duplicate pill she asked removed. `sourceScreen` stays — it is
+                  not a pill, and it says something the chip line does not. */}
               <TicketThread
                 banner={
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <Badge variant="secondary">{ticket.helpType || t("General")}</Badge>
-                    {ticket.sourceScreen && (
-                      <span className="text-muted-foreground">{ticket.sourceScreen}</span>
-                    )}
-                  </div>
+                  ticket.sourceScreen ? (
+                    <span className="text-muted-foreground text-sm">{ticket.sourceScreen}</span>
+                  ) : undefined
                 }
                 messages={[
                   {
                     id: "description",
                     side: "theirs",
-                    author: ticket.raisedByContactName || ticket.raiserName || undefined,
+                    // The CONTACT this was raised for wins, whole — they are the
+                    // person the question belongs to. Failing that it is whoever
+                    // typed it, named by the R54 rule for their own population.
+                    author:
+                      ticket.raisedByContactName ||
+                      (ticket.raiserIsClient
+                        ? ticket.raiserName
+                        : staffNameFromSnapshot(ticket.raiserName)) ||
+                      undefined,
                     body: <RichText html={translation.of(ticket.description)} />,
                   },
+                  /* A REPLY IS PROSE ON THE CHARCOAL FILL, AND PROSE HAS TO BE
+                     TOLD. `side: "mine"` is the bubble the kit paints
+                     `bg-surface-inverse text-ink-on-inverse` — correct, and
+                     immediately overridden by the `ArticleBody` inside it,
+                     which paints its own `--ink-secondary` and its own
+                     `--foreground` on links and bold. The description above is
+                     the same component on `bg-card` and needs nothing, which is
+                     exactly why this went unnoticed: the two bodies are one
+                     line apart and only one of them changed ground. The class
+                     is the app holding the line until the kit rules on an
+                     inverse register — rich-text-view.tsx carries the argument
+                     and the measurement, and names what to delete when it
+                     does. */
                   ...replies.map((r) => ({
                     id: r.id,
                     side: "mine" as const,
                     author: r.author,
                     authorMeta: r.aiDrafted ? t("AI drafted") : undefined,
                     time: r.time,
-                    body: typeof r.body === "string" ? <RichText html={r.body} /> : r.body,
+                    body:
+                      typeof r.body === "string" ? (
+                        <RichText html={r.body} className={ON_INVERSE_UNTIL_THE_KIT_RULES} />
+                      ) : (
+                        r.body
+                      ),
                   })),
                 ]}
-                composer
-                onSend={(body) =>
-                  onReply(
-                    body,
-                    [],
-                    mentionableMembers.filter((m) => body.includes(`@${m.name}`))
-                  )
-                }
+                /* THE KIT'S COMPOSER IS OFF AND THE APP'S IS DRAWN BELOW IT.
+                   The client ruled two sends on this composer — a wordless
+                   paper plane and "Send and close" — and `TicketThread` holds
+                   exactly one `<button type="submit">` with one `sendLabel`,
+                   with no slot beside it. The kit is a pinned dependency (a
+                   hand-edit under `shared/ui/` turns the build red), so the
+                   second control is drawn app-side, out of the kit's own Button
+                   and the kit's own glyph, in the same pill. The thread itself —
+                   the bubbles, the sides, the receipts — is still entirely the
+                   kit's. Logged for the kit's owner: `TicketThread` wants a
+                   secondary send action and a wordless primary. */
+                composer={false}
+              />
+              <ReplyComposer
+                send={reply}
+                /* CLOSING IS `help:edit` — the right `/help/resolve` itself
+                   gates on — and there is nothing to close on a ticket that is
+                   already answered, so the control is not drawn rather than
+                   drawn and refused. Every OTHER status draws it, which is the
+                   whole point: the title's "Answer and close" appears only at
+                   `ready`, and a Question with no stories never reaches it. */
+                canClose={canEdit && ticket.status !== "resolved"}
+                answered={ticket.status === "resolved"}
               />
             </>
           )
@@ -1010,6 +1137,7 @@ export function HelpDetailScreen({
         teamId={teamId}
         helpTypeOptions={helpTypeOptions}
         initial={{
+          titleEn: ticket.titleEn,
           description: ticket.description,
           helpType: ticket.helpType,
           accountId: ticket.accountId,

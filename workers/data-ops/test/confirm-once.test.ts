@@ -43,8 +43,19 @@ import { confirmAndRun } from "../src/lib/agent"
 import { appendMessage, createThread, getPendingProposal } from "../src/lib/threads"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { AGENT_PROPOSAL_TTL_MS } from "@shared/workers/limits"
+import { stripComments } from "@shared/rules/source-scan"
 
-const lib = (name: string) => readFileSync(join(__dirname, "..", "src", "lib", name), "utf8")
+/** THE PROSE COMES OUT FIRST, through the one stripper every other law uses.
+ *
+ * It did not until 2026-09-08, and the two functions this file reads are the
+ * densest commentary in the worker — `confirmAndRun`'s decline branch alone
+ * carries a nine-line paragraph ABOUT the claim, naming the very calls the
+ * assertions below locate by name. Deriving "where is the claim" from source
+ * that still holds sentences about the claim is asking a question of the wrong
+ * text: every position this file computes could be a position inside an
+ * explanation. (It also cuts the other way — the SQL assertion further down
+ * would have been satisfied by a comment quoting the SQL.) */
+const lib = (name: string) => stripComments(readFileSync(join(__dirname, "..", "src", "lib", name), "utf8"))
 const threads = lib("threads.ts")
 const agent = lib("agent.ts")
 
@@ -53,6 +64,90 @@ const confirmBody = (() => {
   const next = agent.indexOf("\nexport ", start + 1)
   return agent.slice(start, next === -1 ? undefined : next)
 })()
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE TWO CALLS THAT LOOK ALIKE, AND THE FALSE GREEN THAT COST (2026-09-08).
+
+   `confirmAndRun` calls `consumePendingProposal` TWICE, and the two calls are
+   opposites. The first spends the proposal on a DECLINE, high up in the
+   `!opts.approve` branch. The second is the CLAIM — the compare-and-swap that
+   this whole suite exists for, the one that has to happen before a single tool
+   call runs.
+
+   Every assertion in this describe used to find its subject with
+   `confirmBody.indexOf("consumePendingProposal(")`, which is the DECLINE call.
+   It sits near the top of the function, unconditionally above `runToolCall(`
+   and above `consumeAiUnit(`, so "the claim comes before the run" and "the
+   loser is turned away before the team is charged" were both true of a call
+   that is neither the claim nor the loser's path. They were true of the text.
+   They said nothing about the code.
+
+   MEASURED, NOT REASONED. The original defect was restored in `agent.ts` —
+   the claim moved back to AFTER the tool loop, exactly the double-run this
+   file was written for — and all eleven tests here passed, as did all 406 in
+   the worker. The suite was green over the bug it names in its own header.
+
+   (The third assertion, `/if\s*\([\s\S]{0,120}consumePendingProposal\(/`, is
+   worth its own sentence: it searched the WHOLE function for ANY `if (` within
+   120 characters of ANY of the two calls. Under the restored bug it matched
+   `if (!ok) failed = true` — the tool loop's error flag, three lines above the
+   misplaced claim. A window that wide is not looking at the subject at all.)
+
+   So the calls are told apart by WHAT THEY WRITE — the outcome each one
+   records, which is the only thing that distinguishes them and is the same
+   word the function's own signature takes — and the claim is then required to
+   sit in a condition that RETURNS, ahead of everything it guards.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Both `consumePendingProposal(…)` calls in `confirmAndRun`, with the outcome
+ * each one writes. Derived, never counted: "the first one" is what went wrong. */
+const claims = [...confirmBody.matchAll(/consumePendingProposal\(([^()]*)\)/g)].map((m) => ({
+  at: m.index,
+  outcome: /"(done|declined)"/.exec(m[1])?.[1],
+}))
+
+/** The condition a call sits inside, if it sits inside one: walk back to the
+ * unbalanced `(` that opens the group, check the word before it, then read the
+ * block that group guards. This is what "the answer is read" means structurally
+ * — a call whose result is thrown away has no such group. */
+const guardingIf = (src: string, at: number): { cond: string; block: string } | null => {
+  // OUTWARD, not to the first bracket. `if (!a.length || !(await claim(…)))`
+  // wraps the call in a group of its own, so stopping at the nearest unbalanced
+  // `(` finds `!(` and concludes there is no guard — which is a check failing
+  // on the ordinary way of writing the thing it is looking for. Every enclosing
+  // group is tried, out to the end of the statement.
+  let depth = 0
+  let i = at
+  let found = -1
+  for (; i >= 0; i--) {
+    const c = src[i]
+    if (c === ")") depth++
+    else if (c === "(") {
+      if (depth > 0) depth--
+      else if (/\bif\s*$/.test(src.slice(Math.max(0, i - 8), i))) {
+        found = i
+        break
+      }
+    } else if (depth === 0 && (c === ";" || c === "{" || c === "}")) break
+  }
+  if (found === -1) return null
+  i = found
+  let close = i
+  depth = 0
+  for (; close < src.length; close++) {
+    if (src[close] === "(") depth++
+    else if (src[close] === ")" && --depth === 0) break
+  }
+  const open = src.indexOf("{", close)
+  if (open === -1) return null
+  let end = open
+  depth = 0
+  for (; end < src.length; end++) {
+    if (src[end] === "{") depth++
+    else if (src[end] === "}" && --depth === 0) break
+  }
+  return { cond: src.slice(i, close + 1), block: src.slice(open, end + 1) }
+}
 
 describe("an approved proposal runs at most once", () => {
   it("the consume is a compare-and-swap, not a blind overwrite", () => {
@@ -71,28 +166,59 @@ describe("an approved proposal runs at most once", () => {
     expect(/Promise<boolean>/.test(body)).toBe(true)
   })
 
-  it("confirmAndRun claims the proposal BEFORE it runs anything", () => {
+  it("spends the proposal on BOTH answers, and the two are told apart by what they write", () => {
+    // THE BLINDNESS TRIPWIRE, and here it is load-bearing rather than
+    // ceremonial: every assertion below picks its subject out of this list by
+    // the outcome it records, so a list that came back short or unlabelled
+    // would leave those assertions comparing `undefined` to `undefined` and
+    // reporting all clear. Two calls, one of each word — a "yes" and a "no"
+    // both spend the proposal (the decline half is why this suite was widened;
+    // see the header), and nothing else in this function may touch it.
     expect(confirmBody, "confirmAndRun must exist").toBeTruthy()
-    const claimAt = confirmBody.indexOf("consumePendingProposal(")
+    expect(
+      claims.map((c) => c.outcome),
+      "confirmAndRun must spend the proposal exactly twice — once per answer — and each call must say which"
+    ).toEqual(["declined", "done"])
+  })
+
+  it("confirmAndRun claims the proposal BEFORE it runs anything, and before it charges", () => {
+    const claimAt = claims.find((c) => c.outcome === "done")?.at
     const runAt = confirmBody.indexOf("runToolCall(")
-    expect(claimAt, "the claim must be in confirmAndRun").toBeGreaterThan(-1)
+    const meterAt = confirmBody.indexOf("consumeAiUnit(")
+    expect(claimAt, "the approve path's claim must be in confirmAndRun").toBeDefined()
     expect(runAt, "the calls must be in confirmAndRun").toBeGreaterThan(-1)
-    expect(runAt, "claim first, execute second — or a lost race still executes").toBeGreaterThan(claimAt)
+    expect(meterAt, "the meter must be in confirmAndRun").toBeGreaterThan(-1)
+    // ORDER, against the claim ITSELF — not against the decline branch's call,
+    // which is what this line used to compare and which is above everything.
+    expect(runAt, "claim first, execute second — or a lost race still executes").toBeGreaterThan(
+      claimAt as number
+    )
+    expect(
+      meterAt,
+      "the loser must be turned away before the team is charged for a turn it won't run"
+    ).toBeGreaterThan(claimAt as number)
   })
 
   it("…and the caller that LOSES the claim proceeds no further", () => {
-    // Not fire-and-forget: the answer has to be read, and the loser has to stop
-    // before the credit is metered and before any write happens.
-    const claim = confirmBody.slice(confirmBody.indexOf("consumePendingProposal("))
+    // Not fire-and-forget: the answer has to be READ, and reading it has to
+    // DECIDE something. Structural rather than a window — the claim must sit
+    // inside an `if` condition, negated, whose block returns. A call whose
+    // result is dropped has no such condition to find, whatever the layout.
+    const claimAt = claims.find((c) => c.outcome === "done")?.at
+    expect(claimAt, "the approve path's claim must be in confirmAndRun").toBeDefined()
+    const guard = guardingIf(confirmBody, claimAt as number)
     expect(
-      /^[\s\S]{0,80}\)\)\s*\{/.test(claim) || /if\s*\([\s\S]{0,120}consumePendingProposal\(/.test(confirmBody),
-      "the claim's result must gate what follows it"
+      guard,
+      "the claim's result is not read by any `if` — a claim nobody checks is a claim that cannot turn a loser away"
+    ).not.toBeNull()
+    expect(
+      /!\s*\(?\s*await\s+consumePendingProposal\(/.test((guard as { cond: string }).cond),
+      `the claim is inside a condition but is not what the condition turns on: ${(guard as { cond: string }).cond}`
     ).toBe(true)
-    const meterAt = confirmBody.indexOf("consumeAiUnit(")
     expect(
-      confirmBody.indexOf("consumePendingProposal("),
-      "the loser must be turned away before the team is charged for a turn it won't run"
-    ).toBeLessThan(meterAt)
+      /\breturn\b/.test((guard as { block: string }).block),
+      "the loser's branch must RETURN — falling through it would run the calls anyway"
+    ).toBe(true)
   })
 })
 

@@ -19,8 +19,27 @@
  * the same reason node_modules is: it is a DEPENDENCY. Its own repo lints it;
  * linting a vendored copy we may not edit would only produce unactionable red.
  *
- * Cloning needs the `alaap-kwapso` GitHub identity (the machine's default
- * credential is a different account), which the REPO URL below carries.
+ * CLONING CARRIES THE `alaap-kwapso` IDENTITY, and both halves of that were
+ * learned the hard way, so both are written down.
+ *
+ * A username in the URL does not SELECT a credential — it forces git to look
+ * one up for that exact user, and when the keychain has nothing filed under it
+ * git falls through to an interactive password prompt. There is no terminal on
+ * the vendor path, so on 7 Sep 2026 the prompt failed as `could not read
+ * Password … Device not configured` and the step died at `git clone` with the
+ * tag sitting correctly on the remote. That is why the identity was taken out.
+ *
+ * AND THE PLAIN URL IS WORSE, measured on 8 Sep 2026 during the main ×
+ * feat/ui-ux merge: `https://github.com/Kwapso/kwapso-ui-ux.git` lets the
+ * machine's DEFAULT credential answer, and that account cannot see this
+ * repository, so the clone returns `Repository not found` — a 404 that reads
+ * like a deleted repo rather than a wrong account. The identity URL cloned
+ * v1.2.70 on the first attempt on the same machine in the same minute.
+ *
+ * So the failure is not the username; it is a keychain with nothing filed
+ * under it. If this prompts, file the `alaap-kwapso` credential rather than
+ * removing the identity — removing it swaps a loud failure for a misleading
+ * one.
  */
 
 import { execSync } from "node:child_process"

@@ -1,7 +1,10 @@
 "use client"
 
-// STORY DETAIL — one piece of work at /stories/<id>, as a tabbed record (Law
-// R2): Overview / Time / Activity.
+// STORY DETAIL — one piece of work at /stories/<id>, as a tabbed record:
+// Overview / Work logs / Files and links. Its history is not a fourth tab any
+// more — it is reached from the ink footer's Latest activity column, on the
+// client's 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the
+// ruling and the argument.
 //
 // A story row in the backlog opened NOTHING before this: the recipe registry
 // pointed at a story-detail.tsx that had never been written, so tapping a story
@@ -33,7 +36,6 @@ import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-pan
 import { StoryAttachmentsPanel } from "@/components/work/story-attachments"
 import { RecordTimerButton } from "@/components/shell/timer-bar"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
@@ -47,6 +49,7 @@ import {
 import { MARK_GROUP, typeMark } from "@/lib/type-marks"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { storiesKey, storyAttachmentsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
@@ -98,7 +101,7 @@ export function StoryDetailScreen({
   const canLogTime = can("work", "create")
   // Precomputed with the outer `t`: `renderPanel` below names its own tab-item
   // parameter `t`, which would otherwise shadow the translation function right
-  // where the Activity tab's note field needs it.
+  // where the footer's own note field needs it.
   const notePlaceholder = t("Add a note")
 
   // The open tab is remembered per record for as long as this document
@@ -211,7 +214,8 @@ export function StoryDetailScreen({
     { label: t("Status"), value: STORY_STATUS_LABEL[story.status] },
     { label: t("Type"), value: story.storyType || "—" },
     { label: t("Reference"), value: story.ref || "—" },
-    { label: t("Who's doing it"), value: story.assigneeName || "Nobody yet" },
+    // R54: a story is agency work, so the assignee is one of ours.
+    { label: t("Who's doing it"), value: staffNameFromSnapshot(story.assigneeName) || "Nobody yet" },
     // WHO REVIEWS IT, and ONLY when somebody has named one.
     //
     // `stories.reviewer_id`/`reviewer_name` have been settable through
@@ -277,13 +281,6 @@ export function StoryDetailScreen({
         badge: formatCount(timeTotal),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
       // WHAT THE STORY SHOWS FOR ITSELF. The same words the ticket's own tab
       // uses, because it is the same collection one record along and a second
       // name for it would be a second thing for a reader to learn (R6/R34).
@@ -294,6 +291,9 @@ export function StoryDetailScreen({
         badge: formatCount(attachmentsTotal),
         badgeVariant: "" as const,
       },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a story's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -446,14 +446,6 @@ export function StoryDetailScreen({
                 canEdit={canEdit}
                 canLog={canLogTime}
                 onActivityChanged={() => invalidate(`activity:record:stories:${storyId}`)}
-              />
-            )
-          if (t.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("work", "create") ? activity.addNote : undefined}
-                notePlaceholder={notePlaceholder}
               />
             )
           // `work:edit`, which is what BOTH attachment doors gate on — not the

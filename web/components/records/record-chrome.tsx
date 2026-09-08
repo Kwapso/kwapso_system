@@ -51,10 +51,13 @@ import type { ShapeState, ShapeStateCopy } from "@shared/ui/compositions/states/
 import type { RecordDetailAuditEntry } from "@shared/ui/components/record-detail/record-detail"
 import type { ActivityFeedItem } from "@shared/ui/components/activity-feed/activity-feed"
 
+import { ActivityRail, hasActivityDoor, type RailActivity } from "@/components/records/activity-rail"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { safeHref } from "@shared/web/rich-text"
-import { clampRecordHeading } from "@shared/web/record-heading"
+import { RecordRef } from "@shared/web/record-ref"
+import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "@shared/web/record-heading"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 import { defaultTabsConfig, type TabsConfig } from "@shared/web/screen-engine/tabs-view"
@@ -236,6 +239,24 @@ export type RecordAudit = {
   createdAt?: string | null
   editedByName?: string | null
   updatedAt?: string | null
+  /** WHICH POPULATION EACH NAME BELONGS TO (R54). A staff person is shown by
+   * their first name and a client contact is shown in full, and this is the ONE
+   * component that draws the audit line for every record detail in the app — so
+   * the decision is made here, once, instead of at fourteen call sites that
+   * would each have to remember it.
+   *
+   * They default to FALSE, i.e. staff, because thirteen of the fourteen records
+   * this footer sits under cannot be created by anybody else: the portal has no
+   * create door for an account, a story, a sprint, an app, a role, a wave, a
+   * dropdown value, a meeting, a knowledge item or a task. The fourteenth is the
+   * ticket, which a contact raises for themselves, and `help-detail.tsx` passes
+   * the row's own `raiserIsClient` / `editorIsClient`. A default that is right
+   * for every screen but one, with that one saying so out loud, is the shape
+   * this codebase already uses for a redaction (`toTicket`'s `hideRaiser`) —
+   * except that here the unsafe direction is TRUNCATING a name, so the default
+   * is the one that leaves a name whole when nobody has answered. */
+  createdByIsClient?: boolean
+  editedByIsClient?: boolean
 }
 
 /** `audit` → the ink footer's Record column, two rows: Created, Last edited.
@@ -256,15 +277,24 @@ function recordAuditEntries(
 ): RecordDetailAuditEntry[] {
   const created = audit.createdAt ? formatRelative(audit.createdAt, t, lang) : null
   const edited = audit.updatedAt ? formatRelative(audit.updatedAt, t, lang) : null
+  // R54 — one place, and the names below are the ONLY ones this function reads.
+  // A colleague is named by their first name; a client contact keeps theirs
+  // whole, because the ruling's second sentence is as binding as its first.
+  const createdBy = audit.createdByIsClient
+    ? audit.createdByName
+    : staffNameFromSnapshot(audit.createdByName) || null
+  const editedBy = audit.editedByIsClient
+    ? audit.editedByName
+    : staffNameFromSnapshot(audit.editedByName) || null
   const rows: RecordDetailAuditEntry[] = []
-  if (audit.createdByName && created)
-    rows.push({ id: "created", label: t("Created by {name}", { name: audit.createdByName }), children: created })
-  else if (audit.createdByName) rows.push({ id: "created", children: t("Created by {name}", { name: audit.createdByName }) })
+  if (createdBy && created)
+    rows.push({ id: "created", label: t("Created by {name}", { name: createdBy }), children: created })
+  else if (createdBy) rows.push({ id: "created", children: t("Created by {name}", { name: createdBy }) })
   else if (created) rows.push({ id: "created", children: t("Created {when}", { when: created }) })
-  if (audit.editedByName && edited)
-    rows.push({ id: "edited", label: t("Last edited by {name}", { name: audit.editedByName }), children: edited })
-  else if (audit.editedByName)
-    rows.push({ id: "edited", children: t("Last edited by {name}", { name: audit.editedByName }) })
+  if (editedBy && edited)
+    rows.push({ id: "edited", label: t("Last edited by {name}", { name: editedBy }), children: edited })
+  else if (editedBy)
+    rows.push({ id: "edited", children: t("Last edited by {name}", { name: editedBy }) })
   else if (edited) rows.push({ id: "edited", children: t("Last edited {when}", { when: edited }) })
   return rows
 }
@@ -585,41 +615,30 @@ const FOOTER_TO_BOTTOM =
   "[&_[data-slot=record-detail]]:flex-1 [&_[data-slot=record-detail]]:min-h-0 " +
   "[&_[data-record-region=footer]]:mt-auto"
 
-/** THE RECORD'S OWN TITLE STEP — CLIENT CORRECTION, 2026-08-31, verbatim:
- * "title on main screens still way too small! it's currently smaller than in
- * detail screens. makes no sense." True, and the reference "Kwapso UI Kit.dc.html"
- * scale says exactly why: display-m/56 is named "Page title" (a main screen's
- * own heading, collection-heading.tsx's own note) and h1/44 is named "Record
- * heading" — a MAIN screen's title is meant to be the LARGER of the two.
- *
- * THIS IS A VENDORED KIT BUG, NOT AN APP CHOICE, AND IT GOES DEEPER THAN
- * `SHAPE_HEADING_SIZE` (states.tsx). `RecordChrome` (the vendored template,
- * compositions/templates/record-chrome.tsx) feeds `RecordDetail` a
- * `titleSize` capped at `SHAPE_HEADING_SIZE`'s own "h2" | "h3" union — but the
- * REAL ceiling is one layer down: `RecordDetail` renders the title through the
- * kit's `Title` primitive (components/title/title.tsx), and `Title`'s own
- * `size` ladder has ONLY THREE RUNGS — h2 (32), h3 (24), h4 (20) — with no h1
- * (44) and no display-m (56) rung AT ALL. `Headline` (components/typography/
- * typography.tsx), the OTHER kit primitive this app already uses for every
- * main-screen title, has both — so the same 44/56 steps exist in the token
- * system and in one kit component, and are simply unreachable from the other.
- * Filed upstream (kwapso-design / kwapso-ui-ux): `Title` needs an `h1` (and
- * ideally `display-m`) rung added to its own `size` variant, matching
- * `Headline`'s ladder exactly, so `RecordDetail` can ask for one directly.
- *
- * `shared/ui/` is vendored and pinned (CLAUDE.md, R39) and cannot be
- * hand-edited here, so this reaches the kit's OWN rendered heading from
- * outside — `[data-slot=title-heading]` is `Title`'s own stable hook — the
- * exact precedent `auth-card.tsx` sets for the sign-in screen's centring: a
- * descendant selector targeting the kit's own data-slot, never a class edited
- * into the vendored file. `text-4xl` is the h1 step's OWN Tailwind utility —
- * tokens.css's `@theme inline` block bridges its font-size, line-height AND
- * letter-spacing together (the same bridge `text-3xl` already gets), so one
- * class is the whole step, not a raw `text-[length:…]` that would silently
- * drop the other two (typography.tsx's own warning). No `!` needed: the
- * attribute-selector descendant this compiles to already outweighs `Title`'s
- * own bare `.text-3xl`/`.text-2xl` class on specificity alone. */
-const RECORD_TITLE_SIZE = "[&_[data-slot=title-heading]]:text-4xl"
+/* THE RECORD'S OWN TITLE STEP (h1/44) AND THE TITLE/ACTIONS SPLIT (80%) BOTH
+   MOVED OUT OF THIS FILE, 2026-09-06 — they are `RECORD_TITLE_TREATMENT` in
+   `shared/web/record-heading.tsx` now, which carries the whole reasoning for
+   each (the kit's `Title` has no h1 rung; the client's "reserve a % on the
+   left for the buttons") verbatim.
+
+   WHY THEY LEFT. Both were PRIVATE constants here, and this file is only ONE
+   of the two ways this app draws a record detail. The other —
+   `renderDetail` in `shared/web/screen-engine/screen-renderer.tsx`, which
+   draws `team.detail`, `members.detail`, `invites.detail`, `brand.detail` and
+   `purposes.detail` on both front doors — could not see either of them, so it
+   fell through to the kit's own `titleSize = "h3"` and drew record names at
+   24px where the thirteen screens below drew them at 44px. `team.detail` is
+   the app's own landing screen. R52 is the law that now censuses both paths
+   against the one constant, so the next patch to a record's title line cannot
+   land on one path and miss the other.
+
+   NOTHING ELSE IN THIS FILE MOVED. `FOOTER_TO_BOTTOM`, `PANEL_BELOW_TABS`,
+   `RECORD_TABS_GEOMETRY` and `STICKY_TABS` stay private on purpose: they
+   correct where THIS path puts its tab strip (inside the panel card, because
+   this app hands its whole `TabsView` down through `panel`), and the recipe
+   path has no such correction to make — the kit draws its strip as region 2,
+   already a sibling above the card. See `RECORD_TITLE_TREATMENT`'s own note
+   for the full reasoning. */
 
 /** THE IDENTITY ROW'S OWN GEOMETRY — see `RecordScreen`'s own note at its
  * `identityChips`, below, for why this exists (a bigger, better-spaced pill
@@ -740,6 +759,7 @@ export function RecordScreen({
   children,
   audit,
   activity,
+  activityHead,
   onAddNote,
   notePlaceholder,
   state,
@@ -798,8 +818,16 @@ export function RecordScreen({
    */
   /** The reference a person quotes on the phone. Drawn as the charcoal chip,
    * now ABOVE the title (client ruling, 2026-09-01, reversing "below the
-   * title" below): "the black chip is always the ID". */
-  recordNumber?: React.ReactNode
+   * title" below): "the black chip is always the ID".
+   *
+   * A STRING, not a node, and the tightening is the point: this is the number
+   * itself and the chip around it is not the caller's decision. It was
+   * `React.ReactNode` while this file drew the badge inline; every one of the
+   * seven call sites has always passed a plain `record.ref` (or an account's
+   * `code`), and typing it that way is what lets `RecordRef` own the mark here
+   * exactly as it owns it in every list row. Absent/empty draws nothing at all
+   * — the component decides that, not the seven callers. */
+  recordNumber?: string
   /** What kind of record this is, or which collection it belongs to — the chip
    * beside the ID. "add a chip for Padelbase like in the example". Pass a
    * clickable node (an `InAppLink` or a `Button variant="link"` wrapped around
@@ -868,12 +896,27 @@ export function RecordScreen({
    */
   audit?: RecordAudit
   /**
-   * The Latest activity column — the SAME rows `useRecordActivity` already
-   * fetched for this record's Activity tab. Pass `activity.items` straight
-   * through (`ActivityFeedRow[]`); the slice to "short" and the shape
-   * conversion to the kit's `ActivityFeedItem` happen here, once.
+   * THE WHOLE `useRecordActivity` BUNDLE, and it always was — every one of the
+   * thirteen call sites has passed `activity={activity}` (the hook's own return)
+   * since this prop existed, so widening the TYPE from `{ items }` to the six
+   * fields the hook already hands over changed no call site at all.
+   *
+   * It feeds two things that must not be able to disagree. The footer's own
+   * Latest activity column takes `items` — sliced to the newest three here,
+   * once, and converted to the kit's `ActivityFeedItem` shape (CH27.8: "the
+   * footer is a summary"). And the DOOR beside that column's eyebrow takes the
+   * rest: `total` is the exact server COUNT(*) it prints (R16 — never the
+   * loaded page's length), `listKey`/`fetchPage` are what let the rail behind
+   * it reach page two of the same feed (R14). One read, one number, one feed;
+   * a second fetch here is what would let the summary and the history drift.
    */
-  activity?: { items: readonly ActivityFeedRow[] }
+  activity?: RailActivity
+  /**
+   * Anything that belongs above the feed INSIDE the activity rail. One caller:
+   * the ticket's stage strip. Forwarded to `ActivityRail`'s `head` and argued
+   * there; a record that passes nothing gets a rail holding the feed alone.
+   */
+  activityHead?: React.ReactNode
   /**
    * CH27.8's add-a-note field on the ink footer, backed by `useRecordActivity`'s
    * `addNote` (web/lib/use-record-activity.ts) over `POST
@@ -938,7 +981,7 @@ export function RecordScreen({
   // width in the first place, and `break-words` is what it shrinks INTO instead
   // of pushing `actions` past the edge of the row. A LONG but BREAKABLE title
   // needed a second fix on top of this one — see `TITLE_ACTIONS_SPLIT`'s own
-  // comment, below the component, for why `actions` could still end up wrapping
+  // comment (shared/web/record-heading.tsx) for why `actions` could still end up wrapping
   // onto a second line under a long multi-word title even with `min-w-0` here.
   //
   // THE PILLS ROW — the title block below needs `identityChips` as its own
@@ -950,7 +993,15 @@ export function RecordScreen({
   const hasIdentity = recordNumber !== undefined || collectionLabel !== undefined || chips !== undefined
   const identityChips = !hasIdentity ? undefined : (
     <span className={IDENTITY_ROW}>
-      {recordNumber !== undefined ? <Badge variant="inverse">{recordNumber}</Badge> : null}
+      {/* THE ONE COMPONENT THAT DRAWS A REFERENCE (shared/web/record-ref.tsx).
+          This line used to build the badge itself, and three list surfaces
+          built the same lozenge separately — the detail header being the one
+          that did NOT carry `tabular-nums`, so the same number set differently
+          on a record's own screen and in the list you reached it from. It
+          reaches `size="pill"` twice over now: once from the component and once
+          from `IDENTITY_ROW`'s rebind below, which agreed by luck before and
+          agrees by construction since. */}
+      <RecordRef value={recordNumber} />
       {collectionLabel !== undefined ? <Badge>{collectionLabel}</Badge> : null}
       {chips}
     </span>
@@ -1071,7 +1122,7 @@ export function RecordScreen({
           rendered; the file that drew it is deleted, and the tab strip below
           is now the only thing a scrolled record screen pins. */}
       <RecordChrome
-        className={`${FOOTER_TO_BOTTOM} ${RECORD_TITLE_SIZE} ${PANEL_BELOW_TABS} ${TITLE_ACTIONS_SPLIT}`}
+        className={`${FOOTER_TO_BOTTOM} ${PANEL_BELOW_TABS} ${RECORD_TITLE_TREATMENT}`}
         /* NO `mark` HANDED TO THE KIT EITHER — "THE MARK IS GONE FROM THIS
            HEADER TOO", this file's header comment. `headerMark` (the local
            variable that used to fold `leading`/`mark` together) is deleted;
@@ -1095,6 +1146,93 @@ export function RecordScreen({
            of its two columns. */
         audit={audit ? recordAuditEntries(audit, t, lang) : undefined}
         activity={activity ? footerActivityItems(activity.items) : undefined}
+        /* THE DOOR TO THE FULL HISTORY, ON THE EYEBROW'S OWN LINE — wired ONCE
+           here for all thirteen bespoke details rather than thirteen times.
+           The client, 2026-09-06, verbatim: "On the right column, on Latest
+           Activity, I would like some view or expand or whatever, and this
+           would open a slide-in with all the activity." 2026-09-07: "implemet
+           'A · in the eyebrow row' across the app." The rail itself — the link,
+           the count and the `EdgePanel` behind them — is
+           `web/components/records/activity-rail.tsx`.
+
+           ── THE KIT OWNS THIS ROW NOW, v1.2.69, VENDORED 2026-09-08 ────────
+
+           `RecordDetail` grew `activityAction` in v1.2.67 for exactly this
+           door, but this file does not reach `RecordDetail` — it goes through
+           `RecordChrome`, the kit's own composition template, which forwarded
+           ~24 props and not that one. So until v1.2.69 the rail was SMUGGLED
+           through `activityLabel`, which is the EYEBROW: a label slot carrying
+           a control, so the eyebrow's own type step and ink applied to it and
+           the two could never be styled apart. v1.2.69 forwards the real prop
+           and this is the deletion its CHANGELOG asks for.
+
+           WHAT WENT WITH IT. A local `activityEyebrowRow` helper hand-copied
+           the kit's own eyebrow row — `flex min-w-0 items-baseline
+           justify-between gap-[var(--space-3)]`, the `--footer-eyebrow-line`
+           declaration, `flex-none whitespace-nowrap` on the action — PLUS
+           three resets the nesting forced, `normal-case`, `tracking-normal`
+           and the footer ink, because `RecordFooterEyebrow` is `text-micro
+           font-[var(--font-weight-medium)] uppercase text-ink-tertiary` and
+           every one of those inherits into a child. All of it is gone, and
+           none of it is still needed: the kit's own branch (record-detail.tsx,
+           `data-slot="record-detail-activity-row"`) draws the action as a
+           SIBLING of the eyebrow rather than a child — nothing to reset — and
+           declares `--footer-eyebrow-line` itself, `calc(var(--text-micro) *
+           var(--text-micro--line-height))`, the same expression the stand-in
+           carried.
+
+           MEASURED after the swap, in a browser against staging rows (a ticket
+           record, 1280×900): the eyebrow's box, the action's box and the ROW's
+           box are all 14.296875px — three numbers, one value, so the door adds
+           nothing to the height the lone eyebrow already had. THE IDENTITY IS
+           THE CLAIM, NOT THE NUMBER. The kit's own note quotes 13.406px for
+           this expression "at the shipped 15px root"; the agency door does not
+           render at 15px — `shared/web/scale-section.tsx` sets an inline
+           `style.fontSize` on <html> (16px here) and an inline style beats
+           `:root[data-scale=…]`, which `shared/scale.ts` documents as
+           deliberate. 0.6875rem × 1.3 × 16 = 14.3. Re-measured at every
+           `data-scale` step and the three boxes stay equal.
+
+           `activityLabel` IS STILL PASSED, AND STILL TRANSLATED. It is no
+           longer carrying the control, but `RecordDetail`'s own default for it
+           is the hardcoded English "Latest activity", and the translation walk
+           never opens `shared/ui/` (R28, `VENDORED_UI`) — left off, a German
+           reader is told "Latest activity" in English over three German
+           sentences. These are now the same two lines the recipe path has used
+           all along (`shared/web/screen-engine/screen-renderer.tsx`).
+
+           `undefined` — NOT `null`, AND NOT AN ELEMENT THAT WILL RENDER
+           NOTHING. `activityAction` is one of the three terms in the kit's
+           `showActivityColumn`, and that term tests the PROP (`!== undefined`),
+           which a React element satisfies even when its component returns null.
+           So the host has to ask BEFORE it builds the node, and it asks
+           `hasActivityDoor` — the same single expression `ActivityRail` itself
+           decides on (R16's `formatCount`: "" for a zero and for a total still
+           in flight), exported rather than copied. Caught by measuring: passing
+           the element unconditionally put a 14.296875px column carrying a bare
+           "LATEST ACTIVITY" and nothing under it onto a knowledge record with
+           no history and no note composer — a record that drew no column at all
+           the day before. The old smuggle could not do this, because
+           `activityLabel` is not a term in that gate.
+
+           NOT GATED ON `state` — a record whose PANEL is still loading has
+           already loaded its footer's own facts or it would not be drawing a
+           footer, and `ActivityRail` waits for the exact total either way. */
+        activityLabel={t("Latest activity")}
+        activityAction={
+          !hasActivityDoor(activity) ? undefined : (
+            <ActivityRail
+              activity={activity}
+              /* The SAME handler the footer's own composer is given, gated by
+                 the SAME `can(module, "create")` at the same call site — never
+                 recomputed here, so the two fields cannot end up disagreeing
+                 about who may write. */
+              onAddNote={onAddNote}
+              notePlaceholder={notePlaceholder}
+              head={activityHead}
+            />
+          )
+        }
         onAddNote={onAddNote}
         notePlaceholder={notePlaceholder}
         state={state}
@@ -1106,55 +1244,6 @@ export function RecordScreen({
   )
 }
 
-/** THE TITLE COLUMN NEVER YIELDS THE WHOLE ROW TO A LONG NAME — CLIENT
- * RULING, 2026-09-01, verbatim: "i want that the space in screen for title
- * is, f.e. 80% of the width. that we always reserve a % on the left for the
- * buttons (so the current behaviour when long titles that the buttons go
- * under is wrong)." `actions` sharing the title's own row (override 73) is
- * what put Edit "aligned with the title" in the first place; a title long
- * enough could still push it onto a SECOND line underneath, which is the
- * defect this fixes.
- *
- * WHY A DESCENDANT SELECTOR. `title`/`actions` are threaded into the kit's
- * `Title` primitive (shared/ui/components/title/title.tsx), one layer below
- * `RecordDetail` — vendored and pinned (R39), so this file cannot hand-edit
- * it the way `RECORD_TITLE_SIZE` above already explains for the same
- * component. `Title`'s own row is a plain `flex flex-wrap items-end gap-4`:
- * the eyebrow+heading wrapper is a bare `<div className="min-w-0">` with no
- * `data-slot` of its own, and `actions` renders as `[data-slot=title-actions]`
- * only when given. `[&_[data-slot=title]>div:not([data-slot=title-actions])]`
- * reaches the FIRST kind of child by ruling OUT the one child that DOES carry
- * a name, rather than by counting on it being first — `Title`'s own source
- * always renders the heading wrapper before `actions` today, but "not the
- * actions div" describes the same element without leaning on that order.
- *
- * THE MECHANICS. A wrapping flex row decides whether its items fit on ONE
- * line using each item's flex-basis, not its post-shrink width — an item
- * whose basis is `auto` (content) gets its own unbroken text width as that
- * basis, so a long single-line title (its max-content width, before
- * `break-words` ever gets a chance to run) can by itself already exceed the
- * row, and `actions` — the sibling with nowhere else to go — is what wraps to
- * a second line UNDER the title, exactly the client's complaint (the title's
- * own `min-w-0` this file already sets, above, only lets it SHRINK once
- * placed on a line; it does nothing to the placement decision itself).
- * Setting the heading wrapper's basis to a real, definite value — `0%`, not
- * `auto` — takes it out of that decision entirely (its hypothetical size for
- * the fit test is now zero, so it never causes a wrap by itself); Tailwind's
- * `flex-1` (`flex: 1 1 0%`) is both of those in one utility — grow, shrink,
- * and the zero basis — so it lets the wrapper grow back to fill whatever room
- * `actions` doesn't need, and `max-w-[80%]` is the ceiling the client asked
- * for — even where `actions` is a single small button, the title is never
- * handed the WHOLE row. `actions` keeps its own natural width — `shrink-0`
- * guards it from ever losing the argument the title used to win by growing
- * straight through it. Long text still wraps/clamps WITHIN the title's own
- * shrunk column, via `min-w-0` + `break-words` (this component's own title
- * span) and `clampRecordHeading` — this class only changes how much of the
- * ROW that column may claim. */
-const TITLE_ACTIONS_SPLIT =
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:min-w-0 " +
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:max-w-[80%] " +
-  "[&_[data-slot=title]>div:not([data-slot=title-actions])]:flex-1 " +
-  "[&_[data-slot=title-actions]]:shrink-0"
 
 /** THE TWO NUMBERS BOTH RULES BELOW SHARE, AS CUSTOM PROPERTIES RATHER THAN
  * LITERALS. Round two (below) escaped the tab strip with a flat `-mt-[170px]`
@@ -1444,7 +1533,7 @@ const PANEL_BELOW_TABS =
  * collection screen; this is the detail screen's own copy of the same strip,
  * fixed in the same pass rather than left to be reported a second time. */
 export const STICKY_TABS =
-  "[&>[role=tablist]]:bg-[var(--surface-raised)] [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
+  "[&>[role=tablist]]:bg-surface-raised [&>[role=tablist]]:sticky [&>[role=tablist]]:top-0 [&>[role=tablist]]:z-10 " +
   "[&>[role=tablist]]:max-w-none [&>[role=tablist]]:w-[calc(100%_+_var(--space-6)_+_var(--space-6))] " +
   "[&>[role=tablist]]:-mx-6 [&>[role=tablist]]:px-1 " +
   "[&>[role=tablist]]:[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)] " +

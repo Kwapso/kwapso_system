@@ -45,19 +45,24 @@ import { X } from "../../foundations/icons";
    why it cannot be mixed from `--foreground` or `--surface-inverse` (both of
    those flip to off-beige in dark and would produce a white scrim).
 
-   `--kw-charcoal` is the raw palette layer, which tokens.css §2 marks as
-   internal. Reaching it here is deliberate and logged: there is no `--scrim`
-   token and no semantic token that is charcoal in both themes. GAPS-A.md
-   OVL-2. `color-mix` keeps the 36% in the stylesheet rather than baking a
-   fourth colour value into a component.
+   THERE IS A `--scrim` TOKEN NOW, AND THIS FILE NO LONGER MIXES ITS OWN —
+   CHANGED 2026-09-07. What stood here was an arbitrary background holding a
+   `color-mix` of the raw charcoal at 36% against transparent — spelled out,
+   because PATTERN §10's lesson is that Tailwind scans this file's comments
+   too and cannot tell an explanation from an intention, so the old class is
+   DESCRIBED here rather than written — under a paragraph saying the raw
+   palette layer was being reached deliberately
+   because no semantic token stays charcoal in both themes (GAPS-A.md OVL-2).
+   That was true, and it was never the fix: OVL-2's own text says the fix is a
+   token. By this week the same expression was written out by hand in four
+   files and `edge-panel.tsx` was about to make it five. tokens.css §3 now
+   states the pair and §10 bridges it, so the scrim is a NAMED utility over a
+   value decided in the one file allowed to decide a colour. Same 36%, same
+   charcoal in both palettes; nothing renders differently.
 
    z: the kit puts the modal scrim at 60 and the drawer scrim at 55. Kept.
    ------------------------------------------------------------------------- */
-const SCRIM = [
-  "fixed inset-0 z-[60]",
-  "bg-[color-mix(in_srgb,var(--kw-charcoal)_36%,transparent)]",
-  "motion-scrim",
-] as const;
+const SCRIM = ["fixed inset-0 z-[60]", "bg-scrim", "motion-scrim"] as const;
 
 /* ----------------------------------------------------------------------------
    The positioner. A grid that centres its one child, sitting inside the same

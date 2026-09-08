@@ -64,6 +64,7 @@ import { safeHref } from "@shared/web/rich-text"
 
 import { isFollowable, MAX_SIZE_LABEL, spellSize } from "@/lib/attachments"
 import { formatRelative } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { primeCache, useCached } from "@shared/web/store"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import { useLanguage } from "@shared/web/language"
@@ -84,6 +85,10 @@ export type AttachmentRow = {
   sizeBytes: number | null
   createdAt: string
   addedByName: string | null
+  /** R54: which population `addedByName` holds. A ticket's files come from both
+   * sides, so the row says; a story is ours end to end (the portal has no story
+   * door at all), so the field is absent and the name is always a colleague's. */
+  addedByIsClient?: boolean
 }
 
 /** What every door here answers with: the list as it now stands, and the exact
@@ -348,7 +353,13 @@ export function RecordAttachments<R extends AttachmentRow>({
                       * Below `sm` the size, the person and the date take a line of
                       * their own and the name gets the width it needs. */}
                     <span className="text-muted-foreground w-full text-xs tabular-nums sm:w-auto">
-                      {[spellSize(a.sizeBytes), a.addedByName, formatRelative(a.createdAt, t, lang)]
+                      {/* R54: a colleague is named by their first name; the contact
+                        * who sent us the file keeps theirs. */}
+                      {[
+                        spellSize(a.sizeBytes),
+                        a.addedByIsClient ? a.addedByName : staffNameFromSnapshot(a.addedByName),
+                        formatRelative(a.createdAt, t, lang),
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>

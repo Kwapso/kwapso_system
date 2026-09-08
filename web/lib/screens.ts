@@ -174,8 +174,15 @@ export const MODULE_PERMISSION: Record<string, string> = {
 
 /* --------------------------------- team --------------------------------- */
 
-/** Team overview — the team's metadata (Overview) + its activity feed, the
- * landing screen at /t/<teamId>. Edit team is gated by teams:edit.
+/** Team overview — the team's metadata (Overview), the landing screen at
+ * /t/<teamId>. Edit team is gated by teams:edit.
+ *
+ * ITS ACTIVITY FEED WAS A SECOND TAB HERE UNTIL 2026-09-06, when the client
+ * killed the Activity tab across the app: a record's history is read from the
+ * footer's Latest activity column and opens in a slide-in off it
+ * (web/components/records/activity-panel.tsx carries the ruling). The feed itself is
+ * unchanged and still read — `use-screen-data.ts` fetches it and the host still
+ * shapes it into this screen's `sets.activity` for whatever draws it next.
  *
  * NO SCREEN GATE, on purpose. Reading a team is `whoAmI`, not a right — the
  * matrix offers no `teams:read` box (MODULE_OFFERED_RIGHTS says why), so a
@@ -217,12 +224,10 @@ const teamDetailRecipe: ScreenRecipe = {
         ],
       },
     },
-    {
-      key: "activity",
-      label: "Activity",
-      icon: CONCEPT_ICON.activity,
-      block: { kind: "activity", source: "activity" },
-    },
+    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
+    // is reached from the record footer's Latest activity column and opens in a
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
+    // the ruling and the argument.
   ],
 }
 
@@ -255,8 +260,9 @@ const membersListRecipe: ScreenRecipe = {
   }),
 }
 
-/** Member detail (Overview + Activity). Actions change-role + remove are gated by
- * team_members edit/delete; the host hides them on your own row. */
+/** Member detail (Overview). Actions change-role + remove are gated by
+ * team_members edit/delete; the host hides them on your own row. Its Activity
+ * tab went with every other one on 2026-09-06 — see the team recipe above. */
 const memberDetailRecipe: ScreenRecipe = {
   type: "detail",
   binding: { module: "members" },
@@ -294,12 +300,10 @@ const memberDetailRecipe: ScreenRecipe = {
         ],
       },
     },
-    {
-      key: "activity",
-      label: "Activity",
-      icon: CONCEPT_ICON.activity,
-      block: { kind: "activity", source: "activity" },
-    },
+    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
+    // is reached from the record footer's Latest activity column and opens in a
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
+    // the ruling and the argument.
   ],
 }
 
@@ -385,12 +389,10 @@ const inviteDetailRecipe: ScreenRecipe = {
         ],
       },
     },
-    {
-      key: "activity",
-      label: "Activity",
-      icon: CONCEPT_ICON.activity,
-      block: { kind: "activity", source: "activity" },
-    },
+    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
+    // is reached from the record footer's Latest activity column and opens in a
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
+    // the ruling and the argument.
   ],
 }
 
@@ -583,6 +585,14 @@ const meetingsListRecipe: ScreenRecipe = {
   binding: { module: "meetings" },
   gate: { module: "meetings", right: "read" },
   fields: [field("name", "Meeting"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME, the same black chip every other collection
+  // leads with. `shapeMeetingsList` has carried this column since the Reference
+  // COLUMN was cut from the All table ("`Reference` already rides the record's
+  // own eyebrow (D4)", meetings-screen.tsx) — and that cut left the key with no
+  // reader at all, so a meeting was the one record whose number appeared on its
+  // own screen and nowhere you could find it from. The column ruling stands:
+  // this is not a seventh column, it is the chip in front of the first one.
+  reference: "ref",
   // The record's own face in the leading slot (R35). Every shaper builds a
   // `mark` node — a picture where the record has one, its type's glyph
   // where the type has one, and its initial where it has neither, which
@@ -637,6 +647,11 @@ const storiesListRecipe: ScreenRecipe = {
   binding: { module: "stories" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Story"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The story TYPE's glyph in the leading slot, the same slot tickets and
   // accounts fill (library v0.11.0 `leading`). `shapeStories` builds the node.
   leading: "mark",
@@ -659,6 +674,11 @@ const sprintsListRecipe: ScreenRecipe = {
   binding: { module: "sprints" },
   gate: { module: "work", right: "read" },
   fields: [field("name", "Sprint"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The sprint TYPE's glyph, the same one the Overview groups lead with.
   leading: "mark",
   actions: [],
@@ -680,6 +700,11 @@ const appsListRecipe: ScreenRecipe = {
   binding: { module: "apps" },
   gate: { module: "processes", right: "read" },
   fields: [field("name", "App"), field("detail", "Details")],
+  // THE NUMBER IN FRONT OF THE NAME (the client's "put the ID before the title
+  // to the left, with the usual black chip design"). The engine draws it as the
+  // black chip through `RecordRef`; this only names the column the shaper puts
+  // it in. A row with no reference draws nothing — see recipe.ts's `reference`.
+  reference: "ref",
   // The record's own face in the leading slot (R35). Every shaper builds a
   // `mark` node — a picture where the record has one, its type's glyph
   // where the type has one, and its initial where it has neither, which
@@ -727,8 +752,14 @@ const tasksListRecipe: ScreenRecipe = {
  * ceremony where a recipe already says it.
  *
  * The Overview tabs are pinned in RECORD_TAB_COUNT_EXCEPTIONS with their reason
- * (one record, not a collection); the Activity tabs are badged with the exact
- * server total by the withTabCounts seam (R8 for the place, R16 for the number).
+ * (one record, not a collection). They used to have an Activity tab beside them,
+ * badged with the exact server total through the withTabCounts seam; the client
+ * killed the Activity tab across the app on 2026-09-06 (a record's history is
+ * read from the footer's Latest activity column and opens in a slide-in off it —
+ * web/components/records/activity-panel.tsx carries the ruling), so each of these
+ * details is a single description block now. The seam stays: it is what badges
+ * whatever collection tab one of these recipes grows next, and it is derived
+ * from the tab's own block rather than from a list of tab keys.
  */
 function internalDetailTabs(rows: { label: string; column: string }[]): RecipeTab[] {
   return [
@@ -738,12 +769,10 @@ function internalDetailTabs(rows: { label: string; column: string }[]): RecipeTa
       icon: CONCEPT_ICON.overview,
       block: { kind: "description", columns: 1, rows },
     },
-    {
-      key: "activity",
-      label: "Activity",
-      icon: CONCEPT_ICON.activity,
-      block: { kind: "activity", source: "activity" },
-    },
+    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — see the note above
+    // this function. These details are down to one tab each as a result; the
+    // strip they draw is the kit's `RecordDetail`'s own, and unlike the thirteen
+    // bespoke details this path has no strip of its own to delete.
   ]
 }
 

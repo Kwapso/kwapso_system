@@ -48,6 +48,7 @@ import {
 import { GROUP_CAP, MAX_CLAUSES, VALUES_PER_CLAUSE } from "../src/lib/query-engine"
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "./spine-harness"
+import { HELP_STATUSES } from "@shared/types"
 
 const db = () => holder.db as DatabaseSync
 
@@ -308,12 +309,19 @@ describe("a grouped count is one call, and it comes back labelled", () => {
 })
 
 describe("the grammar refuses what it cannot answer, in words a model can act on", () => {
-  it("a wrong status names the seven it could have been", async () => {
+  it("a wrong status names the six it could have been", async () => {
     const { status, body } = await ask(
       q({ module: "tickets", where: [{ field: "status", op: "eq", value: "open" }] })
     )
     expect(status).toBe(400)
-    expect(String(body.message)).toContain("awaiting_validation")
+    // ASSERTED AGAINST `HELP_STATUSES` ITSELF rather than a word typed here.
+    // This used to name `awaiting_validation`, which the client retired on
+    // 7 Sep 2026 — so the literal that made the case readable was also the
+    // thing that made it go red for the right reason and the wrong one at once.
+    // The grammar builds this message from the enum, so the test reads it the
+    // same way and cannot be broken again by a vocabulary change that is
+    // working exactly as intended.
+    for (const s of HELP_STATUSES) expect(String(body.message)).toContain(s)
   })
 
   it("a wrong field says to call describe_module", async () => {

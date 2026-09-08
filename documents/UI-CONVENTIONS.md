@@ -157,7 +157,7 @@ why), so the fold was invisible to all of them — the counts before and after a
 identical, and `web/test/source-scan.test.ts` now asserts the walk reaches more
 than a hundred nested files, so a walk that stopped at the top level would enforce
 the UI laws on *nothing* and go red rather than green. And a test that named a
-component by PATH (`join(WEB, "components", "app-shell.tsx")`) failed loudly with
+component by PATH (`join(WEB, "components", "shell", "app-shell.tsx")`) failed loudly with
 an ENOENT; a test that had guarded that read with `existsSync` would have gone
 green and blind. Name a component by basename through the walk, never by folder.
 
@@ -197,7 +197,7 @@ export const BASE_RECIPES: Record<string, ScreenRecipe> = {
 
 A recipe is a `type` (`list` / `detail`), a `binding`, a `gate` (module + right),
 `fields`, `actions`, and, for details, the `tabs`. Example, the member detail's
-Overview + Activity tabs (note this is *data*, not JSX):
+Overview tab (note this is *data*, not JSX):
 
 ```ts
 // web/lib/screens.ts — memberDetailRecipe.tabs
@@ -208,8 +208,11 @@ tabs: [
       { label: "Joined", column: "joined" },
       { label: "Email", column: "email" },
     ] } },
-  { key: "activity", label: "Activity", icon: CONCEPT_ICON.activity,
-    block: { kind: "activity", source: "activity" } },
+  // NO ACTIVITY TAB. The client retired it on 7 Sep 2026 ("kill all old
+  // activity tabs"): a record's history is reached from the ink footer's
+  // Latest activity eyebrow, which opens the slide-in rail. No recipe
+  // declares an `activity` block any more, and `internalDetailTabs`
+  // (screens.ts) is where that decision is written down.
 ]
 ```
 

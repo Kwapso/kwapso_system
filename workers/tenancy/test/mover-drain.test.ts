@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 
+import { stripComments } from "@shared/rules/source-scan"
 import { RETENTION_DELETE_CAP } from "@shared/workers/limits"
 
 const SRC = readFileSync(join(__dirname, "..", "src", "lib", "sharding.ts"), "utf8")
@@ -44,7 +45,7 @@ function moverBody(): string {
  * and every assertion passes or fails on a paragraph. Comments are stripped first
  * so the suite reads code, which is the only thing that runs. */
 function code(text: string): string {
-  return text.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ")
+  return stripComments(text)
 }
 
 function moverSource(): string {

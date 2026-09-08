@@ -224,6 +224,26 @@ export interface ScreenRecipe {
    * A column holding a plain string renders as that string, so point this at
    * the shaped node, not at a raw `logoUrl`. */
   leading?: string
+  /** list: the column holding this row's REFERENCE — the short code a person
+   * quotes on the phone (`T0412`, `B0188`, `S0012`, `M0009`, `A0003`, `W0001`,
+   * `I0007`; shared/workers/refs.ts mints them). Drawn as the black chip in
+   * front of the row's name, which is the client's own instruction: "put the ID
+   * before the title to the left, with the usual black chip design."
+   *
+   * WHY A SECOND COLUMN RATHER THAN A SHAPED `name` NODE. The title slot is a
+   * `React.ReactNode` in the kit's `List`, so a shaper COULD hand it the chip
+   * and the name already joined — and that would silently break two things at
+   * once. The frame searches `fields.map(f => f.column)` against the raw ROW
+   * values, so a React element in `name` is a search box that matches nothing;
+   * and `frameSortOptions` offers the same column as an order, which would then
+   * compare elements. Keeping the name a plain string and the reference beside
+   * it leaves both of those reading exactly what they read before.
+   *
+   * A ROW WITH NOTHING HERE, AND A RECIPE THAT OMITS IT, BOTH DRAW NOTHING AT
+   * ALL — the chip's own absent case (`RecordRef` returns null), so a recipe
+   * that never heard of this gets byte-identical markup, the same promise
+   * `leading` above makes. */
+  reference?: string
   /** list (display: "gallery"): the column holding each row's picture, as a
    * plain URL STRING — deliberately not `leading`, which the list/card
    * displays read as an already-rendered node (a shaped `mark`). The kit's

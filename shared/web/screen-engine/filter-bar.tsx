@@ -489,12 +489,63 @@ function useFilterBar<T>({
         // floor the row wraps, which is the only second line this panel
         // ever draws.
         const facetOptionList = optionsFor(f)
+        // THE MARK RIDES BESIDE THE WORD, NEVER INSTEAD OF IT — client ask,
+        // 2026-09-06: "in filter type i want to see the colored dot / on
+        // filter app i wanna see the icon of the app". `FacetOption.mark`
+        // (config.ts) is a caller-drawn `ReactNode` — a `<Swatch>` for a
+        // ticket type, an `<AppMark>` for an app, whatever picture that
+        // record already wears everywhere else — and this file composes it
+        // beside `label` rather than deciding what either looks like: the
+        // colour map and the app's own mark both live under `web/`, and this
+        // file is read by both front doors (the header's own note on why
+        // `Swatch`/`ticketTypeColour`/`InAppLink` are props on
+        // `ticket-chips.tsx` and never imports, applies identically here).
+        //
+        // NOTHING UPSTREAM HAD TO CHANGE FOR THIS. The kit's own
+        // `CompactFacet`/`SearchableFacet` (shared/ui/components/filter-bar/
+        // filter-bar.tsx) already type `FacetOption.label` as
+        // `React.ReactNode`, not `string` — the closed field prints
+        // `chosen.label` and the option row prints `option.label` as plain
+        // children, either already able to hold a composed node. The seam
+        // was sitting there unused; a facet with no `mark` renders the exact
+        // option object it always did (the `: o` branch below), so every
+        // facet that never carries one is byte-for-byte unchanged.
+        const kitOptions = facetOptionList.map((o) =>
+          o.mark
+            ? {
+                value: o.value,
+                label: (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span aria-hidden="true" className="shrink-0">
+                      {o.mark}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                  </span>
+                ),
+                count: o.count,
+              }
+            : o
+        )
         return (
           <div key={f.field} className="min-w-[11rem] max-w-[15rem] flex-1">
             <CompactFacet
               label={f.label}
               placeholder={t("Any {what}", { what: f.label.toLowerCase() })}
-              options={facetOptionList}
+              options={kitOptions}
+              // THE KIT'S OWN SEARCH MATCH IS BACKWARDS THE MOMENT A LABEL
+              // BECOMES A NODE. `defaultFilterOption` (the kit file) matches
+              // `option.label` when it is a string and falls back to
+              // `option.value` otherwise — exactly right for a plain facet
+              // and exactly wrong here, because `value` is a stored id (an
+              // appId) or a raw dropdown word, never what a person typed
+              // looking for it. This always matches the WORD a reader sees,
+              // mark or no mark, off the app's own option list rather than
+              // the kit-shaped one this facet just built.
+              filterOption={(option, query) => {
+                if (query.trim() === "") return true
+                const said = facetOptionList.find((o) => o.value === option.value)?.label ?? option.value
+                return said.toLowerCase().includes(query.trim().toLowerCase())
+              }}
               // `null` in, `""` out — the boundary conversion the header
               // explains: the kit's own `null` means off, the app's own `""`
               // does.

@@ -7,8 +7,26 @@
 
 import { makeApi, makeRpc, timedFetch } from "./lib/api.mjs"
 import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
+import { FRONT_DOORS } from "./lib/front-doors.mjs"
 
-const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
+// `||`, NOT `??`, and the address comes from the configs — one bug each.
+//
+// This line read `process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"`
+// and threw `TypeError: Invalid URL` on every deploy. `.env` declares SMOKE_BASE
+// blank on purpose, the way it declares a dozen other keys blank, each with a
+// comment naming the default that is supposed to apply. But a blank line in
+// `.env` is an EMPTY STRING, and `??` only falls back on null/undefined — so the
+// default never applied and every deploy's smoke died before its first check,
+// while the pipeline's failure looked like the known missing TEST_LOGIN_KEY.
+// Deploys were going out unproven. `||` treats blank as absent, which is what
+// the file's own comments already promise.
+//
+// The literal was a second fault: the declared staging door is
+// agency-staging.kwapso.app, not that workers.dev host, so on any machine where
+// SMOKE_BASE happened to be unset rather than blank this smoked the wrong
+// address. front-doors.mjs exists to delete exactly that literal — see its
+// header, which makes the argument in full.
+const BASE = process.env.SMOKE_BASE || FRONT_DOORS.staging.agency
 // Resend's test inbox: real send path, always "delivered", never bounces —
 // so running the smoke repeatedly doesn't hurt the sending domain's reputation.
 const EMAIL = "delivered@resend.dev"

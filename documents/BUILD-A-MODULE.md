@@ -16,7 +16,7 @@ recipes in `web/lib/screens.ts`), because it is the smallest module that still
 exercises every layer: a per-team table, a permission row, gated CRUD, boundary
 validation, an audit block, deactivate-not-delete, a pick-or-create vocabulary
 field, an upload door, an activity write, `publishChange`, a screen recipe, a
-record detail with Overview + Activity tabs, and a count badge.
+record detail with an Overview tab and a reachable history, and a count badge.
 
 Where your module needs something the brand library doesn't have, this document
 names the module that does: **Tickets** (`help`) for a collection that GROWS and
@@ -40,7 +40,7 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.tsx`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
-| 5. Record detail | a `<module>.detail` recipe, or `web/components/<module>/<module>-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx`, in the module's OWN folder (`web/components/` has no top-level files — UI-CONVENTIONS.md), and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
+| 5. Record detail | a `<module>.detail` recipe, or `web/components/<module>/<module>-detail.tsx` | The tab strip through the library `TabsView`, and the record's history REACHABLE from the ink footer's Latest activity eyebrow (Law R2 — the Activity TAB was retired on 7 Sep 2026). Nothing to register: name the file `<module>-detail.tsx`, in the module's OWN folder (`web/components/` has no top-level files — UI-CONVENTIONS.md), and the R2/R8 census picks it up off disk from that day |
 | 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | nothing to register for the detail — the laws already walk it; pin any tab that shows no collection, with its reason |
 
 The workers involved: **content** (`workers/content`) is the right home for a
@@ -523,18 +523,22 @@ changed row. Never refetch the whole collection on a change. (CACHING.md.)
 
 ---
 
-## Layer 5, the record detail: Overview + Activity tabs (Law R2)
+## Layer 5, the record detail: the tab strip, and a reachable history (Law R2)
 
-**Every record-detail screen exposes Overview + Activity tabs**, via the library
-`TabsView` + `ActivityFeed`.
+**Every record-detail screen draws its tab strip through the library `TabsView`, and
+every record's history is REACHABLE** — from the ink footer's Latest activity eyebrow
+(`All activity · N ›`), which opens the slide-in `ActivityRail`. The Activity TAB was
+retired on 7 Sep 2026 at the client's ruling, "kill all old activity tabs", so no detail
+renders an `<ActivityPanel>` any more.
 
-**Try the recipe first.** If your record is facts and history, its `tabs` are recipe
-*data* and you get R2 for free, `brandDetailRecipe` (screens.ts) is six
-description-list rows and an activity block, and that is the whole detail screen.
+**Try the recipe first.** If your record is facts, its `tabs` are recipe *data* and you
+get R2 for free, `brandDetailRecipe` (screens.ts) is six description-list rows through
+`internalDetailTabs` and that is the whole detail screen — the history comes from
+`RecordScreen`'s own footer, so a recipe declares no activity block at all.
 
 For a **bespoke** detail this is on you to render, and `knowledge-detail.tsx` is the
-shortest template: three tabs, of which one is the record's own words and two are the
-standard pair.
+shortest template: three tabs — Overview, the relationship map, and the record's own
+words — with its history handed to `RecordScreen`'s `activity` prop for the footer.
 
 Its reads, all cache-first:
 
@@ -688,7 +692,7 @@ AFTER SHIP
 - **A mutation with no `publishChange`.** Fails `publish-seam.test.ts` (R1).
 - **`body.field.trim()` without `requireText`/`optionalText`.** A non-string 500s;
   bad input must be a 400 (locked by validate.test.ts).
-- **A detail without Overview + Activity tabs.** Fails `record-detail-tabs` (R2).
+- **A detail whose history a person cannot reach.** Fails `record-detail-tabs` (R2).
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
 - **A record tab with no count.** Every tab that reveals a collection carries it,
@@ -817,22 +821,30 @@ again, which is the only property that matters here.
 - **R48 `toolbar-shows-search`**, **R49 `toolbar-content-gap`**, **R50
   `empty-toolbar`** — a collection screen gets the toolbar with its search box,
   the gap below it is the row's own margin, and on an EMPTY collection the row
-  draws nothing at all, create button included. **R51 `aside-collapse`** — a
+  draws nothing at all, create button included. **R53 `toolbar-slot-set`** — the
+  row owns its slot SET too: `sort` and `view` are configs `<ToolbarRow>` builds
+  the `<SortControl>`/`<ViewSwitch>` from, no other file in `web/`,
+  `web-portal/` or `shared/web/` may build either control unless it is named in
+  `TOOLBAR_CONTROL_OWNERS`, and every call site passes `sort` or names its
+  enclosing component in `TOOLBAR_SORT_EXEMPT` with the reason its rows have no
+  order to offer. **R51 `aside-collapse`** — a
   panel that minimises collapses; it is never unmounted on the state that
-  animates it.
-- **R52 `one-door-per-unit`** — a component asks a door once. Two reads of ONE
+  animates it. **R52 `record-title-treatment`** — a record detail wears the
+  one shared title treatment whichever path draws it, imported from
+  `shared/web/record-heading` and never re-declared at the call site.
+- **R56 `one-door-per-unit`** — a component asks a door once. Two reads of ONE
   key is a defect with no exemption (the store dedupes it, so the second buys
   nothing); two different keys on one door is a real second request and needs a
   reasoned `TWO_READS_ONE_DOOR` line. A read gated on a permission is the same
   question as an ungated one, so gating it is not a way out.
 - **R25 `savings-caption`** — a screen that shows a saving renders
   `SAVINGS_CAPTION` word for word.
-- **R53 `component-folders`** — your module's components go in ONE folder named
+- **R57 `component-folders`** — your module's components go in ONE folder named
   for it, `web/components/<module>/`, and that folder gets a line in
   `web/components/README.md` saying what belongs there. The top level holds no
   files at all, and the folder set is derived from the README rather than from a
   list in a test, so the paragraph a person reads is the one the build enforces.
-- **R54 `named-paths`** — every path your module's documents and comments name
+- **R58 `named-paths`** — every path your module's documents and comments name
   must open. Write a real file's path or none: an illustrative one goes in
   `<angle brackets>` so it reads as a template, and a path named precisely
   BECAUSE the file is gone gets a reasoned `GONE_ON_PURPOSE` line.
@@ -848,6 +860,44 @@ again, which is the only property that matters here.
   `shared/web/field.tsx`. **R44 `translation-ceiling`** — a catalogued string is
   answered in every language, up to a ceiling that only falls.
 - **R34 `glossary-in-copy`** — the glossary's word, never a synonym for it.
+- **R54 `staff-names-are-first-names`** — the agency's own people are named by
+  their FIRST NAME on screen, and nobody else is. If your module renders a
+  person's name off a row — a `creatorName`, an `editorName`, an `actorName`, a
+  `userName`, or anything else the actor snapshot stamps — put it through
+  `shared/staff-name.ts` and never through a `split(" ")[0]` of your own:
+  `staffName` where you still hold the structured `first_name`/`last_name` pair
+  (exact, so a two-word given name survives), `staffNameFromSnapshot` where a
+  frozen "First Last" string is all there is, and `describeWithStaffName` for an
+  activity SENTENCE, which is where a reader actually meets the name. **The trim
+  happens at the render seam and never in a worker**: the stored string is a
+  search term, a sort expression and a keyset cursor key, and one column holds
+  BOTH populations, because a client-portal login is an ordinary team member. So
+  if your row can have been written by a client, carry the flag that says so —
+  a `*Name` field beside a `*IsClient` sibling — and leave a contact's or a
+  customer's name at its full length, which is the second half of the ruling and
+  as binding as the first. A field you forward untouched into another field is
+  not a rendering and the law will not ask you about it; a match position
+  (`.toLowerCase()`, `.localeCompare(`) is not one either, which is the whole
+  point of trimming late.
+- **R55 `refs-match-the-formula`** — if your module's record carries a
+  REFERENCE (the short code a client quotes: `T0412`, `B0188`, `S0012`), it is
+  minted through `nextTeamRef` in `shared/workers/refs.ts` and nowhere else,
+  and your table is named in `TEAM_REF_TABLES` beside its kind — `tsc` will
+  refuse the file until it is, and the law's census reads the team schema for
+  every `ref` column and fails on any table the map does not claim. Three
+  things follow and none of them is optional. **Never build the string
+  yourself**: `canonicalRef` is the formula and `canonicalRefSql` is its twin
+  inside SQLite, so a migration and a door can both ask what a reference should
+  look like — that they could not is exactly how the whole estate spent six
+  days holding a shape the code said was gone. **Never `UPDATE … SET ref`**: a
+  reference is minted once, and the one act allowed to rewrite one is a team
+  migration that keeps the old string in `ref_aliases` and raises the kind's
+  counter with `MAX()` so it can only go up. And **if your door SEARCHES the
+  reference, OR in `refAliasMatchSql(table, alias)`** and push one more needle,
+  or a number a client was quoted last year stops finding the record — which
+  the client ruled on directly ("alias yes", 7 Sep 2026). A table with a `ref`
+  column and no kind is a reasoned `REF_TABLES_WITHOUT_A_KIND` line, not a
+  silence.
 
 **The machine surfaces**
 

@@ -57,14 +57,17 @@ import { cn } from "../../lib/utils";
 import { X } from "../../foundations/icons";
 
 /* `.kw-scrim--drawer` — charcoal at 28%, z 55, no dark twin drawn and none
-   invented (the kit's note is "kept identical"). `--kw-charcoal` is the raw
-   palette layer and is reached deliberately: no semantic token stays charcoal
-   in both palettes. GAPS-A.md OVL-2. */
-const SCRIM = [
-  "fixed inset-0 z-[55]",
-  "bg-[color-mix(in_srgb,var(--kw-charcoal)_28%,transparent)]",
-  "motion-scrim",
-] as const;
+   invented (the kit's note is "kept identical").
+
+   A NAMED utility since 2026-09-07. This used to mix its own
+   `color-mix(… var(--kw-charcoal) 28% …)` and explain that the raw palette
+   layer was being reached deliberately, because no semantic token stays
+   charcoal in both palettes (GAPS-A.md OVL-2). The value lives in tokens.css
+   §3 now and is bridged in §10, which is what OVL-2 said the answer was; the
+   28% and the charcoal are unchanged, and the shell's narrow aside and
+   `edge-panel.tsx` draw the same scrim from the same name instead of copying
+   this line a third and fourth time. */
+const SCRIM = ["fixed inset-0 z-[55]", "bg-scrim-drawer", "motion-scrim"] as const;
 
 /* ---------------------------------------------------------------------------
    THE CLIENT'S RULE, VERBATIM, 2026-09-04:

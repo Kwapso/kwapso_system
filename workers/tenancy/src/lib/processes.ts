@@ -26,7 +26,7 @@ import { accountScopeClause, appScopeClause, requireAccountInScope, type Account
 import { countCollection } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 import { APP_MODULE_CAP, LIST_HARD_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -37,6 +37,7 @@ import {
   type SavingsView,
   type StepFigures,
 } from "@shared/workers/savings"
+import { ticketTypeKeptForMigrationExcludedSql } from "@shared/types"
 import type { AppModule, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
@@ -149,17 +150,37 @@ function appsWhere(
   // instead of a string, and invisible because the withheld field never appears
   // in the response. A filter is a read.
   //
-  // `name` and `stage` ride to everyone who sees the row (8.11: everyone SEES
-  // every app), so the name is the whole safe surface — and it is what a person
-  // types anyway.
+  // `name`, `stage` AND `ref` ride to everyone who sees the row (8.11: everyone
+  // SEES every app), so those are the whole safe surface — and the name is what
+  // a person types anyway.
+  //
+  // THE REFERENCE JOINED IT ON 7 Sep 2026, when the app's number went onto the
+  // row itself (the black chip in front of the name, apps-screen.tsx). It sits
+  // in the same "rides to everyone" tier as `name` and `stage` — it is selected
+  // unconditionally and returned on every row — so it is inside the safe
+  // surface this paragraph draws, not outside it. It was absent by omission
+  // rather than by the argument above, and a number a person can read off a
+  // list and then not find is worse than one they never saw. Never null on an
+  // app (shared/workers/refs.ts mints it whether or not a client is named), but
+  // `COALESCE` anyway for the rows that predate the counter.
   //
   // ESCAPED, for the same two reasons the accounts search is: `%` and `_` are
   // LIKE's own wildcards, so an unescaped needle answers a different question
   // than the one typed, and a pattern of alternating `%` costs SQLite
   // exponential time over the whole table for a handful of bytes.
+  //
+  // AND THE REFERENCE IT USED TO HAVE (migration 0068). No app on the estate
+  // carries an old-shape reference today — 0059 gave `apps` the column and said
+  // existing rows get none — so this clause matches nothing yet, and it is here
+  // anyway because R55 requires it of every door that searches a reference at
+  // all. A door that will silently stop finding things the day the data changes
+  // is the shape of fault this whole law exists for.
   if (opts.q) {
-    filters.push("name LIKE ? ESCAPE '\\'")
-    params.push(`%${likeLiteral(opts.q)}%`)
+    filters.push(
+      `(name LIKE ? ESCAPE '\\' OR COALESCE(ref, '') LIKE ? ESCAPE '\\'
+        OR ${refAliasMatchSql(TEAM_REF_TABLES.app, `${TEAM_REF_TABLES.app}.id`)})`
+    )
+    params.push(`%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`, `%${likeLiteral(opts.q)}%`)
   }
   return { sql: where(filters), params }
 }
@@ -901,9 +922,23 @@ export async function listAppModules(
   }>(
     cfg,
     guard.databaseId,
+    // OPEN TICKETS ON THIS SECTION, and it means the same "tickets" the Tickets
+    // screen means. The kind that is kept but never shown is subtracted here
+    // too — the client's ruling of 6 Sep 2026, written up in full at
+    // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts. This number is drawn
+    // beside a module's name on a list a person reads (and handed to the
+    // assistant by `list_app_modules`), so a count including rows that screen
+    // cannot show is R16's failure in its quietest form: the number is true and
+    // it is not about the tickets anybody can reach.
+    //
+    // It is its OWN `COUNT(*)` rather than a call into the tickets door, so the
+    // clause has to be said again here — which is exactly why the predicate is
+    // one shared function and not a string literal at each site.
     `SELECT m.id, m.app_id, a.name AS app_name, m.account_id, m.name, m.mark, m.name_de,
             m.description, m.benefit, m.deactivated_at, m.created_at,
-            (SELECT COUNT(*) FROM help h WHERE h.module_id = m.id AND h.resolved = 0) AS ticket_count
+            (SELECT COUNT(*) FROM help h
+              WHERE h.module_id = m.id AND h.resolved = 0
+                AND ${ticketTypeKeptForMigrationExcludedSql("h.help_type")}) AS ticket_count
        FROM app_modules m JOIN apps a ON a.id = m.app_id${sql}
       ORDER BY m.name COLLATE NOCASE ASC LIMIT ${APP_MODULE_CAP}`,
     params

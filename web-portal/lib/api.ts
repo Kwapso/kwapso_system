@@ -24,6 +24,7 @@ import type {
   HelpTicket,
   ProcessComment,
   SessionUser,
+  TicketRating,
   Todo,
   TodoViewName,
 } from "@shared/types"
@@ -196,19 +197,38 @@ export const support = {
       post({ id, attachmentId })
     ),
 
-  /** YES, GO AHEAD (CHECKLIST 5.13) — the ONE lifecycle move a client ever makes,
-   * and the deliberate exception to "the portal never moves a ticket along".
+  /* `validate` — "YES, GO AHEAD" (CHECKLIST 5.13) — WAS HERE, and it was the ONE
+   * lifecycle move a client ever made: the deliberate exception to "the portal
+   * never moves a ticket along". The client retired the `awaiting_validation`
+   * stage on 7 Sep 2026 (shared/types.ts, `HELP_STATUSES`) and the door went
+   * with it, so the exception is gone and the sentence is now unqualified —
+   * NOTHING on this surface moves a ticket along its lifecycle. The client's own
+   * acts on a ticket are raising it, correcting it while it is still theirs,
+   * attaching to it, replying, re-ranking, and rating it once it is answered. */
+
+  /** HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
+   * portal for how did we do it to see if client is happy", then "sentiment they
+   * can add a text (optional)"). Team migration 0067.
    *
-   * The door is narrow by construction rather than by this function being careful:
-   * the account fence rides its UPDATE, and R17's predicate means the only
-   * transition it can make is awaiting_validation → new. Sent at a ticket in any
-   * other state it moves zero rows. It answers with the ticket PAGE, the same
-   * shape `raise` and `edit` do. */
-  validate: (id: string) =>
-    api<PagedResponse<{ tickets: HelpTicket[]; mineTotal: number }>>(
-      "/api/content/help/validate",
-      post({ id })
+   * The READ answers this person with THEIR OWN answers and nobody else's — the
+   * narrowing is in the door's statement, not in this call and not in the screen
+   * — because a colleague's private "1 out of 3" is a personal statement rather
+   * than a fact about the ticket the way a reply is.
+   *
+   * The WRITE is narrow at the door rather than by this function being careful:
+   * the account fence decides whose ticket it is before a row is written, and
+   * the door refuses anything that is not answered yet. It APPENDS — a person
+   * who changes their mind writes a new row, and what they said at the time
+   * survives it. */
+  rating: (id: string) =>
+    api<{ ratings: TicketRating[]; mine: TicketRating | null }>(
+      `/api/content/help/rating?id=${enc(id)}`
     ),
+  /** `comment` is genuinely optional: omitted, the request carries no field at
+   * all and the door reads an absent one as absent. A score on its own is a
+   * complete rating and nothing on either side of this call asks twice. */
+  rate: (id: string, score: 1 | 2 | 3, comment?: string) =>
+    api<{ rating: TicketRating }>("/api/content/help/rating", post({ id, score, comment })),
 }
 
 /** WHAT WE ARE WAITING ON YOU FOR, and WHAT YOU BOUGHT. The two halves of the

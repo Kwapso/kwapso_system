@@ -44,9 +44,6 @@ import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bit
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { invalidate } from "@shared/web/store"
-import { ActivityPanel } from "@/components/records/activity-panel"
-import { tenancy } from "@/lib/api"
-import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import type { TaskView } from "@/lib/live-resources"
 import {
   shapeActivity,
@@ -56,6 +53,7 @@ import {
   shapePurposeDetail,
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
+import { ActivityRail } from "@/components/records/activity-rail"
 import type { ActivityItem } from "@shared/types"
 import type { Language } from "@shared/i18n"
 import type { useScreenData } from "@/lib/use-screen-data"
@@ -78,7 +76,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -135,10 +133,35 @@ type InternalShaper = (
 ) => ReturnType<typeof shapeBrandDetail>
 
 /** The BODY of an agency-internal record detail, once: find the row in its
- * loaded collection, render it through the engine, and hang the paged history
- * under it. The three branches above each own the two things a law reads off
- * them — which recipe, and that it went through withTabCounts — and share
- * everything that is genuinely identical. */
+ * loaded collection and render it through the engine. The branches above each
+ * own the two things a law reads off them — which recipe, and that it went
+ * through withTabCounts — and share everything that is genuinely identical.
+ *
+ * IT USED TO HANG THE PAGED HISTORY UNDER IT TOO, through the engine's
+ * `renderActivity` prop, because these recipes carried an Activity tab. They do
+ * not any more: the client killed the Activity tab across the app on 2026-09-06
+ * ("I don't want to have activity as a tab anywhere but on the footer … this
+ * would open a slide-in with all the activity"), restated 2026-09-07 as "kill
+ * all old activity tabs".
+ *
+ * THE HISTORY IS REACHED FROM THE FOOTER NOW, and this function is where these
+ * screens get their door. `ctx.internalActivity` is the same `useRecordActivity`
+ * every bespoke detail calls, over the generic (table, id) path (R5), resolved
+ * once in use-screen-data because a render switch full of early returns cannot
+ * call a hook. Its rows already ride into `sets.activity` below, which is what
+ * the engine draws as the footer's SUMMARY; the same bundle goes to
+ * `<ActivityRail>` as `activityAction`, which is what makes the rest of it
+ * reachable (R14) under the exact server total the door prints (R16).
+ *
+ * ONE CALL FOR EVERY AGENCY-INTERNAL KIND. Both branches that reach this
+ * function (brand, purposes) get the door from this line rather than each
+ * wiring one, which is the same reason the body itself is shared.
+ *
+ * NO NOTE COMPOSER HERE, and that is not an oversight. The bespoke details pass
+ * `onAddNote` because their footers already draw the field, gated on that
+ * module's own create right; this path has never drawn one, and offering to
+ * write into a brand asset's history is a decision the client has not made.
+ * The rail shows what the screen already had a right to show. */
 function internalDetail(
   ctx: ModuleContentCtx,
   recipe: ScreenRecipe,
@@ -164,7 +187,6 @@ function internalDetail(
   const row = spec.query.data.find((r) => r.id === ctx.recordId) ?? null
   if (!row) return <p className="text-muted-foreground text-sm">{ctx.t("That record no longer exists.")}</p>
   const data = spec.shape(row, ctx.internalActivity.rows, ctx.lang)
-  const internalActivity = ctx.internalActivity
   return (
     <div className="flex flex-col gap-6">
       <ScreenRenderer
@@ -173,23 +195,7 @@ function internalDetail(
         rights={ctx.rights}
         onAction={ctx.onAction}
         onIntent={ctx.onIntent}
-        // R14: the badge above counts the WHOLE history, so the feed the
-        // engine draws for the `activity` block must be able to reach all of
-        // it — `ActivityPanel` carries its own in-tab pager over the same
-        // `internalActivity` the badge's total came from, rather than a
-        // sibling <LoadMore> under the whole screen (which also rendered
-        // under Overview — the bug this prop exists to retire).
-        renderActivity={() => (
-          <ActivityPanel
-            activity={{
-              items: internalActivity.items,
-              loading: internalActivity.loading,
-              error: internalActivity.error,
-              listKey: internalActivity.listKey,
-              fetchPage: internalActivity.fetchPage,
-            }}
-          />
-        )}
+        activityAction={<ActivityRail activity={ctx.internalActivity} />}
       />
     </div>
   )
@@ -216,7 +222,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     activityQ,
     activityTotal,
     activityKey,
-    activityScope,
+    activityFetchPage,
     inviteAuditQ,
     teamName,
     active,
@@ -249,6 +255,50 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         />
       )
     if (perms === undefined) return <Skeleton variant="list" lines={4} />
+
+    // ── THE DOOR TO THE HISTORY, FOR THE THREE SCOPE FEEDS ───────────────────
+    //
+    // The client, 2026-09-06: "I don't want to have activity as a tab anywhere
+    // but on the footer, on top of the dates. On the right column, on Latest
+    // Activity, I would like some view or expand or whatever, and this would
+    // open a slide-in with all the activity."
+    //
+    // WHY THIS IS ONE NODE AND NOT THREE. The team overview, a member and an
+    // invite read the SAME `/api/tenancy/activity` door under three scopes,
+    // resolved once in use-screen-data from what is on screen (`activityScope`,
+    // and the key that mirrors it). So there is one feed in view at a time, and
+    // one door to draw for it — built here, handed to whichever of the three
+    // detail branches below is rendering. Building it inside each branch would
+    // be three copies of one decision, which is the shape the Activity tab was
+    // in before it was deleted.
+    //
+    // THIS IS WHAT MAKES THOSE SCREENS PAGEABLE AGAIN (R14). The team feed is
+    // the fastest-growing table in the base — every mutation writes a row — and
+    // between the tab's removal and this line there was no control anywhere in
+    // `web/` that could ask it for page two. `listKey` is the key page one was
+    // parked under and `fetchPage` is the one fetcher that spends its cursor;
+    // both come from use-screen-data rather than being rebuilt beside the
+    // control, so the door can only ever page the feed it is a door to.
+    //
+    // `<ActivityRail>` DECIDES WHETHER TO DRAW ITSELF, off the same exact
+    // server total it would print (R16) — so a scope with no history at all
+    // yields nothing here, and the footer keeps the eyebrow it already had.
+    const scopeRail =
+      activityKey === null ? undefined : (
+        <ActivityRail
+          activity={{
+            // The SAME shaper the engine's own footer summary and activity
+            // block read, so the three rows in the footer and the first page in
+            // the rail are the same rows dressed once.
+            items: shapeActivity(activityQ.data ?? [], lang),
+            total: activityTotal,
+            loading: activityQ.loading,
+            error: activityQ.error,
+            listKey: activityKey,
+            fetchPage: activityFetchPage,
+          }}
+        />
+      )
 
     // Import — no permission KEY of its own (gated per-target). Handle it before
     // the MODULE_PERMISSION lookup, which would otherwise NotFound it.
@@ -289,8 +339,14 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       const base = resolveRecipe("team.detail", overridesQ.data, t)
       if (!base) return <NotFound />
       if (metaQ.data === undefined) return <Skeleton variant="list" lines={3} />
-      // R8: the Activity tab badges the feed's EXACT server total (R16's seam),
-      // not the loaded page — this feed is the one that pages below.
+      // R8's seam, still applied: it badges whatever collection tab this recipe
+      // declares, derived from each tab's own block rather than from a list of
+      // keys. `activity` is in the totals map because the host knows that total
+      // — the team feed's exact server COUNT(*) — and it is what the slide-in
+      // off the footer's Latest activity column will show. It badges no tab
+      // today: the Activity TAB went on the client's 2026-09-06 ruling (see
+      // web/components/records/activity-panel.tsx), so this recipe is one description
+      // block and the seam is a no-op over it.
       const recipe = withTabCounts(base, { activity: activityTotal })
       const data = shapeTeamDetail({
         teamId: teamId as string,
@@ -308,30 +364,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
             rights={rights}
             onAction={onAction}
             onIntent={onIntent}
-            // R14: the team feed is the fastest-growing collection in the
-            // base — every mutation writes a row — so it pages instead of
-            // stopping at 50. `ActivityPanel` carries that pager INSIDE the
-            // Activity tab now; a sibling <LoadMore> here used to render
-            // under Overview too.
-            renderActivity={() => (
-              <ActivityPanel
-                activity={{
-                  items: shapeActivity(activityQ.data ?? [], lang) as ActivityFeedRow[],
-                  // `activityQ` is a `useCached` query — its own `loading`,
-                  // cleared in a `finally` on success OR failure. Not
-                  // `activityQ.data === undefined`, which never clears after
-                  // a failed first fetch and would hide the error forever
-                  // behind a permanent spinner.
-                  loading: activityQ.loading,
-                  error: activityQ.error,
-                  listKey: `activity:team:${teamId}`,
-                  fetchPage: (c: string) =>
-                    tenancy
-                      .activity("team", undefined, c)
-                      .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
-                }}
-              />
-            )}
+            activityAction={scopeRail}
           />
         </div>
       )
@@ -343,30 +376,17 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (!recordId) return renderCollection(ctx)
 
     // Details ----------------------------------------------------------------
-    // R14: a member's / an invite's history is the same ever-growing feed, sliced
-    // — and the Activity tab badges its EXACT total (R16), so the feed under the
-    // badge must be able to reach the rest of it. `ActivityPanel` carries that
-    // pager INSIDE the Activity tab the recipe renders (via `renderActivity`),
-    // rather than a sibling under the whole screen — which also rendered under
-    // Overview. Same key the detail's page one primed.
-    const renderActivityTab = (_source: string) => (
-      <ActivityPanel
-        activity={{
-          items: shapeActivity(activityQ.data ?? [], lang) as ActivityFeedRow[],
-          // `activityQ` is a `useCached` query — use ITS `loading`, cleared in
-          // a `finally` either way, not `activityQ.data === undefined` (which
-          // never clears after a failed first fetch and hides the error
-          // behind a permanent spinner).
-          loading: activityQ.loading,
-          error: activityQ.error,
-          listKey: activityKey as string,
-          fetchPage: (c: string) =>
-            tenancy
-              .activity(activityScope ?? "team", recordId ?? undefined, c)
-              .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor })),
-        }}
-      />
-    )
+    // NO ACTIVITY TAB ON ANY OF THEM. A member's and an invite's history is the
+    // same ever-growing team feed, sliced, and it used to be a tab on each of
+    // these recipes with `ActivityPanel` (and its R14 pager) handed to the
+    // engine through `renderActivity`. The client killed the Activity tab across
+    // the app on 2026-09-06 — a record's history is read from the footer's
+    // Latest activity column and opens in a slide-in off it — so the engine's
+    // `renderActivity` prop, whose only purpose was to put the app's own panel
+    // inside that tab, is gone with the tabs it served
+    // (shared/web/screen-engine/screen-renderer.tsx). `activityQ` is still read
+    // and still shaped into each detail's `sets.activity` below: the tab was a
+    // PLACE, not the data. web/components/records/activity-panel.tsx carries the ruling.
     if (module === "members") {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />
@@ -374,7 +394,10 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (!member) return <p className="text-muted-foreground text-sm">{t("That member isn't on this team.")}</p>
       const base = resolveRecipe("members.detail", overridesQ.data, t)
       if (!base) return <NotFound />
-      // R8/R16: the Activity tab badges this member's exact history total.
+      // R8/R16's seam, over whatever collection tab this recipe declares. The
+      // total it is handed is this member's exact history count — what the
+      // slide-in off the footer's Latest activity column shows; there is no
+      // Activity tab left for it to badge.
       let recipe = withTabCounts(base, { activity: activityTotal })
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
@@ -387,7 +410,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
             rights={rights}
             onAction={onAction}
             onIntent={onIntent}
-            renderActivity={renderActivityTab}
+            activityAction={scopeRail}
           />
           {/* THE PERSON BEHIND THE MEMBER ROW — the owner's ruling, literally:
               a profile and the certificates somebody holds go on their own page.
@@ -404,7 +427,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       if (!invite) return <p className="text-muted-foreground text-sm">{t("That invite no longer exists.")}</p>
       const base = resolveRecipe("invites.detail", overridesQ.data, t)
       if (!base) return <NotFound />
-      // R8/R16: the Activity tab badges this invite's exact history total.
+      // R8/R16's seam, over whatever collection tab this recipe declares — the
+      // same shape as the member branch above, and with no Activity tab left to
+      // badge either.
       let recipe = withTabCounts(base, { activity: activityTotal })
       // Revoke only makes sense while the invite is still pending.
       if (invite.status !== "pending") recipe = withoutActions(recipe, ["invites.revoke"])
@@ -417,7 +442,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
             rights={rights}
             onAction={onAction}
             onIntent={onIntent}
-            renderActivity={renderActivityTab}
+            activityAction={scopeRail}
           />
         </div>
       )
@@ -509,15 +534,18 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     }
 
     // ── THE AGENCY'S OWN HOUSEKEEPING ────────────────────────────────────────
-    // The only four RECORD details in the app that are pure recipes: each one is
-    // the record's own fields plus its history, which is exactly the pair of
-    // blocks the engine draws. The bespoke details beside them exist because no
-    // engine block draws a ticket's conversation or a map's arithmetic; none of
-    // these three has that problem, so none of them is a component.
+    // The only RECORD details in the app that are pure recipes: each one is the
+    // record's own fields, which is exactly the block the engine draws. The
+    // bespoke details beside them exist because no engine block draws a ticket's
+    // conversation or a map's arithmetic; none of these has that problem, so
+    // none of them is a component.
     //
-    // The history comes through the GENERIC (table, id) path (R5) — the same
-    // hook every bespoke detail uses, resolved once in use-screen-data because a
-    // render switch full of early returns cannot call a hook.
+    // They used to be "the record's own fields PLUS its history", a pair of
+    // blocks. The history is not a tab any more (client, 2026-09-06), so the
+    // pair is a single description block — but the history is still READ, through
+    // the GENERIC (table, id) path (R5): the same hook every bespoke detail uses,
+    // resolved once in use-screen-data because a render switch full of early
+    // returns cannot call a hook, and still shaped into each detail's data.
     //
     // SEPARATE BRANCHES, NOT A TABLE, and that is the law's doing rather than a
     // preference. R8's check counts `resolveRecipe("<x>.detail"` literals and

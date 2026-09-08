@@ -44,7 +44,7 @@
 
 import { APP_STAGES } from "../app-stages"
 import { DELIVERABLE_KINDS } from "../selectable-groups"
-import { HELP_STATUSES, STORY_STATUSES } from "../types"
+import { HELP_STATUSES, STORY_STATUSES, ticketTypeKeptForMigrationExcludedSql } from "../types"
 
 /** The comparisons a filter may make. `contains` is a case-insensitive substring
  * (and, on a reference field, a substring of the referenced record's NAME);
@@ -188,6 +188,29 @@ export type QueryModule = {
    * facts about live work; hiding those rows would be a bug, which is why this
    * is a per-module decision and not a rule about date columns. */
   notYet?: { field: string; reason: string }
+  /** ROWS THIS MODULE NO LONGER ANSWERS ABOUT AT ALL — and unlike the two above,
+   * WITH NO ESCAPE.
+   *
+   * `putAway` and `notYet` are both defaults a caller can step outside by naming
+   * the field themselves, because "put away" and "not yet" are questions somebody
+   * may legitimately want to ask. This is a different sentence: the rows are not
+   * a corner of the collection, they have LEFT it. A caller who names the value
+   * explicitly gets nothing rather than everything, which is the only answer that
+   * agrees with every other door.
+   *
+   * IT EXISTS BECAUSE THIS GRAMMAR IS A SECOND READ PATH OVER THE SAME TABLES.
+   * `runQuery` builds its own WHERE from a caller's parsed question, so a clause
+   * added to a module's own list door (`ticketWhere` in
+   * workers/content/src/lib/help.ts) does not reach it — and this door answers
+   * "how many" far more often than it hands back a page. The exact same
+   * disagreement `putAway` was written to end, one clause along: two doors, two
+   * ideas of what "the tickets" are, and an assistant that answers differently
+   * depending on which one the question happened to reach.
+   *
+   * `sql` is a predicate over the aliased row (`t.`), written in source by the
+   * module that declares it and never assembled from anything off a request.
+   * Today exactly one module carries it — see `tickets` below. */
+  withheld?: { sql: string; reason: string }
   /** A SECOND RIGHT THAT NARROWS WHICH ROWS THIS MODULE MEANS.
    *
    * Some modules are governed by TWO switches, not one: the module's own right
@@ -314,6 +337,20 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       reason:
         "the tickets door's own everyday list is `archived_at IS NULL` — a ticket that has been put away is still a record and is not on the list",
     },
+    // THE KIND THAT IS KEPT BUT NEVER SHOWN. The client's ruling of 6 Sep 2026
+    // is written up in full at `TICKET_TYPE_KEPT_FOR_MIGRATION` in
+    // `shared/types.ts`: the requirements rows stay in the database for a
+    // migration into another one, and stop being part of "the tickets"
+    // everywhere a person is answered. `list_help_tickets` and the whole Tickets
+    // screen already exclude them at their own door; without this line
+    // `query_records` would have gone on listing and COUNTING them, and its
+    // counts are what the assistant says out loud when somebody asks how many
+    // tickets there are.
+    withheld: {
+      sql: ticketTypeKeptForMigrationExcludedSql("t.help_type"),
+      reason:
+        "requirements tickets are kept for a migration into another database and are no longer part of the tickets collection anywhere a person is answered (shared/types.ts, TICKET_TYPE_KEPT_FOR_MIGRATION)",
+    },
     fields: [
       ID,
       { name: "ref", column: "ref", type: "text", identity: true, note: "the human reference, e.g. TIC-0000042" },
@@ -321,6 +358,13 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "description", column: "description", type: "text", bulky: true },
       { name: "status", column: "status", type: "enum", values: HELP_STATUSES },
       { name: "helpType", column: "help_type", type: "enum", vocabulary: "Ticket type" },
+      {
+        name: "raisedAsType",
+        column: "raised_as_type",
+        type: "enum",
+        vocabulary: "Ticket type",
+        note: "the kind the ticket was RAISED as, stamped when it was created and never changed since — helpType is what it is now, so the two differ exactly on the tickets somebody recategorised. Empty on every ticket raised before this was recorded, the ones imported from the old system included: that is 'we did not record it', never 'it was not changed'",
+      },
       { name: "resolved", column: "resolved", type: "boolean" },
       {
         name: "resolvedAt",

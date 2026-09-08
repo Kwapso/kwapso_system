@@ -31,6 +31,7 @@ import {
   workLogsKey,
 } from "@/lib/live-resources"
 import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
+import { ticketTypeKeptForMigration } from "@shared/types"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useAfterPaint } from "@shared/web/after-paint"
@@ -310,7 +311,22 @@ export function useScreenData({
   const departmentOptions = activeSelectable
     .filter((v) => v.type === SELECTABLE_GROUPS.department)
     .map((v) => v.value)
-  const helpTypeOptions = activeSelectable.filter((v) => v.type === "Ticket type").map((v) => v.value)
+  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. This one list is the whole
+  // tickets screen's idea of what kinds exist: the create form's picker, the
+  // toolbar's Kind facet, the sub-tab strip (CHECKLIST 5.1 derives it from these
+  // words) and the dashboard's legend and pipeline order all read it. The DOOR
+  // already refuses to answer about a requirements ticket and refuses to create
+  // one (`TICKET_TYPE_KEPT_FOR_MIGRATION`, shared/types.ts, carries the client's
+  // ruling in full) — subtracting it here is what stops the word itself
+  // appearing: an option nobody may pick, and a sub-tab that would badge nothing
+  // for ever because the door it counts through has already excluded its rows.
+  //
+  // It is a filter on the TEAM'S OWN vocabulary and never an edit to it: every
+  // team already running still has the row, still sees it on the Dropdown values
+  // screen, and every ticket that carries the word still carries it.
+  const helpTypeOptions = activeSelectable
+    .filter((v) => v.type === "Ticket type" && !ticketTypeKeptForMigration(v.value))
+    .map((v) => v.value)
 
   // Activity is one read path over three scopes (team / a member / an invite) — the
   // scope is derived from what's in view, and its cache key mirrors the scope so a
@@ -342,11 +358,28 @@ export function useScreenData({
         return r.activity
       })
   )
-  // R8: the number the DETAIL's Activity tab badges — the same exact, already-
+  // R16: the number the DETAIL's activity door prints — the same exact, already-
   // permission-filtered total the fetch above primed, read as a sidecar so the
-  // tab and the feed can never disagree. Undefined until page one lands, which
-  // formatCount renders as nothing.
+  // door and the feed can never disagree. Undefined until page one lands, which
+  // formatCount renders as nothing. It badged an Activity TAB until the client
+  // killed those (2026-09-06); the number and its argument are unchanged by the
+  // move, only the place it is printed.
   const activityTotal = useCachedValue<number>(activityKey ? `total:${activityKey}` : null)
+  // R14 — PAGE TWO OF WHICHEVER SCOPE FEED IS IN VIEW, spending the cursor the
+  // fetch above parked. It lives here rather than at the host because the door
+  // it is asked through (`<ActivityRail>`, off the record footer's Latest
+  // activity column) must page THE SAME feed under THE SAME key: a fetcher
+  // built beside the control could quietly ask a different scope, and the
+  // reader would get somebody else's history appended to their own. Same three
+  // arguments as page one, plus the cursor, from the one call.
+  const activityFetchPage = (cursor: string) =>
+    tenancy
+      .activity(
+        activityScope ?? "team",
+        activityScope === "team" ? undefined : (recordId ?? undefined),
+        cursor
+      )
+      .then((r) => ({ rows: r.activity, nextCursor: r.nextCursor }))
   // THE GENERIC (table, id) RECORD FEED — Law R5, for the four agency-internal
   // details. The three scopes above (team / user / invite) are the base's older
   // fixed ones, named at the door; a module written today reads its history the
@@ -390,6 +423,7 @@ export function useScreenData({
     activityKey,
     activityQ,
     activityTotal,
+    activityFetchPage,
     internalActivity,
     inviteAuditQ,
   }

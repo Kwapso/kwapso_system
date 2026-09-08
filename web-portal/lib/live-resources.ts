@@ -65,6 +65,11 @@ export const cacheKeys = {
    * per-app slice to key by, and switching company clears the cache outright. */
   deliverables: "portal:deliverables",
   deliverablesTotal: "portal:deliverables:total",
+  /** HOW WE DID, on one ticket, as far as THIS person is concerned (team
+   * migration 0067). Per-ticket like the thread and the attachments, and for the
+   * same reason: the door answers about one request, and a `help` ping carries a
+   * ticket id this listener is not handed. */
+  rating: (ticketId: string) => `portal:rating:${ticketId}`,
 }
 
 /** resource → the portal caches a ping on it invalidates. A resource the portal
@@ -73,7 +78,12 @@ export const cacheKeys = {
  * of". */
 export const PORTAL_LISTENERS: Record<string, (currentAccountId: string | null) => string[]> = {
   // A reply or a status move on one of their tickets.
-  help: () => [cacheKeys.tickets, cacheKeys.ticketsTotal],
+  // A reply, a status move — or a colleague of theirs saying how we did. The
+  // rating drop is the documented coarse one (a trailing-colon entry is a
+  // PREFIX): a ticket resolving is exactly when the question becomes askable, so
+  // the card has to appear without a reload, and the ping that carries that fact
+  // names the ticket while this listener is handed only the account.
+  help: () => [cacheKeys.tickets, cacheKeys.ticketsTotal, "portal:rating:"],
   // …and the OPEN conversation itself. The thread cache is keyed per ticket and
   // a ping names only the reply, so the drop is the documented coarse one: a
   // trailing-colon entry is a PREFIX (applyLivePing below), and cache-first

@@ -42,7 +42,12 @@ import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
-import { RecordTable, visibleActions } from "@/components/records/record-table"
+import {
+  RecordTable,
+  visibleActions,
+  type TableColumn,
+  type TableRowData,
+} from "@/components/records/record-table"
 import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { TaskFormDialog, type TaskFormValues } from "@/components/work/task-form-dialog"
 import { useTaskFormOptions } from "@/lib/use-task-form-options"
@@ -56,7 +61,8 @@ import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { PRIORITY_LABEL, departmentGlyph } from "@shared/departments"
 import type { Task } from "@shared/types"
 import { formatCount } from "@shared/web/format-count"
-import { formatDate, formatDateSortable } from "@shared/web/format"
+import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -83,7 +89,8 @@ function shapeTasks(tasks: Task[], lang: Language) {
           [
             t.status === "done" ? "Done" : "Open",
             PRIORITY_LABEL[t.priority],
-            t.assigneeName ?? "nobody yet",
+            // R54: a task is ours, so its assignee is named by first name.
+            staffNameFromSnapshot(t.assigneeName) || "nobody yet",
             t.dueOn ? `deadline ${formatDate(t.dueOn, lang)}` : null,
           ]
             .filter(Boolean)
@@ -100,14 +107,47 @@ function shapeTasks(tasks: Task[], lang: Language) {
         client: t.accountName ?? "—",
         important: t.important ? "Yes" : "No",
         urgent: t.urgent ? "Yes" : "No",
-        // THE TWO TABLE COLUMNS PEOPLE SORT, so they are the sortable spelling
-        // of a date rather than the warm one (shared/web/format.ts says why).
-        // The summary line above keeps `formatDate`: it is read, not compared.
-        deadline: t.dueOn ? formatDateSortable(t.dueOn) : "—",
-        closed: t.completedAt ? formatDateSortable(t.completedAt) : "—",
+        // THE TWO TABLE COLUMNS PEOPLE SORT, AND THEY ARE WARM AGAIN.
+        //
+        // These two used to be `formatDateSortable` — "2026-04-14", a database
+        // row on a screen built for a manager — because the cell WAS the
+        // comparison value and a locale-formatted date compared as text answers
+        // April before December before January. The table now compares the raw
+        // instant instead (`SORT_AS` below, `sortKey` on record-table.tsx), so
+        // the cell has no comparing to do and is free to be the same warm,
+        // translated date the summary line above it has always used.
+        deadline: t.dueOn ? formatDate(t.dueOn, lang) : "—",
+        closed: t.completedAt ? formatDate(t.completedAt, lang) : "—",
         // Facet columns (read by the filter engine, not the renderer).
         status: t.status === "done" ? "Done" : "Open",
-        assignee: t.assigneeName ?? "Nobody yet",
+        // R54 — and this cell is also the "Who has it" FACET's source, so the
+        // filter menu offers the same word the rows show (the facet derives its
+        // options from the column values, `screen-engine/collection.ts`).
+        assignee: staffNameFromSnapshot(t.assigneeName) || "Nobody yet",
+        // ── THE RAW FACTS, RIDING BESIDE THE SHAPED CELLS ──────────────────
+        //
+        // Four values a COLUMN ABOVE shows in a shaped form and the table has
+        // to COMPARE in its true one. They are not columns and not facets:
+        // nothing renders them, and `RecordTable`'s search only ever reads the
+        // keys its columns name, so they are invisible to a person and visible
+        // only to `SORT_AS`.
+        //
+        // Carried here rather than re-parsed out of the cell, which is the
+        // whole point: "14.04.2025" (de) and "Apr 14, 2025" (en) are the same
+        // day, and a comparison that read the words would answer differently
+        // in the four languages this app ships. A comparison that reads
+        // `dueOn` answers the same in all of them.
+        dueOn: t.dueOn ?? null,
+        completedAt: t.completedAt ?? null,
+        // The level alone. The cell is "4 · Do it now" — a number with a word
+        // glued to it, which text comparison only gets right while there are
+        // fewer than ten levels.
+        priorityLevel: t.priority,
+        // The department's WORD, without the pictograph the cell leads with.
+        // Sorting the shaped cell sorts by the glyph, so every department
+        // that has one lands in codepoint order ahead of every one that does
+        // not — an order with no meaning at all, arrived at silently.
+        departmentName: t.department ?? "",
       }
     }),
   }
@@ -138,6 +178,32 @@ const COMPLETED_COLUMNS = [
   field("deadline", "Deadline"),
   field("closed", "Closed"),
 ]
+
+/** WHAT EACH OF THOSE COLUMNS ACTUALLY IS, where it is not a word.
+ *
+ * The table's default comparison is text, which is the right answer for a task
+ * title and the wrong one for four of the columns above — and wrong SILENTLY,
+ * which is the reason this map exists rather than a comment. A date column
+ * compared as text puts April before December before January, the rows move,
+ * the arrow lights, and the screen looks exactly like one that worked.
+ *
+ * Each entry says two things (record-table.tsx's `SortType` note has the long
+ * version): WHICH VALUE to compare — the raw fact `shapeTasks` carries beside
+ * the shaped cell, never the cell — and HOW to compare it.
+ *
+ * A column absent from here compares its own text, on purpose: `name`, `app`,
+ * `assignee`, `important` and `urgent` are words, and their cell IS the fact.
+ *
+ * Spread onto the columns at the one place they are built, below, so a column
+ * cannot be added to `EVERYDAY_COLUMNS`/`COMPLETED_COLUMNS` and reach the table
+ * by a route that skips this. `web/test/sorted-columns-declare-their-type.test.ts`
+ * is the check that a NEW formatted column does not ship without a line here. */
+const SORT_AS: Record<string, Pick<TableColumn, "sortType" | "sortKey">> = {
+  deadline: { sortType: "date", sortKey: (row: TableRowData) => row.dueOn },
+  closed: { sortType: "date", sortKey: (row: TableRowData) => row.completedAt },
+  priority: { sortType: "number", sortKey: (row: TableRowData) => row.priorityLevel },
+  department: { sortType: "text", sortKey: (row: TableRowData) => row.departmentName },
+}
 
 /** THE SIX TABS, in the tester's order. Written as data so the strip, the fetch
  * key and the badge cannot fall out of step with each other. */
@@ -334,10 +400,12 @@ export function TasksScreen({
   // whole sentence, and UI-GAPS #22(b) has the library's half).
   // Every column orders, and the name it orders by is its own key, because the
   // comparing happens here over rows that are all here.
-  const tableColumns = tableRecipe.fields.map((f) => ({
+  const tableColumns: TableColumn[] = tableRecipe.fields.map((f) => ({
     key: f.column,
     label: f.field.label,
     sort: f.column,
+    // …and WHAT the column is, for the four that are not words. See `SORT_AS`.
+    ...SORT_AS[f.column],
   }))
 
   // THE CALENDAR — the host's own (components/records/record-calendar.tsx), given the
@@ -370,7 +438,9 @@ export function TasksScreen({
       // NO REFERENCE PREFIX — see the same note on the list row above.
       title: r.title,
       accent: r.department ?? "",
-      detail: [PRIORITY_LABEL[r.priority], r.assigneeName].filter(Boolean).join(" · "),
+      detail: [PRIORITY_LABEL[r.priority], staffNameFromSnapshot(r.assigneeName)] // R54
+        .filter(Boolean)
+        .join(" · "),
     }))
 
   return (

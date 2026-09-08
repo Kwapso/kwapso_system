@@ -40,13 +40,12 @@ import { cn } from "../../lib/utils";
 import { buttonVariants } from "../button/button";
 
 /* The kit's modal scrim: charcoal at 36%, identical in both palettes, at z 60.
-   `--kw-charcoal` is reached deliberately — see GAPS-A.md OVL-2, and the same
-   note at the top of dialog/dialog.tsx. */
-const SCRIM = [
-  "fixed inset-0 z-[60]",
-  "bg-[color-mix(in_srgb,var(--kw-charcoal)_36%,transparent)]",
-  "motion-scrim",
-] as const;
+   A NAMED utility since 2026-09-07 — the hand-mixed
+   `color-mix(… var(--kw-charcoal) 36% …)` this used to carry is a token now
+   (tokens.css §3, bridged in §10), which closes GAPS-A.md OVL-2 rather than
+   restating its exception a fourth time. Same value; see the fuller note at
+   the top of dialog/dialog.tsx. */
+const SCRIM = ["fixed inset-0 z-[60]", "bg-scrim", "motion-scrim"] as const;
 
 /* Centred by a grid, not by a translate: `.motion-dialog` owns `transform`,
    and a translate utility on the same element would race it. A grid is also

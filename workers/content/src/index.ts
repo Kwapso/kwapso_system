@@ -23,6 +23,10 @@
 //   POST /api/content/help/archive        -> archive / restore a ticket (any state)
 //   POST /api/content/help/reply          -> add a reply to a ticket's thread
 //   POST /api/content/help/resolve        -> answer it: resolve + reply + email them
+//   GET  /api/content/help/dashboard      -> the Dashboard tab's grouped reads, ?accountId/?helpType/?appId/?q (agency only)
+//   GET  /api/content/help/stages         -> one ticket's stage history + time in each (?id=<ticketId>, agency only)
+//   GET  /api/content/help/rating         -> how we did on one ticket (?id=<ticketId>)
+//   POST /api/content/help/rating         -> the client says how we did (1-3 + optional words)
 //   GET  /api/content/help/stakeholders   -> a ticket's stakeholders (?id=<ticketId>)
 //   POST /api/content/help/stakeholders   -> manually add a stakeholder (add-only)
 //   GET  /api/content/stories             -> the backlog (?id → one; status/ticketId/sprintId/assigneeId/view filters)
@@ -108,10 +112,13 @@ import {
   postBulkHelpStatusByFilter,
   postResolveHelp,
   getHelpAttachments,
+  getHelpDashboard,
   postHelpAttachment,
   postRemoveHelpAttachment,
   postHelpTriageRead,
-  postValidateHelp,
+  getHelpStages,
+  getHelpRating,
+  postHelpRating,
 } from "./routes/help"
 import {
   getSprints,
@@ -382,14 +389,27 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // Everything else about a ticket's status now happens by itself — a timer
   // starts, a sprint is picked, the last story closes — so these two are doors
   // with their own words rather than values in a dropdown of seven.
-  "POST /api/content/help/validate": { handler: postValidateHelp, kind: "mutation" },
   "POST /api/content/help/triage-read": { handler: postHelpTriageRead, kind: "mutation" },
+  // THE DASHBOARD TAB — five grouped reads about the whole backlog, in one
+  // round trip. Its own door rather than more facets on the list, because the
+  // list is read on every page load and this tab is opened deliberately
+  // (lib/help `readTicketDashboard` carries the measurement). Agency only.
+  "GET /api/content/help/dashboard": { handler: getHelpDashboard, kind: "read" },
   // Several files and several links on one ticket, from BOTH front doors.
   "GET /api/content/help/attachments": { handler: getHelpAttachments, kind: "read" },
   "POST /api/content/help/attachments": { handler: postHelpAttachment, kind: "mutation" },
   "POST /api/content/help/attachments/remove": { handler: postRemoveHelpAttachment, kind: "mutation" },
   "GET /api/content/help/stakeholders": { handler: getHelpStakeholders, kind: "read" },
   "POST /api/content/help/stakeholders": { handler: postAddStakeholder, kind: "mutation" },
+  // THE STAGES A TICKET WENT THROUGH, how long it sat in each, and how many
+  // times it was reopened — one read over one table (team migration 0066).
+  // Agency only: the rows name who moved what (SCOPE ch.06).
+  "GET /api/content/help/stages": { handler: getHelpStages, kind: "read" },
+  // HOW WE DID, according to the client (team migration 0067). The POST is the
+  // portal's own control; the GET answers a client with their own answer and the
+  // agency with the whole set.
+  "GET /api/content/help/rating": { handler: getHelpRating, kind: "read" },
+  "POST /api/content/help/rating": { handler: postHelpRating, kind: "mutation" },
   // THE WORK ENGINE — what we DO about a request, and the block of work it was
   // sold inside. Every one of these doors refuses a client login at the door
   // (R21): a story names the staff member doing the work, which the portal never

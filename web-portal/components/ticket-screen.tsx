@@ -14,18 +14,20 @@
 //    (PORTAL_ACTIVITY_EXEMPT) and held true by the portal's rules test — an
 //    exemption nobody checks is just a skip with better manners.
 //
-// 2. NO STATUS CONTROL — WITH EXACTLY ONE EXCEPTION, and the exception is the
-//    reason this paragraph is worth reading. Moving a ticket along its lifecycle
-//    is gated on help:edit, which is the agency's job: the client sees where it
-//    stands (CHECKLIST 5.2 — the status is a label, never a button). The one
-//    move a client makes is the FIRST one: an extra, a request or a piece of
-//    feedback waits in `awaiting_validation` until the company paying for it says
-//    it wants it (CHECKLIST 5.13). That is the "yes, go ahead" band below, and it
-//    is the only lifecycle control on this surface. It is narrow at the DOOR
-//    rather than by this screen being careful: the account fence rides the
-//    UPDATE, and R17's predicate means the only transition it can make is
-//    awaiting_validation → new. It cannot reopen, resolve, or move a started
-//    request, whatever this component sends it.
+// 2. NO STATUS CONTROL, AND SINCE 7 SEP 2026 THE SENTENCE HAS NO EXCEPTION
+//    CLAUSE. Moving a ticket along its lifecycle is gated on help:edit, which is
+//    the agency's job: the client sees where it stands (CHECKLIST 5.2 — the
+//    status is a label, never a button).
+//
+//    There WAS one exception, and it is worth a paragraph because it stood here
+//    for a long time and its safety argument is still quoted elsewhere. The
+//    first move used to be the client's: an extra, a request or a piece of
+//    feedback waited in `awaiting_validation` until the company paying for it
+//    said it wanted it (CHECKLIST 5.13), and this screen drew a "yes, go ahead"
+//    band for exactly that. The client retired the stage (shared/types.ts,
+//    `HELP_STATUSES`), so the band, the door and the tool behind it are gone and
+//    a request goes into the queue the moment it is raised. Nothing on this
+//    surface moves a ticket along its lifecycle now — no qualifier.
 //
 // THE ONE PIECE OF REAL LOGIC: who wrote a reply. A thread now has three kinds
 // of author, not two — since the owner ruled that a contact sees their COMPANY's
@@ -58,17 +60,15 @@
 // safety property this screen should never have been carrying itself) are the
 // kit's now.
 //
-// TWO PARTS ARE STILL COMPOSED HERE, both deliberately:
+// ONE PART IS STILL COMPOSED HERE, deliberately:
 //   • THE COMPOSER. The kit's is a single-line pill (`<input type="text">`),
 //     which is right for a chat and wrong for a client describing what went
 //     wrong with their work. `composer={false}`, and the paragraph field below
 //     stays — built from the kit's own Card, Textarea and Button, so it is the
 //     kit's vocabulary either way.
-//   • THE APPROVAL BAND. `PortalApprovalBand` is exported on its own and is
-//     used, so the band is the kit's DRAWING — but it stays where this screen
-//     puts it (under the description, see the note there) rather than where the
-//     shape would put it (above the composer, at the bottom). A person is asked
-//     to approve a request after they have read it back, not before.
+// (The kit's `PortalApprovalBand` used to be composed here too, under the
+// description — a person is asked to approve a request after they have read it
+// back, not before. It went with the approval it drew; see note 2 below.)
 
 import * as React from "react"
 import Link from "next/link"
@@ -80,7 +80,6 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Textarea } from "@shared/ui/components/textarea/textarea"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
-  PortalApprovalBand,
   PortalConversation,
   type PortalMessage,
 } from "@shared/ui/components/portal-conversation/portal-conversation"
@@ -90,16 +89,17 @@ import { brand } from "@shared/brand"
 import type { HelpMessage } from "@shared/types"
 import { useFollowNewest } from "@shared/web/follow-newest"
 import { formatRelative } from "@shared/web/format"
-import { reportError } from "@shared/web/log"
-import { invalidate, primeCache, useCached } from "@shared/web/store"
+import { primeCache, useCached } from "@shared/web/store"
 import { ApiFailure, support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { STATUS_WORDS } from "@/components/ticket-row"
 import { TicketAttachments } from "@/components/ticket-attachments"
+import { TicketRating } from "@/components/ticket-rating"
 import { ErrorPanel } from "@/components/error-panel"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage } from "@shared/web/language"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RichText } from "@shared/web/rich-text-view"
 
 /** WHICH SIDE A MESSAGE SITS ON — and why it is this way round.
@@ -180,7 +180,6 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
 
   const [draft, setDraft] = React.useState("")
   const [sending, setSending] = React.useState(false)
-  const [confirming, setConfirming] = React.useState(false)
 
   // Land on the newest reply, and follow the one you just sent. Every hook here
   // sits ABOVE the `if (!ticket)` return below, deliberately — a hook under an
@@ -201,30 +200,6 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
       toast.error(e instanceof ApiFailure ? e.message : t("Couldn't send that. Try again."))
     } finally {
       setSending(false)
-    }
-  }
-
-  /** YES, GO AHEAD (CHECKLIST 5.13). The door answers with the ticket page, but
-   * the list in this browser may already hold pages two and three, so the honest
-   * move is to drop what changed and let the screen re-read rather than to
-   * overwrite an appended list with a page one. Both keys, plus the by-id key a
-   * cold deep link is reading from — this screen takes its ticket from whichever
-   * of the two is warm, so refreshing only one leaves the band on screen half
-   * the time. */
-  async function confirmIt() {
-    if (confirming) return
-    setConfirming(true)
-    try {
-      await support.validate(ticketId)
-      invalidate(cacheKeys.tickets)
-      invalidate(cacheKeys.ticketsTotal)
-      invalidate(cacheKeys.ticket(ticketId))
-      toast.success(t("Thank you. We'll get started."))
-    } catch (e) {
-      reportError("portal-ticket.validate", e)
-      toast.error(e instanceof ApiFailure ? e.message : t("Couldn't send that. Try again."))
-    } finally {
-      setConfirming(false)
     }
   }
 
@@ -281,36 +256,20 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
        * ("Open", "In progress") beside this one, so the same fact appeared twice
        * and half of it was the agency's vocabulary rather than the client's. */}
       <Card className="flex flex-col gap-4 p-4">
-        <Badge variant={status.variant} className="w-fit">
-          {t(status.label)}
-        </Badge>
+        {/* THE NUMBER AND THE STATE, in that order — the number is what a client
+            reads down the phone ("I'm calling about T0412"), so it leads. The
+            chip is `RecordRef`, the same component and the same lozenge the
+            agency's own ticket screen draws, and `ticket-row.tsx`'s header
+            carries the whole argument for why a reference crosses the fence
+            when an assignee does not. */}
+        <span className={`${REF_LEADS_NAME} w-fit flex-wrap`}>
+          <RecordRef value={ticket.ref} />
+          <Badge variant={status.variant} className="w-fit">
+            {t(status.label)}
+          </Badge>
+        </span>
         <RichText html={ticket.description} className="break-words" />
       </Card>
-
-      {/* THE ONE THING A CLIENT DOES TO A TICKET'S STATE (CHECKLIST 5.13).
-       *
-       * It sits UNDER the description rather than above it, which is the one
-       * arrangement decision here: UI-RULEBOOK C8 puts a warning band directly
-       * under the header, and on this screen the description IS the header —
-       * asking somebody to approve a request before they have read it back is
-       * the wrong order to put two sentences in.
-       *
-       * Amber because nothing moves until they act, and it disappears the moment
-       * they have: the door answers, the list is re-read, the status is no longer
-       * `awaiting_validation`, and there is nothing left to press. That is why
-       * this is a band and not a permanent control — a client never gets a second
-       * lifecycle button, on this screen or any other. */}
-      {ticket.status === "awaiting_validation" ? (
-        <PortalApprovalBand
-          title={t(
-            "We've written this up the way we understood it. Say the word and we'll get started."
-          )}
-          note={t("Nothing starts until you say yes.")}
-          approveLabel={t("Yes, go ahead")}
-          submitting={confirming}
-          onApprove={() => void confirmIt()}
-        />
-      ) : null}
 
       {/* SHOW US WHAT YOU MEAN (CHECKLIST 5.10) — above the conversation, because
        * the files are part of the request rather than part of the exchange about
@@ -351,6 +310,15 @@ export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId
           errorDescription: t("Try again in a moment."),
         }}
       />
+
+      {/* HOW DID WE DO (the owner, 6 Sep 2026). UNDER the conversation and above
+          the composer, which is the one arrangement decision here: the question
+          is about work that is finished, so it belongs after the person has read
+          what we said — the same "read it back first" ordering the approval band
+          above is placed by. It draws nothing at all until the ticket is
+          answered, and the door refuses a rating on anything else besides, so
+          this prop is the screen agreeing with the rule rather than owning it. */}
+      <TicketRating ticketId={ticketId} resolved={ticket.status === "resolved"} />
 
       {/* No @mentions from this surface: a client has no business naming which
        * staff member picks their request up — so no mention hint in the

@@ -25,12 +25,12 @@ import {
   listTickets,
   markTriaged,
   maybeDraftFirstReply,
+  readTicketDashboard,
   refuseDirectResolve,
   setStatus,
   setTicketArchived,
   setTicketRank,
   updateTicket,
-  validateTicket,
   type HelpStatus,
   type TicketFilter,
   type TicketInput,
@@ -46,6 +46,14 @@ import {
   listAttachments,
   removeAttachment,
 } from "../lib/help-attachments"
+// THE STAGE HISTORY and THE CLIENT'S OWN VERDICT — two tables one along from
+// `help`, each with a single reader (team migrations 0066 and 0067). Both live
+// in their own files rather than in `lib/help.ts` for the reason
+// `help-attachments.ts` does: the fence they carry is a decision about a
+// DIFFERENT table, and a file-level claim about `help.ts` should never be asked
+// to cover it.
+import { readTicketStages } from "../lib/help-stages"
+import { rateTicket, readTicketRatings } from "../lib/help-ratings"
 import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
 import { ANY_FILE_TYPE, dataUrlBytes, parseUploadDataUrl, storedContentType, teamMediaKey } from "@shared/workers/image"
@@ -138,6 +146,7 @@ async function ticketPage(
  * query half of the validation seam at the boundary, where the boundary is. */
 function ticketFilterFrom(url: URL): TicketFilter {
   const status = queryText(url.searchParams.get("status"), "Status")
+  const waiting = queryText(url.searchParams.get("waiting"), "Waiting")
   return {
     tab: queryText(url.searchParams.get("scope"), "Scope") === "mine" ? "mine" : "all",
     view: ticketView(queryText(url.searchParams.get("view"), "View")),
@@ -161,9 +170,31 @@ function ticketFilterFrom(url: URL): TicketFilter {
     // it is not checked against a list here — an unknown word narrows to nothing,
     // which is the honest answer for a type nobody uses.
     helpType: queryText(url.searchParams.get("helpType"), "Type"),
-    status: (HELP_STATUSES as readonly string[]).includes(status ?? "")
-      ? (status as HelpStatus)
-      : undefined,
+    // A SET, COMMA-SEPARATED, AND ONE WORD IS A SET OF ONE — the client's Open
+    // tab names three stages ("Open → triaged + scheduled + in_progress"), so
+    // the parameter had to grow a separator rather than the strip growing three
+    // reads. `status=ready` still means exactly what it always did, which is why
+    // the name did not change either: every existing caller (the machine
+    // surface, an app record's Tickets tab, a bookmarked URL) keeps working
+    // untouched.
+    //
+    // AN UNKNOWN WORD IS DROPPED RATHER THAN REFUSED, which is the behaviour
+    // this line has always had for the single value and the same reason: a
+    // mistyped stage is a filter that narrows to nothing, not a 400 that takes
+    // the whole page down with it. A list that drops to empty is a set with no
+    // recognised word left in it, which `statusClause` treats as "no stage was
+    // asked" rather than "no row may match" — see its own note.
+    statuses: (status ?? "")
+      .split(",")
+      .map((w) => w.trim())
+      .filter((w): w is HelpStatus => (HELP_STATUSES as readonly string[]).includes(w))
+      .filter((w, i, all) => all.indexOf(w) === i),
+    // THE DERIVED HALF (`waitingClause` in lib/help.ts carries the whole
+    // reasoning). One word, exact — "only" — rather than a truthiness test on
+    // whatever arrived: this parameter turns a correlated subselect on, and a
+    // door that accepted `waiting=no` as yes would be an expensive read
+    // triggered by a caller who asked for the opposite.
+    waiting: waiting === "only" ? true : undefined,
   }
 }
 
@@ -591,34 +622,30 @@ export async function postHelpArchive(request: Request, env: Env): Promise<Respo
   return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
 }
 
-/** POST /api/content/help/validate — THE CLIENT SAYS YES (CHECKLIST 5.13).
+/* ── `POST /api/content/help/validate` WAS HERE (retired 7 Sep 2026) ────────
  *
- * The one lifecycle door a portal caller may push, and the only one they ever
- * will: an extra, a request or a piece of feedback waits for the company that
- * pays for it to confirm they want it (Aurora's ap2). Questions and issues never
- * reach `awaiting_validation` at all, so this door has nothing to do to them.
+ * "THE CLIENT SAYS YES" (CHECKLIST 5.13) — the ONE lifecycle door a portal
+ * caller could push, and the deliberate exception to R21's shape on this
+ * module. It moved a waiting ticket into the ordinary queue.
  *
- * NOT `refusePortalCaller`, and it is the deliberate exception to R21's shape on
- * this module — every OTHER status move is ours. Two things keep it safe: the
- * account fence rides the UPDATE (a client can only validate a ticket their own
- * company raised), and R17's predicate means the ONLY transition it can make is
- * `awaiting_validation` → `new`. It cannot reopen, resolve, or move a started
- * request; a caller who sends it at a ticket in any other state moves zero rows.
+ * It went with the stage it moved tickets out of: the client retired
+ * `awaiting_validation` on 7 Sep 2026 (shared/types.ts `HELP_STATUSES` carries
+ * her sentence and the argument), so an extra, a request or a piece of feedback
+ * now opens in `new` like everything else and there is nothing to confirm.
  *
- * Gated by help:READ, not edit. A contact who can see their company's requests is
- * exactly the person being asked, and `help:edit` is a right the seeded Client
- * role deliberately does not hold — gating on it would make this door unreachable
- * by the only people it exists for. Staff may press it too, for the ordinary case
- * where the answer arrives by phone. */
-export async function postValidateHelp(request: Request, env: Env): Promise<Response> {
-  const { actor, cfg, guard, body } = await gatedBody<{ id?: unknown }>(request, env, "help", "read")
-  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
-  const scope = await callerScope(cfg, guard)
-  // R17: not waiting → zero rows moved → no ping, no duplicate history.
-  const { moved, accountId } = await validateTicket(cfg, guard, scope, actor, id)
-  if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
-  return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
-}
+ * WHY THE DOOR WAS REMOVED AND NOT KEPT AS A HARMLESS NO-OP. R17's predicate
+ * was the whole of its safety: it could only ever move a row that was
+ * `awaiting_validation`. With no such row possible, the door could only ever
+ * move zero rows — and it was gated on `help:read` rather than `help:edit`
+ * precisely so a CLIENT login could reach it. A portal-reachable write door
+ * that can no longer do the one useful thing it existed for is surface with no
+ * function, which is the definition of what should not survive a retirement.
+ * `workers/content/src/lib/help.ts` carries the same note beside where
+ * `validateTicket` used to be.
+ *
+ * The client's own act on a ticket that DOES survive is the rating door
+ * (`POST /api/content/help/rating`) — still gated on `help:read`, and still the
+ * reason that gate choice is written down. */
 
 /** POST /api/content/help/triage-read — SOMEBODY HAS READ IT (CHECKLIST 5.11).
  *
@@ -636,6 +663,96 @@ export async function postHelpTriageRead(request: Request, env: Env): Promise<Re
   const { moved, accountId } = await markTriaged(cfg, guard, scope, actor, id)
   if (moved) await publishChange(env, guard.teamId, "help", id, "edit", accountId ?? undefined)
   return ticketPage(cfg, guard, scope, EVERYDAY_LIST, null)
+}
+
+/** GET /api/content/help/dashboard — the Tickets screen's Dashboard tab, in one
+ * read (help:read).
+ *
+ * NINE GROUPED READS, ONE DOOR, over the everyday list (`EVERYDAY_LIST`) —
+ * narrowed by the four filters below and by nothing else.
+ *
+ * THE FILTERS ARE PARAMETERS OF THIS DOOR, NOT A SIEVE IN THE BROWSER, and
+ * that is the whole reason they are parsed here rather than handled on the
+ * screen. The client's ruling, 6 Sep 2026: "dashboard should also have toolbar /
+ * filter by client and type / no sort." Everywhere else in the app a toolbar
+ * facet narrows rows that are already loaded; there are no rows on this tab.
+ * Every number on it is a COUNT(*) the database took, so narrowing it means
+ * taking the counts again over a smaller WHERE — a filter that did not reach the
+ * door would change nothing at all on screen.
+ *
+ * `q` IS THE SEARCH BOX, AND IT IS THE SAME SEARCH THE LIST DOES. Client, 7 Sep
+ * 2026, twice: "on the dashboard, I'm missing the full toolbar", then "still
+ * missing full toolbar!". Sort is absent by her own earlier ruling, so the box
+ * was the one control a sibling ticket tab had that this row did not. It is a
+ * fourth narrowing of exactly the same SHAPE as the three above — a parameter of
+ * this door, checked in the same position, spent in the WHERE clause of all nine
+ * grouped reads through `ticketWhere`'s own `searchClause`, which is the very
+ * function `GET /api/content/help` binds its own `?q=` into. One clause, one
+ * matcher, one answer: a term that finds eleven tickets on the list tab draws
+ * this dashboard over those same eleven. Two different answers to one question
+ * typed into two boxes on one screen is the failure that mattered here, and the
+ * only defence against it is that neither box owns a matcher of its own.
+ *
+ * `accountId`, `helpType`, `appId` and `q`, and NOTHING ELSE. `status` is deliberately
+ * not offered and `readTicketDashboard` drops it if anything ever sets it: a
+ * dashboard narrowed to one stage would draw a pipeline of one row and a
+ * closing-time chart of tickets that have not closed, under headings that all
+ * say backlog. A kind is a different sentence — every chart still answers its
+ * own heading with the kind held constant.
+ *
+ * `appId` IS THE APP RECORD'S OWN DASHBOARD (client, 6 Sep 2026: "create me, in
+ * each app, the ticket page … also create another view for the dashboard … like
+ * a mini version, a filtered version"). It is the third narrowing and it is the
+ * same SHAPE as the other two — a parameter of this door, spent in the WHERE
+ * clause of all nine grouped reads through `ticketWhere`'s own `appClause`,
+ * which the everyday list and its counts have used since the app record grew a
+ * Tickets tab. Nothing in `readTicketDashboard` had to change to accept it,
+ * which is the whole reason `TicketFilter` is one declared type (R19): a filter
+ * the list already understood was already understood here.
+ *
+ * TWO OF THE FIVE PANELS DO NOT SURVIVE THE NARROWING and the SCREEN drops them
+ * rather than this door — "which app" is one bar inside one app, and "who has
+ * more, by client" is a comparison across clients that an app row's single
+ * `account_id` collapses. The door keeps answering both because the reads are
+ * grouped statements a screen chooses among, not a layout; teaching it which
+ * panels a caller intends to draw would be the screen's layout decided in SQL.
+ *
+ * ITS OWN DOOR, NOT MORE FACETS ON THE LIST: `readTicketDashboard` (lib/help)
+ * opens with the measurement — nine extra grouped scans on every ticket page,
+ * for a tab most reads never show.
+ *
+ * REFUSED TO A CLIENT LOGIN (R21), and this is the clearest case of that rule in
+ * the file. Every chart here is a comparison ACROSS clients — which company asks
+ * for the most extras, how long we take to close things — so answering it for a
+ * contact would hand one client the shape of every other client's relationship
+ * with us. The account fence would narrow the rows correctly and still leave a
+ * client reading a chart of themselves against a total they can subtract from;
+ * this is our own material and the honest answer is that the door is not theirs. */
+export async function getHelpDashboard(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await refusePortalCaller(cfg, guard)
+  // R20: every narrowing sits in a checking position — `queryText`'s first
+  // argument — exactly as the list door's own `accountId`/`helpType`/`appId` do
+  // a few hundred lines up, and for the same reason: a value off a query string is
+  // untrusted whether it ends up in a WHERE or in a GROUP BY.
+  const params = new URL(request.url).searchParams
+  return json(
+    await readTicketDashboard(cfg, guard, scope, {
+      ...EVERYDAY_LIST,
+      accountId: queryText(params.get("accountId"), "Client"),
+      helpType: queryText(params.get("helpType"), "Type"),
+      // ONE SYSTEM'S OWN DASHBOARD — see this handler's header. Checked in the
+      // same position as its two neighbours, because a value off a query string
+      // is untrusted whether it ends up in a WHERE or in a GROUP BY.
+      appId: queryText(params.get("appId"), "App"),
+      // THE SEARCH BOX — see this handler's header. Named `q` because that is
+      // what the LIST door calls it (`ticketFilterFrom`), checked in the same
+      // position as its three neighbours, and handed to `readTicketDashboard`
+      // as an ordinary `TicketFilter` field, so the matching is `searchClause`'s
+      // and cannot be a second idea of the same word.
+      q: queryText(params.get("q"), "Search"),
+    })
+  )
 }
 
 /** GET /api/content/help/attachments?id=<ticketId> — the files and links on a
@@ -799,6 +916,100 @@ export async function getHelpStakeholders(request: Request, env: Env): Promise<R
   const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
   if (!id) return fail(400, "invalid_input", "A ticket id is required.")
   return json({ stakeholders: await listStakeholders(cfg, env, guard, scope, id) })
+}
+
+/** GET /api/content/help/stages?id=<ticketId> — the stages this ticket went
+ * through, how long it sat in each, and how many times it came back out of
+ * `resolved` (team migration 0066).
+ *
+ * ONE DOOR FOR ALL THREE, because they are one fact asked three ways: the
+ * sequence IS the durations and the reopens, computed off the same rows. A
+ * second door for "how many reopens" would be a second answer to a question this
+ * one has already answered.
+ *
+ * REFUSED TO A CLIENT LOGIN, and not merely absent from the portal's table. The
+ * rows name the staff who moved each ticket, which is the same disclosure the
+ * activity feed is kept off the portal for (SCOPE ch.06, PORTAL_ACTIVITY_EXEMPT)
+ * — a tidier shape does not make it a different fact. The agency gateway
+ * forwards /api/content/* by PREFIX and the Client role holds `help:read`, so
+ * the refusal has to be here (R21) rather than on the other door's allow-list.
+ *
+ * THE FENCE STILL RIDES IT, through `getTicket`, even though a client is already
+ * refused: a staff member's scope is no clause at all, so this costs nothing and
+ * means the door cannot become a leak the day somebody widens the refusal. A
+ * ticket that is not there answers 404, never 403. */
+export async function getHelpStages(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await refusePortalCaller(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  const ticket = await getTicket(cfg, guard, scope, id)
+  if (!ticket) return fail(404, "help_not_found", "That ticket doesn't exist.")
+  return json(await readTicketStages(cfg, guard, id))
+}
+
+/** GET /api/content/help/rating?id=<ticketId> — what was said about how we did
+ * (team migration 0067).
+ *
+ * OPEN TO BOTH SIDES, deliberately, and it is the one place on this module where
+ * that is the right answer. A client reads their own answer back so the portal
+ * can show it rather than asking twice; the agency reads the whole set, because
+ * being able to read what a client said is the entire reason the fact is stored.
+ * The NARROWING for a portal caller is in the statement, in
+ * `readTicketRatings` — not here, and not in the screen.
+ *
+ * R21: gated on `help:read`, which the seeded Client role holds, and it is a
+ * door the portal itself opens, so it is fenced rather than refused. The fence is
+ * `getTicket` inside the lib. */
+export async function getHelpRating(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "help", "read")
+  const scope = await callerScope(cfg, guard)
+  const id = queryText(new URL(request.url).searchParams.get("id"), "Id")
+  if (!id) return fail(400, "invalid_input", "A ticket id is required.")
+  return json(await readTicketRatings(cfg, guard, scope, id))
+}
+
+/** POST /api/content/help/rating — the client says how we did (CHECKLIST: the
+ * owner's ruling of 6 Sep 2026, "let's store sentiment (1-3) on the portal for
+ * how did we do it to see if client is happy").
+ *
+ * GATED ON `help:read`, NOT `help:edit`, and that is the same reading the
+ * `validate` door already makes: `help:edit` is a right the seeded Client role
+ * deliberately does not hold, so gating on it would close this door to the only
+ * people it exists for. A rating changes no lifecycle, moves no status and edits
+ * nothing — it appends a sentence about work that is already finished.
+ *
+ * NOT `refusePortalCaller`, then, and the safety is by construction rather than
+ * by a condition: the account fence decides whose ticket it is before a row is
+ * written (a miss is a 404, so "not yours" never confirms a ticket exists), the
+ * door refuses anything that is not `resolved`, and the account a client's row is
+ * judged against comes from the guard corridor — `callerScope` — and never from
+ * the body.
+ *
+ * THE COMMENT IS OPTIONAL AND NOTHING HERE NAGS. `optionalText` returns
+ * undefined for an absent field and that is a complete request. */
+export async function postHelpRating(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<{
+    id?: unknown
+    score?: unknown
+    comment?: unknown
+  }>(request, env, "help", "read")
+  const id = requireText(body.id, "Ticket", TEXT_LIMITS.short)
+  // R20: the score sits inside `Number(...)`, the checking position for a
+  // numeric field, and `rateTicket` then holds it against the three values the
+  // scale HAS — so a "2" and a 2 are one answer and a 4 is a sentence rather
+  // than a constraint violation wearing a 500.
+  const score = Number(body.score)
+  const comment = optionalText(body.comment, "Comment", TEXT_LIMITS.long) ?? null
+  const scope = await callerScope(cfg, guard)
+  const rating = await rateTicket(cfg, guard, scope, actor, id, score, comment)
+  // R1: the ticket gained something a screen shows, so the row is pinged — aimed
+  // at the account it belongs to, so a client's colleagues hear it and nobody
+  // else's people do. The ticket is re-read through the fence for that address
+  // rather than trusted off the request.
+  const ticket = await getTicket(cfg, guard, scope, id)
+  await publishChange(env, guard.teamId, "help", id, "edit", ticket?.accountId ?? undefined)
+  return json({ rating })
 }
 
 /** POST /api/content/help/stakeholders — manually add a stakeholder (help:read;

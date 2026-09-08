@@ -26,7 +26,7 @@ resumable ledger, and the size + rate watch) ·
 | Subsystem | Tables |
 |---|---|
 | Permissions + vocabulary | `member_roles` + `role_permissions` · `selectable_data` |
-| Content | `help` + `help_threads` (**Tickets**) · `help_stakeholders` · `ref_counters` |
+| Content | `help` + `help_threads` (**Tickets**) · `help_status_events` · `help_ratings` · `help_stakeholders` · `team_ref_counters` · `ref_aliases` |
 | History + invites | `activity` · `invite_logs` |
 | Import | `data_import_sessions` · `data_import_batches` |
 | The assistant | `agent_threads` + `agent_messages` |
@@ -629,13 +629,18 @@ bucket name follows the table, are a deferred hook, see AGENT-MODULES-PLAN.)
 2026-08-11. SCOPE ch.07). The same table, grown into the thing the scope
 describes; there is no second ticket beside it, and there never will be.
 
-- **The seven states.** `status` runs `awaiting_validation` → `new` → `triaged`
-  → `scheduled` → `in_progress` → `ready` → `resolved`. This line said FIVE for a
-  year after two of them shipped, which is the quiet way a document goes wrong:
-  nothing broke, and anybody reading it built on a state machine the code had
-  already left behind. `awaiting_validation` is the client's main stakeholder not
-  having said yes yet (Aurora's ruling: extras, requests and feedback wait;
-  questions and issues go straight in). `scheduled` is stories existing AND at
+- **The six states.** `status` runs `new` → `triaged` → `scheduled` →
+  `in_progress` → `ready` → `resolved`. This line said FIVE for a year after two
+  of them shipped, which is the quiet way a document goes wrong: nothing broke,
+  and anybody reading it built on a state machine the code had already left
+  behind. It said SEVEN until 7 Sep 2026, when the client retired
+  `awaiting_validation` — the client's main stakeholder not having said yes yet
+  — in one sentence: "kill awaiting_validation". Extras, requests and feedback no
+  longer wait for anybody; every ticket opens in `new`. The stage survives in
+  `RETIRED_HELP_STATUSES` (`shared/types.ts`) so a ticket that really passed
+  through it still reads back correctly on its stage history, and team migration
+  `0069` moves any stored row into `new` without touching `help_status_events`.
+  `scheduled` is stories existing AND at
   least one of them booked into a sprint — both halves in one read, because
   either alone is a different and wrong sentence — flipped by itself in
   `lib/ready-flip` `scheduledFlip`. **SCOPE ch.07 still shows five and calls
@@ -671,6 +676,67 @@ describes; there is no second ticket beside it, and there never will be.
   788 of the tickets arriving from Glide exist only in German, so a translation
   SETS the empty one and never overwrites the original.
 
+### help_status_events. BUILT (per-team, team migration `0066_a_ticket_remembers_its_stages`). THE LADDER A TICKET CLIMBED
+
+One row per status transition: `help_id`, `from_status`, `to_status`, the instant
+and the creator block. The owner, 2026-09-06, asked for two things — "how long it
+sat on each stage" and "how often sth is reopened" — and they are ONE table
+rather than two, because they are one fact asked twice: **time in a stage is the
+gap between consecutive rows, and a reopen is a transition back out of
+`resolved`.** A `reopen_count` column would be a second source of truth for a
+fact this table already holds.
+
+- **Every status writer records, and that is a checked census.** Seven of them:
+  `createTicket` (the first rung, inside the same script as the ticket's own
+  INSERT, so there is no instant in which a ticket has no first stage),
+  `setStatus` (which the status door, the resolve door and `bulkSetStatus` all go
+  through), `markTriaged`, `bulkSetStatusByFilter`, and the three flips in
+  `lib/ready-flip`. It was eight until 7 Sep 2026: `validateTicket` — the
+  client's own "yes, go ahead" — went with the `awaiting_validation` stage. The statement is written once, in
+  `lib/help-stages.ts`, and `workers/content/test/status-history-has-no-holes.test.ts`
+  reads every worker source off disk and fails if a status UPDATE ever appears
+  somewhere that does not reach it. A history with holes is worse than none: the
+  gap is invisible and the stages either side of it merge into one long one.
+- **It is what survives a reopen.** `setStatus` NULLs `resolved_at` and the whole
+  resolver block on any move to a non-resolved status — deliberately, since those
+  columns mean "the answer that stands NOW" — so before this table a reopen
+  erased who answered the ticket and when. The owner blessed the nulling and named
+  the remedy: *"Reopening a ticket nulls its closing timestamp, yeah — but keep it
+  in activity, like closed on x, reopen on y, closed again on z."*
+- **A ticket with no rows reports NOTHING, never zero.** Every ticket that existed
+  before this migration has an empty history and cannot be given one; the reader
+  answers `recorded: false` and the Activity tab prints it in words. A ticket
+  raised before and moved after has a real sequence that does not start at the
+  beginning (`fromCreation: false`), and says so. **Nothing is backfilled** —
+  0066 lists the four reasons the activity feed cannot supply the past.
+- **Append-only, and the order is `created_at` then `rowid`.** A ULID's low half is
+  random, so `id` cannot break a same-millisecond tie; nothing ever deletes from
+  here, so no rowid is recycled. Durations go through `shared/business-days.ts`
+  (Mon–Fri only).
+
+### help_ratings. BUILT (per-team, team migration `0067_the_client_says_how_we_did`). HOW WE DID
+
+The client's own verdict on a finished request: `help_id`, `score` (1–3, with the
+CHECK in the schema), an OPTIONAL `comment`, and the creator block — who said it
+and when. The owner, 2026-09-06: *"let's store sentiment (1-3) on the portal for
+how did we do it to see if client is happy"*, then *"sentiment they can add a text
+(optional)"*.
+
+- **A table and not two columns on `help`**, because "we did badly, and then we
+  fixed it" is the most useful thing this data can say and a column cannot say it.
+  Nothing here is ever UPDATEd; a change of mind is a NEW row and readers take the
+  newest per person as the standing answer.
+- **Only on a `resolved` ticket**, enforced at the door (`lib/help-ratings.ts`).
+  "How did we do" is past tense; asked mid-flight it measures impatience into the
+  same column. A reopen does not take an answer back.
+- **The portal is where it is given** (`POST /api/content/help/rating`), the
+  account comes from the guard corridor, and the fence is the ticket's own
+  (`getTicket`). The READ narrows a client to their own rows — a colleague's
+  private "1 out of 3" is a personal statement, not a fact about the ticket the
+  way a reply is — and answers the agency with the whole set. There is no
+  agency-side dashboard yet, deliberately; a rating writes an activity row, so
+  what a client said is readable on the ticket's own history today.
+
 ### help_stakeholders. KEEP (BUILT, per-team, team migration `0005_help_stakeholders`). WHO ELSE IS WATCHING A TICKET
 
 The extra STAFF people on one ticket, beside whoever raised and whoever answers
@@ -682,14 +748,42 @@ notify path reads this table for who to tell. Creator block only: a stakeholder
 row is a statement, and taking somebody off it is the row going, not a
 deactivation ceremony on a join row.
 
-### ref_counters. BUILT (per-team, team migration `0011_ticket_work_engine`)
-One row per (`account_id`, `kind`) holding `next_no`. The reference numbers SCOPE
-ch.02 describes are sequential **per account**, and allocation is a SINGLE
-statement. `INSERT … ON CONFLICT DO UPDATE … RETURNING`, so two people raising a
-ticket on one account in the same second are serialized by the database instead of
-both reading the same number (CONCURRENCY.md rule 1: the counter rides the write).
-`kind` is the letter the reference wears: `T` ticket today, `S` story and `SPR`
-sprint when those land.
+### team_ref_counters + ref_aliases. BUILT (per-team, team migrations `0059`, `0068`)
+**`ref_counters` IS GONE** — one row per (`account_id`, `kind`), dropped whole by
+`0060_the_last_holdout_gets_a_name`. This section described it in the present
+tense until 7 Sep 2026, which is the smaller half of the same rot R55 was written
+for; the bigger half is below.
+
+**`team_ref_counters`** is the replacement: one row per `kind`, no `account_id` in
+the key, because the team's own database already IS the tenant boundary. The
+client ruled on 2026-08-31 that a reference is TEAM-wide with no account code in
+the string — `T0412`, `B0188`, `S0012`, `M0009`, `A0003`, `W0001`, `I0007` — and
+`shared/workers/refs.ts` carries the whole argument for why (a cross-account
+triage queue prints two unrelated `T0001`s with nothing to tell them apart).
+Allocation is still a SINGLE statement, `INSERT … ON CONFLICT DO UPDATE …
+RETURNING`, so two people raising a ticket in the same second are serialised by
+the database rather than both reading the same number (CONCURRENCY.md rule 1: the
+counter rides the write). `kind` is the letter: `T` ticket, `B` story, `S` sprint,
+`M` meeting, `A` app, `W` wave, `I` input. `tasks` has a `ref` column and mints
+nothing — see `REF_TABLES_WITHOUT_A_KIND` in the registry for why that is a
+decision rather than an omission.
+
+**`ref_aliases`** is what a record USED to be called: `(entity_table, alias)`
+unique, plus `row_id`, `kind`, `replaced_by`, `retired_at` and `source` (the
+migration that retired it). Rows accumulate, so a record renumbered twice has two.
+
+It exists because the 2026-08-31 ruling changed the MINT and rewrote no stored
+row. Every reference already on the books kept the old `<account>-<letters><digits>`
+shape — 1,896 tickets, 275 stories, 100 sprints, 45 meetings and 1 input on
+staging — and the client spent six days reading `VU Solutions-T1183` off her own
+screens. `0068_the_reference_keeps_its_old_name` carries them all to the formula,
+preserving each number where the number is free and reissuing where two accounts
+had both minted it, and keeps the old string here so a number quoted in an email
+last year still finds the record. That was her own ruling when shown the choice:
+"alias yes". Every door that searches a reference ORs in `refAliasMatchSql`, and
+the sprint list — whose door takes no `q` at all — carries the names on the row as
+`refWas` so the browser's own matcher can find them. R55 is the law that stops the
+data and the formula coming apart again.
 
 ### invite_logs. BUILT (per-team, team migration `0003_invite_logs`) + invite_index (GLOBAL, built)
 `invite_logs` (full record in the team DB): audit + a FROZEN inviter snapshot
@@ -1233,7 +1327,7 @@ it on THEIRS. `app_staff` is our people — `user_id` plus `is_lead`, so "who do
 ask" has one name — and `app_stakeholders` is the client's people, `contact_id`
 pointing at the person's own `accounts` row (a stakeholder is a contact you
 already have, never a new record) plus `is_main`, the one whose confirmation a
-ticket's `awaiting_validation` stage waits on. Both carry the full audit block
+ticket's retired `awaiting_validation` stage used to wait on. Both carry the full audit block
 and deactivate rather than delete, so "who USED to run this" stays answerable.
 
 ### app_modules. KEEP (BUILT 2026-08-20, team migration `0048_app_modules`). THE SECTIONS OF A BUILT SYSTEM

@@ -161,6 +161,14 @@ export function WaveFormDialog({
       <Field config={goalField} htmlFor="wave-goal" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(goalField.label)}
+          disabled={busy}
           defaultValue={values.goal}
           onChange={(html) => setValues((s) => ({ ...s, goal: html }))}
           placeholder={t("Map the processes, build two automations, test, train.")}

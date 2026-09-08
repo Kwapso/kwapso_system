@@ -209,6 +209,21 @@ export function KnowledgeFormDialog({
       <Field config={bodyField} htmlFor="knowledge-body" className={fieldSpacing}>
         <Notes
           key={open ? "open" : "shut"}
+          // THE NAME A SCREEN READER READS. The `htmlFor` above lands the id on
+          // the editable node itself, because the kit Field clones it onto its
+          // single child — and this is the label that id could never carry, since
+          // a label element's `for` attribute binds only to a labelable control
+          // and the editable node here is a plain div. Same words as the visible
+          // label, taken from the same config, so the two can never drift apart.
+          aria-label={t(bodyField.label)}
+          // `textOwnedElsewhere`, not just `busy` — this file's own header says
+          // "the two text fields go read-only" when a mirrored source owns the
+          // words, and the title Input above has enforced that since the day it
+          // was written. The body never could: the editor had no `disabled` prop
+          // to be handed, so the promise held for one of the two fields and the
+          // sweep quietly overwrote anything typed into the other on its next
+          // pass — the exact loss the sentence was written to prevent.
+          disabled={busy || textOwnedElsewhere}
           defaultValue={values.body}
           onChange={(html) => setValues((v) => ({ ...v, body: html }))}
           placeholder={t("Write it the way you would explain it to a new colleague.")}

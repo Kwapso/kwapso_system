@@ -15,6 +15,7 @@
   "ignorePatterns": [
     "**/node_modules/**",
     "**/.next/**",
+    "**/.next-*/**",
     "**/out/**",
     "glide/**",
     "**/next-env.d.ts",

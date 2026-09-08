@@ -30,7 +30,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
-import { GROWING_COLLECTIONS } from "@shared/rules/registry"
+import { FIND_NARROWING_OK, GROWING_COLLECTIONS } from "@shared/rules/registry"
 import { BASE_RECIPES } from "../lib/screens"
 
 const HERE = dirname(fileURLToPath(import.meta.url)) // web/test
@@ -94,18 +94,122 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
   // …`), so the check follows that name and demands that any narrowing of it
   // stands down while a find is active. A resting screen may filter as much as
   // it likes — nothing is counting it.
+  //
+  // ── AND IT ASSERTS THE CALL, NOT THE CHARACTERS (2026-09-07) ──────────────
+  //
+  // This check spent its first weeks matching the LITERAL `${name}.filter(` and
+  // reading the guard off the PHYSICAL LINE the match sat on. Both halves were
+  // defeated by the same keystroke — a newline:
+  //
+  //     cards: rows              ← the matcher never sees `rows.filter(`
+  //       .filter((r) => …)         and the "line" it would read the guard off
+  //                                 is `.filter((r) => …)`, which contains
+  //                                 neither the guard nor the binding's name.
+  //
+  // It was not passing because the screen was clean. It was passing because of
+  // where somebody had pressed return, and `tickets-collection.tsx` carried a
+  // paragraph instructing the next reader to KEEP the chain broken so this
+  // suite would stay green — a law bending the code it polices, which is the
+  // wrong way round. Both are gone: the matcher tolerates whitespace before the
+  // dot, and the guard is read off the whole CHAIN (walking back over
+  // continuation lines to the expression's head) rather than off one line of
+  // it. So the only two ways past this check now are the two honest ones —
+  // guard the filter with `found.active`, or write down in
+  // FIND_NARROWING_OK why the call is a partition rather than a narrowing.
   it("no screen re-filters the rows a find bar gave it while a find is running", () => {
     const bindings = /const (\w+) = found\.active \? found\.rows/g
     let inspected = 0
     const offenders: string[] = []
+    /** Every pin that fired, so a pin that fires for nothing can go red below. */
+    const claimed = new Set<string>()
+
+    /** The head of the expression this call hangs off: from the match, walk back
+     * over any lines that are pure continuations (`.foo(…)`, `?.foo(…)`) so a
+     * chain written across four lines reads as the one expression it is. */
+    const chainHead = (src: string, at: number): string => {
+      const lineAt = (i: number) => src.slice(i, src.indexOf("\n", i) === -1 ? src.length : src.indexOf("\n", i))
+      let start = src.lastIndexOf("\n", at - 1) + 1
+      while (start > 0 && /^\s*\??\./.test(lineAt(start))) start = src.lastIndexOf("\n", start - 2) + 1
+      return src.slice(start, at)
+    }
+
+    /** WHAT A `.filter(` IS HANGING OFF — walked backwards from the dot.
+     *
+     * Anchoring on the NAME (`rows.filter(`) is what this check used to do, and
+     * it reads only the plainest spelling of the thing it forbids. Three
+     * ordinary ways of writing the same narrowing walk straight past a
+     * name-anchored matcher, and one of them is what a defensive developer
+     * writes FIRST:
+     *
+     *     rows?.filter(…)          the optional chain
+     *     (rows ?? []).filter(…)   the default
+     *     rows                     the line break — the 2026-09-07 defect
+     *       .filter(…)
+     *
+     * So the receiver is read instead: from the dot, back over the whitespace
+     * and any `?`, then back over ONE primary expression — a balanced `(…)` /
+     * `[…]` with whatever identifier precedes it, or a bare identifier chain.
+     * A receiver that NAMES the find bar's rows is a narrowing of the find
+     * bar's rows however it was spelled. */
+    const receiverAt = (src: string, dot: number): number => {
+      let i = dot
+      while (i > 0 && /\s/.test(src[i - 1])) i--
+      if (src[i - 1] === "?") i--
+      while (i > 0 && /\s/.test(src[i - 1])) i--
+      if (src[i - 1] === ")" || src[i - 1] === "]") {
+        const open = src[i - 1] === ")" ? "(" : "["
+        const close = src[i - 1]
+        let depth = 0
+        i--
+        for (; i >= 0; i--) {
+          if (src[i] === close) depth++
+          else if (src[i] === open && --depth === 0) break
+        }
+      }
+      while (i > 0 && /[\w$.?]/.test(src[i - 1])) i--
+      return i
+    }
+
+    /** The call, from its receiver to its closing paren, whitespace collapsed —
+     * `rows.filter((r) => r.status === stage)`. This is what a
+     * FIND_NARROWING_OK key names, so a pin excuses ONE call and not every
+     * `.filter(` that file will ever hold, and it names the call rather than
+     * one particular way of laying it out. */
+    const callText = (src: string, from: number, argsOpen: number): string => {
+      let depth = 0
+      let i = argsOpen
+      for (; i < src.length; i++) {
+        if (src[i] === "(") depth++
+        else if (src[i] === ")" && --depth === 0) break
+      }
+      return src
+        .slice(from, i + 1)
+        .replace(/\s+/g, " ")
+        .replace(/\s*\.\s*/g, ".")
+        .trim()
+    }
+
     for (const f of componentFiles()) {
+      const rel = f.replace(`${ROOT}/`, "")
       const src = stripComments(read(f))
       for (const bind of src.matchAll(bindings)) {
         inspected++
-        for (const hit of src.matchAll(new RegExp(`\\b${bind[1]}\\.filter\\(`, "g"))) {
-          const line = src.slice(src.lastIndexOf("\n", hit.index) + 1, hit.index)
-          if (!line.includes("found.active"))
-            offenders.push(`${f.replace(`${ROOT}/`, "")}: ${bind[1]}.filter(…)`)
+        const named = new RegExp(`\\b${bind[1]}\\b`)
+        for (const hit of src.matchAll(/\.\s*filter\s*\(/g)) {
+          const from = receiverAt(src, hit.index)
+          const receiver = src.slice(from, hit.index)
+          if (!named.test(receiver)) continue
+          // A FILTER OVER A PROJECTION IS NOT A FILTER OVER THE ROWS. Once the
+          // chain has been through `.map(`/`.flatMap(` the values in hand are
+          // no longer tickets — `rows.map((w) => w.helpType).filter(Boolean)`
+          // builds a Type MENU and drops no row from anything a person is
+          // counting. The order matters and is the whole distinction:
+          // `rows.filter(…).map(…)` has fewer rows in it and IS caught.
+          if (/\.\s*(?:map|flatMap)\s*\(/.test(receiver.slice(receiver.search(named)))) continue
+          if (chainHead(src, from).includes("found.active")) continue
+          const key = `${rel}::${callText(src, from, hit.index + hit[0].length - 1)}`
+          if (key in FIND_NARROWING_OK) claimed.add(key)
+          else offenders.push(key)
         }
       }
     }
@@ -115,7 +219,17 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
     expect(
       offenders,
       "these screens narrow the door's own answer in the browser, under the door's own exact count (R16) — " +
-        "guard the filter with `!found.active`, or ask the door the narrower question in the first place"
+        "guard the filter with `!found.active`, ask the door the narrower question in the first place, or — " +
+        "if the call is a PARTITION that drops no row — pin it in FIND_NARROWING_OK with the reason:\n  " +
+        offenders.join("\n  ")
+    ).toEqual([])
+    // THE RATCHET. A pin that no longer names a real call is a record of what
+    // this screen used to do, and it is exactly the shape of thing that rots
+    // into permission nobody re-read.
+    const stale = Object.keys(FIND_NARROWING_OK).filter((k) => !claimed.has(k))
+    expect(
+      stale,
+      `these FIND_NARROWING_OK pins match no call under a find-bar binding any more — delete them:\n  ${stale.join("\n  ")}`
     ).toEqual([])
   })
 

@@ -22,6 +22,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import worker from "../src/index"
 import { TRIAGE_AFTER_DAYS, weekStart } from "../src/lib/triage"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
+import { workingDaysAgo } from "@shared/business-days"
 
 const db = () => holder.db as DatabaseSync
 
@@ -53,12 +54,25 @@ type TriageBody = {
   total: number
 }
 
-/** Raise a ticket and back-date it by `days`, which is the only way to make a
- * "has been sitting" test about anything other than the clock. */
+/** Raise a ticket and back-date it by `days` WORKING days, which is the only
+ * way to make a "has been sitting" test about anything other than the clock.
+ *
+ * IT USED TO BACK-DATE BY CALENDAR DAYS, and that made this suite pass or fail
+ * depending on WHICH DAY IT WAS RUN. The triage door moved onto working days on
+ * 2026-09-06 (the client: "saturday and sunday do not count towards how long it
+ * took") and this helper was left behind, so the fixture and the door were
+ * measuring in different units. Subtracting four calendar days from a Monday
+ * lands on the Thursday before — two working days, not four — so every case
+ * about the three-day line flipped its answer over a weekend. Green when it was
+ * written, red the following Monday, and nothing in the diff to explain it.
+ *
+ * `workingDaysAgo` is the exact inverse of the `workingDaysBetween` the door
+ * counts with, so a ticket aged N here is a ticket the door reports as N,
+ * whatever day the suite runs. */
 async function ticketAgedDays(description: string, days: number): Promise<string> {
   await call(IDS.staffUser, "POST /api/content/help", { description })
   const id = (db().prepare(`SELECT id FROM help WHERE description = ?`).get(description) as { id: string }).id
-  const when = new Date(Date.now() - days * 86_400_000).toISOString()
+  const when = workingDaysAgo(new Date(), days).toISOString()
   // Straight back to `new`: raising it as staff locks it, which is a different
   // fact from having READ it, and this suite is about the latter.
   db().exec(`UPDATE help SET created_at = '${when}', status = 'new' WHERE id = '${id}'`)

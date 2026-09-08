@@ -287,8 +287,9 @@ To add, say, a `products` module, you touch these seams and nothing else:
 4. **The screen engine.** Describe the list + detail as a recipe in
    `web/lib/screens.ts`, map its URL segment to its permission module in
    `MODULE_PERMISSION`, and the deep-link shell renders it at
-   `/t/<teamId>/products/<id>`. The record detail gets **Overview + Activity tabs**
-   from the library for free (Law R2).
+   `/t/<teamId>/products/<id>`. The record detail gets its **Overview tab** and its
+   tab strip from the library for free (Law R2), and its **history** from the ink
+   footer's Latest activity eyebrow — the Activity TAB was retired on 7 Sep 2026.
 5. **The glossary.** Any new product term goes in `shared/glossary.ts`, one clear,
    brief definition, and UI copy uses that exact word (Law R6). The agent's system
    prompt injects the whole glossary, so the assistant speaks the same dictionary.

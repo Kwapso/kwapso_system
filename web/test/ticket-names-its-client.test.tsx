@@ -24,12 +24,17 @@
 // REQUEST: the door is asked for entities that are not archived, and the door
 // answers for the whole collection.
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 /** What the accounts door was asked, captured. Hoisted so `vi.mock`'s factory —
  * which runs before the module body — can close over it. */
 const door = vi.hoisted(() => ({
+  /** The team's own systems, for the App row. A LET rather than a constant so a
+   * case can hand this door real apps without a second `vi.mock` factory —
+   * `beforeEach` puts it back to empty, which is what every case that predates
+   * the chip row expects. */
+  apps: [] as Record<string, unknown>[],
   accounts: vi.fn(async (_opts: Record<string, unknown> = {}) => ({
     accounts: [
       { id: "acct-bergman", name: "Bergman", code: "BERG", email: null, active: true, accountType: "entity" },
@@ -50,7 +55,7 @@ vi.mock("@/lib/live-resources", () => ({
   // …and the SECTIONS of that system, on the same terms: one bounded list
   // through the store, so the key has to exist here too.
   appModulesKey: (t: string) => `app-modules:${t}`,
-  listFetch: { apps: async () => [] },
+  listFetch: { apps: async () => door.apps },
 }))
 
 // The client picker asks the accounts door; the contact picker asks the accounts
@@ -75,6 +80,9 @@ import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { searchAccounts } from "@/lib/picker-sources"
 
 afterEach(cleanup)
+beforeEach(() => {
+  door.apps = []
+})
 
 /** Write the ticket's own words. The description is a RICH-TEXT field now, so it
  * is not a `<textarea>` with a value to set: it is the library `Notes` editor,
@@ -162,5 +170,187 @@ describe("raising a ticket in the agency app", () => {
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ accountId: "acct-bergman" })
+  })
+})
+
+/** The form's ONE button, by the word every form in the app says (UI-RULEBOOK
+ * F1). It is in the portal with the rest of the dialog. */
+const submitButton = () =>
+  screen.getByRole("button", { name: /submit/i }) as HTMLButtonElement
+
+/** One chip row, by the name a screen reader reads — which is the field's own
+ * label, passed as `ariaLabel` because a `<label for>` cannot bind to a div. */
+const chipRow = (name: string) => screen.getByRole("group", { name })
+
+// ── "NO TYPE IS NOT AN OPTION" (client, 2026-09-07) ─────────────────────────
+//
+// She said it twice in two sentences, which is a rejection rather than a query,
+// and the two halves of acting on it are separable and both have to hold: the
+// chip has to be GONE, and the form has to actually REFUSE a ticket with no type
+// — a row that merely stopped offering "none" while the door still accepted one
+// would be the screen and the record disagreeing silently.
+describe("a ticket has a type", () => {
+  it("offers no way to say it has none", () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={["Issue", "Question"]}
+        teamId="team-1"
+      />
+    )
+    // The four real words are there…
+    expect(within(chipRow("Type")).getByRole("button", { name: "Issue" })).toBeTruthy()
+    // …and the fifth chip is not, anywhere on the form.
+    expect(screen.queryByText("No type")).toBeNull()
+  })
+
+  it("refuses a new ticket until a type is pressed, and nothing is preselected", () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={["Issue", "Question"]}
+        teamId="team-1"
+      />
+    )
+    write("<p>The Tuesday export is empty</p>")
+    // A description alone is no longer enough: Type is required, and the refusal
+    // rides the SAME `submit.disabled` seam the module field already used —
+    // there is no second validation style on this form.
+    expect(submitButton().disabled).toBe(true)
+    // Nothing is chosen on a new ticket, so no chip is pressed…
+    for (const word of ["Issue", "Question"])
+      expect(
+        within(chipRow("Type")).getByRole("button", { name: word }).getAttribute("aria-pressed")
+      ).toBe("false")
+    // …and pressing one is the whole of what was outstanding.
+    fireEvent.click(within(chipRow("Type")).getByRole("button", { name: "Issue" }))
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it("still lets a team with no ticket types at all raise one", () => {
+    // Every word can be switched off on the Choices screen. Required-when-there-
+    // is-nothing-to-require would be a door with no handle: a form nobody in that
+    // team could ever submit, on a row that offers them nothing to press.
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+      />
+    )
+    write("<p>Internal: rotate the D1 token</p>")
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it("does not trap — or silently retype — a ticket that arrived without one", async () => {
+    // About sixty imported rows carry a null `help_type`. Opening one to fix a
+    // typo must not demand a category for somebody else's two-year-old request,
+    // and must not invent one behind their back.
+    const onSubmit = vi.fn(async (_input: { helpType?: string }) => {})
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={onSubmit}
+        helpTypeOptions={["Issue", "Question"]}
+        teamId="team-1"
+        initial={{ description: "<p>Tuesday export is empty</p>", helpType: null }}
+      />
+    )
+    // No chip is pressed — the screen does not claim a type this ticket has never
+    // had…
+    for (const word of ["Issue", "Question"])
+      expect(
+        within(chipRow("Type")).getByRole("button", { name: word }).getAttribute("aria-pressed")
+      ).toBe("false")
+    // …and the form saves anyway.
+    expect(submitButton().disabled).toBe(false)
+    submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    // undefined, not a guess: `optionalText` leaves the stored null alone.
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ helpType: undefined })
+  })
+})
+
+// ── THE APP IS CHIPS, AND IT WAITS FOR A CLIENT (client, 2026-09-07) ────────
+//
+// "make app not openable until client is selected, and whe it is horizontal
+// pills instead of dropdown."
+describe("which app the ticket is about", () => {
+  it("keeps its slot and says why it is empty until a client is named", async () => {
+    // REAL APPS ON THE DOOR, deliberately: with an empty list the row would be
+    // silent whether or not the gate existed, and the case would prove nothing.
+    // These are apps a person could pick the moment a client is named, and the
+    // point is that until then they are not offered.
+    door.apps = [{ id: "app-1", name: "Padelbase", stage: "live", logoUrl: null, active: true }]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+      />
+    )
+    // Give the bounded apps read time to land, so this is the GATE talking and
+    // not a list that simply had not arrived yet.
+    await waitFor(() => expect(chipRow("App")).toBeTruthy())
+    const row = chipRow("App")
+    // The field is still THERE — a row that vanished would move every field
+    // under it as somebody fills the form in, inside an order the client fixed
+    // field by field.
+    expect(row.textContent).toContain("Choose a client first.")
+    expect(within(row).queryAllByRole("button")).toHaveLength(0)
+  })
+
+  it("draws one pill per app, each wearing its own face, once a client is set", async () => {
+    door.apps = [
+      { id: "app-1", name: "Padelbase", stage: "live", logoUrl: null, active: true },
+      { id: "app-2", name: "Ferienhaus", stage: null, logoUrl: null, active: true },
+      { id: "app-3", name: "Retired thing", stage: "live", logoUrl: null, active: false },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("App")
+      expect(within(r).getByRole("button", { name: /Padelbase/ })).toBeTruthy()
+      return r
+    })
+    // Pills, not a dropdown: no combobox anywhere in this field.
+    expect(within(row).queryAllByRole("combobox")).toHaveLength(0)
+    // The live ones only…
+    expect(within(row).queryByRole("button", { name: /Retired thing/ })).toBeNull()
+    // …plus the escape hatch, which the APP row keeps and the type row does not:
+    // a ticket about no system at all is a real and common answer here.
+    expect(within(row).getByRole("button", { name: "No app" })).toBeTruthy()
+    // AND THE ICONS SURVIVE (her own ask, one sentence earlier). "Ferienhaus"
+    // has no logo AND no stage, which is exactly the pill that would otherwise
+    // be the one blank one in a line of icons — the `face` flag makes
+    // `RecordMark` fall through to the name's own initial.
+    //
+    // READ OFF THE MARK BOX ITSELF, not off the button's text: the label already
+    // contains every letter of the name, so asserting on the button's own
+    // textContent would pass with no mark drawn at all. `RecordMark` is
+    // `aria-hidden` by design (the word beside it says everything the picture
+    // does), so no role query can reach it and the class its one component draws
+    // with is the handle.
+    const plainest = within(row).getByRole("button", { name: /Ferienhaus/ })
+    const mark = plainest.querySelector(".bg-muted")
+    expect(mark).toBeTruthy()
+    expect(mark?.textContent).toBe("F")
   })
 })

@@ -24,6 +24,16 @@
 // asked anything to sort. A green test on a helper the screen does not call is
 // how this shape ships three times in one day.
 //
+// THAT HELPER IS GONE, 2026-09-06, and the sentence above is now history rather
+// than description. It bought a correct order by spelling the date for the
+// COMPARATOR instead of for the reader — "2026-04-14" on a screen built for a
+// manager — because the cell and the comparison value were the same string.
+// `record-table.tsx` now takes a `sortType`/`sortKey` per column and compares
+// the raw instant off the row, so Deadline and Closed render `formatDate` again
+// and this file's fixtures read like the screen does. The comparison itself has
+// its own suite: `sorts-compare-the-value-not-the-text.test.tsx`, whose whole
+// point is fixture dates where the calendar and the alphabet DISAGREE.
+//
 // So NOTHING here tests a comparator. Every assertion is about the ORDER OF THE
 // RENDERED ROWS BEFORE AND AFTER A PERSON CLICKS, read out of the DOM of the real
 // screen — the one fact a working helper cannot fake and a lit-up dead control
@@ -39,6 +49,7 @@ import { primeCache } from "@shared/web/store"
 import { PagedFind } from "@/components/records/paged-find"
 import { RecordTable } from "@/components/records/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+import { formatDate } from "@shared/web/format"
 import { appsKey, tasksKey } from "@/lib/live-resources"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
 import { TasksScreen } from "@/components/work/tasks-screen"
@@ -269,7 +280,13 @@ describe("the rest of the collection's chrome survived the swap", () => {
   it("still narrows, and sorting what is left keeps it narrowed", async () => {
     renderTasks()
     // The two rows that share a deadline — the frame searches every column.
-    await search("2025-04-14")
+    //
+    // DERIVED FROM THE FORMATTER rather than typed, because the Deadline cell is
+    // now the warm date and the words in it are the reader's language's: typing
+    // "Apr 14, 2025" here would pin this assertion to English and to a build of
+    // ICU, and typing "2025-04-14" is what it used to say when the cell was the
+    // sortable spelling — which is exactly the string this pass removed.
+    await search(formatDate("2025-04-14T00:00:00.000Z", "en"))
     const narrowed = rowOrder()
     expect(narrowed.length).toBe(2)
     fireEvent.click(header("Deadline"))
@@ -390,9 +407,23 @@ describe("every table in the agency app is one whose headers work", () => {
     // would ship the same defect with a green build — and nothing else in the
     // repo can see it, because a lit arrow over unmoved rows is not a type error.
     const offenders: string[] = []
+    /** Every screen the census actually judged — the positive control, and the
+     * only thing between this test and a silent all-clear.
+     *
+     * TWO WAYS IT GOES QUIET, and the second is the near one. The WALK could
+     * collapse (`web/components` renamed) and this loop would judge no screen.
+     * More likely: the SUBJECT is small. Two screens build a table recipe today
+     * — tasks and meetings — out of 144 component files, so the gate
+     * `display: "table"` is doing the work of finding two needles, and any
+     * change of spelling (a constant instead of the literal, the recipe built
+     * by a helper) empties this census while leaving both defects shippable.
+     * If this floor fails, the shape moved: teach it the new one, do not
+     * lower it. */
+    const judged: string[] = []
     for (const f of sourceFiles(join(__dirname, "..", "components"), { extensions: [".tsx"] })) {
       const src = stripComments(f.source)
       if (!/display:\s*"table"/.test(src)) continue
+      judged.push(f.path.split("/").pop() as string)
       // The recipe a file builds as a table must reach `RecordTable`. Named, so
       // the check reads the same way the screens do: `<name>Recipe` in, table out.
       const names = [...src.matchAll(/const (\w+)\s*=\s*withDataDrivenCollection\(\s*\{[^}]*display:\s*"table"/g)]
@@ -404,6 +435,10 @@ describe("every table in the agency app is one whose headers work", () => {
       if (!src.includes("<RecordTable"))
         offenders.push(`${f.path.split("/").pop()}: builds a table recipe and renders no RecordTable`)
     }
+    expect(
+      judged,
+      `this census judged ${judged.length} screens. There are table screens in this app — finding none means the recipe's shape has moved and nothing here is being checked`
+    ).not.toEqual([])
     expect(
       offenders,
       `a table whose column headers cannot sort: ${offenders.join(" · ")}`

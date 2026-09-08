@@ -5,10 +5,19 @@
 
 import { type ScreenData } from "@shared/web/screen-engine/screen-renderer"
 
-import { formatDate, formatDateSortable, formatDateTime, formatRelative } from "@shared/web/format"
+import { formatDate, formatDateTime, formatRelative } from "@shared/web/format"
+// The ROW SHAPE, named rather than restated. `use-record-activity.ts` declares
+// what a dressed activity row is for the bespoke record path; this function has
+// always produced exactly that object (the header above is the record of two
+// fixes that landed in one copy and not the other), and saying so in the return
+// type is what lets the deep-link host hand this straight to `<ActivityRail>`
+// without a cast. `ScreenData.sets` still takes it: a `Record<string, unknown>`
+// accepts an object type with these six known fields.
+import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
-import { richTextPlain } from "@shared/web/rich-text"
+import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
+import { ticketTitle } from "@shared/web/ticket-chips"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { translator, type Language } from "@shared/i18n"
 import type {
@@ -57,12 +66,26 @@ export const INVITE_STATUS: Record<Invite["status"], string> = {
  * them already has. `dateTime` carries the raw instant alongside it, for the
  * kit's own `<time datetime>` slot — the same pairing added at the other
  * activity feed's fix. */
-export function shapeActivity(items: ActivityItem[], lang: Language): Record<string, unknown>[] {
+export function shapeActivity(items: ActivityItem[], lang: Language): ActivityFeedRow[] {
   const t = translator(lang)
   return items.map((a) => ({
     id: a.id,
-    description: a.description,
-    actor: a.actorName ?? undefined,
+    // R54, and the same two lines `use-record-activity.ts` carries — this is the
+    // OTHER activity shaper, and the file's own header above is a list of fixes
+    // that landed in one of the two and not the other. The sentence is where the
+    // name is visible; `actor` is only the avatar's accessible name.
+    description: a.actorIsClient
+      ? a.description
+      : describeWithStaffName(a.description, a.actorName),
+    // `|| undefined`, NOT `?? undefined`. `staffNameFromSnapshot` answers ""
+    // for a row with no actor (a system write), and "" is not "no actor" here:
+    // the kit draws this field as `aria-label={item.actor}` on the avatar
+    // fallback (shared/ui/components/activity-feed/activity-feed.tsx), and an
+    // EMPTY aria-label is worse than an absent one — it overrides the initials
+    // underneath it with nothing, so a screen reader announces an unnamed
+    // element instead of the "?" mark. `??` only catches null/undefined and
+    // let the empty string straight through.
+    actor: (a.actorIsClient ? a.actorName : staffNameFromSnapshot(a.actorName)) || undefined,
     initials: nameInitials(a.actorName),
     timestamp: formatRelative(a.createdAt, t, lang),
     dateTime: a.createdAt,
@@ -83,7 +106,10 @@ export function shapeTeamDetail(opts: {
       name: opts.name,
       image: opts.logoUrl ?? "",
       created: formatDateTime(opts.meta.createdAt, opts.lang),
-      createdBy: opts.meta.creatorName || opts.meta.creatorEmail || "",
+      // R54 — the team's own audit line. The creator is the colleague who made
+      // the team; the email fallback is handed to the seam too, which returns an
+      // address whole rather than cutting it at the "@".
+      createdBy: staffNameFromSnapshot(opts.meta.creatorName) || opts.meta.creatorEmail || "",
       updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
     },
     sets: { activity: shapeActivity(opts.activity, opts.lang) },
@@ -139,12 +165,14 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
  * One source for the list detail line; the thread's own status badge uses the
  * library's hyphen labels.
  *
- * SEVEN NOW, and every one of them is a FACT rather than a choice: two arrived on
- * 17 Aug 2026 for the two things a person could previously only assert by hand.
- * "Waiting on you" is deliberately not "Awaiting validation" — the client reads
- * the same word we do, and the plain sentence is the one that gets answered. */
+ * SIX NOW, and every one of them is a FACT rather than a choice. It was seven
+ * until the client retired `awaiting_validation` on 7 Sep 2026 (shared/types.ts,
+ * `HELP_STATUSES`); its label, "Waiting on you", is deliberately not gone from
+ * the app — a ticket that really passed through that stage still draws those
+ * words on its stage history (`stageLabel`, web/components/tickets/ticket-stages.tsx).
+ * It is gone from HERE because this map is keyed by the LIVE vocabulary and a
+ * list row can only show a stage a ticket is currently in. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {
-  awaiting_validation: "Waiting on you",
   new: "New",
   triaged: "Triaged",
   scheduled: "Scheduled",
@@ -179,7 +207,16 @@ export function shapeHelpList(
       // which is why a page of tickets read as a wall of text with no shape. It
       // has not been lost: it leads the eyebrow on the record's own screen (D4),
       // where a person looks when a client rings up saying it out loud.
-      name: truncate(richTextPlain(t.description)),
+      // ONE FUNCTION NAMES A TICKET, EVERYWHERE (2026-09-06). This read
+      // `truncate(richTextPlain(t.description))` — the description and nothing
+      // else — while the triage table one screen along read `titleEn ||
+      // titleDe || the first line of the body`, so a ticket with a real title
+      // was called two different things on two tables of the SAME collection.
+      // `ticketTitle` (shared/web/ticket-chips.tsx) is now the only answer, and
+      // its own header carries the full reasoning and the order of the three
+      // steps. `truncate` still runs on top: this shaper's rows are a list, and
+      // the cap it applies is the LIST's measure rather than the name's.
+      name: truncate(ticketTitle(t)),
       // ONE LINE, TWO FACTS. How far along, and what kind. The story counts and
       // the archived flag went with the same edit: a subtitle carrying four
       // facts is table content smuggled into a list (K2).
@@ -344,17 +381,29 @@ export function shapeMeetingsList(meetings: Meeting[], lang: Language): ScreenDa
       // columns"). They ride every row rather than a second shaper, because the
       // three views are three renderings of ONE list — a second shaper is a
       // second idea of what a meeting row is, and the two drift.
-      // A TABLE COLUMN, and the one the "All" view is most often ordered by — so
-      // it is the sortable spelling of a date. The subtitle above it keeps
-      // `formatDate`, because that one is read rather than compared.
-      when: formatDateSortable(m.startsAt),
+      // A TABLE COLUMN, and the one the "All" view is most often ordered by —
+      // BY THE DOOR. The meetings list pages, so its column headers ask
+      // `<PagedFind>`'s own order (meetings-screen.tsx passes `order` to the
+      // table) and the browser never compares this cell against another one.
+      // Nothing here is a sort key, so nothing here has to be spelled for a
+      // comparison: it used to render `formatDateSortable` ("2026-04-14"),
+      // which was the tax the OLD table charged every date column and which
+      // record-table.tsx's `sortKey`/`sortType` seam has now removed. Warm and
+      // in the reader's own language, the same as the subtitle above it.
+      when: formatDate(m.startsAt, lang),
       // The bare day the calendar view keys entries on — it wants a date, not a
       // moment, and formatting it for the grid is the grid's job.
       startsOn: m.startsAt.slice(0, 10),
       app: m.appName ?? "—",
       where: m.location ?? "—",
       written: m.notes ? "Yes" : "—",
-      reference: m.ref ?? "—",
+      // THE NUMBER, FOR THE CHIP IN FRONT OF THE NAME (the recipe's own
+      // `reference` column, screens.ts). It was `reference: m.ref ?? "—"` and
+      // had no reader at all after the All table's Reference COLUMN was cut —
+      // a row key rendering an em dash into nothing. Raw and nullable now,
+      // because `RecordRef` decides what an absent one looks like, and what it
+      // looks like is nothing.
+      ref: m.ref,
     })),
   }
 }
@@ -457,7 +506,9 @@ export function shapeInviteDetail(
       email: invite.email,
       role: invite.roleTitle,
       status: INVITE_STATUS[invite.status],
-      invitedBy: audit?.inviterName || audit?.inviterEmail || "—",
+      // R54: whoever sent the invite is one of ours by definition — an invite
+      // door is not on the portal's surface.
+      invitedBy: staffNameFromSnapshot(audit?.inviterName) || audit?.inviterEmail || "—",
       invited: formatDate(invite.createdAt, lang),
       expires: formatDate(invite.expiresAt, lang),
       accepted: audit?.accepted && audit.acceptedAt ? formatDate(audit.acceptedAt, lang) : "—",
@@ -516,7 +567,7 @@ export function shapeBrandDetail(asset: BrandAsset, activity: ActivityItem[], la
       // construction: the migration cleared `file_url` on every row it converted.
       file: asset.colorHex || asset.fileUrl || "No file yet",
       created: formatDateTime(asset.createdAt, lang),
-      createdBy: asset.creatorName || "—",
+      createdBy: staffNameFromSnapshot(asset.creatorName) || "—", // R54
       updated: asset.updatedAt ? formatDateTime(asset.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity, lang) },
@@ -545,7 +596,7 @@ export function shapePurposeDetail(purpose: MeetingPurpose, activity: ActivityIt
       department: purpose.department || "—",
       description: purpose.description || "—",
       created: formatDateTime(purpose.createdAt, lang),
-      createdBy: purpose.creatorName || "—",
+      createdBy: staffNameFromSnapshot(purpose.creatorName) || "—", // R54
       updated: purpose.updatedAt ? formatDateTime(purpose.updatedAt, lang) : "—",
     },
     sets: { activity: shapeActivity(activity, lang) },

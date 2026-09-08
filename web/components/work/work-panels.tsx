@@ -20,11 +20,19 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@shared/ui/components/table/table"
 import { Button } from "@shared/ui/components/button/button"
 import { Checklist } from "@shared/ui/components/checklist/checklist"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Prohibit, CaretRight } from "@shared/ui/foundations/icons"
+import { Prohibit, CaretRight, ListBullets } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AppMark } from "@/components/apps/app-tiles"
@@ -32,13 +40,21 @@ import { LoadMore } from "@/components/records/load-more"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import { cursorKey, todosDoneKey, todosKey, totalKey } from "@/lib/live-resources"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { softNavigate } from "@/lib/nav"
 import type { AppRow, HelpTicket, Meeting, ProcessSummary, Sprint, Story, Todo, TodoViewName } from "@shared/types"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage, useT } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
-import { AddButton } from "@/components/deep-link/screen-bits"
+import { AddButton, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import { Swatch } from "@/components/records/record-picker"
+import { ticketTypeColour } from "@/lib/type-colours"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { CONCEPT_ICON } from "@/lib/pages"
+import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
+import { useRemembered } from "@shared/web/remembered"
 import { CollectionCreateActionProvider, CollectionEmptyState, CollectionFrame } from "@shared/web/screen-engine/collection-frame"
 import { richTextPlain, safeHref } from "@shared/web/rich-text"
 import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
@@ -209,6 +225,7 @@ function PagedPanelBody<T>({
   emptyTitle,
   loadMoreLabel,
   renderRows,
+  view,
 }: {
   listKey: string
   placeholder: string
@@ -234,6 +251,17 @@ function PagedPanelBody<T>({
   emptyTitle: string
   loadMoreLabel: string
   renderRows: (rows: T[]) => React.ReactNode
+  /** THE OTHER BODY THIS PANEL'S TAB OFFERS, where there is one (R53's `view`
+   * slot, forwarded whole to `<PagedFind>` so the row builds the control).
+   *
+   * Only the app record's Tickets tab passes one today — its list and its
+   * dashboard are two views of one tab, because a record's tab cannot grow a
+   * strip of its own ("there can never be 2 rows of tabs"). Every other panel
+   * here has one body and PASSES NOTHING, which draws nothing. Note the
+   * distinction since kit v1.2.60: passing NO slot is still silent, but
+   * passing a single view now draws a static label naming it — so "one body"
+   * and "no switch" stopped being the same statement. */
+  view?: ToolbarViewSlot
 }) {
   const t = useT()
   if (restingError)
@@ -265,6 +293,7 @@ function PagedPanelBody<T>({
       // above is this panel's whole answer to "does it have any rows yet",
       // computed once and forwarded rather than re-derived per panel.
       restingEmpty={restingData.length === 0}
+      view={view}
       fetchPage={fetchPage}
     >
       {(found) => {
@@ -297,7 +326,8 @@ function storyLine(s: Story, ownerKind: "sprint" | "app" | "ticket", lang: Langu
   return (
     [
       STORY_STATUS_LABEL[s.status],
-      s.assigneeName ?? "unassigned",
+      // R54: an assignee is always one of ours — a story is agency work.
+      staffNameFromSnapshot(s.assigneeName) || "unassigned",
       s.sprintEndsOn ? `due ${formatDate(s.sprintEndsOn, lang)}` : null,
       // THE OWNER IS NOT A FACT ABOUT THE ROW. This list hangs off a sprint, an
       // app or a ticket, and it used to name the sprint and the ticket on every
@@ -360,10 +390,16 @@ export function StoriesPanel({
       {rows.map((s) => (
         <Row key={s.id} live={s.status !== "done"} mark={<RecordMark mark={marks?.get(s.storyType ?? "") ?? null} name={s.storyType ?? s.title} />}>
           <div className="min-w-0 flex-1">
-            <OpenLink
-              label={s.ref ? `${s.ref} · ${s.title}` : s.title}
-              onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)}
-            />
+            {/* THE NUMBER IN FRONT OF THE NAME, as the black chip — the same
+                mark and the same order the ticket rows above use, and the
+                client's own instruction for it. It was `B0188 · Redesign the
+                board` glued into the link's own label: one string, so the
+                reference was underlined on hover as if it were part of the
+                name, and it wrapped and truncated with the title. */}
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={s.ref} />
+              <OpenLink label={s.title} onOpen={() => softNavigate(`${host.base}/stories/${s.id}`)} />
+            </span>
             <p className="text-muted-foreground truncate px-0 text-xs">{storyLine(s, ownerKind, lang)}</p>
           </div>
           {s.status === "done" && (
@@ -579,16 +615,18 @@ export function SprintsPanel({
           ],
         }}
         data={rows}
-        searchKeys={["name", "ref", "sprintType", "accountName", "appName"]}
+        searchKeys={["name", "ref", "refWas", "sprintType", "accountName", "appName"]}
         renderItems={(page) => (
           <RowList>
             {page.map((s) => (
               <Row key={s.id} live={!s.completedAt} mark={<RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? s.name} />}>
                 <div className="min-w-0 flex-1">
-                  <OpenLink
-                    label={s.ref ? `${s.ref} · ${s.name}` : s.name}
-                    onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)}
-                  />
+                  {/* The number in front of the name, as the black chip —
+                      see the stories panel above for the whole argument. */}
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={s.ref} />
+                    <OpenLink label={s.name} onOpen={() => softNavigate(`${host.base}/sprints/${s.id}`)} />
+                  </span>
                   <p className="text-muted-foreground truncate text-xs">{sprintLine(s, lang)}</p>
                 </div>
                 {s.completedAt && (
@@ -683,7 +721,9 @@ export function AppsPanel({
           ],
         }}
         data={q.data}
-        searchKeys={["name", "stage", "url"]}
+        // `ref` because the row shows one now — a number a person can read off
+        // a row is a number they will type into the box above it.
+        searchKeys={["name", "ref", "stage", "url"]}
         renderItems={(page) => (
           <RowList>
             {page.map((a) => (
@@ -694,7 +734,10 @@ export function AppsPanel({
                     and a line of text on the next. */}
                 <AppMark app={a} size="row" />
                 <div className="min-w-0 flex-1">
-                  <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={a.ref} />
+                    <OpenLink label={a.name} onOpen={() => softNavigate(`${host.base}/apps/${a.id}`)} />
+                  </span>
                   <p className="text-muted-foreground truncate text-xs">{appLine(a, accountName)}</p>
                 </div>
                 {!a.active && (
@@ -843,7 +886,10 @@ export function AppMeetingsPanel({
       {rows.map((m) => (
         <Row key={m.id} live={m.active} mark={<RecordMark name={m.accountName ?? m.title} />}>
           <div className="min-w-0 flex-1">
-            <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={m.ref} />
+              <OpenLink label={m.title} onOpen={() => softNavigate(`${host.base}/meetings/${m.id}`)} />
+            </span>
             <p className="text-muted-foreground truncate text-xs">
               {[formatDate(m.startsAt, lang), m.accountName].filter(Boolean).join(" · ")}
             </p>
@@ -906,17 +952,12 @@ export function AppMeetingsPanel({
  * COUNT(*) over the same narrowing, parked where the tab badge reads it (R16). */
 export function AppTicketsPanel({
   appId,
-  marks,
   helpTypeOptions,
   host,
   onNew,
+  view,
 }: {
   appId: string
-  /** THE TEAM'S GLYPH FOR EACH TYPE (R35), handed in rather than fetched.
-   * A panel hangs off three different records and has no team id of its own;
-   * the screens that mount it all hold the vocabulary already, so passing it
-   * costs nothing and fetching it here would cost a round trip per panel. */
-  marks?: Map<string, string>
   /** the team's live `Ticket type` values (the same list `tickets-collection.tsx`
    * builds its own strip from) — what the Kind facet below offers. Absent
    * draws no such facet at all, rather than one with nothing in it. */
@@ -924,8 +965,13 @@ export function AppTicketsPanel({
   host: PanelHost
   /** present = the caller may raise one from here, and this opens the form */
   onNew?: () => void
+  /** THE TAB'S SECOND BODY — this list is the DEFAULT view of the app record's
+   * Tickets tab, and the dashboard is the other one (`AppTicketsTab`, which owns
+   * the state and hands the identical config to both). Forwarded to the toolbar
+   * so the control sits in the same slot whichever body is on screen. */
+  view?: ToolbarViewSlot
 }) {
-  const t = useT()
+  const { t, lang } = useLanguage()
   const key = sliceKey("tickets-app", appId)
   const q = useCached<HelpTicket[]>(key, () =>
     contentApi.help({ appId }).then((r) => {
@@ -935,24 +981,171 @@ export function AppTicketsPanel({
     })
   )
 
-  // Tickets live at their own top-level URL, so the link is built off the host
-  // prefix rather than the section we are standing in.
+  /* ══ THE LIST — A TABLE, THE SAME SHAPE THE TICKET LIST ALREADY DRAWS ═════
+     Client, 6 Sep 2026: "create me, in each app, the ticket page. Put me in the
+     list." What stood here was a `RowList` of two text lines per ticket — the
+     description on top, and `ref · type · status` under it as one dot-joined
+     string. Three facts flattened into prose you cannot scan down: the type of
+     row four is not above the type of row five, so comparing two tickets means
+     reading two sentences.
+
+     THE SHAPE IS REUSED AND NOT REINVENTED. The main Tickets screen's own list
+     view (`tickets-collection.tsx`, drawn to the client's spec: "1. Title.
+     2. Type with the colors, same as we have with the chips. Also include the
+     number, the ID. 3. App. 4. Date.") composes the kit's `Table` primitives
+     directly, and every argument it makes applies here word for word:
+
+       · NOT `RecordTable`, which requires a `CollectionConfig` and wraps
+         `CollectionFrame` — its own search box, its own filter bar, its own
+         "Showing X of Y" and its own pager. This panel already has every one of
+         those, drawn by `<PagedFind>` one element up and counted ONCE by the
+         tab badge above it (R16). Adopting it would draw a second search box
+         under the first and a second count on a record that already shows one.
+       · PLAIN HEADERS, none of them sorting. The order is the DOOR's — the
+         toolbar's sort control asks `content.help` for it — and the list PAGES
+         (R14), so a clickable header would reorder the fifty rows in hand and
+         present that as the order of the whole collection. A header that lights
+         up while the rows sit still reads as broken data, not a broken button.
+       · THE ROW OPENS AND SO DOES THE TITLE. The mouse gets the whole row; the
+         keyboard and a screen reader get a real `variant="link"` control in the
+         first cell, with `stopPropagation` so one press is never two.
+
+     ── THE COLUMNS, AND THE ONE THAT IS NOT HERE ──────────────────────────────
+
+     Title · Type · Stage · Raised. Her fourth column ("3. App") is the record
+     this list is nested inside: every row would say "Bergman dispatch" under a
+     heading that already says it, which is the same subtraction the Dashboard
+     view makes when it drops the "Which app" panel — a column whose every cell
+     is the page you are on is furniture, not information.
+
+     WHAT TAKES ITS PLACE IS THE STAGE, and that is a restoration rather than an
+     invention: the text line this replaces already carried it (`ref · type ·
+     status`), it is the one fact about a ticket that changes while you are
+     working on it, and it is one of the two facets in this panel's own toolbar
+     — so the column a reader wants to narrow by is the column they can see.
+
+     THE MARK LEADS THE FIRST CELL (R35). Every collection row in this app
+     carries its record's own face — `leading: "mark"` in the recipe engine, the
+     `Row` mark one function up — and a ticket's face is the team's glyph for
+     its type, set as data on the Dropdown values screen. The triage list omits
+     it because a ticket waiting for triage often has no type at all; here they
+     do. It is a picture, not a column, so it costs no header. */
   const renderRows = (rows: HelpTicket[]) => (
-    <RowList>
-      {rows.map((ticket) => (
-        <Row key={ticket.id} live={!ticket.archivedAt} mark={<RecordMark mark={marks?.get(ticket.helpType ?? "") ?? null} name={ticket.helpType ?? "?"} />}>
-          <div className="min-w-0 flex-1">
-            <OpenLink
-              label={richTextPlain(ticket.description)}
-              onOpen={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
-            />
-            <p className="text-muted-foreground truncate text-xs">
-              {[ticket.ref, ticket.helpType, ticket.status].filter(Boolean).join(" · ")}
-            </p>
-          </div>
-        </Row>
-      ))}
-    </RowList>
+    <Table
+      // Four columns, so the kit's own specimen width is the right pin — its
+      // doc asks a call site that knows its column count to pass one. Below
+      // that the container scrolls on the inline axis rather than crushing the
+      // title, which is the kit's stated mobile answer: it never restacks a
+      // table into cards.
+      minWidth="42rem"
+      aria-label={t("Tickets")}
+    >
+      <TableHeader>
+        {/* NO HOVER ON THE HEADER — `TableRow` carries the kit's row wash
+            unconditionally, because on a body row that wash is the affordance
+            saying "this opens". On a header that does nothing, and whose
+            columns deliberately do not sort, it is a lie: a surface that lights
+            under the pointer and then refuses the click reads as broken. */}
+        <TableRow className="hover:bg-transparent">
+          <TableHead>{t("Title")}</TableHead>
+          <TableHead>{t("Type")}</TableHead>
+          <TableHead>{t("Stage")}</TableHead>
+          <TableHead>{t("Raised")}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((ticket) => (
+          <TableRow
+            key={ticket.id}
+            // Tickets live at their own top-level URL, so the link is built off
+            // the host prefix rather than the section we are standing in.
+            onClick={() => softNavigate(`${host.base}/tickets/${ticket.id}`)}
+            className="cursor-pointer"
+          >
+            <TableCell>
+              <span className={REF_LEADS_NAME}>
+                {/* NO GLYPH LEADS THE NUMBER HERE. A `<RecordMark>` for the
+                    ticket's TYPE used to sit in front of the ref, fed by a
+                    `marks` prop off the mounting record. Client, 2026-09-07:
+                    "for type, kill the emojis. this is legacy. in current
+                    system we use colors." `MARK_GROUP.ticket` is gone
+                    (web/lib/type-marks.ts carries the ruling and what it
+                    deliberately left alone), so the kind is carried by the
+                    coloured pill in the Type column below and by nothing else.
+                    The story and sprint panels in this file still draw theirs:
+                    her sentence was about tickets. */}
+                {/* THE NUMBER LEADS THE TITLE, in "the usual black chip design",
+                    through the ONE component that draws one
+                    (shared/web/record-ref.tsx). This cell used to spell the
+                    badge out itself, identically to the ticket collection's own
+                    table one file along — two copies of one mark, agreeing by
+                    copy-paste, which is the arrangement that quietly stops
+                    agreeing. */}
+                <RecordRef value={ticket.ref} />
+                <Button
+                  variant="link"
+                  onClick={(e) => {
+                    // The row is already opening; without this one press would
+                    // navigate twice.
+                    e.stopPropagation()
+                    softNavigate(`${host.base}/tickets/${ticket.id}`)
+                  }}
+                  // `variant="link"` is not a box (no height, no padding), so it
+                  // inherits the cell's own type rather than drawing a control
+                  // inside a row. `block` + a measure is what lets a long title
+                  // end in an ellipsis instead of pushing the other three
+                  // columns off the screen.
+                  className="block max-w-[28rem] truncate text-start"
+                >
+                  {/* THE SAME NAME THIS PANEL ALWAYS SHOWED, and the same one
+                      the ticket collection's own rows show (`shapeHelpList`,
+                      deep-link/shape.tsx): the description's plain text. This
+                      pass changed the SHAPE of the list and deliberately not
+                      what a ticket is called — a renaming is a separate
+                      decision and would have arrived disguised as a layout fix.
+
+                      TOLD, NOT HIDDEN: the triage card and its list table name
+                      a ticket `titleEn || titleDe || description` instead
+                      (`ticketTitle`, tickets-collection.tsx), because 788
+                      imported tickets have a German title and no English one.
+                      Two ticket tables in this app therefore name a row two
+                      ways. That divergence predates this panel and is one
+                      shared helper away from being settled; it is not settled
+                      here, silently, on the way past. */}
+                  {richTextPlain(ticket.description)}
+                </Button>
+              </span>
+            </TableCell>
+            <TableCell>
+              {/* THE SAME DOT, FROM THE SAME MAP as the chip line and the type
+                  picker draw — `Swatch` + `ticketTypeColour` rather than a
+                  second lozenge that agrees with them today. A ticket with no
+                  type still gets its pill, saying so with an em dash: a column
+                  with a pill on four rows and a hole on the fifth reads as the
+                  broken row rather than the untyped one. */}
+              <Badge variant="secondary" size="pill">
+                <Swatch colour={ticketTypeColour(ticket.helpType)} />
+                {ticket.helpType ?? "—"}
+              </Badge>
+            </TableCell>
+            {/* THE TWO QUIET COLUMNS, in secondary ink, so the title and the
+                coloured pill are what the eye lands on going down the page.
+                The stage is read through `HELP_STATUS` — the same closed
+                vocabulary this panel's own Stage facet offers — so the word a
+                person filters by and the word they read back are one string. */}
+            <TableCell className="text-muted-foreground">
+              {t(HELP_STATUS[ticket.status])}
+            </TableCell>
+            <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+              {/* Through the shared formatter and the reader's own language, so
+                  one ticket cannot carry two spellings of one day across the
+                  two screens that show it. */}
+              {formatDate(ticket.createdAt, lang)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   )
 
   return (
@@ -1017,6 +1210,125 @@ export function AppTicketsPanel({
       emptyTitle={t("Nothing has been raised about this app yet.")}
       loadMoreLabel={t("Load more tickets")}
       renderRows={renderRows}
+      view={view}
+    />
+  )
+}
+
+/** THE APP RECORD'S TICKETS TAB — one tab, two views (client, 6 Sep 2026):
+ *
+ *   "Once you are convinced, I want you to create me, in each app, the ticket
+ *    page. Put me in the list and also create another view for the dashboard.
+ *    Make the dashboard a view inside the Tickets tab inside the app, and
+ *    include whatever you think is relevant from the main dashboard for
+ *    tickets, like a mini version, a filtered version."
+ *
+ * THE LIST LEADS, and that is her order and not a default this file picked:
+ * "put me in the list" comes first in the sentence, and it is what a person
+ * standing on a system usually wants — which ticket, not how many. The
+ * dashboard is one press away and is remembered per record (`useRemembered`),
+ * so a reader who lives on the numbers keeps them on THIS app without deciding
+ * it for every other one.
+ *
+ * WHY A VIEW SWITCH AND NOT A SECOND TAB STRIP. The Tickets SCREEN puts its
+ * dashboard on the folder strip beside Triage and the list, because a screen
+ * has a strip. A record's tab does not, and it may not grow one — the client,
+ * verbatim and unconditionally: "there can never be 2 rows of tabs, no folder
+ * tabs, no line tabs. just never." So the two bodies are VIEWS, and the switch
+ * sits in the toolbar's own `view` slot (R53), where the app already draws
+ * Tiles/List on Apps, List/Timeline on Waves and Queue/List on Triage.
+ *
+ * ONE CONFIG, HANDED TO BOTH BODIES. The list draws its toolbar through
+ * `<PagedFind>` and the dashboard draws its own `<ToolbarRow>`; both take the
+ * SAME `ToolbarViewSlot` and both render it from the same fixed slot order, so
+ * the control does not move under the hand that just pressed it. Building two
+ * would have been two chances for it to sit in two places.
+ *
+ * NOTHING IS FETCHED HERE. Each body reads its own door — the list its paged
+ * `content.help({ appId })`, the dashboard its grouped `content.helpDashboard({
+ * appId })` — and the body that is not on screen is not mounted, so opening
+ * this tab still costs exactly one read. */
+export function AppTicketsTab({
+  teamId,
+  appId,
+  helpTypeOptions,
+  host,
+  onNew,
+  ticketTotal,
+}: {
+  teamId: string
+  appId: string
+  helpTypeOptions?: string[]
+  host: PanelHost
+  onNew?: () => void
+  /** THIS APP'S OWN EXACT TICKET COUNT (R16), the sidecar the tab badge above
+   * already reads — spent here on R50's question, which is about the
+   * COLLECTION and never about a filtered answer: an app nobody has raised
+   * anything about draws no toolbar on either view. `null` is the third answer
+   * (the role may not read the module) and is treated as "not yet known", which
+   * is the honest reading — this tab is only rendered behind `help:read` at
+   * all, so the value cannot legitimately be null by the time anybody is
+   * looking at it. */
+  ticketTotal: number | null | undefined
+}) {
+  const t = useT()
+  // REMEMBERED PER RECORD, NEVER PER PERSON-EVERYWHERE, which is `ViewSwitch`'s
+  // own stated contract and the same slot shape `triage-view` uses one screen
+  // along: the memory is scoped to the address the host published, so choosing
+  // the dashboard on one app says nothing about the next one you open.
+  const [view, setView] = useRemembered<"list" | "dashboard">("tickets-view", "list")
+  const viewSlot: ToolbarViewSlot = {
+    views: [
+      // A VIEW SHAPE FOR THE LIST, A CONCEPT GLYPH FOR THE DASHBOARD, and the
+      // difference is deliberate rather than an inconsistency. "List" is a way
+      // of looking at rows and wears the same `ListBullets` the Triage switch
+      // wears for the identical body; "Dashboard" is an IDEA this product
+      // already has one icon for, and UI-CONVENTIONS §4 says a concept gets one
+      // glyph reused at page, tab and button level — so it resolves through
+      // `CONCEPT_ICON` exactly as the Tickets screen's own Dashboard tab does,
+      // and the two cannot drift apart.
+      { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+      {
+        value: "dashboard",
+        label: t("Dashboard"),
+        icon: <Icon name={CONCEPT_ICON.dashboard} className="size-4" />,
+      },
+    ],
+    value: view,
+    onValueChange: (v) => setView(v === "dashboard" ? "dashboard" : "list"),
+  }
+
+  if (view === "dashboard")
+    return (
+      <TicketsDashboard
+        teamId={teamId}
+        appId={appId}
+        // The team's own `Ticket type` words, the same list the Kind facet on
+        // the list view offers and the same one the create dialog writes with —
+        // read once by the record above and handed to both, so the pipeline
+        // columns, the matrix axes and the filter can never be three different
+        // vocabularies of one thing.
+        helpTypeOptions={helpTypeOptions ?? []}
+        ticketTotal={ticketTotal ?? undefined}
+        viewSlot={viewSlot}
+        // "RAISE A TICKET", ON BOTH VIEWS OF THIS TAB. The list view gets it
+        // from `PagedPanelBody`'s own `onNew`, which builds exactly this
+        // `<AddButton>` into `<PagedFind>`'s `actions` slot; the dashboard's own
+        // `<ToolbarRow>` had no actions at all until 6 Sep 2026 ("on the
+        // dashboard, I'm missing the full toolbar"). Same label, same glyph,
+        // same slot in the same fixed order, so pressing the view switch does
+        // not move the button that sits beside it.
+        actions={onNew ? <AddButton label={t("Raise a ticket")} onClick={onNew} /> : null}
+      />
+    )
+
+  return (
+    <AppTicketsPanel
+      appId={appId}
+      helpTypeOptions={helpTypeOptions}
+      host={host}
+      onNew={onNew}
+      view={viewSlot}
     />
   )
 }
@@ -1169,8 +1481,9 @@ export function TodosPanel({
           // five or six lines apiece (measured against real staging
           // titles) turned the list into something nobody scans.
           label: (
-            <span className="block truncate">
-              {todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}
+            <span className={REF_LEADS_NAME}>
+              <RecordRef value={todo.ref} />
+              <span className="min-w-0 truncate">{todo.title}</span>
             </span>
           ),
           owner: todo.accountName,
@@ -1179,7 +1492,12 @@ export function TodosPanel({
           meta:
             todo.completedByName || todo.fileName ? (
               <>
-                {todo.completedByName}
+                {/* R54: a to-do is finished by the client's own person or by one
+                    of ours on the phone with them — `completedByIsClient` is the
+                    row's own answer to which. */}
+                {todo.completedByIsClient
+                  ? todo.completedByName
+                  : staffNameFromSnapshot(todo.completedByName)}
                 {todo.completedByName && todo.fileName ? " · " : null}
                 {todo.fileName &&
                   (fileLink ? (
@@ -1233,7 +1551,10 @@ export function TodosPanel({
             mark={<RecordMark name={todo.title} />}
           >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm">{todo.ref ? `${todo.ref} · ${todo.title}` : todo.title}</p>
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={todo.ref} />
+                <span className="min-w-0 truncate">{todo.title}</span>
+              </p>
               <p className="text-muted-foreground truncate text-xs">
                 {meta.filter(Boolean).join(" · ")}
                 {todo.fileName && (

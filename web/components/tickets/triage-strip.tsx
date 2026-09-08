@@ -25,6 +25,7 @@ import type { TeamMember } from "@shared/types"
 import { invalidate, useCached } from "@shared/web/store"
 import { assignableMembers } from "@/lib/members"
 import { useT } from "@shared/web/language"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 
 type Triage = Awaited<ReturnType<typeof contentApi.triage>>
 
@@ -60,7 +61,12 @@ export function TriageStrip({ teamId, canSetDuty }: { teamId: string; canSetDuty
       <span className="flex items-center gap-1">
         <UserCheck className="size-3.5 shrink-0" />
         {triage.onDuty?.userName ? (
-          <span>{t("{name} is on triage this week", { name: triage.onDuty.userName })}</span>
+          // R54: whoever is on triage is one of ours.
+          <span>
+            {t("{name} is on triage this week", {
+              name: staffNameFromSnapshot(triage.onDuty.userName),
+            })}
+          </span>
         ) : (
           <span className="text-muted-foreground">{t("Nobody is on triage this week")}</span>
         )}

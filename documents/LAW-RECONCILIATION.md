@@ -91,7 +91,7 @@ translated. They do not compete; the kit's rule is what makes ours possible.
 
 | Law | What it is about | Why the kit has no view |
 |---|---|---|
-| R2 | record detail exposes Overview + Activity | product structure |
+| R2 | record detail draws its tab strip through TabsView, and its history is reachable | product structure |
 | R3 | collection tabs use the library TabsView | now a special case of R39 — see note |
 | R4 | every form renders through FormShell | product structure |
 | R6 | one glossary of product terms | the kit forbids product vocabulary in itself (§9.5) |

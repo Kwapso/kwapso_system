@@ -94,87 +94,32 @@ function relative(base: string, path: string): string {
   return rest.startsWith("/") ? rest.slice(1) : rest
 }
 
-/** Comments are NOT code, and this repo's comments DISCUSS the very seams being
- * scanned — "no requireRight (it's about you)", "no LIMIT needed here". Without
- * this, a handler whose real gate was deleted stays GREEN, satisfied by the prose
- * below it, and a comment describing the ABSENCE of a bound satisfies the bound.
- *
- * LINE COMMENTS GO FIRST, and the order is load-bearing. Block-first looked
- * right for years and had a hole a sentence wide: a `//` comment mentioning a
- * path like `/api/content/<star>` contains the two characters `/` and `*` side
- * by side, so the block regex opened a comment THERE and ran to the next `*​/`
- * anywhere below — swallowing the rest of the function. Every seam scan then
- * read that function as containing no publish call, no gate and no LIMIT.
- *
- * It cost exactly that: a comment added to `postHelpStatus` explaining WHY the
- * door refuses a client login turned the R1 publish check red, on a handler
- * whose `publishChange` had not moved. A scanner a comment can blind is a
- * scanner that reports "all clear" for the wrong reason — and the direction of
- * this one was lucky. The same shape in reverse (a function whose gate is eaten)
- * reads as an offender; a function whose OFFENCE is eaten reads as clean.
- *
- * Line comments only when the `//` isn't part of a `https://` URL. Still
- * deliberately LOSSY and deliberately NOT string-aware: R14 reads `LIMIT` out of
- * SQL held in template literals, so a stripper that blanked string contents
- * would blind it. When a caller needs JSONC instead, that is stripJsoncComments
- * below — a different job, named apart.
- *
- * EIGHT COPIES OF THIS FUNCTION EXISTED: three named ones with three different doc
- * comments (one guarding the mcp worker — the external machine surface) and five
- * inline repetitions of the same two regexes. Harden the pattern in one and the
- * other seven are checks that only look like it. */
-export function stripComments(src: string): string {
-  return src.replace(/(^|[^:])\/\/[^\n]*/gm, "$1").replace(/\/\*[\s\S]*?\*\//g, " ")
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// AND THE STRIPPER, WHICH NOW LIVES NEXT DOOR IN PLAIN JAVASCRIPT.
+//
+// `stripComments` and `stripJsoncComments` were declared in THIS file until
+// 7 Sep 2026. They moved to `strip-comments.mjs` beside it — the same code,
+// byte for byte the same output — for a reason that has nothing to do with
+// tidiness and everything to do with WHO RUNS THEM.
+//
+// Every caller here compiles: the laws run under vitest, which transpiles
+// TypeScript on the way in. But `scripts/*.mjs` run under PLAIN NODE with no
+// build step, and one of them — `scripts/smoke-portal.mjs`, the LAST step of
+// `deploy:staging` — derives the R24 internal-money door list off disk at deploy
+// time. It was hand-rolling the two regexes this tokeniser exists to replace, so
+// a deploy gate was choosing which doors to attack from source it could not
+// fully see, and a SHORT list of doors to attack passes. It could not import
+// this file to fix that: node strips types without a flag only from 22.18, and
+// `package.json` promises `>=22`, so the import would have worked on one machine
+// and failed on a supported one — at the end of a deploy, after eight workers
+// had shipped. Moving the code is a smaller promise than moving `engines`.
+//
+// THIS RE-EXPORT IS THE WHOLE COMPATIBILITY LAYER. Every TypeScript caller still
+// writes `from "@shared/rules/source-scan"` and none of them changed. There is
+// still exactly ONE stripper: web/test/source-scan.test.ts censuses `scripts/`
+// and `.mjs` as well now, so a second copy anywhere — including a script — turns
+// the build red.
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** JSONC → JSON, for a caller that is about to JSON.parse the result (the
- * wrangler configs). A DIFFERENT JOB from stripComments, which is why it is a
- * different function with a different name, and why nobody should fold the two
- * together:
- *
- *  • It must not eat a `//` inside a string — `"https://…"` in a var would
- *    otherwise truncate the file and leave the caller parsing a fragment, which
- *    is how a worker reads as closed while being open.
- *  • It must be exact, not heuristic. A lossy answer here is not a weaker check,
- *    it is a parse error or a silently wrong config.
- *  • And it is wrong for TypeScript: it tracks only `"`, so one unbalanced double
- *    quote inside a template literal puts it in string mode for the rest of the
- *    file and it stops removing comments at all — exactly the failure the seam
- *    scans strip comments to prevent.
- *
- * Character by character, tracking quote and escape state, which is the only way
- * to be sure. web/test/source-scan.test.ts holds the fixtures proving each is
- * wrong at the other's job. */
-export function stripJsoncComments(src: string): string {
-  let out = ""
-  let inString = false
-  let escaped = false
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i]
-    if (inString) {
-      out += c
-      if (escaped) escaped = false
-      else if (c === "\\") escaped = true
-      else if (c === '"') inString = false
-      continue
-    }
-    if (c === '"') {
-      inString = true
-      out += c
-      continue
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      while (i < src.length && src[i] !== "\n") i++
-      out += "\n"
-      continue
-    }
-    if (c === "/" && src[i + 1] === "*") {
-      i += 2
-      while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) i++
-      i++
-      continue
-    }
-    out += c
-  }
-  return out
-}
+export { stripComments, stripJsoncComments } from "./strip-comments.mjs"
+export type { StripOptions } from "./strip-comments.mjs"

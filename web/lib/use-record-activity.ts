@@ -25,6 +25,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { formatRelative } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import type { ActivityItem } from "@shared/types"
 
 /** One activity row, dressed for the library ActivityFeed. Every record detail
@@ -139,8 +140,28 @@ export function useRecordActivity(
     rows,
     items: rows.map((a) => ({
       id: a.id,
-      description: a.description,
-      actor: a.actorName ?? undefined,
+      // R54 — AND THIS IS THE HALF THAT IS ACTUALLY VISIBLE. The kit's
+      // ActivityFeed draws `actor` only as an avatar's accessible name; the line
+      // a person READS is this sentence, which the worker composed with the
+      // actor's full name inside it. Shortening `actor` alone would have changed
+      // nothing on screen. `describeWithStaffName` rewrites it against the row's
+      // OWN actor snapshot — an exact prefix, never prose parsing — so it fixes
+      // history as well as everything written from today.
+      description: a.actorIsClient
+        ? a.description
+        : describeWithStaffName(a.description, a.actorName),
+      // `|| undefined`, NOT `?? undefined`. `staffNameFromSnapshot` answers ""
+      // for a row with no actor (a system write), and "" is not "no actor" here:
+      // the kit draws this field as `aria-label={item.actor}` on the avatar
+      // fallback (shared/ui/components/activity-feed/activity-feed.tsx), and an
+      // EMPTY aria-label is worse than an absent one — it overrides the initials
+      // underneath it with nothing, so a screen reader announces an unnamed
+      // element instead of the "?" mark. `??` only catches null/undefined and
+      // let the empty string straight through.
+      actor: (a.actorIsClient ? a.actorName : staffNameFromSnapshot(a.actorName)) || undefined,
+      // The MARK keeps both letters. An initial is not a name (R35), so "AK" is
+      // not the thing the ruling is about, and one-lettering every avatar in the
+      // app would be a design change nobody asked for.
       initials: nameInitials(a.actorName),
       timestamp: formatRelative(a.createdAt, t, lang),
       dateTime: a.createdAt,

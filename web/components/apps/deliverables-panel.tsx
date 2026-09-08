@@ -40,7 +40,6 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Eye, EyeSlash, PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -269,21 +268,21 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
         }
         filters={q.data.length > 0 && filterPill}
         toolbarPanel={q.data.length > 0 && filterPanel}
+        // A CONFIG, NOT A `<SortControl>` (R53) — the row draws the control
+        // itself now, so this panel and every other collection toolbar in the
+        // app put the same chip in the same place. See screen-bits.tsx's
+        // `ToolbarSortSlot` for the client ruling behind the move.
         sort={
-          q.data.length > 0 && (
-            <SortControl
-              options={sortOptions}
-              value={sort.by}
-              onValueChange={(by) => {
-                const opt = DELIVERABLE_SORTS.find((o) => o.value === by)
-                setSort({ by, dir: opt?.defaultDir ?? "asc" })
-              }}
-              direction={sort.dir}
-              onDirectionChange={(dir) => setSort((s) => ({ ...s, dir }))}
-              label={t("Sort by")}
-              hideLabel
-            />
-          )
+          q.data.length > 0 && {
+            options: sortOptions,
+            value: sort.by,
+            onValueChange: (by: string) => {
+              const opt = DELIVERABLE_SORTS.find((o) => o.value === by)
+              setSort({ by, dir: opt?.defaultDir ?? "asc" })
+            },
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }
         }
         actions={canCreate && <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />}
       />

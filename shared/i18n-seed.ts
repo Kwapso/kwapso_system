@@ -130,6 +130,12 @@ export const SEED: Catalogue = {
   Search: { de: "Suchen", es: "Buscar", ca: "Cercar" },
   Filter: { de: "Filtern", es: "Filtrar", ca: "Filtrar" },
   Close: { de: "Schließen", es: "Cerrar", ca: "Tancar" },
+  /* THE WORKSPACE TAB SET'S OWN CLOSE VERB (2026-09-06, kit v1.2.59's
+   * `BreadcrumbFoldersProps.closeLabel`). Not just "Close": the kit joins this
+   * with the crumb's own label to announce WHICH tab a button shuts ("Close
+   * tab: Halloway"), so the verb itself has to say "tab" rather than leave the
+   * join to carry that word alone — see `app-shell.tsx`'s `closeLabel` prop. */
+  "Close tab": { de: "Tab schließen", es: "Cerrar pestaña", ca: "Tancar pestanya" },
   Back: { de: "Zurück", es: "Atrás", ca: "Enrere" },
   "Start timer": {
     de: "Zeit starten",
@@ -1557,6 +1563,7 @@ export const SEED: Catalogue = {
   "Nothing in Meetings this month.": { de: "Diesen Monat keine Termine.", es: "Nada en Reuniones este mes.", ca: "Res a Reunions aquest mes."},
   "Nothing logged yet": { de: "Noch nichts erfasst", es: "Aún no se ha registrado nada", ca: "Encara no s'ha registrat res"},
   "Nothing matched.": { de: "Nichts gefunden.", es: "Nada coincide.", ca: "Res no coincideix."},
+  "Nothing matched “{term}”.": { de: "Nichts passt zu „{term}“.", es: "Nada coincide con «{term}».", ca: "Res no coincideix amb «{term}»."},
   "Nothing new to bring in.": { de: "Es gibt nichts Neues zu importieren.", es: "No hay nada nuevo que importar.", ca: "No hi ha res nou per importar."},
   "Nothing to read yet.": { de: "Noch nichts zu lesen.", es: "Nada que leer todavía.", ca: "Encara no hi ha res per llegir."},
   "Nothing was deleted, this puts it back in front of the assistant.": { de: "Es wurde nichts gelöscht, damit steht es dem Assistenten wieder zur Verfügung.", es: "No se borró nada, esto vuelve a ponerlo delante del asistente.", ca: "No s'ha esborrat res, això el torna a posar davant de l'assistent."},
@@ -1580,6 +1587,7 @@ export const SEED: Catalogue = {
   "Put back.": { de: "Zurückgelegt.", es: "Devuelto a la lista.", ca: "Tornat a la llista."},
   "Put somebody on duty": { de: "Jemanden in den Dienst einteilen", es: "Poner a alguien de servicio", ca: "Posar algú de guàrdia"},
   "Raise a ticket": { de: "Ein Ticket erstellen", es: "Crear un ticket", ca: "Obrir un ticket"},
+  "Raised as": { de: "Eingegangen als", es: "Recibido como", ca: "Rebut com a"},
   "Recently added": { de: "Zuletzt hinzugefügt", es: "Añadido recientemente", ca: "Afegit recentment"},
   "Recently changed": { de: "Zuletzt geändert", es: "Modificado recientemente", ca: "Modificat recentment"},
   "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted.": { de: "Wenn Sie festhalten, dass er nicht mehr stattfindet, wird seine ganze Zeit zur Ersparnis. Der Schritt behält seinen Platz in dieser und in jeder älteren Version, nichts wird gelöscht.", es: "Registrar que dejó de ocurrir es lo que convierte todo su tiempo en ahorro. El paso mantiene su sitio en esta versión y en todas las anteriores, no se borra nada.", ca: "Registrar que ha deixat de passar és el que converteix tot el seu temps en estalvi. El pas manté el seu lloc en aquesta versió i en totes les anteriors, no s'esborra res."},
@@ -1744,6 +1752,11 @@ export const SEED: Catalogue = {
   "Choose a part of your system": { de: "Wählen Sie einen Teil Ihres Systems", es: "Elige una parte de tu sistema", ca: "Tria una part del teu sistema"},
   "Choose an app first": { de: "Wählen Sie zuerst eine App", es: "Elige primero una aplicación", ca: "Tria primer una aplicació"},
   "Choose an app first.": { de: "Wählen Sie zuerst eine App.", es: "Elige primero una aplicación.", ca: "Tria primer una aplicació."},
+  /* The ticket form's "Raised by" row, when no client has been named yet — the
+   * exact sibling of the line above it, one field further down the same form,
+   * so it is deliberately the same sentence with one noun changed. Written by
+   * hand rather than sent to the model for that reason: the two have to match. */
+  "Choose a client first.": { de: "Wählen Sie zuerst einen Kunden.", es: "Elige primero un cliente.", ca: "Tria primer un client."},
   "Colour": { de: "Farbe", es: "Color", ca: "Color"},
   "Compare with": { de: "Vergleichen mit", es: "Comparar con", ca: "Compara amb"},
   "Connect everything": { de: "Alles verbinden", es: "Conectar todo", ca: "Connecta-ho tot"},
@@ -1857,6 +1870,87 @@ export const SEED: Catalogue = {
   "{created} added · {skipped} skipped · {failed} failed": { de: "{created} hinzugefügt · {skipped} übersprungen · {failed} fehlgeschlagen", es: "{created} añadidos · {skipped} omitidos · {failed} fallidos", ca: "{created} afegits · {skipped} omesos · {failed} fallits"},
   "{name} is on triage this week": { de: "{name} macht diese Woche die Triage", es: "{name} está de triaje esta semana", ca: "{name} fa el triatge aquesta setmana"},
   "{title} · current": { de: "{title} · aktuell", es: "{title} · actual", ca: "{title} · actual"},
+
+  /* ── THE TICKET STRIP'S NEW TABS AND THEIR TWO SECOND BODIES (2026-09-06) ──
+     Thirteen sentences, hand-written here in all three languages in the same
+     commit that adds them, so R44's ceiling does not move: a string seeded in
+     German, Spanish and Catalan is ANSWERED, and the count of unanswered
+     strings is what the pin records.
+
+     THE VOCABULARY FOLLOWS THE GERMAN THE AGENCY ALREADY USES with its German
+     clients, per this file's own rule about lifting rather than translating:
+     a ticket stays "Ticket", a stage word stays plain and short, and "Board"
+     is the word German product teams say for a Kanban board — "Tafel" would be
+     a blackboard.
+
+     "Ready" AND "Waiting" ARE STAGES, NOT ADJECTIVES, which is why they are
+     not "Bereit"/"Wartend": the tab names a PILE of tickets, and the German for
+     that pile is what the agency already says about work that is finished and
+     unsent ("Fertig") and work where the ball is with the client
+     ("Wartet auf Kunde" is the sentence; the tab has room for "Wartend" only,
+     and the icon beside it carries the rest). Aurora's Spanish and Catalan
+     follow the same register: short, sentence case, one word per tab. */
+  /* "Ready" AND "Scheduled" ARE NOT REPEATED HERE — both were already seeded in
+     the Statuses block near the top of this file ("Fertig", "Geplant"), which is
+     where a ticket's own stage words belong, and a second entry would be a
+     second answer waiting to disagree. The tab and the Kanban column read those.
+     "Triaged" is genuinely new: the block has "Triage" (the act) and never had
+     the state a ticket is left in by it. */
+  "Triaged": { de: "Gesichtet", es: "Clasificado", ca: "Classificat" },
+  "Waiting": { de: "Wartend", es: "En espera", ca: "En espera" },
+  "Board": { de: "Board", es: "Tablero", ca: "Tauler" },
+  "Split": { de: "Geteilt", es: "Dividido", ca: "Dividit" },
+  "No tickets here yet.": {
+    de: "Hier gibt es noch keine Tickets.",
+    es: "Aquí todavía no hay tickets.",
+    ca: "Aquí encara no hi ha tiquets.",
+  },
+  "Nothing at this stage.": {
+    de: "Nichts in dieser Phase.",
+    es: "Nada en esta fase.",
+    ca: "Res en aquesta fase.",
+  },
+  /* THE BOARD'S TWO FOOTNOTES, REWORDED 2026-09-07 — and reseeded in the same
+     edit, which is the whole point of doing it here. The client asked for a
+     fifth column ("in open, include status ready and waiting"), and Waiting is
+     a PREDICATE rather than a stage, so its cards are repeats of cards in the
+     four columns beside it. Both sentences now say so. A reader who adds five
+     columns up would otherwise get a number larger than the tab's own badge,
+     and the alternative — hiding a waiting ticket from the stage it is really
+     in — would make the four stage columns lie about the work.
+     The two sentences these replace were seeded, so the ceiling does not move:
+     `TRANSLATION_CEILING` counts strings with NO answer, and each of these has
+     three. Rewording seeded copy costs nothing but the rewording. */
+  "Cards are the tickets that matched, as far as they have loaded. Waiting repeats cards from the stages before it. Click a card to open the ticket.": {
+    de: "Die Karten sind die Treffer, so weit sie geladen sind. Wartend wiederholt Karten aus den Phasen davor. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Las tarjetas son los tickets que coinciden, hasta donde se han cargado. En espera repite tarjetas de las fases anteriores. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Les targetes són els tiquets que coincideixen, fins on s'han carregat. En espera repeteix targetes de les fases anteriors. Fes clic en una targeta per obrir el tiquet.",
+  },
+  "Each of the first four columns counts every open ticket at that stage. Waiting repeats those same tickets — the ones where a client owes us an answer — so the columns don't add up to the total. Click a card to open the ticket.": {
+    de: "Jede der ersten vier Spalten zählt alle offenen Tickets in dieser Phase. Wartend wiederholt dieselben Tickets — die, bei denen ein Kunde uns eine Antwort schuldet — deshalb ergeben die Spalten zusammen nicht die Gesamtzahl. Klicken Sie auf eine Karte, um das Ticket zu öffnen.",
+    es: "Cada una de las primeras cuatro columnas cuenta todos los tickets abiertos en esa fase. En espera repite esos mismos tickets — aquellos en los que un cliente nos debe una respuesta — así que las columnas no suman el total. Haz clic en una tarjeta para abrir el ticket.",
+    ca: "Cadascuna de les quatre primeres columnes compta tots els tiquets oberts en aquesta fase. En espera repeteix aquests mateixos tiquets — aquells en què un client ens deu una resposta — així que les columnes no sumen el total. Fes clic en una targeta per obrir el tiquet.",
+  },
+  /* THE FIFTH COLUMN'S EMPTY LINE. Not "Nothing at this stage." above, because
+     waiting is not a stage — the honest empty sentence here is that no client
+     owes us an answer, which is good news rather than an absence of rows. */
+  "Nothing is waiting on a client.": {
+    de: "Es wartet nichts auf einen Kunden.",
+    es: "No hay nada a la espera de un cliente.",
+    ca: "No hi ha res a l'espera d'un client.",
+  },
+  "Open the ticket": { de: "Ticket öffnen", es: "Abrir el ticket", ca: "Obre el tiquet" },
+  "Ready tickets": { de: "Fertige Tickets", es: "Tickets listos", ca: "Tiquets llestos" },
+  "The ticket you are reading": {
+    de: "Das Ticket, das Sie gerade lesen",
+    es: "El ticket que estás leyendo",
+    ca: "El tiquet que estàs llegint",
+  },
+  "Up and down move between tickets. Enter opens the one you are reading.": {
+    de: "Mit Auf und Ab wechseln Sie zwischen Tickets. Mit Enter öffnen Sie das gerade gelesene.",
+    es: "Arriba y abajo cambian de ticket. Enter abre el que estás leyendo.",
+    ca: "Amunt i avall canvien de tiquet. Enter obre el que estàs llegint.",
+  },
   /* ── The screen engine + notes editor, moved app-side by the design-kit swap
      (2026-08-24). These sentences lived in the old library, exempt from the
      walk; moving the code moved the words into R28's territory, and these are
@@ -3260,6 +3354,35 @@ export const SEED: Catalogue = {
   "My work": { de: "Meine Arbeit", es: "Mi trabajo", ca: "La meva feina" },
   "Build": { de: "Aufbau", es: "Construcción", ca: "Construcció" },
 
+  /* THE RECORD FOOTER'S ACTIVITY COLUMN AND THE DOOR ON ITS EYEBROW ROW
+   * (7 Sep 2026 — record-chrome.tsx, screen-renderer.tsx, activity-rail.tsx).
+   *
+   * "Latest activity" is the column's own heading, and it was said in ENGLISH
+   * to every reader until this line: nothing passed `activityLabel`, so the
+   * heading fell through to the vendored `RecordDetail`'s own default, and the
+   * translation walk never opens `shared/ui/` (R28). It is passed and
+   * translated now at both hosts, beside the door on its row. (Until design
+   * kit v1.2.69, vendored 8 Sep 2026, `RecordChrome` dropped `activityAction`
+   * and record-chrome.tsx had to build the label and the door as ONE node to
+   * get the door onto the row at all; the kit forwards the real slot now, so
+   * the label is a plain `t("Latest activity")` at both hosts. The reason it
+   * is passed is unchanged — the vendored default is English.)
+   *
+   * "All activity · {count}" is the door. The MIDDOT and the HOLE are both
+   * load-bearing: the count is `formatCount`'s output (R16 — "48", "1.3k",
+   * "1m+"), and it goes in a hole rather than being concatenated so a
+   * translator can put the number where their language wants it. The German
+   * takes "Aktivität" rather than the vocabulary block's "Verlauf" for
+   * consistency with every other activity sentence already in the catalogue
+   * ("Noch keine Aktivität.", "Weitere Aktivitäten laden"), which is what a
+   * reader of this rail actually sees around it. */
+  "Latest activity": { de: "Letzte Aktivität", es: "Actividad reciente", ca: "Activitat recent" },
+  "All activity · {count}": {
+    de: "Gesamte Aktivität · {count}",
+    es: "Toda la actividad · {count}",
+    ca: "Tota l'activitat · {count}",
+  },
+
   /* THE RECORD FOOTER'S ADD-A-NOTE FIELD (ch27.8), record-chrome.tsx /
    * use-record-activity.ts. */
   "Add a note": { de: "Notiz hinzufügen", es: "Añadir una nota", ca: "Afegir una nota" },
@@ -3388,4 +3511,279 @@ export const SEED: Catalogue = {
     es: "Actualizar",
     ca: "Actualitza",
   },
+  /* ── THE TICKETS DASHBOARD (6 Sep 2026) ──────────────────────────────────
+     Written here rather than left to accumulate as ceiling debt (R44), and for
+     a reason particular to this screen: a dashboard is read at a glance and
+     never re-read. A list in the wrong language is still a list — the rows are
+     names and dates, and a reader recognises them. A CHART in the wrong
+     language is a picture with a caption somebody skips, and the captions here
+     are the half that says what the picture may NOT be used for: which months
+     were dropped, which tickets have no record of what they arrived as, that
+     the weekend does not count. Those are the sentences that stop a number
+     being misread, so they are the last ones that should ship in English to
+     somebody who chose German.
+
+     THE HOLES ARE THE CONTRACT — {count}, {moved}, {counted}, {median}, {low},
+     {high} and {max} must survive intact and keep their names. */
+  "The open work": {
+    de: "Die offene Arbeit",
+    es: "El trabajo abierto",
+    ca: "La feina oberta",
+  },
+  "{count} past the three-day line": {
+    de: "{count} über der Drei-Tage-Grenze",
+    es: "{count} por encima del límite de tres días",
+    ca: "{count} per sobre del límit de tres dies",
+  },
+  "No system named": {
+    de: "Kein System genannt",
+    es: "Sin sistema indicado",
+    ca: "Sense sistema indicat",
+  },
+  "Who has more": {
+    de: "Wer mehr hat",
+    es: "Quién tiene más",
+    ca: "Qui en té més",
+  },
+  "Raised as, then triaged as": {
+    de: "Eingegangen als, dann eingeordnet als",
+    es: "Entró como, y se clasificó como",
+    ca: "Va entrar com a, i es va classificar com a",
+  },
+  "Became": {
+    de: "Wurde zu",
+    es: "Pasó a ser",
+    ca: "Va passar a ser",
+  },
+  "{moved} of {counted} tickets left triage as a different kind from the one they arrived as.": {
+    de: "{moved} von {counted} Tickets haben die Sichtung als andere Art verlassen, als sie eingegangen sind.",
+    es: "{moved} de {counted} tickets salieron de la clasificación con un tipo distinto del que entraron.",
+    ca: "{moved} de {counted} tiquets van sortir de la classificació amb un tipus diferent del que van entrar.",
+  },
+  "{count} older tickets have no record of what they arrived as.": {
+    de: "Bei {count} älteren Tickets ist nicht festgehalten, als was sie eingegangen sind.",
+    es: "De {count} tickets antiguos no consta como entraron.",
+    ca: "De {count} tiquets antics no consta com van entrar.",
+  },
+  "Nothing has been triaged since we started recording what a ticket arrived as, so there is nothing to compare yet.": {
+    de: "Seit wir festhalten, als was ein Ticket eingeht, wurde nichts eingeordnet — es gibt also noch nichts zu vergleichen.",
+    es: "No se ha clasificado nada desde que registramos como entra un ticket, así que aún no hay nada que comparar.",
+    ca: "No s'ha classificat res des que registrem com entra un tiquet, així que encara no hi ha res a comparar.",
+  },
+  "How long a ticket takes to close": {
+    de: "Wie lange ein Ticket bis zum Abschluss braucht",
+    es: "Cuánto tarda un ticket en cerrarse",
+    ca: "Quant triga un tiquet a tancar-se",
+  },
+  /* THE TREND IS A PANEL OF ITS OWN NOW, so its heading is a heading (client,
+     6 Sep 2026: "same style as How long a ticket takes to close put text above
+     the mountain graph 'Tendency'"). One word, and it is a NOUN in all three —
+     the thing the line shows, not a direction it is going. */
+  "Tendency": {
+    de: "Tendenz",
+    es: "Tendencia",
+    ca: "Tendència",
+  },
+  /* FOUR PANEL SUBTITLES AND TWO SUB-HEADINGS WERE RETIRED HERE, 6 Sep 2026 —
+     client: "rmoeve all subtitles: Every open ticket, as one pipeline per kind
+     down a shared set of stages. Open tickets against the thing you built. Open
+     work by client, for the kinds that wait for a client to confirm. What your
+     morning is actually spent on." and "in the how logn ticket takes to close
+     remove subtitle 'What it is now' and 'Which way it is going'". Their seed
+     entries went with them for the same reason the caption below did: a
+     sentence the app no longer says is a sentence being translated on every
+     build for a screen nobody can read it on. "And {count} more systems." went
+     the same day and for a different reason — the panel stopped dropping rows
+     at all, so there is nothing left for it to confess. */
+  /* THE "WORKING DAYS ONLY" CAPTION WAS RETIRED HERE, 6 Sep 2026 — client:
+     "remove the subtitle 'working days only.' It's not needed. We already know
+     it." The SENTENCE is gone; the arithmetic it described has not moved an
+     inch (`shared/business-days.ts` is still under both reads on that panel).
+     Its seed entry goes with it rather than being left behind to be translated
+     on every build for a screen that no longer says it — R28's ORPHAN clause,
+     applied on this side of the pipeline. */
+  "{count} closed": {
+    de: "{count} abgeschlossen",
+    es: "{count} cerrados",
+    ca: "{count} tancats",
+  },
+  /* ONE MONTH OF THE TREND, said twice from one string — inside the hover card
+     the client asked for ("when I hover over the graphic on a specific day, it
+     has a little modal that gives me the info for this date") and, joined with
+     the month and the kind, as the accessible NAME of the hit area that opens
+     it. Seeded in all three rather than left to the next translation run, for
+     the reason the block above this one gives: this screen has no rows, so its
+     sentences are the whole of what a reader gets, and the count a median was
+     taken over is precisely the half that stops the median being misread.
+     {median} and {count} must survive intact and keep their names. */
+  "{median} days, from {count} closed": {
+    de: "{median} Tage, aus {count} abgeschlossenen",
+    es: "{median} días, de {count} cerrados",
+    ca: "{median} dies, de {count} tancats",
+  },
+  "Middle ticket {median} days · middle half {low} to {high} · longest {max}": {
+    de: "Mittleres Ticket {median} Tage · mittlere Hälfte {low} bis {high} · längstes {max}",
+    es: "Ticket central {median} días · mitad central {low} a {high} · el más largo {max}",
+    ca: "Tiquet central {median} dies · meitat central {low} a {high} · el més llarg {max}",
+  },
+  /* THE WINDOW BECAME SIX MONTHS AND THE SENTENCE MOVED WITH IT (client, 6 Sep
+     2026: "for this how long, only consider the latest 6 months"). The days
+     version was retired rather than left behind: it named a window that no
+     longer exists, and an entry nothing says is translated on every build for a
+     screen that cannot show it — R28's ORPHAN clause, applied on this side of
+     the pipeline. {count} is `CLOSURE_WINDOW_MONTHS` and must keep its name. */
+  "Nothing has closed in the last {count} months.": {
+    de: "In den letzten {count} Monaten wurde nichts abgeschlossen.",
+    es: "No se ha cerrado nada en los últimos {count} meses.",
+    ca: "No s'ha tancat res en els darrers {count} mesos.",
+  },
+  "The middle ticket, month by month": {
+    de: "Das mittlere Ticket, Monat für Monat",
+    es: "El ticket central, mes a mes",
+    ca: "El tiquet central, mes a mes",
+  },
+  /* THE FLOOR'S TWO SENTENCES WERE RETIRED HERE, 7 Sep 2026 — client: "Only
+     months with at least 8 of a kind are thrown. No, even if it's only 1, it
+     should appear there."
+
+     They were "Only a month where at least {count} of a kind closed is drawn —
+     a middle ticket out of six is one ticket wearing a statistic." and "No kind
+     has closed at least {count} tickets in two of the last months, so there is
+     no trend to draw yet." The first explained a subtraction the door no longer
+     makes; the second named the floor as the reason a young team has no trend,
+     when the real reason is that a line needs two points. Both went with the
+     rule rather than being left behind to be translated on every build for a
+     screen that no longer says them — R28's ORPHAN clause, applied on this side
+     of the pipeline, and the same disposal the "working days only" caption got
+     one block up. The reasoning the first one carried is not lost: it is kept in
+     full where `CLOSURE_TREND_MIN_CLOSURES` used to be defined, in
+     `shared/types.ts`. Both were seeded in all three languages, so retiring them
+     moves no ceiling (R44). */
+  "Nothing has closed in two different months yet, so there is no trend to draw.": {
+    de: "In zwei verschiedenen Monaten wurde noch nichts abgeschlossen — es gibt also noch keinen Verlauf zu zeichnen.",
+    es: "Todavía no se ha cerrado nada en dos meses distintos, así que aún no hay tendencia que dibujar.",
+    ca: "Encara no s'ha tancat res en dos mesos diferents, així que encara no hi ha tendència a dibuixar.",
+  },
+  /* ONE ROW OF A RANKED CHART, said twice from one string — inside the hover
+     card the client asked for ("i want that when i hover on client i see the
+     details of the numbers of tickets") and, joined with the row's name and its
+     kind, as the accessible NAME of the bar that opens it. Both ranked panels
+     use it, so "Which app" and "Who has more" cannot become two readings of one
+     gesture. Seeded in all three in the same change that adds it, so R44's
+     ceiling does not move: this screen has no rows on it, so its sentences are
+     the whole of what a reader gets. {count} is what is still open and {total}
+     is everything ever raised — both names must survive intact, and the order
+     matters to the sentence in every language here. */
+  "{count} open of {total}": {
+    de: "{count} von {total} offen",
+    es: "{count} abiertos de {total}",
+    ca: "{count} oberts de {total}",
+  },
+  "Couldn't load the dashboard.": {
+    de: "Das Dashboard konnte nicht geladen werden.",
+    es: "No se ha podido cargar el panel.",
+    ca: "No s'ha pogut carregar el tauler.",
+  },
+  /* A CORRECTION, NOT A NEW STRING. The generated catalogue answered "Type"
+     with "Eingeben" — the VERB, "to type on a keyboard" — which is what a
+     machine does with a one-word English string that is two different words.
+     It is the label on the ticket dashboard's second filter and on the ticket
+     list's own, so a German reader was being offered a chip that said "Enter".
+     The seed wins at run time (SPOKEN, shared/i18n.ts), so this fixes it on
+     screen without a generator run and without spending anything. */
+  "Type": { de: "Typ", es: "Tipo", ca: "Tipus" },
+
+  /* ── The ticket composer's two sends, and the five seconds before either of
+     them happens (client ruling, 6 Sep 2026) ─────────────────────────────────
+     Eight sentences, written here in all three languages in the same change
+     that adds them, so R44's ceiling does not move: an untranslated string is
+     debt, and this feature is not the place to take any on. Two of the eight
+     are the accessible NAME of the wordless send — the tooltip and the
+     aria-label say the same two words on purpose (label-in-name), so they are
+     one entry read twice and a translator must keep them one. */
+  "Send reply": { de: "Antwort senden", es: "Enviar respuesta", ca: "Enviar resposta" },
+  "Send and close": { de: "Senden und schließen", es: "Enviar y cerrar", ca: "Enviar i tancar" },
+  "Sending your reply": {
+    de: "Ihre Antwort wird gesendet",
+    es: "Enviando tu respuesta",
+    ca: "Enviant la teva resposta",
+  },
+  "Sending and closing": {
+    de: "Wird gesendet und geschlossen",
+    es: "Enviando y cerrando",
+    ca: "Enviant i tancant",
+  },
+  /* The receipt under the pending bubble, where a timestamp goes once it is
+     real. `{seconds}` is a bare number and stays one in every language. */
+  "Sending in {seconds}": {
+    de: "Wird in {seconds} gesendet",
+    es: "Se envía en {seconds}",
+    ca: "S'envia en {seconds}",
+  },
+  "Sent.": { de: "Gesendet.", es: "Enviado.", ca: "Enviat." },
+  "This ticket is answered. Reply anyway…": {
+    de: "Dieses Ticket ist beantwortet. Trotzdem antworten…",
+    es: "Este ticket está respondido. Responder igualmente…",
+    ca: "Aquest tiquet està respost. Respondre igualment…",
+  },
+  "Nothing was sent. Your words are back in the composer.": {
+    de: "Es wurde nichts gesendet. Ihr Text steht wieder im Eingabefeld.",
+    es: "No se ha enviado nada. Tu texto ha vuelto al campo de respuesta.",
+    ca: "No s'ha enviat res. El teu text ha tornat al camp de resposta.",
+  },
+
+  /* ── The sign-in code, said out loud (2026-09-07) ──────────────────────────
+   *
+   * Two sentences nobody reading the screen will ever see: both are the
+   * accessible names on `shared/web/code-input.tsx`, the six-box code field on
+   * the way in to both front doors. They are SEEDED rather than left for the
+   * next translation run — the pattern the tickets-dashboard lane set — and the
+   * reason is the same one that makes this control worth fixing at all. Every
+   * other untranslated string in this app sits on a screen made of rows, where
+   * a name and a date are recognisable in any language. These are the only
+   * words a blind reader gets on the sign-in screen, and a person who cannot
+   * get past sign-in cannot reach the language switcher to fix it. Leaving them
+   * English would mean the one screen with no way around it is the one screen
+   * that does not speak the reader's language.
+   *
+   * `{position}` and `{total}` are bare numbers and stay numbers everywhere. */
+  "Verification code": {
+    de: "Bestätigungscode",
+    es: "Código de verificación",
+    ca: "Codi de verificació",
+  },
+  "Digit {position} of {total}": {
+    de: "Ziffer {position} von {total}",
+    es: "Dígito {position} de {total}",
+    ca: "Dígit {position} de {total}",
+  },
+  /* ── The stages a ticket went through, and how the client says we did ────
+   * Team migrations 0066 and 0067, 2026-09-07. Written by hand at the same
+   * commit as the English, so the ceiling (R44) never rises: a string shipped
+   * with no answer is an English sentence on a screen that looks finished.
+   *
+   * TWO REGISTERS, unchanged from the rest of this file: German keeps `Sie`,
+   * Spanish and Catalan keep the second person singular. The three points of
+   * the scale are ordinary words a person would say out loud about a job — not
+   * "unzufrieden / neutral / zufrieden", which is a survey talking, and this is
+   * one question at the bottom of a request somebody raised. */
+  "Stages": { de: "Phasen", es: "Etapas", ca: "Etapes"},
+  "Still here": { de: "Noch hier", es: "Sigue aquí", ca: "Encara aquí"},
+  "Reopened": { de: "Wieder geöffnet", es: "Reabierto", ca: "Reobert"},
+  "New": { de: "Neu", es: "Nuevo", ca: "Nou"},
+  "Waiting on you": { de: "Wartet auf Sie", es: "Esperando tu respuesta", ca: "Esperant la teva resposta"},
+  /* The compact day count on a stage row. A letter rather than the word, so a
+   * six-rung strip stays one line per rung on a phone — the same shape
+   * `formatRelative`'s own "{count}d ago" already uses, and translated the same
+   * way (T for Tage, d for días / dies). */
+  "{count}d": { de: "{count} T", es: "{count} d", ca: "{count} d"},
+  "Earlier stages have no record.": { de: "Für frühere Phasen gibt es keine Aufzeichnung.", es: "No hay registro de las etapas anteriores.", ca: "No hi ha registre de les etapes anteriors."},
+  "This ticket has no record of the stages it went through.": { de: "Für dieses Ticket gibt es keine Aufzeichnung der durchlaufenen Phasen.", es: "Este ticket no tiene registro de las etapas por las que pasó.", ca: "Aquest ticket no té registre de les etapes per les quals ha passat."},
+  "How did we do?": { de: "Wie haben wir das gemacht?", es: "¿Qué tal lo hemos hecho?", ca: "Com ho hem fet?"},
+  "Not great": { de: "Nicht gut", es: "No muy bien", ca: "No gaire bé"},
+  "Fine": { de: "Geht so", es: "Bien", ca: "Bé"},
+  "Great": { de: "Sehr gut", es: "Muy bien", ca: "Molt bé"},
+  "Anything you'd like to add? (optional)": { de: "Möchten Sie noch etwas ergänzen? (optional)", es: "¿Quieres añadir algo? (opcional)", ca: "Vols afegir-hi alguna cosa? (opcional)"},
+  "Send": { de: "Senden", es: "Enviar", ca: "Enviar"},
+  "Thanks for telling us.": { de: "Danke für Ihre Rückmeldung.", es: "Gracias por decírnoslo.", ca: "Gràcies per dir-nos-ho."},
 }

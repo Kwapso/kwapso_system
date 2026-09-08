@@ -1,7 +1,10 @@
 "use client"
 
-// Account detail — one COMPANY at /accounts/<id>, as a tabbed record (Law R2):
-// Overview / its work / Rates / Knowledge / Activity.
+// Account detail — one COMPANY at /accounts/<id>, as a tabbed record:
+// Overview / its work / Rates / Knowledge. Its history is not the last tab any
+// more — it is reached from the ink footer's Latest activity column, on the
+// client's 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the
+// ruling and the argument.
 // Host-composed, because most of those tabs are collections with their own
 // actions — link a person, add an app, deactivate a rate — and no engine block draws
 // those. Those list bodies live next door in account-detail-panels.tsx; this file
@@ -88,7 +91,6 @@ import { ImpactPanel } from "@/components/process/impact-panel"
 import { createAppFrom } from "@/components/apps/apps-screen"
 import { AppsPanel, SprintsPanel, TodosPanel, sliceKey } from "@/components/work/work-panels"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { ApiFailure, content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -581,15 +583,9 @@ export function AccountDetailScreen({
         : []),
       // NO PORTAL TAB. Only a person can hold a login (the owner's ruling), so
       // the switch lives on the contact's own page — see contact-detail.tsx.
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        // R8: a tab that reveals a collection carries its count, and R16 says the
-        // number is the server total through the one seam — never the loaded page.
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // AND NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a client's history
+      // is reached from the ink footer's Latest activity column now, and opens in
+      // a slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -789,15 +785,6 @@ export function AccountDetailScreen({
               </div>
             )
 
-          if (tabItem.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("accounts", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
-
           // THE WORK HANGING OFF THIS CLIENT. Each panel asks the SERVER its own
           // narrowed question (?accountId=), so the rows and the badge above are
           // the same answer — never a page of everything filtered in the browser.
@@ -893,15 +880,13 @@ export function AccountDetailScreen({
               </div>
             )
 
-          // ACTIVITY is the last tab, and the fall-through. The login switch is
-          // not here any more — only a person can hold one.
-          return (
-            <ActivityPanel
-              activity={activity}
-              onAddNote={can("accounts", "create") ? activity.addNote : undefined}
-              notePlaceholder={t("Add a note")}
-            />
-          )
+          // EVERY TAB ABOVE HAS ITS OWN BRANCH, so this is unreachable — kept
+          // because `renderPanel` must return a node for any tab it is handed,
+          // and drawing the Overview panel a second time here would put the
+          // record's own fields under a strip position that no longer exists.
+          // Activity used to be the fall-through; it is not a tab any more
+          // (see the tabs config above).
+          return null
         }}
       />
 

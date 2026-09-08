@@ -56,6 +56,7 @@ import { contentHash, plainText } from "./knowledge-text"
 import { logActivity } from "@shared/workers/activity"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { brand } from "@shared/brand"
+import { ticketTypeKeptForMigrationExcludedSql } from "@shared/types"
 
 /** Rows one kind may ingest per tick. The bound on the work a single invocation
  * does — the reason a cron handler here cannot become a long-running job. Sized
@@ -446,7 +447,19 @@ export const INGEST_KINDS: IngestKind[] = [
     label: "accounts",
     // v2: "when we last spoke" is the latest meeting that has STARTED, not the
     // latest one somebody remembered to tick held.
-    textVersion: 2,
+    // v3: AN ACCOUNT'S TICKET SENTENCES NOW MEAN WHAT THE TICKETS SCREEN MEANS.
+    // Two things this reader writes into a client's indexed prose are about
+    // tickets — the `open_tickets` COUNT and the `tickets` rollup of recent ones
+    // by name — and the assistant reads both back to a person out loud ("Bergman
+    // has 7 open tickets"). The client's ruling of 6 Sep 2026 took the
+    // requirements kind out of the Tickets experience (written up in full at
+    // `TICKET_TYPE_KEPT_FOR_MIGRATION`, shared/types.ts), so both are now
+    // subtracted here as well. THE BUMP IS NOT COSMETIC: this is a forward-only
+    // lane, so every account already indexed keeps the old number and the old
+    // list until a version change walks the cursor back over it — a spoken
+    // number that disagrees with the screen is the harder kind to catch, because
+    // nobody can check a sentence against a list they are not looking at.
+    textVersion: 3,
     rollup: true,
     read: async (cfg, guard, cursor, limit) => {
       // The accounts read aliases its table (`a`), so its sort expression is
@@ -521,12 +534,14 @@ export const INGEST_KINDS: IngestKind[] = [
                     ORDER BY pr.name LIMIT ${ROLLUP_ROWS}`
                 )} AS processes,
                 (SELECT COUNT(*) FROM help h
-                  WHERE h.account_id = a.id AND h.archived_at IS NULL AND h.resolved = 0) AS open_tickets,
+                  WHERE h.account_id = a.id AND h.archived_at IS NULL AND h.resolved = 0
+                    AND ${ticketTypeKeptForMigrationExcludedSql("h.help_type")}) AS open_tickets,
                 ${childLines(
                   `SELECT COALESCE(h.title_en, h.title_de, substr(h.description, 1, 120)) ||
                           ' (' || REPLACE(h.status, '_', ' ') || ')' AS line
                      FROM help h
                     WHERE h.account_id = a.id AND h.archived_at IS NULL
+                      AND ${ticketTypeKeptForMigrationExcludedSql("h.help_type")}
                     ORDER BY h.created_at DESC LIMIT ${ROLLUP_ROWS}`
                 )} AS tickets,
                 ${childLines(

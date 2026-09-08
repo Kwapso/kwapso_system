@@ -465,6 +465,42 @@ export interface RecordDetailProps
   activityFeedLabel?: string;
 
   /**
+   * THE TRAILING SLOT ON THE "LATEST ACTIVITY" LINE — added 2026-09-07 on the
+   * client's ruling, verbatim: "recoerd activity- implemet 'A · in the eyebrow
+   * row' across the app. kill all old activity tabs."
+   *
+   * The footer's summary is now the ONLY activity on a record page — the
+   * Activity TAB is gone — so the door to the full history has to be
+   * somewhere, and she named the place: the eyebrow's own row. The first
+   * caller passes a door of the form "All activity · 48 ›" and opens an
+   * `EdgePanel` with it.
+   *
+   * WHAT THIS SLOT SUPPLIES AND WHAT IT DOES NOT. It supplies the PLACE (the
+   * inline end of the eyebrow's line), the TYPE STEP, the LEADING and the
+   * INK. It does not supply the control: pass a `Button variant="link"`, an
+   * anchor, whatever the route's router needs. Two reasons it is a node and
+   * not a `{ label, onSelect }` pair — a kit component must not own a string
+   * (PATTERN §7), and it must not own a navigation either.
+   *
+   * WHAT IT MUST NOT BE IS A BUTTON WITH A BOX. This card already teaches one
+   * shape: a pill on it is a CONTROL BY ELIMINATION — that is the note
+   * field's own argument, written out at the `Input` below, and it is the
+   * whole reason that field can afford to have no edge. A second pill up here
+   * would make the reader ask which of the two is the field. `Button
+   * variant="link"` is the shape that fits: the kit's `.kw-link`, which
+   * "inherits its ink, underlines on hover, occupies no box", and whose
+   * compound class is `h-auto p-0` — so it takes the ink this row hands it
+   * and adds no height at all.
+   *
+   * OMITTED, THIS ROW IS BYTE-IDENTICAL TO WHAT IT WAS. The eyebrow is
+   * rendered by the same `RecordFooterEyebrow` call it always was, with no
+   * wrapper around it — the flex row is inside the `else` branch, not around
+   * both. Nothing about the omitted case is a new default; it is the old
+   * element, unchanged, reached by the same expression.
+   */
+  activityAction?: React.ReactNode;
+
+  /**
    * CH27.8's add-a-note field, under the feed. Given, the field is drawn;
    * omitted, it is not — which is how the PORTAL door obeys the chapter's
    * "the portal never shows internal notes, only what was said to the
@@ -560,6 +596,12 @@ function RecordFooterEyebrow({ children }: { children: React.ReactNode }) {
  *                      is also how the portal door obeys "the portal never
  *                      shows internal notes, only what was said to the
  *                      client" — no handler, no field.
+ *                      `activityAction` (2026-09-07) is NOT a second
+ *                      exception and must not be read as one: it writes
+ *                      nothing, changes no value and submits nothing. It is a
+ *                      door — the one the client asked for when she killed
+ *                      the Activity tab — and a page being read-only has
+ *                      never meant a page you cannot leave.
  *
  * THREE BREAKPOINTS
  *  mobile   — the band's actions WRAP under the title (`Title` does this
@@ -632,6 +674,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       activityVisible = true,
       activityLabel = "Latest activity",
       activityFeedLabel,
+      activityAction,
       onAddNote,
       notePlaceholder = "Add a note",
       footerVisible = true,
@@ -657,7 +700,18 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
     const auditRows = auditVisible ? (audit ?? []) : [];
     const activityRows = activityVisible ? (activity ?? []) : [];
     const showRecordColumn = auditRows.length > 0;
-    const showActivityColumn = activityRows.length > 0 || (activityVisible && onAddNote !== undefined);
+    /* `activityAction` joins the two things that could already bring this
+       column into existence on its own, and for the same reason they do: the
+       door to the full history is a fact about the record even on a day when
+       nothing has happened yet, and a route that hides it because the summary
+       is empty has hidden the only way to the entries that are not summarised.
+       It is gated on `activityVisible` with the rest, so permissions still
+       HIDE (ch24.6) and a portal route that passes `activityVisible={false}`
+       gets no door either. A caller that passes nothing changes nothing: the
+       condition is the old one with a term that is `undefined`. */
+    const showActivityColumn =
+      activityRows.length > 0 ||
+      (activityVisible && (onAddNote !== undefined || activityAction !== undefined));
     const showFooter = footerVisible && (showRecordColumn || showActivityColumn);
 
     if (process.env.NODE_ENV !== "production" && auditRows.length > 4) {
@@ -1067,7 +1121,98 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
               {/* ---- Left · Latest activity ---------------------------- */}
               {showActivityColumn ? (
                 <div data-record-region="footer-activity" className="min-w-0">
-                  <RecordFooterEyebrow>{activityLabel}</RecordFooterEyebrow>
+                  {/* ---- THE EYEBROW'S ROW — CLIENT, 2026-09-07 -----------
+                      "implemet 'A · in the eyebrow row' across the app."
+
+                      WITH NO ACTION IT IS THE BARE EYEBROW, exactly as it has
+                      been: the same call, no wrapper, no row, nothing new in
+                      the DOM. The flex row exists only in the other branch,
+                      so "omitted renders as before" is a property of the
+                      structure rather than a promise about a default.
+
+                      WITH ONE, THE ACTION SITS ON THE EYEBROW'S OWN LINE AND
+                      COSTS NO HEIGHT — and that is arithmetic, not an
+                      eyeball. `--footer-eyebrow-line` is the eyebrow's line
+                      BOX, written once here the way `activity-feed.tsx`
+                      writes `--feed-line` and for the identical reason: two
+                      things measure against it and they must not drift.
+
+                        --footer-eyebrow-line
+                          = --text-micro x --text-micro--line-height
+                          = 0.6875rem x 1.3
+                          = 0.89375rem
+                          = 13.406px at the shipped 15px root (ruling 18)
+
+                      `RecordFooterEyebrow` is `text-micro`, whose own line
+                      height IS that 1.3, so its line box is that expression
+                      by construction. Handing the SAME length to the action
+                      makes the two boxes identical, `items-baseline` then
+                      lands them on one baseline, and the row's height is the
+                      height the lone eyebrow already had. Nothing below moves
+                      — the feed's `mt-3` starts from the same y it always
+                      did.
+
+                      `text-xs` FOR THE ACTION, AND FOUR THINGS KEEP IT FROM
+                      READING AS A SECOND EYEBROW: it is sentence case, its
+                      tracking is 0 where the eyebrow's step carries 0.08em,
+                      it takes no medium weight, and it is in the FULL footer
+                      ink where the eyebrow is in the quiet one. The ink is
+                      the load-bearing one of the four — the label is quiet
+                      and the target is not, which is chapter 13's "colour
+                      separates" doing the work a box would otherwise have to.
+
+                      MEASURED, both palettes, against `--surface-record-
+                      footer` (the card's own ground, so the number is the one
+                      the reader actually sees):
+                        · the action, `--ink-on-record-footer`
+                            #FFFEF9 on #1A1918 (light)  17.386:1
+                            #FFFEF9 on #26241F (dark)   15.353:1
+                        · the eyebrow beside it, for the step between them
+                            #d5d1c9 on #1A1918          11.531:1
+                            #d5d1c9 on #26241F          10.183:1
+                      The instrument was checked against the fault this file
+                      already records — the 2026-08 eyebrows at #5F5D59 on
+                      charcoal — and returns that case's 2.672:1, so it can
+                      still say no. Nothing here is anywhere near it.
+
+                      THE INK IS NAMED RATHER THAN INHERITED. The card above
+                      already sets `text-ink-on-record-footer`, so this would
+                      inherit the same colour and the class looks redundant.
+                      It is not: this row is the one place in the card where a
+                      quiet ink and a full ink sit side by side and MEAN
+                      different things, and an ink that arrives by inheritance
+                      is an ink nobody has decided. Stated here, it survives
+                      the next change to the card's own text class.
+
+                      `whitespace-nowrap` because the derived leading is a
+                      ONE-LINE measurement: a wrapped action would stack two
+                      13.406 boxes and the "costs no height" claim would stop
+                      being true. The eyebrow keeps the flexible side and
+                      wraps first, which is the right order — the label can
+                      afford two lines, the door cannot. */}
+                  {activityAction === undefined || activityAction === null ? (
+                    <RecordFooterEyebrow>{activityLabel}</RecordFooterEyebrow>
+                  ) : (
+                    <div
+                      data-slot="record-detail-activity-row"
+                      className={cn(
+                        "flex min-w-0 items-baseline justify-between gap-[var(--space-3)]",
+                        "[--footer-eyebrow-line:calc(var(--text-micro)*var(--text-micro--line-height))]",
+                      )}
+                    >
+                      <RecordFooterEyebrow>{activityLabel}</RecordFooterEyebrow>
+                      <span
+                        data-slot="record-detail-activity-action"
+                        className={cn(
+                          "flex-none whitespace-nowrap",
+                          "text-xs leading-[var(--footer-eyebrow-line)]",
+                          "text-ink-on-record-footer",
+                        )}
+                      >
+                        {activityAction}
+                      </span>
+                    </div>
+                  )}
                   {activityRows.length > 0 ? (
                     /* COMPOSED, never redrawn — override 18 owns this row. */
                     <ActivityFeed

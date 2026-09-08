@@ -99,7 +99,15 @@ export function selectWaves(rows: Wave[], query: WaveQuery): Wave[] {
     if (!needle) return true
     // The client's name is searched too: "Hogo" is how somebody looks for the
     // package they sold Hogo, and it is on the row already.
-    return [w.name, w.accountName ?? "", w.goal ?? ""].some((s) => s.toLowerCase().includes(needle))
+    //
+    // AND THE REFERENCE, since the wave's number went onto the row itself (the
+    // black chip in front of the name, waves-screen.tsx). Waves are a BOUNDED
+    // collection — the whole list is in the browser and the door takes no `q`
+    // at all — so this filter IS the wave search, and a number a person can
+    // read off a row and then not find is worse than one they never saw.
+    return [w.name, w.ref ?? "", w.accountName ?? "", w.goal ?? ""].some((s) =>
+      s.toLowerCase().includes(needle)
+    )
   })
   const sorted = [...matched].sort((a, b) => compare(a, b, query.sortBy))
   // A sort with an undated tail keeps that tail at the bottom in both

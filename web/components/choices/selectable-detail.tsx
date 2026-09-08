@@ -1,6 +1,7 @@
 "use client"
 
-// ONE DROPDOWN VALUE, AS A RECORD (Law R2): Overview + Activity.
+// ONE DROPDOWN VALUE, AS A RECORD: its own fields, and its history off the ink
+// footer's Latest activity column.
 //
 // WHY IT EXISTS. `selectable_data` has been writing activity rows since the day
 // it shipped — created, renamed, made a default, deactivated, reactivated, four
@@ -9,8 +10,27 @@
 // under their group, with a rename box and a row menu. So every one of those
 // sentences was written to a feed no screen opened, and "who retired this ticket
 // type, and when" was a question the database could answer and the app could
-// not. R2's clause is exactly this shape — a record with history and no tabs is
-// a record whose history is invisible.
+// not. That reason is unchanged; only the PLACE the answer is read has moved.
+//
+// THE ACTIVITY TAB IS GONE — CLIENT RULING, 2026-09-06, verbatim: "I don't want
+// to have activity as a tab anywhere but on the footer, on top of the dates. On
+// the right column, on Latest Activity, I would like some view or expand or
+// whatever, and this would open a slide-in with all the activity", restated
+// 2026-09-07 as "record activity — implement 'A · in the eyebrow row' across the
+// app. kill all old activity tabs." The history is reached from the footer's own
+// Latest activity column now (`RecordScreen`'s `activity` prop, below), which
+// every detail in the app already draws; the feed and its fetch are untouched.
+//
+// AND THIS IS THE ONE SCREEN THE REMOVAL LEFT WITH A SINGLE TAB, so it has no
+// strip at all. A tab strip is a choice between faces of one record; with one
+// face there is no choice to offer, and a lone trigger under a full-width
+// underline is exactly the furniture this header has had killed off it three
+// times already (the eyebrow, the repeated type chip, the meta line). It is NOT
+// the tickets collection's "the view selector is shown even with one view"
+// (client, 2026-09-06): that control says other views exist and names which one
+// you are in, so it earns its place at one; a lone tab says only the word
+// already written above the panel it opens. The Overview panel is rendered
+// directly.
 //
 // IT READS ONE ROW, NOT THE LIST. `selectableOne` is a single `WHERE id = ?`
 // (one D1 round trip); the vocabulary list is a capped read plus an exact
@@ -26,19 +46,14 @@ import * as React from "react"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
-import { TabsView } from "@shared/web/screen-engine/tabs-view"
-import { useRemembered } from "@shared/web/remembered"
 
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { OverviewList } from "@/components/records/overview-list"
-import { RecordScreen, STICKY_TABS, RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
-import { CONCEPT_ICON } from "@/lib/pages"
+import { RecordScreen } from "@/components/records/record-chrome"
 import { tenancy } from "@/lib/api"
 import { selectableOneKey } from "@/lib/live-resources"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import type { SelectableValue } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
-import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 
@@ -50,11 +65,13 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
   const valueQ = useCached<SelectableValue | null>(selectableOneKey(teamId, valueId), () =>
     tenancy.selectableOne(valueId)
   )
+  // STILL READ, WITH NO TAB TO READ IT IN. The footer's Latest activity column
+  // is fed from this same hook (`RecordScreen`'s `activity` prop below), and so
+  // is the slide-in the client asked for off that column — removing the tab
+  // removed a PLACE, never the fetch. No remembered tab any more either: this
+  // screen has one panel, so there is nothing to remember (web/lib/nav-memory.ts
+  // simply never records a slot for it).
   const activity = useRecordActivity("selectable_data", valueId)
-  // The open tab is remembered per record for as long as this document
-  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
-  // back lands on the tab she was reading, and a miss lands on "overview".
-  const [tab, setTab] = useRemembered("tab", "overview")
 
   const value = valueQ.data ?? null
   // A FAILED READ SAYS SO. `data` stays undefined when the fetch REJECTS as well
@@ -117,22 +134,6 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
     },
   ]
 
-  const tabsConfig = {
-    ...RECORD_TABS_CONFIG,
-    tabs: [
-      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        // R16: the exact server COUNT(*) the feed's own door returns, through
-        // the one formatCount seam — never the number of rows on screen.
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
-    ],
-  }
-
   return (
     <RecordScreen
       // R35 — the record's own face. A value's mark IS its face where it has
@@ -179,16 +180,7 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
       audit={{ createdByName: value.createdByName, createdAt: value.createdAt }}
       activity={activity}
     >
-      <TabsView
-        className={STICKY_TABS}
-        config={tabsConfig}
-        value={tab}
-        onValueChange={setTab}
-        renderPanel={(panel) => {
-          if (panel.value === "activity") return <ActivityPanel activity={activity} />
-          return <OverviewList items={overviewItems} />
-        }}
-      />
+      <OverviewList items={overviewItems} />
     </RecordScreen>
   )
 }

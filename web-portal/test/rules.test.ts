@@ -208,13 +208,15 @@ describe("portal rules the agency app doesn't have", () => {
   // until somebody widens the type to make a build pass, so the claim is asserted
   // against HELP_STATUSES itself rather than left to the annotation.
   //
-  // NOT asserted here, deliberately: "the portal has only one lifecycle control".
-  // That promise is kept in three places that cannot be talked round — the door is
-  // absent from the portal gateway's table, every other status handler opens with
-  // refusePortalCaller, and the fence suite next door walks every /api path this
-  // app names against that table. A hand-typed list of forbidden doors here would
-  // be a fourth copy that is correct until the next door is added, which is the
-  // exact shape R21 has already been bitten by twice.
+  // NOT asserted here, deliberately: "the portal has NO lifecycle control" — it
+  // read "only one" until 7 Sep 2026, when the client retired
+  // `awaiting_validation` and the confirm door went with it. That promise is kept
+  // in three places that cannot be talked round — no such door is in the portal
+  // gateway's table, every status handler opens with refusePortalCaller, and the
+  // fence suite next door walks every /api path this app names against that
+  // table. A hand-typed list of forbidden doors here would be a fourth copy that
+  // is correct until the next door is added, which is the exact shape R21 has
+  // already been bitten by twice.
   it("every ticket state a client can be shown has words in the portal's voice", () => {
     expect(HELP_STATUSES.length, "the status list did not load").toBeGreaterThan(4)
     const labels = HELP_STATUSES.map((s) => {
@@ -292,7 +294,7 @@ describe("portal rules the agency app doesn't have", () => {
       expect(at, `${needle.trim()} is where names are decided — did it move?`).toBeGreaterThan(-1)
       // Comments stripped, or the prose ABOVE the seam explaining the rule would
       // satisfy the assertion in place of the code that implements it.
-      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+      return stripComments(lib.slice(at, lib.indexOf("\n}", at)))
     }
     expect(
       seamBody("export async function listReplies("),
@@ -325,10 +327,7 @@ describe("portal rules the agency app doesn't have", () => {
     const commentSeam = (() => {
       const at = processes.indexOf("export async function listProcessComments(")
       expect(at, "listProcessComments is where a comment's author is decided — did it move?").toBeGreaterThan(-1)
-      return processes
-        .slice(at, processes.indexOf("\n}", at))
-        .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\/\/.*$/gm, "")
+      return stripComments(processes.slice(at, processes.indexOf("\n}", at)))
     })()
     expect(
       commentSeam,
@@ -365,7 +364,7 @@ describe("portal rules the agency app doesn't have", () => {
       expect(at, `${needle.trim()} is where an account's fields are decided — did it move?`).toBeGreaterThan(-1)
       // Comments stripped, or the prose explaining the rule would satisfy the
       // assertion in place of the code that implements it.
-      return lib.slice(at, lib.indexOf("\n}", at)).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+      return stripComments(lib.slice(at, lib.indexOf("\n}", at)))
     }
     const account = seamBody("function toAccount(")
     expect(account, "toAccount must decide about a client login at all").toContain('scope.kind === "portal"')
@@ -431,9 +430,7 @@ describe("the portal does not compile out of the agency app's tree", () => {
     for (const file of portalFiles()) {
       // Comments are not imports: this file explains the rule, and so do several
       // portal headers, so the prose must not read as a violation of itself.
-      const code = read(file)
-        .replace(/\/\*[\s\S]*?\*\//g, " ")
-        .replace(/^\s*\/\/.*$/gm, "")
+      const code = stripComments(read(file))
       for (const m of code.matchAll(/from\s+["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']/g)) {
         const spec = m[1] ?? m[2]
         if (/^@web\//.test(spec) || /(^|\/)\.\.\/web\//.test(spec))

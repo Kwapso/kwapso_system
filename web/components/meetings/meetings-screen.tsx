@@ -46,7 +46,7 @@ import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
-import { RecordTable, visibleActions } from "@/components/records/record-table"
+import { RecordTable, visibleActions, type TableColumn } from "@/components/records/record-table"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
@@ -115,13 +115,38 @@ const COLUMN_SORT: Record<string, string> = {
   client: "client",
   state: "status",
 }
-const ALL_COLUMN_HEADERS = ALL_COLUMNS.map((f) => {
-  const sort = COLUMN_SORT[f.column]
+
+/** …AND THE PAIRING IS CHECKED AGAINST THE MENU, not trusted.
+ *
+ * `state: "status"` above is a name the door does not have. The meetings menu is
+ * `when | title | client | added` (collection-sorts.ts, whose own comment
+ * records that a Status option "went with the status: sorting by when a meeting
+ * IS is already sorting by whether it has happened") — so the Status header was
+ * a live-looking control sending an order nothing answers, which is the exact
+ * defect the paragraph above says this table must not ship. It survived because
+ * a hand-written pair has nobody to disagree with.
+ *
+ * So a name the menu does not offer produces NO `sort`, and the column draws a
+ * plain header beside App and Where. The line stays in the map deliberately: it
+ * records that somebody wanted Status ordered, and the day the door grows a
+ * `status` option the header lights up on its own with no second edit here.
+ *
+ * `defaultDir` comes off the same lookup, so a header can never land in a
+ * different direction from the picker above it offering the same order — that
+ * is why the option object is found once and read twice. */
+const ALL_COLUMN_HEADERS: TableColumn[] = ALL_COLUMNS.map((f) => {
+  const option = COLLECTION_SORTS.meetings.options.find((o) => o.value === COLUMN_SORT[f.column])
   return {
     key: f.column,
     label: f.field.label,
-    sort,
-    defaultDir: COLLECTION_SORTS.meetings.options.find((o) => o.value === sort)?.defaultDir,
+    sort: option?.value,
+    defaultDir: option?.defaultDir,
+    // NO `sortType`/`sortKey` ON ANY OF THESE, and their absence is the
+    // statement: every order this table can be put in is the DOOR's (the
+    // `order={found.order}` at the render below). A browser-side comparison
+    // declared here would arrange the fifty rows in hand under a badge counting
+    // the whole meetings list — the lie `<PagedFind>` exists to stop, and worse
+    // than the alphabetical dates it would be fixing.
   }
 })
 
@@ -594,6 +619,15 @@ export function MeetingsScreen({
                 <RecordTable
                   columns={ALL_COLUMN_HEADERS}
                   rows={data.rows ?? []}
+                  // THE NUMBER IN FRONT OF THE MEETING, not a seventh column.
+                  // The `Reference` column was cut from this table on purpose
+                  // ("already rides the record's own eyebrow (D4)", above) and
+                  // that ruling stands — a column of identical black lozenges
+                  // is furniture. What it left behind was a meeting whose
+                  // number appeared on its own screen and on no list you could
+                  // find it from, which is the client's September instruction
+                  // read the other way round: the ID leads the title.
+                  refColumn="ref"
                   config={tableRecipe.collection as CollectionConfig}
                   order={found.order}
                   actions={visibleActions(tableRecipe, rights, onAction)}

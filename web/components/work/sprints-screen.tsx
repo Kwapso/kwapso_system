@@ -67,6 +67,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
 import type { AppRow, SelectableValue, Sprint } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { type Translate } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
@@ -220,15 +221,15 @@ function sprintQueryIsActive(query: SprintQuery): boolean {
   return query.q.trim() !== "" || query.state !== "" || query.kind !== ""
 }
 
-/** SEARCH (name/app), then the two facets the view already groups by — state
- * and kind — over the whole bounded collection. */
+/** SEARCH (name/app/reference — `refWas` too, the numbers 0068 reissued, since this
+ * box is a sprint's only search), then the two facets the view groups by. */
 function selectSprints(sprints: Sprint[], query: SprintQuery, today: string): Sprint[] {
   const needle = query.q.trim().toLowerCase()
   return sprints.filter((s) => {
     if (query.state && sprintState(s, today) !== query.state) return false
     if (query.kind && (s.sprintType ?? "") !== query.kind) return false
     if (!needle) return true
-    return [s.name, s.appName ?? "", s.ref ?? ""].some((v) => v.toLowerCase().includes(needle))
+    return [s.name, s.appName ?? "", s.ref ?? "", s.refWas ?? ""].some((v) => v.toLowerCase().includes(needle))
   })
 }
 
@@ -266,7 +267,15 @@ function shapeSprints(sprints: Sprint[], today: string, lang: Language, marks?: 
       id: s.id,
       // THE GLYPH THE ROW IS KNOWN BY (recipe `leading`). A NODE, not a string.
       mark: <RecordMark mark={marks?.get(s.sprintType ?? "") ?? null} name={s.sprintType ?? "?"} />,
-      name: s.ref ? `${s.ref} · ${s.name}` : s.name,
+      // THE NAME ALONE, AS A PLAIN STRING. It was `${s.ref} · ${s.name}` — the
+      // reference glued into the title, which is the shape the client replaced
+      // on tickets with "put the ID before the title to the left, with the
+      // usual black chip design". The chip is the engine's job now (`reference`
+      // below); this has to stay a bare string because the frame's search and
+      // its sort both read this exact value, and neither can see past a node.
+      name: s.name,
+      // THE NUMBER, for the chip in front of it (the recipe's `reference`).
+      ref: s.ref,
       detail: sprintLine(s, lang),
       // Facet columns (read by the filter engine, not the renderer). The status
       // facet says the SAME three words the Overview groups under, so narrowing
@@ -600,7 +609,17 @@ export function SprintsScreen({
                   items={group.sprints.map((s) => ({
                     id: s.id,
                     leading: group.mark ? <RecordMark mark={group.mark} /> : undefined,
-                    title: s.ref ? `${s.ref} · ${s.name}` : s.name,
+                    // THE NUMBER IN FRONT OF THE NAME, as the black chip. The
+                    // kit's `List` types its title as a node, so this row can
+                    // hold the real mark rather than the `S0012 · ` prefix it
+                    // carried — and the All tab beside it draws exactly the
+                    // same thing through the engine, off the same component.
+                    title: (
+                      <span className={REF_LEADS_NAME}>
+                        <RecordRef value={s.ref} />
+                        <span className="min-w-0 truncate">{s.name}</span>
+                      </span>
+                    ),
                     // The kind is the heading above; how much is done is the
                     // number on the right. What is left is the three facts a
                     // status line may carry (D5): whose, which app, and when.

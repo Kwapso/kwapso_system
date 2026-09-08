@@ -135,15 +135,33 @@ export const PORTAL_DOORS: Record<string, Upstream> = {
   "GET /api/content/help/attachments": "CONTENT",
   "POST /api/content/help/attachments": "CONTENT",
   "POST /api/content/help/attachments/remove": "CONTENT",
-  // THE ONE LIFECYCLE DOOR A CLIENT MAY PUSH (CHECKLIST 5.13, Aurora's ap2). An
-  // extra, a request or a piece of feedback waits for the company that pays for
-  // it to confirm they want it — a question or an issue never waits at all. It is
-  // the deliberate exception to the paragraph above, and it is narrow by
-  // construction rather than by this table: the account fence rides its UPDATE,
-  // and R17's predicate means the ONLY move it can make is
-  // awaiting_validation → new. It cannot reopen, resolve, or touch a request
-  // somebody here has already started.
-  "POST /api/content/help/validate": "CONTENT",
+  // NO LIFECYCLE DOOR IS ON THIS TABLE ANY MORE, AND THAT IS NEW.
+  // `POST /api/content/help/validate` stood here — "the one lifecycle door a
+  // client may push" (CHECKLIST 5.13, Aurora's ap2) — and was the deliberate
+  // exception to the paragraph above: an extra, a request or a piece of feedback
+  // waited for the company paying for it to confirm they wanted it. The client
+  // retired the `awaiting_validation` stage on 7 Sep 2026 (shared/types.ts,
+  // `HELP_STATUSES`), so the door is gone from the content worker and the
+  // paragraph above now holds without an exception — this gateway forwards no
+  // door that moves a ticket along its lifecycle.
+  // HOW DID WE DO (the owner, 6 Sep 2026: "let's store sentiment (1-3) on the
+  // portal for how did we do it to see if client is happy"). The portal is where
+  // it is GIVEN, which is why these two are the only doors on the whole feature.
+  //
+  // It is not a lifecycle door and it is not the exception the paragraph above
+  // is: a rating changes no status, edits nothing and appends a sentence about
+  // work that is already finished. Narrow by construction — the account fence
+  // decides whose ticket it is before a row is written, the door refuses
+  // anything that is not `resolved`, and the account the row is judged against
+  // comes from the guard corridor rather than the body.
+  //
+  // The GET answers a CLIENT with their own answer and nobody else's — the
+  // narrowing is in the statement (`readTicketRatings`), not in the screen —
+  // because a colleague's private "1 out of 3" is a personal statement rather
+  // than a fact about the ticket. `GET /api/content/help/stages` is deliberately
+  // NOT here for the sibling reason: its rows name the staff who moved the work.
+  "GET /api/content/help/rating": "CONTENT",
+  "POST /api/content/help/rating": "CONTENT",
 
   // ── what we are waiting on them for ────────────────────────────────────────
   // The only rows in the work engine a client writes to. They read their own

@@ -46,6 +46,7 @@ import type {
   StaffCertificate,
   StaffProfile,
   StoryAttachment,
+  TicketStageHistory,
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, listQuery, post } from "@shared/web/api"
@@ -245,6 +246,31 @@ export type TriageWaiting = {
   appId: string | null
   moduleId: string | null
   raisedByContactId: string | null
+  /** THE CARD'S OWN FACTS (2026-09-06) — the client, the person who asked, and
+   * both faces, resolved by the DOOR rather than looked up here. The reasoning
+   * is on the worker's own `TriageView` (`workers/content/src/lib/triage.ts`)
+   * and it is R14's: `accounts` pages, so the accounts cache a screen holds is
+   * page one, and a card that resolved names against it would have gone blank
+   * on the fifty-first client. */
+  accountName: string | null
+  accountLogo: string | null
+  /** THE APP AND THE SECTION, with their own faces (2026-09-06, round nine).
+   * Widened for the meta block under the description — the client ruled client,
+   * app, module and author are four LINKS, each wearing its record's own face
+   * (R35) — and read a second time by the queue toolbar's "filter by app", whose
+   * options are built from these rows so the dropdown and the card cannot
+   * disagree. Resolved by the DOOR for the reason the two above it are: see
+   * `workers/content/src/lib/triage.ts`. */
+  appName: string | null
+  appLogo: string | null
+  moduleName: string | null
+  moduleMark: string | null
+  raisedByContactName: string | null
+  raisedByContactLogo: string | null
+  /** Both titles, never one standing in for the other — `HelpTicket`'s own
+   * ruling: 788 tickets from Glide exist only in German. */
+  titleDe: string | null
+  titleEn: string | null
 }
 
 /** ONE CLIENT'S TALLY — the shape `countTicketFacets`' `byAccount`
@@ -253,6 +279,92 @@ export type TriageWaiting = {
  * sits beside `open` because a client with everything resolved is a real
  * answer to "how much have we done for them", not a row worth hiding. */
 export type HelpAccountFacet = { accountId: string; accountName: string | null; open: number; total: number }
+
+/** THE TICKETS DASHBOARD, exactly as `readTicketDashboard`
+ * (workers/content/src/lib/help.ts) hands it back — five grouped reads about the
+ * whole backlog in one round trip, every one of them counted by the database.
+ *
+ * WHY THE SHAPES ARE THE DOOR'S AND NOT THE CHART'S. Each of these is a list of
+ * GROUPS with their counts, not a series ready to draw. A chart decides how to
+ * stack, order and label; the door decides what is true. The one thing the door
+ * will not do is hand back rows for a screen to tally, because the backlog is a
+ * collection the browser only ever holds page one of. */
+export type TicketDashboard = {
+  /** 1B — one row per (kind, stage) among the OPEN stages, so the stage is
+   * visible inside each kind's bar rather than in a second chart beside it. */
+  openByTypeAndStatus: { helpType: string; status: HelpTicket["status"]; n: number }[]
+  /** 2B — one row per (client, kind), ordered with the most open work first, so
+   * "which client asks for the most extras" is the first matching row. */
+  byAccountAndType: {
+    accountId: string
+    accountName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** 3A — the five-number summary of days-to-close, per kind. A DISTRIBUTION and
+   * never a mean: a handful of tickets that sat for a year drag an average clear
+   * of every ticket anybody experienced. `n` travels with it because a median
+   * over four tickets is arithmetic rather than a measurement. */
+  closureDays: {
+    helpType: string
+    n: number
+    minDays: number
+    p25Days: number
+    medianDays: number
+    p75Days: number
+    maxDays: number
+  }[]
+  /** 5A — raised-as against is-now, the matrix team migration 0065 exists for.
+   * The diagonal is the tickets nobody recategorised. */
+  raisedVsCurrent: { raisedAsType: string; helpType: string | null; n: number }[]
+  /** …and how many tickets the matrix cannot speak for, because nothing recorded
+   * what they arrived as (every ticket raised before 0065, the ~788 imported
+   * from Glide included). It is NOT a zero and it is not part of the diagonal:
+   * a chart that folded it in would be reporting a rate over a denominator it
+   * had quietly changed. Show it as "not recorded". */
+  raisedAsNotRecorded: number
+  /** 3B — the same middle ticket, month by month, by the month it CLOSED in.
+   * The rows a chart draws a line from.
+   *
+   * EVERY (kind, month) BUCKET IS HERE, however few closed in it. Until
+   * 2026-09-07 a floor of eight was applied at the door and the thin buckets
+   * never reached this type at all; the client removed it ("even if it's only 1,
+   * it should appear there") and the argument that had been made for it is kept
+   * where the constant used to live, in `shared/types.ts`. `n` is what a reader
+   * is given instead: a month's median may have been taken over one ticket, and
+   * the screen says so in the hover readout rather than hiding the month. */
+  closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
+  /** 6A — open work by system, with the KIND inside each system, ordered with
+   * the busiest system first (and every one of a system's kinds kept together,
+   * so the cap can only drop whole bars off the bottom, never a slice out of a
+   * bar still on screen). `appId: null` is a real bar: the work nobody has said
+   * which system it is about. */
+  openByApp: {
+    appId: string | null
+    appName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** How many tickets nobody has opened yet, past the line the triage queue
+   * already draws — counted in WORKING days, off the same threshold and the
+   * same function that queue uses, so the two can never disagree about what
+   * "late" means. */
+  unopenedPastLine: number
+  /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
+   * above was taken over, counted once by the door through the bounded count
+   * seam (R16).
+   *
+   * The screen reads it as a yes/no — did anything match at all — and never
+   * renders the figure, which is why no `formatCount` badge appears beside it.
+   * It exists so a search that finds nothing can be ONE sentence on the screen
+   * instead of six panels each drawing its own private zero, and it is counted
+   * rather than inferred from the arrays because a ticket with no kind and
+   * nothing closed sits in none of them: "every array is empty" is a fact about
+   * which groupings exclude nulls today, not about whether anything matched. */
+  matched: number
+}
 
 export const content = {
   /** R14: a PAGE of tickets (a GROWING collection) — hand back `nextCursor` from
@@ -306,6 +418,39 @@ export const content = {
         byAccount: HelpAccountFacet[]
       }>
     >(`/api/content/help${listQuery({ scope: "all", view: "live", ...opts })}`),
+  /** THE DASHBOARD TAB, in one round trip — every chart on it, counted by the
+   * database. Agency only: the door refuses a client login, because every chart
+   * on it compares one client against the rest.
+   *
+   * THE ARGUMENTS ARE THE TAB'S TOOLBAR, and they are arguments rather than
+   * something the screen does to the answer. Everywhere else in this app a
+   * toolbar facet narrows rows the browser already holds; this tab has no rows —
+   * every number on it is a COUNT(*) the database took — so a filter that did
+   * not reach the door would change nothing at all on screen. Spread through
+   * `listQuery` for the reason every list read is: a parameter spelled out one
+   * `if` at a time is a parameter somebody can leave out.
+   *
+   * `appId` IS NOT A TOOLBAR FACET AND NEVER APPEARS AS ONE. It is where the
+   * reader is STANDING — the app record's own Tickets tab, whose Dashboard view
+   * is this same screen narrowed to one system (client, 6 Sep 2026: "a mini
+   * version, a filtered version"). A fact about the address rather than a
+   * question, which is exactly how `content.help({ appId })` already treats it
+   * one screen along, and why it rides the same object rather than a second
+   * function.
+   *
+   * `q` IS THE SEARCH BOX, and it is the SAME `q` `content.help()` sends one
+   * method along — one name, one door-side matcher (`searchClause`, over the
+   * description, the reference and the title), so a term typed on the Dashboard
+   * tab and the same term typed on the list tab describe the same tickets. It is
+   * the third toolbar argument and the same shape as the first two: it reaches
+   * the WHERE clause, because there is nothing on screen for a browser to sieve.
+   *
+   * There is no `status` and no sort. A dashboard narrowed to one stage would
+   * draw a pipeline of one row under a heading that says backlog, and a
+   * dashboard has no row order to offer (R53 — the exemption is on file). */
+  helpDashboard: (
+    opts: { accountId?: string; helpType?: string; appId?: string; q?: string } = {}
+  ) => api<TicketDashboard>(`/api/content/help/dashboard${listQuery(opts)}`),
   /** PUT IT AWAY, or take it back out. The door has answered this since archive
    * shipped; nothing on any screen called it, so a ticket could be archived by
    * the assistant and then never found again by a person. */
@@ -322,6 +467,10 @@ export const content = {
   // door decides that — a portal caller's account comes from the guard corridor
   // and the body is never consulted (workers/content/src/lib/help.ts).
   createHelp: (input: {
+    /** THE TICKET'S NAME. Optional: the portal's own raise dialog sends none,
+     * and 788 imported tickets never had one — `ticketTitle` falls back to the
+     * description's first line for exactly those. */
+    titleEn?: string
     description: string
     helpType?: string
     sourceScreen?: string
@@ -341,6 +490,7 @@ export const content = {
   }) => api<{ tickets: HelpTicket[]; id?: string }>("/api/content/help", post(input)),
   updateHelp: (input: {
     id: string
+    titleEn?: string
     description: string
     helpType?: string
     accountId?: string
@@ -371,15 +521,19 @@ export const content = {
       byStatus?: Record<string, number>
       byAccount?: HelpAccountFacet[]
     }>("/api/content/help/triage-read", post({ id })),
-  /** THE CLIENT SAYS YES (5.13). Staff press it too, for the answer that arrives
-   * by phone; a client presses it in their own portal. */
-  validateHelp: (id: string) =>
-    api<{ tickets: HelpTicket[] }>("/api/content/help/validate", post({ id })),
   /** ANSWER IT AND TELL THEM (5.6 + 5.7). The resolution is REQUIRED — the door
    * refuses without it, which is the whole of 5.6 — and the send goes to whoever
-   * raised it and that client's main stakeholder. */
-  resolveHelp: (id: string, resolution: string) =>
-    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", post({ id, resolution })),
+   * raised it and that client's main stakeholder.
+   *
+   * `leaving` is the composer's five-second hold reaching zero because the TAB
+   * IS CLOSING (web/lib/send-hold.ts). See `replyHelp` below for the whole
+   * argument; the same one applies here and matters more, because this door
+   * emails the client. */
+  resolveHelp: (id: string, resolution: string, leaving?: boolean) =>
+    api<{ sent: boolean; alreadyResolved: boolean }>("/api/content/help/resolve", {
+      ...post({ id, resolution }),
+      keepalive: leaving === true,
+    }),
   /** Several files and several links on one ticket (5.10). The same three doors
    * the client portal calls — this is one record with one list, not two. */
   helpAttachments: (id: string) =>
@@ -396,12 +550,40 @@ export const content = {
       "/api/content/help/attachments/remove",
       post({ id, attachmentId })
     ),
-  replyHelp: (helpId: string, body: string, taggedUserIds?: string[]) =>
-    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", post({ helpId, body, taggedUserIds })),
+  /** ADD A REPLY TO THE CONVERSATION.
+   *
+   * `leaving` is the one unusual argument and it is worth its paragraph. The
+   * ticket composer holds a reply for five seconds before it is sent at all
+   * (web/lib/send-hold.ts), and one of the four ways that wait ends is the
+   * person CLOSING THE TAB. The send then has to outlive the document, which is
+   * exactly what `keepalive` is for: the browser keeps the request in flight
+   * after the page it was made from is gone.
+   *
+   * WHY NOT `navigator.sendBeacon`, which is the usual answer to this question:
+   * a beacon sends a body and cannot set request headers, so it cannot carry
+   * the `Content-Type: application/json` every worker door parses on, and it
+   * gives back no response to reconcile the thread with. `fetch` with
+   * `keepalive` does both, at the cost of a 64 KB body limit that a reply
+   * (TEXT_LIMITS.long) is nowhere near. */
+  replyHelp: (helpId: string, body: string, taggedUserIds?: string[], leaving?: boolean) =>
+    api<{ replies: HelpMessage[]; total: number }>("/api/content/help/reply", {
+      ...post({ helpId, body, taggedUserIds }),
+      keepalive: leaving === true,
+    }),
   helpStakeholders: (id: string) =>
     api<{ stakeholders: HelpStakeholder[] }>(`/api/content/help/stakeholders?id=${enc(id)}`),
   addStakeholder: (id: string, userId: string) =>
     api<{ stakeholders: HelpStakeholder[] }>("/api/content/help/stakeholders", post({ id, userId })),
+  /** THE STAGES ONE TICKET WENT THROUGH (team migration 0066) — the sequence,
+   * how long it sat in each rung in WORKING days, and how many times it came
+   * back out of `resolved`.
+   *
+   * R14: bounded by the door (`TICKET_STAGE_EVENT_CAP`), so this is the whole
+   * history and there is no page two to walk. A ticket that predates the table
+   * answers `recorded: false`, which the Activity tab must render as WORDS —
+   * never as zeroes, which would be a measurement nobody took. */
+  helpStages: (id: string) =>
+    api<TicketStageHistory>(`/api/content/help/stages?id=${enc(id)}`),
 
   /* --------------------------- the work engine ----------------------------- */
   /** R14: a PAGE of stories (a GROWING collection) — hand `nextCursor` back to

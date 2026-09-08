@@ -14,7 +14,14 @@ import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
-import { TASK_VIEWS, type HelpTicket, type Meeting, type TaskViewName } from "@shared/types"
+import {
+  HELP_STATUSES,
+  OPEN_TAB_STATUSES,
+  TASK_VIEWS,
+  type HelpStatus,
+  type Meeting,
+  type TaskViewName,
+} from "@shared/types"
 import { RECORD_CHILDREN } from "@shared/record-counts"
 import { cachedKeys, primeCache, readCache } from "@shared/web/store"
 
@@ -131,7 +138,7 @@ export const listFetch = {
       // The third facet — which client is generating the most work — rides the
       // same read. The door has answered it since 2026-08-28; this is the first
       // screen that reads it (workers/content/src/lib/help.ts's own note on it).
-      primeCache(`help-by-account:${teamId}`, r.byAccount)
+      primeCache(helpByAccountKey(teamId), r.byAccount)
       return r.tickets
     }),
   // PUT AWAY, AND FINDABLE — archive shipped as a door with no button, and
@@ -153,19 +160,23 @@ export const listFetch = {
    * they are counted over the list ignoring the kind and stage facets, so the
    * strip's badges stay right whichever sub-tab is open. */
   helpFacet: (teamId: string, scope: HelpScope, facet: HelpFacet) => {
-    const f = helpFacetFilter(facet)
     return contentApi
       .help({
         view: scope === "archived" ? "archived" : "live",
-        helpType: f.helpType,
-        status: f.status,
+        // THE WHOLE TOKEN, SPREAD — it used to pick two named fields off the
+        // answer, which meant every new narrowing the grammar learned had to be
+        // remembered here as well, and the day one was not the resting read and
+        // the paged read would have been asking different questions of the same
+        // tab. `helpFacetFilter` returns the door's own query now, so there is
+        // nothing left to forget.
+        ...helpFacetFilter(facet),
       })
       .then((r) => {
         primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
         primeCache(cursorKey(helpFacetKey(teamId, scope, facet)), r.nextCursor)
         primeCache(`help-by-type:${teamId}`, r.byType)
         primeCache(`help-by-status:${teamId}`, r.byStatus)
-        primeCache(`help-by-account:${teamId}`, r.byAccount)
+        primeCache(helpByAccountKey(teamId), r.byAccount)
         return r.tickets
       })
   },
@@ -474,6 +485,68 @@ export function triageKey(teamId: string): string {
   return `triage:${teamId}`
 }
 
+/** THE TICKETS DASHBOARD — every chart on it, in one cache entry.
+ *
+ * ONE KEY, for the reason the pulse below gives: the door answers the grouped
+ * reads together, and a key each would be several entries able to hold several
+ * different moments of the same backlog — a chart of open work beside a chart of
+ * the same open work counted a minute earlier.
+ *
+ * …AND ONE KEY PER QUESTION, which is what the four narrowing parts are for. The
+ * tab's toolbar narrows by client, by kind and by SEARCH TERM, all three AT THE
+ * DOOR (a dashboard has no rows for a browser to sieve), so "all clients" and
+ * "Bergmann's" are two different answers and must not share an entry — the same
+ * arrangement `helpFacetKey` makes for the ticket list's own sub-tabs. Every
+ * part is in the key even when empty, so the unfiltered key is a fixed shape
+ * rather than a prefix of every filtered one.
+ *
+ * THE THIRD PART IS THE SYSTEM, AND IT IS THE ONE THAT WOULD HAVE BEEN A BUG.
+ * The app record's Tickets tab now has a Dashboard view of its own — the same
+ * screen narrowed to one app (client, 6 Sep 2026: "a mini version, a filtered
+ * version") — and every panel on it is a tally over THAT system's tickets. Left
+ * out of the key, two apps' dashboards would share one entry: opening the second
+ * would paint the first one's numbers under the second one's heading, instantly,
+ * from cache, and only correct itself once the read landed. That is the same
+ * defect `sliceKey` was written for one file along ("opening a second app showed
+ * the first one's work"), and it is worse here, because a chart carries no row
+ * a reader could recognise as belonging to somewhere else.
+ *
+ * THE FOURTH PART IS THE SEARCH TERM, AND IT IS THE SAME BUG THE THIRD ONE WAS
+ * ADDED TO PREVENT. The Dashboard tab grew a search box on 7 Sep 2026 ("still
+ * missing full toolbar!"), and the term is a door parameter like the two facets
+ * beside it, spent in the WHERE clause of every grouped read behind this key.
+ * Left out, two searches would share one entry: typing "invoice", then clearing
+ * it and typing "hosting", would paint the first term's numbers under the second
+ * term's box, instantly, from cache, and only correct itself once the read
+ * landed. That is exactly what `appId` was added for one paragraph up, and it is
+ * worse for a term than for a system, because a term changes on every keystroke
+ * the debounce lets through.
+ *
+ * IT IS LAST BECAUSE IT IS THE ONLY FREE TEXT HERE. The other three parts are
+ * ids and vocabulary words; a person can type a colon. With the term last, the
+ * key stays injective anyway — everything after the fourth colon is the term,
+ * whatever is in it — where a colon in a middle part could make two different
+ * questions spell one key.
+ *
+ * A DERIVED cache, so it is dropped and re-read rather than patched: there is no
+ * row in it to patch. Dropped by PREFIX in `help`'s own `slicePrefix` below
+ * rather than named in its `deps`, because a ping carries a row id and cannot
+ * know which filters anybody currently has on screen — and a ticket raised,
+ * recategorised, resolved or archived on somebody else's screen is exactly when
+ * every one of these numbers stops being true, under every filter. Dropping a
+ * key nobody is subscribed to fetches nothing at all, so a team who never opens
+ * the tab pays nothing for it. */
+const HELP_DASHBOARD_PREFIX = "help-dashboard:"
+export function helpDashboardKey(
+  teamId: string,
+  accountId = "",
+  helpType = "",
+  appId = "",
+  q = ""
+): string {
+  return `${HELP_DASHBOARD_PREFIX}${teamId}:${accountId}:${helpType}:${appId}:${q}`
+}
+
 /** THE PULSE — Home's big numbers and its two charts, in one cache entry.
  *
  * ONE KEY FOR ALL THREE SECTIONS, because it is one round trip and one answer:
@@ -621,6 +694,17 @@ export function storyAttachmentsKey(storyId: string): string {
  * checking the pattern rather than copying it. */
 export function helpAttachmentsKey(ticketId: string): string {
   return `help-attachments:${ticketId}`
+}
+/** THE STAGES ONE TICKET WENT THROUGH (team migration 0066).
+ *
+ * HERE RATHER THAN IN THE PANEL, learning the two bugs directly above rather
+ * than repeating them: every status writer publishes `help` with the TICKET's
+ * own id, and this key has to be nameable by `TEAM_RESOURCES.help` for that ping
+ * to reach the sequence. It is not a cosmetic dependency — the panel draws how
+ * long the ticket has been in its CURRENT stage, and that number stops being
+ * true at the exact instant somebody moves it. */
+export function helpStagesKey(ticketId: string): string {
+  return `help-stages:${ticketId}`
 }
 /** WHAT WE HANDED OVER, ON ONE APP. Its rows live ONLY in a per-app slice,
  * because a deliverable is never read anywhere but the app it belongs to —
@@ -833,19 +917,231 @@ export type HelpScope = "all" | "archived"
  * encoded into one anyway. */
 export type HelpFacet = string
 
-/** Split a facet token into the two filters the door parses. `triage` and `all`
- * narrow nothing; the caller decides what to render for the first. */
-export function helpFacetFilter(facet: HelpFacet): {
-  helpType?: string
-  status?: HelpTicket["status"]
-} {
+/** THE FACET GRAMMAR — a tab token turned into the DOOR'S OWN QUERY.
+ *
+ * ── THE GRAMMAR, IN FULL ──────────────────────────────────────────────────
+ *
+ *   `type:<word>`          one kind, the team's own `Ticket type` vocabulary
+ *   `status:<a>`           one stage
+ *   `status:<a>,<b>,<c>`   SEVERAL stages — the Open tab, and the reason the
+ *                          separator exists (client, 2026-09-06: "Open →
+ *                          triaged + scheduled + in_progress + waiting")
+ *   `waiting`              the derived subset: those same open stages, AND the
+ *                          last word on the ticket was ours
+ *   `triage` / `dashboard` / `all`   narrow nothing — the first two swap the
+ *                          collection for a different screen wearing the same
+ *                          strip, and the third is the whole list
+ *
+ * ── WHY IT HANDS BACK A QUERY AND NOT TWO NAMED FIELDS ─────────────────────
+ *
+ * It used to return `{ helpType?, status? }` — one typed field per narrowing —
+ * with a comment saying the strip was "genuinely two questions wearing one row
+ * of tabs". The strip has three now (kind, stage-set, and a derived predicate),
+ * and the third is not a column at all, so a shape with one property per COLUMN
+ * had stopped being able to describe it.
+ *
+ * `Record<string, string>` IS THE DOOR'S QUERY, which is what a facet token has
+ * always really been: `content.help()` spreads whatever it is given through
+ * `listQuery`, so a token that produces query keys directly cannot be lost in
+ * translation between here and the wire — and adding a fourth narrowing tomorrow
+ * is one line here rather than a field on three types.
+ *
+ * THE COMMA IS THE DOOR'S SEPARATOR TOO, deliberately: `ticketFilterFrom`
+ * (workers/content/src/routes/help.ts) splits `status` on exactly this, so the
+ * token, the cache key and the query string all spell the set one way. There is
+ * no encode/decode step to get wrong.
+ *
+ * AN UNRECOGNISED TOKEN NARROWS NOTHING, unchanged — that is what lets `triage`
+ * and `dashboard` be tab values at all without this function knowing they are
+ * screens. */
+export function helpFacetFilter(facet: HelpFacet): Record<string, string> {
   if (facet.startsWith("type:")) return { helpType: facet.slice(5) }
-  // The ONE cast, where the value is built. The two stage tabs are named after
-  // real statuses (`status:ready`, `status:resolved`) and a `slice` cannot know
-  // that — so it is asserted here rather than at each call site, which is what
-  // was happening and is how two places came to spell the same fact differently.
-  if (facet.startsWith("status:")) return { status: facet.slice(7) as HelpTicket["status"] }
+  // NO CAST ANY MORE, and that is a real simplification rather than a lost
+  // check. This used to assert the sliced text was a `HelpStatus`, which was a
+  // claim this file could not actually verify — the words come out of a tab
+  // constant. The DOOR checks them now, against `HELP_STATUSES` itself, and
+  // drops what it does not recognise; a browser asserting a server's vocabulary
+  // was always the wrong end to do it from.
+  if (facet.startsWith("status:")) return { status: facet.slice(7) }
+  // WAITING IS OPEN PLUS A PREDICATE, and it is written here as literally that
+  // — the same stage set the Open tab sends, and the flag. Two keys rather than
+  // one word the door has to expand, so the door never has to know what "Open"
+  // means on this screen: it is handed the stages and the predicate, both of
+  // which it already understands on their own.
+  if (facet === WAITING_FACET)
+    return { status: OPEN_TAB_STATUSES.join(","), waiting: "only" }
   return {}
+}
+
+/** THE STAGES THE OPEN TAB MEANS, AS A TOKEN — built from the one list in
+ * `shared/types.ts` rather than typed out, so the tab, the cache key, the query
+ * and the door's own vocabulary cannot drift apart. */
+export const OPEN_FACET: HelpFacet = `status:${OPEN_TAB_STATUSES.join(",")}`
+/** …AND THE ONE TOKEN THAT NAMES NO STATUS AT ALL. A word rather than a
+ * `status:` token because it is not a stage: see `waitingClause`
+ * (workers/content/src/lib/help.ts) for what it actually asks. */
+export const WAITING_FACET: HelpFacet = "waiting"
+
+/* ══════════════════════════════════════════════════════════════════════════
+   WHICH FILTERS A TICKET TAB MAY OFFER — THE RULE, WRITTEN ONCE.
+
+   ── THE CLIENT'S RULING, 2026-09-07, VERBATIM ─────────────────────────────
+
+     "On open, I want, instead of the current filters, client, app, type, and
+      status. On waiting, client, app, and type. On closed client app type. On
+      all client app type status. On triage client up and type."
+
+   ("up" is "app" — she was typing fast.) FIVE tabs are named and the strip has
+   SEVEN. So this file does NOT hold five lists. Five lists would answer only
+   the tabs somebody thought to type out, and the next tab added to the strip
+   would arrive with whatever facet set the code happened to fall through to —
+   silently, because a facet that should not be there looks exactly like one
+   that should.
+
+   ── THE RULE UNDERNEATH HER FIVE ANSWERS ──────────────────────────────────
+
+   A FACET IS OFFERED ON A TAB ONLY WHERE THE TAB SPANS MORE THAN ONE VALUE OF
+   THAT FACET'S FIELD.
+
+   That is one sentence and it derives all seven tabs, because the tab token
+   IS the tab's narrowing: `helpFacetFilter` above turns it into the door's own
+   query, and a field that query pins is a field the reader cannot move. A
+   select whose only content is the value already in force is a control with
+   nothing to control — the same argument the kit makes about a one-view
+   `ViewSwitch` (it draws a static label rather than a switch below two views),
+   and the same one `translatedFacets` already makes when it drops a facet whose
+   option list came back empty.
+
+   Read against her five answers:
+
+     TRIAGE   `status = 'new'` and nothing else, so ONE status. No Status.
+              Client, app and type are unpinned → all three. ✓ her list.
+     READY    `status:ready`. ONE status. No Status. ✓ (she did not name this
+              tab at all — see below.)
+     OPEN     `OPEN_FACET`, the `status:` token built from `OPEN_TAB_STATUSES`.
+              FOUR since 2026-09-07 ("in open, include status ready and
+              waiting"), and this paragraph deliberately no longer spells them:
+              the set is one array in shared/types.ts and a count typed out here
+              is a second copy of it that can go stale silently. Status, offering
+              exactly the stages the tab spans. ✓ her list.
+     WAITING  see clause two. ✓ her list.
+     CLOSED   `status:resolved`. ONE. No Status. ✓ her list.
+     ALL      pins nothing, so it spans the whole lifecycle. Status, offering
+              all seven. ✓ her list.
+
+   SHE DID NOT MENTION READY, and the rule settles it rather than a guess
+   settling it: the tab is `status:ready`, one status, so a Status facet on it
+   would offer exactly one word. Client, app and type. That is the same answer
+   the rule gives Closed and Triage, which she DID name, so Ready is not being
+   treated as a special case — it is being treated as the ordinary case it is.
+
+   AND IT STAYS THE ORDINARY CASE NOW THAT OPEN CONTAINS IT (2026-09-07). The
+   Ready TAB is still `status:ready` and still spans one stage, so it still
+   offers no Status facet; what changed is that the same tickets ALSO appear
+   under Open, where the reader can narrow to them with the Status control. Two
+   ways to the same pile is what a nesting strip is, and the rule above needed
+   no clause for it: it reads each tab's own token and neither token moved.
+
+   ── CLAUSE TWO: A DERIVED TAB'S STATUS CLAUSE IS NOT ITS SPAN ─────────────
+
+   WAITING is the one tab the span clause alone would get wrong. Its query is
+   `{ status: <OPEN_TAB_STATUSES>, waiting: "only" }` — several statuses, so
+   clause one would hand it a Status facet, and the client explicitly did not
+   ask for one.
+
+   She is right, and the reason is structural rather than a preference. Waiting
+   is not a range of stages; it is a PREDICATE (`waitingClause`,
+   workers/content/src/lib/help.ts — the last word on the conversation was
+   ours). The statuses in its query are not a description of the tab, they
+   are SCAFFOLDING it borrows from Open so the predicate has a sensible pile to
+   run over: `helpFacetFilter` writes them out precisely so the door never has
+   to know what "Open" means on this screen. A facet built off borrowed
+   scaffolding would be a control describing something the tab is not about.
+
+   SO: a tab whose query touches a field the toolbar has no facet for is a
+   DERIVED tab, and a derived tab offers no Status. That is computable rather
+   than hand-listed — `HELP_TOOLBAR_FACET_FIELDS` below is the toolbar's own
+   four, and `waiting` is not one of them — so the day a second derived tab
+   arrives it gets the same answer without anybody remembering this paragraph.
+
+   It deliberately does NOT withhold client, app or type from a derived tab:
+   those three are unpinned on Waiting, they span the whole collection there,
+   and she asked for all three. Only the borrowed field is withheld, because
+   only the borrowed field was borrowed.
+
+   ── WHAT THIS FUNCTION IS NOT ────────────────────────────────────────────
+
+   It does not know what the OPTIONS are, only which questions may be ASKED.
+   Where each facet's options come from is a separate decision with its own
+   trap (page one of a growing collection is not the collection), and it is
+   made at the call site in `tickets-collection.tsx`, beside the caches that
+   answer it. The one exception is Status, whose options ARE the span — a
+   closed, server-owned vocabulary this function is already computing — so it
+   hands the exact words back rather than leaving the screen to re-derive them
+   and offer a stage the tab cannot contain.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** The four door parameters the tickets toolbar draws a facet for, in the
+ * client's own reading order (client, app, type, status). A key in a tab's own
+ * query that is NOT one of these makes that tab DERIVED — see clause two
+ * above. Exported so the check beside this rule reads the same four the code
+ * does rather than a copy that can drift. */
+export const HELP_TOOLBAR_FACET_FIELDS = ["accountId", "appId", "helpType", "status"] as const
+
+/** Which of the toolbar's four facets one tab may offer. `statuses` is empty
+ * where the Status facet is withheld, and otherwise IS the closed set of words
+ * that tab can contain — never "whatever is on the page". */
+export type HelpTabFacets = {
+  accountId: boolean
+  appId: boolean
+  helpType: boolean
+  statuses: HelpStatus[]
+}
+
+/** THE RULE ABOVE, APPLIED TO ONE TAB TOKEN. */
+export function helpTabFacets(facet: HelpFacet): HelpTabFacets {
+  // The tab's own narrowing, as the door reads it — the same one line the list
+  // spreads into `fetchPage`, so the control set and the query cannot come to
+  // disagree about what a tab is.
+  const query = helpFacetFilter(facet)
+  // CLAUSE TWO. A key outside the toolbar's own four is a narrowing no facet
+  // can express, which makes this a derived tab.
+  const derived = Object.keys(query).some(
+    (key) => !(HELP_TOOLBAR_FACET_FIELDS as readonly string[]).includes(key)
+  )
+  // THE STATUS SPAN. No `status` key means the tab pins no stage at all, which
+  // is the WHOLE lifecycle rather than none of it — `all` and `dashboard` both
+  // land here, and the difference between them is that one draws a list.
+  // A `status` key is split on the door's own separator and checked against the
+  // server's vocabulary, so a token carrying a word `HELP_STATUSES` no longer
+  // holds cannot become an option nothing can ever match.
+  const spanned =
+    query.status === undefined
+      ? [...HELP_STATUSES]
+      : query.status
+          .split(",")
+          .map((word) => word.trim())
+          .filter((word): word is HelpStatus => (HELP_STATUSES as readonly string[]).includes(word))
+  return {
+    // The three single-valued parameters: pinned by the tab means a span of
+    // one, which is the same "nothing to control" test the statuses get below.
+    accountId: query.accountId === undefined,
+    appId: query.appId === undefined,
+    helpType: query.helpType === undefined,
+    statuses: derived || spanned.length < 2 ? [] : spanned,
+  }
+}
+
+/** WHERE THE DOOR'S PER-CLIENT TALLY LANDS — one grouped `COUNT(*)` per client
+ * over the WHOLE ticket collection (`countTicketFacets`, workers/content/src/
+ * lib/help.ts), primed by every resting ticket read whichever tab is open.
+ *
+ * A KEY RATHER THAN TWO STRING LITERALS, because it has readers on both sides
+ * now: this file primes it and the toolbar's Client facet reads it. It was
+ * spelled out twice while only the primer existed; a third spelling is how a
+ * facet quietly reads a cache nobody writes. */
+export function helpByAccountKey(teamId: string): string {
+  return `help-by-account:${teamId}`
 }
 
 /** The cache key for one sub-tab of one scope. It carries BOTH, because the two
@@ -1022,6 +1318,11 @@ export const TEAM_RESOURCES: Record<
       // ping. The story's twin is directly above; this is its ticket half.
       helpAttachmentsKey(id),
       `total:${helpAttachmentsKey(id)}`,
+      // …AND THE LADDER IT CLIMBED. Every status writer publishes `help` with
+      // the ticket's own id (0066 lists all eight of them), so this is where the
+      // Activity tab's stage strip learns that a rung was added — and, just as
+      // importantly, that the CURRENT stage's running duration has restarted.
+      helpStagesKey(id),
       `help-mine:${t}`,
       insightsKey(t),
       ...recordCountDeps("help"),
@@ -1029,7 +1330,20 @@ export const TEAM_RESOURCES: Record<
     // …and every per-account slice of the ticket list — a contact's Tickets tab
     // is one of those, and a slice nobody drops is a tab that goes stale the
     // moment somebody else raises a ticket.
-    slicePrefix: ["tickets-account-of:", RECORD_MAP_PREFIX],
+    //
+    // …AND THE WHOLE DASHBOARD FAMILY, which moved OUT of `deps` above when that
+    // tab grew a toolbar. Its charts are counted off this collection by the
+    // server, so a ticket raised, recategorised, resolved or put away is
+    // precisely when every one of them stops being true — but they are now keyed
+    // by the reader's own two filters as well as the team, and a ping carries a
+    // row id and cannot know which filters anybody has on screen. `deps` could
+    // name the unfiltered key and only that one, so a reader who had picked a
+    // client would have sat in front of numbers that never moved again. This is
+    // the shape `slicePrefix` exists for (the header on this field says so): a
+    // family of keys the ping cannot name, dropped by prefix. A derived cache
+    // has no row to patch, and only the entry somebody is actually looking at is
+    // re-read.
+    slicePrefix: [HELP_DASHBOARD_PREFIX, "tickets-account-of:", RECORD_MAP_PREFIX],
   },
   // PROCESS MAPS — row-level live. A step edited on somebody else's screen
   // patches just that map in the cached list; the deps carry the parts of the

@@ -2,8 +2,11 @@
 import { Prohibit, GitBranch, ListNumbers, Plus } from "@shared/ui/foundations/icons"
 import { ApiFailure } from "@/lib/api"
 
-// Process detail — one map at /processes/<id>, as a tabbed record (Law R2):
-// Overview / Steps / Versions / Conversation / Activity. Host-composed, because
+// Process detail — one map at /processes/<id>, as a tabbed record:
+// Overview / Steps / Versions / Conversation. Its history is not the last tab
+// any more — it is reached from the ink footer's Latest activity column, on the
+// client's 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the
+// ruling and the argument. Host-composed, because
 // the Steps tab draws an ARITHMETIC no engine block knows about — a baseline, a
 // latest, and the subtraction between them — and Versions and the conversation
 // are collections with their own actions.
@@ -77,7 +80,6 @@ import type {
 import { ProcessFormDialog, type ProcessFormValues } from "@/components/process/process-form-dialog"
 import { StepFormDialog, type StepFormValues } from "@/components/process/step-form-dialog"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -106,6 +108,7 @@ import { invalidate, invalidatePrefix, useCached } from "@shared/web/store"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useLanguage } from "@shared/web/language"
 import { formatDate } from "@shared/web/format"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { RichText } from "@shared/web/rich-text-view"
 
 
@@ -414,15 +417,9 @@ export function ProcessDetailScreen({
         badge: formatCount(commentsQ.data?.total ?? commentsTotal),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        // R8: a tab that reveals a collection carries its count, and R16 says the
-        // number is the server total through the one seam — never the loaded page.
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a map's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -723,7 +720,9 @@ export function ProcessDetailScreen({
                         </span>
                         <span className="text-muted-foreground block text-xs">
                           {formatDate(v.createdAt, lang)}
-                          {v.createdByName ? ` · ${v.createdByName}` : ""}
+                          {/* R54: a process VERSION is ours — a client can comment on a map,
+                              never author a version of it. */}
+                          {v.createdByName ? ` · ${staffNameFromSnapshot(v.createdByName)}` : ""}
                         </span>
                       </span>
                       <ListNumbers className="text-muted-foreground size-4 shrink-0" />
@@ -748,7 +747,11 @@ export function ProcessDetailScreen({
                   // named hole rather than gluing a translated fragment onto
                   // `c.body`: a fragment plus a value is the one shape a
                   // translator cannot reorder.
-                  author: c.createdByName ?? (c.fromStaff ? t("Your team") : t("A colleague")),
+                  // R54: a map's conversation has both sides on it, and `fromStaff`
+                  // is the row's own answer to which side wrote this one.
+                  author:
+                    (c.fromStaff ? staffNameFromSnapshot(c.createdByName) : c.createdByName) ||
+                    (c.fromStaff ? t("Your team") : t("A colleague")),
                   body: c.explainsStepKey
                     ? t("Why a step takes longer, {reason}", { reason: c.body })
                     : c.body,
@@ -768,13 +771,11 @@ export function ProcessDetailScreen({
               />
             )
 
-          return (
-            <ActivityPanel
-              activity={activity}
-              onAddNote={can("processes", "create") ? activity.addNote : undefined}
-              notePlaceholder={t("Add a note")}
-            />
-          )
+          // EVERY TAB ABOVE HAS ITS OWN BRANCH, so this is unreachable — kept
+          // because `renderPanel` must return a node for whatever tab it is
+          // handed. Activity used to be the fall-through; it is not a tab any
+          // more (see the tabs config above).
+          return null
         }}
       />
 

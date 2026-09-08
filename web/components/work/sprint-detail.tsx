@@ -1,7 +1,9 @@
 "use client"
 
-// SPRINT DETAIL — one block of sold work at /sprints/<id>, as a tabbed record
-// (Law R2): Overview / Stories / Activity.
+// SPRINT DETAIL — one block of sold work at /sprints/<id>, as a tabbed record:
+// Overview / Stories. Its history is not a third tab any more — it is reached
+// from the ink footer's Latest activity column, on the client's 2026-09-06
+// ruling; web/components/records/activity-panel.tsx carries the ruling and the argument.
 //
 // COMPLETING A SPRINT LIVES HERE, deliberately and nowhere else. It is not a
 // status word: it is the moment that cuts a version of every process map beneath
@@ -33,7 +35,6 @@ import { StoryFormDialog } from "@/components/work/story-form-dialog"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import { StoriesPanel, sliceKey } from "@/components/work/work-panels"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { ApiFailure, content as contentApi } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -241,13 +242,9 @@ export function SprintDetailScreen({
         badge: formatCount(storiesTotal),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a sprint's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -375,14 +372,6 @@ export function SprintDetailScreen({
                 host={host}
                 onNew={canCreate ? () => setStoryOpen(true) : undefined}
                 emptyText={t("No work in this sprint yet.")}
-              />
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("work", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
               />
             )
           return (

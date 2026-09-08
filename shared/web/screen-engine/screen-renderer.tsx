@@ -55,7 +55,10 @@ import { Input } from "@shared/ui/components/input/input"
 import { Notes } from "@shared/web/notes-editor/notes-editor"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { Switch } from "@shared/ui/components/switch/switch"
-import { ActivityFeed } from "@shared/ui/components/activity-feed/activity-feed"
+import {
+  ActivityFeed,
+  type ActivityFeedItem,
+} from "@shared/ui/components/activity-feed/activity-feed"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Card, CardDescription, CardHeader, CardTitle } from "@shared/ui/components/card/card"
 import { Gallery, type GalleryTile } from "@shared/ui/components/gallery/gallery"
@@ -70,8 +73,9 @@ import {
 } from "@shared/ui/components/dropdown-menu/dropdown-menu"
 import { DescriptionList } from "@shared/ui/components/description-list/description-list"
 import { List } from "@shared/web/list-compat"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { RecordDetail } from "@shared/ui/components/record-detail/record-detail"
-import { clampRecordHeading } from "../record-heading"
+import { RECORD_TITLE_TREATMENT, clampRecordHeading } from "../record-heading"
 
 /* ------------------------- host-injected contracts ------------------------- */
 
@@ -135,30 +139,36 @@ export interface ScreenRendererProps {
   useKitPanel?: boolean
   band?: React.ReactNode
   /**
-   * THE HOST'S OWN ACTIVITY PANEL, for a recipe's `activity` block.
+   * THE DOOR ON THE RECORD FOOTER'S LATEST-ACTIVITY ROW — a node, drawn at the
+   * inline end of that column's eyebrow (`RecordDetail.activityAction`), for a
+   * `type: "detail"` recipe. Today the app's own `<ActivityRail>`: the link
+   * "All activity · 48" and the `EdgePanel` it opens.
    *
-   * A record's history is the same thing on a recipe screen as on a bespoke
-   * one, and the app already has ONE component for it —
-   * `web/components/records/activity-panel.tsx` (`<ActivityPanel>`): the feed, its
-   * empty/loading/error registers, the note composer, and — the part that
-   * matters most — the "Load more activity" pager INSIDE the tab. Law R2's own
-   * check names that component by hand for every bespoke detail.
+   * THIS IS NOT `renderActivity` COMING BACK, and the difference is the whole
+   * reason the old prop is not the answer here. `renderActivity` let a host
+   * pass `web/components/records/activity-panel.tsx` INTO this engine as the body of a
+   * recipe's `activity` BLOCK — a tab. The client killed the Activity tab
+   * across the app (2026-09-06: "I don't want to have activity as a tab
+   * anywhere but on the footer … this would open a slide-in with all the
+   * activity"; 2026-09-07: "kill all old activity tabs"), no recipe declares
+   * that block any more, and a rail hung off the FOOTER is not a tab body.
    *
-   * The engine cannot import it. `ActivityPanel` lives under `web/`, reaches
-   * the app-side `@/lib` alias, and `shared/web/` is rendered by BOTH front
-   * doors, where `@/` resolves to two different folders — so the panel comes
-   * IN through this prop rather than the engine going out to fetch it. The
-   * host is the half that knows the record's feed, its cache key and its next
-   * page anyway.
+   * WHAT SURVIVES OF THE OLD PROP'S REASONING IS WHY THIS IS STILL A NODE
+   * RATHER THAN SOMETHING THE ENGINE BUILDS. `ActivityRail` lives under `web/`
+   * and reaches the app-side `@/lib` alias; `shared/web/` is rendered by BOTH
+   * front doors, where `@/` resolves to two different folders. So the door
+   * comes IN, exactly as the panel used to, and for the same constraint. The
+   * kit says the same thing from its own side: `activityAction` "supplies the
+   * PLACE, the TYPE STEP, the LEADING and the INK. It does not supply the
+   * control" — a kit component must not own a string or a navigation, and
+   * neither may an engine that is shared by two products.
    *
-   * Omitted, the block falls back to a plain kit `ActivityFeed` with this
-   * app's own words on all three registers — correct, translated, and pagerless.
-   * The pager is the one thing the fallback CANNOT have: nothing here knows a
-   * list key or how to fetch a second page. A host that hangs one below the
-   * whole `<ScreenRenderer>` instead puts "Load more activity" under the
-   * Overview tab as well, which is the shape this prop exists to retire.
+   * The PORTAL passes nothing and gets nothing: it renders no record activity
+   * at all (`PORTAL_ACTIVITY_EXEMPT` — the door is not on the portal
+   * gateway's surface), and an omitted node leaves that column's eyebrow
+   * exactly as it was.
    */
-  renderActivity?: (source: string) => React.ReactNode
+  activityAction?: React.ReactNode
 }
 
 /** Everything a block needs to draw itself. One bundle rather than seven
@@ -172,10 +182,42 @@ interface BlockCtx {
   rights: ScreenRights
   onIntent?: ScreenRendererProps["onIntent"]
   state?: ScreenRendererProps["state"]
-  renderActivity?: ScreenRendererProps["renderActivity"]
 }
 
 /* -------------------------------- helpers -------------------------------- */
+
+/** A host-shaped activity set → the kit's own feed rows.
+ *
+ * ONE MAPPING, TWO READERS, and they must not drift: the `activity` BLOCK
+ * (a recipe that still declares one) and the record footer's own Latest
+ * activity SUMMARY, which `renderDetail` draws from the same `sets.activity`
+ * the block would have. Written twice it would be the same four-line map in
+ * two places on one screen — which is exactly the shape
+ * `web/lib/use-record-activity.ts` already carries a note about, having been
+ * the second copy of this map for a year.
+ *
+ * The cast is the seam this engine is built on: `ScreenData.sets` is
+ * deliberately untyped rows the host shaped (`shapeActivity`,
+ * web/components/deep-link/shape.tsx, whose output is exactly these six
+ * fields). Nothing here fetches; the host's shaper owns the contract.
+ */
+function feedItems(rows: Row[] | undefined): ActivityFeedItem[] {
+  return ((rows ?? []) as unknown as Array<{
+    id: string
+    description: string
+    actor?: string
+    initials?: string
+    timestamp?: string
+    dateTime?: string
+  }>).map((a) => ({
+    id: a.id,
+    description: a.description,
+    actor: a.actor,
+    initials: a.initials,
+    time: a.timestamp,
+    dateTime: a.dateTime,
+  }))
+}
 
 const gapClass = { sm: "gap-2", md: "gap-4", lg: "gap-6" } as const
 
@@ -372,6 +414,11 @@ function ScreenForm({
   rights: ScreenRights
   onAction: ScreenRendererProps["onAction"]
 }) {
+  // The reader's language, for the one control in `renderInput` that names
+  // itself: a notes editor is a `div`, so its label cannot come from the
+  // `<label for>` the `Field` below draws and has to be spoken as an aria name
+  // instead. Everything else on this form reads its words through `Field`.
+  const t = useT()
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
   )
@@ -422,6 +469,17 @@ function ScreenForm({
       case "notes":
         return (
           <Notes
+            // The recipe engine's own half of the same fix. Every other branch
+            // here already hands its control an `id` (`f.column`, the same
+            // string the `Field` below writes as its `htmlFor`) and a
+            // `disabled`; the notes branch could hand over neither, because the
+            // editor accepted neither — so a recipe screen's notes field was
+            // the one control in this switch with no name and no gate. The
+            // label comes from the field's own config, translated here the same
+            // way `Field` translates the one it paints above the box.
+            id={f.column}
+            aria-label={f.field.label ? t(f.field.label) : undefined}
+            disabled={disabled}
             defaultValue={String(v ?? "")}
             onChange={(html) => set(f.column, html)}
           />
@@ -533,13 +591,18 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
             }))}
         />
       )
-    // A RECORD'S HISTORY, THROUGH THE HOST'S OWN PANEL WHERE THERE IS ONE.
-    // `renderActivity` hands back `<ActivityPanel>` — the same component every
-    // bespoke detail draws, pager and all — and its own prop doc says why the
-    // engine cannot simply import it.
+    // A RECORD'S HISTORY. It used to draw the host's own `<ActivityPanel>`
+    // where one was handed in (`renderActivity`, retired with the Activity tabs
+    // it served — the prop's own note above says why it is not coming back);
+    // what is left is the block's own feed, for a recipe that still declares an
+    // `activity` block. NOTHING IN THIS APP DOES: the base recipes lost their
+    // Activity tabs on the client's 2026-09-06 ruling. It stays because a
+    // recipe is DATA a team can OVERRIDE (`resolveRecipe` in web/lib/screens.ts
+    // takes opaque JSON from the config store), so a stored override can still
+    // name this block, and a block kind the engine has forgotten how to draw is
+    // a blank panel rather than an honest one.
     //
-    // The fallback below is what a host that passes nothing still gets, and it
-    // is no longer a bare feed. It used to be exactly that: no `emptyLabel`, no
+    // The feed below is not a bare one. It used to be exactly that: no `emptyLabel`, no
     // `loading`, no `error`, so an empty history fell through to the KIT'S own
     // hardcoded English ("No history yet", "History unavailable") — words the
     // translation walk cannot see, because it never opens `shared/ui/` (R28,
@@ -549,7 +612,6 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
     // `web/components/records/activity-panel.tsx` already says, so the two feeds cannot
     // drift apart and the catalogue gains nothing new.
     case "activity": {
-      if (ctx.renderActivity) return ctx.renderActivity(block.source)
       return (
         <ActivityFeed
           emptyLabel={t("No activity yet.")}
@@ -562,21 +624,7 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
           error={ctx.state === "error"}
           errorLabel={t("Couldn't load activity")}
           errorBody={t("We couldn't load this record's activity. Try again in a moment.")}
-          items={((data.sets?.[block.source] ?? []) as unknown as Array<{
-            id: string
-            description: string
-            actor?: string
-            initials?: string
-            timestamp?: string
-            dateTime?: string
-          }>).map((a) => ({
-            id: a.id,
-            description: a.description,
-            actor: a.actor,
-            initials: a.initials,
-            time: a.timestamp,
-            dateTime: a.dateTime,
-          }))}
+          items={feedItems(data.sets?.[block.source])}
         />
       )
     }
@@ -747,12 +795,55 @@ function renderList(
   const leadingOf = (row: Row): React.ReactNode =>
     recipe.leading ? asNode(row[recipe.leading]) : undefined
 
+  /** THE ROW'S NAME, WITH ITS REFERENCE IN FRONT OF IT WHEN IT HAS ONE.
+   *
+   * `String(row[title])` is what every list row was, and it is still exactly
+   * that when the recipe declares no `reference` — the same byte-identical
+   * promise `leading` makes one line up, and the reason this is a wrapper
+   * rather than a change to the cast.
+   *
+   * WHY THE ENGINE DRAWS IT AND NOT THE SHAPER. Six of the seven kinds that
+   * carry a reference reach a person through a recipe list, and before this
+   * they said so five different ways: `S0012 · Redesign` glued into the title
+   * on three sprint views, nothing at all on stories, nothing at all on apps,
+   * and a `reference` row key on meetings that no column had read since the
+   * Reference column was removed. Every one of those was a shaper making a
+   * presentation decision the client had already ruled on for tickets, in a
+   * place no rule could see it. The mark is `RecordRef`'s, the position is
+   * `REF_LEADS_NAME`, and a recipe's only say in it is WHICH COLUMN holds the
+   * number. */
+  const titleOf = (row: Row): React.ReactNode => {
+    const name = String(row[fields[0]?.column ?? "id"] ?? "")
+    const ref = recipe.reference ? row[recipe.reference] : null
+    if (typeof ref !== "string" || !ref) return name
+    return (
+      <span className={REF_LEADS_NAME}>
+        <RecordRef value={ref} />
+        {/* `truncate` on the NAME and not on the row: the chip is `shrink-0`,
+            so when a row runs out of width it is the name that gives way and
+            the reference is never clipped. An id with its tail cut off is not
+            a shortened id, it is a different record's. */}
+        <span className="min-w-0 truncate">{name}</span>
+      </span>
+    )
+  }
+
   return (
     <CollectionFrame
       config={recipe.collection ?? { ...defaultCollectionConfig }}
       data={rows}
       memoryKey={recipe.binding.module}
-      searchKeys={fields.map((f) => f.column)}
+      // THE REFERENCE IS SEARCHABLE WHEREVER IT IS VISIBLE. A number on a row
+      // is a number somebody will type into the box above it, and the sprints
+      // list is where that nearly went wrong: its reference used to be glued
+      // into the `name` column (`S0012 · Redesign`), so pulling it out into its
+      // own column for the chip would have silently taken "S0012" out of the
+      // one search that could answer it. A visible id that finds nothing is
+      // worse than a hidden one, so the column the chip reads is a search key
+      // in the same breath. (On a PAGED collection this frame's search is off
+      // entirely — `listCollection(…, { paged: true })` — and the door's own
+      // clause is what has to know about `ref`.)
+      searchKeys={[...fields.map((f) => f.column), ...(recipe.reference ? [recipe.reference] : [])]}
       state={state}
       useKitPanel={useKitPanel}
       band={band}
@@ -839,7 +930,7 @@ function renderList(
             surface={recipe.surface}
             items={page.map((row) => ({
               id: String(row.id ?? ""),
-              title: String(row[fields[0]?.column ?? "id"] ?? ""),
+              title: titleOf(row),
               subtitle: String(row[fields[1]?.column ?? ""] ?? ""),
               leading: leadingOf(row),
             }))}
@@ -870,9 +961,10 @@ function tabGlyph(tab: { key: string; icon?: string }): React.ReactNode {
 
 function renderDetail(
   blockCtx: BlockCtx,
-  onAction: ScreenRendererProps["onAction"]
+  onAction: ScreenRendererProps["onAction"],
+  activityAction: ScreenRendererProps["activityAction"]
 ): React.ReactNode {
-  const { recipe, data, rights, onIntent } = blockCtx
+  const { t, recipe, data, rights, onIntent } = blockCtx
   const record = data.record ?? {}
   const header = recipe.header
   const title = header
@@ -964,7 +1056,70 @@ function renderDetail(
       tabs={detailTabs}
       onTabChange={(v) => onIntent?.({ kind: "tab", tab: v })}
       panel={panelBody}
-      className="w-full"
+      /* THE RECORD'S HISTORY, ON THE FOOTER AND NOWHERE ELSE — client ruling,
+         2026-09-06, verbatim: "I don't want to have activity as a tab anywhere
+         but on the footer, on top of the dates. On the right column, on Latest
+         Activity, I would like some view or expand or whatever, and this would
+         open a slide-in with all the activity."
+
+         THIS PATH HAD NEITHER HALF OF THAT, AND THE GAP WAS INVISIBLE. The
+         thirteen bespoke details have drawn the kit's ink footer since
+         2026-08-31 (web/components/records/record-chrome.tsx §"the footer"); this
+         engine has always rendered `RecordDetail` with no `audit` and no
+         `activity`, so a recipe-driven record (the team's own landing screen,
+         a member, an invite, the four agency-internal kinds) showed no footer
+         summary at all. While those recipes still carried an Activity TAB
+         nobody noticed: the history was one click away. The tab went on
+         2026-09-06 and the same screens were left with no route to their
+         history whatsoever, which is the half of R14 that is about a person
+         rather than a cursor.
+
+         THE ROWS ARE THE ONES THE HOST ALREADY SHAPED. `sets.activity` is fed
+         by every detail branch in web/components/deep-link/module-content.tsx
+         (`shapeMemberDetail`, `shapeTeamDetail`, `shapeInviteDetail`, and the
+         internal shapers) and was being carried and drawn by nothing after the
+         tab left. No new read, no new prop, no second fetch — `feedItems` is
+         the same mapping the `activity` block uses, and `RecordDetail` takes
+         the newest few because CH27.8 says the footer is a summary.
+
+         `activityLabel` IS PASSED SO IT CAN BE TRANSLATED. Left off, the
+         column's heading falls through to `RecordDetail`'s own hardcoded
+         English, which the translation walk cannot see (R28 never opens
+         `shared/ui/`). The same sentence, said once, in the reader's language.
+
+         AND `activityAction` IS THE DOOR — the app's `<ActivityRail>`, handed
+         in by the host (see the prop's own note above for why it comes in
+         rather than being built here). Omitted — the portal, and any host that
+         has not wired one — the row is byte-identical to what it was. */
+      activity={feedItems(data.sets?.activity)}
+      activityLabel={t("Latest activity")}
+      activityAction={activityAction}
+      /* THE SAME TITLE TREATMENT THE BESPOKE DETAILS WEAR — R52, added
+         2026-09-06. `RECORD_TITLE_TREATMENT` (shared/web/record-heading.tsx)
+         is the h1/44 step and the 80% title/actions split as ONE string, and
+         `web/components/records/record-chrome.tsx` applies exactly this same constant
+         to the thirteen hand-composed detail screens.
+
+         WITHOUT IT THIS PATH DREW A DIFFERENT SCREEN FROM THE SAME MODEL.
+         Both constants used to be private to record-chrome.tsx, so nothing
+         here applied either: `RecordDetail` fell through to the kit's own
+         `titleSize = "h3"` default and set every recipe record's name at 24px
+         where the bespoke path set it at 44px — five screens, `team.detail`
+         (the app's own landing screen) among them, disagreeing with thirteen
+         for no reason anybody chose. Nobody could see it in review either,
+         because the difference is a DEFAULT on one path and a class on the
+         other, and neither file mentions the other.
+
+         IT LANDS ON THE SAME ELEMENT FROM A DIFFERENT ROOT. `RecordChrome`
+         (the kit template the bespoke path goes through) puts its className on
+         a wrapper ABOVE `[data-slot=record-detail]`; this puts it ON that node.
+         Both selectors inside the constant are descendant selectors under
+         `[data-slot=title]` / `[data-slot=title-heading]`, which are inside
+         `RecordDetail` either way.
+
+         `cn` rather than a template string so tailwind-merge sees `w-full` and
+         the arbitrary-variant classes as the separate groups they are. */
+      className={cn("w-full", RECORD_TITLE_TREATMENT)}
     />
   )
 }
@@ -1067,7 +1222,7 @@ function ScreenRenderer({
   state,
   useKitPanel,
   band,
-  renderActivity,
+  activityAction,
 }: ScreenRendererProps) {
   const t = useT()
   const mode: ScreenPresentation =
@@ -1090,13 +1245,13 @@ function ScreenRenderer({
     )
   }
 
-  const blockCtx: BlockCtx = { t, recipe, data, rights, onIntent, state, renderActivity }
+  const blockCtx: BlockCtx = { t, recipe, data, rights, onIntent, state }
 
   const content =
     recipe.type === "list" ? (
       renderList(t, recipe, data, rights, onAction, onIntent, state, useKitPanel, band)
     ) : recipe.type === "detail" ? (
-      renderDetail(blockCtx, onAction)
+      renderDetail(blockCtx, onAction, activityAction)
     ) : recipe.type === "edit" || recipe.type === "add" ? (
       <ScreenForm
         recipe={recipe}

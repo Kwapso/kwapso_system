@@ -45,6 +45,7 @@ import type { BrandAsset, TeamMember } from "@shared/types"
 import { useCached, useCachedValue } from "@shared/web/store"
 import { totalKey } from "@/lib/live-resources"
 import { useT } from "@shared/web/language"
+import { personName } from "@/lib/identity"
 
 export function KwapsoScreen({
   active,
@@ -172,11 +173,15 @@ function TeamPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
               are" and it was the one that showed nobody. */}
           <RecordMark
             picture={m.imageUrl}
-            name={[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+            name={personName(m)}
             shape="round"
           />
           <span className="font-medium">
-            {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+            {/* R54, and this was the one place in the app that joined the pair
+                by hand instead of asking `personName`. A verbatim copy of a seam
+                is a screen the seam cannot reach: this list would have kept
+                saying "Audora Alasa" while every other one said "Audora". */}
+            {personName(m)}
           </span>
           <span className="text-muted-foreground text-xs">{m.roleTitle}</span>
           <span className="text-muted-foreground ml-auto text-xs">{m.email}</span>

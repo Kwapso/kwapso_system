@@ -254,6 +254,7 @@ async function listWaveSprints(
     id: string
     wave_id: string | null
     account_id: string | null
+    ref: string | null
     name: string
     starts_on: string | null
     ends_on: string | null
@@ -262,7 +263,9 @@ async function listWaveSprints(
     cfg,
     guard.databaseId,
     // R14 hard cap — a package holds a handful of sprints, never a growing feed.
-    `SELECT s.id, s.wave_id, s.account_id, s.name, s.starts_on, s.ends_on, s.deactivated_at
+    // `s.ref` rides along: the wave's screen draws each sprint's number in
+    // front of its name, the same chip every other sprint face carries.
+    `SELECT s.id, s.wave_id, s.account_id, s.ref, s.name, s.starts_on, s.ends_on, s.deactivated_at
        FROM sprints s
       WHERE s.wave_id = ${sqlString(waveId)}
       ORDER BY (s.deactivated_at IS NOT NULL), COALESCE(s.starts_on, s.created_at), s.name
@@ -272,6 +275,7 @@ async function listWaveSprints(
     id: r.id,
     waveId: r.wave_id,
     accountId: r.account_id,
+    ref: r.ref,
     name: r.name,
     startsOn: r.starts_on,
     endsOn: r.ends_on,

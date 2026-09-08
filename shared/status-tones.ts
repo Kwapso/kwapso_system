@@ -39,32 +39,35 @@
 //               file uses that app-stages.ts never needed, because an app
 //               has nobody to wait on but the team itself.
 //
-// `awaiting_validation` IS `blocked`, NOT INVENTED — it is the client portal's
-// OWN existing ruling for this exact status, reused rather than duplicated
-// with a different answer: `web-portal/components/ticket-row.tsx`'s
-// `STATUS_WORDS` already singles this one stage out with its own distinct
-// colour ("warning", which resolves to the same poppy `blocked` draws — the
-// kit's palette holds no amber, badge.tsx's own note), with the reason
-// written beside it: "the one state where nothing moves until the person
-// reading the screen does something." That is what `blocked` means
-// everywhere else in this file's tiering, so the two front doors agree about
-// this stage without a shared import between them (the portal's copy is
-// client-facing words over the same seven-value enum; this file is the
-// agency's own words over it, so they stay two files on purpose — R21's
-// account-fence reason: no code path may cross the portal/agency line).
+// NO TICKET STAGE ANSWERS `blocked` ANY MORE, AND THE TIER IS NOT DEAD — read
+// this before deleting it. Until 7 Sep 2026 `awaiting_validation` held it: the
+// stage where the client had not said yes yet. The client retired that stage
+// (shared/types.ts, `HELP_STATUSES`, carries her sentence and the argument),
+// and the thing it was reaching for did not go with it — WAITING is now a
+// PREDICATE over the ticket's conversation rather than a stored word
+// (`waitingClause`, workers/content/src/lib/help.ts: "we spoke last and nobody
+// has answered"). A predicate has no row in a `Record<HelpStatus, …>` by
+// construction, so it gets `waitingDotTone()` at the foot of this file instead,
+// and `blocked` keeps its meaning and its one caller.
+//
+// The tier's definition never depended on the stage, which is why it survives
+// it intact: "stuck on somebody OUTSIDE the team" described `awaiting_validation`
+// and describes the waiting predicate at least as exactly.
 import type { DotTone } from "./app-stages"
 import type { HelpStatus, StoryStatus } from "./types"
 
-/** A TICKET'S SEVEN STAGES → THE CHIP'S DOT. `Record<HelpStatus, …>` rather
+/** A TICKET'S SIX STAGES → THE CHIP'S DOT. `Record<HelpStatus, …>` rather
  * than a function with a fallback, on purpose — the same reason the portal's
- * own `STATUS_WORDS` is typed this way (ticket-row.tsx): an eighth stage
+ * own `STATUS_WORDS` is typed this way (ticket-row.tsx): a seventh stage
  * added to `HELP_STATUSES` fails this file's own type check instead of
- * rendering a chip with no dot. */
+ * rendering a chip with no dot.
+ *
+ * THE RETIRED STAGE IS NOT LISTED, AND MUST NOT BE. This map is keyed by the
+ * LIVE vocabulary, so it answers for what a ticket can be in now. A ticket's
+ * HISTORY is drawn from words, not dots (`stageLabel`,
+ * web/components/tickets/ticket-stages.tsx), so a retired stage needs no row here and
+ * adding one back would re-open the `Record` to a word no chip can be handed. */
 const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
-  // Waiting on the CLIENT to say yes — nothing here moves until they do. The
-  // portal draws this exact stage in its one attention-getting colour; this
-  // is the agency side reusing that same call rather than re-deciding it.
-  awaiting_validation: "blocked",
   // Raised, nobody has read it yet — the "Not started" tier.
   new: "archived",
   // Read and sorted, not yet scheduled — the "somebody is looking at this"
@@ -83,6 +86,33 @@ const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
 /** The dot tone for a ticket's status. */
 export function helpStatusDotTone(status: HelpStatus): DotTone {
   return HELP_STATUS_DOT_TONE[status]
+}
+
+/** WAITING'S OWN TONE — for the ticket board's fifth column, which counts a
+ * PREDICATE and not a stage (`waitingClause`, workers/content/src/lib/help.ts:
+ * the last reply came from our side and nobody has answered).
+ *
+ * ── WHY THIS IS A FUNCTION HERE AND NOT `"blocked"` TYPED AT THE COLUMN ─────
+ *
+ * The board used to ask `helpStatusDotTone("awaiting_validation")` and say so
+ * out loud: the point was that the colour be ASKED FOR rather than chosen, so
+ * that re-toning "the client owes us an answer" moved the column without an
+ * edit. That instinct was right and its subject was wrong — it borrowed the
+ * tone of a STAGE to paint a PREDICATE, and when the client retired the stage
+ * on 7 Sep 2026 the call went with it. Hard-coding `"blocked"` at the column
+ * would have thrown away the property along with the bug.
+ *
+ * So waiting gets an honest entry of its own, in the file that owns what a
+ * status colour MEANS, and the board asks this instead. It resolves to
+ * `blocked` — the tier this file defines as "stuck on somebody OUTSIDE the
+ * team", which is waiting's own sentence exactly — and it is the same poppy the
+ * portal has always drawn for a ticket that needs the reader to act.
+ *
+ * NOT IN `HELP_STATUS_DOT_TONE`: that map is a closed `Record<HelpStatus, …>`
+ * and waiting is not a status. A pseudo-key there would be a lie the type
+ * system would then defend. */
+export function waitingDotTone(): DotTone {
+  return "blocked"
 }
 
 /** A STORY'S FOUR STAGES → THE CHIP'S DOT. Same `Record` shape, same reason:

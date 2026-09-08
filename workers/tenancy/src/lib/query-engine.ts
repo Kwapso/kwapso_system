@@ -453,6 +453,27 @@ function fenced(
   }
 }
 
+/** THE ROWS A MODULE HAS STOPPED ANSWERING ABOUT, subtracted from the caller's
+ * question — the shape `fenced` above has, and applied in the same expression,
+ * because they are the same kind of thing: a clause the caller did not write and
+ * cannot remove.
+ *
+ * NOT ESCAPABLE, and that is the difference from `putAway` / `notYet`, whose
+ * whole design is that naming the field opts you out. A caller who filters
+ * `helpType eq Requirements` is asking about rows that have left the collection,
+ * and the honest answer is none of them — not all of them. Wrapping the caller's
+ * own clause in brackets first, so an `OR` inside it cannot reach around this.
+ *
+ * A module with nothing withheld is returned untouched, so this costs the other
+ * fourteen modules exactly one comparison. */
+function withheld(
+  mod: QueryModule,
+  where: { sql: string; params: Param[] }
+): { sql: string; params: Param[] } {
+  if (!mod.withheld) return where
+  return { sql: `(${where.sql}) AND ${mod.withheld.sql}`, params: where.params }
+}
+
 /** The sort menu a module offers: every declared field, ordered by its own
  * column. Built FROM the grammar rather than written beside it, so a field
  * cannot be filterable and un-orderable. Dates land newest-first; the rest A→Z. */
@@ -531,7 +552,13 @@ export async function runQuery(
    * door answers "how many" far more often than it hands back a page. */
   fenceFor: FenceFor = async () => null
 ): Promise<QueryAnswer> {
-  const where = fenced(whereSql(q, refs), await fenceFor(mod))
+  // THE MODULE'S OWN WITHHOLDING, ANDed on last and never escapable. It rides
+  // the ONE clause the rows, the exact total and the grouped counts are all
+  // built from, for the reason the fence does: a subtraction applied beside the
+  // rows is a subtraction three of those four reads can forget, and this door is
+  // asked "how many" far more often than it is asked for a page. See `withheld`
+  // in shared/workers/query-grammar.ts for what it is and why it has no escape.
+  const where = withheld(mod, fenced(whereSql(q, refs), await fenceFor(mod)))
   // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
   // no return path below can hand back a total without it. It gets the RESOLVER
   // rather than this module's fence: its lookups run against the REFERENCED

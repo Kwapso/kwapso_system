@@ -120,28 +120,99 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
   })
 
   // ── #18 · A TAB ──────────────────────────────────────────────────────────
-  // The Tickets strip has a tab per TICKET TYPE, and a type is exactly the thing
-  // §5 gives a mark to — the same glyph the ticket's own header band draws.
-  // `TabsView` resolves `icon` as a kit glyph NAME, so a pictograph in that slot
-  // renders nothing at all.
-  it("#18 · SHIPPED — a tab takes a node, and the ticket kinds carry their marks", () => {
+  // The gap as it was written: a record strip has a tab per TYPE, and a type is
+  // exactly the thing §5 gives a mark to. `TabsView` resolved `icon` as a kit
+  // glyph NAME, so a pictograph in that slot rendered nothing at all. The
+  // library closed it in v0.11.0 (a tab takes a NODE), and the check has
+  // followed the glyph across three redraws of the tickets screen since.
+  // ITS SUBJECT IS NO LONGER TICKETS — the client retired their marks on
+  // 2026-09-07 — so the positive half is asserted on a kind that still wears
+  // one, and the retirement is asserted as a ratchet beside it. The long note
+  // inside carries the history.
+  it("#18 · SHIPPED — a tab takes a node, and the kinds that still HAVE marks carry them", () => {
     const tabs = library("screen-engine", "tabs-view.tsx")
     expect(
       /icon\??:\s*(React\.)?ReactNode/.test(tabs),
-      "TabItem no longer takes a node — the type marks on the ticket strip have gone dark"
+      "TabItem no longer takes a node — the type marks on the record strips have gone dark"
     ).toBe(true)
 
-    // The host half: the strip reads the glyph out of the TEAM'S vocabulary
+    // The host half: a screen reads the glyph out of the TEAM'S vocabulary
     // rather than a map in the component, which is what makes an emoji edited on
-    // the Dropdown values screen reach the tab without a deploy.
-    const strip = readFileSync(join(ROOT, "web", "components", "tickets", "tickets-collection.tsx"), "utf8")
+    // the Dropdown values screen arrive without a deploy.
+    //
+    // ── THE ASSERTION HAS MOVED THREE TIMES, AND THE THIRD IS A RETIREMENT ──
+    //
+    // The SEAM is "the team's own glyph reaches a record row without a deploy",
+    // and for two years what drew a TICKET row kept changing under it:
+    //
+    //   1 · It asserted `icon: ticketMarks.get(` — the per-type TABS — until the
+    //       client's 2026-09-06 ordering retired them (triage is where a type is
+    //       decided, so a strip of type tabs beside it offered the same
+    //       categorisation twice).
+    //   2 · It then asserted `shapeHelpList(rows, ticketMarks)`, the recipe-drawn
+    //       list those tabs sat above. Later the same day the client ruled that
+    //       every ticket tab draws the triage list's own TABLE ("do the list view
+    //       exactly the same as we have it in the Triage list"), so the recipe
+    //       renderer left this screen and `shapeHelpList` with it.
+    //   3 · It then asserted `shapeHelpList(rows, ticketMarks)`'s successor,
+    //       `marks={ticketMarks}` reaching `TicketRowsTable`.
+    //
+    // ON 2026-09-07 THE MARKS WERE RETIRED FOR TICKETS. Client, over a
+    // screenshot of the ticket list's Type column: *"for type, kill the emojis.
+    // this is legacy. in current system we use colors"*. That is a RULING, not a
+    // regression, and the difference is the whole reason this comment is long:
+    // the first two moves happened because a glyph nearly went dark by accident
+    // and the assertion had to follow it; this one happened because somebody
+    // decided the glyph should not be there. So the ticket clause is not
+    // "temporarily failing" and it is not quietly deleted — it is inverted, and
+    // the inversion is the coverage.
+    //
+    // NOTHING WAS DROPPED. The seam is unchanged and still has real subjects:
+    // stories and sprints draw their marks through the same `markMap`, on four
+    // screens. So this check now proves the same sentence about the kinds that
+    // still have marks, plus the negative the ruling asked for. The stored
+    // glyphs on `Ticket type` rows were NOT touched — see web/lib/type-marks.ts,
+    // which carries the ruling and what it left alone.
+    const marksSeam = readFileSync(join(ROOT, "web", "lib", "type-marks.ts"), "utf8")
+
+    // THE POSITIVE HALF — a record kind that still wears a glyph, drawn on a
+    // real screen, read through the one seam.
     expect(
-      /icon:\s*ticketMarks\.get\(/.test(strip),
-      "the ticket type tabs no longer carry the team's own mark"
+      /story:\s*"Story type"/.test(marksSeam),
+      "MARK_GROUP no longer names the story vocabulary — this check has no subject left"
+    ).toBe(true)
+    const stories = readFileSync(join(ROOT, "web", "components", "work", "stories-screen.tsx"), "utf8")
+    expect(
+      /markMap\(.*MARK_GROUP\.story\)/.test(stories),
+      "the stories screen no longer reads the team's own glyphs through the type-mark seam"
     ).toBe(true)
     expect(
-      strip.includes("markMap("),
-      "the strip must read its glyphs through the one type-mark seam (web/lib/type-marks.ts)"
+      /marks\?\.get\(s\.storyType/.test(stories),
+      "the stories screen no longer draws the team's own glyph for a row's kind"
+    ).toBe(true)
+
+    // THE NEGATIVE HALF — the ruling, held as a ratchet. `MARK_GROUP` is a
+    // closed union, so removing the key is what makes this structural: a screen
+    // that tries to look a ticket's glyph up fails `tsc`. Asserting on the seam
+    // rather than on each of the four screens that used to draw one is the
+    // honest shape — those screens can be rewritten, and there is exactly one
+    // door back to the emoji.
+    expect(
+      /ticket:\s*"Ticket type"/.test(marksSeam),
+      "MARK_GROUP.ticket is back. The client retired the ticket type emoji on 2026-09-07 " +
+        '("for type, kill the emojis … we use colors") and the colour is the mark now ' +
+        "(Swatch + ticketTypeColour). Restoring the group needs a ruling, not a commit."
+    ).toBe(false)
+    const strip = readFileSync(join(ROOT, "web", "components", "tickets", "tickets-collection.tsx"), "utf8")
+    expect(
+      /markMap\(/.test(strip),
+      "the tickets screen reads type marks again — see the ruling above"
+    ).toBe(false)
+    // …and what replaced it is on screen, so this is a SWAP rather than a loss:
+    // the kind is still drawn, by its colour.
+    expect(
+      /<Swatch colour=\{ticketTypeColour\(w\.helpType\)\} \/>/.test(strip),
+      "the ticket table's Type cell draws neither a glyph nor a colour — the kind has gone dark"
     ).toBe(true)
   })
 

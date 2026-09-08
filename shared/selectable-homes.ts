@@ -45,7 +45,27 @@ export type VocabularyHome =
 
 export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   /* ---- real vocabularies: the word is stored on records ------------------ */
-  "Ticket type": { columns: [{ table: "help", column: "help_type" }] },
+  // TWO HOMES ON ONE TABLE, and the second one is the reason team migration
+  // 0065 exists. `raised_as_type` records the type a ticket was CREATED with and
+  // is written exactly once, at the INSERT, so that the app can say how often a
+  // ticket arrives as one kind and is recategorised into another. Nothing may
+  // UPDATE it — that is the whole of its value — and this rewrite is not an
+  // exception to that, it is the same rule read carefully.
+  //
+  // A rename changes a value's SPELLING, never a ticket's identity. Carry only
+  // `help_type` and renaming "Request" to "Ask" would leave every historical
+  // request claiming it arrived as a "Request" and is now an "Ask" — a
+  // recategorisation nobody performed, manufactured by an edit on the Dropdown
+  // values screen, and the exact number the chart exists to report. It would
+  // also leave the column holding a word the vocabulary no longer contains, so
+  // the row would have no mark and no tab, which is the original fault at the
+  // top of this file, one column along.
+  "Ticket type": {
+    columns: [
+      { table: "help", column: "help_type" },
+      { table: "help", column: "raised_as_type" },
+    ],
+  },
   "Story type": { columns: [{ table: "stories", column: "story_type" }] },
   "Sprint type": { columns: [{ table: "sprints", column: "sprint_type" }] },
   "Brand asset category": { columns: [{ table: "brand_assets", column: "category" }] },

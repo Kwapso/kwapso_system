@@ -439,7 +439,7 @@ And the region order, ch27.1 verbatim:
 
 ## What the app actually does
 
-Both strips are `variant: "line"` — `web/components/tickets-collection.tsx:163` and `:182`:
+Both strips are `variant: "line"` — `web/components/tickets/tickets-collection.tsx:163` and `:182`:
 
 | strip | app | kit |
 |---|---|---|

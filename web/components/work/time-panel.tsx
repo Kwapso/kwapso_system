@@ -50,6 +50,7 @@ import { useActiveTeam } from "@/lib/use-active-team"
 import type { RunningTimer, Story, WorkLog } from "@shared/types"
 import { invalidate, invalidatePrefix, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { AddButton } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
@@ -66,7 +67,8 @@ import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame
  * where you read one — it is on the record, one click away, and the click is
  * cheaper than the crowd. */
 function line(l: WorkLog): string {
-  return [l.userName, l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")
+  // R54: only staff log hours — there is no work-log door on the portal.
+  return [staffNameFromSnapshot(l.userName), l.startedAt.slice(0, 10)].filter(Boolean).join(" · ")
 }
 
 /** Everything a row of time touches: the team's list and its totals, the header

@@ -1,7 +1,10 @@
 "use client"
 
-// APP DETAIL — one system at /apps/<id>, as a tabbed record (Law R2): Overview /
-// Sprints / Stories / Process maps / Activity.
+// APP DETAIL — one system at /apps/<id>, as a tabbed record: Overview /
+// Sprints / Stories / Process maps. Its history is not the last tab any more —
+// it is reached from the ink footer's Latest activity column, on the client's
+// 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the ruling and
+// the argument.
 //
 // THIS SCREEN IS THE CROSS-LINK the owner named as mattering more than any single
 // path: from an app to its account, from an app to its other stories. So the
@@ -37,7 +40,7 @@ import { createSprintFrom } from "@/components/work/sprints-screen"
 import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
 import {
   AppMeetingsPanel,
-  AppTicketsPanel,
+  AppTicketsTab,
   ProcessesPanel,
   SprintsPanel,
   StoriesPanel,
@@ -47,7 +50,6 @@ import { DeliverablesPanel } from "@/components/apps/deliverables-panel"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { AppMoneyPanel } from "@/components/apps/app-money-panel"
 import { OverviewList } from "@/components/records/overview-list"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { content as contentApi, tenancy } from "@/lib/api"
 import {
   RecordActionsMenu,
@@ -74,6 +76,7 @@ import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
+import { ticketTypeKeptForMigration } from "@shared/types"
 import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
 import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { useT } from "@shared/web/language"
@@ -173,14 +176,51 @@ export function AppDetailScreen({
   // THE TEAM'S OWN `Ticket type` WORDS — one derivation, read by the create
   // dialog below AND by the Tickets tab's own Kind facet, so the two can never
   // offer two different lists of the same vocabulary.
+  //
+  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. The same subtraction
+  // `use-screen-data.ts` makes on the top-level tickets screen, for the same
+  // reason and out of the same shared test — the client's ruling of 6 Sep 2026
+  // is written up in full beside it (`TICKET_TYPE_KEPT_FOR_MIGRATION`,
+  // shared/types.ts). Both call sites derive the list from the team's own
+  // vocabulary, so both had to subtract, or this tab would offer a kind the
+  // tickets screen does not and the door refuses.
   const helpTypeOptions = (teamVocabulary.data ?? [])
-    .filter((v) => v.type === "Ticket type" && v.active)
+    .filter((v) => v.type === "Ticket type" && v.active && !ticketTypeKeptForMigration(v.value))
     .map((v) => v.value)
 
   // The open tab is remembered per record for as long as this document
   // lives (web/lib/nav-memory.ts) — leaving to another section and coming
   // back lands on the tab she was reading, and a miss lands on "overview".
-  const [tab, setTab] = useRemembered("tab", "overview")
+  //
+  // …WITH ONE DEEP-LINKABLE TAB, `?tab=modules` (2026-09-06). The exact shape
+  // `account-detail.tsx` already uses for `?tab=organisation`, and added for the
+  // same class of reason: a link that lands one tab away from what it named is a
+  // link that makes the reader hunt.
+  //
+  // WHY A MODULE'S LINK POINTS HERE AT ALL. The client ruled that the four facts
+  // under a triage card — client, app, module and author — are all LINKS she can
+  // navigate from. Three of the four already had an address. A MODULE HAS NONE:
+  // there is no `modules` segment in `TEAM_SECTIONS`, no `modules.detail`
+  // recipe, no branch in `module-content.tsx`, and `relationship-map.tsx`'s own
+  // `RECORD_PATH` deliberately has no `app_modules` entry — a module is a
+  // division OF an app, and the only screen it has ever appeared on is this
+  // record's Modules tab (`ModulesPanel`, below). Inventing a `/modules/<id>`
+  // URL to satisfy one link would have been a whole screen nobody asked for; the
+  // honest destination is the place the module actually is, and that place is a
+  // tab. So the tab got an address rather than the module getting a screen.
+  //
+  // AND A LINK BEATS THE MEMORY, which is `account-detail.tsx`'s own sentence
+  // and the reason this is not simply an initial value: an address that NAMES a
+  // tab is somebody telling us where to go, so the per-record memory does not
+  // get to argue with it — the third argument to `useRemembered` refuses the
+  // remembered value outright whenever the URL asked for one.
+  const askedTab = () =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  const [tab, setTab] = useRemembered(
+    "tab",
+    () => (askedTab() === "modules" ? "modules" : "overview"),
+    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+  )
   const [editOpen, setEditOpen] = React.useState(false)
   const [sprintOpen, setSprintOpen] = React.useState(false)
   const [mapOpen, setMapOpen] = React.useState(false)
@@ -482,13 +522,9 @@ export function AppDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a system's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -646,9 +682,22 @@ export function AppDetailScreen({
               />
             )
           if (panel.value === "tickets")
+            // TWO VIEWS ON ONE TAB (client, 6 Sep 2026) — the list she asked to
+            // be put in, and this system's own dashboard beside it. The switch,
+            // the memory and the choice of which panels survive one app all
+            // live in `AppTicketsTab`; this record hands over only what it
+            // alone knows.
             return (
-              <AppTicketsPanel
-                marks={markMap(teamVocabulary.data, MARK_GROUP.ticket)}
+              <AppTicketsTab
+                teamId={teamId}
+                // NO `marks` — client ruling, 2026-09-07, "for type, kill the
+                // emojis. this is legacy. in current system we use colors."
+                // This handed the panel the team's own glyph per TICKET type;
+                // the panel's rows draw the kind as a coloured pill like every
+                // other ticket surface. `MARK_GROUP.ticket` no longer exists,
+                // so there is nothing to pass — web/lib/type-marks.ts carries
+                // the ruling. The sprint and story marks below are untouched:
+                // her sentence is about tickets.
                 // The same vocabulary the create dialog below already fetches
                 // (gated the same way, on `canRaiseTicket`) — a reader who may
                 // only READ tickets here simply gets no Kind facet, rather than
@@ -657,6 +706,11 @@ export function AppDetailScreen({
                 appId={appId}
                 host={host}
                 onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
+                // R50's own question, asked of the WHOLE collection: the exact
+                // server COUNT(*) this record's own tab badge is already
+                // showing (R16), read from the same sidecar rather than counted
+                // a second way.
+                ticketTotal={ticketsTotal}
               />
             )
           if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
@@ -682,14 +736,6 @@ export function AppDetailScreen({
                 ]
                   .filter(Boolean)
                   .join(", ")}
-              />
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("processes", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
               />
             )
           return <OverviewList items={overviewItems} />

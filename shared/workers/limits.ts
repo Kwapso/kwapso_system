@@ -322,10 +322,51 @@ export const APP_MODULE_CAP = 1000
  * the query rather than implied by the shape of the data. */
 export const TICKET_FACET_CAP = 500
 
+/** Rows ONE grouped read on the Tickets dashboard may return (R14).
+ *
+ * SMALLER THAN `TICKET_FACET_CAP` ON PURPOSE, and the difference is what the
+ * numbers are FOR. A facet tally feeds a badge, and a badge nobody can read is
+ * still a correct badge. These five reads feed CHARTS, and every one of them is
+ * a chart a person looks at: a bar per client, a bar per system, a cell per
+ * (arrived-as, is-now) pair. Past a hundred marks a chart has stopped being a
+ * chart, so this is the point at which "bounded" and "legible" are the same
+ * ceiling rather than two different ones.
+ *
+ * FOUR OF THE FIVE GROUP OVER SETS THAT CANNOT RUN AWAY — the team's own ticket
+ * vocabulary, the seven-value status lifecycle, and those two crossed with each
+ * other. The fifth groups by CLIENT, which grows with the business, so its read
+ * is ORDERED (most work first) before it is capped: the first row is the answer
+ * to "who has the most", which is the question, and a hundred clients of tail is
+ * a chart nobody was going to read to the end of anyway. */
+export const TICKET_DASHBOARD_GROUP_CAP = 100
+
 /** Files AND links one ticket may carry (CHECKLIST 5.10). "Several" is the ask,
  * from both front doors; a ceiling turns "several" into something a list can be
  * read to the end of and a count can be trusted. */
 export const TICKET_ATTACHMENT_CAP = 50
+
+/** Recorded stage moves ONE ticket's history read may return (R14, team
+ * migration 0066).
+ *
+ * A ticket's ladder has seven rungs and every move up it is a person pressing
+ * something or a story closing, so a real ticket carries single figures and a
+ * badly behaved one carries dozens. Two hundred is therefore a REFUSAL CEILING
+ * rather than a page size: nothing legitimate approaches it, and the read is a
+ * summary of one record rather than a collection a screen pages through — which
+ * is why this is a cap and not `GROWING_COLLECTIONS` paging. The rows come back
+ * OLDEST FIRST because the sequence is the answer ("closed on x, reopen on y,
+ * closed again on z") and a sequence read from the wrong end is not one. */
+export const TICKET_STAGE_EVENT_CAP = 200
+
+/** Ratings ONE ticket's read may return (R14, team migration 0067).
+ *
+ * A rating is one sentence from one person about one finished request, and the
+ * people who can give one are the contacts on a single account. A ticket at this
+ * many is not a ticket anybody is still learning from, so — like the stage cap
+ * above — this exists to make the bound visible at the query rather than to page
+ * anything. Newest first: the standing answer is the newest row per person, and
+ * everything older is the record of how we did at the time. */
+export const TICKET_RATING_CAP = 50
 
 /** WHAT A STORY MAY SHOW FOR ITSELF. Smaller than a ticket's fifty on purpose:
  * a ticket accumulates evidence over a conversation that can run for weeks, and

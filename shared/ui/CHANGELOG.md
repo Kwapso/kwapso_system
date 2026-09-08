@@ -2,6 +2,1407 @@
 
 ## Unreleased
 
+### Added — the kit stops shipping rules as prose: `foundations/rules/`, and a seam that runs them against somebody else's source
+
+The client's sentence on 7 Sep: *"how we will use the ui kit: as the onlly
+ui&ux input for other apps. i wanna void iteration tehre, so make sure rules
+are good set."* Until today the kit shipped **components** and shipped its
+rules as `docs/RULES.md` — 948 lines that every consumer vendors and none
+executes. The consuming app re-derived 55 machine-checked laws of its own by
+iterating with the client, and **two of them are word for word about the
+kit's own vocabulary**. A second app would have paid for those two again.
+That is the cost this removes.
+
+`npm run check` **exits 0**, with a seventh gate on the end of it.
+
+#### Three laws, chosen because the kit can check its OWN source for them
+
+| | what it holds, and what it DERIVES rather than lists |
+|---|---|
+| `radii` | Two radii and no third. The vocabulary is every `--radius*` at `:root`; the safe bare spellings are the `@theme inline` bridge. So `rounded-lg` is refused **because tokens.css re-points `--radius-lg` and does not bridge it** — the load-order trap of §4.2, stated by a check that can see both halves — and `rounded-4xl` is refused because tokens.css declares no such thing. No deny-list of Tailwind keys anywhere; ship `--radius-huge` and `rounded-[var(--radius-huge)]` is legal the same second. |
+| `palette` | Every colour resolves through a token, in all five positions one can reach the screen: an arbitrary class value, a `style={{ }}` object, a Tailwind ramp, an SVG paint attribute, and **the raw `--kw-*` ramp** (§8.3, never enforced before). The ramp clause is the derived one and the prefix is *not* the test: `--kw-kanban-col` and `--kw-dl-label` are component-local properties, not pigments, and a prefix check reports all five of them. A name is the ramp **iff tokens.css declares it** — 17 today. |
+| `borders` | §2.7, which no law anywhere has ever enforced. A boundary is a paper step, a fill (`bg-border` on a 1px element), or an inset shadow — the third of which the **contrast law can read**, which is why a stroke written as a `border` is not merely off-vocabulary but invisible to the measurement that discharged `--surface-idle` at 1.042 last week. The two are one argument. |
+
+The kit passes all three with **four reasoned exemptions**: the spinner's arc
+in `spinner.tsx` and `button.tsx` (the border *is* the shape — a rotating ring
+has no fill and no inset shadow that draws a partial arc), `file-upload.tsx`'s
+dashed drop target (§2.7's own blessed case), and one `#0000` in
+`record-detail.tsx` that is CSS's spelling of *no shadow* rather than a colour.
+Every one is rot-checked in both directions and can only shrink.
+
+#### A clause that was written, fired 24 times, and was deleted
+
+The first `radii` draft called `rounded-[var(--radius-select)]` a finding —
+the token is bridged, so `rounded-select` is already its word. It produced 24
+findings against the kit's own source, which is the right number for a real
+rule and a warning sign for an invented one. **It was invented.** §4.1's table
+reads *"`rounded-select` **or** `rounded-[var(--radius-select)]`"*, in bold. A
+law stricter than the document it claims to check has stopped being a check.
+The clause is gone, its argument is in the file's header, and the spelling
+census is printed as a number instead: **140 spelled as the word, 23 spelled
+the long way** — visible to anyone who wants to argue for one, binding on
+nobody until the client rules.
+
+#### The conformance seam — and the constraint that decided its shape
+
+`foundations/rules/conformance.mjs` takes an app's directories and an app's
+exemption file, and holds that source to the kit's rules:
+
+```bash
+node shared/ui/foundations/rules/conformance.mjs \
+     --exemptions web/test/kit-conformance.json \
+     web/components web/app web/lib web-portal/components shared/web
+```
+
+**It lives under `foundations/` because that is the only way it arrives.**
+`kwapso_system/scripts/sync-design.mjs` copies exactly nine entries out of a
+tag; a `rules/` directory at the repo root is not one of them, and a seam that
+exists upstream and is absent downstream is not a seam. For the same class of
+reason it uses **Node builtins only**: inside a consumer it sits in a vendored
+directory with no `package.json` and no `node_modules`. And the **exemptions
+stay outside the kit** — an app that hand-edits `shared/ui/` fails its own
+vendored-kit hash, so the rules are the kit's and the exceptions are the app's,
+in the app's own diff. `docs/RULES.md` §12 is the copy-pasteable version.
+
+#### Pointed at the real consuming app, because a suite nobody has aimed is a suite nobody should trust
+
+314 files across `web/`, `web-portal/` and `shared/web/`. **44 findings in 15
+files, exit 1.** Nine bare `rounded` (Tailwind's 4px, where the kit has a 4px
+token and `tickets-dashboard.tsx`'s own comment shows the author looking for
+one and not finding it); `--kw-charcoal` reached directly in
+`screen-renderer.tsx`'s overlay; Google's four brand hexes in
+`google-sign-in.tsx` (a textbook exemption, not a fault); and **30 CSS
+borders** across twelve files, which no test in that repository has ever read
+because the rule lived only in a document it vendors.
+
+#### Two bugs found by aiming it, one of them in this repo's existing law
+
+Both were found by the scan getting *quieter* where the source got more
+interesting, which is this repository's oldest tell:
+
+- **A template literal with an apostrophe desynchronised the literal
+  scanner.** `` `Couldn't list your ${noun}s.` `` is not matched by the
+  backtick arm of the obvious regex, so the walk opened a single-quoted string
+  at the apostrophe and closed it 32 lines later, hiding everything between —
+  including a real bare `rounded` in `google-source-dialog.tsx:352`. The run
+  was green on that file and the file was not clean. `source.mjs` now walks
+  instead of matching, and quotes must close on their own line or they were
+  never quotes. **`literalsIn` in `foundations/tokens/ground-map.mjs` still
+  carries the original regex and the contrast law stands on it** — left alone
+  deliberately, because that law is finished and re-reading its source would
+  move published numbers, but the blind spot is the same one and it is written
+  down now.
+- **A template literal is not one string.** Skipping an interpolated template
+  wholesale dropped both the static chunks *and* the branches — the shape the
+  app writes every conditional class in. Chunks are now literals in their own
+  right and every `${ }` is re-scanned from the top. Coverage against the app:
+  **3,006 → 4,589 class lists**, and 12 more findings.
+
+#### Proved by breaking it, not by reading it
+
+A green law measures nothing until something makes it red. Eleven planted
+violations in one file: ten caught, exit 1 (the eleventh — a bare `rounded`
+alone in a one-word literal — is the documented cost of the class-list
+heuristic, and is caught the moment it sits beside any other utility, which is
+how all nine app findings were caught). An empty directory turns every law
+**red on its blindness tripwire**, not green. A deliberately false exemption
+turns the run **red as rotted**. All three are asserted, not asserted-about.
+
+### Changed — the law learns the kit's other boundary: a step **or** a stroke
+
+The two findings the entry below left red on purpose are closed, and not by
+moving anything. `npm run check` **exits 0**.
+
+**The kit has always drawn a boundary two ways and the law could only see
+one.** `tokens.css` forbids the `border` property outright — review 1A · fix
+2 — and sanctions in its place either a fill one step from the ground or an
+inset stroke; `--hairline` is `inset 0 0 0 1px var(--hair)` and exists for
+nothing else. `badge.tsx`'s `outline` variant draws with it, `card.tsx` has a
+`hairline` prop for it, and `StatusStepper`'s own not-yet-reached mark has
+used it since yesterday's fix. The contrast law measured the fill, saw 1.042,
+and reported an absent boundary for an element that draws one — while its own
+header said, in as many words, that it *"does not credit an inset hairline for
+a boundary the fill fails to make"*. Half of that sentence was wrong. The
+record-footer entry two passes ago had already written the true version:
+**the boundary is a step AND a rule.**
+
+#### The rule, and it is a derivation rather than an exemption
+
+> A fill below the boundary tier is acceptable **if and only if** the element
+> also draws a hairline whose own contrast against that same ground clears the
+> hairline tier.
+
+**Nothing about a threshold moves.** Boundary is still 1.05, quiet is still
+1.10, hairline is still 1.05, no tier is renamed, and `EXEMPT` is still the
+same two entries it has been — still rot-checked, still shrinking-only. What
+changed is that a second **measured** fact can now answer the question the
+first one asked. The law resolves the `shadow-[…]` class through the same
+token model that turns `--surface-record-footer` into `#26241F` three hops
+down, reads what comes back as a shape and a colour, composites the alpha the
+way an ink's is composited, and holds the result to the hairline tier against
+the ground the fill just failed against. A hairline that is itself invisible
+discharges nothing.
+
+| | fill vs ground | the ring, light | the ring, dark |
+|---|---|---|---|
+| later pill · overflow tail on `--popover` | **1.042** | **1.175** | **1.161** |
+| later pill · overflow tail on `--surface-raised` | **1.042** | **1.175** | **1.161** |
+
+`--ink-disabled` on `--surface-idle` is **untouched at 2.335 light / 3.979
+dark** — GAPS-CONTRAST §2 row 8, the pair the client ruled on, to three
+decimals. That is the whole point of taking this route: `--surface-quiet`
+would have cleared the boundary at 1.339 / 1.324 and dropped that ruled label
+to 1.817 / 2.508.
+
+#### Four things that keep it from being a blanket pass, each asserted on every run
+
+The regression set proves the law still catches a bad fill; it can prove
+nothing about a discharge, because a rule reading *"anything with a shadow
+class passes"* would leave all four of those fixtures red and still be a
+blanket pass wearing a measurement's clothes. So the discharge has its own
+fixtures — **five, of which four assert a REFUSAL** — checked both ways the
+way `EXEMPT` is:
+
+| stroke drawn round a 1.042 fill | verdict | why |
+|---|---|---|
+| `var(--hairline)` | **DISCHARGED** 1.175 / 1.161 | the ring the kit actually draws |
+| `inset 0 0 0 1px var(--hair-faint)`, dark | refused at **1.022** | the rule is invisible: 6% ink on that fill |
+| `var(--hairline-under)` | refused | one edge, not a shape — same ink as row 1 |
+| `0 0 0 1px var(--hair-strong)` | refused | identical but for `inset`, in a **darker** ink |
+| nothing | refused | the finding exactly as it stood |
+
+Rows 3 and 4 are the shape test and are drawn in inks that would sail past the
+floor if the shape test let them through; row 2 is the colour test and is the
+kit's own faintest hairline. **The stroke is also measured the worse of the two
+honest ways** — an inset shadow paints on the element's fill, so its true
+colour is stroke-over-fill, but a reader may as fairly ask what it measures
+over the ground alone, and the LOWER of the two is the one that has to clear.
+Picking the kinder of two defensible numbers is how a law starts negotiating
+with itself. And the stroke must be provably on WITH the fill: the same arm of
+the same `cn()`, or an unconditional group on the same element. A stroke in
+the other arm of a ternary is not a stroke this fill has.
+
+Every one of those was verified by mutation, not by reading: soften the
+hairline floor, take the max instead of the min, drop the compositing, widen
+the ring to any inset, drop the `inset` requirement, soften the boundary floor,
+or blind the walker to `shadow-[…]` altogether — **each one turns the check
+red, and each names which fixture it broke.** Blinding the walker brings back
+the original two findings verbatim, which is the proof that the discharge is
+read out of `status-stepper.tsx` and not out of a list.
+
+#### A discharged boundary is printed, not disappeared
+
+New **DISCHARGED** band in the report, beside QUIET, carrying the fill's
+number, the stroke that carries it, and the ring's figure in **both** palettes
+with the over-fill and over-ground readings shown separately. A boundary held
+by a rule rather than by a step is a thing the client should be able to count.
+And an **IDLE DISCHARGE** tripwire fails the check if the kit ever stops
+drawing one, so the machinery cannot outlive its use the way a stale exemption
+would — the same discipline `EXEMPT`'s rot check applies from the other side.
+
+Census 103 → 105 pairs: a stroke is now part of a pair's identity, so one fill
+on one ground drawn with a hairline in one place and bare in another is **two**
+boundaries and exactly one of them may be discharged. No anchor died, no floor
+moved, and the four regression fixtures still measure 1.000 / 1.000 / 1.000 /
+1.019 red-before.
+
+#### And the component
+
+`StatusStepper`'s later pill and its overflow tail take
+`shadow-[var(--hairline)]` beside the fill they already had. The fill is the
+ruled one; the boundary is the stroke. The comment at the pill, which said the
+finding was *"logged as the law's known backlog"*, now says what was actually
+done.
+
+### Fixed — the contrast law's first eleven, triaged: nine closed, two of them the law's own, two left red on purpose
+
+> **Superseded in part, 2026-09-08.** The two findings this entry left red are
+> closed by the entry above — by teaching the law that a boundary can be
+> carried by a stroke, not by moving a threshold and not by darkening the
+> ruled fill. `npm run check` exits 0.
+
+The entry below arrived deliberately RED on **11 pairs**, reported for triage
+rather than patched in the pass that found them. They have now been read one at
+a time, and the answer was not the same three times running — which is the
+whole reason they were left for a person:
+
+| # | pair | verdict |
+|---|---|---|
+| 1 | `--card` on `--popover`, both | **BUG** — `Alert` inside a `Sheet`. Fixed at the token. |
+| 2 | `--card` on `--surface-raised`, both | **BUG** — `StatusStepper` on the shell's content region. Same fix. |
+| 3 | `--background` on `--surface-raised`, light | **CALL SITE** — the book's cards on the book's raised panel. |
+| 4 | `--btn-secondary-fill` on `--background`, light | **FALSE PAIR** — the law could not see §8. Fixed in the LAW. |
+| 5 | `--surface-idle` on `--popover` / `--surface-raised`, light | **REAL, LEFT RED** — see below. |
+| 6 | `--ink-on-accent` on `--popover` / `--surface-raised`, dark | **FALSE PAIR** — a fragment and a local const. Fixed in the LAW. |
+| 7 | `--foreground` on `--surface-brand`, dark | **BUG** — off-beige ink on mango. The right token already existed. |
+
+**`npm run check` exits 1, on two findings and a written reason.** That is the
+honest state and it is the one worth having.
+
+#### The one that mattered most: two names, one colour, four papers
+
+`--surface-raised` **is** `--card` — tokens.css §4 declares it as
+`var(--card)` — and `--popover` is that colour again in both palettes by
+ch12's design. So an element painting `bg-card` to say *"I am a raised thing"*
+has **no boundary at all** whenever what it is standing on is any of those
+four papers. Not by anybody's mistake. By the definition of the tokens, in
+both palettes, permanently.
+
+The law found three of them inside the kit and one in the book:
+
+- **`Alert` in a `Sheet`.** Not hypothetical: `Form`'s error summary IS an
+  `Alert`, and `BulkEditScreen` renders that form inside a sheet. A
+  destructive alert with a coloured dot, correct copy and no panel under it.
+- **`StatusStepper`'s pill and mark** on `ScreenShell`'s content region.
+- **the book's own shadow swatch**, which is a shadow specimen with nothing
+  under the shadow.
+
+**THE PROBLEM IS THE ONE RULING 01 ALREADY SOLVED FOR A BUTTON**, so the fix
+is that answer and not a new one. *"A band and its buttons are never the same
+tone"* is a RELATION, and a relation cannot be held by a flat value:
+`--btn-secondary-fill` is rebound by the GROUND in §8. tokens.css §4 now
+carries **`--surface-lift`**, the same mechanism given a name a surface can
+use — `var(--card)` by default, which is correct on the soft-paper panel where
+cards and forms live, and rebound by §8 to soft paper inside an off-beige
+region and back to the raised paper inside a soft-paper one.
+
+| | before | after |
+|---|---|---|
+| `Alert` on a sheet / popover, light | **1.000** | **1.103** |
+| `Alert` on a sheet / popover, dark | **1.000** | **1.111** |
+| stepper pill · mark on the shell body, light | **1.000** | **1.103** |
+| stepper pill · mark on the shell body, dark | **1.000** | **1.111** |
+| the book's shadow swatch on its raised panel, light / dark | **1.000** / **1.000** | **1.103** / **1.111** |
+| `Alert` on a soft-paper panel, light / dark | 1.103 / 1.111 | **unchanged** |
+
+1.103 and 1.111 are not new numbers. They are the kit's own page/panel step
+and the pair the client ruled on in register row 77.
+
+**It does not replace `--card`.** A `Card` that knows its ground is right to
+name the paper it wants. `--surface-lift` is for the parts that are HANDED a
+ground they cannot see: an alert a call site drops into a sheet, a stepper the
+shell puts on its content region, a swatch the book stands on either.
+
+#### And one arbitrary background that took a whole region out of §8
+
+`ScreenShell`'s BODY painted `bg-[var(--surface-raised)]`. That is the
+identical colour to `bg-surface-raised` and **not the same thing to a
+stylesheet**: Tailwind emits the arbitrary form under its own escaped
+selector, so the shell's entire content region sat outside every ground-keyed
+rebind in §8 — which is exactly why that constant had to hand-write
+`[--btn-secondary-fill:var(--surface-panel)]` underneath it. §10's note on
+`--color-surface-record-footer` records the same failure from the other side,
+in the same words: the arbitrary form *"took the element out of every
+ground-keyed rebind in §8 without rendering any differently"*.
+
+Both grounds now use the named class — the shell's body and the book's
+`Panel` — and the hand-written secondary fill is deleted because §8 supplies
+it. (`--pill-fill` is still written by hand there: it is not one of §8's
+relational tokens, and adding it would be a change to ruling 26's
+`--pill-fill-building` that nobody has asked for.)
+
+#### Off-beige ink on mango — the `--dot-building` shape, again
+
+`demo/sheets/motion-sheet.tsx`'s demo box was `bg-[var(--surface-brand)]
+text-foreground`. Mango does not flip; `--foreground` does. **12.072 in light,
+1.440 in dark** — correct in the palette it was written in and all but
+invisible in the other, which is the same sentence this CHANGELOG wrote about
+`--dot-building` a day ago and has the same answer already sitting in
+tokens.css. `--ink-on-accent` is declared with the comment *"the accent law,
+as a token"* and is charcoal in both palettes because the ground it names is.
+**12.072 in light AND dark.**
+
+#### TWO OF THE ELEVEN WERE THE LAW'S OWN, AND THAT IS THE MORE USEFUL HALF
+
+A law that misses a pair leaves a hole. A law that INVENTS one costs more,
+because the first thing a person does with a false finding is stop reading the
+true ones. Two of the eleven were false, and neither was a colour problem:
+
+**§8 was invisible to it.** `--btn-secondary-fill` resolved to its `:root`
+value on every ground, so the law measured the exact pair the rebind exists to
+prevent and reported the mechanism itself as a 1.000 bug. It now reads the
+ground scopes out of tokens.css — no list, same discipline as everything else
+in the file — and resolves a relational token against **the ground being
+measured**, never a merge across an element's branches. It also reads
+Tailwind's `[--tok:value]` arbitrary-property utility, which is how the shell
+rebinds a fill on a ground §8 cannot reach. `--btn-secondary-fill` on the
+book's card: **1.000 → 1.103 light / 1.079 dark**, which is what the browser
+was drawing all along.
+
+**A fragment was not a node, and a class constant had to be at column zero.**
+`<>` carries no tag name, so `ground-map.mjs` walked past it — and with it
+past the structure that makes `const inner = (<>…</>)` a binding, so
+everything inside was reparented onto whatever element the fragment sat in.
+Separately, `const skin = cn(…)` written inside a render read as an element
+with no fill, and an element that paints nothing hands its ANCESTOR's ground
+to its children. Together those two put `StatusStepper`'s current pill's
+number — charcoal `--ink-on-accent`, sitting on the mango pill that covers
+it — against the DIALOG behind the stepper: **1.132 dark, for a pair no screen
+has ever drawn.** Both fixed in `ground-map.mjs`, with the argument beside
+each. The census moved 103 → 99 pairs and back to 103; no anchor died, no
+floor was touched.
+
+**No exemption was added.** The list is still the two that were there, and
+still rot-checked.
+
+#### LEFT RED, WITH THE REASON — the later stage's fill
+
+> **Answered 2026-09-08, and the reasoning below is why it was answered this
+> way rather than by `--surface-quiet`.** The fill stays; the boundary is now
+> drawn as an inset hairline and the law measures it. See the entry at the top
+> of Unreleased.
+
+`--surface-idle` measures **1.042** against off-beige paper in light, under
+the 1.05 invisibility gate, wherever a stepper is placed on a raised ground.
+It is a real finding: the later pill's and the overflow tail's SHAPE genuinely
+does not exist in light on that paper.
+
+**The obvious fix makes a ruled number worse, so it is not this pass's to
+take.** CH23's specimen line says *"later stages take the quiet fill"*, and
+`--surface-quiet` would clear the boundary at 1.339 light / 1.324 dark. But
+the pair the client actually ruled on is GAPS-CONTRAST §2 row 8 — *"a later
+pill at 2.335:1 light / 3.979:1 dark"* — and those two figures are
+`--ink-disabled` on `--surface-idle`, reproduced here to three decimals. On
+`--surface-quiet` the same label reads **1.817 / 2.508**. Closing the boundary
+would darken the ground under the one word CH23 insists stays readable: *"a
+record that hides its future reads as finished, and the client cannot see what
+they are waiting for."* That is a trade for the client to make with both
+numbers in front of her. **A red law with a known backlog is worth more than a
+green one that was talked into it.**
+
+#### The two regression fixtures that say STILL OPEN now say something truer
+
+`--surface-raised` on `--card` is **1.000 by design and can never go green**:
+the two names are one colour on purpose. The fixture keeps asserting exactly
+that, because it is a permanent proof that the law still catches a 1.000. What
+changed is that nothing in the kit DRAWS it any more, and the fixture now says
+so and names `--surface-lift`. If a component starts painting `bg-card` on the
+shell body again it is the FINDINGS list that will report it, not this
+fixture.
+
+### Fixed — `npm run check` now fails on a stale `tokens.json`
+
+`--check` ran the generator's four guards and wrote nothing, and *"wrote
+nothing"* was reported as a pass — so the generated file could disagree with
+`tokens.css` indefinitely behind a green build. **That is not hypothetical: it
+was found on 2026-09-07 still carrying BOTH of that evening's colour bugs**
+(`--surface-record-footer` dark as `#26241F`, and no dark half for
+`--dot-building` at all) days after the stylesheet had been corrected, and it
+had to be found by a person reading a file.
+
+`--check` now RENDERS the document it would have written and fails if that is
+not what is on disk, naming the tokens that differ. It still writes nothing.
+**What it would have caught:** both of last night's bugs, on the first `npm run
+check` after the fix landed in `tokens.css` — and, this morning, `--surface-lift`
+itself, which is how the guard was proved.
+
+`tokens.json` is the copy a consuming app reads. A generated artifact that can
+contradict its source and still pass the gate is a second, silent opinion
+about what a token is, which is the whole subject of the law next door.
+
+### Fixed — two gaps the consuming app was paying for
+
+**`RecordChrome` dropped `activityAction`.** `RecordDetail` gained that slot in
+v1.2.67; `compositions/templates/record-chrome.tsx` forwards ~24 props into it
+and that was not one of them, so the app was smuggling its control through
+`activityLabel` — which is the EYEBROW. A label slot carrying a control means
+the eyebrow's own type step and ink apply to it and the two can never be
+styled apart. One line, and **the app's documented workaround is now
+deletable.**
+
+**The required-field marker sits at the trailing edge, in the kit.** The
+client ruled the label goes left and the marker right. `Field`'s label row was
+`flex items-baseline gap-2` with both children at their natural width, so the
+marker sat wherever the label happened to end — and the app was pushing it
+over from OUTSIDE, with a descendant selector into the kit's own slot:
+`[&_[data-slot=field-required]]:order-last` plus `ms-auto`. An app reaching
+through the kit's markup to restate a layout the kit should own.
+
+Three classes, each doing a job: `justify-between` on the header row (logical,
+so it follows `dir="rtl"` with nothing else written), `min-w-0` on the label
+so a long one SHRINKS instead of shoving the marker off the end — which the
+app's `ms-auto` never fixed either — and `shrink-0` on the marker, which is
+three characters with nothing to give up. **The app's override
+(`[&_[data-slot=field-required]]:order-last`, `ms-auto`) can be removed.**
+
+### Added — a contrast law: every pair the kit draws, both palettes, measured against the surface it is actually on
+
+The entry below this one ends with a FINDING rather than a fix: *"nothing in
+this kit measures a token against the surface it is actually used on."* Three
+bugs in one evening were three shapes of that one hole —
+
+| surface | measured |
+|---|---|
+| record footer on the card it sits inside (dark) | **1.000** |
+| toolbar well on the shell's content card (**both** palettes) | **1.000** |
+| `--dot-building` bare on `--surface-panel` (dark) | **1.02** |
+
+— and not one of them could go red. This is the check that closes it:
+`foundations/tokens/check-contrast.mjs`, wired into `npm run check` as the
+last gate.
+
+**IT DERIVES EVERY PAIR. IT KEEPS NO LIST, AND THE ARGUMENT AGAINST LISTS IS
+THIS REPOSITORY'S OWN.** `GAPS-TRACK1.md` STA-2 recorded *"nothing in the kit
+consumes the six `--dot-*` tokens"* as the JUSTIFICATION for leaving those six
+values alone. It was true when it was written. It expired the day `Kanban`
+grew a column header, and nobody edited it, because nothing made them. A
+hand-kept register of "these must differ" would rot the same way and for the
+same reason.
+
+So the pairs come out of three things that cannot go stale without somebody
+editing code:
+
+- **the token values**, through `token-model.mjs` — which is
+  `build-tokens.mjs`'s own reader, lifted out so that both checks use it.
+  `--surface-record-footer` → `--surface-raised` → `--card` → `#26241F` is a
+  three-hop chain and the bug was only visible at the end of it; a check that
+  compared NAMES would have called that pair different and passed. **A second
+  resolver would have been a second opinion about what a token resolves to,
+  which is the same failure the law exists to catch, one level up.**
+- **the utility names**, out of tokens.css's own `@theme inline` bridge —
+  the same source `build-tokens.mjs`'s DEAD SELECTOR guard reads from the
+  other side.
+- **what sits on what**, out of the components — `ground-map.mjs`. The kit's
+  law is that a ground-painting element uses a NAMED utility class, so the
+  tree of those classes IS the answer. The walk crosses component boundaries
+  (a `<Card>` is its cva's fill, and a caller's `className` merges over it the
+  way tailwind-merge makes it), follows children through slots, reads class
+  TABLES (`COLUMN_DOT[dot]` — the shape that made bug three unreadable in the
+  first place), and breaks the chain at a portal, because an overlay does not
+  sit on the card its trigger happened to be in.
+
+**`demo/` IS IN SCOPE AND HAS TO BE.** `components/` says what each part
+paints; almost none of them say what they are placed ON. The book is the only
+place in this repository where several of them meet a ground at all.
+
+103 pairs, 206 measurements, 210 files, 7 809 component expansions.
+
+#### The tiers, and why not WCAG
+
+Four, because the kit draws four different things with colour and they have
+nothing in common: a word, a 7px dot, a card boundary, a hairline.
+
+| tier | floor | earned by |
+|---|---|---|
+| **ink** | **4.5** | the number this kit has spent two hexes on. `--kw-forest` moved to `#20955B` because 4.44 was *"under AA's 4.5 for the 12px badge label"*; `--kw-poppy-ink` was minted at 4.98/4.52 the same way. Its own ladder sits far above it — `--ink-tertiary`, the palest ink it writes a word in, is 6.51 light / 7.93 dark. |
+| **mark** | **1.5** | ruling 26 — *"the dot never speaks alone"* — so a dot beside a word is not text and 4.5 would be a category error. But a mark is TINY, and area is what makes a small step readable, so it needs MORE than a card's boundary. 1.5 is the smallest same-family separation this kit has ever defended in writing (the record footer's well, 1.499 / 1.587) applied as a floor to a shape a thousand times smaller. |
+| **boundary** | **1.05**, quiet at 1.10 | see below. |
+| **hairline** | **1.05** | ch13's subtitle is *"Colour separates, strokes don't"*, so a hairline that shouted would be the wrong fix. `--hair-faint` composites to 1.127; the one hairline bug this kit has had measured exactly 1.000. |
+
+**THE BOUNDARY FLOOR IS THE ONE WORTH ARGUING, AND IT IS DELIBERATELY LOWER
+THAN IT LOOKS.** Not 3:1 — WCAG's non-text threshold would fail almost every
+surface this kit ships, and the client has ruled on these exact numbers
+repeatedly (1.103/1.111 is override 77's answer for a selected row; 1.198 is
+last night's corrected footer). And **not 1.10 either**, which is the harder
+call: the kit's own page/panel alternation, which CH26.04 states as law,
+measures **1.079** in dark. *A law whose first act is to fail the foundation
+of the system it guards is a law that gets switched off within a week.* So the
+GATE is the invisibility line and nothing more, and **1.10 is kept as the
+QUIET line** — every boundary under it is printed with its number on every
+run, so the register grows and the client can rule on the band.
+
+**The bar that is not negotiable is that nothing may be INVISIBLE.** 1.000 is
+not a low-contrast surface, it is the same surface, and 1.02 is not a design
+position. Everything else in the file is a judgement a person may overturn
+with a reason; that one is arithmetic.
+
+#### Proved on the evidence, not on a clean tree
+
+**A law that passes on a FIXED tree tells you nothing, because green is also
+what a law that has stopped looking prints.** So the three bugs are kept in
+the check as fixtures, with the values `tokens.css` carried before the fix,
+and every run asserts the law calls each of them a failure — and, where a fix
+exists, that the corrected value now clears the floor:
+
+| fixture | pre-fix | today |
+|---|---|---|
+| `--surface-record-footer` on `--card`, dark | **1.000** | 1.198 |
+| `--surface-raised` on `--card`, light | **1.000** | **still open** |
+| `--surface-raised` on `--card`, dark | **1.000** | **still open** |
+| `--dot-building` on `--surface-panel`, dark | **1.019** | 17.056 |
+
+Those pre-fix figures are the check's own arithmetic, not transcriptions: the
+colour maths reproduces every number this CHANGELOG has ever published —
+1.198, 1.587, 17.386, 1.499, 17.06, 1.103, 1.111, 12.07, 4.61 — to three
+decimals. Soften a threshold, rename a tier, widen an exemption or drift the
+maths, and the fixtures go red before anything else does.
+
+#### A blindness tripwire, because silence and a clean bill of health look identical
+
+A resolver that has stopped matching reports "all clear" in the same words a
+passing check uses. That failure mode has cost this project two evenings
+already — STA-2's assumption expiring unnoticed, and `verify/out.css` going on
+resolving `--dot-building` to a colour the source had changed. So the
+derivation has to prove it is still looking, and it does it with **anchors**
+rather than a count, because a count can be met by any old rubbish while an
+anchor names a chain through named files:
+
+- `--card` on `--surface-panel` — proves component expansion and cva variants
+  still work; that pair is written in no single file.
+- `--dot-building` on `--card` — proves class TABLES are still read.
+- `--ink-on-record-footer` on `--surface-record-footer` — proves a caller's
+  `className` still wins over the component's own cva.
+
+Plus collapse floors on the census (files, components, expansions, pairs), set
+well under today's numbers: their job is to notice the walk has stopped
+working, not to freeze a count that legitimately moves.
+
+**Two exemptions, both rot-checked** — an exemption that matches nothing FAILS
+the check, so the list can only shrink and shrinking it takes a person
+deleting a line, exactly as `demo/check-book.mjs`'s `TOOLBAR_EXEMPT` works.
+They are `--ink-disabled` and its `--btn-disabled-label` sibling (tokens.css
+§3 states it in the declaration itself: *"disabled means disabled and nothing
+else, and disabled is exempt from contrast"*), and `--surface-selected` on the
+four papers it can equal — **RULED D15-B, register row 77**, where the client
+took the artifact's lift after seeing it drawn AND MEASURED in red. That one
+is exempt because it was ruled, not because it is fine.
+
+#### What it deliberately does not assert
+
+It does not say a low number is wrong; it says an invisible one is. It does
+not enter states it cannot reach — 564 `hover:` / `data-[state]` / breakpoint
+grounds are counted and printed, never measured. It does not assert
+co-occurrence it cannot prove: two conditional fills chosen inside ONE
+component are two props, and a `dot="shipped"` on a `variant="destructive"`
+badge is a product no call site writes, so 1 892 such pairs are declined and
+counted. It does not see a ground changed by a custom property (135 of them;
+`record-detail.tsx`'s footer grid rebinds `--card` with no class attached).
+And **it does not see the consuming app** — every pair here is one the KIT
+draws, and an app that composes two kit parts in a way the kit never does can
+still make an invisible one. That is exactly how bug two reached a screen. The
+answer is this same check running there, over the same tokens.
+
+#### THE CHECK ARRIVES RED, AND THAT IS THE POINT
+
+**11 pairs are below their tier's floor on today's tree and none of them has
+been touched.** A law that arrives with its own violations quietly patched is
+a law nobody can trust, so they are reported for triage rather than fixed in
+the pass that found them. The first of them is the third bug of last night,
+still live in the kit:
+
+| pair | palettes | measured | where |
+|---|---|---|---|
+| `--card` on `--surface-raised` | both | **1.000** | a `raised` card inside the shell's content region — `screen-shell.tsx`, `status-stepper.tsx:350/447` |
+| `--card` on `--popover` | both | **1.000** | a `raised` card inside a `Sheet` — `alert.tsx:157` |
+| `--background` on `--surface-raised` | light | **1.000** | `demo/sheets/*` inside the book's content card |
+| `--btn-secondary-fill` on `--background` | light | **1.000** | `demo/sheets/motion-sheet.tsx:551` |
+| `--surface-idle` on `--popover` / `--surface-raised` | light | **1.042** | `status-stepper.tsx:629`'s overflow tail |
+| `--ink-on-accent` on `--popover` / `--surface-raised` | dark | **1.132** | `status-stepper.tsx:578`'s number span |
+| `--foreground` on `--surface-brand` | dark | **1.440** | `demo/sheets/motion-sheet.tsx:504` — off-beige ink on mango, which does not flip |
+
+Three sit in the QUIET band and fail nothing: `--btn-primary-fill` on
+`--surface-quiet` (1.075 light), and the page/panel alternation at 1.079 dark,
+twice.
+
+#### One thing found on the way, and not by the law
+
+`foundations/tokens/tokens.json` was **stale in the repository** — it still
+carried `--surface-record-footer` dark as `#26241F` and no dark half for
+`--dot-building` at all, which is to say it still shipped both of last night's
+bugs. `npm run check` runs the generator with `--check`, which writes nothing,
+so nothing noticed. Regenerated here; the diff is two lines and both are the
+fix that already landed in `tokens.css`. **Flagged rather than treated as
+routine: a generated artifact that can disagree with its source and still pass
+the gate is the same shape of hole as the one this entry is about.**
+
+### Fixed — two dark-palette colours that were not faint but absent
+
+The client, on a dark ticket screen: *"in dark mode cannot see the footer- fix
+it"*, and, on the ticket board: *"grerat but status (th header) have no color
+associated."* Both read like taste. Neither was.
+
+**THE RECORD FOOTER WAS PAINTING ITSELF ITS OWN PARENT'S COLOUR.** In dark,
+`--surface-record-footer` resolved to `--surface-raised`, which resolves to
+`--card` — and the record detail's own card *is* `--card`. #26241F on #26241F.
+**Contrast 1.000.** Not a low-contrast surface; the same surface. Every child of
+that footer was drawn correctly, laid out correctly, and sitting on nothing.
+
+CH27.8's dark clause says the ink footer "stops being an inverse surface and
+becomes an ordinary RAISED card", and that sentence is true — of a footer
+sitting on the PAGE. This one sits on a card. Nothing in the clause, and nothing
+in any check, asked what was behind it. **Two tokens can each be correct and
+still name one colour**, which is the whole lesson and the reason the entry
+below shares this heading.
+
+The rule both palettes now keep is the one light already stated: the footer is
+the record's DARKEST band. In light it is the ink card on paper (17.386). In
+dark it RECESSES below the card instead of matching it — `--kw-unlit-page`, an
+existing brand paper, nothing minted. Measured both ways, because this is a card
+that also holds one: **1.198** against the record card above it, and it carries
+`--hair-record-footer` as well, so the boundary is a step AND a rule; and the
+well inside it now reads **1.587**, which is *better* separation than the 1.499
+the same pair manages in light. `docs/TOKENS.md` rows 136 and 137 are corrected.
+
+**AND `--dot-building` WAS INVISIBLE IN DARK — 1.02.** Ruling 26's dark clause
+puts a `building` dot on a MANGO pill, where charcoal is the only legible ink,
+and `GAPS-TRACK1.md` STA-2 recorded the justification plainly: *"Nothing in the
+kit consumes `--pill-fill` or the six `--dot-*` tokens."* That was true when it
+was written. `Kanban`'s column header consumes one now — a bare 7px dot on
+`--surface-panel` — and a value tuned against mango is nothing at all there.
+`docs/TOKENS.md` had documented dark `--dot-building` as `#FFFEF9` the whole
+time and `verify/out.css` still resolved it to off-beige, so source, docs and
+the verify build had been disagreeing with each other.
+
+**So the pill becomes the exception, not the token.** `--dot-building` returns to
+`--foreground` (17.06 on the panel, and the docs are right again), and
+`badge.tsx`'s `variant="status"` + `building` compound variant now repaints its
+own dot with `--pill-label-building` — the charcoal that pill already sets for
+its label, so the dot and the words cannot drift apart. The dot gained a
+`data-slot="badge-dot"` so that variant can reach it without a `span` selector
+that would also catch anything nested in `label`.
+
+Measured, on `--surface-panel`:
+
+| tone | light | dark before | dark after |
+|---|---|---|---|
+| `building` | 15.76 | **1.02** | 17.06 |
+
+The other five are unchanged and are argued separately: `--dot-review` (1.81
+light) and `--dot-archived` (2.21 light) are low, but every one of the six was
+sized for a dot INSIDE a labelled pill, where ruling 26's "the dot never speaks
+alone" holds and the words carry the meaning. The board is the first surface to
+use one bare. Retuning all six for the harder context is a real decision and is
+not being taken in a bug fix — **but no tone may be invisible, and 1.02 was not
+a design position.**
+
+#### FINDING — the check that should have caught both
+
+Neither of these could go red, because nothing in this kit measures a token
+against the surface it is actually used on. Both bugs are the same shape: a
+value that is correct in the context it was written for, consumed in a context
+nobody re-measured. A contrast law — every shipped pair, both palettes, red when
+illegible — would have caught both before either reached a person, and it
+matters more than either fix, because this kit is about to be the only UI input
+for more than one application.
+
+
+### Changed — a board card reads its chips BEFORE its title, and they are the title's overline rather than a fourth row
+
+Client, 2026-09-07, over a screenshot of a board card reading title-then-chips,
+verbatim: *"in cards put chips above title."*
+
+`KanbanCard` drew `title`, `description`, `content`, `badges`. It now draws
+the chips and the title as one HEAD, then the description, then `content`. Only
+the chips moved — `content` is a body (a mark, a bar, a row of avatars) and
+stays last.
+
+**APPLIED AT THE COMPONENT AND NOT OFFERED AS A PROP**, which is the decision
+worth arguing rather than the swap. A `badgesPosition` would let two boards in
+the same app disagree about what a card is, and a kit whose components hold
+both answers to a question the client has answered is a kit that has stopped
+ruling. It is also the wrong shape for this component in particular: CH27.24
+draws a board card as *"only number, title, owner and age"* and states **no
+status pill**, so the `badges` slot is already past what the chapter draws, and
+giving an unruled affordance a second axis of variation is the one move a kit
+cannot afford. A caller who genuinely needs another arrangement has `content`,
+the documented hole for "anything else inside the card"; the ordered parts are
+not a menu.
+
+**THE OBJECTION, ANSWERED RATHER THAN AVOIDED.** On the RECORD page the client
+ruled the other way — 2026-08-26, KWAPSO-SPEC row 73 — moving the identity
+chips from above the title to *"directly underneath the title"*, which reversed
+CH27.8's own stated reason that *"keys sit above because they tell you which
+record this is before you read what it's called"*. A board card now restores
+exactly the reason 27.8 discarded. That is not reconciled here and should not
+be: a record page is one object read at full size, with a heading that carries
+the page on its own; a board card is a caption-step line in a column of twenty,
+where the chips ARE how you find the card you are looking for before you read
+any of them. Both rulings are hers, both are recorded, neither is generalised
+over the other.
+
+**THE RHYTHM CHANGED WITH THE ROLE, AND THIS IS THE HALF A PURE SWAP WOULD HAVE
+MISSED.** `CardContent` is `gap-2`, and gap is directionless, so nothing
+"breaks" when two children trade places: the chips would simply keep the
+stack's own 7.5 (`--spacing` is `0.25rem`, the root is 15px, ruling 18).
+Keeping it is still wrong. Along the foot the chip row was a PEER of the meta
+line — last in a stack, equally spaced from everything, which is what it was.
+Above the title it is the title's OVERLINE, and an overline sitting at the
+stack's own step tells the reader all four rows are equally related while the
+strongest mark on the card, a filled pill, sits at the top out-shouting the
+title it is supposed to introduce.
+
+So the number is the kit's one stated number for a mark above a title —
+`--space-1h`, written in `title.tsx` as *"6 under the eyebrow, and nothing at
+all without one"* — taken rather than newly chosen. Measured at the 15px root,
+counting each text line's half-leading because a filled pill has none (its
+border-box IS its edge):
+
+```
+chips → title   5.625 + (15.234 − 12.1875)/2       =  7.15
+title → meta    7.5 + 1.52 + (14.953 − 10.3125)/2  = 11.34
+```
+
+7.15 against 11.34 is a head and a body. At the old 7.5 it would have been 9.02
+against 11.34 — a difference too small to group anything, which is the gap
+sized for the old order that this avoids.
+
+The margin needs a wrapper, because a margin inside a flex column ADDS to the
+gap (7.5 + 6) and the only other way under the stack's step is a negative
+margin. So the head is one flex item spaced internally — precisely how
+`title.tsx` builds its own eyebrow-and-heading pair, which means the
+construction is borrowed too, not just the number. With no chips the head is
+one `<p>` in a `<div>` and preflight zeroes the paragraph's margins, so a card
+without chips renders at exactly the metrics it did before.
+
+**A CARD WITH CHIPS AND NO TITLE NOW READS CORRECTLY, AND DID NOT BEFORE.**
+`title` is typed required, but `ReactNode` admits `null` and the title's `<p>`
+was drawn unconditionally — an empty paragraph is not nothing, it is a 15.234px
+line box. Before today that hole sat at the TOP of the card where it was easy
+to miss; the reorder would have moved it into plain view between the chips and
+the meta line. Both parts of the head are guarded now, and so is the head
+itself: chips with no title close up, title with no chips is unchanged, neither
+draws no head at all rather than an empty div taking a gap on both sides.
+
+**THE ORDER IS THE DOM's, NOT `order:`.** A CSS reorder would leave a pressable
+card (`role="button"`) announcing its name in the old sequence while the eye
+reads the new one. **So the spoken name of a card does change with this ruling**
+— chips first, then title — and that is correct: what is seen first is what is
+said first. No `aria-label` is invented to paper over it; this file's law is
+that every user-facing string is a prop, and a label here would be the
+component writing one.
+
+**NOT CHANGED: `Swimlane`.** Its card already carries `card.stage` as a 10/500
+uppercase eyebrow above the title, drawn from CH19 view 08's own HTML, and
+chips above that would be two overlines stacked on one 13-step title. The
+client's screenshot is a board card and the ruling is applied where she pointed
+it. Flagged here so the next reader does not think it was missed.
+
+Nothing else in the kit asserted the old order — no demo state note, no
+specimen and no book page names it — so nothing else needed updating. The
+`badges` and `title` prop docs on `KanbanCard` say what they now are.
+
+### Added — `EdgePanel`, the docked rail: beside the record above 45rem, the drawer's own bottom sheet below it
+
+Client, 2026-09-07, on the record-activity shapes, verbatim: *"recoerd
+activity- implemet 'A · in the eyebrow row' across the app. kill all old
+activity tabs. For the design, let's do a a 6 - but make it slide in in desktop
+and slide up in phone"*, and the day before, 2026-09-06: *"I don't want to have
+activity as a tab anywhere but on the footer, on top of the dates. On the right
+column, on Latest Activity, I would like some view or expand or whatever, and
+this would open a slide-in with all the activity."*
+
+Two sentences, three decisions. The Activity TAB dies. The record's footer
+summary becomes the only activity on the page. And the door out of it opens
+**this** — the thing there was no component for.
+
+**"A 6" IS SHAPE 06 OF THE ARTIFACT SHE REVIEWED, AND WHICH SHAPE IT IS, IS THE
+WHOLE SPECIFICATION.** Shape 06 is the DOCKED RAIL: the history stands at the
+inline end while the record stays live beside it. She picked it over three
+SHEET shapes on the same page, and the single thing that separates it from all
+three is the thing this component exists to preserve — **it is not modal**.
+Nothing dims, nothing locks, nothing traps, and the reader keeps working with
+the history open. A rail that dimmed the record would be one of the three
+shapes she did not pick, so the non-modality is not a simplification that could
+be tidied up later; it is the ruling.
+
+**HER AMENDMENT TURNED IT FROM A PANE THAT PUSHES INTO ONE THAT SLIDES OVER.**
+Shape 06 as drawn takes its 420 out of the layout and moves the record across.
+"Slide in in desktop" does not. So the panel is `position: fixed`, portalled,
+and lands **over** the inline end: the record keeps its measure, and not one
+line of it reflows while the reader is in the middle of reading it. That is
+also why there is no `push` variant — the artifact's version and hers are not
+two options, the second replaces the first.
+
+**IT NEEDED NO NEW MECHANIC, WHICH IS THE POINT OF THE RULE SHE GAVE THREE DAYS
+EARLIER.** 2026-09-04, standing: *"everythung that's slisde in in desktop,
+should be slide up in mobile"* — already law in
+`foundations/motion/motion.css` §3a/§3b and quoted in full in `sheet.tsx`.
+§3b's `.motion-edge-panel` is described in that file, in its own words, as "the
+same rule for A PANEL THAT IS NOT A SHEET", and it was written for the shell's
+assistant column. So "slide in in desktop and slide up in phone" was a class
+that already existed before she asked for it. **`motion.css` is untouched by
+this release.** The component attaches one class and satisfies its five-point
+contract literally — the class on the panel element itself (never a wrapper,
+because the keyframes translate 100% of the animated box), `data-side` and
+`data-state` on that same element, the caller placing the panel where it lands,
+and the unmount lag.
+
+**IT IS `EdgePanel` AND NOT `ActivityRail`.** PATTERN §9 forbids product
+vocabulary in a kit file, and it would be wrong on the merits anyway: the
+motion contract had already named this box, and a component and the class that
+moves it must not end up with two names for one idea. It leaves the box general
+enough for the second caller it was drawn for — the shell's assistant column —
+and for the next rail after that.
+
+#### THE ASYMMETRY, WHICH IS THE ONE THING IN THIS COMPONENT MOST LIKELY TO BE "FIXED" BY SOMEBODY MAKING IT CONSISTENT
+
+Above 45rem the panel takes **no scrim, no focus trap and no page lock**. Below
+45rem it takes **all three**. Both halves are deliberate, and the entry states
+the argument rather than mentioning it, because a reader who meets only one
+half will read it as an oversight.
+
+Above 45rem, non-modality is true by construction and is the ruling. The rail
+is 420 of a 1440 viewport; the record is fully visible beside it and fully
+operable. Dimming it, trapping focus in the rail, or freezing the page would
+take away the exact property she chose shape 06 for — the reader working with
+the history open. A rail that locked the page would BE one of the sheets.
+
+Below 45rem none of that survives, and the shape has changed underneath the
+argument. The panel is full width and 85dvh tall: the record is not beside it,
+it is under it. A page that is 85% covered, still scrollable, still tabbable
+and still clickable is not "non-modal" — it is a page you can operate **blind**.
+The reader tabs from the last control in the sheet into a form they cannot see;
+the thumb is over the sheet, the momentum lands on the record, and nothing on
+screen says which one moved. The honest name for that is a trap. So below
+45rem the panel takes a scrim, a focus trap and a page lock.
+
+Put the other way round, and this is the version to remember: **the asymmetry
+is not between two widths, it is between two shapes.** Above 45rem this is a
+rail beside a record. Below it, it is the drawer — the kit already has one, it
+is already modal, and this panel becomes it. The root element's role changes
+with it, from `aside` to `role="dialog" aria-modal="true"`, because that is the
+truth at each width and a component that lied about one of them would be
+readable by nobody.
+
+**THE GEOMETRY BELOW 45rem IS `sheet.tsx`'s, COPIED AND NOT RE-DERIVED.** Eight
+declarations, line for line — `inset-x-0`, `top-auto`, `bottom-0`, `h-auto`,
+`w-full`, `max-h-[85dvh]`, `rounded-t-[var(--radius)]`, `rounded-b-none` — each
+one fighting a specific base declaration, and the 85dvh is the client's own
+85/15 ruling in `dvh` rather than `vh` for the drawer's reason: on a phone the
+browser chrome is the difference between a footer you can press and one under
+the address bar. Two bottom sheets on one phone that differed by a pixel would
+be the worst possible outcome of a rule whose entire purpose is that panels
+behave the same way. The grabber (ch27.2's, *"On narrow it rises from the
+bottom as a sheet with a grabber"*) comes with the geometry, and is
+`display: none` above 45rem where the drawer draws none either.
+
+**EVERY VISIBLE DECISION IS A MEDIA QUERY; ONLY THE UNPAINTED ONES READ THE
+VIEWPORT.** The scrim's existence, the bottom anchoring, the radius flip and
+the grabber are all `max-[45rem]:` classes, for the reason `sheet.tsx` and
+motion.css §3a already state: a JS breakpoint read during render gives the
+server the desktop answer and the client the phone answer, and even where it
+hydrates cleanly the first painted frame is a panel flying in from the side
+before it corrects itself. A focus trap, a page lock and an ARIA role are not
+painted — they are attached in an effect, which never runs on the server and
+runs after the first client paint, so reading `matchMedia` there mismatches
+nothing and flashes nothing. The one visible consequence is that for a single
+frame on a phone the panel is announced as a complementary region rather than
+as a dialog; the scrim is already drawn by then, because the scrim is CSS. Both
+halves are written against the **range** form — `max-[45rem]:` compiles to
+`width < 45rem` and the effect asks `matchMedia("(width < 45rem)")` — rather
+than `max-width: 45rem`, so the two halves cannot flip one pixel apart.
+
+#### The rest of what it does, and the reasons
+
+- **It portals to `document.body`, and that is not optional.** Everything here
+  is `position: fixed`, which resolves against the viewport only while no
+  ancestor establishes a containing block. This kit ships one that always
+  does: `.motion-page` (motion.css §2) animates `transform` with
+  `animation-fill-mode: both`, so the route wrapper holds `translateY(0)` for
+  the whole life of the page — a non-`none` transform, and therefore a
+  containing block, long after the entrance has finished. A rail mounted inside
+  a route would anchor to the route's box instead of the window, and it would
+  look *almost* right, which is worse. `Sheet` never had to think about this
+  because Radix's `Portal` was doing it; there is no Radix here.
+- **The exit is waited out, and the duration is READ rather than written.**
+  Unmounting in the same commit that sets `data-state="closed"` lands
+  `display: none` on the exit's first frame, so the panel disappears instead of
+  leaving and the class looks broken when the caller is what broke it. `inert`
+  goes on immediately — a panel on its way out must be unreachable from the
+  keyboard, the accessibility tree and the pointer while it is still painted —
+  and removal waits for `--duration-exit`, resolved off the document. RULES
+  §6.1 says a component writes no duration; this one writes none, and gets
+  reduced motion for free because tokens.css §9 zeroes that token and the read
+  returns the zero. An unreadable token returns 0, which is the coherent answer
+  rather than a fallback guess: if the stylesheet declaring `--duration-exit`
+  is absent, so is the stylesheet that would have animated the exit. It is a
+  timer and **not** `animationend`, for PATTERN §12's recorded case: an
+  embedded browser pane at `document.hidden === true` never ticks a CSS
+  animation, so a surface that unmounts on that event never unmounts.
+- **Escape works at both widths, and listens on the document.** Above 45rem the
+  panel is non-modal and focus is normally somewhere else entirely; a rail you
+  can only dismiss while your cursor is inside it is a rail you cannot dismiss.
+- **Above 45rem nothing takes focus, and exactly one focus move is allowed.**
+  A rail that stole focus from the record would have taken away the thing shape
+  06 was chosen for. The exception: if the reader **was** working inside the
+  rail when it closed, focus would otherwise land on `<body>` and the next Tab
+  would restart the page from the top, so it is returned to whatever opened the
+  panel. That is recorded on the way in (`onFocusCapture`) rather than measured
+  on the way out, because by then the panel is already `inert` and the browser
+  has moved focus off it, so asking afterwards always says no.
+- **The page lock restores what was there before**, not a blank, so a host that
+  sets its own `overflow` gets it back.
+- **The narrow trap re-reads its stops on every Tab.** A rail's contents change
+  under the reader — a feed loads, a register is replaced — and a list captured
+  once at open would send Tab to a control that has since left. With no stops
+  at all, focus is held on the panel rather than let out onto the page the
+  sheet is covering, which is why the panel carries `tabIndex={-1}`: a target,
+  never a stop.
+- **z 50 — one rung under the drawer.** The ladder stated in `select.tsx` is
+  sheet 55, dialog and alert-dialog 60, the four anchored surfaces at 70. A
+  rail belongs under all of them: it must cover the page and the shell's own
+  chrome (which tops out at 10), and it must not cover a drawer or a dialog
+  opened from inside it. The scrim takes the same 50 and the two are ordered by
+  DOM order, which is how the drawer's pair is ordered too.
+- **`open` is controlled with no uncontrolled twin.** A rail is opened from
+  somewhere else on the screen — a footer's action, a toolbar, a shortcut — and
+  the thing that opens it is the thing that has to know it is open, so a second
+  copy of that state inside the panel could only ever disagree with it.
+- **No `onClose`, no close chip.** `showClose` defaults to `true` and is
+  honoured, but a chip that cannot dismiss anything is worse than no chip, so
+  the panel with no handler draws none and the caller closes it from outside.
+- **There is no `top` or `bottom` side, and that is a decision.**
+  `.motion-edge-panel` supports four and `Sheet` exposes four because 18 call
+  sites already passed them. Nothing passes this one yet, so the API is the
+  honest size. A `bottom` edge panel is a bottom sheet at every width and the
+  kit already draws that; a `top` one cannot obey the client's rule at all —
+  `sheet.tsx`'s sentence is the whole argument, *"a `top` sheet that rose from
+  the bottom would arrive at the edge it did not come from"*. Two sides are the
+  two the rule is about.
+- **Nothing about it is mango**, no ring is written (tokens.css §8 rings
+  everything at once), separation is a fill or an inset shadow and never a
+  border, and every user-visible string is a prop with a default.
+
+**REJECTED.** A `variant="push"` that took its width out of the layout (her
+amendment replaced it, and keeping both would let two rails in one app disagree
+about whether the record moves). A JS breakpoint driving the geometry
+(hydration mismatch and a wrong first frame — this is why the seam is where it
+is). `animationend` as the unmount signal (PATTERN §12). A `Sheet` with its
+scrim switched off (the scrim is not the modality — the trap, the lock and the
+role are, and a `Sheet` with four things disabled is a second component wearing
+the first one's name). Widening the rail with the viewport: 420 is the measure
+the kit states for its drawer, and past about 480 a history column stops being
+a margin note and starts competing with the record for the reader's eye, which
+is the failure she rejected when she rejected the sheets.
+
+**API.** `EdgePanel`, `edgePanelVariants`. Props: `open` (required),
+`onClose`, `side` (`"left" | "right"`, default `"right"`), `title`,
+`description`, `footer`, `showClose` (default `true`), `closeLabel` (default
+`"Close"`), `label`. Slots published for the app's own probes:
+`edge-panel`, `-scrim`, `-grabber`, `-header`, `-title`, `-description`,
+`-body`, `-footer`, `-close-button`.
+
+Filed in the book under **Feedback & overlays**, with the dialog, the alert
+dialog and the sheet, because a reader comparing "which of these covers the
+page" wants all four on one screen. `demo/sections/c-d.tsx` grew a letter to
+C–E rather than gaining a sixth registry file for one section — the section
+index sorts the merged array by slug, so which file a section is declared in
+has never decided where it appears.
+
+#### Where to look
+
+- **`demo/` → Feedback & overlays › EdgePanel** — the reading-end rail with a
+  head and a pinned foot, the start-edge twin, and the bare panel with no head,
+  no foot and no chip. The section's caveat is the instruction that actually
+  demonstrates the component: open one and keep scrolling, keep tabbing, keep
+  pressing things underneath it — then narrow the window under 720 and open it
+  again.
+- **`demo/` → Templates › RecordDetail**, panel *"activityAction — the door the
+  Activity tab left behind"*, where the footer's door and this rail are drawn
+  as the one flow she asked for.
+
+#### FINDING — `verify/edge-panel/` is scaffolded and does not run
+
+Recorded rather than papered over. The sandbox has its `index.html`,
+`entry.css`, `main.tsx` and `vite.config.ts` (port 5307), and all four of them
+reference a `page.tsx` that **is not written**: `main.tsx` imports `./page` and
+`entry.css` has it as a `@source`. `npm run check` does not catch it, and that
+is not a fluke — `tsconfig.json`'s `include` covers `components`, `lib`,
+`compositions`, `foundations/icons`, `demo` and `mini-app`, and has never
+covered `verify/`, so a broken sandbox is invisible to the gate by design.
+Until that page exists, the settled-geometry numbers this component would
+otherwise print under each state are unmeasured, and this entry deliberately
+does not claim any. The travel itself is already measured next door, in
+`verify/sheet-slide-up/`, whose whole subject is the keyframes.
+
+### Added — `RecordDetail.activityAction`, the door the Activity tab left behind
+
+Client, 2026-09-06: *"I don't want to have activity as a tab anywhere but on
+the footer, on top of the dates. On the right column, on Latest Activity, I
+would like some view or expand or whatever, and this would open a slide-in with
+all the activity."* And 2026-09-07, naming the place: *"recoerd activity-
+implemet 'A · in the eyebrow row' across the app. kill all old activity tabs."*
+
+With the Activity tab gone, the footer's summary is the only activity on a
+record page — so the door to the full history has to be somewhere, and she said
+where. `activityAction?: React.ReactNode` is the trailing slot on the "Latest
+activity" eyebrow's own row. The first caller fills it with
+`All activity · 48 ›` and opens an `EdgePanel` with it.
+
+**IT SUPPLIES THE PLACE, THE TYPE STEP, THE LEADING AND THE INK — AND NOT THE
+CONTROL.** A `Button variant="link"`, an anchor, whatever the route's router
+needs. Two reasons it is a node and not a `{ label, onSelect }` pair: a kit
+component must not own a string (PATTERN §7), and it must not own a navigation
+either.
+
+**WHAT IT MUST NOT BE IS A BUTTON WITH A BOX**, and the reason is local to this
+card. The record's footer already teaches one shape: a pill on it is a CONTROL
+BY ELIMINATION, which is the note field's own argument and the whole reason
+that field can afford to have no edge. A second pill up here would make the
+reader ask which of the two is the field. `Button variant="link"` is the shape
+that fits — the kit's `.kw-link`, which *"inherits its ink, underlines on
+hover, occupies no box"*, compounding to `h-auto p-0`, so it takes the ink this
+row hands it and adds no height at all.
+
+**IT COSTS NO HEIGHT, AND THAT IS ARITHMETIC RATHER THAN AN EYEBALL.**
+`--footer-eyebrow-line` is the eyebrow's line BOX, written once on the row the
+way `activity-feed.tsx` writes `--feed-line` and for the identical reason: two
+things measure against it and they must not drift.
+
+```
+--footer-eyebrow-line
+  = --text-micro × --text-micro--line-height
+  = 0.6875rem × 1.3
+  = 0.89375rem
+  = 13.406px at the shipped 15px root (ruling 18)
+```
+
+`RecordFooterEyebrow` is `text-micro`, whose own line height IS that 1.3, so
+its line box is that expression by construction. Handing the same length to the
+action makes the two boxes identical, `items-baseline` lands them on one
+baseline, and the row's height is the height the lone eyebrow already had.
+Nothing below moves: the feed's `mt-3` starts from the same y it always did.
+
+**`text-xs` FOR THE ACTION, AND FOUR THINGS KEEP IT FROM READING AS A SECOND
+EYEBROW:** it is sentence case, its tracking is 0 where the eyebrow's step
+carries 0.08em, it takes no medium weight, and it is in the FULL footer ink
+where the eyebrow is in the quiet one. The ink is the load-bearing one of the
+four — the label is quiet and the target is not — which is chapter 13's
+"colour separates" doing the work a box would otherwise have to. Measured in
+both palettes against `--surface-record-footer`, the card's own ground, so the
+number is the one the reader actually sees:
+
+| | light, on `#1A1918` | dark, on `#26241F` |
+| --- | --- | --- |
+| the action, `--ink-on-record-footer` `#FFFEF9` | **17.386:1** | **15.353:1** |
+| the eyebrow beside it, `#d5d1c9` | 11.531:1 | 10.183:1 |
+
+The instrument was checked against the fault this component already
+records — the 2026-08 eyebrows at `#5F5D59` on charcoal — and returns that
+case's 2.672:1, so it can still say no. Nothing here is anywhere near it.
+
+**THE INK IS NAMED RATHER THAN INHERITED**, and the redundancy is deliberate.
+The card above already sets `text-ink-on-record-footer`, so the class looks
+like nothing. It is not: this row is the one place in the card where a quiet
+ink and a full ink sit side by side and MEAN different things, and an ink that
+arrives by inheritance is an ink nobody has decided. Stated on the element, it
+survives the next change to the card's own text class.
+
+**`whitespace-nowrap`, because the derived leading is a ONE-LINE
+measurement.** A wrapped action would stack two 13.406 boxes and the "costs no
+height" claim would stop being true. The eyebrow keeps the flexible side and
+wraps first, which is the right order — the label can afford two lines, the
+door cannot.
+
+**OMITTED, THE ROW IS BYTE-IDENTICAL TO WHAT IT WAS, AND THAT IS A PROPERTY OF
+THE STRUCTURE RATHER THAN A PROMISE ABOUT A DEFAULT.** The flex row lives
+inside the `else` branch, not around both: with no action the eyebrow is
+rendered by the same `RecordFooterEyebrow` call it always was, with no wrapper
+around it and nothing new in the DOM. It is the old element, unchanged, reached
+by the same expression.
+
+**IT CAN BRING THE FOOTER'S ACTIVITY COLUMN INTO EXISTENCE, ALONGSIDE THE TWO
+THINGS THAT ALREADY COULD, AND FOR THEIR REASON.** The door to the full
+history is a fact about the record even on a day when nothing has happened yet,
+and a route that hid it because the summary was empty would have hidden the
+only way to the entries that are not summarised. It is gated on
+`activityVisible` with the rest, so permissions still HIDE (ch24.6) and a
+portal route passing `activityVisible={false}` gets no door either. A caller
+that passes nothing changes nothing: the condition is the old one with a term
+that is `undefined`.
+
+**IT IS NOT A SECOND EXCEPTION TO THE CARD'S READ-ONLY RULE**, and must not be
+read as one. `onAddNote` is an exception because it writes. This slot writes
+nothing, changes no value and submits nothing. It is a door, and a page being
+read-only has never meant a page you cannot leave.
+
+Slots: `record-detail-activity-row` and `record-detail-activity-action`.
+
+#### Where to look
+
+- **`demo/` → Templates › RecordDetail**, panel *"activityAction — the door the
+  Activity tab left behind"*: the same footer twice, given and omitted, with
+  the press wired to a live `EdgePanel` so the whole 2026-09-06 sentence — the
+  summary in the footer, the door on the eyebrow's line, the slide-in with all
+  the activity — is drawn end to end rather than described.
+
+### Changed — the kit's two scrims are a token, so no component mixes its own charcoal any more
+
+`--scrim` (charcoal at 36%) and `--scrim-drawer` (charcoal at 28%) are minted
+in tokens.css §3 and bridged in §10 as `bg-scrim` / `bg-scrim-drawer`. Four
+files stop hand-mixing and consume the name: `dialog.tsx`, `alert-dialog.tsx`,
+`sheet.tsx`, and `ScreenShell`'s narrow aside. **Nothing renders differently.**
+
+This closes GAPS-A.md OVL-2, which had logged the problem and named the fix in
+its own words — *"A component may not write a colour, so the value has to come
+from a token — but the ruling is charcoal in BOTH palettes, and every semantic
+token that is charcoal in light flips to off-beige in dark (`--foreground`,
+`--surface-inverse`, `--focus`). Mixing from any of them produces a WHITE scrim
+in dark mode."* There was no token that could hold it, so four files each wrote
+the mix out by hand against the raw palette layer, each with its own paragraph
+explaining the exception. **These two names are that token.** They are the only
+names in §3 deliberately not re-declared in either dark block, and that is the
+whole ruling: a scrim is charcoal at both ends of the palette, so a dark
+override would be the bug rather than the completeness.
+
+**A FIFTH CONSUMER IS WHAT FINALLY FORCED IT.** `edge-panel.tsx`'s narrow
+presentation is the drawer and therefore wants the drawer's 28%. Adding a fifth
+hand-mixed exception was the alternative, and was declined.
+
+**THE KIT'S OWN LITERAL, AND NOT A `color-mix` OFF `--kw-charcoal` — MEASURED,
+NOT PREFERRED.** The first draft mixed the raw charcoal, which reads better and
+keeps the 36 and the 28 visible as percentages. Compiled, it does not survive:
+Tailwind rewrites a `color-mix` in a custom property into a PAIR — the un-mixed
+colour, then an `@supports (color: color-mix(in lab, red, red))` block with the
+real value — so a browser without `color-mix` gets **fully opaque charcoal**
+where a 36% dim was asked for. A scrim is the one value where that fallback is
+not a graceful degradation but a black screen over the record. The same pair
+was already being emitted for all four hand-mixed call sites — verified by
+compiling the old arbitrary class against the current tokens file — so this is
+a trap being **removed**, not one being avoided. `rgba(26, 25, 24, …)` is also
+what the kit literally states, and how every other alpha-on-a-ground value in
+that file is already written (`--border`, `--hair-faint`, `--hair-inverse`).
+The value is identical either way: `color-mix(in srgb, #1A1918 36%,
+transparent)` resolves to exactly `rgba(26, 25, 24, .36)`.
+
+They are bridged as utilities rather than left as bare custom properties
+because an element that PAINTS A GROUND uses a named utility — the same law the
+record footer's arbitrary background was written to enforce, and the reason the
+four old call sites each carried an arbitrary background that `cn` merges by
+the wrong group.
+
+### Added — `ScreenShell.asideLead`, so a screen can put something on the assistant's own row instead of in its body
+
+Client, 2026-09-07, with a screenshot of a ticket screen where the running
+timer floats over the content: *"Back to overall design: I want the timer out
+of the main body. I want it exactly at the same level on the left of the
+assistant button opener, and of course, if I open the assistant, they should
+also move. Do you understand what I mean?"*
+
+This is a shell-level placement, not a nudge on a pill. The shell's public
+slots — rail, aside, navLead, ambient, breadcrumb, header, eyebrow, title,
+actions, recordNumber, collectionLabel, chips, tags, meta, figureStrip,
+children, footer, fallback — had **nothing beside the assistant's opener**.
+That was the gap.
+
+**WHICH OPENER, ESTABLISHED BEFORE ANYTHING WAS DRAWN.** The shell has two
+drawings of one control and they never coexist: `screen-shell-assistant-trigger`,
+a `variant="secondary"` (paper) button that is `md:hidden`'s child and so
+exists only below 768; and the aside's `EdgeHandle`, which is `HANDLE_HIT` —
+`--btn-primary-fill`, i.e. **mango** — and which when shut takes the screen's
+true top-trailing corner on her own earlier instruction ("real top right
+corner"). Her screenshot is a wide screen with a mango circle at the top
+right, and paper is not mango. It is the shut `EdgeHandle`. The consuming
+application confirms it from the other side: it passes `narrowTopBar={false}`
+and draws its own phone bar, so the kit's narrow trigger is not even mounted
+in the product she photographed.
+
+**THE SLOT.** `asideLead?: React.ReactNode` — one prop, no label, no second
+control. Named for the place, not for the timer: the next caller will be a
+save state, an unsaved-changes count or a live-connection mark, and a prop
+called `timer` would be product vocabulary in a kit file (PATTERN §9). `Lead`
+is already this shell's word for "the node at the leading end of a bar" — see
+`navLead`. It paints nothing: no fill, no radius, no hairline, no ink, so
+there is no ground here to name a utility class for and the two-radii rule is
+untouched. It publishes `data-slot="screen-shell-aside-lead"`.
+
+**IT IS ANCHORED TO THE ASSISTANT DOCK'S LEADING EDGE, WITH NO STATE BRANCH IN
+ITS PLACEMENT.** `top-[var(--shell-gutter)] end-full
+me-[calc(var(--control-height-button)+var(--space-2h))]`, and that one string
+answers all three states:
+
+- **Open** — the dock's inline size is the column's, and
+  `.motion-column-collapse` (motion.css §7) is already easing it. A percentage
+  inset against a box whose width is animating resolves on every frame, so the
+  row *glides* inland with the column. That is her "if I open the assistant,
+  they should also move", and the shell writes **no duration and no curve** for
+  it (law 6.1). Measured at 1440: the row travels 375.00, which is the column's
+  own width.
+- **Shut** — the dock collapses to its own leading gutter, so the same anchor
+  lands the row `--space-2h` (9.37 at the 15px root) short of the corner
+  circle. `--space-2h` is `Stopwatch`'s own gap between the parts of a pill, so
+  the client's component supplies the air beside her circle.
+- The trailing reserve is **constant in both states** and that is the trade
+  that buys the glide. Branching it on `isAsideOpen` recovers ~47px of
+  tightness when open and turns a continuous travel into a jump on the state
+  frame; a CSS transition on the margin would be a component writing motion,
+  which is law 6.1 with the sign flipped. The reserved band is the opener's own
+  footprint and the opener stands in it half the time.
+
+**"EXACTLY AT THE SAME LEVEL" IS A DERIVATION, NOT AN EYEBALLED LITERAL.** The
+row spends `--shell-gutter` for its block inset and `--control-height-button`
+for its height — the same two tokens the shut opener spends — and is
+`items-center`. Measured at 1440: both tops 18.75, both centres 37.50, Δ 0.00.
+Open, the assistant's folder tab holds the same line (the dock pays its top
+gutter *inside* the tab), so Δ top is 0.00 there too; the centres differ by the
+folder's own greater height, which is its shape and not a misplacement.
+
+**NO ASIDE AT ALL — IT IS STILL DRAWN, AT THE ROW'S END.** `aside={null}`
+renders no dock and no opener, so this instance is a child of the SCREEN and
+takes `top-[var(--shell-gutter)] end-[var(--shell-gutter)]` — the corner the
+opener would have had, flush with the content column's own trailing inset. The
+reserve is dropped with the opener. It does **not** go unrendered: a clock that
+disappeared because a screen happens to have no assistant is a clock that
+stopped existing while it was still running.
+
+**BELOW `md` IT IS NOT DRAWN, AND THE APPLICATION IS NOT FORCED TO DRAW ITS
+PILL TWICE.** `max-md:hidden` — `display: none`, so the caller's node is out of
+the tab order and out of the accessibility tree, measured with a focus sweep at
+375 rather than with `checkVisibility`. It is the same suppression the shut
+`EdgeHandle` already takes, for the same collision: on a phone the opener is in
+a top bar, not in the corner, and below 45rem the dock is a full-bleed bottom
+sheet that `end-full` would carry the row clean off the leading edge of the
+window. So the app keeps its own narrow copy in its own phone bar and hands the
+wide copy to this slot instead of to `header` — one drawing at each width, with
+the breakpoint doing the choosing.
+
+**WIDTH.** `w-max`, capped at `40vw`, one line, never wrapped. `w-max` is
+load-bearing rather than decorative: an absolutely positioned box with an `end`
+inset of `100%` has a *negative* shrink-to-fit available width, so `width: auto`
+would collapse the pill onto its min-content floor. The 40vw cap is the
+assistant column's own (`lg:max-w-[40vw]`), reused rather than invented — what
+it protects is the **breadcrumb**, which shares this line from the leading side
+and keeps at least three fifths of it. Inside the cap the caller truncates: the
+row hands its children `min-width: 0`, the same one-line enabler
+`.motion-column-collapse > *` already gives, so a `truncate` engages instead of
+overflowing. Measured with a deliberately long title: 258.89 × 37.50 — one line
+of `--control-height-button`, and the trail ends at 562.83 with the row
+starting at 702.98.
+
+**Every inset is logical** (`end`, `me`, and a `top` on the axis that does not
+mirror), so "on the left of the assistant button" is the reading end in both
+directions. `?dir=rtl` reports identical numbers.
+
+**`z-10` and `pointer-events-auto`, both the handle's own.** Above `lg` the
+dock is an in-flow item at `z-auto` and the row hangs out of it over the card,
+which is `relative z-[2]` — at the default stack level the caller's node would
+be painted *under* the card. Ten is the rung the handle already spends for
+exactly that overhang. `pointer-events-auto` takes the events back from the
+dock's `max-lg:pointer-events-none`; without it the pill is a control you can
+see and cannot press between 768 and 1024, which is the precise defect the
+phone's top bar found and fixed once. Verified at 900 with the column open:
+`elementFromPoint` over the pill returns `stopwatch-action`, not the overlay.
+
+#### FINDING FOR THE CLIENT — this placement puts two mangos on one line
+
+Not fixed here, and deliberately so. The kit rules **one mango per view**
+(docs/RULES.md §2.5). The shut opener paints `--btn-primary-fill`; the
+`Stopwatch` in her screenshot paints its action disc `--surface-brand`, and
+that component's own source calls it *"the one mango in the pill"*. Both are
+#FED069, and this slot stands them 9.37px apart. Neither is the shell's to
+restyle, and a kit that quietly demoted a client's control to keep its own law
+would be hiding the collision rather than reporting it. Three honest answers,
+hers to pick: the opener goes paper on wide screens as it already did on the
+phone; or the pill's disc goes charcoal while a timer sits on this row; or the
+rule takes a stated exception for the screen's chrome corner. It is drawn as it
+stands in `verify/aside-lead/` and in the book so the choice is made from a
+picture.
+
+#### Where to look
+
+- **`verify/aside-lead/`** — the three states stacked, at the window's real
+  width, with the numbers behind every claim printed under each one, plus a
+  LIVE panel whose toggle shows the row and the column travelling together.
+  `?dir=rtl`, `?t=dark`, `?spine=ink|paper|mango`.
+  `npx vite --config verify/aside-lead/vite.config.ts` → :5273.
+- **`demo/` → Screens › Templates › ScreenShell**, panel *"asideLead — the
+  assistant's row, in all three states"*, with the two-mango finding as a
+  `Caveat` beneath it.
+
+### Added — `Sankey`, so "what did it arrive as, and what did it turn out to be" is a component rather than a picture in a document
+
+Client, 2026-09-07, pointing at a chart in an approved design artifact: "for
+the Raised as, then triaged as i want this graphic you proposed / also, if its
+not there, include in ui-ux components". It was not there. The kit's charts
+stop at bar/line/area, the donut, the rings, the radar, the gantt, the heat map
+and the pulse band; chapter 19's flowchart draws edges between RECORDS and its
+comparison draws two records side by side. Nothing in the kit draws COUNTS
+moving between two categorisations of one population.
+
+**`components/sankey/sankey.tsx`**, and it is generic on purpose. PATTERN §9
+forbids product vocabulary in a component, so the file knows only `nodes` and
+`flows`; what the two columns MEAN is two caption props. The client's figure is
+one call site of it, not its definition.
+
+**Node totals are DERIVED, and there is no `value` on a node.** A supplied
+total and a summed one can disagree, and there is no honest drawing of a
+disagreement — a bar longer than the ribbons leaving it is a gap with no
+meaning. Her own reference is the proof the derivation is the natural one:
+`Issue 149` down the left and `71 Issue` down the right are exactly the row sum
+and the column sum of ONE matrix.
+
+**Colour is the source's, from the chart series tokens, and a caller may hand
+one per node.** `--chart-1..5` in `chart.tsx`'s own order by default; the
+consuming application passes its fixed four (poppy / orange / lavender / sky)
+and they stay put when the sort order does not. Mango is nowhere near it.
+
+**The ribbons are a COLOUR, never an alpha** — `color-mix`, the mechanism and
+the reasoning `chart.tsx` already states — at 34% for the body and 68% for the
+edge, where the kit's stated area fill is 16%. 34 because an area fill sits
+behind a curve and is read as shading, while a ribbon is read as an object and
+is crossed by others; at 16% one ribbon and two overlapping ribbons are the
+same tone.
+
+**Paint order is thickest first, thinnest last, and thickness means the
+ribbon's NARROWEST end.** The artifact's own trend chart already paid for
+getting this wrong: a small translucent area behind a large one has no findable
+edge. Order alone does not fix two ribbons of the same hue, so every ribbon
+also carries its own 1-unit outline. Measured on `verify/sankey`, light on the
+page tone: body **1.569** against its ground, edge **2.528**, edge against its
+own body **1.611**. Dark: **1.691 / 3.319 / 1.963**. All above the step
+override 77 already ships as a visible surface change (1.103 / 1.111).
+
+**The diagonal is quieter by default, and it is a prop.** "Arrived an issue,
+still an issue" is usually the biggest ribbon and the least interesting one, so
+`selfFlow="quiet"` draws it at the kit's 16% with no edge and `selfFlow="equal"`
+draws it like anything else. Measured 1.229 light / 1.225 dark against the page
+— present, and beaten by every correction crossing it (1.276 / 1.381). There is
+deliberately no `"hidden"`: totals are derived from the flows, so a hidden
+diagonal would leave every bar longer than the ribbons explaining it.
+
+**A minimum thickness, and the honesty cost written down rather than tuned
+until nobody notices.** A ribbon is never under 0.9% of the plot and a node
+band never under 8% — under three device pixels and one caption line
+respectively at the default height. THE COST: two flows whose true thickness
+both fall under the floor are drawn IDENTICALLY. On her own 180-record
+population a 1 and a 2 are the same band; a 3 clears the floor and is drawn
+true. What pays for it is that no value here is readable ONLY from a thickness
+— every flow states its exact number in the readout, in its button's accessible
+name and in the hidden table, and the floor can distort none of the three.
+Drawing a 1 to scale is honest about proportion and silent about existence.
+
+**Accessibility is answered three ways, and this shape is the hard case.** The
+figure has a name; it has a real textual equivalent — a visually-hidden
+`<table>` carrying the same matrix with both margins, because "148 flows" read
+as prose is useless and a table can be navigated cell by cell; and every ribbon
+is a REAL `<button>` carrying its whole readout as its accessible name, wrapped
+in `HoverCard` so the card opens on focus as well as hover. That is the kit's
+established pattern, reused rather than re-invented. `interactive={false}`
+removes the buttons, the cards and the hover entirely — the one thing not
+offered is the middle case, a hover-only readout on something not focusable.
+**This closes the hole `chart.tsx` and `donut.tsx` both had to log** (GAPS-COL1
+CHT-5: "the SVG is not focusable, so the tooltip is pointer-only").
+
+The hit area is exactly the mark and is NOT inflated: a comfortable 24-tall
+target over a thin ribbon would sit on top of the thick ribbon under it and
+open the wrong readout. **Built the other way round first and measured on
+verify/sankey** — the buttons were in the reverse of the paint order, so every
+thin ribbon's control sat UNDER the thick one crossing it and the ribbon you
+could see was never the one you could reach. One order for both now.
+
+**Two nothings, drawn differently, because they are different.** No categories
+at all: the quiet register stands in for the plot, since a flow figure with no
+categories has no axes to draw. Categories but nothing moved: the columns ARE
+drawn, with their labels and their zeros, and the words sit under them. An
+empty box there would throw away the one thing that is known.
+
+**Where to look.** The book: Charts → **Flow**, a new page (`demo/book.ts`),
+because a Sankey is not a plot along an axis, not circular and not a calendar
+ramp, and filing it under any of the three would make it unfindable on the one
+page a reader would open. Section in `demo/collections/data-viz.tsx` beside the
+other charts. **`verify/sankey/`** draws the seven awkward cases — the real
+figure, a 1 against a 149, the diagonal quiet beside equal, one node with
+everything, zero flows, labels far longer than the track, and no categories at
+all — each on two grounds, in both palettes, with `?only=N` to review one on
+its own.
+
+Seven decisions the artifact does not settle are logged in **`/GAPS-FLOW.md`**
+as FLW-1 … FLW-7, including one that is not this component's: `chart.tsx` and
+`donut.tsx` both still warn that `--chart-4` and `--chart-5` repeat 1 and 2,
+and `tokens.css` has said lavender and orange for some time. Two headers
+warning about a hole that is filled will make somebody avoid a colour for no
+reason. FLW-7.
+
 ### Changed — the ink footer wears no outline, in either palette, and CH27.8's dark clause is overruled
 
 Client, 2026-09-06, on a screenshot of a ticket's detail screen in dark mode:

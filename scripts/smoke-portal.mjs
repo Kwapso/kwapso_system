@@ -57,14 +57,21 @@ import { fileURLToPath } from "node:url"
 import { makeApi, timedFetch } from "./lib/api.mjs"
 import { testLoginKey, NO_KEY_MESSAGE } from "./lib/test-login-key.mjs"
 import { FRONT_DOORS } from "./lib/front-doors.mjs"
+// THE SAME TOKENISER THE LAWS READ SOURCE THROUGH — not a copy of it, and not a
+// pair of regexes. It is plain JavaScript precisely so this file can import it
+// under plain node with no build step; shared/rules/strip-comments.mjs says why
+// at length. This script DERIVES a door list off disk (see internalMoneyDoors
+// below) and then attacks those doors on a live environment, so a stripper that
+// cannot see all of the source is a gate that cannot see all of the doors.
+import { stripComments } from "../shared/rules/strip-comments.mjs"
 
-const BASE = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
+const BASE = process.env.SMOKE_BASE || FRONT_DOORS.staging.agency
 // The REAL hostname, not the workers.dev alias: the Google sign-in door
 // derives its redirect from the origin the caller stands at and requires it to
 // be one of the two configured front doors (an open-redirect defence), so at
 // the alias it answers 400 BY DESIGN — and this smoke's job is the door a
 // client actually uses.
-const PORTAL = process.env.SMOKE_PORTAL_BASE ?? FRONT_DOORS.staging.portal
+const PORTAL = process.env.SMOKE_PORTAL_BASE || FRONT_DOORS.staging.portal
 const REPO = fileURLToPath(new URL("..", import.meta.url))
 
 // Resend's test inbox: a real send path that always "delivers" and never
@@ -192,9 +199,30 @@ async function allPages(call, path, key, cookie) {
 
 /* ------------------------------ reading the source ---------------------------- */
 
-/** A sentence ABOUT a call is not a call. Rough but sufficient: the `[^:]` guard
- * keeps `https://` intact, which is the only false positive that matters here. */
-const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1")
+// A SENTENCE ABOUT A CALL IS NOT A CALL, which is why everything below is read
+// through `stripComments` (imported above) before it is matched.
+//
+// This used to be two regexes written out here — one for block comments, one for
+// line comments with a `[^:]` guard in front of it so that `https://` survived —
+// and it was the LAST copy of that pair in the repo, left behind when the laws
+// moved to the tokeniser on 7 Sep 2026. (They are not spelled out in this
+// comment on purpose: web/test/source-scan.test.ts censuses this file for those
+// exact two patterns now, and a comment quoting one would read as a twelfth
+// copy. That is the census doing its job, not a nuisance.)
+//
+// The regexes are blind in a way that is silent rather than loud, and the shape
+// is worth carrying in your head: `accept="image/*"` in a JSX attribute
+// puts the two characters that open a block comment inside a STRING, and the
+// regex closes that "comment" sixty lines below at the end of some JSDoc.
+// Everything in between is gone before anything reads it.
+//
+// That mattered more here than anywhere else. `internalMoneyDoors()` below
+// derives the R24 door list from `internal-money.ts` and from every tenancy
+// handler that calls into it, and this script then proves each of those doors is
+// refused at both hostnames. A blinded scan does not produce a WRONG list, it
+// produces a SHORT one — and a short list of doors to attack passes, at deploy
+// time, with a green line printed under it. Absence looks exactly like
+// compliance. There is a floor check on the count for the same reason.
 const read = (p) => readFileSync(`${REPO}${p}`, "utf8")
 
 /** THE PORTAL'S SURFACE, read off the gateway's own table — never typed here.
@@ -218,14 +246,14 @@ function portalDoors() {
  * actually DEPLOYED, at both hostnames, which is a different sentence — a
  * gateway can be red-green correct in the repo and stale in the account. */
 function internalMoneyDoors() {
-  const internal = strip(read("workers/tenancy/src/lib/internal-money.ts"))
+  const internal = stripComments(read("workers/tenancy/src/lib/internal-money.ts"))
   const exported = [...internal.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
   if (exported.length < 4) stop("the internal-money scan found no exports", "it has gone blind")
 
   const dir = `${REPO}workers/tenancy/src/routes`
   const fns = new Map()
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".ts"))) {
-    const src = strip(readFileSync(`${dir}/${file}`, "utf8"))
+    const src = stripComments(readFileSync(`${dir}/${file}`, "utf8"))
     const starts = [...src.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
     starts.forEach((m, i) => fns.set(m[1], src.slice(m.index, starts[i + 1]?.index ?? src.length)))
   }
@@ -249,7 +277,7 @@ function portalListeners() {
   // scan that stopped at the first `=` never reached the opening brace.
   const table = /export const PORTAL_LISTENERS[\s\S]*?=\s*\{\r?\n([\s\S]*?)\r?\n\}/.exec(src)
   if (!table) stop("PORTAL_LISTENERS not found", "did the registry move?")
-  const names = [...strip(table[1]).matchAll(/^\s*(\w+):\s*\(/gm)].map((m) => m[1])
+  const names = [...stripComments(table[1]).matchAll(/^\s*(\w+):\s*\(/gm)].map((m) => m[1])
   if (names.length < 5) stop("PORTAL_LISTENERS did not parse", `found ${names.length} resources`)
   return names
 }
@@ -398,9 +426,10 @@ const THEIRS = await account(FIX.theirs, { accountType: "entity" })
 const CONTACT = await account(FIX.contact, { accountType: "individual", email: CLIENT_EMAIL })
 ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
 
-// The contact is the MAIN STAKEHOLDER of their company — which is what makes the
-// validate door (below) a real move rather than a call that answers politely and
-// changes nothing.
+// The contact is the MAIN STAKEHOLDER of their company. That used to be what made
+// the validate door a real move rather than a polite no-op; that door is gone
+// (the client retired `awaiting_validation` on 7 Sep 2026), and the link is still
+// made here because the portal's own reads are fenced on it.
 {
   const detail = await agency(`/api/tenancy/accounts/detail?id=${MINE}`, {}, staffCookie)
   const linked = (detail.body?.links ?? []).some((l) => l.personAccountId === CONTACT && l.active)
@@ -413,6 +442,54 @@ ok("two companies and one contact exist", Boolean(MINE && THEIRS && CONTACT))
     if (!made.ok) stop("could not link the contact to their company", JSON.stringify(made.body).slice(0, 200))
   }
   ok("the contact is linked to their company", true)
+}
+
+// ORDER MATTERS HERE, AND IT DID NOT USED TO SHOW.
+//
+// The grant door refuses a FIRST client login to somebody who is already an
+// active team member (`routes/accounts.ts`, `is_staff`): handing a colleague a
+// client login would fence them out of the agency app. It exempts anyone who
+// already holds a `portal_users` row, live or revoked, because presence is
+// permanent.
+//
+// This script used to invite the client to the team FIRST and grant second,
+// which only ever worked because the portal row predated every run. When
+// staging was reset on 2026-09-07 that row went with it, and the next run met
+// the refusal — on the FIRST-run path, which almost never executes, so the
+// ordering had been wrong for as long as it had existed without ever being
+// exercised.
+//
+// So the grant comes first: an ordinary contact becomes a client, and only then
+// joins the team on the client role. That is also the order a real one happens
+// in — somebody is a client before they are given a seat.
+
+// The grant that makes them a CLIENT rather than a colleague: the door looks the
+// person up by the email on their contact record, never by a typed-in id.
+{
+  // The row stores the PERSON's account id (grantPortalAccess's own note: that
+  // is what the fence walks from), so the lookup asks by the CONTACT. Asking by
+  // the company came back empty every run, so every rerun re-granted — and the
+  // grant of an already-enrolled client then refused. The deploy chain wore
+  // green anyway whenever the runner piped its output (the pipe's exit code is
+  // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
+  const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
+  if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
+    const made = await agencyPost(
+      "/api/tenancy/portal-users",
+      // THE ROLE IS NAMED, not left to be found. The door takes an explicit
+      // `roleId` or falls back to the team's own role titled "Client" — and this
+      // script deliberately does NOT use that one (see `CLIENT_RIGHTS` above: the
+      // seed's Client role is an example an owner copies, this is a probe nobody
+      // should). Leaving it unnamed meant the grant quietly rode the SEED's role,
+      // so a run only worked on a team that had been seeded. Staging was reset on
+      // 2026-09-07 and the fallback found nothing: "no role called Client", from
+      // a script that had built itself a role two hundred lines earlier.
+      { accountId: MINE, personAccountId: CONTACT, roleId: CLIENT_ROLE_ID },
+      staffCookie
+    )
+    if (!made.ok) stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
+  }
+  ok("the contact holds a client login on their company", true)
 }
 
 // The client joins the team on the client role, exactly as a real one does: an
@@ -444,26 +521,6 @@ const clientAtAgency = await signIn(CLIENT_EMAIL, BASE)
 await agency("/api/auth/profile", { method: "POST", body: JSON.stringify({ firstName: "Portal", lastName: "Smoke" }) }, clientAtAgency)
 await agency("/api/tenancy/bootstrap", { method: "POST" }, clientAtAgency)
 
-// The grant that makes them a CLIENT rather than a colleague: the door looks the
-// person up by the email on their contact record, never by a typed-in id.
-{
-  // The row stores the PERSON's account id (grantPortalAccess's own note: that
-  // is what the fence walks from), so the lookup asks by the CONTACT. Asking by
-  // the company came back empty every run, so every rerun re-granted — and the
-  // grant of an already-enrolled client then refused. The deploy chain wore
-  // green anyway whenever the runner piped its output (the pipe's exit code is
-  // tail's), which is how this sat unnoticed from 24 Aug to 25 Aug.
-  const logins = await agency(`/api/tenancy/portal-users?accountId=${CONTACT}`, {}, staffCookie)
-  if (!(logins.body?.portalUsers ?? []).some((l) => l.accountId === CONTACT && l.active)) {
-    const made = await agencyPost(
-      "/api/tenancy/portal-users",
-      { accountId: MINE, personAccountId: CONTACT },
-      staffCookie
-    )
-    if (!made.ok) stop("could not grant the client login", JSON.stringify(made.body).slice(0, 200))
-  }
-  ok("the contact holds a client login on their company", true)
-}
 
 /** Find-or-create an app, a map, a ticket, a to-do and a deliverable on each
  * company. Everything on `THEIRS` is BAIT: it exists so the fence has something
@@ -670,8 +727,11 @@ section("their own world")
   ok("their to-dos answer", todos.ok && typeof todos.body?.total === "number", `status ${todos.status}`)
 }
 
-// A request of their own: raised as a kind that WAITS for the company to
-// confirm, so `validate` below is a real move rather than a polite no-op.
+// A request of their own. It used to be raised as a kind that WAITED for the
+// company to confirm it; nothing waits any more (the `awaiting_validation`
+// retirement, 7 Sep 2026), and the kind is kept because the rest of this section
+// asserts what a client may do to their OWN request — correct it, re-rank it,
+// attach to it, rate it — which is unchanged.
 let MY_TICKET
 {
   const before = await allTickets(client, portal)
@@ -731,10 +791,36 @@ let MY_TICKET
   const ranked = await portalPost("/api/content/help/rank", { id: MY_TICKET.id }, client)
   ok("they can drag their company's requests into order", ranked.ok || ranked.status === 403, `status ${ranked.status}`)
 
-  // The one lifecycle door a client may push, and R17 makes it idempotent: on
-  // the second run the ticket is already `new` and the call moves nothing.
-  const validated = await portalPost("/api/content/help/validate", { id: MY_TICKET.id }, client)
-  ok("they can confirm a request should go ahead", validated.ok, `status ${validated.status}`)
+  // "they can confirm a request should go ahead" was asserted here, against
+  // `POST /api/content/help/validate` — the one lifecycle door a client could
+  // push. The door is gone with the stage it moved tickets out of (7 Sep 2026),
+  // so there is nothing to knock on; the portal now opens no door at all that
+  // moves a ticket along its lifecycle, which the gateway's own allow-list is
+  // what proves.
+
+  // HOW DID WE DO — the rating doors (migration 0067). The door refuses a
+  // rating on a ticket that is not RESOLVED, and this smoke ticket is
+  // deliberately still open, so the honest live check is that the door
+  // ANSWERS A CLIENT and refuses for the stated reason rather than leaking or
+  // 500-ing. A smoke run must not resolve a client's own request to make an
+  // assertion convenient: that would move a real row on staging to please a
+  // test, and every rerun would need a new ticket.
+  const rated = await portalPost(
+    "/api/content/help/rating",
+    { id: MY_TICKET.id, score: 3 },
+    client
+  )
+  ok(
+    "the rating door answers a client, refusing one on an unanswered request",
+    rated.status === 400 || rated.status === 409 || rated.ok,
+    `status ${rated.status} ${JSON.stringify(rated.body).slice(0, 140)}`
+  )
+  const ratings = await portal(`/api/content/help/rating?id=${MY_TICKET.id}`, {}, client)
+  ok(
+    "and reads back only their own ratings",
+    ratings.ok && Array.isArray(ratings.body?.ratings),
+    `status ${ratings.status} ${JSON.stringify(ratings.body).slice(0, 140)}`
+  )
 
   // Showing us what they mean: attach a link, read it back, take it off again —
   // so the run leaves nothing behind.
@@ -849,7 +935,6 @@ section("the account fence")
     ["reply to", "/api/content/help/reply", { helpId: THEIR_TICKET.id, body: "PORTAL SMOKE · this must never land" }],
     ["reword", "/api/content/help/update", { id: THEIR_TICKET.id, description: "PORTAL SMOKE · this must never land" }],
     ["re-rank", "/api/content/help/rank", { id: THEIR_TICKET.id }],
-    ["confirm", "/api/content/help/validate", { id: THEIR_TICKET.id }],
     ["attach a file to", "/api/content/help/attachments", { id: THEIR_TICKET.id, kind: "link", label: "PORTAL SMOKE · never", url: "https://example.com/never" }],
     ["remove a file from", "/api/content/help/attachments/remove", { id: THEIR_TICKET.id, attachmentId: "whatever" }],
   ]) {

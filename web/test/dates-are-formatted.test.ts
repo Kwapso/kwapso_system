@@ -79,14 +79,18 @@ import { join } from "node:path"
  * `formatTime` is here because an AGENDA row says the clock time alone under a
  * heading that already said the day.
  *
- * `DateSortable` is here for a reason worth reading: it produces "2026-06-13",
- * which is exactly the shape this check exists to catch. The difference is that
- * it is a decision rather than a leak — a table column somebody clicks to sort
- * has to compare correctly, and the library compares the rendered text
- * (shared/web/format.ts says the rest). Its output being a date and not a
- * timestamp is the visible half of that: no clock, no `T`, no `Z`, nothing that
- * looks like a database row. */
-const FORMATTED = /format(DateSortable|DateTime|Date|Time|Relative|ActivityWhen)\s*\(/
+ * `DateSortable` USED TO BE ON THIS LIST and is gone with the function, 2026-09-06.
+ * It produced "2026-06-13" — exactly the shape this check exists to catch — and
+ * was allowed because it was a decision rather than a leak: a table column
+ * somebody clicks to sort had to compare correctly, and the comparison WAS the
+ * rendered text, so the date on screen had to be spelled for the comparator
+ * instead of for the reader. `web/components/records/record-table.tsx` now takes a
+ * `sortKey`/`sortType` per column and compares the RAW value off the row, so a
+ * sortable date column no longer buys its order with its own legibility, and
+ * the two columns that were paying (Tasks' Deadline and Closed) render
+ * `formatDate` again. Nothing is exempt from this rule any more, which is the
+ * shape it should have had all along. */
+const FORMATTED = /format(DateTime|Date|Time|Relative|ActivityWhen)\s*\(/
 
 // `.toLocaleDateString(`/`.toLocaleTimeString(` are Date-only, so any receiver
 // counts. `.toLocaleString(` is shared with Number.prototype (money, byte
@@ -129,23 +133,53 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:146":
+  "web/lib/use-record-activity.ts:167":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
     "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
-    "is the one that is.",
-  "web/components/deep-link/shape.tsx:68":
-    "same shape as use-record-activity.ts:146 — `dateTime: a.createdAt` " +
+    "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
+    "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
+    "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
+  "web/components/deep-link/shape.tsx:91":
+    "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
-    "line up, for the same `<time dateTime>` attribute.",
-  "web/components/work/work-panels.tsx:1178":
+    "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
+    "on 7 Sep 2026, when `shapeActivity` gained a named return type — " +
+    "`ActivityFeedRow` — and the import and its note landed above this line.)",
+  "web/components/work/work-panels.tsx:1491":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
-    "text.",
+    "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
+    "from a `ref · title` string into the black reference chip beside the " +
+    "title, which is thirteen lines of JSX where there was one; from " +
+    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; and " +
+    "back to :1491 the same day again, when the ticket panel above lost its " +
+    "`marks` prop and the `<RecordMark>` it drew — three lines net.)",
 }
 
 describe("no screen shows a raw timestamp", () => {
+  /* THIS CENSUS ALREADY HAS ITS BLINDNESS TRIPWIRE, and it is the rot check —
+   * said out loud because it is not obvious and because the next person auditing
+   * this file for one will otherwise add a second.
+   *
+   * The usual danger of a census whose pass condition is an empty list is that a
+   * scan matching NOTHING reports all clear in the same words as a scan matching
+   * everything and finding nothing wrong. A walk over five directories is
+   * exactly the shape that goes quiet: rename `web/components`, move
+   * `shared/web`, and `offenders` is empty for the wrong reason.
+   *
+   * It cannot happen here. RAW_DATE_EXEMPT is not empty, and every entry in it
+   * is a line the walk MUST reach and MUST match — that is what `exemptUsed`
+   * records and what the stale check at the bottom of this test asserts. A walk
+   * that lost a directory loses those lines with it, `exemptUsed` comes back
+   * short, and the suite goes red naming the exact files it could no longer
+   * find. The exemptions are the positive control, for free.
+   *
+   * THE ONE CONDITION: that holds only while the list is NON-EMPTY. If the last
+   * exemption is ever fixed and deleted, this test loses its tripwire silently
+   * — add an explicit floor on the number of files walked at that moment, and
+   * delete this paragraph. */
   it("every date put in front of a person goes through shared/web/format", () => {
     const offenders: string[] = []
     const exemptUsed = new Set<string>()

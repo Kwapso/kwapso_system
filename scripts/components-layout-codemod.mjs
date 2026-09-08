@@ -25,7 +25,7 @@
  *                                          documents/ and the four root docs
  *   3  `WEB|"web"|"..", "components", "<base>.tsx"`   the tests' own join() reads
  *   4  `components/<base>.tsx`               the same read written as one string
- *                                          (`read("components/app-shell.tsx")`),
+ *                                          (`read("components/shell/app-shell.tsx")`),
  *                                          the prose in web/lib that names a
  *                                          component, and the registry's web-relative
  *                                          `pagerFile` paths — nowhere else, for the

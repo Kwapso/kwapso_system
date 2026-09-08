@@ -19,20 +19,44 @@
 import { listGaps, triageGaps } from "@shared/triage-readiness"
 import { accountScopeClause, appScopeClause, type AccountScope } from "@shared/workers/account-scope"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
-import { countCollectionWith, reportedTotal } from "@shared/workers/count"
+import { countCollection, countCollectionWith, reportedTotal } from "@shared/workers/count"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
 import {
+  CLOSURE_TREND_MONTHS,
+  CLOSURE_WINDOW_MONTHS,
   HELP_STATUSES,
-  ticketTypeWaitsForValidation,
+  OPEN_HELP_STATUSES,
+  TICKET_TYPE_KEPT_FOR_MIGRATION,
+  ticketTypeKeptForMigration,
+  ticketTypeKeptForMigrationExcludedSql,
   type HelpMessage,
   type HelpStatus,
   type HelpTicket,
 } from "@shared/types"
+// EVERY DURATION ON THE DASHBOARD, FROM THE ONE PLACE THE RULE LIVES — Mon–Fri
+// only, the client's ruling of 6 Sep 2026. `workingDaysSql` is the SQL twin of
+// the `workingDaysBetween` the triage queue counts its cards with, proved equal
+// by `working-days-agree.test.ts`; `workingDaysAgo` is the same seam's cutoff,
+// used here for exactly the reason triage uses it — so the dashboard's count of
+// unopened tickets and the queue's own list can never disagree about "late".
+import { workingDaysAgo, workingDaysSql } from "@shared/business-days"
+// THE THREE-DAY LINE, read from the queue that draws it rather than retyped as a
+// 3 here. It is not a new promise: the dashboard is reporting on the queue's own
+// threshold, so the day somebody moves it, both move together.
+import { TRIAGE_AFTER_DAYS } from "./triage"
+// EVERY STATUS MOVE IN THIS FILE GOES THROUGH ONE SEAM (team migration 0066).
+// `createTicket` embeds the statement in its own script — one transaction, so a
+// ticket cannot exist for an instant with no first stage — while `setStatus`,
+// `markTriaged` and the set-shaped bulk write theirs after the
+// UPDATE that made the move. lib/help-stages.ts carries the argument for that
+// order, and for why this one seam does not swallow its own failures the way
+// `logActivity` does.
+import { recordStatusEvent, recordStatusEvents, statusEventStatement } from "./help-stages"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { optionalText, parseStringArray, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import {
-  BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_FACET_CAP
+  BULK_CONCURRENCY, BULK_IDS_LIMIT, THREAD_HARD_CAP, TICKET_DASHBOARD_GROUP_CAP, TICKET_FACET_CAP
 } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -40,7 +64,7 @@ import { rankAtTop, rankBetween } from "@shared/workers/rank"
 // The reference number lives in shared/workers/refs.ts — a ticket is TEAM-wide
 // now (no account-code prefix), and app/wave mint from the same seam over in
 // tenancy, so it moved out of this worker entirely (2026-08-31 ruling).
-import { nextTeamRef, TEAM_REF_KINDS } from "@shared/workers/refs"
+import { nextTeamRef, refAliasMatchSql, TEAM_REF_KINDS, TEAM_REF_TABLES } from "@shared/workers/refs"
 import { inOrder } from "@shared/workers/parallel"
 
 // The fixed status lifecycle the code trusts (the team-editable dropdown is
@@ -52,6 +76,12 @@ export { HELP_STATUSES, type HelpStatus }
 type TicketRow = {
   id: string
   help_type: string | null
+  /** WHAT IT ARRIVED AS. Stamped in `createTicket`'s INSERT and touched by no
+   * UPDATE in this file or any other — team migration 0065 says why at length,
+   * and `workers/content/test/raised-as-is-stamped-once.test.ts` fails the
+   * build if a second writer appears. Null on every row raised before the
+   * column existed; never backfilled. */
+  raised_as_type: string | null
   description: string
   screen_recording_link: string | null
   source_screen: string | null
@@ -120,6 +150,12 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
   return {
     id: r.id,
     helpType: r.help_type,
+    // WHAT IT ARRIVED AS, on every ticket-shaped read, and NOT redacted for a
+    // client login. It is the same class of fact as `helpType` beside it — the
+    // kind of thing they asked for — and a contact who raised a question that we
+    // later recorded as an issue is entitled to see that we did. Nothing about
+    // our side of the fence is in it.
+    raisedAsType: r.raised_as_type,
     description: r.description,
     screenRecordingLink: r.screen_recording_link,
     sourceScreen: r.source_screen,
@@ -142,6 +178,15 @@ function toTicket(r: TicketRow, scope: AccountScope): HelpTicket {
     raiserId: hideRaiser ? null : r.creator_id,
     raiserName: hideRaiser ? null : r.creator_name,
     editorName: hideEditor ? null : r.editor_name,
+    // R54, AND IT IS THE SAME FACT THE TWO LINES ABOVE ARE ALREADY STANDING ON.
+    // The row has always known whether each of these two people is one of the
+    // client's or one of ours; the portal used it and then it was dropped. The
+    // AGENCY app needs the same answer for the opposite reason — it draws both
+    // names, and a colleague is shown by first name where a contact is shown in
+    // full. Not redacted for a client login: it says nothing the name beside it
+    // (present, or null) does not already say.
+    raiserIsClient: r.raiser_is_client === 1,
+    editorIsClient: r.editor_is_client === 1,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     accountId: r.account_id,
@@ -192,7 +237,11 @@ type ReplyRow = {
   created_at: string
 }
 
-function toMessage(r: ReplyRow): HelpMessage {
+/** `fromClient` is passed rather than read off the row because the row type is
+ * shared with writers that have no such column — the reader that HAS the
+ * subselect (`listReplies`) hands the answer in, and the one that does not says
+ * so by passing false, which is the direction that leaves a name whole (R54). */
+function toMessage(r: ReplyRow, fromClient: boolean): HelpMessage {
   return {
     id: r.id,
     ticketId: r.help_id,
@@ -201,6 +250,7 @@ function toMessage(r: ReplyRow): HelpMessage {
     isAgent: r.is_agent === 1,
     authorId: r.creator_id,
     authorName: r.creator_name,
+    authorIsClient: fromClient,
     createdAt: r.created_at,
   }
 }
@@ -209,7 +259,7 @@ function toMessage(r: ReplyRow): HelpMessage {
 // asked of the raiser and of the last editor. Exactly the subselect listReplies
 // uses on an author, and it rides the SAME read as the row so a name and the
 // answer about that name can never come from two different moments.
-const TICKET_COLS = `id, help_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
+const TICKET_COLS = `id, help_type, raised_as_type, description, screen_recording_link, source_screen, status, resolved, resolved_at,
   account_id, app_id, module_id, raised_by_contact_id, validated_at,
   ref, rank, locked_at, archived_at, draft_resolution, title_de, title_en,
   creator_id, creator_name, editor_name, created_at, updated_at,
@@ -435,16 +485,186 @@ function typeClause(helpType: string | undefined): { sql: string; params: string
   return helpType ? { sql: "help_type = ?", params: [helpType] } : { sql: "", params: [] }
 }
 
-function statusClause(status: HelpStatus | undefined): { sql: string; params: string[] } {
-  return status ? { sql: "status = ?", params: [status] } : { sql: "", params: [] }
+/** THE KIND THAT IS KEPT BUT NEVER SHOWN, subtracted here and nowhere else.
+ *
+ * The client's ruling of 6 Sep 2026 — keep the rows, stop displaying them —
+ * written up in full beside the test itself (`shared/types.ts`,
+ * `TICKET_TYPE_KEPT_FOR_MIGRATION`). These rows are being preserved for a
+ * migration into another database. Do not "tidy them up".
+ *
+ * WHY IT IS A CLAUSE ON `ticketWhere` AND NOT A FILTER ON THE ROWS. Everything
+ * that describes this collection to a person is a grouped `COUNT(*)` at this
+ * same door — the sub-tab badges (`countTicketFacets`), the All/My totals
+ * (`countTickets`) and every panel on the dashboard (`readTicketDashboard`).
+ * Sieving the rows in the browser would have left all of those counting a
+ * backlog the list can no longer show, which is R16's failure in its quietest
+ * form: every number true, none of them about the rows on screen. One clause on
+ * the one WHERE the page and its counts already share is the only shape that
+ * cannot drift.
+ *
+ * IT IS NOT PART OF `ticketFence`, deliberately. The fence decides what a caller
+ * MAY see and rides every read AND every write; this decides what the COLLECTION
+ * is and rides only the list, its counts and its charts. Folded into the fence it
+ * would have made a requirements ticket unreadable, unreplyable and
+ * un-unarchivable — you cannot migrate a row you can no longer reach. */
+function keptForMigrationClause(): { sql: string; params: string[] } {
+  return { sql: ticketTypeKeptForMigrationExcludedSql("help_type"), params: [] }
 }
 
+/** …AND THE WRITE HALF, so no new one can be raised.
+ *
+ * REMOVING THE WORD FROM THE SEED ONLY HELPS A TEAM THAT DOES NOT EXIST YET.
+ * Every team already running got the row from team migration 0034, it is still
+ * ACTIVE, and the client's instruction was explicitly not to touch their
+ * vocabulary — so their Dropdown values screen still lists it and their ticket
+ * form's picker still offers it. That is a hole with a person-shaped edge: raise
+ * one and it would vanish the instant it was saved, which reads as data loss
+ * even though nothing is lost. Rather than deactivate a row she asked us to
+ * leave alone, the DOOR refuses the value. A picker cannot be trusted to
+ * withhold anything — the machine surface and the importer reach the same door
+ * with no picker at all.
+ *
+ * IT REFUSES A MOVE INTO THE KIND, NEVER A ROW ALREADY IN IT. `was` is the
+ * ticket's current word, and an edit that leaves the type where it is passes.
+ * That is the difference between hiding a collection and freezing a record: the
+ * existing rows must stay editable and readable right up to the day they are
+ * migrated, which is the whole reason they are still here. On a create there is
+ * no `was`, so any spelling of the word is refused outright. */
+function refuseKeptForMigration(next: string | null, was: string | null): void {
+  if (!ticketTypeKeptForMigration(next)) return
+  if (ticketTypeKeptForMigration(was)) return
+  throw new GuardError(
+    400,
+    "retired_ticket_type",
+    `"${TICKET_TYPE_KEPT_FOR_MIGRATION}" isn't a kind of ticket any more. Pick another one.`
+  )
+}
+
+/** WHICH STAGE(S) — A SET, NOT ONE WORD (client ruling, 2026-09-06).
+ *
+ * IT USED TO TAKE EXACTLY ONE, and the comment above `TicketFilter` said why:
+ * "every tab in the strip that names a stage names exactly one, and a door that
+ * accepted several would be a filter language nobody asked for." That sentence
+ * was true of the strip it described and stopped being true the day she ruled
+ * "Open → triaged + scheduled + in_progress" — a tab that names three.
+ *
+ * THE BROWSER MAY NOT DO THIS INSTEAD, which is the whole reason it is here.
+ * Every badge on that strip is this door's own grouped `COUNT(*)`
+ * (`countTicketFacets`) and the list PAGES (R14), so an Open tab that fetched
+ * `status=triaged` and then sieved two more stages out of the loaded page would
+ * show "the triaged among the newest fifty" under a badge counting all three
+ * — R16's founding defect, drawn deliberately.
+ *
+ * AN EMPTY SET NARROWS NOTHING rather than matching nothing. `IN ()` is not
+ * valid SQL in SQLite and "the caller named no stage" is indistinguishable from
+ * "the caller did not ask", so the empty array is the same answer as
+ * `undefined`. The route below never produces one — an unrecognised word is
+ * dropped, and a parameter that drops to nothing is simply not a filter. */
+function statusClause(statuses: readonly HelpStatus[] | undefined): { sql: string; params: string[] } {
+  if (!statuses || statuses.length === 0) return { sql: "", params: [] }
+  return { sql: `status IN (${statuses.map(() => "?").join(", ")})`, params: [...statuses] }
+}
+
+/** WHO SPOKE LAST — the one subselect the WAITING tab is built out of.
+ *
+ * Written once, interpolated where it is needed, and it takes NO parameter: it
+ * correlates on `help.id` and reads nothing a caller supplied, so there is
+ * nothing here for a value to be bound into. `ORDER BY created_at DESC, id DESC`
+ * rather than `MAX(created_at)`: two replies written in the same millisecond
+ * would both satisfy a MAX and the answer would depend on which row the planner
+ * reached first, which is a filter that gives two answers to one question. The
+ * id is a ULID, so it breaks the tie in the order the rows were actually made. */
+const LAST_REPLY_AUTHOR = `(SELECT th.creator_id FROM help_threads th
+     WHERE th.help_id = help.id ORDER BY th.created_at DESC, th.id DESC LIMIT 1)`
+
+/** THE WAITING TAB — "this is when we are waiting sth from the customer", and,
+ * asked what that meant: "waiting means there's a message from us, pending
+ * answer from customer" (client, 2026-09-06).
+ *
+ * ── IT IS DERIVED, AND THAT IS THE POINT ──────────────────────────────────
+ *
+ * There is no `waiting` status and this adds none. A status would need a column,
+ * a backfill across the ~1,820 tickets already in the database, and — far worse
+ * — a WRITER: something would have to notice every reply from either side and
+ * move the ticket, forever, and the day it missed one the tab would be quietly
+ * wrong with no way to tell. Read-time derivation cannot go stale: it is a
+ * question about the thread, asked of the thread, every time it is asked.
+ *
+ * ── WHICH SIDE WROTE A MESSAGE IS NOT RECORDED ANYWHERE ────────────────────
+ *
+ * `help_threads` (workers/tenancy/src/team-schema/migrations.ts) is id, help_id,
+ * message_body, tagged_user_ids, is_agent, created_at and the three creator_*
+ * columns. NOT ONE OF THEM SAYS WHOSE SIDE THE AUTHOR IS ON. So the side is
+ * COMPUTED, from the one fact that does answer it: a client login is an ordinary
+ * team member whose only distinguishing mark is a `portal_users` row in this
+ * team's own database (workers/tenancy/src/lib/members.ts says exactly this
+ * about the members list, and resolves `isClient` the same way).
+ *
+ * PRESENCE, NOT LIVENESS — `deactivated_at` is deliberately not tested, which is
+ * the convention `members.ts` states in words: "a revoked grant still means
+ * 'this login belongs to a client', and reviving it is one click." Reading only
+ * the live grants would move every message a paused client ever wrote onto the
+ * agency's side of this filter.
+ *
+ * THE KNOWN WEAKNESS, STATED RATHER THAN HIDDEN: the answer is computed from
+ * TODAY'S grant, not from the grant as it stood when the message was written, so
+ * it can DRIFT. Granting portal access to somebody who has been replying as
+ * staff reclassifies their whole history as the client's, and a ticket sitting
+ * on this tab quietly leaves it. (Revocation does NOT drift, because the row
+ * survives it — which is the other half of why presence is the right test.) The
+ * cost is bounded: a tab is briefly wrong about a handful of tickets, and no
+ * record is changed. The alternative — stamping the side onto every reply as it
+ * is written — is a column and a backfill that would have to GUESS the same
+ * answer for every row already in the table, which is the same drift, frozen.
+ *
+ * `is_agent` COUNTS AS A MESSAGE FROM US, and it needs no clause of its own.
+ * The column marks the AI-drafted reply nobody typed (`maybeDraftFirstReply`,
+ * further down this file, is still a no-op hook — no row in any team database
+ * carries a 1 today). When it ships, that reply is POSTED INTO THE THREAD the
+ * client reads and is written under a staff actor's own `creator_id`, so the
+ * portal test above already classifies it as ours. Excluding it would have been
+ * the expensive mistake: a ticket whose only outbound message was drafted rather
+ * than typed is exactly the one nobody has chased, and it would have been the
+ * one this tab hid. The client is waiting on an answer, not on an author.
+ *
+ * A TICKET WITH NO REPLIES AT ALL IS NOT WAITING — the subselect returns NULL
+ * and the first half of the clause fails. Nothing has been said, so nobody is
+ * pending an answer to it, and a ticket nobody has replied to belongs on Open
+ * (where it is) rather than here. A reply whose `creator_id` is NULL (the column
+ * is nullable) falls the same way: an author we cannot identify is not an author
+ * we may claim.
+ *
+ * ── AND WAITING IS A SUBSET OF OPEN, NOT A SIBLING OF IT ──────────────────
+ *
+ * The tab pairs this clause with the SAME `OPEN_TAB_STATUSES` the Open tab
+ * sends, so every ticket on Waiting is also on Open. That is not a bug and it is
+ * not double-counting: Open is "what is under way" and Waiting is "the part of
+ * it that is not moving because we are the ones who spoke last". A reader
+ * clearing Waiting is working through a corner of Open, and the two badges
+ * overlapping is what makes that legible rather than what makes it wrong. */
+function waitingClause(waiting: boolean | undefined): { sql: string; params: string[] } {
+  if (!waiting) return { sql: "", params: [] }
+  return {
+    sql: `(${LAST_REPLY_AUTHOR} IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM portal_users pu WHERE pu.user_id = ${LAST_REPLY_AUTHOR}))`,
+    params: [],
+  }
+}
+
+/** AND THE NUMBER IT USED TO HAVE. Migration 0068 carried every ticket from the
+ * old account-coded reference (`VU Solutions-T1183`) to the team-wide one, and
+ * kept the old string in `ref_aliases` precisely so this box still answers it —
+ * a client quoting a number from an email last year is the whole reason the
+ * client asked for the alias rather than a plain rewrite. The clause is built by
+ * `refAliasMatchSql` rather than written here, so the five doors that search a
+ * reference cannot each grow their own spelling of it. */
 function searchClause(q: string | undefined): { sql: string; params: string[] } {
   if (!q) return { sql: "", params: [] }
   const needle = `%${likeLiteral(q.toLowerCase())}%`
   return {
-    sql: `(LOWER(description) LIKE ? ESCAPE '\\' OR LOWER(ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(title_en, '')) LIKE ? ESCAPE '\\')`,
-    params: [needle, needle, needle],
+    sql: `(LOWER(description) LIKE ? ESCAPE '\\' OR LOWER(ref) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(title_en, '')) LIKE ? ESCAPE '\\'
+       OR ${refAliasMatchSql(TEAM_REF_TABLES.ticket, `${TEAM_REF_TABLES.ticket}.id`)})`,
+    params: [needle, needle, needle, needle],
   }
 }
 
@@ -471,8 +691,13 @@ export type TicketFilter = {
   moduleId?: string
   /** one kind — the sub-tab strip's four type tabs */
   helpType?: string
-  /** one stage — the sub-tab strip's Ready and Closed tabs */
-  status?: HelpStatus
+  /** ONE OR MORE STAGES — the strip's Triage, Ready, Open, Waiting and Closed
+   * tabs. A SET since 2026-09-06, because "Open" names three of them; see
+   * `statusClause` for why the browser may not do this narrowing instead. */
+  statuses?: HelpStatus[]
+  /** WE SPOKE LAST AND NOBODY HAS ANSWERED — derived from the thread rather than
+   * stored, and only ever asked ALONGSIDE `statuses`. See `waitingClause`. */
+  waiting?: boolean
 }
 
 /** Everything except the keyset cursor, written once so the page and its count
@@ -484,11 +709,19 @@ function ticketWhere(
 ): { sql: string[]; params: string[] } {
   const fence = ticketFence(guard, scope, filter.tab)
   const parts = [
+    // FIRST, AND UNCONDITIONALLY — no facet turns it off, because "the tickets"
+    // no longer means these (see `keptForMigrationClause`). It sits with the
+    // filters rather than in the fence for the reason written there.
+    keptForMigrationClause(),
     accountClause(filter.accountId),
     appClause(filter.appId),
     moduleClause(filter.moduleId),
     typeClause(filter.helpType),
-    statusClause(filter.status),
+    statusClause(filter.statuses),
+    // LAST, because it is the only clause here that reads another table. Every
+    // clause above it is an indexed equality on `help` itself, so a row that
+    // fails one of those never reaches the correlated subselect at all.
+    waitingClause(filter.waiting),
     searchClause(filter.q),
   ].filter((p) => p.sql)
   return {
@@ -605,7 +838,12 @@ export async function countTicketFacets(
     ...filter,
     tab: "all",
     helpType: undefined,
-    status: undefined,
+    statuses: undefined,
+    // …AND THE DERIVED ONE TOO. `waiting` is a narrowing OF the stage facet (the
+    // Waiting tab is Open plus a predicate), so counting the strip's badges
+    // while it was on would have every badge answering "…that we replied to
+    // last", which is the same R16 failure the two lines above it prevent.
+    waiting: undefined,
   })
   const rows = await d1Query<{ help_type: string | null; status: string; n: number }>(
     cfg,
@@ -643,12 +881,19 @@ export async function countTicketFacets(
   }>(
     cfg,
     guard.databaseId,
-    `SELECT h.account_id AS account_id, a.name AS account_name,
-            SUM(CASE WHEN h.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+    // THE TABLE IS NOT ALIASED, and that is now load-bearing rather than a
+    // style choice. `ticketWhere` is shared by five reads, and since the search
+    // clause learned to look in `ref_aliases` (migration 0068) it correlates on
+    // `help.id` — which resolves under `FROM help` and under nothing else. A
+    // bare `id` was tried first and is ambiguous here, because `accounts` has
+    // one too. Alias this table again and the read fails loudly on the next run
+    // rather than quietly returning the wrong rows.
+    `SELECT help.account_id AS account_id, a.name AS account_name,
+            SUM(CASE WHEN help.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
             COUNT(*) AS total_n
-       FROM help h LEFT JOIN accounts a ON a.id = h.account_id
-      WHERE ${where.sql.join(" AND ")} AND h.account_id IS NOT NULL
-      GROUP BY h.account_id, a.name
+       FROM help LEFT JOIN accounts a ON a.id = help.account_id
+      WHERE ${where.sql.join(" AND ")} AND help.account_id IS NOT NULL
+      GROUP BY help.account_id, a.name
       ORDER BY open_n DESC, total_n DESC
       LIMIT ${TICKET_FACET_CAP}`,
     where.params
@@ -662,6 +907,574 @@ export async function countTicketFacets(
       open: Number(r.open_n) || 0,
       total: Number(r.total_n) || 0,
     })),
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE TICKETS DASHBOARD — the whole backlog, asked eight ways, in one read.
+ *
+ * WHY THIS IS ITS OWN DOOR AND NOT MORE FACETS ON THE LIST. `countTicketFacets`
+ * above rides EVERY ticket page, because its three tallies badge a tab strip that
+ * is on the screen whether anybody looks at it or not. These do not badge
+ * anything: they are one tab's charts, opened deliberately. Hanging them
+ * off the list door would put eight extra grouped scans on every page of every
+ * ticket list on both front doors, for a tab most reads never show — the same
+ * argument, run the other way, that made the tab strip ONE grouped read instead
+ * of six counts.
+ *
+ * COUNTED BY THE DATABASE, LIKE EVERY OTHER NUMBER HERE. The rows a chart would
+ * need to tally these itself are the whole backlog, which is a GROWING
+ * collection (R14) the browser only ever holds page one of — so a chart drawn
+ * from loaded rows would be a picture of the newest fifty tickets under a title
+ * claiming to be the backlog. `countTicketFacets`' own note on `byAccount` is the
+ * measured version of that argument.
+ *
+ * EVERY READ IS BOUNDED BY ITS GROUPING and says its cap
+ * (TICKET_DASHBOARD_GROUP_CAP, which explains why it is smaller than the badge
+ * one). Most group over sets that cannot run away — the team's ticket vocabulary,
+ * the seven-value status lifecycle, and twelve months — crossed with each other
+ * and with themselves. The two that group over something that DOES grow (clients,
+ * systems) are ORDERED with the busiest first before they are capped, so the cap
+ * can only ever drop the quiet tail, never the answer. Two more are single
+ * aggregate rows and are capped at one.
+ *
+ * EVERY DURATION HERE IS COUNTED IN WORKING DAYS, through the one shared
+ * expression (`workingDaysSql`, shared/business-days.ts) and never by
+ * subtracting two `julianday`s at the chart that needs it. The client's ruling,
+ * 6 Sep 2026: "the time counts monday-friday! saturday and sunday do not count
+ * towards how long it took! very very important!" That seam's own header carries
+ * the arithmetic and the reason it is one function rather than three — including
+ * why public holidays are deliberately NOT subtracted.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The stages a ticket is still OURS TO DO SOMETHING ABOUT, spelled for SQL.
+ *
+ * DERIVED from `OPEN_HELP_STATUSES` (shared/types.ts), never retyped as `status
+ * <> 'resolved'`: the day an eighth stage lands, or the day "resolved" stops
+ * being the only finished one, every "open work" chart here moves with the one
+ * list rather than three of them moving and two staying behind. The values are
+ * a fixed code-owned enum, so this interpolation can only ever contain words
+ * this file shipped with. */
+const OPEN_STATUS_SQL = OPEN_HELP_STATUSES.map((s) => sqlString(s)).join(", ")
+
+export type TicketDashboard = {
+  /** 1B — OPEN WORK, BY KIND, WITH THE STAGE VISIBLE INSIDE EACH KIND. One row
+   * per (kind, stage) pair, so the chart can stack the stages inside each type's
+   * bar. Deliberately NOT two separate groupings: "12 questions, 9 of them still
+   * new" is a fact about one pair, and two tallies beside each other cannot say
+   * it. `helpType` is never null here — a ticket nobody gave a kind has no bar
+   * to sit in. */
+  openByTypeAndStatus: { helpType: string; status: string; n: number }[]
+  /** 2B — WHICH CLIENT ASKS FOR THE MOST OF WHAT. The account facet on
+   * `countTicketFacets` groups by client ALONE, which answers "who generates the
+   * most work" and cannot answer "who asks for the most extras" — this is the
+   * same read with the kind crossed in. `open` and `total` both ride the row for
+   * the reason `byAccount` carries both: a client whose extras are all delivered
+   * is a real answer to "who asks for the most", not a row worth hiding. */
+  byAccountAndType: {
+    accountId: string
+    accountName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** 3A — HOW LONG THINGS TAKE TO CLOSE, AS A DISTRIBUTION AND NEVER AS A MEAN.
+   * One row per kind (the chart picks the one it wants — the vocabulary is the
+   * team's to edit, so this file does not hard-code "Issue"), carrying the
+   * five-number summary a box plot is drawn from. A mean over closure times is
+   * the one number this data cannot support: a handful of tickets that sat for a
+   * year drags it clear of every ticket anybody actually experienced. */
+  closureDays: {
+    helpType: string
+    /** how many closed tickets the summary is computed over — a median over four
+     * of them is arithmetic, not a measurement, and only the reader can decide
+     * that, so the count travels with it */
+    n: number
+    minDays: number
+    p25Days: number
+    medianDays: number
+    p75Days: number
+    maxDays: number
+  }[]
+  /** 5A — RAISED AS versus IS NOW. The matrix team migration 0065 exists for:
+   * one row per (arrived-as, is-now) pair, the diagonal being the tickets that
+   * were never recategorised. `helpType` may be null (a kind that was cleared
+   * rather than changed); `raisedAsType` never is — a row with no record of what
+   * it arrived as is not a zero, it is a row this question cannot be asked of,
+   * and it is counted separately below. */
+  raisedVsCurrent: { raisedAsType: string; helpType: string | null; n: number }[]
+  /** …AND HOW MANY ROWS THE MATRIX ABOVE CANNOT SPEAK FOR. Every ticket raised
+   * before 0065 shipped, the ~788 imported from Glide included. It rides the
+   * same read because a matrix without it is a rate with a silently wrong
+   * denominator — 0065 refused to backfill precisely so that this number could
+   * be told rather than absorbed. */
+  raisedAsNotRecorded: number
+  /** 3B — THE SAME STATISTIC, MONTH BY MONTH, BY THE MONTH A TICKET CLOSED IN.
+   * One row per (kind, month) over the last `CLOSURE_TREND_MONTHS`, carrying the
+   * median and the count it was taken over.
+   *
+   * EVERY BUCKET IS HERE, however few closed in it (client, 2026-09-07: "even if
+   * it's only 1, it should appear there"). Until that day a floor of eight was
+   * applied in this read and the thin months never reached the screen; the
+   * retired constant's note in `shared/types.ts` keeps the argument for it. `n`
+   * still travels with every row, and it now carries more weight than it used
+   * to: it is the only thing that tells a reader a month's median was taken over
+   * one ticket rather than a hundred.
+   *
+   * `month` is `YYYY-MM`, the month a ticket was CLOSED in and never the month
+   * it was raised in — this line answers "are we getting faster", which is a
+   * question about the moment the work finished. */
+  closureTrend: { helpType: string; month: string; n: number; medianDays: number }[]
+  /** 6A — OPEN WORK BY SYSTEM, WITH THE KIND VISIBLE INSIDE EACH SYSTEM. One row
+   * per (system, kind), so a bar can be split by what sort of work it is: an app
+   * carrying fourteen tickets of which eight are issues is a quality problem in
+   * one app, and an app carrying fourteen requests is a client spending money.
+   * Two tallies beside each other cannot tell those apart, which is the same
+   * argument `openByTypeAndStatus` above is built on.
+   *
+   * `app_id` is indexed (0035). The null bucket is KEPT and comes back as
+   * `appId: null`: "work nobody has said which system it is about" is one of the
+   * more useful bars on this chart, and dropping it would quietly shrink the
+   * total. `helpType` is never null — a ticket nobody gave a kind has no segment
+   * to sit in, exactly as it has no bar in 1B. */
+  openByApp: {
+    appId: string | null
+    appName: string | null
+    helpType: string
+    open: number
+    total: number
+  }[]
+  /** HOW MANY TICKETS NOBODY HAS OPENED YET, past the line triage already draws
+   * (`TRIAGE_AFTER_DAYS`, counted in WORKING days). The one number on this whole
+   * screen that is about us rather than about the work: every other chart says
+   * what arrived, and this says what we did not pick up.
+   *
+   * IT IS NOT A NEW PROMISE — the threshold is the one the triage queue has used
+   * since it shipped, read from the same constant, so the dashboard and the
+   * queue cannot come to disagree about what "late" means. */
+  unopenedPastLine: number
+  /** HOW MANY TICKETS THE WHOLE QUESTION FOUND — the population every grouping
+   * above was taken over, counted once, through the one bounded seam (R16).
+   *
+   * IT EXISTS SO THE SCREEN CAN SAY "NOTHING MATCHED" IN ONE SENTENCE. Without
+   * it a dashboard whose search term finds nothing is six panels each drawing
+   * its own private zero, which is a screen that looks broken rather than a
+   * screen that answered. And it cannot be INFERRED from the arrays: a ticket
+   * with no kind and nothing closed sits in none of the grouped reads above,
+   * so "every array is empty" is a proposition about which GROUPINGS happen to
+   * exclude nulls today rather than about whether anything matched. Two of
+   * those arrays happen to partition the population between them right now —
+   * which is exactly the kind of accident that stops being true when somebody
+   * adds a `WHERE`, silently, with nothing red.
+   *
+   * BOUNDED, like every other total over this collection: tickets are a
+   * `GROWING_COLLECTIONS` member, so it goes through `countCollection` and
+   * stops at `TOTAL_COUNT_CAP` exactly as `countTickets` does. Nothing renders
+   * the NUMBER — the screen reads it as "is this zero" — so the ceiling costs
+   * no honesty here; it is used because an unbounded `COUNT(*)` over a growing
+   * table is the one read this codebase does not allow, whoever reads it. */
+  matched: number
+}
+
+/** THE WHOLE DASHBOARD, IN ONE ROUND TRIP.
+ *
+ * `filter` is the everyday list's own question — the fence, the archive view —
+ * built by the same `ticketWhere` the list and its counts use, so a chart can
+ * never be drawn over rows the list itself would not show (R16's sentence,
+ * applied to a picture instead of a badge).
+ *
+ * THE STAGE FACET IS DROPPED AND THE KIND FACET IS NOT, and the two used to be
+ * dropped together. A dashboard narrowed to one STAGE would draw a pipeline
+ * chart of one row and a closing-time chart of tickets that have not closed:
+ * every heading here would be about the backlog while every picture was about a
+ * slice of it. A dashboard narrowed to one KIND is a different sentence — it is
+ * the toolbar's second filter, ruled by the client on 6 Sep 2026 ("dashboard
+ * should also have toolbar / filter by client and type / no sort"), and every
+ * chart on the screen still answers its own heading with the kind held constant:
+ * "how long does an Issue take to close" is the same question as "how long does
+ * a ticket take to close", asked of fewer rows. The two filters are a WHERE
+ * clause on every read below rather than a narrowing of loaded rows, because a
+ * dashboard has no rows to narrow — there is nothing on that tab a browser could
+ * sieve.
+ *
+ * …AND THE THIRD FILTER IS THE SEARCH BOX (`q`, 7 Sep 2026). It is the same
+ * field on the same `TicketFilter` the LIST door binds its own `?q=` into, so it
+ * reaches the same `searchClause` inside the same `ticketWhere` — one matcher
+ * over description, reference and title, and therefore one answer. A term that
+ * finds eleven tickets on the list tab draws these panels over those eleven,
+ * and that is a property of there being no second matcher rather than of two
+ * matchers currently agreeing. Nothing in this function had to change to accept
+ * it, which is the point `appId` already made: a filter the list understood was
+ * already understood here.
+ *
+ * NINE STATEMENTS IN ONE WAVE. Each is its own round trip to the team database
+ * (~150ms, measured 25 Aug 2026) and none depends on another's answer, so they
+ * are one `Promise.all` rather than nine consecutive lines — the same reasoning
+ * `createTicket`'s waves are built on. The ninth is `matched`, the population
+ * the other eight were grouped over; see the field's own note on the type. */
+export async function readTicketDashboard(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  filter: TicketFilter
+): Promise<TicketDashboard> {
+  const where = ticketWhere(guard, scope, {
+    ...filter,
+    tab: "all",
+    // The stage is what half these panels are ABOUT, so it can never be a
+    // narrowing they inherit — and `waiting` goes with it for the same reason it
+    // does in `countTicketFacets`: it is a narrowing of the stage.
+    statuses: undefined,
+    waiting: undefined,
+  })
+  const fenced = where.sql.join(" AND ")
+  const cap = TICKET_DASHBOARD_GROUP_CAP
+  // HOW LONG A TICKET TOOK, ONCE, for both reads below that need it (the
+  // client's Mon–Fri ruling; see the seam's own header). The column names are
+  // written here in the source and never taken off a request, which is the one
+  // condition `workingDaysSql` interpolating rather than binding asks for.
+  const tookDays = workingDaysSql("created_at", "resolved_at")
+  // …AND THE LINE A TICKET NOBODY HAS OPENED IS LATE PAST. Built the way the
+  // triage queue builds it — the same function, the same constant, a bound
+  // parameter rather than date arithmetic in the statement — because the number
+  // on this dashboard and the length of that queue are the same fact, and two
+  // ways of asking it would eventually be two answers.
+  const unopenedCutoff = workingDaysAgo(new Date(), TRIAGE_AFTER_DAYS).toISOString()
+
+  // NINE STATEMENTS NOW, and the ninth is the population the other eight were
+  // grouped over — see `matched` on the type above for why it is counted rather
+  // than inferred from whether the eight came back empty.
+  const [openByType, byAccountType, closure, trend, matrix, notRecorded, byApp, unopened, matched] = await Promise.all([
+    // 1B. Bounded by GROUPING: at most (kinds × stages) rows, and both sets are
+    // collections that cannot run away.
+    d1Query<{ help_type: string; status: string; n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT help_type, status, COUNT(*) AS n FROM help
+        WHERE ${fenced} AND status IN (${OPEN_STATUS_SQL}) AND help_type IS NOT NULL
+        GROUP BY help_type, status
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // 2B. The fenced rows are named ONCE in a CTE and joined from there, rather
+    // than joining `help` to `accounts` and leaning on the WHERE's unqualified
+    // column names to land on the right table. `accounts` carries an
+    // `account_id` of its own and `apps` carries a `ref`, both of which the
+    // ticket clause can name, so "it resolves correctly today" is a property of
+    // which filters this door happens to parse — which is exactly the kind of
+    // thing that stops being true when somebody adds one.
+    //
+    // ORDERED BEFORE IT IS CAPPED, and ordered ACROSS the kinds rather than
+    // within each: the cap then drops the quietest (client, kind) pairs in the
+    // team, so the top of every kind's ranking survives it. That is the property
+    // the two ranked lists need; "the first N clients alphabetically" is not.
+    d1Query<{
+      account_id: string
+      account_name: string | null
+      help_type: string
+      open_n: number
+      total_n: number
+    }>(
+      cfg,
+      guard.databaseId,
+      `WITH scoped AS (SELECT account_id, help_type, status FROM help WHERE ${fenced})
+       SELECT s.account_id AS account_id, a.name AS account_name, s.help_type AS help_type,
+              SUM(CASE WHEN s.status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+              COUNT(*) AS total_n
+         FROM scoped s LEFT JOIN accounts a ON a.id = s.account_id
+        WHERE s.account_id IS NOT NULL AND s.help_type IS NOT NULL
+        GROUP BY s.account_id, a.name, s.help_type
+        ORDER BY open_n DESC, total_n DESC
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // 3A. THE QUANTILES ARE COMPUTED BY THE DATABASE, and that is the bound as
+    // much as it is the arithmetic: the alternative — hand back every closed
+    // ticket's duration and let the chart sort them — is an unbounded row set on
+    // a collection R14 makes page, which is the one shape this file may not
+    // return. One row per kind comes back instead.
+    //
+    // NEAREST RANK, no interpolation, because the reader is a person looking at
+    // a box: the quartiles are the durations of REAL tickets rather than numbers
+    // between two of them. The median is the one exception and it is the
+    // ordinary definition — with an even count it averages the two middle rows,
+    // which is why the two ranks are selected together and averaged.
+    // `(n*25+99)/100` is integer-division ceiling: SQLite's `ceil` is a
+    // compile-time option and D1 is not the place to find out whether it was
+    // taken. For n >= 1 both ranks are always within 1..n, so no clamping is
+    // needed and none is written.
+    //
+    // WHAT IS LEFT OUT, deliberately: a ticket whose `resolved_at` is missing or
+    // unreadable, and one that reads as closed BEFORE it was raised. `julianday`
+    // answers null for a date it cannot parse, and both comparisons then fail,
+    // so those rows fall out rather than arriving as a negative duration that
+    // would drag a quartile below zero.
+    //
+    // …AND EVERYTHING CLOSED MORE THAN `CLOSURE_WINDOW_MONTHS` AGO, which is a
+    // decision rather than a tidy-up. The panel asks how long a ticket takes to
+    // close, which is a question about NOW, and a distribution taken over all
+    // time is a distribution over ways of working the team has already left
+    // behind. The trend read below is where the longer view lives, and it is a
+    // better shape for it: a year of months says WHICH WAY this is going, where
+    // one number over a year says only that a year happened.
+    //
+    // SIX CALENDAR MONTHS, NOT A COUNT OF DAYS (client, 6 Sep 2026: "for this
+    // how long, only consider the latest 6 months"). `julianday('now', '-6
+    // months')` walks the calendar the way she said it, so the window is the
+    // same six months whichever six they are — where a fixed day count would
+    // make a window containing February shorter than one containing July. The
+    // shape of the comparison is unchanged: `julianday` still answers null for
+    // a date it cannot parse, so an unreadable `resolved_at` falls out here
+    // exactly as it falls out of the two comparisons above it.
+    //
+    // WORKING DAYS, NOT CALENDAR DAYS (`tookDays`). This read used to subtract
+    // two `julianday`s, so a ticket raised at five on a Friday and closed at
+    // nine on the Monday reported three days of work over a weekend nobody
+    // worked. The client's ruling is in the seam's own header.
+    d1Query<{
+      help_type: string
+      n: number
+      min_days: number
+      p25_days: number
+      median_days: number
+      p75_days: number
+      max_days: number
+    }>(
+      cfg,
+      guard.databaseId,
+      `WITH closed AS (
+         SELECT help_type AS t, ${tookDays} AS days
+           FROM help
+          WHERE ${fenced} AND status = 'resolved' AND help_type IS NOT NULL
+            AND julianday(resolved_at) >= julianday(created_at)
+            AND julianday(resolved_at) >= julianday('now', '-${CLOSURE_WINDOW_MONTHS} months')
+       ), ranked AS (
+         SELECT t, days,
+                ROW_NUMBER() OVER (PARTITION BY t ORDER BY days) AS rn,
+                COUNT(*)     OVER (PARTITION BY t)               AS n
+           FROM closed
+       )
+       SELECT t AS help_type, n AS n,
+              MIN(days) AS min_days,
+              MAX(days) AS max_days,
+              MAX(CASE WHEN rn = (n * 25 + 99) / 100 THEN days END) AS p25_days,
+              AVG(CASE WHEN rn IN ((n + 1) / 2, (n + 2) / 2) THEN days END) AS median_days,
+              MAX(CASE WHEN rn = (n * 75 + 99) / 100 THEN days END) AS p75_days
+         FROM ranked
+        GROUP BY t, n
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // 3B. THE SAME MIDDLE TICKET, ONE MONTH AT A TIME — the line that says which
+    // way this is going, which is the question the box plot above cannot answer
+    // at all. Grouped by the month a ticket CLOSED in, because that is when the
+    // work finished: grouping by the month it was RAISED in would put a ticket
+    // that took four months into the month it arrived, so the most recent months
+    // would be built out of the fastest tickets and every trend would look like
+    // an improvement.
+    //
+    // THERE IS NO FLOOR ON THIS READ ANY MORE (client, 2026-09-07): "Only
+    // months with at least 8 of a kind are thrown. No, even if it's only 1, it
+    // should appear there."
+    //
+    // WHAT USED TO BE HERE, so the removal is a decision on the record rather
+    // than a line that went missing: `WHERE n >= CLOSURE_TREND_MIN_CLOSURES`,
+    // eight, applied in the rows precisely because a median exists for a bucket
+    // of one and is then drawn at the same weight as a median of a hundred. That
+    // objection is still true and the constant's own retirement note in
+    // `shared/types.ts` keeps the whole argument. She has heard it and ruled the
+    // other way: a month she knows something closed in, drawn as a gap, reads as
+    // the app having lost her work, and that costs her more than a line that
+    // jumps.
+    //
+    // SO EVERY BUCKET LEAVES THE DOOR, and `n` still travels with each one — it
+    // is what the screen's hover readout says per month, which is now the only
+    // thing standing between a thin month and a misread one. Nothing here
+    // thresholds anything; a filter reintroduced under another name would be the
+    // same refusal wearing a different word.
+    //
+    // BOUNDED BY ITS GROUPING: at most (kinds × twelve months) rows, and the cap
+    // is said anyway (R14). No ORDER BY for the cap to protect, because there is
+    // no tail to lose — the whole grouping is small by construction.
+    d1Query<{ help_type: string; month: string; n: number; median_days: number }>(
+      cfg,
+      guard.databaseId,
+      `WITH closed AS (
+         SELECT help_type AS t, strftime('%Y-%m', resolved_at) AS mo, ${tookDays} AS days
+           FROM help
+          WHERE ${fenced} AND status = 'resolved' AND help_type IS NOT NULL
+            AND julianday(resolved_at) >= julianday(created_at)
+            AND resolved_at >= strftime('%Y-%m-01', 'now', '-${CLOSURE_TREND_MONTHS - 1} months')
+       ), ranked AS (
+         SELECT t, mo, days,
+                ROW_NUMBER() OVER (PARTITION BY t, mo ORDER BY days) AS rn,
+                COUNT(*)     OVER (PARTITION BY t, mo)               AS n
+           FROM closed
+       )
+       SELECT t AS help_type, mo AS month, n AS n,
+              AVG(CASE WHEN rn IN ((n + 1) / 2, (n + 2) / 2) THEN days END) AS median_days
+         FROM ranked
+        GROUP BY t, mo, n
+        ORDER BY mo ASC
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // 5A. NULL `raised_as_type` is EXCLUDED here and counted separately in the
+    // next statement — the two together are the whole population, and neither is
+    // any use without the other. Team migration 0065 is the argument for why
+    // those rows are null rather than guessed at.
+    d1Query<{ raised_as_type: string; help_type: string | null; n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT raised_as_type, help_type, COUNT(*) AS n FROM help
+        WHERE ${fenced} AND raised_as_type IS NOT NULL
+        GROUP BY raised_as_type, help_type
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // …and the denominator's missing half. One aggregate row.
+    d1Query<{ n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT COUNT(*) AS n FROM help WHERE ${fenced} AND raised_as_type IS NULL LIMIT 1`,
+      where.params
+    ),
+    // 6A. Same CTE shape and same reasoning as 2B, and the NULL app is kept.
+    //
+    // THE KIND IS CROSSED IN NOW, so a bar can be split by what sort of work it
+    // is — which is the whole point of the chart the client picked. That change
+    // breaks the ORDERING 2B can get away with, and the fix is the two extra
+    // CTEs below rather than a smarter ORDER BY. Ordering (app, kind) pairs by
+    // their own tally and capping at a hundred would rank pairs ACROSS apps, so
+    // the busiest app's smallest segment could be dropped while a quiet app's
+    // biggest one survived — and a stacked bar missing one segment does not look
+    // broken, it looks like an app with no extras. 2B is safe from that because
+    // it draws two independent ranked lists and a missing pair is a missing row;
+    // here a missing pair silently rewrites a bar that is still drawn.
+    //
+    // So the apps are ranked FIRST, by their own whole-app total, and the pairs
+    // are then ordered by their app's rank. The cap can now only ever drop the
+    // quiet apps at the bottom of the chart — entire bars, visibly absent —
+    // never a slice out of a bar that is still on screen.
+    //
+    // `r.app_id IS p.app_id` rather than `=`: the null app is a real bucket and
+    // `NULL = NULL` is null, so a plain equality would join that bucket to
+    // nothing and drop the very bar the comment above insists on keeping.
+    d1Query<{
+      app_id: string | null
+      app_name: string | null
+      help_type: string
+      open_n: number
+      total_n: number
+    }>(
+      cfg,
+      guard.databaseId,
+      `WITH scoped AS (SELECT app_id, help_type, status FROM help WHERE ${fenced}),
+            pairs AS (
+              SELECT app_id, help_type,
+                     SUM(CASE WHEN status = 'resolved' THEN 0 ELSE 1 END) AS open_n,
+                     COUNT(*) AS total_n
+                FROM scoped
+               WHERE help_type IS NOT NULL
+               GROUP BY app_id, help_type
+            ),
+            ranked_apps AS (
+              SELECT app_id, SUM(open_n) AS app_open, SUM(total_n) AS app_total
+                FROM pairs GROUP BY app_id
+            )
+       SELECT p.app_id AS app_id, ap.name AS app_name, p.help_type AS help_type,
+              p.open_n AS open_n, p.total_n AS total_n
+         FROM pairs p
+         JOIN ranked_apps r ON r.app_id IS p.app_id
+         LEFT JOIN apps ap ON ap.id = p.app_id
+        ORDER BY r.app_open DESC, r.app_total DESC, p.open_n DESC
+        LIMIT ${cap}`,
+      where.params
+    ),
+    // …AND THE ONE NUMBER ON THIS SCREEN THAT IS ABOUT US. Tickets still sitting
+    // in `new` past the line the triage queue already draws, in WORKING days.
+    //
+    // THE SAME PREDICATE `needsTriage` USES, deliberately, down to the strict
+    // `<`: `status = 'new'` and raised before the cutoff. A dashboard chip that
+    // said seven over a queue holding six would be read as a bug in one of them,
+    // and nobody could tell which — so the two are one sentence, built from one
+    // function and one constant.
+    //
+    // `archived_at IS NULL` rides in `fenced` already (the everyday list's own
+    // `view: "live"`), which is the third clause that queue applies: a ticket
+    // somebody deliberately put away is not one nobody has looked at.
+    //
+    // ONE AGGREGATE ROW, so `LIMIT 1` is the honest cap (R14). The cutoff binds
+    // AFTER the fence's own parameters, because both are positional.
+    d1Query<{ n: number }>(
+      cfg,
+      guard.databaseId,
+      `SELECT COUNT(*) AS n FROM help
+        WHERE ${fenced} AND status = 'new' AND created_at < ? LIMIT 1`,
+      [...where.params, unopenedCutoff]
+    ),
+    // …AND HOW MANY TICKETS THE QUESTION FOUND AT ALL — the denominator under
+    // every picture above, over the identical `fenced` clause and the identical
+    // parameters, so it can never describe a different population from the one
+    // the panels were drawn from.
+    //
+    // THROUGH THE COUNT SEAM AND NEVER A BARE `COUNT(*)` (R16, amended): tickets
+    // grow with ordinary use, and the seam's own header is explicit that a
+    // `COUNT(*)` over a growing table is the one read in this product with no
+    // ceiling at all. `countCollection` wants the collection's own question
+    // selecting one row per member, which is exactly what `fenced` already is.
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM help WHERE ${fenced}`, where.params),
+  ])
+
+  // `Number(...) || 0` on every tally, exactly as `byAccount` above does it: the
+  // D1 REST door hands numbers back as JSON, and a SUM over no rows is null.
+  const num = (v: unknown) => Number(v) || 0
+  return {
+    openByTypeAndStatus: openByType.map((r) => ({
+      helpType: r.help_type,
+      status: r.status,
+      n: num(r.n),
+    })),
+    byAccountAndType: byAccountType.map((r) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      helpType: r.help_type,
+      open: num(r.open_n),
+      total: num(r.total_n),
+    })),
+    closureDays: closure.map((r) => ({
+      helpType: r.help_type,
+      n: num(r.n),
+      minDays: num(r.min_days),
+      p25Days: num(r.p25_days),
+      medianDays: num(r.median_days),
+      p75Days: num(r.p75_days),
+      maxDays: num(r.max_days),
+    })),
+    raisedVsCurrent: matrix.map((r) => ({
+      raisedAsType: r.raised_as_type,
+      helpType: r.help_type,
+      n: num(r.n),
+    })),
+    raisedAsNotRecorded: num(notRecorded[0]?.n),
+    closureTrend: trend.map((r) => ({
+      helpType: r.help_type,
+      month: r.month,
+      n: num(r.n),
+      medianDays: num(r.median_days),
+    })),
+    openByApp: byApp.map((r) => ({
+      appId: r.app_id,
+      appName: r.app_name,
+      helpType: r.help_type,
+      open: num(r.open_n),
+      total: num(r.total_n),
+    })),
+    unopenedPastLine: num(unopened[0]?.n),
+    // Already a clamped number off the seam, so no `num(...)` — every other
+    // field here is unwrapping a JSON value the REST door handed back, and this
+    // one is not.
+    matched,
   }
 }
 
@@ -767,7 +1580,10 @@ export async function listReplies(
   // promise; both are kept now, and this is the half that makes the linkage
   // worthless even if a name escapes somewhere else.
   return rows.map((r) =>
-    toMessage(scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r)
+    toMessage(
+      scope.kind === "portal" && r.from_client !== 1 ? { ...r, creator_id: null, creator_name: null } : r,
+      r.from_client === 1
+    )
   )
 }
 
@@ -980,20 +1796,29 @@ export async function createTicket(
     topRank(cfg, guard),
   ])
   const helpType = optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null
+  // NOTHING NEW ARRIVES AS THE KIND WE STOPPED SHOWING. There is no `was` on a
+  // create, so this is the flat refusal (see `refuseKeptForMigration`).
+  refuseKeptForMigration(helpType, null)
   const now = new Date().toISOString()
-  // WHERE IT STARTS, and it is a FACT about the kind of thing being asked rather
-  // than a choice anybody makes (CHECKLIST 5.13, Aurora's ap2).
+  // WHERE IT STARTS, AND IT IS THE SAME PLACE FOR EVERYTHING NOW.
   //
-  // An EXTRA, a REQUEST or a piece of FEEDBACK is somebody asking for more work,
-  // so the person who pays for it confirms they want it before we spend a day on
-  // triage. A QUESTION or an ISSUE is somebody stuck, and making them ask their
-  // own colleague for permission first is the version of this rule that gets the
-  // feature switched off — Aurora's note, and it is the load-bearing half.
+  // This line used to fork. An EXTRA, a REQUEST or a piece of FEEDBACK opened in
+  // `awaiting_validation` and waited for the client who pays for it to confirm
+  // they wanted it before we spent a day on triage (CHECKLIST 5.13, Aurora's
+  // ap2); a QUESTION or an ISSUE went straight in, because somebody stuck should
+  // not have to ask their own colleague for permission first.
   //
-  // The agency's own tickets never wait: there is no client-side stakeholder to
-  // ask, so a ticket with no account would sit in `awaiting_validation` for ever
-  // waiting on somebody who does not exist.
-  const status = accountId && ticketTypeWaitsForValidation(helpType) ? "awaiting_validation" : "new"
+  // The client retired that stage on 7 Sep 2026 — "kill awaiting_validation" —
+  // and shared/types.ts `HELP_STATUSES` carries the argument. So there is no
+  // longer a stage to wait in and nothing left to fork on: every ticket, of
+  // every kind, with or without a client, opens in `new` and is read by a person
+  // like everything else. We stop asking permission before we look at the thing.
+  //
+  // THE KIND DIVISION SURVIVED THE GATE, and is not to be re-derived from here:
+  // `isScopedTicketType` (shared/types.ts) is the same three words, still used —
+  // by the dashboard's "who has more scoped work" ranking. What it stopped being
+  // is a lifecycle decision.
+  const status = "new"
   // The reference the client will quote, and the place in the list. Both are
   // resolved BEFORE the insert so the row is complete the first time anybody
   // reads it — a ticket that exists for a moment with no number is a ticket
@@ -1017,8 +1842,29 @@ export async function createTicket(
   await d1ExecScript(
     cfg,
     guard.databaseId,
-    `INSERT INTO help (id, help_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, module_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
-VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});`
+    // WHAT IT ARRIVED AS, STAMPED HERE AND NOWHERE ELSE (team migration 0065).
+    // `raised_as_type` takes the SAME `helpType` value on the SAME line as
+    // `help_type`, in one statement, so the two cannot start life disagreeing —
+    // and from this moment `help_type` is free to move while this one never
+    // does. There is no update path for it anywhere in the codebase, which is
+    // the whole of its value: the pair is "arrived as / is now", and a column
+    // that could be rewritten would report zero recategorisations for ever.
+    // The single exception is a dropdown RENAME, which re-spells both columns
+    // together — shared/selectable-homes.ts says why that is not an update of
+    // this fact.
+    `INSERT INTO help (id, help_type, raised_as_type, description, screen_recording_link, source_screen, source_related_table, source_related_row_id, status, resolved, account_id, app_id, module_id, raised_by_contact_id, ref, rank, locked_at, title_de, title_en, created_at, creator_id, creator_email, creator_name)
+VALUES (${sqlString(id)}, ${sqlString(helpType)}, ${sqlString(helpType)}, ${sqlString(description)}, ${sqlString((optionalText(input.screenRecordingLink, "Screen recording link", TEXT_LIMITS.link) ?? null))}, ${sqlString((optionalText(input.sourceScreen, "Source", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedTable, "Source table", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.sourceRelatedRowId, "Source row", TEXT_LIMITS.short) ?? null))}, ${sqlString(status)}, 0, ${sqlString(accountId)}, ${sqlString(appId)}, ${sqlString(moduleId)}, ${sqlString(raisedBy)}, ${sqlString(ref)}, ${sqlString(rank)}, ${sqlString(lockedAt)}, ${sqlString((optionalText(input.titleDe, "German title", TEXT_LIMITS.short) ?? null))}, ${sqlString((optionalText(input.titleEn, "English title", TEXT_LIMITS.short) ?? null))}, ${sqlString(now)}, ${sqlString(actor.id)}, ${sqlString(actor.email)}, ${sqlString(actor.name)});
+` +
+      // WHERE THE SEQUENCE STARTS (team migration 0066). The first stage event
+      // rides INSIDE this script rather than following it, which is a property
+      // no other status writer in the codebase can have: `d1ExecScript` runs the
+      // statements as one batch, so there is no instant in which a ticket exists
+      // with no recorded first stage — and the ONE reader of that sequence can
+      // therefore treat a `from_status` of null as "this ticket was born here"
+      // rather than as "something went missing". Same `status` value, same
+      // statement, same argument `raised_as_type` makes two lines above: two
+      // facts that must agree at birth are written in one place.
+      statusEventStatement(actor, id, null, status, now)
   )
 
   await logActivity(cfg, guard.databaseId, actor, {
@@ -1084,6 +1930,15 @@ export async function updateTicket(
   // deliberate feature with a confirm panel, not a quiet field on an edit form.
   // A portal caller never reaches this: their own ticket already carries their
   // company, so the branch below is unreachable for them by construction.
+  // NOBODY RECATEGORISES A TICKET *INTO* THE KIND WE STOPPED SHOWING. Checked
+  // against what the row already says, so an ordinary edit to one of the
+  // preserved rows (which posts its own unchanged type straight back) still
+  // saves — see `refuseKeptForMigration`. Before the first write, so a refusal
+  // costs no round trips.
+  refuseKeptForMigration(
+    optionalText(input.helpType, "Type", TEXT_LIMITS.short) ?? null,
+    before.help_type
+  )
   const namedAccount =
     scope.kind === "portal" ? null : await accountForStaffTicket(cfg, guard, input.accountId)
   if (namedAccount && before.account_id && namedAccount !== before.account_id) {
@@ -1125,6 +1980,15 @@ export async function updateTicket(
   // re-stamping it would keep moving the moment the client's rights ended.
   const lockSet = scope.kind === "portal" ? "" : ", locked_at = COALESCE(locked_at, ?)"
   const lockParams = scope.kind === "portal" ? [] : [now]
+  // `raised_as_type` IS DELIBERATELY NOT IN THIS SET LIST, and this is the one
+  // statement in the app where its absence is load-bearing. THIS is the write
+  // that recategorises a ticket — the "Type" line in the activity sentence below
+  // is written from exactly this UPDATE — so adding the column here would erase
+  // the fact the column exists to hold, on the precise event it exists to
+  // record, and the raised-as/is-now chart would report zero for ever. Team
+  // migration 0065 carries the full reasoning; a source scan
+  // (workers/content/test/raised-as-is-stamped-once.test.ts) fails the build if
+  // this or any other UPDATE ever names it.
   const changed = await d1Query<{ id: string }>(
     cfg,
     guard.databaseId,
@@ -1223,6 +2087,24 @@ export async function setStatus(
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
 
+  // THE MOVE, AS A ROW (team migration 0066) — and this is the writer that makes
+  // the reopen legible. The `resolveBlock` above NULLs `resolved_at` and the
+  // whole resolver block on any move to a non-resolved status, so before this
+  // existed a reopen ERASED who answered the ticket and when, with nothing
+  // anywhere that could say it had ever been answered at all. The owner blessed
+  // the nulling and named where the fact belongs instead: "Reopening a ticket
+  // nulls its closing timestamp, yeah — but keep it in activity, like closed on
+  // x, reopen on y, closed again on z". The row below IS that record: the
+  // resolve is one event carrying its resolver and its instant, the reopen is
+  // the next, and neither can rub the other out.
+  //
+  // AFTER the R17 early return, so a zero-row move writes no event — a re-run
+  // must not put a stage of zero seconds into the sequence. And BEFORE the
+  // activity sentence deliberately: this is the record the numbers are computed
+  // from, `logActivity` is prose that is allowed to fail, and the one that must
+  // not fail goes first.
+  await recordStatusEvent(cfg, guard, actor, id, before.status, status, now)
+
   await logActivity(cfg, guard.databaseId, actor, {
     type: `Ticket ${status === "resolved" ? "resolved" : status === "ready" ? "ready" : "updated"}`,
     description: `${actor.name} set ${before.ref ?? "a ticket"} to ${status.replace("_", " ")}`,
@@ -1252,45 +2134,35 @@ export function refuseDirectResolve(status: HelpStatus): void {
   )
 }
 
-/** THE CLIENT SAYS YES (CHECKLIST 5.13). Moves a waiting ticket into the ordinary
- * queue and stamps WHEN they said so.
+/* ── `validateTicket` WAS HERE, AND IT IS GONE (7 Sep 2026) ─────────────────
  *
- * R17: `status = 'awaiting_validation'` rides the UPDATE, so a second press moves
- * zero rows — no duplicate history, no second ping. Validating a ticket that was
- * never waiting is not an error and not an event: it moves nothing.
+ * "THE CLIENT SAYS YES" (CHECKLIST 5.13): it moved a ticket out of
+ * `awaiting_validation` into `new`, stamped `validated_at`, and recorded the
+ * move as a stage event like any other —
+ * `recordStatusEvent(cfg, guard, actor, id, "awaiting_validation", "new", now)`.
+ * That call is the one WRITE anywhere in the codebase that named the retired
+ * stage, and this note exists so the next reader knows where it went rather
+ * than finding a hole where the module's most-argued-about function used to be.
  *
- * It does NOT close the wording lock. The client is confirming they want the
- * thing, not handing it over — and until somebody here reads it, the account
- * still owns what it says (SCOPE ch.07). */
-export async function validateTicket(
-  cfg: D1Rest,
-  guard: MemberGuard,
-  scope: AccountScope,
-  actor: Actor,
-  id: string
-): Promise<{ moved: boolean; accountId: string | null }> {
-  const before = await ticketOrThrow(cfg, guard, scope, id)
-  const now = new Date().toISOString()
-  const fence = ticketFence(guard, scope, "all")
-  const changed = await d1Query<{ id: string }>(
-    cfg,
-    guard.databaseId,
-    // R17: `status IN (…)` rather than `status = …`, which is the same sentence
-    // and the spelling the rest of this module uses — the states a move is
-    // allowed OUT OF, named in the statement rather than checked before it.
-    `UPDATE help SET status = 'new', validated_at = ?, updated_at = ?
-      WHERE id = ? AND status IN ('awaiting_validation')${fence.sql ? ` AND ${fence.sql}` : ""} RETURNING id`,
-    [now, now, id, ...fence.params]
-  )
-  if (!changed[0]) return { moved: false, accountId: before.account_id }
-  await logActivity(cfg, guard.databaseId, actor, {
-    type: "Ticket validated",
-    description: `${actor.name} confirmed ${before.ref ?? "a ticket"} should go ahead`,
-    relatedTable: "help",
-    relatedRowId: id,
-  })
-  return { moved: true, accountId: before.account_id }
-}
+ * IT WAS REMOVED RATHER THAN LEFT AS A NO-OP, and that is the decision worth
+ * recording. With the stage retired (shared/types.ts, `HELP_STATUSES`) R17's
+ * predicate — `status IN ('awaiting_validation')` — can no longer match any row
+ * in any team database, so the function would have been a door that could only
+ * ever move zero rows: a control whose sole possible outcome is silent failure.
+ * Worse, it was the ONE exception to this module's every-other-status-move-
+ * refuses-a-portal-caller rule (R21), gated on `help:read` so a client login
+ * could reach it. An exception that has stopped buying anything is not
+ * harmless — it is a portal-reachable write door kept alive by inertia. Both
+ * halves of the safety argument for it (the account fence on the UPDATE, R17's
+ * predicate) were arguments for why a USEFUL door was narrow enough; neither is
+ * a reason to keep a useless one.
+ *
+ * WHAT SURVIVES IT. Every `help_status_events` row that recorded a real
+ * `awaiting_validation → new` move stays exactly where it is — team migration
+ * 0069 touches `help.status` and never the history — and `stageLabel`
+ * (web/components/tickets/ticket-stages.tsx) still draws those rungs as "Waiting on
+ * you". The `validated_at` values stay too. Nothing that happened is unhappened
+ * by the door that made it happen going away. */
 
 /** SOMEBODY READ IT (CHECKLIST 5.11) — the one act the triage screen performs.
  *
@@ -1349,6 +2221,11 @@ export async function markTriaged(
     [now, now, actor.id, actor.email, actor.name, id]
   )
   if (!changed[0]) return { moved: false, accountId: before.account_id }
+  // Somebody reading a request is the second rung of the ladder and it is
+  // recorded like every other (0066). `new` is written rather than
+  // `before.status` for the same reason validation writes its own: the UPDATE's
+  // predicate is `status IN ('new')`, so a row that moved was `new`, full stop.
+  await recordStatusEvent(cfg, guard, actor, id, "new", "triaged", now)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Ticket triaged",
     description: `${actor.name} read ${before.ref ?? "a ticket"}`,
@@ -1546,6 +2423,16 @@ export async function bulkSetStatusByFilter(
   const authored = ticketFence(guard, scope, "all")
   const extra: string[] = authored.sql ? [authored.sql] : []
   const extraParams: (string | number)[] = [...authored.params]
+  // …AND THE KIND THAT IS KEPT BUT NEVER SHOWN IS NOT IN THE SET EITHER. This is
+  // the one WRITE that takes a FILTER rather than ids, so it is the one write
+  // that inherits the collection's own definition: a set-shaped job says "every
+  // ticket matching this", and these rows are no longer part of "the tickets".
+  // It is also the number a person APPROVES — the count above is what the
+  // confirm panel states — so leaving them in would have told somebody they were
+  // about to move more tickets than the list in front of them holds, and then
+  // quietly moved rows they cannot see. That is the same sentence R16 makes
+  // about a badge, made about a confirmation.
+  extra.push(keptForMigrationClause().sql)
   if (filter.status) {
     extra.push("status = ?")
     extraParams.push(filter.status)
@@ -1572,6 +2459,35 @@ export async function bulkSetStatusByFilter(
     )
 
   const now = new Date().toISOString()
+  // WHAT EACH OF THEM IS ABOUT TO MOVE OUT OF (team migration 0066).
+  //
+  // THE ONE PLACE A STAGE EVENT NEEDS A SECOND READ, and it is worth saying why
+  // there is no cheaper way. This is the only status writer in the module that
+  // moves MANY rows in ONE statement, and SQLite's `RETURNING` hands back the
+  // row as it is AFTER the update — so the statement that performs the move
+  // cannot also report what each row was before it. The alternative was to drop
+  // `from_status` for a bulk, which would make the FIRST recorded event on a
+  // bulk-moved ticket indistinguishable from a creation row, and a creation row
+  // is what tells the reader the sequence is whole.
+  //
+  // BOUNDED AND POSITIONED, not merely added: it runs AFTER the ceiling refusal
+  // above, so it can never read more than `BULK_IDS_LIMIT` rows, and it reads
+  // exactly the WHERE the UPDATE below is about to carry. R14: the cap rides the
+  // statement anyway, because a bound that is only true because of a check
+  // fifteen lines up is a bound the next reader has to go and find.
+  //
+  // A row the UPDATE moves that this read did not see means a concurrent write
+  // pushed a ticket INTO the filter between the two statements. 0066 names that
+  // race: such a row is recorded with a null `from_status`, which reads as "no
+  // recorded stage before this one" — true, and the same sentence the creation
+  // row means.
+  const beforeRows = await d1Query<{ id: string; status: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, status FROM help WHERE status <> ?${extraSql} LIMIT ${BULK_IDS_LIMIT}`,
+    [toStatus, ...extraParams]
+  )
+  const wasAt = new Map(beforeRows.map((r) => [r.id, r.status]))
   const resolved = toStatus === "resolved"
   const resolveBlock = resolved
     ? `resolved = 1, resolved_at = ${sqlString(now)}, resolver_id = ${sqlString(actor.id)}, resolver_email = ${sqlString(actor.email)}, resolver_name = ${sqlString(actor.name)}`
@@ -1588,6 +2504,23 @@ export async function bulkSetStatusByFilter(
     [toStatus, now, now, toStatus, ...extraParams]
   )
   const changed = changedRows.length
+  // ONE EVENT PER TICKET, even though there is one activity row for the whole
+  // set — and the asymmetry is the point rather than an inconsistency. The
+  // activity feed is a story a person reads, and "Aurora set 40 tickets to
+  // ready" is the sentence that happened. The stage history is a MEASUREMENT,
+  // per ticket: fold a bulk into one row there and forty tickets each lose a
+  // rung, their durations either side of it silently merge, and nothing on any
+  // chart says a thing went missing. This is also the writer whose omission the
+  // activity feed could never have been backfilled from, for exactly this reason
+  // (0066's third refusal).
+  if (changed > 0)
+    await recordStatusEvents(
+      cfg,
+      guard,
+      actor,
+      changedRows.map((r) => ({ ticketId: r.id, from: wasAt.get(r.id) ?? null, to: toStatus })),
+      now
+    )
   if (changed > 0)
     // ONE activity row for the set — history says what happened, not per-row noise.
     await logActivity(cfg, guard.databaseId, actor, {

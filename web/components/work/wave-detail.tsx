@@ -1,7 +1,9 @@
 "use client"
 
-// WAVE DETAIL — one package a client bought, at /waves/<id>, as a tabbed record
-// (Law R2): Overview / Sprints / Activity.
+// WAVE DETAIL — one package a client bought, at /waves/<id>, as a tabbed record:
+// Overview / Sprints. Its history is not a third tab any more — it is reached
+// from the ink footer's Latest activity column, on the client's 2026-09-06
+// ruling; web/components/records/activity-panel.tsx carries the ruling and the argument.
 //
 // THE SPRINTS TAB IS THE WHOLE SCREEN, really. A wave IS its sprints: putting
 // one in or taking one out is the only thing that changes what the package runs
@@ -28,14 +30,12 @@ import * as React from "react"
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
-import { SortControl } from "@shared/ui/components/sort-control/sort-control"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { useRemembered } from "@shared/web/remembered"
 import { PencilSimple, Power, ArrowCounterClockwise, UserMinus } from "@shared/ui/foundations/icons"
 
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { OverviewList } from "@/components/records/overview-list"
@@ -64,6 +64,7 @@ import type { Sprint } from "@shared/types"
 import type { Wave, WaveOverlap, WaveSprint } from "@shared/waves"
 import { formatCount } from "@shared/web/format-count"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { invalidate, useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import { RichText } from "@shared/web/rich-text-view"
@@ -237,13 +238,9 @@ export function WaveDetailScreen({
         badge: formatCount(wave.sprintCount),
         badgeVariant: "" as const,
       },
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: CONCEPT_ICON.activity,
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a package's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -391,29 +388,34 @@ export function WaveDetailScreen({
                     // sprint has nothing for either control to do.
                     search={
                       sprints.length > 1 && (
-                        <>
-                          <SearchInput
-                            value={sprintQuery}
-                            onChange={(e) => setSprintQuery(e.target.value)}
-                            onClear={() => setSprintQuery("")}
-                            placeholder={t("Search sprints in this wave…")}
-                            className="flex-1"
-                            aria-label={t("Search sprints in this wave")}
-                          />
-                          <SortControl
-                            options={[
-                              { value: "startsOn", label: t("Starts") },
-                              { value: "name", label: t("Name") },
-                            ]}
-                            value={sprintSort.by}
-                            onValueChange={(by) => setSprintSort({ by: by as typeof sprintSort.by, dir: "asc" })}
-                            direction={sprintSort.dir}
-                            onDirectionChange={(dir) => setSprintSort((s) => ({ ...s, dir }))}
-                            label={t("Sort by")}
-                            hideLabel
-                          />
-                        </>
+                        <SearchInput
+                          value={sprintQuery}
+                          onChange={(e) => setSprintQuery(e.target.value)}
+                          onClear={() => setSprintQuery("")}
+                          placeholder={t("Search sprints in this wave…")}
+                          className="flex-1"
+                          aria-label={t("Search sprints in this wave")}
+                        />
                       )
+                    }
+                    // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06)
+                    // — see screen-bits.tsx's `ToolbarSortSlot`. Same two
+                    // columns, same gate (more than one sprint to order), drawn
+                    // by the row now so this tab's toolbar and the Apps screen's
+                    // put the chip in the same place.
+                    sort={
+                      sprints.length > 1 && {
+                        options: [
+                          { value: "startsOn", label: t("Starts") },
+                          { value: "name", label: t("Name") },
+                        ],
+                        value: sprintSort.by,
+                        onValueChange: (by: string) =>
+                          setSprintSort({ by: by as typeof sprintSort.by, dir: "asc" }),
+                        direction: sprintSort.dir,
+                        onDirectionChange: (dir: "asc" | "desc") =>
+                          setSprintSort((s) => ({ ...s, dir })),
+                      }
                     }
                     actions={
                       <>
@@ -453,13 +455,22 @@ export function WaveDetailScreen({
                         {/* R35 — a record row carries its face. */}
                         <RecordMark name={s.name} />
                         <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => softNavigate(`${basePath}/${waveId}/sprints/${s.id}`)}
-                            className="hover:text-foreground block max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
-                          >
-                            {s.name}
-                          </button>
+                          {/* THE SPRINT'S OWN NUMBER, in front of its name — the
+                              same black chip the sprints collection and every
+                              other sprint face draw. A sprint nested here had
+                              no reference at all, so the wave was the one
+                              screen where you could see a sprint and not say
+                              which one out loud. */}
+                          <span className={REF_LEADS_NAME}>
+                            <RecordRef value={s.ref} />
+                            <button
+                              type="button"
+                              onClick={() => softNavigate(`${basePath}/${waveId}/sprints/${s.id}`)}
+                              className="hover:text-foreground block min-w-0 max-w-full truncate text-left text-sm font-medium underline-offset-2 hover:underline"
+                            >
+                              {s.name}
+                            </button>
+                          </span>
                           <p className="text-muted-foreground truncate text-xs">
                             {waveDates(s, t, lang)}
                           </p>
@@ -481,14 +492,6 @@ export function WaveDetailScreen({
                   </ul>
                 )}
               </div>
-            )
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("work", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
             )
           return <OverviewList items={overviewItems} />
         }}

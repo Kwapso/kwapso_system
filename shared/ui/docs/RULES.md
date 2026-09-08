@@ -890,6 +890,163 @@ The full list with reasoning is `manifest.json → notDelivered` and `STATUS.md`
 
 ---
 
+## 12 · Conformance — running these laws in *your* app
+
+Everything above this line is prose. Three of the rules are now **executable**,
+and they run against **your** source, not just the kit's:
+
+| Law | What it holds you to | Written in this document at |
+|---|---|---|
+| `radii` | Two radii and no third, spelled a way that does not depend on import order | §4.1, §4.2 |
+| `palette` | Every colour resolves through a token; the raw `--kw-*` ramp is tokens.css's alone | §2.2, §8.3 |
+| `borders` | A boundary is a paper step, a fill, or an inset shadow — never a CSS border | §2.7 |
+
+The kit supplies the rules. **You supply the paths, and your own reviewed
+exceptions.** Nothing about your directory layout is baked into the kit, and
+nothing about the kit's is baked into your build.
+
+### 12.1 Adopting it — four steps, the last one optional
+
+**1 · Vendor a kit tag that has it.** `foundations/rules/` ships inside
+`foundations/`, so any sync script that already copies `foundations` gets it
+with no change. Confirm it arrived:
+
+```bash
+ls shared/ui/foundations/rules/          # conformance.mjs, radii.mjs, palette.mjs, borders.mjs, source.mjs
+```
+
+**2 · Run it over your own source.** Name the directories a person's UI is
+written in. Do **not** name the vendored kit — it is pinned, and it is checked
+upstream by the tag you pinned.
+
+```bash
+node shared/ui/foundations/rules/conformance.mjs \
+     web/components web/app web/lib web-portal/components shared/web
+```
+
+Exit `0` means every law passed, nothing was blind, and no exception has rotted.
+Exit `1` names each finding with a file, a line, and the remedy.
+
+**3 · Record your exceptions as data, in your own repo.** The kit cannot know
+which of your components have a real claim to a stroke or a fixed colour, and
+it must not: `shared/ui/` is a dependency, and an app that edits it fails its
+own vendored-kit hash. So exceptions live in a JSON file **you** own, in
+**your** diff:
+
+```jsonc
+// web/test/kit-conformance.json
+[
+  {
+    "law": "palette",
+    "where": "shared/web/google-sign-in.tsx",   // a path SUFFIX
+    "what": "#",                                 // a substring of the finding, or "*"
+    "why": "Google's own mark, whose four colours are fixed by their brand terms; a sign-in button that recolours their G is a terms violation, not a theming win."
+  }
+]
+```
+
+```bash
+node shared/ui/foundations/rules/conformance.mjs \
+     --exemptions web/test/kit-conformance.json \
+     web/components web/app web/lib web-portal/components shared/web
+```
+
+`why` must be a sentence, not a label — a `why` under 24 characters is refused
+outright. **Every entry is rot-checked in both directions:** an entry whose file
+is gone is *dead*, an entry whose file no longer commits the violation is
+*spent*, and both turn the run red with *delete this line* as the remedy. The
+list can only ever shrink.
+
+**4 · Wire it into your build,** beside your other gates:
+
+```jsonc
+"check:kit": "node shared/ui/foundations/rules/conformance.mjs --exemptions web/test/kit-conformance.json web/components web/app web/lib web-portal/components shared/web"
+```
+
+**Optional:** `--law radii|palette|borders` runs one law alone, which is how to
+adopt them one at a time rather than all at once.
+
+### 12.2 What it needs from you: nothing
+
+No dependency, no build step, no config file, no plugin. It is Node builtins
+reading `.ts`/`.tsx` text, and it finds `tokens.css` beside itself. That is a
+deliberate constraint, not a boast: inside your repo this code sits in a
+vendored directory with no `package.json` and no `node_modules`, and anything
+it needed that was not already there would make the seam theoretical.
+
+### 12.3 If a law is wrong, say so — do not switch it off
+
+Each law's file opens with what it checks, what it deliberately does **not**
+check, and the argument for both. The `radii` law's header records a clause
+that was written, produced 24 findings, and was then **deleted** because §4.1
+blesses both spellings and the clause was legislating past the rulebook. That
+is the shape of the conversation to have. Deleting a call site to get a build
+green removes the only thing that would have told the next person.
+
+---
+
+## 13 · What the kit owns, and what it does not
+
+The kit is becoming the only UI/UX input for other applications. This section
+is the boundary of that claim, because *"the kit is the only input"* is a
+promise about a scope, and a promise without a scope is how the second app
+ends up re-litigating the first app's decisions.
+
+The first consuming app, `kwapso_system`, enforces **55 machine-checked laws**
+(`RULES.md`, `shared/rules/registry.ts`). They divide three ways, and the
+counts are exact.
+
+**A · The kit's own vocabulary, checkable HERE with no app at all — 3 of the
+55.** `R31` two radii, `R32` the closed palette, `R51` the aside collapse
+(whose check already reads `shared/ui/compositions/templates/screen-shell.tsx`
+and `shared/ui/foundations/motion/motion.css` — kit files, read from a
+consumer's test suite, which is the clearest possible sign of a law living in
+the wrong repository). **R31 and R32 are now implemented here (§12) and should
+be DELETED from the app rather than left to disagree with these.** `R51` should
+follow, and needs no seam: its whole subject is kit source.
+
+The kit also carries rules the app has no twin for, and they are the reason
+this list is not just three: the **contrast law** (implemented), the **boundary
+law** (§2.7, implemented here, enforced nowhere before now), the **`--kw-*`
+ramp** clause (§8.3, folded into `palette`), and four that remain prose —
+`px`-freedom (§1.1), strings-as-props (§7.1), one-motion-class (§6.1) and
+no-colour-only-in-a-media-query (§2.1). **This group is what a second app
+inherits for free.**
+
+**B · The kit's vocabulary, but the subject is YOUR source — 13 of the 55.**
+`R2` (a record detail's strip is the library's), `R3` (no hand-rolled toggles),
+`R4` (FormShell), `R29` (one page width), `R35` (a chooseable thing carries its
+visual), `R39` (no app imports a UI package), `R45`/`R46` (every composition and
+component is adopted or refused for a stated reason), `R48`/`R49`/`R50`/`R53`
+(the toolbar's search, its gap, its emptiness, its slot set), `R52` (one title
+treatment). The kit owns the *rule*; it cannot check it against itself, because
+the subject is which of the kit's parts *you* reached for. §12's seam is the
+shape all thirteen should take. **Two of these name a real kit gap rather than
+an app fault:** `R52` exists because the kit's `Title` has no h1 rung, and the
+toolbar four exist because the kit ships no `ToolbarRow` and the app built one.
+
+**C · Your architecture, and none of the kit's business — 39 of the 55.** All
+21 `arch` laws, all 6 `ai` laws, the 1 `workflow` law, and 11 `ui` laws whose
+subject is the product rather than its surface (`R6`, `R7`, `R8`, `R16`, `R25`,
+`R28`, `R33`, `R34`, `R38`, `R44`, `R54`). Paging and cursors, permission gates,
+account fences, tenancy partitions, i18n catalogues, activity feeds, idempotent
+transitions, reference formulas, agent/MCP parity, email censuses, stored-file
+reachability. **A second app must write its own, and must not expect the kit to
+help** — a design kit that knew what a permission gate was would be breaking
+§9.5 to do it.
+
+The line between B and C is the useful one, and it is simple: **if the law's
+sentence still makes sense with the product's nouns removed, it is the kit's.**
+"Every collection screen draws its toolbar's search box unless a reasoned entry
+says otherwise" survives that test. "A door on the agency's own material refuses
+a client login" does not, and never will.
+
+**So the honest scope of *"the kit is the only UI input"* is A plus B: 16 of 55
+laws today, of which 4 are executable.** The other 39 are the second app's own
+work, and saying so is the point of this section.
+
+---
+
 ## Appendix · The rejection list, in one screen
 
 Copy this into a review checklist.

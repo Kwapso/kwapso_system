@@ -67,6 +67,13 @@ export type WaveSprint = {
   id: string
   waveId: string | null
   accountId: string | null
+  /** THE SPRINT'S OWN REFERENCE — `S0012`, minted team-wide by
+   * `shared/workers/refs.ts`. Here because a sprint nested on a wave's screen
+   * is still a sprint's FACE (R35) and wears the same black chip in front of
+   * its name that it wears in the sprints collection; without it the wave was
+   * the one screen where you could see a sprint and not say which one out loud.
+   * Null on a sprint with no client, like every other kind's. */
+  ref: string | null
   name: string
   startsOn: string | null
   endsOn: string | null

@@ -72,6 +72,11 @@ const audit: InviteAudit = {
 const ticket: HelpTicket = {
   id: "h1",
   helpType: "Bug",
+  // WHAT IT ARRIVED AS — stamped at creation and never updated (team migration
+  // 0065). Different from `helpType` above on purpose: this fixture is a ticket
+  // somebody raised as a question and triage recorded as a bug, which is the
+  // only state of the pair worth pinning in a shape test.
+  raisedAsType: "Question",
   description: "The invite button is greyed out and I can't add anyone to the team at all.",
   screenRecordingLink: null,
   sourceScreen: "members",
@@ -111,6 +116,11 @@ const ticket: HelpTicket = {
   archivedAt: null,
   titleDe: null,
   titleEn: null,
+  // R54: staff-raised and staff-edited, which is the majority case — staff raise
+  // a client's questions for them (SCOPE ch.07). Both false means both names are
+  // shown by first name alone.
+  raiserIsClient: false,
+  editorIsClient: false,
 }
 
 const meta: TeamMeta = {
@@ -127,6 +137,9 @@ const activity: ActivityItem[] = [
     type: "Member role changed",
     description: "Alaap changed Bo's role to Editor",
     actorName: "Alaap",
+    // R54: staff, so the screen shows the first name alone. A contact who acted
+    // through the portal lands in this same feed and is named in full.
+    actorIsClient: false,
     createdAt: "2026-06-14T09:00:00.000Z",
     // The row says WHICH KIND of thing happened and WHICH DOOR it came through.
     // Both are nullable on the type because rows written before the columns
@@ -159,8 +172,28 @@ describe("shapeActivity", () => {
     expect(row).toHaveProperty("timestamp")
   })
 
+  // UNDEFINED, NOT "". R54's trim runs through `staffNameFromSnapshot`, which
+  // answers "" for a row with no actor, and `?? undefined` let that empty string
+  // straight through — `??` catches null and undefined and an empty string is
+  // neither. It has to be `|| undefined`, and the difference is not cosmetic:
+  // the kit draws this field as `aria-label={item.actor}` on the avatar fallback
+  // (shared/ui/components/activity-feed/activity-feed.tsx), and an EMPTY
+  // aria-label is not an absent one — it overrides the initials underneath it
+  // with nothing, so a screen reader meets an unnamed element where it would
+  // otherwise have read the "?" mark the case below asserts.
   it("leaves actor undefined when actorName is null", () => {
     const [row] = shapeActivity([{ ...activity[0], actorName: null }], "en")
+    expect(row.actor).toBeUndefined()
+    // Not "" — see above. Asserted separately because `toBeUndefined` is the
+    // one thing an empty string would also satisfy if this ever became a
+    // truthiness check.
+    expect(row.actor).not.toBe("")
+  })
+
+  it("leaves actor undefined for a blank actor snapshot too", () => {
+    // A system write can store "" rather than null, and the trim answers "" for
+    // both. The same empty aria-label, reached by the other road.
+    const [row] = shapeActivity([{ ...activity[0], actorName: "   " }], "en")
     expect(row.actor).toBeUndefined()
   })
 
@@ -184,7 +217,9 @@ describe("shapeMembersList", () => {
   it("maps userId→id, name via personName, and a 'role · joined …' detail", () => {
     const { rows } = shapeMembersList([member], "en")
     expect(rows?.[0].id).toBe("u1")
-    expect(rows?.[0].name).toBe("Alaap Kanchwala")
+    // R54 — the member list is our own people, and `personName` reads
+    // `first_name` straight off the structured pair, so this is the EXACT trim.
+    expect(rows?.[0].name).toBe("Alaap")
     expect(String(rows?.[0].detail)).toContain("Admin")
     expect(String(rows?.[0].detail)).toContain("joined")
   })
@@ -263,7 +298,9 @@ describe("shapeMemberDetail", () => {
   it("shapes the record fields and a shaped activity set", () => {
     const data = shapeMemberDetail(member, activity, "en")
     expect(data.record?.id).toBe("u1")
-    expect(data.record?.name).toBe("Alaap Kanchwala")
+    expect(data.record?.name).toBe("Alaap") // R54, via `personName`
+    // The EMAIL is untouched: it is an address, not a name, and the heading
+    // beside it is the only thing the ruling shortened.
     expect(data.record?.email).toBe("alaap@x.com")
     expect(data.record?.role).toBe("Admin")
     expect(data.record).toHaveProperty("joined")
@@ -277,7 +314,10 @@ describe("shapeInviteDetail", () => {
     expect(data.record?.id).toBe("i1")
     expect(data.record?.email).toBe("guest@x.com")
     expect(data.record?.status).toBe(INVITE_STATUS.pending)
-    expect(data.record?.invitedBy).toBe("Alaap Kanchwala")
+    // R54 through the SNAPSHOT path — `audit.inviterName` is the frozen
+    // "First Last" the invite stored, so `staffNameFromSnapshot` takes the
+    // first token. Whoever sent an invite is one of ours by construction.
+    expect(data.record?.invitedBy).toBe("Alaap")
     expect(data.sets?.activity?.[0].id).toBe("a1")
   })
 
@@ -306,7 +346,9 @@ describe("shapeTeamDetail", () => {
     expect(data.record?.id).toBe("t1")
     expect(data.record?.name).toBe("Acme")
     expect(data.record?.image).toBe("")
-    expect(data.record?.createdBy).toBe("Alaap Kanchwala")
+    // R54, snapshot path again — `meta.creatorName`. A team is created by
+    // staff; a client login cannot reach the form that makes one.
+    expect(data.record?.createdBy).toBe("Alaap")
     expect(data.record?.updated).toBe("—") // meta.updatedAt is null
     expect(data.sets?.activity?.[0].id).toBe("a1")
   })

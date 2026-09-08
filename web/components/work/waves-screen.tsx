@@ -66,6 +66,7 @@ import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
 import { formatDate, formatMonth } from "@shared/web/format"
 import { RecordMark } from "@shared/web/record-mark"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
@@ -482,9 +483,17 @@ export function WaveCollection({
                     picture of its own, so this is its initial. */}
                 <RecordMark name={w.name} />
                 <div className="min-w-0 flex-1 basis-[12rem]">
-                  <InAppLink href={`${basePath}/${w.id}`} className="block truncate text-sm font-medium">
-                    {w.name}
-                  </InAppLink>
+                  {/* THE NUMBER IN FRONT OF THE NAME (`RecordRef`, the one black
+                      chip in the product). A wave mints a reference
+                      unconditionally — its account is mandatory — and until now
+                      it appeared on the wave's own screen and on no list you
+                      could reach it from. */}
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={w.ref} />
+                    <InAppLink href={`${basePath}/${w.id}`} className="block min-w-0 truncate text-sm font-medium">
+                      {w.name}
+                    </InAppLink>
+                  </span>
                   <p className="text-muted-foreground truncate text-xs">
                     {[
                       w.accountName,

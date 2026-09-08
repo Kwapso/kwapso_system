@@ -239,7 +239,7 @@ addition."* Mango cannot take the job — "mango is never a status" is a named b
 So the question is what the app actually MEANS by warning, and it turns out to
 mean two things:
 
-1. **"Nothing moves until somebody outside answers."** `awaiting_validation` on the ticket stepper and the portal's "Waiting for your go-ahead" pill. The code says so in as many words: *"the single stage where nothing will happen until somebody outside this building answers"*.
+1. **"Nothing moves until somebody outside answers."** Until 7 Sep 2026 this was `awaiting_validation` on the ticket stepper and the portal's "Waiting for your go-ahead" pill, described in the code as *"the single stage where nothing will happen until somebody outside this building answers"*. The client retired that stage; the MEANING survived it and is now the Open board's Waiting column, a predicate over the ticket's conversation rather than a stored stage (`waitingDotTone()`, `shared/status-tones.ts`).
 2. **"Work is happening."** `in_progress` and `in_review` on the two steppers.
 
 The kit answers both without inventing anything, in its own pill vocabulary:

@@ -1,7 +1,10 @@
 "use client"
 
-// ONE MEETING, as a tabbed record: Notes / Overview / Activity (the standard
-// every record gets, R2).
+// ONE MEETING, as a tabbed record: Notes / Overview (plus Guests and Work logs
+// where the meeting has them). Its history is not a tab any more — it is
+// reached from the ink footer's Latest activity column, on the client's
+// 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the ruling and
+// the argument.
 //
 // NOTES IS THE FIRST TAB, not Overview, and that is the whole argument for this
 // module existing. Somebody opening a meeting from six months ago is not looking
@@ -49,7 +52,6 @@ import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
 import { OverviewList } from "@/components/records/overview-list"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
-import { ActivityPanel } from "@/components/records/activity-panel"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
 import { useConfirm } from "@shared/web/use-confirm"
@@ -195,8 +197,8 @@ export function MeetingDetailScreen({
     primeCache(`meeting:one:${meetingId}`, next)
     const cur = meetingsQ.data
     if (cur) primeCache(meetingsKey(teamId), cur.map((m) => (m.id === meetingId ? next : m)))
-    // The Activity tab's rows AND its badge come from one fetcher, so dropping
-    // the key re-primes both.
+    // The footer's Latest activity rows AND the total come from one fetcher, so
+    // dropping the key re-primes both.
     invalidate(recordActivityKey("meetings", meetingId))
   }
 
@@ -367,13 +369,9 @@ export function MeetingDetailScreen({
             },
           ]
         : []),
-      {
-        value: "activity",
-        label: t("Activity"),
-        icon: "clock-counter-clockwise",
-        badge: formatCount(activity.total),
-        badgeVariant: "" as const,
-      },
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a meeting's history
+      // is reached from the ink footer's Latest activity column now, and opens in
+      // a slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
     ],
   }
 
@@ -549,14 +547,6 @@ export function MeetingDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
-          if (panel.value === "activity")
-            return (
-              <ActivityPanel
-                activity={activity}
-                onAddNote={can("meetings", "create") ? activity.addNote : undefined}
-                notePlaceholder={t("Add a note")}
-              />
-            )
           if (panel.value === "time")
             return (
               <WorkLogsPanel
@@ -605,7 +595,18 @@ export function MeetingDetailScreen({
                   The AGENDA is never editable here — it is set beforehand, on
                   the edit page, which is the other half of the same rule. */}
               <section className="flex flex-col gap-2">
-                <h2 className="text-muted-foreground text-sm font-medium">{t("Notes")}</h2>
+                {/* The heading IS the editor's label — `aria-labelledby` below
+                    points at this id. The only editor on either front door that
+                    sits outside a `Field`, so it is the only one whose name has
+                    to be borrowed from the words already on the screen rather
+                    than from a field config. A static id is safe here: this
+                    screen resolves ONE meeting (`item` above), never a list. */}
+                <h2
+                  id="meeting-notes-heading"
+                  className="text-muted-foreground text-sm font-medium"
+                >
+                  {t("Notes")}
+                </h2>
                 {canEdit && item.active ? (
                   <>
                     {/* Uncontrolled, and keyed on the row's ID — which does NOT
@@ -618,6 +619,14 @@ export function MeetingDetailScreen({
                         claim the opposite; the key never did it. */}
                     <Notes
                       key={item.id}
+                      aria-labelledby="meeting-notes-heading"
+                      // Only while the NOTES are saving. `busy` on this screen
+                      // names which action is in flight, and a rename or a
+                      // status move happening elsewhere is no reason to take
+                      // the caret out of a paragraph somebody is mid-sentence
+                      // in — the loss this guards against is a save that has
+                      // already read the value it is posting.
+                      disabled={busy === "notes"}
                       defaultValue={item.notes ?? ""}
                       onChange={(html) => setNotesDraft(html)}
                       placeholder={t("Type as you go, this is the part worth keeping.")}

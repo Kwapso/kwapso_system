@@ -237,7 +237,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **276 doors, 218 with a tool, 58 with a written reason**, the
+  red build. Today: **279 doors, 217 with a tool, 62 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE doors of the direct upload (permission to PUT a file, which hands
@@ -258,12 +258,17 @@ Today it covers:
   that spend the team's AI allowance outside a chat turn (translating a ticket's
   title, and translating a screen's human-typed text for the reader looking at
   it), one
-  invite's audit trail, the cross-module activity feed, and the two
+  invite's audit trail, the cross-module activity feed, the tickets
+  DASHBOARD door — five groupings of the ticket list assembled for five charts,
+  every one of which `query_records` already answers better with `groupBy` (type
+  × status, client × type, by app, and the raised-as × current-type matrix over
+  the `raisedAsType` field), so a tool here would be a rigid duplicate of a
+  general one — and the two
   record-counts doors, one per worker, which bundle a record's child totals so a
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
   through `list_apps`, `list_processes`, `list_sprints`, `list_stories`,
-  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 218, **194 are on THIS surface** and 24 are the in-app assistant's
+  `list_todos`, `list_help_tickets` and `list_meetings`. Of the 217, **193 are on THIS surface** and 24 are the in-app assistant's
   alone: the twenty-one Google doors (the twenty `google_` tools plus the
   connections list), the two confirm-panel bulk writes and the role
   permission matrix read, each reasoned in §3.
@@ -402,7 +407,7 @@ Today it covers:
     figures live in cannot be reached from any door the portal opens. (R24, not R23 —
     R23 is the knowledge base's citation law.)
   - tickets, `create_help_ticket`, `update_help_ticket`, `set_help_status`,
-    `validate_help_ticket`, `triage_help_ticket`, `resolve_help_ticket`,
+    `triage_help_ticket`, `resolve_help_ticket`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
     `add_help_stakeholder`, plus the three that carry the files and links on a
     ticket: `list_help_attachments`, `add_help_link` and
@@ -415,19 +420,25 @@ Today it covers:
     ticket away without deleting anything; read them back with
     `list_help_tickets` and `view: 'archived'`.
 
-    **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the seven
-    stages are now reached by something HAPPENING rather than by anybody choosing
-    them: `scheduled` when the work on a request lands in a sprint, `in_progress`
-    when a timer starts on the ticket or on one of its stories, `ready` when the
-    last story closes, `resolved` only through `resolve_help_ticket`, and
-    `awaiting_validation` at birth for the kinds that wait. So `set_help_status`
-    is a CORRECTION rather than the ordinary path, and it **will not accept
-    `resolved`** — nor will either bulk — because answering a client means sending
-    words, and a value in a dropdown carries none. The two stages a person still
-    decides have doors of their own: `validate_help_ticket` (the client confirms
-    an extra, a request or a piece of feedback — a question or an issue never
-    waits) and `triage_help_ticket` (somebody has read it). Both are idempotent by
-    construction: a second call moves nothing.
+    **A STATUS IS A FACT HERE, NOT A SWITCH** (17 Aug 2026). Five of the six
+    stages are reached by something HAPPENING rather than by anybody choosing
+    them: `new` at birth, `scheduled` when the work on a request lands in a
+    sprint, `in_progress` when a timer starts on the ticket or on one of its
+    stories, `ready` when the last story closes, and `resolved` only through
+    `resolve_help_ticket`. So `set_help_status` is a CORRECTION rather than the
+    ordinary path, and it **will not accept `resolved`** — nor will either bulk —
+    because answering a client means sending words, and a value in a dropdown
+    carries none. The one stage a person still decides has a door of its own:
+    `triage_help_ticket` (somebody has read it), idempotent by construction, so a
+    second call moves nothing.
+
+    It was seven stages and two such doors until 7 Sep 2026, when the client
+    retired `awaiting_validation` — the stage an extra, a request or a piece of
+    feedback opened in while it waited for that client to confirm it. Its door,
+    `validate_help_ticket`, went with it. **If you have an integration calling
+    that tool, it no longer exists**; there is nothing to replace it with,
+    because there is nothing left to confirm — a ticket is in the queue from the
+    moment it is raised.
   - the work engine, stories and sprints, `create_story`, `update_story`,
     `set_story_status` (`work:create` / `work:edit`), `create_sprint`,
     `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat

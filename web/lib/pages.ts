@@ -493,6 +493,48 @@ export const CONCEPT_ICON = {
   // idea). Distinct from `overview`'s "squares-four" — that one is a
   // RECORD's own summary tab; this is a chart.
   dashboard: "chart-donut",
+  // THE TWO STAGE TABS on the ticket strip — client, 2026-09-06: "open and
+  // closed also need icons: for open the hourglass-high (solid), for closed
+  // check-fat (solid)."
+  //
+  // A LINE HERE RATHER THAN A NAME AT THE TAB, the same argument `triage` and
+  // `dashboard` above make: open work and finished work are ideas, not one
+  // screen's decoration, and the day a second collection grows the same pair of
+  // stages it must reach for these instead of picking a second glyph for one
+  // idea. `web/test/icon-vocabulary.test.ts` builds its allow-list from these
+  // keys, so a name typed at a call site is not merely untidy — it is unlisted.
+  //
+  // HOURGLASS-HIGH, not the plain hourglass: the sand is still at the top,
+  // which is the state — triaged, and none of the work done yet. Its own family
+  // (high/medium/low) is the reason the kit carries four of them.
+  open: "hourglass-high",
+  /* THE TWO TABS THE CLIENT ADDED ON 2026-09-06 — "add new tab: waiting (this is
+     when we are waiting sth from the customer)" and "add another tab: ready /
+     will do split view and list / between triage and open".
+
+     A LINE HERE RATHER THAN A NAME AT THE TAB, the fourth time this file makes
+     the same argument (see `triage`, `dashboard` and the pair above): these are
+     stages of work, not one strip's decoration, and `web/test/icon-vocabulary.
+     test.ts` builds its allow-list from these keys — so a glyph chosen at a call
+     site is not merely untidy, it is unlisted and draws nothing.
+
+     READY IS A PAPER PLANE, and that is the state said exactly: every story on
+     the ticket is closed and NOBODY HAS SENT IT YET. The work is written and
+     waiting to go out. Deliberately not a tick — `closed` below is `check-fat`
+     and `ready` is the pile immediately before it, so two ticks side by side
+     would be the one distinction on this strip that has to be legible.
+
+     WAITING IS A CLOCK WITH A PERSON ON IT, which is the whole of the client's
+     own definition: "waiting means there's a message from us, pending answer
+     from customer". Time is passing and it is passing on SOMEBODY ELSE'S side —
+     which is the fact that separates it from `open`'s hourglass, where the time
+     is ours. A second hourglass would have said "later than open", which is not
+     what this tab means: Waiting is a SUBSET of Open, not a stage after it. */
+  ready: "paper-plane-tilt",
+  waiting: "clock-user",
+  // CHECK-FAT rather than the hairline check: this ends a row of stages and has
+  // to read at tab size beside a word, where the thin glyph goes to nothing.
+  closed: "check-fat",
   import: "upload-simple",
   activity: "clock-counter-clockwise",
   // The agency's own housekeeping: the material we make our own work with, why
@@ -503,8 +545,18 @@ export const CONCEPT_ICON = {
 } as const
 
 
-/** A breadcrumb step. `href` omitted = the current (non-link) page. */
-export type Crumb = { label: string; href?: string }
+/** A breadcrumb step. `href` omitted = the current (non-link) page.
+ *
+ * `closeKey` IS THE WORKSPACE-TAB HALF, and it is optional because the two
+ * things this strip can be drawing are genuinely different facts. A TRAIL step
+ * (`buildCrumbs`, deep-link/crumbs.ts) is derived from the address and cannot
+ * be closed — there is nothing to close, it is just where you are. An OPEN TAB
+ * (web/lib/workspace-tabs.ts) is a place somebody is holding, and holding it is
+ * a decision they must be able to reverse; the key is that tab's own address,
+ * which is what `onCloseCrumb` is handed back. A crumb with no `closeKey` draws
+ * exactly as it always has — which is what the phone, and every screen while
+ * the tab set is still empty, gets. */
+export type Crumb = { label: string; href?: string; closeKey?: string }
 
 /** Is `path` the active nav destination for the current `pathname`? */
 export function isNavActive(path: string, pathname: string): boolean {

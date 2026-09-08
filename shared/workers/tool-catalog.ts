@@ -385,10 +385,10 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
-      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `moduleId` narrows to one SECTION of that system, the modules an app is divided into (list_app_modules gives their ids). `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one stage of the lifecycle, 'awaiting_validation', 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved'. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. `byAccount` is the same tally per CLIENT — `accountId`, `accountName`, `open` and `total` — already sorted with the most open first, so 'which client has the most open tickets' is the first entry and needs no counting of your own. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `moduleId` narrows to one SECTION of that system, the modules an app is divided into (list_app_modules gives their ids). `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one or more stages of the lifecycle — 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved' — comma-separated for several at once, so 'triaged,scheduled,in_progress' is every ticket that has been sorted and is not finished. `waiting`: 'only' keeps just the tickets whose LAST reply came from the agency's side, i.e. the ones where a client owes us an answer; it is not a stage and stores nothing, it is worked out from the conversation each time you ask, so combine it with `status` to say which stages you mean. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. `byAccount` is the same tally per CLIENT — `accountId`, `accountName`, `open` and `total` — already sorted with the most open first, so 'which client has the most open tickets' is the first entry and needs no counting of your own. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
     schema: obj({
-      scope: S, view: S, q: S, accountId: S, appId: S, moduleId: S, helpType: S, status: S, id: S,
+      scope: S, view: S, q: S, accountId: S, appId: S, moduleId: S, helpType: S, status: S, waiting: S, id: S,
       sort: S, dir: S, cursor: S,
     }),
     buildQuery: (i) => {
@@ -399,6 +399,11 @@ export const SHARED_TOOLS: SharedTool[] = [
       if (str(i, "moduleId")) q.push(`moduleId=${encodeURIComponent(str(i, "moduleId"))}`)
       if (str(i, "helpType")) q.push(`helpType=${encodeURIComponent(str(i, "helpType"))}`)
       if (str(i, "status")) q.push(`status=${encodeURIComponent(str(i, "status"))}`)
+      // R19 — the door grew this filter, so the tool offers it and forwards it
+      // unchanged. The door reads exactly one word here ("only"); anything else
+      // is the same as not asking, and it is passed through rather than
+      // second-guessed so the door stays the one place that decides.
+      if (str(i, "waiting")) q.push(`waiting=${encodeURIComponent(str(i, "waiting"))}`)
       // Forwarded only when the caller asked for the archive: the door defaults
       // to the live list, and sending `view=live` on every call would be noise
       // the model has to keep re-reading.
@@ -741,7 +746,7 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
     summary:
-      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. A ticket whose kind is an extra, a request or feedback opens `awaiting_validation` and waits for that client's main stakeholder to confirm it; a question or an issue opens `new` and goes straight into the queue. GIVE IT A TITLE: `titleDe` and `titleEn` are the two titles a ticket carries, and neither is derived from the other — write the one you have in the language it was asked in, and the other when you have it. A ticket with neither is what a person sees at the top of their list with no name on it.",
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. Every ticket opens in `new` and goes straight into the queue, whatever its kind. GIVE IT A TITLE: `titleDe` and `titleEn` are the two titles a ticket carries, and neither is derived from the other — write the one you have in the language it was asked in, and the other when you have it. A ticket with neither is what a person sees at the top of their list with no name on it.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
     schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["description"]),
     // accountId is read in lib/help.ts, not in the handler, so R22's source scan
@@ -798,26 +803,24 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_help_status",
     summary:
-      "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch, five of the seven stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: awaiting_validation (an extra, a request or feedback, waiting for the client's main stakeholder, clear it with validate_help_ticket), new (raised, nobody has read it), triaged (somebody read it. Set by triage_help_ticket), scheduled (its work is booked into a sprint, happens by itself), in_progress (a timer started on it or on one of its stories, happens by itself), ready (every story closed, happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened, there is no separate reopened state.",
+      "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch, five of the six stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: new (raised, nobody has read it), triaged (somebody read it. Set by triage_help_ticket), scheduled (its work is booked into a sprint, happens by itself), in_progress (a timer started on it or on one of its stories, happens by itself), ready (every story closed, happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened, there is no separate reopened state.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/status",
     schema: obj({ id: S, status: S }, ["id", "status"]),
     buildBody: (i) => ({ id: str(i, "id"), status: str(i, "status") }),
     agent: { write: true, confirm: false, summarize: (i) => `Set ticket ${str(i, "id")} to "${str(i, "status")}"` },
   },
   {
-    // The two acts on the ladder a machine cannot infer. Everything else about a
-    // ticket's status now happens by itself, so these are doors with their own
-    // words rather than values in a status picker — and each is idempotent by
+    // THE ONE ACT ON THE LADDER A MACHINE CANNOT INFER. Everything else about a
+    // ticket's status now happens by itself, so this is a door with its own word
+    // rather than a value in a status picker — and it is idempotent by
     // construction, so a second call moves nothing.
-    name: "validate_help_ticket",
-    summary:
-      "The client CONFIRMS they want it: moves one ticket out of awaiting_validation and into the queue, by `id`. Only an extra, a request or feedback ever waits, a question or an issue goes straight in. A ticket in any other stage moves nothing, so this is safe to call twice.",
-    binding: "CONTENT", method: "POST", path: "/api/content/help/validate",
-    schema: obj({ id: S }, ["id"]),
-    buildBody: (i) => ({ id: str(i, "id") }),
-    agent: { write: true, confirm: false, summarize: (i) => `Confirm ticket ${str(i, "id")} should go ahead` },
-  },
-  {
+    //
+    // IT WAS TWO UNTIL 7 SEP 2026. `validate_help_ticket` — "the client confirms
+    // they want it" — stood here beside it, and went with the
+    // `awaiting_validation` stage it moved tickets out of when the client
+    // retired that stage (shared/types.ts, `HELP_STATUSES`). Its door is gone
+    // too, so leaving the tool would have described a capability the app no
+    // longer has, which is exactly the divergence R9 exists to prevent.
     name: "triage_help_ticket",
     summary:
       "Record that somebody has READ a ticket, by `id`, the one judgement in the lifecycle nothing can infer. Moves it from new to triaged; a ticket already triaged, scheduled or being worked on moves nothing, so this never drags a started request backwards.",

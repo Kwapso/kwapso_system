@@ -26,6 +26,7 @@ import {
 
 import { dataOps, type UsageLogRow } from "@/lib/api"
 import { nameInitials } from "@/lib/identity"
+import { staffNameFromSnapshot } from "@shared/staff-name"
 import { formatActivityWhen } from "@shared/web/format"
 import { useT } from "@shared/web/language"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -70,7 +71,9 @@ export function AgentUsageDialog({
   const items: ActivityFeedItem[] = (rows ?? []).map((row) => ({
     id: row.id,
     description: rowDescription(row),
-    actor: row.actorName ?? undefined,
+    // R54: the assistant is an agency tool — there is no agent door on the
+    // portal — so whoever spent these credits is one of ours.
+    actor: staffNameFromSnapshot(row.actorName) || undefined,
     initials: nameInitials(row.actorName),
     time: formatActivityWhen(row.createdAt),
   }))

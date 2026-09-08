@@ -175,6 +175,12 @@ const ticket: HelpTicket = {
   doneStoryCount: 0,
   raiserId: "u1",
   raiserName: "Aurora Thalassa",
+  // R54 — which population each stored name belongs to. A colleague raised this
+  // one, so both flags are false and the screen shows a first name.
+  raiserIsClient: false,
+  editorIsClient: false,
+  // What it arrived as, before triage said what it is.
+  raisedAsType: "Question",
   editorName: null,
   moduleId: null,
   moduleName: null,

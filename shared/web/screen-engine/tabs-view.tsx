@@ -352,7 +352,7 @@ export type FolderTabStrip = {
    `--tab-content-gap` is padding on this same box, so the gap below the tabs
    takes the corrected colour with it. */
 export const STICKY_FOLDER_TABS =
-  "bg-[var(--surface-raised)] sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
+  "bg-surface-raised sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place
@@ -454,8 +454,33 @@ const LINE_ACTIVE_MATCH =
  * reaches for, so the pairing is Light/Medium everywhere a tab strip renders,
  * never a third, invented step. App-side, not a kit edit, for the same R39
  * reason as `LINE_ACTIVE_MATCH` above. */
-const TAB_RESTING_WEIGHT =
-  "[&_[data-slot=tabs-trigger][data-state=inactive]]:!font-[var(--font-weight-normal)]"
+const TAB_RESTING_WEIGHT = cn(
+  "[&_[data-slot=tabs-trigger][data-state=inactive]]:!font-[var(--font-weight-normal)]",
+  /* AND THE HOVER THE LINE ABOVE WAS ACCIDENTALLY KILLING. Client,
+     2026-09-06: "in line tabs, when i hover i want change in weight, same
+     weight as active (no change in color)" — which the KIT already does, and
+     has done since her 2026-09-02/09-03 rulings: `TRIGGER_SKIN` carries
+     `enabled:hover:font-[var(--font-weight-medium)]`, weight as the only
+     hover signal, colour untouched.
+
+     It never reached these tabs. The resting rule above is `!important`,
+     because it had to beat an unset weight that was silently resolving to
+     the Medium face — and `!important` beats the kit's ordinary hover
+     declaration too. So every strip drawn through this view had a hover
+     state that could not fire, on every screen, while the kit's own demo
+     showed it working. That is why she is asking for a thing that was
+     already ruled twice.
+
+     Restored rather than reimplemented: the same token the kit reaches for
+     (`--font-weight-medium`), so the pairing stays the two named faces
+     Light/Medium and no third step is invented. It wins on SPECIFICITY, not
+     on order — `[data-slot][data-state]:hover` is three compound conditions
+     against the resting rule's two, and both being `!important` the more
+     specific one applies. `:hover` is a pointer signal only; the focus ring
+     and the selected state remain the signals a touch or keyboard reader
+     gets, exactly as the kit's own comment sets out. */
+  "[&_[data-slot=tabs-trigger][data-state=inactive]:hover]:!font-[var(--font-weight-medium)]",
+)
 
 export function TabsView({
   config,

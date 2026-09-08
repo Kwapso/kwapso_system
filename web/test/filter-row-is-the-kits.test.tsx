@@ -511,7 +511,11 @@ describe("the app's filter row is the design kit's", () => {
     // should be same as background of content body"): the container's fill
     // matches the CARD it sits in (`--surface-raised`), not the page ground
     // (`bg-background`) — the two coincide in light mode only.
-    expect(column!.className).toContain("bg-[var(--surface-raised)]")
+    // THE NAMED CLASS, not `bg-[var(--surface-raised)]`: same colour, but only
+    // the named one is in the kit's `--btn-secondary-fill` rebind list, and the
+    // arbitrary form left every control inside this container invisible against
+    // it (see web/test/ground-classes-are-named.test.ts).
+    expect(column!.className).toContain("bg-surface-raised")
     expect(column!.className, "collapsed reads as the pill every other toolbar wears").toContain(
       "rounded-pill"
     )
@@ -576,7 +580,7 @@ describe("the app's filter row is the design kit's", () => {
     expect(
       column!.className,
       "the merged container still owns the single background in the open state"
-    ).toContain("bg-[var(--surface-raised)]")
+    ).toContain("bg-surface-raised")
     expect(
       column!.className,
       "a panel is open — the container must switch to the box radius"
