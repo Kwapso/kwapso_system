@@ -51,6 +51,7 @@ import {
   OPS_SIGNATURE_CAP,
 } from "@shared/workers/limits"
 import { foldSignature, SIGNATURE_SQL } from "@shared/workers/error-signature"
+import { MEASUREMENT_SOURCES } from "@shared/workers/error-log"
 import { sendBrandedEmail } from "@shared/workers/notify"
 import { aiCostUsd, usd } from "@shared/workers/pricing"
 import { brand } from "@shared/brand"
@@ -125,6 +126,26 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   // 90-day retention, and the reasoning is in limits.ts.
   const historyFrom = since(now, 24 * 30)
 
+  // WHAT AN EMAIL TO A PERSON MAY BE ABOUT. This digest goes to `ALERT_TO`, a
+  // human address, and the only reason to wake somebody is something they can
+  // act on. A MEASUREMENT is not that: `slow-door` rows are this codebase's own
+  // latency instrument (timing.ts), and on 8 Sep 2026 one morning's mail led
+  // with eighteen of them — the top three being `GET /api/auth/me`,
+  // `my-permissions` and `active`, each over the read budget having made ZERO
+  // database trips and read ZERO rows. A door that touches no database and is
+  // still "too slow" is not reporting a defect in that door; it is reporting
+  // that the budget sits under the platform's own floor (this file's header
+  // measured routing alone at ~90ms against a 100ms read budget). Eighteen such
+  // lines do not tell the reader a door regressed — they bury the one line that
+  // would have.
+  //
+  // The rows are NOT suppressed: they are still written, still swept on the same
+  // 90-day clock, and still the first thing the errors door returns (it already
+  // announces `measurementSources` so a reader can tell the two apart). What
+  // changes is only that a measurement no longer composes a sentence addressed
+  // to a person. An exception — something that THREW, with a stack — still does.
+  const measurementFilter = MEASUREMENT_SOURCES.map(() => "?").join(", ")
+
   // Last night's signatures, biggest first. R14: the read is capped at five
   // times the line budget rather than at the budget itself, because the FOLD
   // below merges rows — asking for exactly twenty raw groups could hand back
@@ -132,12 +153,12 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   const todayRows = await env.DB.prepare(
     `SELECT ${SIGNATURE_SQL} AS sig, COUNT(*) AS n
        FROM error_logs
-      WHERE at > ?
+      WHERE at > ? AND source NOT IN (${measurementFilter})
       GROUP BY sig
       ORDER BY n DESC
       LIMIT ${OPS_SIGNATURE_CAP * 5 + 1}`
   )
-    .bind(day)
+    .bind(day, ...MEASUREMENT_SOURCES)
     .all<{ sig: string; n: number }>()
   const today = fold(todayRows.results ?? [])
   const notShown = Math.max(0, today.length - OPS_SIGNATURE_CAP)
@@ -151,11 +172,11 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
     `SELECT sig, SUM(n) AS n FROM (
         SELECT ${SIGNATURE_SQL} AS sig, 1 AS n
           FROM error_logs
-         WHERE at > ? AND at <= ?
+         WHERE at > ? AND at <= ? AND source NOT IN (${measurementFilter})
          LIMIT ${OPS_HISTORY_CAP}
       ) GROUP BY sig`
   )
-    .bind(historyFrom, day)
+    .bind(historyFrom, day, ...MEASUREMENT_SOURCES)
     .all<{ sig: string; n: number }>()
   // Folded the SAME way, or "have we seen this before" would answer no every
   // time an id changed — which is the whole failure the fold exists to end.
