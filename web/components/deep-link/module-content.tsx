@@ -76,7 +76,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "knowledgeShapeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -110,6 +110,10 @@ export type ModuleContentCtx = Pick<
   myUserId: string | null
   query: ScreenQuery
   taskView: TaskView
+  /** Which body the knowledge collection is showing — its list, or the picture
+   * of the whole base. The `view` slot on that screen's toolbar (R53). */
+  knowledgeView: string
+  setKnowledgeView: (v: string) => void
   setTaskView: (v: TaskView) => void
   /** The reader's language, as `t`. It rides the ctx rather than a hook because
    * these two render halves are plain functions, not components — the host

@@ -11,7 +11,7 @@
 // whole team area (they back list + breadcrumb + a tab-count badge); members /
 // tickets / accounts / team-meta load only on their own module.
 
-import { tenancy } from "@/lib/api"
+import { content, tenancy } from "@/lib/api"
 import type { TaskView } from "@/lib/live-resources"
 import {
   accountsKey,
@@ -21,6 +21,7 @@ import {
   cursorKey,
   helpKey,
   knowledgeKey,
+  knowledgeShapeKey,
   listFetch,
   meetingsKey,
   purposesKey,
@@ -57,6 +58,11 @@ export type ScreenDataInput = {
   /** which pile of our own admin the Tasks screen is showing — a SERVER view,
    * for the same reason (R14/R16). */
   taskView?: TaskView
+  /** WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture
+   * of the whole base. Declared up here for `taskView`'s own reason: the shape
+   * is a DOOR, not a sieve over rows already loaded, so which body is on screen
+   * decides which read happens. */
+  knowledgeView?: string
 }
 
 /** Which TABLE a record under each agency-internal URL segment lives in — the
@@ -79,6 +85,7 @@ export function useScreenData({
   module,
   recordId,
   taskView = "open",
+  knowledgeView = "list",
   ancestorModules = [],
 }: ScreenDataInput) {
   /** Is this module ON SCREEN — as the level being rendered, or as one of the
@@ -150,6 +157,26 @@ export function useScreenData({
   const knowledgeQ = useCached(
     enabled && onScreen("knowledge") ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
+  )
+  // THE SAME COLLECTION AS A PICTURE — the Shape view of the knowledge base.
+  //
+  // ASKED ONLY WHEN SOMEBODY IS LOOKING AT IT, which is what the null key means
+  // here: the List view is the default, so a reader who never touches the switch
+  // never pays for this door. It is a whole-corpus read (bounded, but the widest
+  // one the knowledge section has), so making it lazy is the difference between
+  // one extra request per person who wants the picture and one per visit to the
+  // section.
+  //
+  // NOT NARROWED FROM HERE. The door takes a `compartment`, but the toolbar's
+  // facets live inside `PagedFind` and this hook runs above it; the whole-base
+  // picture is the one this screen asks for, and narrowing is what the reader
+  // does by opening an account. Said out loud so the missing argument reads as a
+  // decision rather than an omission.
+  const knowledgeShapeQ = useCached(
+    enabled && onScreen("knowledge") && knowledgeView === "shape"
+      ? knowledgeShapeKey(teamId as string, null)
+      : null,
+    () => content.knowledgeShape()
   )
   // EVERY COMPANY, as a safety net for the list's "filed under" names —
   // 2026-08-31: `accountsQ` above is gated to the accounts/contacts screens, so
@@ -398,6 +425,7 @@ export function useScreenData({
     overridesQ,
     accountsQ,
     knowledgeQ,
+    knowledgeShapeQ,
     companiesQ,
     storiesQ,
     sprintsQ,

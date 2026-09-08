@@ -929,6 +929,34 @@ export const content = {
       total: number
       capped: boolean
     }>(`/api/content/knowledge/map?table=${enc(table)}&id=${enc(id)}`),
+  /** THE WHOLE KNOWLEDGE BASE AS ONE PICTURE — every source this reader may see,
+   * clustered by the client it is filed under, with the apps and sprints it
+   * hangs off as the hubs inside each cluster.
+   *
+   * `total` is the EXACT size of the corpus and `drawn` is how many dots came
+   * back; `capped` says the two differ, and every cluster carries its own true
+   * `total` beside the `drawn` sample so the picture is sized by the corpus
+   * rather than by what fitted. `clustered` is false when the caller may not
+   * read accounts — the picture then has no clusters at all, because a dense
+   * named blob is the fact that right was withholding. See
+   * workers/content/src/lib/knowledge-shape.ts. */
+  knowledgeShape: (compartment?: string) =>
+    api<{
+      clusters: { id: string; label: string; total: number; drawn: number }[]
+      nodes: {
+        id: string
+        kind: string
+        label: string
+        cluster: string
+        table: string
+        recordId: string
+      }[]
+      links: { from: string; to: string }[]
+      total: number
+      drawn: number
+      capped: boolean
+      clustered: boolean
+    }>(`/api/content/knowledge/shape${compartment ? `?compartment=${enc(compartment)}` : ""}`),
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null

@@ -160,7 +160,10 @@ const colourFor = (table: string) => KIND_COLOUR[table] ?? "var(--chart-5)"
  * screen of its own — the node is still drawn and still says what it is, it
  * simply is not a door. The mapping is the app's own segments (web/lib/pages.ts);
  * a table absent here has no page, which is a fact rather than an omission. */
-const RECORD_PATH: Record<string, string> = {
+/** WHERE A RECORD LIVES, by table. EXPORTED because `knowledge-shape.tsx` draws
+ * a second picture of the same records and the two must not disagree about
+ * where a click goes — one table of destinations, two drawings. */
+export const RECORD_PATH: Record<string, string> = {
   accounts: "accounts",
   apps: "apps",
   help: "tickets",
@@ -170,6 +173,10 @@ const RECORD_PATH: Record<string, string> = {
   processes: "processes",
   meetings: "meetings",
   tasks: "tasks",
+  // Reached only from the whole-corpus shape: `RECORD_EDGES` draws no edge with
+  // a knowledge source at either end, so no node of this table arrives at the
+  // neighbourhood map above.
+  knowledge_sources: "knowledge",
 }
 
 /* ------------------------------- the control ------------------------------ */

@@ -591,8 +591,15 @@ function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: stri
  * decisions are made: the index (and the word-match beside it) NARROWS, and the
  * team's database DECIDES. A restricted chunk can reach the candidate pool and
  * cost a relevant passage its place; it cannot reach an answer, because the
- * read-back below is a join to `knowledge_sources` and this clause is on it. */
-function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
+ * read-back below is a join to `knowledge_sources` and this clause is on it.
+ *
+ * EXPORTED so the whole-corpus SHAPE (lib/knowledge-shape.ts) fences with THIS
+ * clause rather than with a second copy of it. `sourcesWhere` above already made
+ * this argument about the list and its count — one builder, no drift — and a
+ * picture of the corpus is a third reader of the same rows, so it is the same
+ * argument a third time. A fence written twice is a fence that will be amended
+ * once. */
+export function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
   const owner = ownerClause(guard, `${prefix}owner_user_id`)
   const app = appClause(guard, prefix)
   return { sql: `${owner.sql} AND ${app.sql}`, params: [...owner.params, ...app.params] }

@@ -3455,6 +3455,43 @@ export const SEED: Catalogue = {
     es: "Ver el mapa entero",
     ca: "Veure el mapa sencer",
   },
+  /* ── THE WHOLE KNOWLEDGE BASE AS ONE PICTURE (8 Sep 2026) ────────────────
+   * The Shape view beside the knowledge list. Same register as the
+   * neighbourhood map above it: plain, short, sentence case, and the same word
+   * for the same thing — "Karte"/"mapa" for the picture, "Quellen"/"fuentes"/
+   * "fonts" for what the assistant may read, which is the word the knowledge
+   * list already uses ("{count} sources match"). */
+  Shape: { de: "Form", es: "Forma", ca: "Forma" },
+  "{count} sources": { de: "{count} Quellen", es: "{count} fuentes", ca: "{count} fonts" },
+  "A map of the whole knowledge base, grouped by account": {
+    de: "Eine Karte der ganzen Wissensbasis, nach Konto gruppiert",
+    es: "Un mapa de toda la base de conocimiento, agrupada por cuenta",
+    ca: "Un mapa de tota la base de coneixement, agrupada per compte",
+  },
+  /* The cap, said out loud — and the second sentence is the load-bearing one:
+   * the dots are a sample and the sizes are not. */
+  "Drawing the {drawn} most recently touched. Every group is sized by its full count.": {
+    de: "Es werden die {drawn} zuletzt bearbeiteten gezeigt. Jede Gruppe ist nach ihrer vollen Anzahl bemessen.",
+    es: "Se dibujan las {drawn} más recientes. Cada grupo se dimensiona por su total completo.",
+    ca: "Es dibuixen les {drawn} més recents. Cada grup es dimensiona pel seu total complet.",
+  },
+  /* The aggregation fence, said out loud. "Konto"/"cuenta"/"compte" is the
+   * glossary's Account, and the second half says whose limit it is. */
+  "Grouping by account is off, because you cannot open accounts.": {
+    de: "Die Gruppierung nach Konto ist aus, weil Sie Konten nicht öffnen können.",
+    es: "La agrupación por cuenta está desactivada, porque no puedes abrir cuentas.",
+    ca: "L'agrupació per compte està desactivada, perquè no pots obrir comptes.",
+  },
+  "Nothing in the knowledge base yet.": {
+    de: "Noch nichts in der Wissensbasis.",
+    es: "Todavía no hay nada en la base de conocimiento.",
+    ca: "Encara no hi ha res a la base de coneixement.",
+  },
+  "Nothing is filed under an account yet.": {
+    de: "Noch nichts unter einem Konto abgelegt.",
+    es: "Todavía no hay nada archivado bajo una cuenta.",
+    ca: "Encara no hi ha res arxivat sota un compte.",
+  },
   /* Read aloud, never drawn — the picture's own name. */
   "A map of what this record is connected to": {
     de: "Eine Karte davon, womit dieser Eintrag verbunden ist",

@@ -60,6 +60,7 @@
 //   GET  /api/content/record-counts       -> one record's child totals, before a tab is clicked
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
+//   GET  /api/content/knowledge/shape     -> the whole base as one clustered picture
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
 //   POST /api/content/knowledge           -> add a source
 //   POST /api/content/knowledge/upload    -> …or hand it a FILE, and read it
@@ -163,6 +164,7 @@ import {
   getKnowledge,
   getKnowledgeAsk,
   getKnowledgeMap,
+  getKnowledgeShape,
   getKnowledgeSync,
   postCreateKnowledge,
   postKnowledgeSync,
@@ -476,6 +478,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/map": { handler: getKnowledgeMap, kind: "read" },
+  "GET /api/content/knowledge/shape": { handler: getKnowledgeShape, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
   "POST /api/content/knowledge": { handler: postCreateKnowledge, kind: "mutation" },
   // A file becomes a source: stored whole, read where we can, and honest about

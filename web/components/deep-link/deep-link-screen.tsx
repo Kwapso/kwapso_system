@@ -63,7 +63,7 @@ import {
   visitTrail,
   type OpenTab,
 } from "@/lib/workspace-tabs"
-import { RememberedScreen } from "@shared/web/remembered"
+import { RememberedScreen, useRemembered } from "@shared/web/remembered"
 import { usePermissions } from "@/lib/perms"
 import { useScreenData } from "@/lib/use-screen-data"
 import { useScreenActions } from "@/lib/use-screen-actions"
@@ -162,12 +162,21 @@ export function DeepLinkScreen() {
   // door, not a sieve over the rows already loaded), so it is declared here too.
   const [taskView, setTaskView] = React.useState<TaskView>("open")
 
+  // WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture of
+  // the whole base (R53's `view` slot on that screen's toolbar). Declared beside
+  // `taskView` and for the same reason: the picture is a DOOR of its own, so the
+  // choice has to be visible to `useScreenData` rather than kept inside the
+  // control that draws it. REMEMBERED per person, which is `ViewSwitch`'s own
+  // rule — a body somebody chose should still be there when they come back.
+  const [knowledgeView, setKnowledgeView] = useRemembered<string>("knowledge-view", "list")
+
   // Per-module data — cache-first + null-keyed (a screen fetches only the modules
   // it shows). Lifted into one hook so the host reads as "fetch, then render".
   const {
     overridesQ,
     accountsQ,
     knowledgeQ,
+    knowledgeShapeQ,
     companiesQ,
     membersQ,
     rolesQ,
@@ -200,6 +209,7 @@ export function DeepLinkScreen() {
     module,
     recordId,
     taskView,
+    knowledgeView,
     // The records this one was opened INSIDE. Their lists back the breadcrumb's
     // labels, so a nested address that does not ask for them shows the word
     // "Account" above a screen already displaying the client's name.
@@ -844,7 +854,7 @@ export function DeepLinkScreen() {
           <RememberedScreen memory={screenMemory}>
           {renderModuleContent({
             noAccess, enabled, perms, permsError, can, module, recordId, teamId, canImport, go,
-            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, companiesQ, totals,
+            overridesQ, metaQ, membersQ, rolesQ, roles, invitesQ, helpQ, accountsQ, knowledgeQ, knowledgeShapeQ, companiesQ, totals,
             brandQ, purposesQ, internalActivity,
             storiesQ, sprintsQ, appsQ, tasksOpenQ, tasksAllQ, workLogsQ, meetingsQ,
             activityQ, activityTotal, activityKey, activityScope, activityFetchPage, inviteAuditQ, teamName, active,
@@ -854,7 +864,7 @@ export function DeepLinkScreen() {
             // ticket types (CHECKLIST 5.1) — the same list the ticket form's
             // picker reads, so the words agree wherever they appear.
             helpTypeOptions,
-            taskView, setTaskView, t, lang,
+            taskView, setTaskView, knowledgeView, setKnowledgeView, t, lang,
           })}
           </RememberedScreen>
           </div>

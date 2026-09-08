@@ -21,6 +21,7 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 import { neighbourhood, readableTables } from "../lib/record-map"
+import { buildShape } from "../lib/knowledge-shape"
 import { kindsForChips, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
@@ -215,6 +216,46 @@ export async function getKnowledgeMap(request: Request, env: Env): Promise<Respo
     return fail(400, "invalid_input", "That is not a kind of record this map draws.")
   const readable = await readableTables(cfg, guard)
   return json(await neighbourhood(cfg, guard, { table, id, readable }))
+}
+
+/** GET /api/content/knowledge/shape — THE WHOLE KNOWLEDGE BASE AS ONE PICTURE:
+ * every source we may show this reader, clustered by the client it is filed
+ * under, with the apps and sprints it hangs off as the hubs inside each cluster.
+ *
+ * THE SIBLING OF THE DOOR ABOVE, AND THE OPPOSITE QUESTION. `map` answers "what
+ * is this connected to" about one record. This answers "where is the knowledge,
+ * and where is there none" about all of them — which is not a question any
+ * neighbourhood can be asked, and not one a list answers either, because a list
+ * of clients sorted by a count is the same facts with the shape taken out.
+ *
+ * R14, AND THE HONEST HALF OF IT. A picture cannot page: a cursor hands somebody
+ * the second half of a drawing whose first half has scrolled away. So the cap
+ * (KNOWLEDGE_SHAPE_SOURCES) falls on the DOTS and never on the arithmetic —
+ * every cluster is sized by an exact count over the whole corpus — and past the
+ * cap the reader NARROWS with `compartment`, the same filter the list beside
+ * this picture already offers. That is the paging story: one client's material
+ * is far under the ceiling.
+ *
+ * THE FENCE IS APPLIED TWICE, and the second time is the one only a picture
+ * needs. The nodes carry knowledge.ts's own `readerClause`. The CLUSTERS carry
+ * the module fence: a picture leaks by AGGREGATION, so a reader who may not open
+ * accounts is not shown a dense named blob either — the blob IS the withheld
+ * fact. `readableTables` is that clause, the same one the neighbourhood door
+ * subtracts through, and lib/knowledge-shape.ts carries the whole argument.
+ *
+ * AGENCY ONLY, for the reason `getKnowledgeMap` gives above.
+ *
+ * Gated on `knowledge:read` because this is the knowledge section's own screen;
+ * what it can SHOW is then decided by the per-module subtraction. */
+export async function getKnowledgeShape(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "knowledge", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  // Checked where it sits (R20): the value is capped text, and it is then only
+  // ever compared against the compartment column as a bound parameter.
+  const compartment = queryText(url.searchParams.get("compartment"), "Compartment", TEXT_LIMITS.short)
+  const readable = await readableTables(cfg, guard)
+  return json(await buildShape(cfg, guard, { compartment: compartment ?? null, readable }))
 }
 
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
