@@ -729,6 +729,18 @@ describe("a transcript still being written is read again, not frozen", () => {
     expect(out.captured).toBe(true)
     expect(out.fileId, "the fuller document is the one claimed").toBe("THE_HOUR")
     expect((await transcriptOnScreen(id)).text).toContain("first Monday of April")
+    // THE LOSER IS NAMED, not just outvoted — this is what lets the knowledge
+    // base retire the abandoned document too (knowledge-google.ts's fold, widened
+    // by migration 0070), rather than leaving it as an unrelated-looking
+    // `document` source for as long as the base runs.
+    expect(
+      (
+        db().prepare("SELECT superseded_transcript_ids AS s FROM meetings WHERE id = ?").get(id) as {
+          s: string | null
+        }
+      ).s,
+      "the false start is on record as rejected"
+    ).toBe("FALSE_START")
   })
 
   it("and picks the second one up later, when the first was all there was at the time", async () => {
@@ -756,6 +768,22 @@ describe("a transcript still being written is read again, not frozen", () => {
     expect(again.fileId, "and the row points at the document it now quotes").toBe("THE_HOUR")
     expect((await transcriptOnScreen(id)).text).toContain("first Monday of April")
     expect(meetingLogs(), "nobody is billed a second time").toHaveLength(1)
+    // THE OLD WINNER JOINS THE LIST THE MOMENT IT STOPS WINNING — it was quoted
+    // by this very row a moment ago, and the fold must retire it exactly as it
+    // would have retired a same-hunt runner-up. It lands twice (the refresh's
+    // OWN re-scan of the attachment list rejects it too, same as `fromAttachments`
+    // always would) — harmless duplication a `Set` absorbs the moment
+    // `readFoldTargets` reads it back (knowledge-google.ts), so the assertion is
+    // on MEMBERSHIP, not on the exact string.
+    const superseded = (
+      db().prepare("SELECT superseded_transcript_ids AS s FROM meetings WHERE id = ?").get(id) as {
+        s: string | null
+      }
+    ).s
+    expect(
+      new Set((superseded ?? "").split(",")),
+      "the false start is on record as rejected, even though it once won"
+    ).toEqual(new Set(["FALSE_START"]))
   })
 
   it("R1 — a refresh pings the meeting and NOT the week", async () => {
