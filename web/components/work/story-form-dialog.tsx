@@ -90,8 +90,18 @@ const appField = {
   ...defaultFieldConfig,
   label: "App",
   required: true,
-  hint: "The system this work is on. Everything below is narrowed by it.",
+  helpText: "The system this work is on. Everything below is narrowed by it.",
 }
+
+/** THE SAME FIELD WITH NOTHING LEFT TO ASK. When the dialog is opened from an
+ * app, the app is SETTLED and the control is replaced by the value — so the
+ * `required` marker has to go with the control it belonged to. The kit draws
+ * that marker as the word "Required", which is an instruction to the reader:
+ * printed over a fact they cannot touch it tells them to do something that
+ * cannot be done. The owner, 8 Sep 2026: "If I can't choose it or interact with
+ * it, why show it?" Same reasoning as `workField`/`settledWorkField` in
+ * time-form-dialog.tsx, which met this first. */
+const settledAppField = { ...appField, required: false }
 const titleField = { ...defaultFieldConfig, label: "What needs doing", required: true }
 const typeField = {
   ...defaultFieldConfig,
@@ -436,9 +446,21 @@ export function StoryFormDialog({
       }}
     >
       {/* FIRST, and everything below is narrowed by it (CHECKLIST 6.1). */}
-      <Field config={appField} htmlFor="story-app" className={fieldSpacing}>
+      <Field
+        config={fixedApp ? settledAppField : appField}
+        htmlFor="story-app"
+        className={fieldSpacing}
+      >
         {fixedApp ? (
-          <p className="text-muted-foreground text-sm" id="story-app">
+          // A FACT, NOT A CONTROL — time-form-dialog.tsx's words, and its shape:
+          // the panel and padding are what make this read as a filled answer
+          // rather than a hint under the label. It used to be bare muted text,
+          // so the only real information in the row looked less important than
+          // the word "App" above it.
+          <p
+            id="story-app"
+            className="bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm"
+          >
             {fixedApp.name}
           </p>
         ) : (

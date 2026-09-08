@@ -783,6 +783,28 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 216 -> 217 in all three on 8 Sep 2026. ONE sentence, and it is the
+  // first of a class worth naming here because the next 48 arrive the same way:
+  //
+  //  · "The system this work is on. Everything below is narrowed by it." — the
+  //    New story dialog's explanation of its App row. It was WRITTEN when the
+  //    field was built and has never rendered, because the config set `hint:`
+  //    and `FieldConfig` has no such key; it has `helpText`. Nothing in the app
+  //    or the kit accepts a `hint` prop, and TypeScript never objected because
+  //    the config is a named constant rather than an inline literal, so the
+  //    excess-property check does not fire.
+  //
+  // FORTY-EIGHT MORE LIKE IT sit across both front doors — tickets, sprints,
+  // rates, reviews, legal details, time — every one an explanation somebody
+  // wrote for a person and no person has ever read. They are outside R28, R33
+  // and R34 as well, because those walk `label:` and `helpText:` and a dead key
+  // says nothing to anybody. This one was converted alone, deliberately, to
+  // MEASURE what the class costs: one ceiling point per language each, so the
+  // whole set is +48 more unless it is translated in the same change.
+  //
+  // The owner asked why the row shows "Required" over a value he cannot touch
+  // (8 Sep 2026). This sentence is the answer the dialog always meant to give.
+  //
   // RAISED 213 -> 216 in all three on 7 Sep 2026, dead-end lane. THREE new
   // English sentences, all three of them the words a dead end needed in order
   // to stop being one — a field the machine surface could already write, put in
@@ -868,9 +890,9 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // visible, bounded debt is the shape R44 was written for; this is exactly it.
   //
   // It only ever falls. The next reviewed run takes all three back down together.
-  de: 216,
-  es: 216,
-  ca: 216,
+  de: 217,
+  es: 217,
+  ca: 217,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

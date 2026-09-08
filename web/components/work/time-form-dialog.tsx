@@ -54,6 +54,11 @@ export type TimeFormValues = {
 }
 
 const workField = { ...defaultFieldConfig, label: "What you worked on", required: true }
+/** The same field once the answer is settled — on a correction, or on a new
+ * entry opened from the record itself. `required` is a marker on a CONTROL, and
+ * there is no control here, so asking for something the reader cannot give is
+ * the one thing this must not do. See `settledAppField` in story-form-dialog. */
+const settledWorkField = { ...workField, required: false }
 const startField = { ...defaultFieldConfig, label: "Started", required: true }
 const endField = { ...defaultFieldConfig, label: "Finished", required: true }
 const kindField = { ...defaultFieldConfig, label: "Kind of work", required: false }
@@ -164,13 +169,17 @@ export function TimeFormDialog({
         disabled: !ready,
       }}
     >
-      <Field config={workField} htmlFor="time-target" className={fieldSpacing}>
+      <Field
+        config={isEdit || fixedTarget ? settledWorkField : workField}
+        htmlFor="time-target"
+        className={fieldSpacing}
+      >
         {isEdit || fixedTarget ? (
           // A FACT, NOT A CONTROL. On a correction because the door never moves a
           // row from a story to a ticket, so a picker here would offer a change
           // the server would quietly drop; on a new entry opened from a record
           // because the record IS the answer.
-          <p id="time-target" className="text-muted-foreground bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm">
+          <p id="time-target" className="bg-surface-panel rounded-[var(--radius)] px-3 py-2 text-sm">
             {fixedTarget ? fixedTarget.label : (initial?.targetLabel ?? "—")}
           </p>
         ) : (
