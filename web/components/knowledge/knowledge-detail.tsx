@@ -362,6 +362,18 @@ export function KnowledgeDetailScreen({
                 total={mapQ.data.total}
                 capped={mapQ.data.capped}
               />
+            ) : mapQ.error ? (
+              // A FAILED READ SAYS SO — the house failure pattern by name
+              // (CLAUDE.md): this used to fall straight through to the loading
+              // skeleton below on any error, four grey rows sitting there
+              // forever for a door that had already answered "no". Same shape
+              // as work-logs-panel.tsx's own block-level retry.
+              <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+                {t("Couldn't load this record's connections.")}
+                <Button variant="secondary" size="sm" onClick={() => mapQ.refresh()}>
+                  {t("Try again")}
+                </Button>
+              </p>
             ) : (
               <Skeleton variant="list" lines={4} />
             )
