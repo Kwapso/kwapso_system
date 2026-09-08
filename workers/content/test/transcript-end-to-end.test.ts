@@ -275,6 +275,7 @@ async function sweepCalendar(): Promise<string> {
 
 type CaptureReply = {
   captured: boolean
+  refreshed: boolean
   fileId: string | null
   fileName: string | null
   logsWritten: number
@@ -579,6 +580,196 @@ describe("9.2 · the transcript writes the room's time, and only ours", () => {
     expect(meetingLogs(), "the same hour is not billed a second time").toHaveLength(1)
     expect(meetingLogs()[0].id, "and it is the original row, not a replacement").toBe(before[0].id)
     expect(again.logsWritten, "an honest zero, not the size of the room").toBe(0)
+  })
+})
+
+/* ───── a transcript that was still being written when we first read it ───── */
+//
+// GOOGLE WRITES THE NOTES DOCUMENT DURING THE CALL. Ask for it two minutes in
+// and it exists, it is readable, and it holds two minutes. `transcript_captured_at`
+// meant "do not look again", so whatever had been written by the moment of the
+// first read was all this app ever held.
+//
+// MEASURED, 2026-09-07, on the owner's own `⏩ Week planning`: the meeting row
+// holds 1,179 characters ending "Transcription ended after 00:02:30", while the
+// same document — finished — holds 73,138 characters and ends at 01:01:00. The
+// hour of conversation was in the base, filed by the Drive lane as a separate
+// `document`, and the MEETING held a stub of it. Ask "what did we agree in the
+// week planning meeting?" and the top passage is a placeholder saying a summary
+// was not produced.
+//
+// THE EARLIER REPAIR HERE FIXED THE NEIGHBOUR. A transcript of ZERO characters
+// used to tick the meeting held, and the hunt now proves a candidate is readable
+// before claiming it. That is a test of "are there words" and it passes on two
+// minutes of them, which is why empty was mended and INCOMPLETE outlived the
+// mend. These cases are about the difference.
+//
+// AND THE LAST CASE IS THE ONE THAT KILLED THE FIRST ATTEMPT AT THIS FIX. The
+// obvious repair — re-read the file id already on the row — is wrong, because
+// that entry ran as two Meet sessions and Gemini wrote TWO documents: the one
+// the meeting claimed was abandoned after three seconds and never grew again.
+// A re-read would have returned the same 4,159 bytes for ever and reported
+// success. So the refresh HUNTS.
+
+describe("a transcript still being written is read again, not frozen", () => {
+  /** The document as Google had it two minutes into the call — real, readable,
+   * and a fifth of a sentence of what was actually said. */
+  const STILL_RUNNING =
+    "Attendees\r\nÃlaap Kanchawala, Marta Reyes\r\n" +
+    "Transcription ended after 00:02:30"
+
+  /** Set the world up with the call's document attached, holding `text`. */
+  const attach = (text: string) => {
+    world.events = [pastEntry([{ fileId: "ATT_DOC", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null }])]
+    world.files.set("ATT_DOC", driveFile("ATT_DOC"))
+    world.text.set("ATT_DOC", text)
+  }
+
+  it("the whole conversation lands once Google has finished writing it", async () => {
+    attach(STILL_RUNNING)
+    const id = await sweepCalendar()
+
+    const first = await readTranscript(id)
+    expect(first.captured, "the fragment is a real transcript and is claimed").toBe(true)
+    expect((await transcriptOnScreen(id)).text, "…holding only what had been said so far").not.toContain(
+      "first Monday of April"
+    )
+
+    // Google finishes the document. Nothing else about the meeting changes.
+    world.text.set("ATT_DOC", WHAT_WAS_SAID)
+
+    const again = await readTranscript(id)
+    expect(again.refreshed, "the document grew, so the words are replaced").toBe(true)
+    expect(again.captured, "…but nothing is CAPTURED a second time").toBe(false)
+    expect(
+      (await transcriptOnScreen(id)).text,
+      "the rest of the conversation is now on the meeting"
+    ).toContain("first Monday of April")
+  })
+
+  it("and nobody is billed for the same hour twice", async () => {
+    attach(STILL_RUNNING)
+    const id = await sweepCalendar()
+    await readTranscript(id)
+    const before = meetingLogs()
+    expect(before, "one person of ours in the room, one log").toHaveLength(1)
+
+    world.text.set("ATT_DOC", WHAT_WAS_SAID)
+    const again = await readTranscript(id)
+
+    // The hours were logged when the transcript was FIRST read and are the same
+    // hours however many times the words are re-read. Both halves fail
+    // differently: the count catches a duplicate row, `logsWritten` catches the
+    // door telling somebody it logged time it did not log.
+    expect(meetingLogs(), "the same hour is not billed again").toHaveLength(1)
+    expect(meetingLogs()[0].id, "and it is the original row").toBe(before[0].id)
+    expect(again.logsWritten, "an honest zero").toBe(0)
+  })
+
+  it("a SHORTER re-read never overwrites a longer transcript", async () => {
+    // THE FAILURE RUNNING BACKWARDS, and the reason the predicate is LENGTH
+    // rather than recency. A read cut short by a timeout or a dropped socket
+    // comes back as a partial document; a refresh that trusted the newer answer
+    // would replace an hour with two minutes and call it an improvement.
+    attach(WHAT_WAS_SAID)
+    const id = await sweepCalendar()
+    await readTranscript(id)
+
+    world.text.set("ATT_DOC", STILL_RUNNING)
+    const again = await readTranscript(id)
+
+    expect(again.refreshed, "a shorter document is not an update").toBe(false)
+    expect((await transcriptOnScreen(id)).text, "the full transcript stands").toContain(
+      "first Monday of April"
+    )
+  })
+
+  it("a settled transcript moves zero rows and says nothing (R17)", async () => {
+    attach(WHAT_WAS_SAID)
+    const id = await sweepCalendar()
+    await readTranscript(id)
+
+    published = []
+    const activityBefore = db()
+      .prepare("SELECT COUNT(*) AS n FROM activity WHERE related_row_id = ?")
+      .get(id) as { n: number }
+
+    // The same document, unchanged — which is what every tick inside the settle
+    // window sees once Google has finished.
+    const again = await readTranscript(id)
+
+    expect(again.refreshed, "nothing grew").toBe(false)
+    expect(published, "…so no ping").toEqual([])
+    expect(
+      (db().prepare("SELECT COUNT(*) AS n FROM activity WHERE related_row_id = ?").get(id) as { n: number }).n,
+      "…and no second activity line"
+    ).toBe(activityBefore.n)
+  })
+
+  it("takes the fuller of two documents when one call wrote two", async () => {
+    // THE REAL SHAPE OF 2026-09-07, and the case a re-read cannot reach: one
+    // calendar entry, two Meet sessions, two notes documents — the abandoned
+    // three-second one FIRST in the attachment list, the whole hour second.
+    // Both are readable, both are titled like a transcript, both were written
+    // after the meeting began. Only their length tells them apart.
+    world.events = [
+      pastEntry([
+        { fileId: "FALSE_START", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null },
+        { fileId: "THE_HOUR", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null },
+      ]),
+    ]
+    world.files.set("FALSE_START", driveFile("FALSE_START"))
+    world.files.set("THE_HOUR", driveFile("THE_HOUR"))
+    world.text.set("FALSE_START", STILL_RUNNING)
+    world.text.set("THE_HOUR", WHAT_WAS_SAID)
+
+    const id = await sweepCalendar()
+    const out = await readTranscript(id)
+
+    expect(out.captured).toBe(true)
+    expect(out.fileId, "the fuller document is the one claimed").toBe("THE_HOUR")
+    expect((await transcriptOnScreen(id)).text).toContain("first Monday of April")
+  })
+
+  it("and picks the second one up later, when the first was all there was at the time", async () => {
+    // The same entry, in the order it really happens: at capture there is only
+    // the false start, and the fuller document is attached afterwards. This is
+    // the case the settle window exists for.
+    world.events = [pastEntry([{ fileId: "FALSE_START", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null }])]
+    world.files.set("FALSE_START", driveFile("FALSE_START"))
+    world.text.set("FALSE_START", STILL_RUNNING)
+
+    const id = await sweepCalendar()
+    const first = await readTranscript(id)
+    expect(first.fileId).toBe("FALSE_START")
+
+    // Google finishes the call in a second session and writes a second document.
+    world.events[0].attachments = [
+      { fileId: "FALSE_START", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null },
+      { fileId: "THE_HOUR", title: TRANSCRIPT_NAME, mimeType: "", iconUrl: null, url: null },
+    ]
+    world.files.set("THE_HOUR", driveFile("THE_HOUR"))
+    world.text.set("THE_HOUR", WHAT_WAS_SAID)
+
+    const again = await readTranscript(id)
+    expect(again.refreshed, "the fuller document replaces the false start").toBe(true)
+    expect(again.fileId, "and the row points at the document it now quotes").toBe("THE_HOUR")
+    expect((await transcriptOnScreen(id)).text).toContain("first Monday of April")
+    expect(meetingLogs(), "nobody is billed a second time").toHaveLength(1)
+  })
+
+  it("R1 — a refresh pings the meeting and NOT the week", async () => {
+    attach(STILL_RUNNING)
+    const id = await sweepCalendar()
+    await readTranscript(id)
+
+    world.text.set("ATT_DOC", WHAT_WAS_SAID)
+    published = []
+    await readTranscript(id)
+
+    // `work_logs` is deliberately absent: the hours did not move, and a ping
+    // that said they had would send every open week screen to refetch nothing.
+    expect(published.map((p) => p.resource)).toEqual(["meetings"])
   })
 })
 

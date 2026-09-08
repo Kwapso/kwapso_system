@@ -210,9 +210,18 @@ export async function postMeetingTranscript(request: Request, env: Env): Promise
   if (result.captured) {
     await publishChange(env, guard.teamId, "meetings", id, "edit")
     await publishChange(env, guard.teamId, "work_logs", id, "add")
+  } else if (result.refreshed) {
+    // THE MEETING MOVED AND NOBODY'S WEEK DID. A refresh replaces the words of a
+    // transcript that kept growing after it was first read; the hours were
+    // logged by that first read and are the same hours now, so `work_logs` is
+    // deliberately not pinged. Both branches are still "only when something
+    // actually changed" — a document that has settled moves zero rows and
+    // reaches neither.
+    await publishChange(env, guard.teamId, "meetings", id, "edit")
   }
   return json({
     captured: result.captured,
+    refreshed: result.refreshed,
     fileId: result.fileId,
     fileName: result.fileName,
     logsWritten: result.logsWritten,

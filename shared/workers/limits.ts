@@ -291,6 +291,30 @@ export const TRANSCRIPT_HORIZON_DAYS = 14
  * The manual capture button ignores the counter, so a person can always try. */
 export const TRANSCRIPT_ATTEMPT_CAP = 8
 
+/** HOW LONG A TRANSCRIPT MAY STILL BE GROWING after its meeting began.
+ *
+ * Google writes a Gemini notes document DURING the call, so a document read at
+ * 11:30 for a call that runs to 12:00 is a real, readable, complete-looking
+ * document holding half a conversation. `transcript_captured_at` used to mean
+ * "do not look again", so whatever was written by the moment of the first read
+ * was all the base ever held — measured on 2026-09-07, a one-hour meeting whose
+ * stored transcript ends "Transcription ended after 00:02:30".
+ *
+ * Six hours from the meeting's own START, not from the capture: it is the call
+ * that decides when its document stops changing, and a window hung off the
+ * capture would slide forward every time the sweep looked. Six is well past the
+ * longest meeting this app has seen (one hour) plus the minutes Google takes to
+ * finish writing, and it is short enough that a re-read is only ever competing
+ * with the day's own meetings for the sweep's three slots — a meeting from last
+ * week is never selected twice.
+ *
+ * The cost inside the window is one Drive read per look, and it is bounded twice
+ * over: TRANSCRIPT_SWEEP_PER_PERSON caps the looks per tick, and a look that
+ * finds no new words counts against TRANSCRIPT_ATTEMPT_CAP, so a document that
+ * has settled is left alone after eight quiet tries — two hours at the
+ * fifteen-minute tick, the same arithmetic the cap was chosen for. */
+export const TRANSCRIPT_SETTLE_HOURS = 6
+
 /** @mentions one help reply may carry. Each mention becomes a row in an `IN (...)`
  * lookup AND an email, so an uncapped list is both an unbounded statement and an
  * unbounded send from a trusted sender. */

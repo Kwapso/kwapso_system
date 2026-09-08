@@ -746,6 +746,12 @@ export type TranscriptCapture = {
   foundBy: TranscriptRoute | null
   /** how many work logs were written — our staff who were in the room. */
   logsWritten: number
+  /** THE WORDS GREW. A transcript already read was read AGAIN and this time held
+   * more of the conversation, so the row was replaced. Separate from `captured`
+   * because the two mean different things to the caller: a capture writes work
+   * logs and a refresh must never write a second set, so the door that publishes
+   * `work_logs` has to be able to tell them apart. */
+  refreshed: boolean
   /** why nothing happened, in a sentence a person can act on. */
   note: string | null
 }
@@ -805,12 +811,36 @@ export async function captureTranscript(
     fileName: null,
     foundBy: null,
     logsWritten: 0,
+    refreshed: false,
     note,
   })
   if (!meeting.googleEventId)
     return nothing("This meeting isn't in a calendar yet, so there's nowhere to look for a transcript.")
-  if (meeting.transcriptCapturedAt)
-    return nothing("The transcript for this meeting has already been read.")
+  // ALREADY READ IS NOT ALREADY FINISHED, and this is where that used to be
+  // decided — `if (meeting.transcriptCapturedAt) return nothing(...)`, one line,
+  // final for the life of the meeting. The decision now sits below the calendar
+  // read, because what replaces it is a HUNT and the hunt starts from the entry.
+  //
+  // MEASURED, on the owner's own `⏩ Week planning` of 2026-09-07. Google writes
+  // a Gemini notes document while the call is happening, and that entry ran as
+  // two Meet sessions, so there were two of them: `…11:00 CEST`, created
+  // 09:05:24 and last modified 09:05:27 — three seconds, then abandoned — and
+  // `…11:28 CEST`, holding the whole hour. The sweep captured the first at
+  // 09:16:53, stored 1,179 characters ending "Transcription ended after
+  // 00:02:30", stamped `transcript_captured_at`, and the remaining fifty-eight
+  // minutes never entered the base through this door. They were not lost: the
+  // Drive lane filed the fuller document separately as a `document` source, so
+  // the conversation was in the base twice over and the MEETING held the stub.
+  // Ask the assistant what was agreed in week planning and the passage it leads
+  // with is a placeholder saying a summary was not produced.
+  //
+  // THE EARLIER REPAIR HERE FIXED THE NEIGHBOUR. A transcript of ZERO characters
+  // used to tick the meeting held, and the hunt now proves a candidate is
+  // readable before claiming it. That is a test of "are there words" and it
+  // passes on two minutes of them, which is why empty was mended and INCOMPLETE
+  // outlived the mend.
+  //
+  // So "captured" now means WE HAVE WORDS rather than WE ARE DONE.
 
   const { token: calendarToken } = await accessTokenFor(env, cfg, guard, "calendar")
   // ACROSS THE CALENDARS THIS PERSON NAMED, not `primary` alone: a meeting made
@@ -820,6 +850,10 @@ export async function captureTranscript(
   const event = await scopedCalendarEvent(cfg, guard, calendarToken, meeting.googleEventId)
   if (!event)
     return nothing("That calendar entry isn't in reach any more — check what Calendar is allowed to read.")
+  // BELOW THE CALENDAR READ, because a refresh hunts and the hunt starts from
+  // this entry. See `refreshTranscript` for why it is a hunt and not a re-read.
+  if (meeting.transcriptCapturedAt)
+    return refreshTranscript(env, cfg, guard, actor, meeting, event, nothing)
   const found = await findTranscript(env, cfg, guard, event)
   if (!found)
     return nothing(
@@ -934,11 +968,134 @@ RETURNING id`
     fileName: found.name,
     foundBy: found.foundBy,
     logsWritten,
+    refreshed: false,
     // The one note worth carrying up: a transcript longer than a row may hold
     // was CUT, and the person is told so rather than left to discover that the
     // assistant only knows the first half of the conversation.
     note: words.note,
   }
+}
+
+/** HUNT AGAIN FOR THIS CONVERSATION, and keep whichever document holds more of
+ * it.
+ *
+ * ── WHY A HUNT AND NOT A RE-READ, WHICH IS WHERE THIS FIX WENT WRONG FIRST ──
+ *
+ * The obvious repair is to re-read the file id already on the row, on the theory
+ * that Google keeps writing the document we found. It does not always. Measured
+ * on `⏩ Week planning`, 2026-09-07: that entry ran as two Meet sessions, so
+ * Gemini wrote TWO notes documents — `…11:00 CEST`, created 09:05:24 and last
+ * modified 09:05:27 (three seconds, then abandoned, 4,159 bytes), and
+ * `…11:28 CEST`, 1,165,858 bytes, holding the whole hour. The meeting claimed
+ * the first. Re-reading it would have returned the same 4,159 bytes for ever and
+ * reported success, which is a worse failure than the one it was meant to
+ * repair: it looks like a fix and measures like one.
+ *
+ * So the hunt runs again, under its own power, and everything that makes it
+ * trustworthy still applies — `notesCouldBelongTo` still refuses a document
+ * written before the meeting, so a re-hunt cannot drift onto last week's notes
+ * (the fault `clear-mismatched-transcripts.mjs` exists to undo).
+ *
+ * ── LONGER, NEVER SHORTER, AND THE PREDICATE RIDES THE UPDATE (R17) ─────────
+ *
+ * A false start and a real transcript are the same shape — both are readable
+ * Google documents with the right title, written after the meeting began — so
+ * the only thing that tells them apart is how much of the conversation is in
+ * them. LENGTH decides, in SQL, so there is no read-then-write window for a
+ * concurrent tick to land in, and a document that has stopped growing moves ZERO
+ * rows: no activity line, no ping, nothing said. It is also what stops a read
+ * cut short by a timeout replacing an hour with two minutes — this failure
+ * running backwards.
+ *
+ * IT WRITES NO WORK LOGS, and that is why `refreshed` is a separate flag from
+ * `captured`. The hours were logged when the transcript was first read; they are
+ * the same hours however many times the words are re-read.
+ *
+ * THE COST IS ONE HUNT, and who pays it is bounded by the caller:
+ * `meetingsToTry` only re-offers a meeting inside TRANSCRIPT_SETTLE_HOURS of its
+ * own start, and a barren refresh counts against TRANSCRIPT_ATTEMPT_CAP, so a
+ * transcript that has settled stops being hunted after eight quiet tries. The
+ * manual button ignores both, exactly as it always has. */
+async function refreshTranscript(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  meeting: { id: string; title: string },
+  event: CalendarEvent,
+  nothing: (note: string) => TranscriptCapture
+): Promise<TranscriptCapture> {
+  const settled = "The transcript for this meeting has already been read."
+  const found = await findTranscript(env, cfg, guard, event)
+  // Nothing found is not a loss: the words we already hold stay exactly where
+  // they are. Only a document with MORE of the conversation in it may replace
+  // them, and that decision is the statement below.
+  if (!found) return await quietly(cfg, guard, meeting.id, nothing(settled))
+  const words = capToRow(mendMojibake(found.text))
+
+  const now = new Date().toISOString()
+  const grew = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // THE FILE ID MOVES WITH THE WORDS. When a fuller document wins, the row has
+    // to point at THAT document — the link a person opens, and the id every
+    // later look starts from — or the meeting would quote one file and link to
+    // another.
+    `UPDATE meetings SET transcript_text = ?, transcript_note = ?, transcript_file_id = ?,
+        transcript_url = ?, transcript_found_by = ?, transcript_attempts = 0,
+        updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
+      WHERE id = ? AND transcript_captured_at IS NOT NULL
+        AND LENGTH(?) > LENGTH(COALESCE(transcript_text, ''))
+      RETURNING id`,
+    [
+      words.text,
+      words.note,
+      found.fileId,
+      found.url,
+      found.foundBy,
+      now,
+      actor.id,
+      actor.email,
+      actor.name,
+      meeting.id,
+      words.text,
+    ]
+  )
+  if (!grew[0]) return await quietly(cfg, guard, meeting.id, nothing(settled))
+
+  await logActivity(cfg, guard.databaseId, actor, {
+    type: "Meeting transcript read",
+    description: `${actor.name} read more of the transcript of "${meeting.title}" — a fuller record of the call had been written since it was first read`,
+    relatedTable: "meetings",
+    relatedRowId: meeting.id,
+  })
+  return {
+    captured: false,
+    fileId: found.fileId,
+    fileName: found.name,
+    foundBy: found.foundBy,
+    logsWritten: 0,
+    refreshed: true,
+    note: words.note,
+  }
+}
+
+/** NOTHING GREW, so this conversation has settled — count the quiet try so the
+ * sweep stops asking. Best effort: a counter that cannot be written costs one
+ * more hunt next tick, which is cheaper than failing the refresh over. */
+async function quietly(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  id: string,
+  answer: TranscriptCapture
+): Promise<TranscriptCapture> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    "UPDATE meetings SET transcript_attempts = transcript_attempts + 1 WHERE id = ?",
+    [id]
+  ).catch(() => undefined)
+  return answer
 }
 
 /* ------------- the calendar, read into Meetings. ONE WAY -------------------- */
