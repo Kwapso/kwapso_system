@@ -87,6 +87,7 @@
 //   POST /api/tenancy/activity/note        -> add a note to one record's history ({table, id, note})
 //   GET  /api/tenancy/query                -> ask a module a question (?module=&where=&groupBy=&countOnly=&cursor=)
 //   GET  /api/tenancy/query/describe       -> what a module has: its fields, types and allowed values
+//   GET  /api/tenancy/tools/describe       -> one shared tool's full instructions (?tool=), the half no manifest carries
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
 //   GET  /api/tenancy/invites              -> the team's invites (all statuses)
 //   GET  /api/tenancy/invites/audit        -> one invite's invite_logs audit (?id)
@@ -156,6 +157,7 @@ import {
   switchActiveTeam,
 } from "./routes/team"
 import { getQueryDescribe, getQueryRecords } from "./routes/query"
+import { getToolDescribe } from "./routes/tools"
 import { getMembers, postMemberRemove, postMemberRole } from "./routes/members"
 import {
   getMyPerms,
@@ -331,6 +333,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // login at the door (R21).
   "GET /api/tenancy/query": { handler: getQueryRecords, kind: "read" },
   "GET /api/tenancy/query/describe": { handler: getQueryDescribe, kind: "read" },
+  // The manual behind a one-line summary — routes/tools.ts says why it sits
+  // here beside describe_module and why it demands no module right.
+  "GET /api/tenancy/tools/describe": { handler: getToolDescribe, kind: "read" },
   "GET /api/tenancy/team-meta": { handler: getTeamMetaFeed, kind: "read" },
   "GET /api/tenancy/invites": { handler: getInvites, kind: "read" },
   "GET /api/tenancy/invites/audit": { handler: getInviteAudit, kind: "read" },

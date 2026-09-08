@@ -247,7 +247,12 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     // script (`node scripts/measure-preamble.mjs`): a step went from 133,505
     // characters to 40,334 — 34,928 tokens to 10,552, a 69.8% cut — and the
     // number this ceiling guards is the one that got 677 characters bigger.
-    const UNGATED_CEILING = 53
+    // 53 → 54 on 2026-09-08, for the same shape of reason and a smaller one:
+    // `describe_tool` reads the catalogue's own `detail` — source code, no row,
+    // no record — so there is no right it could sensibly demand, and it exists
+    // because the summaries it stands behind were cut from 69,892 characters to
+    // 19,494. It costs 133 characters and gives back 50,359.
+    const UNGATED_CEILING = 54
     expect(
       ungated.map((t) => t.name).sort(),
       `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +
@@ -292,5 +297,139 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     const all = names()
     for (const n of names(new Set(Object.values(TOOL_GATES))))
       expect(all.has(n), `"${n}" appeared only when rights were passed`).toBe(true)
+  })
+})
+
+/* ───────────────── THE SUMMARY IS ONE LINE, AND NOTHING WAS LOST ─────────────
+ *
+ * The diet above drops tools a role could never call. This is the other half of
+ * the same bill and it is paid by every caller, whatever their rights: the words
+ * themselves. A `tools/list` on the MCP surface carried 85,621 characters of
+ * description on 2026-09-08 — loaded before the user has typed anything, on a
+ * surface that has no two-stage catalogue to defer it — and the owner connecting
+ * his own Claude to it is how that stopped being an abstract number.
+ *
+ * So a summary is ONE LINE and the rest of the sentence is on `detail`, which no
+ * manifest carries and `describe_tool` hands back on request. The two checks
+ * below are the two ways that can rot, and they are different failures:
+ *
+ *   · a summary that grows back — the whole saving, undone one PR at a time by
+ *     people each adding one reasonable paragraph;
+ *   · a summary trimmed by DELETING rather than moving — which is the dangerous
+ *     one, because it reads exactly like the other and nobody notices for weeks.
+ *     A trimmed tool must have a detail, and the detail must still name every
+ *     identifier the summary does, so the short line can never promise a
+ *     contract the long one has stopped explaining.
+ *
+ * What neither can prove is that the ONE LINE kept the right sentence. That is
+ * judgement, it was made tool by tool, and R27 (`described-contracts`) is what
+ * stops it inventing a name — it reads summary and detail together for exactly
+ * this reason.
+ */
+describe("a tool summary is one line, and its detail keeps what the line dropped", () => {
+  /** Characters, not words: this is a bill measured in tokens. ~110 is the
+   * target and this is the refusal, sized so an ordinary sentence fits and a
+   * paragraph does not. Every summary in the catalogue is under it today. */
+  const SUMMARY_CEILING = 160
+
+  it("no summary is longer than one line", () => {
+    const over = SHARED_TOOLS.filter((t) => t.summary.length > SUMMARY_CEILING).map(
+      (t) => `${t.name} (${t.summary.length})`
+    )
+    expect(
+      over,
+      `a tool summary is ONE LINE, at most ${SUMMARY_CEILING} characters — every manifest on both machine surfaces ` +
+        `carries it before anybody has asked for anything. Move the rest to \`detail\`, which \`describe_tool\` serves: ${over.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("the catalogue as a whole stays under its budget", () => {
+    // A ratchet, not a target: it can fall and must never rise. 69,892 chars
+    // before the trim, 19,494 after — this is that number with a little room,
+    // so a new tool costs nothing to add and a re-inflated one is caught long
+    // before the manifest is a problem again.
+    const CATALOGUE_CEILING = 22_000
+    const total = SHARED_TOOLS.reduce((n, t) => n + t.summary.length, 0)
+    expect(
+      total,
+      `the shared catalogue's summaries total ${total} characters (ceiling ${CATALOGUE_CEILING}). ` +
+        `That is what every MCP client loads before its user types a word.`
+    ).toBeLessThanOrEqual(CATALOGUE_CEILING)
+  })
+
+  it("a trimmed summary MOVED its prose — it did not delete it", () => {
+    // WHAT THIS CAN AND CANNOT PROVE, said plainly. `detail` holds the summary
+    // as it stood before the trim, verbatim — but no test can read the version
+    // that was replaced, so "verbatim" is not the property enforced here. What
+    // IS enforced is the half that rots: a summary may not name something its
+    // own detail never explains, because `describe_tool` is the only place a
+    // caller can go and ask.
+    //
+    // A DECLARED ARGUMENT IS EXEMPT, and that exemption is the check's shape,
+    // not a hole in it. The schema travels beside the description in every
+    // manifest, so `id` is already explained where the caller is standing; the
+    // one-liners routinely backtick an argument the old prose spelled plainly
+    // ("by id"), and failing those would only teach people to un-backtick. What
+    // is left is the class that matters: a RESPONSE field, a status value, a
+    // flag — a word the caller can find nowhere but the prose.
+    const identifiers = (text: string) => [...new Set([...text.matchAll(/`([A-Za-z][A-Za-z0-9_]*)`/g)].map((m) => m[1]))]
+    const orphans: string[] = []
+    let checked = 0
+    for (const t of SHARED_TOOLS) {
+      if (!t.detail) continue
+      checked++
+      const args = new Set(Object.keys((t.schema as { properties?: Record<string, unknown> }).properties ?? {}))
+      for (const word of identifiers(t.summary)) {
+        if (args.has(word)) continue
+        // Whole word, backticked or not: the old prose often named a field in
+        // ordinary sentences, and it explained it just as well there.
+        if (!new RegExp(`\\b${word}\\b`).test(t.detail)) orphans.push(`${t.name}: \`${word}\``)
+      }
+    }
+    // Tripwire: a catalogue with no details at all would pass the loop above in
+    // silence, which is exactly the state this check exists to forbid.
+    expect(checked, "no tool carries a `detail` — the prose was deleted, not moved").toBeGreaterThan(100)
+    expect(
+      orphans,
+      `a summary names an identifier its own \`detail\` never mentions, so \`describe_tool\` cannot explain it: ${orphans.join(", ")}`
+    ).toEqual([])
+  })
+
+  it("the prose that left the manifest is still on disk, all of it", () => {
+    // THE HOLE THIS CLOSES, found by mutation on 8 Sep 2026 and not by reading:
+    // deleting one tool's `detail` outright — leaving its one-line summary in
+    // place, so the manifest looks identical and `describe_tool` answers with
+    // nothing — passed every other check in this file. The move-proof above
+    // SKIPS a tool with no detail, which is exactly the tool a deletion makes.
+    //
+    // So the two numbers are pinned. Not derivable from anything: "was this
+    // summary trimmed?" is a fact about the version that was replaced, and no
+    // test can read that. A pin is the honest instrument, and it is the same
+    // shape as UNGATED_CEILING above — it moves when somebody decides it
+    // should, in a commit that says why, and never by accident.
+    const detailed = SHARED_TOOLS.filter((t) => t.detail)
+    const DETAILED_TOOLS = 126
+    const DETAIL_CHARS_FLOOR = 67_000
+    expect(
+      detailed.map((t) => t.name),
+      `${detailed.length} tools carry a \`detail\` (pinned at ${DETAILED_TOOLS}). A tool that LOSES one has had its ` +
+        `prose deleted rather than moved, and its one-line summary is now the only thing anybody can read. ` +
+        `A tool that GAINS one is fine — move the pin in the same commit.`
+    ).toHaveLength(DETAILED_TOOLS)
+    const chars = detailed.reduce((n, t) => n + (t.detail as string).length, 0)
+    expect(
+      chars,
+      `the details hold ${chars} characters of prose (floor ${DETAIL_CHARS_FLOOR}). This is what left the manifest ` +
+        `on 8 Sep 2026 and it is not spare — a detail gutted to a sentence keeps the count above and loses the words.`
+    ).toBeGreaterThanOrEqual(DETAIL_CHARS_FLOOR)
+  })
+
+  it("the long ones are the ones that were trimmed", () => {
+    // A detail on a tool whose summary was always short is duplication, not a
+    // move: `update_role` says "Rename or re-describe a team role (by id)" and
+    // there is nothing behind it to fetch. Keeps the list honest about which
+    // tools have a second half worth asking for.
+    const pointless = SHARED_TOOLS.filter((t) => t.detail && t.detail.length <= t.summary.length).map((t) => t.name)
+    expect(pointless, `a \`detail\` no longer than its summary is a copy, not a move: ${pointless.join(", ")}`).toEqual([])
   })
 })

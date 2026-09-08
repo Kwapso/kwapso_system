@@ -943,6 +943,9 @@ export function toolSpecs(held?: ReadonlySet<string>, loaded?: ReadonlySet<strin
  * catalogue you cannot open is a shorter catalogue and nothing else. */
 export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "describe_module",
+  // Beside `load_tools` and for the same reason: every summary in the shared
+  // catalogue is one line now, and this is where the rest of the sentence is.
+  "describe_tool",
   "query_records",
   "ask_knowledge",
   "read_activity",
