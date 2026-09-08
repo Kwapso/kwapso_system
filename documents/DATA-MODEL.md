@@ -1164,7 +1164,27 @@ them. Four tables, one per job:
   source can be a 300-page contract and a page of fifty of them would be tens of
   megabytes on the way to a screen showing titles. `app_id` / `ticket_id` /
   `sprint_id` / `record_date` are the rest of the notebook a question is routed
-  by. `body_bytes` is how much material there really is, so a screen can say
+  by. `event_id` / `event_id_from` (team migration
+  `0070_a_source_says_which_call_it_is_from`) say WHICH CALL a source came from,
+  where Google itself said so and nowhere else: one meeting produces a calendar
+  entry, several RSVP notices, a Gemini notes document and a "Notes:" mail, and
+  before this nothing in the schema could say two of them were about the same
+  half-hour — on 8 Sep 2026 the assistant answered about that week's planning
+  call from a 1,179-character stub while a 73,141-character transcript sat beside
+  it. Three routes fill it and `event_id_from` names which was read, exactly as
+  `meetings.transcript_found_by` does beside it: `origin` (a calendar source's
+  own `origin_row_id` IS the event id), `meeting` (`meetings.google_event_id`,
+  stored since 0012) and `mail` (the `eid=` Google's robot writes into a notice,
+  base64url of `"<eventId> <calendarId>"` — read by
+  `scripts/backfill-source-events.mjs`, because SQLite has no base64). **NULL is
+  a correct answer and most rows keep one.** Measured on staging that day: the
+  Gemini notes DOCUMENT states no event anywhere — 0 of 80 live Drive sources
+  carry a calendar link, an `eid` or even a Meet link — and neither do the 121
+  "Notes:" mails that hold the minutes. Matching those on their title is the one
+  thing this must never do; a wrong parent is worse than none, because the base
+  then answers confidently from the wrong artefact. It is NOT on the vector: the
+  index carries nine metadata keys and this is not a tenth, so nothing about what
+  is searched changed with it (R26). `body_bytes` is how much material there really is, so a screen can say
   "the first part of 412 KB" rather than presenting an excerpt as the whole
   thing. `index_error` is why a source could not be indexed whole, in words,
   nothing here is ever silently trimmed. Deactivating means "stop reading this":

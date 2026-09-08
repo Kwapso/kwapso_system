@@ -1099,6 +1099,50 @@ export function documentIdInText(text: string): string | null {
   return hit?.[1] ?? null
 }
 
+/** THE CALENDAR EVENT A NOTICE IS ABOUT — Google's own id, read out of the link
+ * Google's own robot wrote.
+ *
+ * Every invitation, update, acceptance and decline carries one line: `Reply for
+ * … and view more details` over a
+ * `calendar.google.com/calendar/event?action=VIEW&eid=<eid>` link, where `eid`
+ * is base64url of `"<eventId> <calendarId>"`. So this is READING an identifier,
+ * not matching on one — the same class of fact as `documentIdInText` above, and
+ * the opposite of the title comparison `eventNamedBy` does in
+ * lib/knowledge-google.ts.
+ *
+ * MEASURED ON STAGING, 8 Sep 2026, over every mail the base holds: 240 messages
+ * carry an `eid`, 240 of 240 decoded cleanly, and 225 of those (93.8%) name an
+ * event this base already holds as a calendar source or a meeting. The 15 that
+ * do not are real events outside the window we ever read — the honest shape of
+ * "Google says which, and we have not met it".
+ *
+ * Returns null rather than guessing. A message with no such link — a "Notes:"
+ * mail, a cancellation, an ordinary thread — is one Google did not tell us
+ * about, and half-matching one would file somebody's newsletter against a call.
+ *
+ * The calendar id is deliberately dropped: two guests receive the same event
+ * under their own calendar ids, and it is the EVENT the two artefacts share. */
+export function calendarEventIdInText(text: string): string | null {
+  const hit = /calendar\.google\.com\/calendar\/event\?[^\s"'<>]*[?&]eid=([A-Za-z0-9_-]+)/.exec(text)
+  if (!hit) return null
+  let decoded: string
+  try {
+    // base64url → base64, and back to the padding `atob` insists on. `atob` is on
+    // the Workers runtime and in Node, so this needs nothing imported.
+    const b64 = hit[1].replace(/-/g, "+").replace(/_/g, "/")
+    decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4))
+  } catch {
+    // A truncated link in a forwarded mail is not an error worth a log line: it
+    // is one message we cannot place, which is the same answer as no link at all.
+    return null
+  }
+  const space = decoded.indexOf(" ")
+  const eventId = (space === -1 ? decoded : decoded.slice(0, space)).trim()
+  // Google's event ids are base32hex-ish; anything else means we decoded noise
+  // that happened to be valid base64, and noise must never become a parent.
+  return /^[A-Za-z0-9_-]{5,}$/.test(eventId) ? eventId : null
+}
+
 /**
  * SEARCH THE MAILBOX — or the part of it a person has left in reach.
  *
