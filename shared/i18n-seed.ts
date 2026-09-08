@@ -3461,6 +3461,16 @@ export const SEED: Catalogue = {
     es: "Un mapa de con qué está conectado este registro",
     ca: "Un mapa d'amb què està connectat aquest registre",
   },
+  /* THE TAB'S OWN FAILURE (8 Sep 2026) — the map's read can fail like any
+   * other, and this is the sentence that says so instead of leaving the
+   * loading skeleton on screen forever. Written here, beside the rest of the
+   * map's words, for the same "{count} connected" / "Nothing is linked to
+   * this yet." register. */
+  "Couldn't load this record's connections.": {
+    de: "Verbindungen dieses Eintrags konnten nicht geladen werden.",
+    es: "No se pudieron cargar las conexiones de este registro.",
+    ca: "No s'han pogut carregar les connexions d'aquest registre.",
+  },
   /* The group's accessible name — read aloud, never drawn. */
   "Which sources the assistant reads": {
     de: "Welche Quellen der Assistent liest",
