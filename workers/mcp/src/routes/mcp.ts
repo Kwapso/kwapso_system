@@ -63,8 +63,11 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: `${brand.name}-mcp`, version: "1.0.0" }, // brand-derived; kwapso's value unchanged
+        // The last sentence is load-bearing since 2026-09-08: every tool
+        // description here is ONE LINE, so a client that never calls
+        // describe_tool is reading a quarter of what the catalogue says.
         instructions:
-          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
+          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions.",
       })
     case "notifications/initialized":
       return new Response(null, { status: 202 })

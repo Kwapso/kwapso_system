@@ -131,10 +131,18 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 65 of the 190 tools (counted from the live catalogue, 26 Aug 2026),
+- **Read** — 69 of the 195 tools answer on a GET (counted from the live catalogue,
+  8 Sep 2026), and 194 of the doors in the census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
   the write families proper are under **Write**:
+  - **reading a tool's own manual** — `describe_tool`. Every description on this
+    surface is ONE LINE: a `tools/list` used to carry 85,621 characters of prose,
+    loaded before the caller had asked for anything, and it is what stopped the
+    owner's own Claude behaving when he connected to it. The rest of each
+    sentence — the history, the reasoning, the worked examples — is on the tool's
+    `detail` and comes back from here, by name, when a caller actually needs it.
+    Nothing was deleted; ask for it before a call you are unsure of.
   - **asking, rather than listing** — `describe_module` and `query_records`. One
     read tool over every module a caller may read: `describe_module` answers with
     the fields, their types and an enum's values (including the ones the team
@@ -237,7 +245,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **279 doors, 217 with a tool, 62 with a written reason**, the
+  red build. Today: **280 doors, 218 with a tool, 62 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE doors of the direct upload (permission to PUT a file, which hands

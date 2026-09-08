@@ -112,11 +112,23 @@ type Judged = {
 /** Every distinct tool on either machine surface, with the one description its
  * callers read. The two surface catalogues PROJECT the shared tools (the MCP
  * appends only the derived "Needs <gate>." hint), so the shared summary is
- * judged once and each surface-only description is judged where it lives. */
+ * judged once and each surface-only description is judged where it lives.
+ *
+ * BOTH HALVES OF A SHARED TOOL'S PROSE, joined. On 2026-09-08 the summaries
+ * were cut to one line each and everything they said moved onto `detail`,
+ * which `describe_tool` hands back on request. A model reads that text exactly
+ * as it reads a summary, so a law that judged only the line above it would have
+ * gone from covering 69,892 characters of prose to covering 19,494 — the same
+ * words, three quarters of them suddenly unchecked, on a green build. Joined
+ * rather than listed as a second entry so the surface COUNTS below still count
+ * tools. */
 const sharedNames = new Set(SHARED_TOOLS.flatMap((s) => [s.name, s.mcpName ?? s.name]))
 const JUDGED: Judged[] = [
   ...SHARED_TOOLS.map((t): Judged => ({
-    name: t.name, surface: "shared", text: t.summary, schema: t.schema, method: t.method, path: t.path,
+    name: t.name,
+    surface: "shared",
+    text: t.detail ? `${t.summary}\n${t.detail}` : t.summary,
+    schema: t.schema, method: t.method, path: t.path,
   })),
   ...MCP_TOOLS.filter((t) => !sharedNames.has(t.name)).map((t): Judged => ({
     name: t.name, surface: "mcp", text: t.description, schema: t.inputSchema, method: t.method, path: t.path,
