@@ -852,7 +852,9 @@ function CalendarPanel({
               return (
                 <div
                   key={g.email}
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b p-3 text-sm last:border-0"
+                  // A row rule inside one panel: an inset hairline, not a
+                  // border (kit §2.7 — web/test/kit-conformance.test.ts).
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-sm shadow-[var(--hairline-under)] last:shadow-none"
                 >
                   <span className="font-medium">{g.name || g.email}</span>
                   {g.name && <span className="text-muted-foreground text-xs">{g.email}</span>}
@@ -907,7 +909,9 @@ function CalendarPanel({
                 href={safeHref(a.url)}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="hover:bg-muted/50 flex items-center gap-2 border-b p-3 text-sm last:border-0"
+                // The attachment rows' rule, the same inset hairline as the
+                // invitee rows above (kit §2.7).
+                className="hover:bg-muted/50 flex items-center gap-2 p-3 text-sm shadow-[var(--hairline-under)] last:shadow-none"
               >
                 {a.iconUrl && (
                   <img src={safeSrc(a.iconUrl)} alt="" width={16} height={16} className="shrink-0" />

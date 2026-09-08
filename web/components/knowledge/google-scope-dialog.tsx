@@ -276,8 +276,25 @@ export function GoogleScopeDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, mode: m.value }))}
               disabled={busy}
+              /* THE PICKED CARD'S RING IS AN INSET SHADOW, NOT A BORDER (kit
+                 §2.7 — web/test/kit-conformance.test.ts). This is the third of
+                 the kit's three remedies, and it is the right one here because
+                 the thing being drawn IS a ring around a card rather than a
+                 rule between two of them.
+                 The paper step is already present and is kept: the card moves
+                 from `--surface-panel` to `--muted` when it is picked. The ring
+                 is the second half of one answer, not a second answer — a step
+                 between two adjacent quiet tones is a weak signal for the one
+                 decision this dialog exists to take, and the mango edge is what
+                 makes it read at a glance.
+                 An inset ring also removes a fault the border had: a border is
+                 inside the box, so picking a card used to shift its own words
+                 1px in and 1px down. A shadow paints over the padding and moves
+                 nothing. */
               className={`flex flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
-                values.mode === m.value ? "border border-primary bg-muted" : ""
+                values.mode === m.value
+                  ? "bg-muted shadow-[inset_0_0_0_0.0625rem_var(--primary)]"
+                  : ""
               }`}
             >
               <span className="text-sm font-medium">{t(m.title)}</span>
@@ -329,7 +346,12 @@ export function GoogleScopeDialog({
                         key={o.externalId}
                         type="button"
                         onClick={() => toggle(o)}
-                        className={`hover:bg-muted/50 flex items-center gap-2 border-b p-3 text-left text-sm last:border-0 ${
+                        /* A row rule inside the picker list — an inset hairline,
+                           not a border (kit §2.7). The picked row's own answer
+                           stays the paper step it already was (`bg-muted`); a
+                           multi-select row carries a tick, so it needs no ring
+                           of its own the way the mode card above does. */
+                        className={`hover:bg-muted/50 flex items-center gap-2 p-3 text-left text-sm shadow-[var(--hairline-under)] last:shadow-none ${
                           on ? "bg-muted" : ""
                         }`}
                       >

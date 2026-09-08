@@ -129,7 +129,8 @@ describe("the live socket is keyed on where the person is standing", () => {
     const shell = readFileSync(resolve(__dirname, "../components/portal-shell.tsx"), "utf8")
     const at = shell.indexOf("useRealtime(")
     expect(at, "the shell must open the team channel").toBeGreaterThan(-1)
-    const call = shell.slice(at, shell.indexOf("\n  )", at))
+    const call = realtimeCall(shell)
+    expect(call, "the useRealtime call does not close — re-read this test").not.toBeNull()
     // `accountId` on its own line, as an ARGUMENT rather than part of an
     // expression. This used to anchor on the end of the call ($) and therefore on
     // accountId being the LAST argument — which broke the day a fifth argument
@@ -189,8 +190,31 @@ describe("the portal subscribes to what it handles, and nothing else", () => {
 
   it("the shell actually passes it — a derived list nobody sends is decoration", () => {
     const shell = readFileSync(resolve(__dirname, "../components/portal-shell.tsx"), "utf8")
-    const at = shell.indexOf("useRealtime(")
-    expect(at, "the shell must open the team channel").toBeGreaterThan(-1)
-    expect(shell.slice(at, shell.indexOf("\n  )", at))).toContain("PORTAL_SUBSCRIPTIONS")
+    const call = realtimeCall(shell)
+    expect(call, "the shell must open the team channel").not.toBeNull()
+    expect(call).toContain("PORTAL_SUBSCRIPTIONS")
   })
 })
+
+/** The argument list of the shell's `useRealtime(...)` call, parenthesis-balanced.
+ *
+ * WHY NOT `shell.slice(at, shell.indexOf("\n  )", at))`, which is what both
+ * checks above used to do: that bound is a TWO-SPACE indent before the closing
+ * paren — a fact about where the call currently sits, not about the call. Wrap
+ * it in one more block (an `if`, an effect) and the indent becomes four, the
+ * marker is missed, and `indexOf` returns -1. `slice(at, -1)` does not fail: it
+ * returns nearly the whole component, so `PORTAL_SUBSCRIPTIONS` and an
+ * `accountId,` line would both be found SOMEWHERE and both checks would pass
+ * without saying anything about what the socket is actually opened with. A call
+ * ends where its own parenthesis closes, at any indentation. */
+function realtimeCall(shell: string): string | null {
+  const at = shell.indexOf("useRealtime(")
+  if (at === -1) return null
+  const open = shell.indexOf("(", at)
+  let depth = 0
+  for (let i = open; i < shell.length; i++) {
+    if (shell[i] === "(") depth++
+    else if (shell[i] === ")" && --depth === 0) return shell.slice(open + 1, i)
+  }
+  return null
+}

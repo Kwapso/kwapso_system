@@ -29,7 +29,14 @@ describe("the ticket strip's default tab", () => {
   it("is the tab drawn first, not a tab that used to be first", () => {
     const src = readFileSync(join(WEB, "components/tickets/tickets-collection.tsx"), "utf8")
 
-    const remembered = src.match(/useRemembered<HelpFacet>\(\s*"ticket-facet"\s*,\s*([A-Z_]+)\s*\)/)
+    // The GENERIC ARGUMENT is optional here. Pinned as `useRemembered<HelpFacet>`,
+    // this broke on any purely local retype — widening the union, aliasing it, or
+    // letting TypeScript infer it from the default and dropping the argument
+    // altogether — none of which changes which tab the strip opens on. The key
+    // and the default constant are what the law compares.
+    const remembered = src.match(
+      /useRemembered\s*(?:<[^>()]*>)?\(\s*"ticket-facet"\s*,\s*([A-Z_]+)\s*\)/
+    )
     expect(
       remembered,
       "could not find the remembered ticket facet — if `useRemembered(\"ticket-facet\", …)` was renamed or reshaped, teach this test the new spelling rather than deleting it"

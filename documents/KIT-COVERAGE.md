@@ -18,7 +18,7 @@ another kit part (`notes` through Comments, `folder` through tabs, `title`
 through the kit's own record-detail, `progress` through file-upload, two more
 filed as footnotes), and `motion` arrives through a CSS `@import` in both front
 doors' globals.css — a reference no JS-import grep can see at all, in either
-direction. 7 parts are reached that way today, JS or CSS. The
+direction. 9 parts are reached that way today, JS or CSS. The
 walk cannot over-count: nothing enters without a path back to a file the app
 itself names, which is why `heatmap` stays unadopted even though `pulse-band`
 imports it — pulse-band is not reached either. `[ ]` = not reached. `(absent)` =
@@ -92,7 +92,7 @@ preparation, never edited by hand.
 
 - [x] `command`
 - [x] `dropdown-menu`
-- [ ] `hover-card`
+- [x] `hover-card`
 - [x] `popover`
 - [x] `tooltip`
 
@@ -132,7 +132,7 @@ preparation, never edited by hand.
 - [x] `sort-control`
 - [x] `table`
 - [x] `use-virtual-rows`
-- [x] `visibility`
+- [ ] `visibility`
 - [x] `data-preview-table`
 - [x] `description-list`
 
@@ -170,7 +170,7 @@ preparation, never edited by hand.
 ## Collection views
 
 - [x] `list`
-- [ ] `kanban`
+- [x] `kanban`
 - [x] `card-grid`
 - [x] `calendar-view`
 - [x] `data-table`
@@ -180,8 +180,8 @@ preparation, never edited by hand.
 - [ ] `timeline`
 - [x] `agenda`
 - [x] `gallery`
-- [ ] `split`
-- [ ] `queue`
+- [x] `split`
+- [x] `queue`
 - [x] `activity-feed`
 - [x] `checklist`
 - [ ] `chat`
@@ -203,8 +203,11 @@ preparation, never edited by hand.
 - [x] `brand`
 - [x] `portal-conversation`
 
-## Components the kit ships that the list did not name (0)
+## Components the kit ships that the list did not name (3)
 
+- [x] `cursor-glow`
+- [x] `edge-panel`
+- [x] `sankey`
 
 ## Compositions (47)
 
@@ -253,16 +256,17 @@ preparation, never edited by hand.
 - [x] `templates/screen-shell`
 - [ ] `templates/search-results`
 - [x] `templates/sign-in`
-- [ ] `templates/stat-strip`
+- [x] `templates/stat-strip`
 - [ ] `templates/stepper-hero`
 
 ## Foundations
 
 - [x] `icons`
 - [x] `motion`
+- [x] `rules`
 - [x] `tokens`
 
 ---
 
-**Components 85/115 · Foundations 3/3 · Compositions 8/47**
-**Components + foundations combined (the owner's "118"): 88/118**
+**Components 91/118 · Foundations 4/4 · Compositions 9/47**
+**Components + foundations combined (the owner's "118"): 95/122**

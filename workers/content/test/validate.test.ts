@@ -244,11 +244,16 @@ describe("no query parameter reaches a handler uncapped", () => {
 
   it("a help reply's @mentions are capped (an unbounded list is an unbounded send)", () => {
     const src = readFileSync(join(ROOT, "workers/content/src/routes/help.ts"), "utf8")
+    // `\s*` at every gap, and the reason is the near miss rather than the
+    // aesthetics: this pinned `new Set(body.taggedUserIds.filter` with exactly
+    // one space and no others, so a wrap after `new Set(` — which Prettier will
+    // do the moment the filter's callback grows — reddens a law about a SEND
+    // CAP over a line break. It is the de-dupe-then-count shape that matters.
     expect(src, "the mention list must be de-duped before it is counted").toMatch(
-      /new Set\(body\.taggedUserIds\.filter/
+      /new Set\(\s*body\.taggedUserIds\s*\.filter/
     )
     expect(src, "the mention list must be refused past MENTIONS_LIMIT").toMatch(
-      /tagged\.length > MENTIONS_LIMIT/
+      /tagged\.length\s*>\s*MENTIONS_LIMIT/
     )
     expect(MENTIONS_LIMIT).toBeGreaterThan(0)
   })

@@ -269,7 +269,12 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
             const live = liveFor(service)
             const named = sources.filter((s) => s.service === service)
             return (
-              <div key={service} className="flex flex-col gap-2 border-b p-3 last:border-0">
+              // One service per row inside one panel: the row rule is an inset
+              // hairline, not a border (kit §2.7).
+              <div
+                key={service}
+                className="flex flex-col gap-2 p-3 shadow-[var(--hairline-under)] last:shadow-none"
+              >
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                   <span className="font-medium">{t(SERVICE_COPY[service].label)}</span>
                   {live ? (

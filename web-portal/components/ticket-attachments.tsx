@@ -182,7 +182,17 @@ export function TicketAttachments({ ticketId }: { ticketId: string }) {
         </p>
       ) : (
         // K5: one container, rows separated by a hairline — never a box each.
-        <ul className="divide-y rounded-[var(--radius)] bg-surface-panel">
+        //
+        // `divide-border`, because until now that sentence was not true. Bare
+        // `divide-y` sets a WIDTH and a STYLE and no colour, and Tailwind v4's
+        // preflight leaves the colour at `currentColor` — so these rows were
+        // separated by a 1px line in the ink the row was written in, not by a
+        // hairline. The other thirty `divide-y` sites across both front doors
+        // all name the token; this was the one that did not. Found while
+        // adopting the kit's boundary law, which names `divide-*` as the one
+        // clause it deliberately does not carry (kit borders.mjs header) — so
+        // no check would have said a word about this line either way.
+        <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {attachments.map((a) => {
             const size = a.kind === "file" ? fileSize(a.sizeBytes) : null
             const Glyph = a.kind === "file" ? fileTypeIcon(a.label) : LinkSimple

@@ -268,8 +268,15 @@ export function GoogleSourceDialog({
                   setOptions(null)
                 }}
                 disabled={busy}
+                /* The picked card's ring is an inset shadow, not a border —
+                   the same treatment, and the same argument, as
+                   `google-scope-dialog.tsx`'s mode cards, which this dialog is
+                   deliberately a twin of. Kit §2.7; the paper step
+                   (`--surface-panel` → `--muted`) is kept beside it. */
                 className={`flex flex-1 flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
-                  kind === k.value ? "border border-primary bg-muted" : ""
+                  kind === k.value
+                    ? "bg-muted shadow-[inset_0_0_0_0.0625rem_var(--primary)]"
+                    : ""
                 }`}
               >
                 <span className="text-sm font-medium">{t(k.title)}</span>
@@ -313,7 +320,10 @@ export function GoogleSourceDialog({
                   key={o.externalId}
                   type="button"
                   onClick={() => toggle(o)}
-                  className={`hover:bg-muted/50 flex items-center gap-2 border-b p-3 text-left text-sm last:border-0 ${
+                  /* A row rule inside the picker list: an inset hairline, not a
+                     border (kit §2.7). Same list, same treatment as the scope
+                     dialog's own picker. */
+                  className={`hover:bg-muted/50 flex items-center gap-2 p-3 text-left text-sm shadow-[var(--hairline-under)] last:shadow-none ${
                     picked ? "bg-muted" : ""
                   }`}
                 >
@@ -349,7 +359,12 @@ export function GoogleSourceDialog({
                       src={safeSrc(content.googleDriveThumbnailUrl(o.externalId))}
                       alt=""
                       loading="lazy"
-                      className="h-8 w-8 shrink-0 rounded shadow-[var(--hairline)] object-cover"
+                      /* `--radius-sm` (4px), the kit's own small step, rather
+                         than Tailwind's bare `rounded` — which is 4px today by
+                         coincidence and answerable to nothing. Not `--radius`:
+                         a 24px corner on a 32px thumbnail is a circle with the
+                         picture cropped out of its four sides. */
+                      className="h-8 w-8 shrink-0 rounded-[var(--radius-sm)] shadow-[var(--hairline)] object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = "none"
                       }}
@@ -419,8 +434,12 @@ export function GoogleSourceDialog({
               type="button"
               onClick={() => setValues((v) => ({ ...v, shelf: s.value }))}
               disabled={busy}
+              /* The shelf cards are the kind cards above, one question later:
+                 same ring, same argument (kit §2.7). */
               className={`flex flex-col gap-1 rounded-[var(--radius)] bg-surface-panel p-3 text-left ${
-                values.shelf === s.value ? "border border-primary bg-muted" : ""
+                values.shelf === s.value
+                  ? "bg-muted shadow-[inset_0_0_0_0.0625rem_var(--primary)]"
+                  : ""
               }`}
             >
               <span className="text-sm font-medium">{t(s.title)}</span>

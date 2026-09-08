@@ -348,7 +348,26 @@ export function StepsPanel({
           {shownSteps.map((step, i) => (
             <div
               key={step.id}
-              className="flex items-start justify-between gap-2 border-b p-3 last:border-b-0"
+              /* THE STEP DIVIDERS ARE STRUCTURAL AND THEY STAY — as the kit's
+                 own named hairline shape rather than a border (kit §2.7,
+                 web/test/kit-conformance.test.ts). A step's line wraps to two
+                 and three lines, so without a rule between them a reader cannot
+                 tell where one step ends and the next begins; this is the one
+                 list on this screen where the divider is doing work no gap
+                 does. `--hairline-under` is `inset 0 -1px 0 var(--hair)`, and
+                 `--hair` IS `--border` — so the line is in the same place, at
+                 the same width, and the row loses only the 1px of height a
+                 border added to its box.
+                 WHAT DOES CHANGE IS THE COLOUR, and it is a fix rather than a
+                 cost. `border-b` sets a width and a style and names no colour;
+                 Tailwind v4's preflight leaves that at `currentColor`, so these
+                 rules were drawn in the step's own ink at full strength —
+                 near-black in light, near-white in dark — where every other
+                 divider in this app (thirty `divide-border` sites) is the 8%
+                 hairline. `shared-web-is-styled.test.ts` found the identical
+                 fault in `form-shell.tsx` in August and wrote a one-file law
+                 against it; this is the same fault, twelve files wider. */
+              className="flex items-start justify-between gap-2 p-3 shadow-[var(--hairline-under)] last:shadow-none"
             >
               <div className="min-w-0 flex-1">
                 <p className="block truncate text-sm font-medium">
@@ -481,7 +500,13 @@ export function StepsPanel({
               month this way of working costs. The subtraction between
               two of these is the saving, and it is shown below with
               the sentence it has to be quoted with. */}
-          <div className="bg-muted/40 flex items-baseline justify-between gap-2 border-t p-3">
+          {/* The total's own rule, an inset hairline on its top edge — the
+              same one every step row above it draws on its bottom, so the last
+              step and the total are separated exactly like any two steps (kit
+              §2.7). The row ALSO stands on its own tone, which is the kit's
+              first remedy already in place: the paper step says "this is not
+              another step", the hairline says where it starts. */}
+          <div className="bg-muted/40 flex items-baseline justify-between gap-2 p-3 shadow-[var(--hairline-over)]">
             <span className="text-sm font-medium">
               {t("Total, as")}{" "}
               {shownVersion ? versionLabel(shownVersion).toLowerCase() : t("this version")}{" "}

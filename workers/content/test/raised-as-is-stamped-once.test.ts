@@ -609,14 +609,32 @@ describe("0065 backfills nothing, on purpose", () => {
     "utf8"
   )
   const at = ledger.indexOf('version: "0065_a_ticket_remembers_what_it_arrived_as"')
+  // BOUND ON THE ENTRY'S OWN END, NEVER A CHARACTER COUNT. This used to read
+  // `ledger.slice(at, at + 400)`, which said "0065's SQL" and meant "the next
+  // 400 characters" — one added comment line, or one more column, above the
+  // ALTER and the window stops reaching the statement it exists to find, so a
+  // no-op edit to a neighbouring migration breaks CI. The entry ends where its
+  // template literal ends, which is the bound the sibling assertion below has
+  // always used; both now share it.
+  //
+  // AND THE BOUND IS ASSERTED. `indexOf` returns -1 when the marker is gone,
+  // and `slice(at, -1)` does not fail — it hands back nearly the whole ledger,
+  // so an UPDATE in some later migration would be read as 0065's and the check
+  // would flip to failing (or, for a `toContain`, pass) for a reason that has
+  // nothing to do with 0065.
+  const end = at === -1 ? -1 : ledger.indexOf("`,", at)
+  const entry = () => {
+    expect(at, "0065 is gone — has the column moved?").toBeGreaterThan(-1)
+    expect(end, "0065's SQL literal does not close — the ledger's shape has moved").toBeGreaterThan(at)
+    return ledger.slice(at, end)
+  }
 
   it("the migration exists and is the one that adds the column", () => {
-    expect(at, "0065 is gone — has the column moved?").toBeGreaterThan(-1)
-    expect(ledger.slice(at, at + 400)).toContain("ALTER TABLE help ADD COLUMN raised_as_type TEXT;")
+    expect(entry()).toContain("ALTER TABLE help ADD COLUMN raised_as_type TEXT;")
   })
 
   it("its SQL is the ALTER and nothing else", () => {
-    const sql = ledger.slice(at, ledger.indexOf("`,", at))
+    const sql = entry()
     expect(
       /UPDATE\s+help/i.test(sql),
       "0065 must not backfill: an inferred value in the same column as a stamped one cannot be told apart afterwards. Read the migration's own comment"

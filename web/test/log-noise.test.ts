@@ -70,8 +70,45 @@ describe("the error store keeps signal, not chatter", () => {
   })
 
   it("is wired into the one reporting seam, not applied ad hoc", () => {
-    expect(LOG, "reportError must consult both filters before beaconing").toMatch(
-      /if \(isBenignNetworkError\(e\) \|\| isBrowserNoise\(e\)\) return/
-    )
+    // THE SHAPE OF THE GUARD, not one spelling of it. This was pinned as the
+    // single line `if (isBenignNetworkError(e) || isBrowserNoise(e)) return` —
+    // so adding braces, swapping the two operands (`||` is commutative), or
+    // wrapping the condition when a third filter joins it would each have
+    // reddened the law while the guard did exactly the same thing. Worse, the
+    // pin is stated in the direction where a near-miss is dangerous: it says the
+    // filters are consulted, and the whole point is that a real failure still
+    // reaches the store.
+    //
+    // So: find every early-return guard in the file by BALANCING its own
+    // parentheses (a `[^)]*` condition stops at the first `)`, which here is
+    // `isBenignNetworkError(e`), and require ONE guard that consults both
+    // filters and returns. Drop either filter from the condition, or drop the
+    // `return` so it stops being a guard, and it goes red.
+    const guards: string[] = []
+    for (const m of LOG.matchAll(/\bif\s*\(/g)) {
+      const open = (m.index as number) + m[0].length - 1
+      let depth = 0
+      let close = -1
+      for (let j = open; j < LOG.length; j++) {
+        if (LOG[j] === "(") depth++
+        else if (LOG[j] === ")" && --depth === 0) {
+          close = j
+          break
+        }
+      }
+      if (close === -1) continue
+      // The consequent, however it is written: `return`, `{ return }`, or a
+      // `return` on the next line.
+      if (/^\s*\{?\s*return\b/.test(LOG.slice(close + 1, close + 40)))
+        guards.push(LOG.slice(open + 1, close))
+    }
+    expect(
+      guards.length,
+      "no early-return guard found in shared/web/log.ts at all — this scan has gone blind"
+    ).toBeGreaterThan(0)
+    expect(
+      guards.some((c) => /isBenignNetworkError\(/.test(c) && /isBrowserNoise\(/.test(c)),
+      "reportError must consult BOTH filters in one early return before beaconing"
+    ).toBe(true)
   })
 })

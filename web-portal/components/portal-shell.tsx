@@ -173,7 +173,23 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     // already resolved by the time this paints, so there is no flash of English.
     <LanguageProvider value={session.user?.language}>
     <div className="flex min-h-[100svh] flex-col">
-      <header className="bg-background sticky top-0 z-30 border-b">
+      {/* THE STICKY HEADER'S EDGE IS AN INSET SHADOW (kit §2.7). It is
+          load-bearing rather than decorative: this bar is `sticky` over
+          scrolling content, and without an edge the page slides under it with
+          nothing saying where the bar stops.
+          THE STRONG SHAPE, not the plain one, and the reason is that there is
+          no paper step under it to help: the bar and the page it covers are
+          both `--background`, so this 1px line is the ONLY thing separating
+          them. tokens.css reserves `--hair-strong` (20%) for exactly that
+          reading — section rules — and `--hair` (8%) for same-tone card
+          separation, which is what the row dividers elsewhere use. A named
+          shape rather than an arbitrary inset: `--hairline-under-strong`
+          exists so the whole system's edges are one edit, and it also flips
+          correctly on an inverse ground, which a hand-written
+          `var(--border)` does not.
+          NOT a paper step, either: a sticky bar in a second tone reads as a
+          banner the page is missing rather than as the top of the page. */}
+      <header className="bg-background sticky top-0 z-30 shadow-[var(--hairline-under-strong)]">
         <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center gap-2 overflow-hidden px-5 py-3">
           <AccountSwitcher
             accounts={session.accounts}
@@ -258,7 +274,10 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
        * the slot gets `min-w-0` so it can actually be that narrow. A second
        * line costs about 16px of bar height, in the two languages that need
        * one. Nothing is truncated and no word had to be shortened. */}
-      <nav className="bg-background sticky bottom-0 border-t">
+      {/* The header's own argument, upside down: the bottom bar is sticky over
+          the same scrolling content, on the same ground, so it takes the same
+          strong edge on its top side (kit §2.7). */}
+      <nav className="bg-background sticky bottom-0 shadow-[var(--hairline-over-strong)]">
         <div className="mx-auto flex w-full max-w-3xl px-1">
           {DESTINATIONS.map((dest) => {
             const { label, icon: Icon } = dest

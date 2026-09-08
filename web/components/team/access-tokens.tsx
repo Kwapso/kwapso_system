@@ -168,7 +168,10 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           {tokens.map((token) => (
             <div
               key={token.id}
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b p-3 text-sm last:border-0"
+              // A row rule inside one panel, as an inset hairline rather than a
+              // border (kit §2.7 — web/test/kit-conformance.test.ts). One list,
+              // one kind of row, so a paper step would be saying they differ.
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-sm shadow-[var(--hairline-under)] last:shadow-none"
             >
               <span className="font-medium">{token.label}</span>
               {token.revokedAt ? (

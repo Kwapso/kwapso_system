@@ -213,7 +213,16 @@ describe("the seam keeps its one decision", () => {
     // The component's ONE expression. Written out here so that widening it — a
     // third branch, a raw fallback, a "trusted" flag — has to change this line
     // too, in front of somebody.
-    expect(src).toContain("looksLikeHtml(html) ? sanitizeRichHtml(html) : toHtml(html ?? \"\")")
+    // THE EXPRESSION'S SHAPE, with any whitespace between its parts. As one
+    // literal string it also pinned the LAYOUT: a ternary this long is exactly
+    // what a formatter breaks over three lines, and the seam would have gone red
+    // over a wrap. What the law is for is unchanged — the condition, and the two
+    // branches it may take, are still spelled out here in full, so a third
+    // branch, a raw fallback or a "trusted" flag still has to be argued for in
+    // front of somebody at this line.
+    expect(src).toMatch(
+      /looksLikeHtml\(\s*html\s*\)\s*\?\s*sanitizeRichHtml\(\s*html\s*\)\s*:\s*toHtml\(\s*html\s*\?\?\s*""\s*\)/
+    )
     expect(
       (src.match(/dangerouslySetInnerHTML/g) ?? []).length,
       "the seam injects in exactly one place"

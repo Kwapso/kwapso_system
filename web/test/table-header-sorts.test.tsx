@@ -472,8 +472,44 @@ describe("every table in the agency app is one whose headers work", () => {
     // follow `config.sortBy`) and both halves go red together, which is the
     // signal `RecordTable` is free to collapse onto `DataTable`.
     const seedsOnceFromConfig =
-      /useState\(config\.sortBy\)/.test(frame) || /sortBy:\s*config\.sortBy/.test(frame)
-    const resyncsFromTheProp = /useEffect\([\s\S]{0,400}config\.sortBy/.test(frame)
+      /useState\(\s*config\.sortBy\s*\)/.test(frame) || /sortBy:\s*config\.sortBy/.test(frame)
+    // THE EFFECT THAT OWNS `sortBy`, not any effect that happens to be followed
+    // by the word. This was `/useEffect\([\s\S]{0,400}config\.sortBy/`, and a
+    // canary written as a character window lies in BOTH directions — which
+    // matters more here than in an ordinary law, because this one is deliberately
+    // held red-when-fixed and its whole job is to report the day the seam
+    // changes.
+    //   · TOO NARROW: a real re-sync effect with more than 400 characters of
+    //     dependency array, comment or body between `useEffect(` and the prop
+    //     read keeps this reporting "still broken" after the fix has landed, and
+    //     `RecordTable` stays in the tree with nothing to say so.
+    //   · TOO WIDE: the window does not stop at the effect's own closing paren,
+    //     so ANY `useEffect(` with a `config.sortBy` within 400 characters after
+    //     it — a neighbouring effect, a line of config below it — flips this
+    //     green and announces a fix nobody made.
+    // So each effect is read by BALANCING ITS OWN PARENTHESES, and it counts as
+    // a re-sync only if it both reads the prop and writes the remembered value
+    // back (`remember(` / `setSortBy(`). An effect that merely mentions
+    // `config.sortBy` while doing something else is not the fix.
+    const effects: string[] = []
+    for (const m of frame.matchAll(/\buseEffect\s*\(/g)) {
+      const open = frame.indexOf("(", m.index as number)
+      let depth = 0
+      for (let j = open; j < frame.length; j++) {
+        if (frame[j] === "(") depth++
+        else if (frame[j] === ")" && --depth === 0) {
+          effects.push(frame.slice(open + 1, j))
+          break
+        }
+      }
+    }
+    expect(
+      effects.length,
+      "no useEffect found in collection-frame.tsx at all — this canary has gone blind, teach it the frame's new shape rather than deleting it"
+    ).toBeGreaterThan(0)
+    const resyncsFromTheProp = effects.some(
+      (e) => /config\.sortBy/.test(e) && /(remember\(|setSortBy\()/.test(e)
+    )
     expect(
       seedsOnceFromConfig && !resyncsFromTheProp,
       "CollectionFrame no longer seeds its sort once from config — re-check UI-GAPS #22(b), the host table may be able to go"

@@ -104,7 +104,24 @@ function StepLine({ step }: { step: StepSaving }) {
   const t = useT()
   const gain = step.savedSecondsPerMonth >= 0
   return (
-    <div className="flex flex-col gap-1 border-t py-3 first:border-t-0">
+    // THE RULE BETWEEN TWO STEPS IS AN INSET SHADOW, NOT A BORDER (kit §2.7,
+    // now machine-checked — web/test/kit-conformance.test.ts). It is the
+    // divider inside a list, so of the kit's three remedies this is the middle
+    // one, written as the kit's own NAMED shape rather than an inset spelled
+    // out: `--hairline-over` is `inset 0 1px 0 var(--hair)`, and tokens.css
+    // names the five shapes precisely so the standing client question — should
+    // even the hairline go — is one edit there rather than a sweep here.
+    //
+    // IT IS NOT THE SAME LINE THAT SHIPPED, and that is the point rather than a
+    // side effect. `border-t` sets a width and a style and no COLOUR, and
+    // Tailwind v4's preflight leaves the colour at `currentColor` — so this
+    // divider was a 1px line in the row's own ink (near-black in light,
+    // near-white in dark), not the 8% hairline it reads as in every other list
+    // on this door. The test file's header has the measurement.
+    //
+    // A paper step is wrong here — these rows are one list of one kind of
+    // thing, and alternating their ground would say they differ.
+    <div className="flex flex-col gap-1 py-3 shadow-[var(--hairline-over)] first:shadow-none">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <div className="min-w-0">
           <p className="text-foreground truncate text-sm font-medium">
@@ -267,7 +284,9 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
               {data.prices.rates.map((r) => (
                 <div
                   key={r.label}
-                  className="flex items-baseline justify-between gap-2 border-b p-3 last:border-b-0"
+                  // A row rule inside one panel — the same inset hairline
+                  // `StepLine` above uses, and for the same reason (kit §2.7).
+                  className="flex items-baseline justify-between gap-2 p-3 shadow-[var(--hairline-under)] last:shadow-none"
                 >
                   <span className="text-sm">{r.label}</span>
                   <span className="text-muted-foreground text-sm">
@@ -382,7 +401,15 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
   }
 
   return (
-    <div className="mt-4 border-t pt-4">
+    // The rule above the conversation, as an inset hairline rather than a
+    // border (kit §2.7). This one separates two DIFFERENT things — the figures
+    // and the thread about them — which makes it a SECTION rule, and tokens.css
+    // gives section rules their own tone: `--hair-strong` at 20%, named as the
+    // shape `--hairline-over-strong`. The row dividers above take the 8%
+    // `--hairline-under`, which is the same file's "same-tone card separation".
+    // A fill on a 1px element (`Separator`) would also have been right; the
+    // inset keeps the block's own box, which is what `mt-4 … pt-4` spaces.
+    <div className="mt-4 pt-4 shadow-[var(--hairline-over-strong)]">
       <p className="mb-2 text-sm font-medium">{t("Questions about this?")}</p>
       <Comments
         items={(data?.comments ?? []).map((c) => ({

@@ -129,12 +129,22 @@ describe("storedContentType: accepted widely, served safely", () => {
     const { join } = await import("node:path")
     for (const f of ["help.ts", "stories.ts", "todos.ts"]) {
       const src = readFileSync(join(__dirname, "..", "src", "routes", f), "utf8")
-      expect(src, `${f} must accept any type`).toMatch(/BYTES, ANY_FILE_TYPE/)
-      expect(src, `${f} must store through storedContentType`).toContain(
-        "contentType: storedContentType(parsed.contentType)"
+      // `\s*` after the comma: the two arguments are pinned in ORDER, which is
+      // the assertion, but a formatter that wraps this call onto two lines
+      // changes nothing about which limits the door passes. As a literal
+      // "BYTES, ANY_FILE_TYPE" it went red on the wrap.
+      expect(src, `${f} must accept any type`).toMatch(/BYTES,\s*ANY_FILE_TYPE/)
+      expect(src, `${f} must store through storedContentType`).toMatch(
+        /contentType:\s*storedContentType\(\s*parsed\.contentType\s*\)/
       )
+      // THE NEGATIVE CLAUSE, spacing-tolerant — and it is the one that had to
+      // be. A banned shape pinned as a literal string stops matching the moment
+      // the formatter touches it, and a negative assertion that stops matching
+      // does not go red: it goes GREEN over the very thing it forbids. Written
+      // as a shape, the raw declared type cannot be smuggled past it by a line
+      // break or a second property.
       expect(
-        src.includes("httpMetadata: { contentType: parsed.contentType }"),
+        /httpMetadata:\s*\{[^}]*contentType:\s*parsed\.contentType/.test(src),
         `${f} stores an attachment under its declared type — that is stored XSS`
       ).toBe(false)
     }

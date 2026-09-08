@@ -50,7 +50,18 @@ export function LiveStatus() {
       // The gap to the content below is the strip's OWN margin rather than a
       // wrapper at each host: it is paid only when the strip renders, which is
       // the same argument `TimerBar`'s conditional band makes one file over.
-      className="border-warning/40 bg-warning/10 text-warning mb-4 flex items-center gap-2 rounded-[var(--radius)] border px-3 py-2 text-xs"
+      //
+      // NO BORDER, 8 Sep 2026, and it is the kit's own law rather than taste.
+      // This strip drew `border-warning/40 border` until the main × feat/ui-ux
+      // merge put it in front of the kit's borders rule for the first time
+      // (RULES.md §2.7, executable since kit v1.2.70): a boundary is a paper
+      // step, a fill, or an inset shadow, and a CSS border is none of the
+      // three. The tint IS the paper step here — which is what the app's two
+      // other notice strips already do, `bg-warning/10` on a wave's warning and
+      // `bg-destructive/10` on an import's error rows, neither of which has ever
+      // carried an outline. The strip lost a hairline and gained agreement with
+      // its own siblings.
+      className="bg-warning/10 text-warning mb-4 flex items-center gap-2 rounded-[var(--radius)] px-3 py-2 text-xs"
     >
       <CloudSlash className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1">
