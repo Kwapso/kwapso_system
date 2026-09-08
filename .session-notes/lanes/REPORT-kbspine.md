@@ -319,3 +319,102 @@ entry into `node:sqlite`, so its SQL ran inside 991 tenancy tests and 1,193 cont
   decision and it now has ids to make it with.
 - Adding `event` to the vector metadata is the tenth and last slot, and Vectorize does not index
   retrospectively — it means a full re-index. Decide it deliberately.
+
+---
+
+# ADDENDUM — the planner's correction, answered
+
+The planner's correction arrived **after** this branch was committed and pushed. It did not change
+what was built: I had read `knowledge.ts` and the migration ledger during phase 1a, reached the same
+conclusion independently, and **added no account or app column**. The correction and the branch agree.
+
+**All nine of the planner's line citations verify.** `knowledge.ts` :1425 (the SELECT), :919 and
+:1008 (the INSERTs), :499 (`accountId: r.account_id`), :218 (`AGENCY_COMPARTMENT`), :909 / :995 /
+:1088 (`accountCompartment(...)`) are exact. `knowledge-ingest.ts:1969` is exact **against `main`**;
+my own edit shifted it to :1992.
+
+## 1. Are the columns FILLED? — mostly yes. The hypothesised finding is refuted.
+
+One pass, 2026-09-08T14:03Z, **live sources only** (3,973 — six more than the 13:47 pass; staging is
+live and the sweep runs between reads):
+
+| kind | rows | account_id | app_id |
+|---|---:|---:|---:|
+| ticket | 2,050 | 2,035 (99%) | 1,828 (89%) |
+| email | 518 | 243 (47%) | 0 |
+| story | 339 | 322 (95%) | 319 (94%) |
+| task | 256 | 114 (45%) | 2 (1%) |
+| message (chat) | 148 | **0** | 0 |
+| account | 134 | 134 (100%) | 0 |
+| meeting | 115 | 34 (30%) | 1 |
+| sprint | 112 | 112 (100%) | 107 (96%) |
+| contact | 89 | 89 (100%) | 0 |
+| document (drive) | 80 | **0** | 0 |
+| event (calendar) | 55 | 44 (80%) | 0 |
+| app / process | 44 | 44 (100%) | 44 (100%) |
+| dropdown / person | 27 | 0 | 0 |
+| portal_login / todo | 6 | 6 (100%) | 0 |
+| **TOTAL** | **3,973** | **3,177 (80%)** | **2,301 (58%)** |
+
+**"The shape is there and nothing fills it" is not what the data says.** `account_id` is filled on
+80% of live sources and `app_id` on 58%. The nulls are concentrated and each has a known cause, not a
+missing mechanism:
+
+- **chat 0/148 and drive 0/80** — all 13 shared Google containers have `google_sources.account_id`
+  unset. Nobody has said which client those folders and spaces belong to. Data entry.
+- **meeting 34/115, task 114/256, email 243/518** — the mirrored ROW has no client either. Of every
+  mirrored source, the number whose `account_id` disagrees with the row it mirrors is **0**.
+- **dropdown / person 0** — correctly agency-wide; they belong to no client.
+
+`app_id` at 0% on Google material is the same story one level down: nothing outside a ticket, story,
+sprint, app or process names a system today.
+
+So the job is **smaller than briefed, and smaller in a different place than expected**: not "the
+columns need filling by code" but "somebody has to tell 13 Google containers which client they are".
+
+## 2. The event is the only new structure — built, as briefed.
+
+Covered above: `event_id` + `event_id_from`, three routes, 844 rows placeable, NULL where Google is
+silent.
+
+## 3. Compartment or its own column? — **its own column, and the data settles it**
+
+I chose **its own column**, and agree with the planner's instinct, but the argument from reading the
+code is stronger than "relevance vs identity":
+
+**`compartment` is not a second fact — it is a projection of `account_id`, and the projection is
+currently exact.** Measured over all 3,973 live sources, three ways:
+
+- `account_id` set but compartment `'agency'`: **0**
+- compartment set but `account_id` NULL: **0**
+- `compartment <> 'account:' || account_id`: **0**
+
+135 distinct compartments = 134 distinct accounts + `'agency'`. It is derived on write from the row
+(`row.accountId ? accountCompartment(row.accountId) : AGENCY_COMPARTMENT`, `knowledge-ingest.ts:1992`)
+and it is `NOT NULL` with a default — one value, one meaning, no exceptions in the data.
+
+Putting the event there breaks that four ways:
+
+1. **It is single-valued and already spent.** 44 live calendar sources sit in a client compartment
+   *and* have an event. Each would have to **give up its client to carry its event** — the exact
+   trade the owner's ruling forbids, since account is universal and event optional.
+2. **It is the FENCE.** Retrieval narrows on `compartment` (with `owner_user_id`) on every read. An
+   event id in that column would put a grouping label inside the thing that decides who may read
+   what — which is precisely R26's warning about grouping becoming a second, weaker fence. Its own
+   column keeps the event outside the fence entirely, which is why I could tell you nothing about the
+   search changed.
+3. **It is `NOT NULL`; the event must be nullable.** 3,129 of 3,973 live sources have no event and
+   must keep saying so.
+4. **A derived column would stop being derivable.** The invariant `compartment = 'account:' || account_id`
+   holds at exactly 0 exceptions today and is worth keeping checkable.
+
+`event_id_from` is the second reason it cannot ride the compartment: provenance for the event is not
+provenance for the compartment, and they would have to be stored apart anyway.
+
+## 4. The sibling sessions
+
+Not my call and not my work — I have done none of phases 2, 3 or 4. `feat/knowledge-sources-know-their-event`
+is pushed at **6813ec2e**, green, and is the precondition they are waiting on. Two things they should
+know before building on it: **nothing reads `event_id` yet** (no search, screen or tool), and **the
+migration has not been applied to staging** — that is the owner's gated step, so a session expecting
+to query the column against staging data will find it absent.
