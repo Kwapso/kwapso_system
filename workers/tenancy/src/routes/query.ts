@@ -36,6 +36,7 @@ import {
   QUERY_MODULE_NAMES,
   QUERY_OPS,
   queryModule,
+  RENUMBERED_NOTE,
   suggestModule,
 } from "@shared/workers/query-grammar"
 import { parseQuery, runQuery, type Fence, type FenceFor } from "../lib/query-engine"
@@ -220,6 +221,14 @@ export async function getQueryDescribe(request: Request, env: Env): Promise<Resp
       ...(mod.notYet?.field === f.name
         ? { hidesRowsUnlessAsked: true, note: mod.notYet.reason }
         : {}),
+      // THE FIELD WHOSE VALUES HAVE A PAST. Its own key rather than a sentence
+      // folded into `note`, because `note` is a per-field line somebody wrote and
+      // this is a fact derived from the grammar — and because two of the five
+      // renumbered fields already have a note of their own, which would have won.
+      // Said HERE at all because a caller who is not told will not think to try
+      // the number they were given: `alsoFinds` is what turns "that reference
+      // returns nothing" into "that reference is the old one, and it still works".
+      ...(f.renumbered ? { alsoFinds: RENUMBERED_NOTE } : {}),
       ...(f.note ? { note: f.note } : {}),
     })),
   })

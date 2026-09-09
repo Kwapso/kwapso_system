@@ -37,6 +37,7 @@ import { D1_MAX_BOUND_PARAMS, LIST_HARD_CAP } from "@shared/workers/limits"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type SortMenu } from "@shared/workers/sorting"
 import { TEXT_LIMITS } from "@shared/workers/validate"
+import { refAliasMatchSql, REF_ALIAS_TABLE } from "@shared/workers/refs"
 import {
   LIST_OPS,
   QUERY_OPS,
@@ -48,7 +49,7 @@ import {
 } from "@shared/workers/query-grammar"
 
 type Row = Record<string, unknown>
-type Param = string | number | null
+export type Param = string | number | null
 
 /** HOW MANY GROUPS A GROUPED ANSWER MAY CARRY (R14: a hard cap, said at the
  * query). A grouped read is bounded by the number of DISTINCT values, not by the
@@ -316,6 +317,49 @@ const folded = (field: QueryField, col: string, op: string, rhs: string): string
 const foldValues = (field: QueryField, values: Param[]): Param[] =>
   foldsCase(field) ? values.map((v) => (typeof v === "string" ? v.toLowerCase() : v)) : values
 
+/** An EXACT value as a needle the alias seam can compare with. `likeLiteral`
+ * escapes the `%` and `_` a caller's own string may contain, so what is left is
+ * a pattern with nothing wild in it — LIKE reduced to equality, folded to lower
+ * case on both sides exactly as `folded` folds the column. Without the escape a
+ * reference containing an underscore would match its neighbours. */
+const exactNeedles = (values: Param[]): Param[] =>
+  values.map((v) => likeLiteral(String(v)).toLowerCase())
+
+/** WHAT THIS RECORD USED TO BE CALLED, as a predicate — the alias half of a
+ * filter on a `renumbered` field (see `QueryField.renumbered` in the grammar for
+ * the whole argument, and `refAliasMatchSql` in shared/workers/refs.ts for the
+ * one spelling of the join).
+ *
+ * THE SAME SEAM THE FIVE HAND-WRITTEN DOORS USE, reached differently. A door
+ * spells `refAliasMatchSql(TEAM_REF_TABLES.ticket, "help.id")` into its own
+ * search clause because it knows which collection it is; this engine does not,
+ * so the table comes from the module it was handed and the row from the alias
+ * every statement here already uses (`t`). Nothing about the join is written
+ * twice — if the alias key ever changes, it changes in refs.ts and both surfaces
+ * follow.
+ *
+ * ONE NEEDLE PER `?`, in the SAME ORDER as the plain half, because the caller
+ * may have named several values and each of them has to be asked of the alias
+ * table separately.
+ *
+ * NULL FOR EVERY OTHER FIELD, which is what keeps this from costing the other
+ * two hundred: a field that was never renumbered gets not one extra subquery.
+ * And null on a REFERENCE field even if one were ever marked — `field.ref`
+ * means the value is matched against another module's NAME through a subquery
+ * of its own, and an alias of THIS row is not that question. R55 forbids the
+ * combination outright rather than leaving it to this line. */
+function aliasMatch(
+  mod: QueryModule,
+  field: QueryField,
+  needles: Param[]
+): { sql: string; params: Param[] } | null {
+  if (!field.renumbered || field.ref) return null
+  return {
+    sql: `(${needles.map(() => refAliasMatchSql(mod.table, "t.id")).join(" OR ")})`,
+    params: needles,
+  }
+}
+
 /** One filter, as SQL plus its bound parameters.
  *
  * `field.column` is a literal from our own source (promise 2 in the header);
@@ -323,6 +367,7 @@ const foldValues = (field: QueryField, values: Param[]): Param[] =>
  * (promise 3). A reference field additionally resolves NAMES through a subquery
  * over the referenced module's own table — also a literal, also from the map. */
 function clauseSql(
+  mod: QueryModule,
   c: ParsedClause,
   refs: Record<string, QueryModule>
 ): { sql: string; params: Param[] } {
@@ -330,16 +375,17 @@ function clauseSql(
   // one-field filter, so a multi-field search cannot mean something a
   // single-field one does not.
   if (c.fields.length > 1) {
-    const parts = c.fields.map((f) => oneFieldSql(f, c, refs))
+    const parts = c.fields.map((f) => oneFieldSql(mod, f, c, refs))
     return {
       sql: `(${parts.map((p) => p.sql).join(" OR ")})`,
       params: parts.flatMap((p) => p.params),
     }
   }
-  return oneFieldSql(c.fields[0], c, refs)
+  return oneFieldSql(mod, c.fields[0], c, refs)
 }
 
 function oneFieldSql(
+  mod: QueryModule,
   field: QueryField,
   c: ParsedClause,
   refs: Record<string, QueryModule>
@@ -347,6 +393,15 @@ function oneFieldSql(
   const col = `t.${field.column}`
   const ref = field.ref ? refs[field.ref] : undefined
 
+  // THE SEVEN OPS BELOW ASK NOTHING AN ALIAS COULD ANSWER, and that is a
+  // decision rather than an omission. `isNull`/`notNull` are about the COLUMN —
+  // "has this record got a reference at all" — and a row that was renumbered has
+  // one by construction, so consulting the history would turn "no reference" into
+  // "no reference, unless it once had one", which is a different question and a
+  // wrong answer. The five ORDERED comparisons (`between` included) sort strings, and
+  // a retired reference sorts nowhere meaningful: `VU Solutions-T1183` is not
+  // between `T0001` and `T0500` under any ordering a caller means. Only the
+  // ops that ask "is this the thing called X" consult what it used to be called.
   switch (c.op) {
     case "isNull":
       return { sql: `${col} IS NULL`, params: [] }
@@ -367,11 +422,19 @@ function oneFieldSql(
       // stops it becoming a PATTERN (an alternating %-and-letter needle costs
       // the worker exponential time over the whole table).
       const needles = c.values.map((v) => `%${likeLiteral(String(v)).toLowerCase()}%`)
-      if (!ref)
-        return {
+      if (!ref) {
+        const plain = {
           sql: `(${needles.map(() => `LOWER(${col}) LIKE ? ESCAPE '\\'`).join(" OR ")})`,
-          params: needles,
+          params: needles as Param[],
         }
+        // …OR THE NUMBER IT USED TO HAVE. The same needle, asked of the alias
+        // table — which is exactly what the ticket search box does one door
+        // along, and is why typing the string into the app found the record
+        // while asking this engine for it did not.
+        const was = aliasMatch(mod, field, needles)
+        if (!was) return plain
+        return { sql: `(${plain.sql} OR ${was.sql})`, params: [...plain.params, ...was.params] }
+      }
       // On a REFERENCE field the needle is a substring of the referenced
       // record's NAME — "the tickets from flu clinic", without knowing its id.
       const byName = needles.map(() => `LOWER(r.${ref.labelColumn}) LIKE ? ESCAPE '\\'`).join(" OR ")
@@ -387,7 +450,22 @@ function oneFieldSql(
       // comparison rather than two, and the fold is the same one either side.
       const plain = folded(field, col, not ? "NOT IN" : "IN", `(${holes(c.values.length)})`)
       const vals = foldValues(field, c.values)
-      if (!ref) return { sql: plain, params: vals }
+      if (!ref) {
+        // …AND THE NUMBERS THESE RECORDS USED TO HAVE. An EXACT op, so the
+        // needle carries no `%` of its own — `likeLiteral` escapes whatever the
+        // caller's value contains, which turns a LIKE with nothing wild left in
+        // it into the case-insensitive equality `folded` is already doing on the
+        // column. (The seam compares with LIKE because the five doors that share
+        // it are search boxes; an exact caller must not inherit their wildcards.)
+        const was = aliasMatch(mod, field, exactNeedles(c.values))
+        if (!was) return { sql: plain, params: vals }
+        // `notIn` SUBTRACTS THE HISTORY TOO. "Everything except VU Solutions-T1183"
+        // has to exclude the row that used to wear that string, or the one record
+        // the caller named by its old number is the one record they get back.
+        return not
+          ? { sql: `(${plain} AND NOT ${was.sql})`, params: [...vals, ...was.params] }
+          : { sql: `(${plain} OR ${was.sql})`, params: [...vals, ...was.params] }
+      }
       // An id OR the referenced record's exact name, so a caller holding the
       // name and not the id is not made to look it up first.
       const byName = `${col} ${not ? "NOT IN" : "IN"} (SELECT r.id FROM ${ref.table} r WHERE LOWER(r.${ref.labelColumn}) IN (${holes(c.values.length)}))`
@@ -401,7 +479,16 @@ function oneFieldSql(
       const not = c.op === "ne"
       const plain = folded(field, col, not ? "<>" : "=", "?")
       const vals = foldValues(field, c.values)
-      if (!ref) return { sql: plain, params: vals }
+      if (!ref) {
+        // The single-value twin of the branch above, and the one that matters
+        // most in practice: `{field:"reference", op:"eq", value:"VU Solutions-T1183"}`
+        // is how an assistant looks up a number somebody read off an old email.
+        const was = aliasMatch(mod, field, exactNeedles(c.values))
+        if (!was) return { sql: plain, params: vals }
+        return not
+          ? { sql: `(${plain} AND NOT ${was.sql})`, params: [...vals, ...was.params] }
+          : { sql: `(${plain} OR ${was.sql})`, params: [...vals, ...was.params] }
+      }
       const byName = `${col} ${not ? "NOT IN" : "IN"} (SELECT r.id FROM ${ref.table} r WHERE LOWER(r.${ref.labelColumn}) = ?)`
       return {
         sql: not ? `(${plain} AND ${byName})` : `(${plain} OR ${byName})`,
@@ -414,11 +501,12 @@ function oneFieldSql(
 /** The WHERE, as one fragment. An empty filter list is `1 = 1` rather than an
  * empty string, so every statement below concatenates without having to know. */
 function whereSql(
+  mod: QueryModule,
   q: ParsedQuery,
   refs: Record<string, QueryModule>
 ): { sql: string; params: Param[] } {
   if (!q.where.length) return { sql: "1 = 1", params: [] }
-  const parts = q.where.map((c) => clauseSql(c, refs))
+  const parts = q.where.map((c) => clauseSql(mod, c, refs))
   return { sql: parts.map((p) => p.sql).join(" AND "), params: parts.flatMap((p) => p.params) }
 }
 
@@ -472,6 +560,34 @@ function withheld(
 ): { sql: string; params: Param[] } {
   if (!mod.withheld) return where
   return { sql: `(${where.sql}) AND ${mod.withheld.sql}`, params: where.params }
+}
+
+/** THE ONE CLAUSE EVERY READ BELOW IS BUILT FROM: the caller's own question,
+ * then the fence their second right leaves them, then what the module has
+ * stopped answering about at all.
+ *
+ * A NAMED FUNCTION RATHER THAN THE INLINE EXPRESSION IT USED TO BE, because
+ * something other than `runQuery` now has to be able to ask what a question
+ * compiles to. R55 — the law that a stored reference is what the formula makes,
+ * and that a search which finds the new number finds the old one — proves this
+ * engine's half by RUNNING it: it replays the real migration ledger into a real
+ * SQLite handle, parses a filter carrying a retired reference, builds the WHERE
+ * through THIS function and executes it. There is no other honest way to check a
+ * data path, and a law that read the source instead would have passed on the day
+ * this door was blind.
+ *
+ * THE ORDER IS THE FENCE. Both wrappers bracket what they are given before
+ * ANDing their own term on, so a caller's `OR` — and the alias `OR` this engine
+ * now adds inside it — cannot reach around either. That is what makes the alias
+ * lookup safe: it widens which rows answer the caller's OWN question, and is
+ * then narrowed by the same two clauses every other row is. */
+export function readWhere(
+  mod: QueryModule,
+  q: ParsedQuery,
+  refs: Record<string, QueryModule>,
+  fence: Fence
+): { sql: string; params: Param[] } {
+  return withheld(mod, fenced(whereSql(mod, q, refs), fence))
 }
 
 /** The sort menu a module offers: every declared field, ordered by its own
@@ -558,7 +674,7 @@ export async function runQuery(
   // rows is a subtraction three of those four reads can forget, and this door is
   // asked "how many" far more often than it is asked for a page. See `withheld`
   // in shared/workers/query-grammar.ts for what it is and why it has no escape.
-  const where = withheld(mod, fenced(whereSql(q, refs), await fenceFor(mod)))
+  const where = readWhere(mod, q, refs, await fenceFor(mod))
   // WHAT NAMED NOTHING — worked out alongside the count rather than after it, so
   // no return path below can hand back a total without it. It gets the RESOLVER
   // rather than this module's fence: its lookups run against the REFERENCED
@@ -722,9 +838,16 @@ function present(select: QueryField[], row: Row): Row {
  * was fixed for two days earlier, and the closure sat forty lines from the
  * copy with nothing forcing the second call site to reach for it. One
  * function, both callers, so a THIRD copy cannot leave it out again. */
-async function fenceOn(fenceFor: FenceFor, m: QueryModule): Promise<{ sql: string; params: string[] }> {
+async function fenceOn(
+  fenceFor: FenceFor,
+  m: QueryModule,
+  /** the alias to qualify the column with, where the statement JOINS and a bare
+   * column name would be a bet that the other table has none like it. Empty at
+   * the two single-table call sites, which is what they had before it existed. */
+  prefix = ""
+): Promise<{ sql: string; params: string[] }> {
   const f = await fenceFor(m)
-  return f ? { sql: ` AND ${f.column} = ?`, params: [f.value] } : { sql: "", params: [] }
+  return f ? { sql: ` AND ${prefix}${f.column} = ?`, params: [f.value] } : { sql: "", params: [] }
 }
 
 async function findUnmatched(
@@ -785,6 +908,60 @@ async function findUnmatched(
           [...needles.map((n) => (exact ? n.toLowerCase() : `%${likeLiteral(n).toLowerCase()}%`)), ...ownFence.params]
         )
         const found = rows.map((r) => (r.v ?? "").toLowerCase())
+        // …AND THE NUMBERS THESE RECORDS USED TO HAVE, on a field that has been
+        // renumbered. WITHOUT THIS THE ENGINE CONTRADICTS ITSELF IN ONE REPLY:
+        // the rows come back (the filter searches the alias now) and `unmatched`
+        // says the value names nothing here, and the tool's own description tells
+        // the model it MUST say so out loud — "there is no ticket called
+        // VU Solutions-T1183" printed directly above the ticket. `unmatched` is
+        // an oracle about EXISTENCE, so it has to know everything the predicate
+        // knows or it is worse than absent.
+        //
+        // ONE EXTRA READ, AND ONLY WHERE IT COULD CHANGE THE ANSWER: nothing runs
+        // unless the field was renumbered AND a needle has already failed against
+        // the current values. `found` gains the retired strings and the two
+        // `missed` tests below are untouched — a retired string is matched the
+        // same way a live one is, exactly or as a substring.
+        //
+        // THE JOIN, not the `refAliasMatchSql` seam, and the difference is the
+        // question: the seam asks "does THIS row answer to that string" and this
+        // asks "which strings are answered to at all", which is what an existence
+        // oracle needs. The table name still comes from refs.ts.
+        if (field.renumbered && needles.length) {
+          const stillMissing = needles.filter((n) =>
+            exact ? !found.includes(n.toLowerCase()) : !found.some((f) => f.includes(n.toLowerCase()))
+          )
+          if (stillMissing.length) {
+            // FENCED THROUGH THE SAME FUNCTION the lookup above uses, qualified
+            // because this one joins: an alias must not become a way to learn
+            // that a row exists outside what this caller may see. A row the
+            // fence hides contributes no alias, so its old number reads as a
+            // number that names nothing — the same answer its current number
+            // already gets.
+            const aliasFence = await fenceOn(fenceFor, mod, "m.")
+            const aliasRows = await d1Query<{ v: string | null }>(
+              cfg,
+              guard.databaseId,
+              `SELECT DISTINCT ra.alias AS v
+                 FROM ${REF_ALIAS_TABLE} ra JOIN ${mod.table} m ON m.id = ra.row_id
+                WHERE ra.entity_table = ?
+                  AND (${stillMissing
+                    .map(() =>
+                      exact ? `LOWER(ra.alias) = ?` : `LOWER(ra.alias) LIKE ? ESCAPE '\\'`
+                    )
+                    .join(" OR ")})${aliasFence.sql}
+                LIMIT ${VALUES_PER_CLAUSE * 4}`,
+              [
+                mod.table,
+                ...stillMissing.map((n) =>
+                  exact ? n.toLowerCase() : `%${likeLiteral(n).toLowerCase()}%`
+                ),
+                ...aliasFence.params,
+              ]
+            )
+            for (const r of aliasRows) found.push((r.v ?? "").toLowerCase())
+          }
+        }
         const missed = needles.filter((n) =>
           exact ? !found.includes(n.toLowerCase()) : !found.some((f) => f.includes(n.toLowerCase()))
         )
