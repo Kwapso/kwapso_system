@@ -1017,7 +1017,19 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // which its note records. Every other per-kind digest is unchanged, which is the
 // evidence rather than the claim. So no textVersion moves, and a bump here would
 // re-read every row of every kind to rewrite none of them.
-const SHARED_DIGEST = "7a71f801ff00cfc7"
+// 9 Sep 2026: A ROW POINTS AT A DIFFERENT CALL AND STILL SAYS THE SAME WORDS.
+// The sweep now settles a recurring occurrence's event id onto the call the base
+// actually holds (`settledEvent`, knowledge-google.ts): the owner's Jourfix moved
+// from 10:00 to 10:30, so Google's own id for it changed, and 37 artefacts on
+// staging pointed at a call under the OTHER stamp. That resolution touches
+// `eventId` and nothing else — not `title`, not `summary`, not `body` — so
+// nothing reaching the index or the model moved, and no per-kind digest above
+// moved either, which is the evidence rather than the claim. A textVersion bump
+// would be actively wrong here: the upsert writes `event_id` on EVERY pass
+// (COALESCE keeps the old value only where the new one is null), so the fix
+// lands without re-reading a single row's text, and a bump would re-embed the
+// whole base to change one column. Re-pinned, exactly as the notes above record.
+const SHARED_DIGEST = "93d4992740fa64e7"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
