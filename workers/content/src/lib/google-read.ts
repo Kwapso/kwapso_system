@@ -49,6 +49,7 @@ import {
   calendarList,
   gmailMessage,
   gmailSearch,
+  isConnectionLost,
   GMAIL_CONTACT_CAP,
   type CalendarWindow,
   type MailMessage,
@@ -470,7 +471,7 @@ export async function readGoogleMaterial(
           try {
             text = await driveFileText(env, token, file.id)
           } catch (e) {
-            if ((e as { code?: string })?.code === "google_access_lost") throw e
+            if (isConnectionLost(e)) throw e
             const reason = e instanceof Error ? e.message : String(e)
             const name = file.name || file.id
             console.error(`google drive file "${name}" (${file.id}) skipped: ${reason}`)
@@ -693,7 +694,7 @@ export async function hydrateText(
           ? await driveFileText(env, token, item.externalId)
           : (await gmailMessage(token, item.externalId)).text
     } catch (e) {
-      if ((e as { code?: string })?.code === "google_access_lost") throw e
+      if (isConnectionLost(e)) throw e
       const reason = e instanceof Error ? e.message : String(e)
       const name = item.title || item.externalId
       console.error(`google ${item.service} item "${name}" (${item.externalId}) skipped: ${reason}`)
