@@ -161,7 +161,6 @@ import {
 } from "../../components/record-detail/record-detail";
 import { cn } from "../../lib/utils";
 import {
-  SHAPE_HEADING_SIZE,
   SHAPE_SHELL,
   shapeCopy,
   type ScreenDensity,
@@ -506,7 +505,20 @@ function RecordChrome({
            no extra markup written here. */
         title={title}
         mark={mark}
-        titleSize={SHAPE_HEADING_SIZE[measure]}
+        /* NO `titleSize`, SINCE 2026-09-08 — and the line that was here is
+           worth naming rather than quietly deleting, because it was the same
+           conflation `Title`'s ladder change fixed one level down. It read
+           `titleSize={SHAPE_HEADING_SIZE[measure]}`: the SCREEN'S per-door
+           step, handed to a RECORD'S heading. Those are two roles and the
+           kit's own type scale names them separately — "Page title" and
+           "Record heading" — so a record's name is not a page title measured
+           at whichever door it happens to be behind. `RecordDetail`'s own
+           default IS the record-heading rung now, so the right amount of
+           typography for this file to write is none, which is also this
+           folder's own law — and dropping the prop drops the import with it,
+           so this file no longer reads the screen's heading record at all.
+           `SHAPE_SHELL`, the shape's own measure, is a different record and
+           is still read below. */
         meta={metaLine}
         actions={actions}
         actionsVisible={actionsVisible}

@@ -247,7 +247,7 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 import { Card, CardContent } from "../card/card";
 import { Input } from "../input/input";
-import { Title } from "../title/title";
+import { Title, type TitleStep } from "../title/title";
 import {
   ActivityFeed,
   type ActivityFeedItem,
@@ -345,11 +345,38 @@ export interface RecordDetailProps
   /** The reader may not act on this record: the whole action group is absent. */
   actionsVisible?: boolean;
   /**
-   * Which heading step the title takes. `Title`'s own ladder — 32 / 24 / 20.
-   * The kit's 24.6 draws 18, which is not a rung on that ladder, so the
-   * nearest page-level rung is the default (GAPS-COL3 REC-3).
+   * WHICH HEADING STEP THE TITLE TAKES — `Title`'s own ladder, and since
+   * 2026-09-08 the WHOLE of it (56 / 44 / 32 / 24 / 20) rather than its
+   * bottom three rungs.
+   *
+   * THE DEFAULT MOVED, AND IT MOVED BECAUSE THE SCALE ALREADY NAMED IT.
+   * This prop defaulted to `h3` (24), and the reason recorded here was that
+   * "the kit's 24.6 draws 18, which is not a rung on that ladder, so the
+   * nearest page-level rung is the default" (GAPS-COL3 REC-3). That reading
+   * was doing the best it could with a ladder whose top was 32: the rung the
+   * kit's own type-scale table names **"Record heading"** is h1 · 44, and 44
+   * was not reachable from this file until `Title` grew the rung. So the
+   * default was never a choice between 24 and 44 — it was 24 or nothing.
+   *
+   * 24.6's 18 IS NOT OVERRULED BY THIS AND IS WORTH SAYING OUT LOUD, because
+   * the two sources genuinely disagree and a later reader will find both. The
+   * chapter DRAWS a band at 18. The scale table NAMES a rung "Record
+   * heading" at 44. A drawing sets a specimen; the table assigns a role to a
+   * step, and this component IS that role — it is the band that carries the
+   * one record a detail screen is about. Where a drawing and a role name
+   * disagree about a step, the role name is the one that generalises to the
+   * next screen, and 18 was in any case not a rung either way.
+   *
+   * WHAT THIS COSTS AND WHY IT IS STILL RIGHT. Every existing call site that
+   * passed nothing now sets its record's name two rungs larger. That is the
+   * change: the consuming app has been reaching around this default since
+   * 2026-08-31 with a descendant selector on `Title`'s own data-slot, applied
+   * at every detail call site and policed by a law of its own, because its
+   * client's correction — "title on main screens still way too small! it's
+   * currently smaller than in detail screens" — could not be answered from
+   * inside the kit. A default that every consumer overrides is not a default.
    */
-  titleSize?: "h2" | "h3" | "h4";
+  titleSize?: TitleStep;
 
   /* ---- The stage hero, chapter 23, above the strip -------------------- */
   /**
@@ -643,7 +670,7 @@ const RecordDetail = React.forwardRef<HTMLDivElement, RecordDetailProps>(
       mark,
       actions,
       actionsVisible = true,
-      titleSize = "h3",
+      titleSize = "h1",
       stages,
       currentStage = 0,
       onStageSelect,

@@ -58,11 +58,75 @@ import { cn } from "../../lib/utils";
    The other two rungs are the kit's own smaller section headings, at the h3
    and h4 tracking values, which resolve to `text-2xl` and `text-xl` by the
    same tracking match.
+
+   ── THE LADDER GREW UPWARD ON 2026-09-08, AND THE THREE RUNGS ABOVE ARE NOT
+   NEW SIZES ──────────────────────────────────────────────────────────────────
+
+   WHAT WAS WRONG. This ladder stopped at 32 because chapter 13's SECTION
+   HEADER is what this file was transcribed from, and 32 is the top of a
+   section header. Nothing was ever decided about the rungs above it — the
+   ladder simply ended where its own design source did. That absence then
+   travelled, silently, into three other files, because `Title` is not only
+   the section header: it is also the one heading row `RecordDetail`,
+   `ScreenRenderer` and `ScreenShell` draw a SCREEN'S OWN NAME with.
+
+     · `RecordDetail` renders `<Title as="h1">` — the ELEMENT has always been
+       the page's h1 — and could ask for no step larger than 32 for it.
+     · `SHAPE_HEADING_SIZE` (compositions/states/states.tsx) is typed
+       `Record<ScreenDensity, "h2" | "h3">`. That union is not a design
+       decision about a door; it is this ladder's top two rungs, written down
+       somewhere else. A ceiling wearing a decision's clothes.
+     · `ScreenRenderer` typed the same two values again, inline.
+
+   The consuming app hit the floor of that on 2026-08-31 and could only reach
+   past it from outside — a `[&_[data-slot=title-heading]]:text-4xl` descendant
+   selector applied at every detail call site, and a law (its R52) written to
+   police that every call site applies it. A rule an application had to invent
+   because the kit did not ship the part.
+
+   WHY THESE THREE VALUES AND NOT A JUDGEMENT. The kit's own type-scale table
+   NAMES every rung with the role it is for, and the two roles above "Section
+   title" are exactly the two `Title` is being asked to draw:
+
+       display-m · 56 · "Page title"        <- a screen's own name
+       h1        · 44 · "Record heading"    <- a record's own name
+       h2        · 32 · "Section title"     <- chapter 13, this file's source
+       h3        · 24 · "Card heading"
+       h4        · 20 · "Row heading"
+
+   So nothing here is chosen. The rungs are the ladder's, the steps are matched
+   to their tracking tokens exactly as `Headline` matches them
+   (`components/typography/typography.tsx` has carried BOTH of the new rungs
+   since it was written — the same two steps existed in the token system and in
+   one kit component, and were unreachable from the other), and the three
+   sizes above are the ones the table already assigns to the three things a
+   `Title` is ever the heading OF.
+
+   THE DEFAULT DOES NOT MOVE, AND THAT IS THE POINT. `size="h2"` stays,
+   because chapter 13 is still this component's design source and a section
+   header is still 32. Raising the ceiling is not the same as raising the
+   floor: what changes is that a call site drawing a PAGE or a RECORD can now
+   name the rung the kit already named for it, instead of reaching around this
+   file with a descendant selector.
+
+   WHAT IS DELIBERATELY NOT HERE. The three display rungs above `display-m`
+   (`display-l` 72, `display-xl` 96) are `Headline`'s and stay `Headline`'s.
+   The table names them "Structured" and "Work, structured." — cover type, a
+   marketing measure — and a component whose row also holds an eyebrow, an
+   actions cluster and a section rule is not what sets a 96px cover line. A
+   call site that wants one wants `Headline`, bare.
    ------------------------------------------------------------------------- */
 const titleHeadingVariants = cva(["font-[var(--font-weight-medium)]"], {
   variants: {
     size: {
-      /** 32 · the h2 step (`--tracking-h2`, -0.02em). Chapter 13's drawing. */
+      /** 56 · the display-m step (`--tracking-display-m`, -0.025em). The
+       *  scale's "Page title": a screen's own name, at the top of its door. */
+      "display-m": "text-5xl",
+      /** 44 · the h1 step (`--tracking-h1`, -0.025em). The scale's "Record
+       *  heading": the name of the one thing a detail screen is about. */
+      h1: "text-4xl",
+      /** 32 · the h2 step (`--tracking-h2`, -0.02em). Chapter 13's drawing,
+       *  the scale's "Section title", and this component's default. */
       h2: "text-3xl",
       /** 24 · the h3 step (`--tracking-h3`, -0.014em). A block inside a page. */
       h3: "text-2xl",
@@ -72,6 +136,47 @@ const titleHeadingVariants = cva(["font-[var(--font-weight-medium)]"], {
   },
   defaultVariants: { size: "h2" },
 });
+
+/**
+ * The rungs `Title` draws, as a type any file that CHOOSES one may name.
+ *
+ * Published because three modules already choose one on somebody else's
+ * behalf — `RecordDetail`'s `titleSize`, `ScreenRenderer`'s per-door step and
+ * `SHAPE_HEADING_SIZE` — and until today each of them wrote its own narrower
+ * union by hand. Two of the three wrote `"h2" | "h3"`, which was this ladder's
+ * ceiling copied into a place that could not see when the ceiling moved. A
+ * name they can all import cannot fall behind the ladder it names.
+ */
+export type TitleStep = NonNullable<
+  NonNullable<VariantProps<typeof titleHeadingVariants>>["size"]
+>;
+
+/**
+ * THE LADDER'S OWN ORDER, largest first — so "one rung down" is a fact a
+ * caller can READ rather than a pair of sizes it has to retype.
+ *
+ * `ScreenShell` is the reason this is published. It steps a nested screen's
+ * title one rung below its door's, and its own comment already insisted the
+ * map it does that with "is a RELATION, not a size — one rung down `Title`'s
+ * own three-rung ladder — which is why it can be written at all in a folder
+ * whose law is that no file in it writes a type step". It was still a hand-
+ * written pair of values, and the ladder is no longer three rungs. A relation
+ * that is spelled as its results stops being true the moment the thing it
+ * relates changes; this array is what lets it be spelled as itself.
+ *
+ * The order is the type scale's, descending, and it is the same order the
+ * tracking tokens run in (`--tracking-display-m` … `--tracking-h4`). The
+ * bottom rung is its own floor: stepping down from `h4` yields `h4`, because
+ * a heading smaller than the row heading is body copy and this component does
+ * not draw body copy.
+ */
+export const TITLE_LADDER = ["display-m", "h1", "h2", "h3", "h4"] as const satisfies readonly TitleStep[];
+
+/** One rung down `TITLE_LADDER`, floored at its last rung. */
+export function titleStepDown(step: TitleStep): TitleStep {
+  const at = TITLE_LADDER.indexOf(step as (typeof TITLE_LADDER)[number]);
+  return TITLE_LADDER[Math.min(at + 1, TITLE_LADDER.length - 1)];
+}
 
 export interface TitleProps
   extends React.ComponentPropsWithoutRef<"div">,
@@ -139,7 +244,12 @@ export interface TitleProps
  *  which is where the kit puts a wrapped action row everywhere else. Nothing
  *  restacks and nothing changes size: a 32 heading is legible at 320 and
  *  shrinking it would make the page's largest type the same size as its body
- *  copy.
+ *  copy. The same answer holds one and two rungs up, and it is the reason
+ *  every step on this ladder carries its own line-height: `--text-4xl` is
+ *  1.08 and `--text-5xl` is 1.06 against `--text-3xl`'s 1.18, so a "Page
+ *  title" that wraps to three lines at 320 sets tighter rather than taller,
+ *  which is what the scale was drawn to do. One class carries all three
+ *  values, which is why no rung here is ever spelled as a raw length.
  *
  * RTL — safe, and one thing was changed to make it so. The kit pushes the
  * actions with `margin-left: auto`; this file uses `ms-auto`

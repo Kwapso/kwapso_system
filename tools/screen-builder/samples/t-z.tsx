@@ -2,7 +2,9 @@
  * and may not do. Keys are the kit's folder names; each `render` draws the real
  * export with made-up content and spreads `p.of("<Export>")` onto every export
  * the properties panel offers options for. */
+import { Badge } from "../../../shared/ui/components/badge/badge"
 import { Button } from "../../../shared/ui/components/button/button"
+import { Input } from "../../../shared/ui/components/input/input"
 import {
   Table,
   TableBody,
@@ -20,6 +22,7 @@ import { Tiles, type TileItem } from "../../../shared/ui/components/tiles/tiles"
 import { Timeline, type TimelineEvent } from "../../../shared/ui/components/timeline/timeline"
 import { Title } from "../../../shared/ui/components/title/title"
 import { Toggle } from "../../../shared/ui/components/toggle/toggle"
+import { ToolbarRow } from "../../../shared/ui/components/toolbar-row/toolbar-row"
 import { ToggleGroup, ToggleGroupItem } from "../../../shared/ui/components/toggle-group/toggle-group"
 import {
   Tooltip,
@@ -296,6 +299,33 @@ export const samples: Samples = {
           Calendar
         </ToggleGroupItem>
       </ToggleGroup>
+    ),
+  },
+  // NEW IN KIT v1.2.71. The kit now ships a toolbar row of its own, which is
+  // the same JOB as the app's `<ToolbarRow>` (R48/R49/R50/R53) and NOT the same
+  // component: the app's row builds its `sort` and `view` slots from structured
+  // configs precisely so a call site cannot hand a control to the wrong slot,
+  // and takes a required `empty` so a collection with no rows draws no toolbar
+  // at all. Whether the app adopts this one is a real decision with a visible
+  // consequence on every collection screen, and it is not made by giving the
+  // builder a thumbnail. This is dummy data, nothing more.
+  "toolbar-row": {
+    render: () => (
+      <ToolbarRow
+        search={<Input placeholder="Search" className="w-full" />}
+        filters={<Badge variant="secondary">Open</Badge>}
+        viewSwitch={
+          <ToggleGroup type="single" defaultValue="list" aria-label="View">
+            <ToggleGroupItem value="list" aria-label="List">
+              <ListBullets size={16} aria-hidden="true" />
+            </ToggleGroupItem>
+            <ToggleGroupItem value="board" aria-label="Board">
+              <Kanban size={16} aria-hidden="true" />
+            </ToggleGroupItem>
+          </ToggleGroup>
+        }
+        actions={<Button size="sm">New ticket</Button>}
+      />
     ),
   },
   tooltip: {

@@ -1021,9 +1021,33 @@ component is adopted or refused for a stated reason), `R48`/`R49`/`R50`/`R53`
 (the toolbar's search, its gap, its emptiness, its slot set), `R52` (one title
 treatment). The kit owns the *rule*; it cannot check it against itself, because
 the subject is which of the kit's parts *you* reached for. §12's seam is the
-shape all thirteen should take. **Two of these name a real kit gap rather than
-an app fault:** `R52` exists because the kit's `Title` has no h1 rung, and the
-toolbar four exist because the kit ships no `ToolbarRow` and the app built one.
+shape all thirteen should take. **Two of these named a real kit gap rather than
+an app fault, and both gaps are closed as of 2026-09-08:**
+
+- `R52` existed because the kit's `Title` had no h1 rung. It has one now, and a
+  `display-m` rung above it — the two roles the kit's own type-scale table
+  already names ("Record heading" 44, "Page title" 56) and that `Headline` had
+  carried all along. `RecordDetail`'s `titleSize` defaults to the record-heading
+  rung, so **the app's constant and its census can be deleted outright rather
+  than moved**: the correct step now arrives by default on both of its detail
+  paths, which is what R52 was policing. The `TITLE_ACTIONS_SPLIT` half of that
+  constant is a separate ruling and stays the app's — see below.
+- The toolbar four existed because the kit shipped no `ToolbarRow`. It ships
+  one now, extracted from `CollectionFrame` (which renders it) so that the
+  contract has one implementation and any body can stand under it. **`R49` — the
+  gap between the row and what it sits above — moves here**: `TOOLBAR_ROW_GAP`
+  is `--space-5`, the same number `TABS_STRIP_GAP` and the collection panel's
+  own column gap already spend on that sentence, and the row pays it itself
+  wherever it is standing on its own ground. **`R48`, `R50` and `R53` stay the
+  app's, each for a stated reason** written into `toolbar-row.tsx`'s header:
+  search-as-a-default is that product's policy over that product's recipes; the
+  empty-collection gate contradicts ch27.21, which draws the toolbar over an
+  empty collection, so the kit is not the place to settle two client rulings
+  silently; and closing slot 4 into a sort/view config pair would break every
+  `viewSwitch` call site to enforce one product's fixed answer to "which
+  controls", which a gantt's period stepper already contradicts inside this
+  repository. A kit component that is one product's component with the serial
+  numbers filed off is worse than no component.
 
 **C · Your architecture, and none of the kit's business — 39 of the 55.** All
 21 `arch` laws, all 6 `ai` laws, the 1 `workflow` law, and 11 `ui` laws whose

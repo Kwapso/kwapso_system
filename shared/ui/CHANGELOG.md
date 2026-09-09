@@ -2,6 +2,157 @@
 
 ## Unreleased
 
+### Added — the two laws the consuming app wrote because the kit was missing a part: `Title` gets its h1 rung, and `ToolbarRow` gets out of `CollectionFrame`
+
+Classifying the app's 55 laws against §11 turned up thirteen that are "the
+kit's rule over the app's source", and **two of those thirteen were not app
+faults at all** — they were parts this kit did not ship, written down as laws
+because something had to hold them. `docs/RULES.md` said so in one sentence
+and then left it there. This closes both, in the kit's own terms rather than
+by importing the app's answers.
+
+`npm run check` **exits 0**.
+
+#### `Title` had three rungs and was being asked to draw five things
+
+The ladder stopped at 32 because chapter 13's **section header** is what
+`title.tsx` was transcribed from, and 32 is the top of a section header.
+Nothing was ever decided about the rungs above; the ladder ended where its
+design source did. Then it travelled:
+
+| where | what it said | what it actually was |
+|---|---|---|
+| `RecordDetail` | `titleSize?: "h2" \| "h3" \| "h4"`, default `h3` | a record's own name, capped at 32, defaulted to 24 |
+| `SHAPE_HEADING_SIZE` | `Record<ScreenDensity, "h2" \| "h3">` | **not a rule about doors** — `Title`'s top two rungs, written down somewhere else |
+| `ScreenRenderer` | `density === "calm" ? "h3" : "h2"`, inline | the same two values typed a **third** time, matching by coincidence |
+| `CollectionFrame` | `headingSize?: "h2" \| "h3" \| "h4"` | a fourth copy of the same ceiling |
+
+**The rungs were never missing from the system.** The kit's own type-scale
+table names every step with the role it is for — `display-m · 56 · "Page
+title"`, `h1 · 44 · "Record heading"`, `h2 · 32 · "Section title"` — and
+`Headline` has carried both of the top two since it was written. The same two
+steps existed in the tokens and in one kit component and were unreachable from
+the other. So nothing here is chosen: `Title` gains `display-m` and `h1`, matched
+to `--tracking-display-m` and `--tracking-h1` exactly the way its other three
+rungs are matched, and **the default does not move** — a section header is
+still 32, because chapter 13 is still this component's design source. Raising a
+ceiling is not raising a floor.
+
+**Was the 32 cap the right ceiling or the bug?** It was the bug, and precisely
+because it was never a ceiling anyone set. It is `Title`'s ladder end, copied
+into three type unions that read like decisions about doors and records. What
+IS a real decision — whether a door's page title should climb to the scale's own
+"Page title" rung — is now a one-line change in **one** place (`SCREEN_TITLE_STEP`)
+instead of a component limitation, and it is not made here: it is visible on
+every screen in both doors and it is the client's. `verify/decisions.html` has
+the side-by-side.
+
+`RecordDetail`'s default DOES move, h3 → **h1**, because the scale settles that
+one outright: the rung named "Record heading" is 44 and this component is the
+record heading. Two sources disagree and the disagreement is written into the
+prop rather than smoothed over — ch24.6 draws that band at 18, which is not a
+rung either way; a drawing sets a specimen, a role name assigns a step, and the
+role name is what generalises to the next screen. `RecordChrome` stopped passing
+`titleSize={SHAPE_HEADING_SIZE[measure]}` at the same time: that was the
+**screen's** per-door step handed to a **record's** heading, two roles the scale
+names separately.
+
+Three copies became one. `SCREEN_TITLE_STEP` lives beside the `ScreenDensity`
+type it is keyed by; `SHAPE_HEADING_SIZE` is now that object rather than a
+promise to match it; `ScreenRenderer` reads it instead of retyping it. And
+`TITLE_STEP_CHILD` — whose own comment already insisted it was "a RELATION, not
+a size" while being spelled as the pair of values the relation produced — is now
+`titleStepDown(SHAPE_HEADING_SIZE[door])`, floored at the ladder's last rung. It
+yields exactly what it yielded before, and it will keep being true if the root
+step ever moves.
+
+**What the app can delete, not move.** `RECORD_TITLE_SIZE`
+(`[&_[data-slot=title-heading]]:text-4xl`, applied at every detail call site and
+policed by a census) exists to reach 44 from outside a component that could not
+offer it. The right step now arrives by default on both of its detail paths, so
+the constant and its half of the law go. `TITLE_ACTIONS_SPLIT` — the 80% title /
+actions split — is a different ruling about a different property and stays where
+it is.
+
+#### The toolbar contract was never missing. A way to REACH it was.
+
+`CollectionFrame` has always drawn the row the kit's dev note fixes — "toolbar
+order never changes: search, then filters, then view switcher, then actions
+pinned right … the 4th+ action collapses under a '···'" — with the one-row lane
+of 2026-09-04 behind it, the elastic search slot, the chip slot as the row's
+shock absorber, and every measurement that rejected a `···` fold, an in-flow
+disclosure and a double render. All of it welded inside a frame that also owns
+the heading, the count chip, the figure strip, the tab strip, one soft-paper
+panel, three registers, the body and the pager.
+
+A screen whose tab body is a month grid, a chart or a grouped pair of lists
+cannot adopt all of that to get a search box and a `+`. So it writes
+`<div className="flex justify-end">` instead. **The consuming app wrote that
+four times, noticed, and built a private `ToolbarRow` — which grew eighteen call
+sites and four laws to police them.** The duplicated markup is not the cost. The
+cost is that a second copy of a contract cannot receive the contract's later
+rulings: that private row still carries `flex-wrap`, so it draws a two-, four-
+and five-row toolbar at exactly the widths this kit measured and rebuilt to fix,
+and it has no scrolling lane, no group rules and no overflow menu — not because
+anyone decided against them, but because the ruling landed on the kit's row and
+the app was not holding the kit's row.
+
+So the row is extracted, **and `CollectionFrame` renders it**. Same markup, one
+module instead of two; `data-slot="collection-frame-toolbar"` is passed through,
+so every probe that ever measured it still does. The frame's own file is 300
+lines lighter and four imports shorter, and it lost nothing: the whole argument
+travelled with the code rather than being summarised away.
+
+#### Two things it needed that the frame's panel used to provide, and three it deliberately refused
+
+**A GROUND, ASKED RELATIONALLY.** `ground` is `bare` (default — something else
+painted, which is what the frame passes), `page` (standing on off-beige, so the
+row takes soft paper) or `panel` (standing on soft paper, so it takes
+off-beige) — `CollectionFrame`'s own `tone` question, in the same words, because
+a toolbar cannot know its ground and a fixed fill is right on exactly one
+screen. **Named utility classes, and that is load-bearing rather than tidy:**
+the app painted this identical row `bg-[var(--surface-raised)]`, the same colour
+by a different class, so none of tokens.css's ground selectors matched, the
+`--btn-secondary-fill` rebind never fired, and every button in its toolbar was
+beige on beige — reported twice before it was traced. `ground="panel"` resolves
+to the fill that app hand-derived after two rounds of client feedback, which is
+the relation working.
+
+**THE GAP TO WHAT COMES NEXT.** `TOOLBAR_ROW_GAP` is `--space-5` — the third
+place in this kit to spend that number on that sentence, beside `TABS_STRIP_GAP`
+and the collection panel's own `gap-5`. The app re-derived it as
+`--toolbar-content-gap` after fourteen call sites had drifted into five values
+doing one job (7.5 / 11.25 / 15 / 22.5px and an `mb-4` passed straight to the
+row). The kit owns the number, so the kit pays it — but only where the row is
+standing on its own; inside a host that stacks it, the host's gap **is** that
+number and paying it twice is the bug the app's law was written about. `ground`
+answers both questions at once, so it is asked once.
+
+Refused, each with its reason in the file header:
+
+- **A sixth `sort` slot.** The evidence behind the app's version is real — eight
+  of its call sites had smuggled a `<SortControl>` into the `search` slot, where
+  it sat inside the one *growing* box at whatever label treatment that screen
+  typed. But the contract here has no sort slot to fill: `SortControl` shares
+  slot 4 by CH27.13's "the view switcher and the sub-tab picker are controls",
+  and override 28's precedent for growing this row is explicitly *"a chapter
+  draws a control in this toolbar that none of the existing slots describes"*.
+  Slot 4 describes it. Adding a sixth would be legislating past the rulebook.
+- **An `empty` gate that hides the whole row.** A good mechanism, and not this
+  kit's ruling: `compositions/states/empty-collection.tsx` is 27.21 transcribed,
+  and 27.21 draws the search box, the chips and the actions over a collection
+  with nothing in it. Two client rulings genuinely disagree, and the kit is not
+  the place to settle that silently.
+- **A fill and a radius picked by name.** See `ground`.
+
+#### Proved on itself
+
+The three conformance laws were pointed at the new file with five planted
+violations in one `cva` value — a bare `rounded-lg`, a `border`, a `border-b-2`,
+a hex in an arbitrary class and `var(--kw-mango)`. **radii 1, palette 2, borders
+2, exit 1.** Reverted, exit 0. A law that has never been red on a file has not
+read it.
+
 ### Added — the kit stops shipping rules as prose: `foundations/rules/`, and a seam that runs them against somebody else's source
 
 The client's sentence on 7 Sep: *"how we will use the ui kit: as the onlly

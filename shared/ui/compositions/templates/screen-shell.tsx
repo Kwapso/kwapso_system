@@ -935,7 +935,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "../../components/sheet/sheet";
-import { Title } from "../../components/title/title";
+import { Title, titleStepDown, type TitleStep } from "../../components/title/title";
 import { Text } from "../../components/typography/typography";
 import {
   CaretLeft,
@@ -2084,22 +2084,35 @@ const DENSITY_STACK: Record<ScreenDensity, string> = {
    imported and used for the depth-1 case, so `ScreenRenderer`,
    `CollectionFrame`, `RecordChrome` and this shell all keep reading one
    number. This map is the only new typography in the file and it is a
-   RELATION, not a size — "one rung down `Title`'s own three-rung ladder" —
-   which is why it can be written at all in a folder whose law is that no file
-   in it writes a type step.
+   RELATION, not a size — "one rung down `Title`'s own ladder" — which is why
+   it can be written at all in a folder whose law is that no file in it writes
+   a type step.
+
+   IT IS NOW SPELLED AS THAT RELATION, 2026-09-08. It used to be the pair of
+   values the relation happened to produce:
+
+       const TITLE_STEP_CHILD = { comfortable: "h3", calm: "h4" };
+
+   which is a relation frozen at its results, and the results moved the moment
+   `Title` grew rungs above h2. `titleStepDown` is the ladder's own step-down,
+   published by the file that owns the ladder, so if a door's root step is ever
+   raised to the scale's "Page title" rung the nested step follows it without
+   anybody remembering to come here. The values this produces today are exactly
+   the ones that were written out before:
 
        comfortable  h2 (32) → h3 (24)
        calm         h3 (24) → h4 (20)
 
-   `Title`'s ladder has exactly three rungs and calm's nested step lands on
-   the last of them, so a fourth level of nesting cannot ask for a fifth size:
-   the depth rule is "root or not", never "one rung per crumb". A five-deep
-   trail and a two-deep trail take the same step, which is correct — the title
-   says what this record is called, not how far in it is. The trail says that.
+   `titleStepDown` floors at the ladder's last rung, so calm's nested step
+   lands on h4 and stays there: a fourth level of nesting cannot ask for a
+   sixth size, and the depth rule is "root or not", never "one rung per crumb".
+   A five-deep trail and a two-deep trail take the same step, which is correct
+   — the title says what this record is called, not how far in it is. The trail
+   says that.
    -------------------------------------------------------------------------- */
-const TITLE_STEP_CHILD: Record<ScreenDensity, "h3" | "h4"> = {
-  comfortable: "h3",
-  calm: "h4",
+const TITLE_STEP_CHILD: Record<ScreenDensity, TitleStep> = {
+  comfortable: titleStepDown(SHAPE_HEADING_SIZE.comfortable),
+  calm: titleStepDown(SHAPE_HEADING_SIZE.calm),
 };
 
 /** A trail of one tab is a top-level location. See `breadcrumbDepth`. */

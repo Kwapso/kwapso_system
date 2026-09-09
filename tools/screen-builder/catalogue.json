@@ -1,20 +1,20 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.70",
-  "sha": "69922096c315b217d157a9f178f27dd61811ecf6",
-  "syncedAt": "2026-09-08"
+  "tag": "v1.2.71",
+  "sha": "7b8de645f21f6ce31ce79dfec26b757ef6862fcb",
+  "syncedAt": "2026-09-09"
  },
- "generatedAt": "2026-09-08T07:29:25.224Z",
+ "generatedAt": "2026-09-09T08:53:04.786Z",
  "counts": {
-  "components": 118,
+  "components": 119,
   "hooks": 2,
-  "withVariants": 41,
+  "withVariants": 42,
   "withoutVariants": 77,
-  "cvaSites": 50,
-  "variantGroups": 76,
-  "variantOptions": 246,
-  "typedEnumProps": 42,
+  "cvaSites": 51,
+  "variantGroups": 77,
+  "variantOptions": 251,
+  "typedEnumProps": 40,
   "typedBooleanProps": 312,
   "compositions": 47,
   "icons": 1512,
@@ -2312,7 +2312,7 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "registerVariants",
-     "line": 205,
+     "line": 209,
      "base": "flex min-w-0 flex-col",
      "groups": [
       {
@@ -2343,7 +2343,7 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionFrameVariants",
-     "line": 415,
+     "line": 419,
      "base": "flex min-w-0 flex-col rounded-[var(--radius)]",
      "groups": [
       {
@@ -2411,7 +2411,7 @@
     {
      "file": "components/collection-frame/collection-frame.tsx",
      "name": "collectionPanelVariants",
-     "line": 532,
+     "line": 536,
      "base": "relative z-[2] flex min-w-0 flex-col rounded-[var(--radius)] bg-surface-panel text-foreground [--btn-secondary-fill:var(--surface-page)] [--pill-fill:var(--surface-page)]",
      "groups": [
       {
@@ -2456,17 +2456,6 @@
       "collectionFrameVariants"
      ],
      "props": [
-      {
-       "name": "headingSize",
-       "optional": true,
-       "kind": "enum",
-       "values": [
-        "h2",
-        "h3",
-        "h4"
-       ],
-       "note": "The heading step. `Title`'s ladder: 32 / 24 / 20."
-      },
       {
        "name": "headingAs",
        "optional": true,
@@ -5760,17 +5749,6 @@
        "note": "The reader may not act on this record: the whole action group is absent."
       },
       {
-       "name": "titleSize",
-       "optional": true,
-       "kind": "enum",
-       "values": [
-        "h2",
-        "h3",
-        "h4"
-       ],
-       "note": "Which heading step the title takes. `Title`'s own ladder — 32 / 24 / 20. The kit's 24.6 draws 18, which is not a rung on that ladder, so the nearest page-level rung is the default (GAPS-COL3 REC-3)."
-      },
-      {
        "name": "stagesVisible",
        "optional": true,
        "kind": "boolean",
@@ -5958,6 +5936,10 @@
     "components/screen-renderer/screen-renderer.tsx"
    ],
    "exports": [
+    {
+     "name": "SCREEN_TITLE_STEP",
+     "file": "components/screen-renderer/screen-renderer.tsx"
+    },
     {
      "name": "ScreenRenderer",
      "file": "components/screen-renderer/screen-renderer.tsx"
@@ -7882,6 +7864,14 @@
    ],
    "exports": [
     {
+     "name": "TITLE_LADDER",
+     "file": "components/title/title.tsx"
+    },
+    {
+     "name": "titleStepDown",
+     "file": "components/title/title.tsx"
+    },
+    {
      "name": "Title",
      "file": "components/title/title.tsx"
     }
@@ -7890,16 +7880,26 @@
     {
      "file": "components/title/title.tsx",
      "name": "titleHeadingVariants",
-     "line": 62,
+     "line": 119,
      "base": "font-[var(--font-weight-medium)]",
      "groups": [
       {
        "name": "size",
        "options": [
         {
+         "name": "display-m",
+         "classes": "text-5xl",
+         "note": "56 · the display-m step (`--tracking-display-m`, -0.025em). The scale's \"Page title\": a screen's own name, at the top of its door."
+        },
+        {
+         "name": "h1",
+         "classes": "text-4xl",
+         "note": "44 · the h1 step (`--tracking-h1`, -0.025em). The scale's \"Record heading\": the name of the one thing a detail screen is about."
+        },
+        {
          "name": "h2",
          "classes": "text-3xl",
-         "note": "32 · the h2 step (`--tracking-h2`, -0.02em). Chapter 13's drawing."
+         "note": "32 · the h2 step (`--tracking-h2`, -0.02em). Chapter 13's drawing, the scale's \"Section title\", and this component's default."
         },
         {
          "name": "h3",
@@ -8076,6 +8076,72 @@
     }
    ],
    "description": "ToggleGroup · ToggleGroupItem — the segmented control (3 direct call sites). DESIGN SOURCE design-mothership/specimens/_fragments/t10.css → `.kw-seg` and `.kw-seg__btn` / `.kw-seg__btn--active` (chapter 10, \"Segmented\"): container inline-fl"
+  },
+  {
+   "name": "toolbar-row",
+   "kind": "component",
+   "files": [
+    "components/toolbar-row/toolbar-row.tsx"
+   ],
+   "exports": [
+    {
+     "name": "TOOLBAR_ROW_GAP",
+     "file": "components/toolbar-row/toolbar-row.tsx"
+    },
+    {
+     "name": "ToolbarRow",
+     "file": "components/toolbar-row/toolbar-row.tsx"
+    }
+   ],
+   "cva": [
+    {
+     "file": "components/toolbar-row/toolbar-row.tsx",
+     "name": "toolbarRowVariants",
+     "line": 165,
+     "base": "flex min-w-0 flex-col",
+     "groups": [
+      {
+       "name": "ground",
+       "options": [
+        {
+         "name": "bare",
+         "classes": "",
+         "note": "SOMETHING ELSE ALREADY PAINTED. No fill, no radius, no trailing gap — the host owns all three, which is what `CollectionFrame` does with its own soft-paper panel and its `gap-5`. The default, because a row that paints nothing cannot paint the wrong thing."
+        },
+        {
+         "name": "page",
+         "classes": "bg-surface-panel",
+         "note": "STANDING ON OFF-BEIGE — a page, a body pane, a screen's own ground. The row takes soft paper, which is 26.04 read at this level: \"The page itself is off-beige and every panel on it is soft paper: never the other way round.\" Controls inside then rebind to off-beige."
+        },
+        {
+         "name": "panel",
+         "classes": "bg-surface-raised",
+         "note": "STANDING ON SOFT PAPER — a screen card, a panel, a sheet. The row takes off-beige, and the controls inside rebind to soft paper. This is the value the consuming app's own row arrived at by hand after two rounds of client feedback, which is the relation working."
+        }
+       ]
+      }
+     ],
+     "defaults": {
+      "ground": "bare"
+     },
+     "compound": [],
+     "unresolved": [],
+     "usedBy": [
+      "ToolbarRow"
+     ]
+    }
+   ],
+   "typedProps": [
+    {
+     "file": "components/toolbar-row/toolbar-row.tsx",
+     "type": "ToolbarRowProps",
+     "variantsFrom": [
+      "toolbarRowVariants"
+     ],
+     "props": []
+    }
+   ],
+   "description": "ToolbarRow — the collection toolbar contract, on its own, above any body (1 direct call site: `CollectionFrame`). WHAT THIS IS, IN ONE SENTENCE The row `CollectionFrame` has always drawn — search, filters, period, view switch, actions pinne"
   },
   {
    "name": "tooltip",
@@ -9200,6 +9266,11 @@
     "default",
     "disabled"
    ]
+  },
+  {
+   "component": "toolbar-row",
+   "kind": "source-only",
+   "detail": "on disk, not in manifest.json"
   }
  ],
  "unresolved": []
