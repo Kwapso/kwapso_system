@@ -384,14 +384,75 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
   //     writes for a solo calendar block) the same `creator_id` IS the person
   //     whose calendar it was read from, and they were in that room alone.
   //
-  // WHAT IT COSTS, SAID PLAINLY (R14). A LIKE over a JSON blob cannot use an
-  // index, so this is a full scan of `meetings` — for the rows AND, through the
-  // one `whereFor` both statements share, for the exact COUNT(*) behind the
-  // badge. At 458 rows that is nothing. This table only grows, and the
-  // structural answer is a denormalised link table (`meeting_attendees(meeting_id,
-  // email)`, indexed on the address) which would also make the `q` search's own
-  // guest-list scan an index seek. That is a MIGRATION and a backfill, so it is
-  // written down here and raised with the lead rather than built in silence.
+  // WHAT IT COSTS — MEASURED ON STAGING, 9 Sep 2026, and the answer is not the
+  // one the first draft of this paragraph assumed (R14).
+  //
+  // The claim it made was "a LIKE over a JSON blob cannot use an index, so this
+  // is a full scan — for the rows AND for the COUNT(*)". Half of that is wrong,
+  // and the wrong half is the one that would have justified the fix.
+  //
+  //   THE ROWS ARE NOT A FULL SCAN. The list is `ORDER BY starts_at DESC LIMIT
+  //   51`, so SQLite walks `idx_meetings_when` in the order it already wants
+  //   and STOPS at the fifty-first match. D1's own `rows_read`, against the 557
+  //   meetings this base holds: 51 for Alaap, 63 for Aurora, 124 for Ishita,
+  //   127 for Alex. The predicate is evaluated per row, never sorted, never
+  //   scanned to the end. Only somebody in NO meetings pays the whole table
+  //   (557 rows, 0.9 ms), because there is no fifty-first match to stop at.
+  //
+  //   THE COUNT IS A FULL SCAN — 557 rows read, 0.6-1.3 ms — AND SO IS THE ONE
+  //   BESIDE IT. `total` for the All view is `deactivated_at IS NULL`, which
+  //   reads the same 557 rows and rides EVERY meetings response. So Mine's
+  //   count is not a new class of cost; it is the class the door already pays,
+  //   once more, once per screen mount. No link table removes it, because "how
+  //   many rows are in this collection" has no narrower question hiding inside
+  //   it — `shared/workers/count.ts` says the same thing about its own ceiling.
+  //
+  // AND THE SCAN IS 0.1% OF THE REQUEST. The team database is reached over the
+  // D1 REST door: ~500 ms of round trip around 0.6 ms of engine. A primary-key
+  // read that touches nothing costs 0.1 ms of that same 500. Making the
+  // predicate free would make the meetings list no faster by any amount a
+  // person can perceive.
+  //
+  // THE LINK TABLE WAS DESIGNED, BENCHED AND NOT BUILT. It would be exactly
+  // right: one row per (meeting, attendee) plus one per no-list meeting for its
+  // creator, built by the rule the two clauses above state. Simulated off the
+  // real 557 rows it answers IDENTICALLY to this SQL for all ten members of
+  // this team — 552 / 276 / 177 / 161 / 139 / 12 / four zeros, not one row of
+  // disagreement. It was refused on cost, not on doubt:
+  //
+  //   1 · THE OBVIOUS SHAPE IS A REGRESSION, and this is the finding worth
+  //       keeping. A link table keyed `(meeting_id, email)` and indexed on the
+  //       address turns the list from an ordered walk into a join whose matches
+  //       arrive in ADDRESS order and must then be sorted by start time to
+  //       answer `LIMIT 51`. Benched over synthetic rows shaped like these at
+  //       100,000: 0.15 ms today, 36 ms with that table. Two hundred times
+  //       WORSE on the tab it was built for.
+  //   2 · THE SHAPE THAT WINS HAS TO CARRY THE SORT KEY — `starts_at` and a
+  //       live flag denormalised beside the address, covering-indexed. That is
+  //       29x on the count at 100,000 rows, and it is three MUTABLE facts kept
+  //       in a second place by a sweep that rewrites all three. A stale copy
+  //       there does not slow anything down; it tells somebody they were not in
+  //       a room they were in.
+  //   3 · IT ONLY WINS ON ONE SORT. `MEETING_SORTS` offers four (when, title,
+  //       client, added). A covering index on start time answers the default;
+  //       the other three fall straight back to the scan.
+  //   4 · IT SPENDS THE METER THIS APP ACTUALLY PAYS. `documents/COSTS.md`
+  //       bills D1 rows WRITTEN; reads sit inside an allowance three orders of
+  //       magnitude above this traffic. The link table converts a read nobody
+  //       is billed for into writes on every calendar mirror — 1,121 pairs
+  //       rewritten on a full resync of this one team.
+  //
+  // WHAT WOULD CHANGE THE ANSWER, so the next person measures rather than
+  // re-argues. The sweep's horizon is five years back and a rolling year ahead,
+  // and this base has taken 557 rows out of 22 months of one agency's calendar
+  // — roughly 300 a year. Build it when a team's `meetings` passes ~50,000
+  // rows (where the count crosses ~15 ms and stops being noise beside the round
+  // trip), or when a second question starts asking the same scan on the same
+  // response. Not before, and not with the keyed-on-email shape.
+  //
+  // THE `q` SEARCH GETS NOTHING FROM IT EITHER, contrary to what stood here.
+  // That search matches `%needle%`, unanchored on both ends, which cannot use
+  // an index on a narrow `email` column any more than on this blob.
   if (filter.view === "mine") {
     if (filter.caller) {
       where.push(
