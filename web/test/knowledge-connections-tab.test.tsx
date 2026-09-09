@@ -306,6 +306,36 @@ describe("WHERE the Connections tab stands — the origin row, else the source i
     expect(asked).toContainEqual({ table: "knowledge_sources", id: "SRC-NOTE" })
   })
 
+  it("THE ROUND TRIP: the call on a source's map is a real link to the meeting screen", async () => {
+    // THE CONJUNCT THAT MAKES THE FEATURE REACHABLE, and neither end proves it
+    // alone. `record-map.ts` gathers a call's artefacts (its own suite), and the
+    // meeting screen now draws them (meeting-connections-tab.test.tsx) — but
+    // between the two sits the question nobody was asking: can a person GET
+    // there? Until 9 Sep 2026 they could not, because `knowledge-detail` was the
+    // only screen in the app that drew a map at all.
+    //
+    // So this asserts the href, on the sentence a reader actually clicks. R37:
+    // an in-app destination is an `<InAppLink>`, a real anchor.
+    const source = makeSource({ id: "SRC-HOP", kind: "email", originTable: "google_gmail", originRowId: "u1:m" })
+    primeTeam(source)
+    const focus = { table: "knowledge_sources", id: "SRC-HOP", label: "Re: the Tuesday call" }
+    const call = { table: "meetings", id: "MEET-HOP", label: "The Tuesday call" }
+    door.recordMap = async () => ({
+      focus,
+      nodes: [focus, call],
+      links: [{ from: "knowledge_sources:SRC-HOP", to: "meetings:MEET-HOP", relation: "came out of" }],
+      total: 1,
+      capped: false,
+    })
+    openConnectionsTab(source)
+
+    const link = await screen.findByRole("link", { name: "The Tuesday call" })
+    expect(
+      link.getAttribute("href"),
+      "the call must land on the meeting's own screen, which is where its siblings are drawn"
+    ).toBe(`/t/${TEAM}/meetings/MEET-HOP`)
+  })
+
   it("…and a source with nothing attached says so, rather than looking broken", async () => {
     const source = makeSource({ id: "SRC-LONELY", kind: "note", originTable: null, originRowId: null })
     primeTeam(source)

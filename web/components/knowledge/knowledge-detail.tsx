@@ -26,7 +26,7 @@ import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 
-import { RelationshipMap } from "@/components/records/relationship-map"
+import { ConnectionsPanel } from "@/components/records/connections-panel"
 import { useRemembered } from "@shared/web/remembered"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { fileTypeIcon } from "@shared/web/screen-engine/file-type-icon"
@@ -37,7 +37,7 @@ import { KnowledgeFormDialog, type KnowledgeFormValues } from "@/components/know
 import { KNOWLEDGE_KIND } from "@/components/deep-link/shape"
 import { OverviewList } from "@/components/records/overview-list"
 import { TranslateAction, useHumanTranslation } from "@/components/records/translate-human-text"
-import { ApiFailure, content, tenancy } from "@/lib/api"
+import { content, tenancy } from "@/lib/api"
 import { auditItems } from "@/lib/audit-overview"
 import { accountKey, appsKey, knowledgeKey, listFetch, recordMapKey } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
@@ -402,45 +402,13 @@ export function KnowledgeDetailScreen({
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
           if (panel.value === "map")
-            return mapQ.data ? (
-              <RelationshipMap
+            return (
+              <ConnectionsPanel
                 teamId={teamId}
-                focus={mapQ.data.focus}
-                nodes={mapQ.data.nodes}
-                links={mapQ.data.links}
-                total={mapQ.data.total}
-                capped={mapQ.data.capped}
+                read={mapQ}
+                emptyTitle={t("Nothing is linked to this yet.")}
+                refusedText={t("This source doesn't have a map to draw.")}
               />
-            ) : mapQ.error ? (
-              // A FAILED READ SAYS SO — the house failure pattern by name
-              // (CLAUDE.md): this used to fall straight through to the loading
-              // skeleton below on any error, four grey rows sitting there
-              // forever for a door that had already answered "no". Same shape
-              // as work-logs-panel.tsx's own block-level retry.
-              //
-              // BUT NOT EVERY REFUSAL IS THE SAME REFUSAL. `getKnowledgeMap`'s
-              // 400 ("that is not a kind of record this map draws") is
-              // PERMANENT — `mapTarget` above should already keep this tab
-              // from being reached for that table, so seeing it here means the
-              // fence moved between the read that built the tab strip and this
-              // one, not that the door is having a bad moment. A "Try again"
-              // on a refusal that will refuse again forever teaches the wrong
-              // lesson, so a 400 gets the honest sentence instead and no button;
-              // anything else (a 5xx, a dropped connection) keeps the retry.
-              mapQ.error instanceof ApiFailure && mapQ.error.status === 400 ? (
-                <p className="text-muted-foreground text-sm">
-                  {t("This source doesn't have a map to draw.")}
-                </p>
-              ) : (
-                <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-                  {t("Couldn't load this record's connections.")}
-                  <Button variant="secondary" size="sm" onClick={() => mapQ.refresh()}>
-                    {t("Try again")}
-                  </Button>
-                </p>
-              )
-            ) : (
-              <Skeleton variant="list" lines={4} />
             )
           return (
             <div className="flex flex-col gap-6">
