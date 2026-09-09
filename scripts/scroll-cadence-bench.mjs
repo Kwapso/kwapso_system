@@ -68,6 +68,31 @@ const CARD = '[data-slot="screen-shell-content"]'
 const VARIANTS = {
   baseline: null,
   square: `${CARD}{border-radius:0 !important;}`,
+  // THE CANDIDATES, added 9 Sep 2026 when the owner ruled "do this". `square`
+  // proves the MECHANISM and is not shippable — the card's radius is the
+  // shell's one elevation cue and the corner is client-approved. Calibration
+  // already established that a clip alone and a radius alone are both fine, so
+  // each of these separates the pair a different way, and the question is which
+  // one composites while leaving the card looking exactly as it does now.
+  //
+  // unclip  — the card keeps its radius and stops clipping; the body's own
+  //           `overflow-y-auto` is the clip, and it carries no radius.
+  // contain — both stay on the card, and the scroller is given its own paint
+  //           containment, on the chance Blink will promote it anyway.
+  // maskclip— the card keeps its radius and clips with a mask instead of
+  //           `overflow`, which is a different code path in Blink.
+  unclip: `${CARD}{overflow:visible !important;}`,
+  contain: `${BODY}{contain:paint !important;}`,
+  maskclip: `${CARD}{overflow:visible !important;-webkit-mask-image:radial-gradient(#fff,#fff) !important;mask-image:radial-gradient(#fff,#fff) !important;}`,
+  // THE SHAPE ACTUALLY PROPOSED FOR THE KIT, measured as itself rather than
+  // inferred from `unclip`. Moving the clip off the card leaves the BODY
+  // square, and a square body paints the card tone into the card's rounded
+  // bottom corners, against a different ground - so the card would READ square
+  // at the bottom. Giving the body the bottom radius fixes the picture and
+  // re-forms radius-plus-clip on the scroller itself, one level down, which is
+  // the very pairing this whole exercise is about. Whether that costs the win
+  // back is a question for the trace, not for reasoning.
+  unclipRound: `${CARD}{overflow:visible !important;} ${BODY}{border-bottom-left-radius:var(--radius) !important;border-bottom-right-radius:var(--radius) !important;}`,
 }
 
 const pctl = (xs, p) => { const s = [...xs].sort((a, b) => a - b); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))] * 100) / 100 : 0 }
