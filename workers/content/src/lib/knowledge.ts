@@ -944,7 +944,7 @@ export async function createSource(
       actor.name,
     ]
   )
-  await indexSource(env, cfg, guard, id)
+  await indexOneSource(env, cfg, guard, id)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Knowledge source added",
     description: `${actor.name} added "${v.title}" to the knowledge base`,
@@ -1038,7 +1038,7 @@ export async function createFileSource(
       actor.name,
     ]
   )
-  await indexSource(env, cfg, guard, id)
+  await indexOneSource(env, cfg, guard, id)
   await logActivity(cfg, guard.databaseId, actor, {
     type: "Knowledge source added",
     // The history says which of the two happened, because "we have that file"
@@ -1160,7 +1160,7 @@ export async function updateSource(
   // The chunks and the vectors carry the compartment and the owner too (both
   // arms narrow on them without a join), so a re-filing has to travel down or
   // the index would answer for a client whose material this no longer is.
-  await indexSource(env, cfg, guard, id, { force: true })
+  await indexOneSource(env, cfg, guard, id, { force: true })
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
     { label: "Filed under", from: before.compartment, to: compartment },
@@ -1211,7 +1211,7 @@ export async function setSourceActive(
     active ? [now, id] : [now, now, id]
   )
   if (!changed[0]) return false
-  if (active) await indexSource(env, cfg, guard, id, { force: true })
+  if (active) await indexOneSource(env, cfg, guard, id, { force: true })
   else await clearIndex(env, cfg, guard, id)
   await logActivity(cfg, guard.databaseId, actor, {
     type: active ? "Knowledge source restored" : "Knowledge source removed",
@@ -1590,6 +1590,76 @@ export async function indexSource(
     ])
 
   return { total, indexed: from, done: from >= total }
+}
+
+/** ONE SOURCE'S FAILURE IS ONE SOURCE'S — the same sentence the Google readers
+ * learnt on 9 Sep 2026, one layer further in, and on a much wider population.
+ *
+ * ── WHAT WAS WRONG ──────────────────────────────────────────────────────────
+ *
+ * `indexSource` was awaited at three points in the loop below with NO catch
+ * around any of them, so anything it threw for ONE source — a Vectorize upsert
+ * refused, a D1 write that would not take that row's text, a sub-request budget
+ * reached on an awkward document — escaped the loop, escaped `sweepKind`, and
+ * landed in `sweepKinds`' catch, which recorded a fact about one document as the
+ * failure of the WHOLE KIND. The tick's remaining sources were never reached,
+ * the pass was discarded, and the kind sat red until it next had a completely
+ * clean run.
+ *
+ * `embed()` catches its own model failures, which is why this stayed invisible:
+ * the common failure was already handled, so the loop LOOKED protected. It was
+ * protected against exactly one thing.
+ *
+ * ── WHY IT MATTERS MORE THAN THE GOOGLE ONE ─────────────────────────────────
+ *
+ * The Google fix was about READING from Google, so it reached the four Google
+ * lanes. This is the INDEXING step, which every kind goes through — tickets,
+ * stories, meetings, processes, people, and every file a person uploads through
+ * the app by hand. The owner asked whether the skip-and-continue rule covered
+ * the manual uploads too. It did not. It does now, and it covers them by
+ * construction rather than by four more copies of a catch.
+ *
+ * ── WHAT IT DELIBERATELY DOES NOT SWALLOW ───────────────────────────────────
+ *
+ * The repair write is NOT wrapped. If the database itself is unreachable, this
+ * catch cannot record anything either, and that throw propagates and fails the
+ * lane — which is correct: "one document is awkward" and "the database is gone"
+ * must not come back as the same sentence, and the second is one somebody has to
+ * be told about. The failing case chooses honestly between them without anybody
+ * having to enumerate error codes.
+ *
+ * ── AND IT CANNOT LOOP FOR EVER ─────────────────────────────────────────────
+ *
+ * It bumps `embed_attempts`, the counter the loop below ALREADY consults against
+ * `EMBED_ATTEMPT_CAP`, so a source that fails repeatably is given up on and
+ * reported once, exactly as a repeatably-unembeddable one is — and is picked up
+ * again the moment its text changes, because the upsert clears the counter. It
+ * also blanks `content_hash`, so a source that threw halfway through is re-read
+ * rather than skipped as unchanged.
+ *
+ * Returns whether the source was indexed, so the caller's count stays true. */
+export async function indexOneSource(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  sourceId: string,
+  opts: { force?: boolean } = {}
+): Promise<boolean> {
+  try {
+    await indexSource(env, cfg, guard, sourceId, opts)
+    return true
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e)
+    console.error(`knowledge source ${sourceId} failed to index: ${reason}`)
+    await d1Query(
+      cfg,
+      guard.databaseId,
+      `UPDATE knowledge_sources SET index_error = ?, content_hash = NULL, embed_attempts = embed_attempts + 1
+        WHERE id = ?`,
+      [reason.slice(0, 300), sourceId]
+    )
+    return false
+  }
 }
 
 /** THE LABELS ON EVERY VECTOR A SOURCE PRODUCES — the notebook it belongs to,

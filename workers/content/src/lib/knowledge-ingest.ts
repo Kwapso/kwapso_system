@@ -50,7 +50,7 @@ import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
 import { EMBED_ATTEMPT_CAP, THREAD_HARD_CAP } from "@shared/workers/limits"
 import type { Env } from "../env"
-import { AGENCY_COMPARTMENT, accountCompartment, indexableText, indexSource } from "./knowledge"
+import { AGENCY_COMPARTMENT, accountCompartment, indexOneSource, indexableText } from "./knowledge"
 import { buildSummary } from "./knowledge-summary"
 import { contentHash, plainText } from "./knowledge-text"
 import { logActivity } from "@shared/workers/activity"
@@ -2099,8 +2099,7 @@ async function sweepKind(
             WHERE id = ? AND deactivated_at IS NULL`,
           [now, now, source.id]
         )
-        await indexSource(env, cfg, guard, source.id)
-        indexed++
+        if (await indexOneSource(env, cfg, guard, source.id)) indexed++
       }
       continue
     }
@@ -2154,8 +2153,7 @@ async function sweepKind(
       // happens not to bite — but that is a second fact in another file, and a
       // row put back on screen with nothing behind it is precisely the state this
       // branch exists to end. It does not depend on which path retired the row.
-      await indexSource(env, cfg, guard, source.id, { force: true })
-      indexed++
+      if (await indexOneSource(env, cfg, guard, source.id, { force: true })) indexed++
       continue
     }
     // THE SKIP THAT PAYS FOR THE SWEEP: unchanged text is not re-chunked, so it
@@ -2179,8 +2177,7 @@ async function sweepKind(
       givenUp.push(source.id)
       continue
     }
-    await indexSource(env, cfg, guard, source.id)
-    indexed++
+    if (await indexOneSource(env, cfg, guard, source.id)) indexed++
   }
   // ONE ROW FOR THE TICK, not one per source: a kind where forty sources have
   // been given up on is one fact, and forty error rows would be the flood the
