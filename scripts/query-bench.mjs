@@ -46,6 +46,7 @@ import "./lib/shared-alias.mjs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -53,8 +54,8 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..")
 // them is evaluated, so an `@shared/*` specifier at the top of this file is
 // looked up before the hook that teaches Node what it means has run. kb-bench.mjs
 // reaches for the shipped code the same way, for the same reason.
-const { QUERY_MODULES, queryModule } = await import(join(REPO, "shared", "workers", "query-grammar.ts"))
-const { parseQuery, runQuery } = await import(
+const { QUERY_MODULES, queryModule } = await importTs(join(REPO, "shared", "workers", "query-grammar.ts"))
+const { parseQuery, runQuery } = await importTs(
   join(REPO, "workers", "tenancy", "src", "lib", "query-engine.ts")
 )
 
@@ -189,7 +190,7 @@ console.log(
 // characters and turns "nothing matched" into "here is how the clients are
 // spelled" — the difference between an empty answer a person can act on and one
 // they cannot.
-const { QUERY_MODULES: MODS } = await import(join(REPO, "shared", "workers", "query-grammar.ts"))
+const { QUERY_MODULES: MODS } = await importTs(join(REPO, "shared", "workers", "query-grammar.ts"))
 const tickets = MODS.tickets
 const inUse = await sql(
   team.database_id,

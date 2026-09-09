@@ -132,12 +132,12 @@ const SELF_TEST = process.argv.includes("--self-test")
 import { importTs } from "./lib/import-ts.mjs"
 
 const { systemFor } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
-const { toolSpecs, stageOneSystem, CORE_TOOL_NAMES } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
-const { DEFAULT_AGENT_MODEL } = await import(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
+const { toolSpecs, stageOneSystem, CORE_TOOL_NAMES } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
+const { DEFAULT_AGENT_MODEL } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
 // DYNAMIC, like the three above and for the same reason: the `@shared/*` hook is
 // registered when shared-alias.mjs EVALUATES, and a static import in this file
 // would have been resolved before that happened.
-const { aiCostUsd, aiNeurons, UNPRICED_MODEL, usd } = await import(join(REPO, "shared", "workers", "pricing.ts"))
+const { aiCostUsd, aiNeurons, UNPRICED_MODEL, usd } = await importTs(join(REPO, "shared", "workers", "pricing.ts"))
 
 /* ------------------------------ the question set ------------------------- */
 

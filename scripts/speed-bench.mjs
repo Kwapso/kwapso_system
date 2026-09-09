@@ -62,6 +62,7 @@ import "./lib/shared-alias.mjs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 /** WHICH WORKING TREE'S CODE IS BEING MEASURED. Defaults to this script's own
@@ -72,16 +73,16 @@ const REPO = process.env.SB_REPO ? process.env.SB_REPO : join(HERE, "..")
 // DYNAMIC, not static: every static import is resolved before any of them runs,
 // so an `@shared/*` specifier at the top of this file would be looked up before
 // the hook that teaches Node what it means has run.
-const { sqlString } = await import(join(REPO, "shared", "workers", "d1-rest.ts"))
+const { sqlString } = await importTs(join(REPO, "shared", "workers", "d1-rest.ts"))
 // THE YARDSTICK COMES FROM THIS CHECKOUT, NOT FROM THE CODE UNDER TEST. When
 // `SB_REPO` points at another tree the budgets must still be the ones being
 // measured against, or a comparison would be scored by two different rulers —
 // and an older tree may not have the constants at all.
-const { LATENCY_BUDGET_MS, BULK_CONCURRENCY, MEASURED_MS, MEASURED_ON } = await import(
+const { LATENCY_BUDGET_MS, BULK_CONCURRENCY, MEASURED_MS, MEASURED_ON } = await importTs(
   join(HERE, "..", "shared", "workers", "limits.ts")
 )
-const help = await import(join(REPO, "workers", "content", "src", "lib", "help.ts"))
-const workLogs = await import(join(REPO, "workers", "content", "src", "lib", "work-logs.ts"))
+const help = await importTs(join(REPO, "workers", "content", "src", "lib", "help.ts"))
+const workLogs = await importTs(join(REPO, "workers", "content", "src", "lib", "work-logs.ts"))
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.SB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging

@@ -54,6 +54,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
@@ -131,7 +132,7 @@ const AI = {
   },
 }
 
-const { indexSource } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
+const { indexSource } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
 
 const FINGERPRINT = ["knowledge_sources", "knowledge_chunks", "internal_rates", "google_sources"]
 async function proveTeamDatabase(db, name) {
