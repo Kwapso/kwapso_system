@@ -50,12 +50,12 @@ import { RecordTable, visibleActions, type TableColumn } from "@/components/reco
 import { RecordMark } from "@shared/web/record-mark"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
-import { appsKey, cursorKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
 import { field, translateFields, withDataDrivenCollection } from "@/lib/screens"
 import { usePermissions } from "@/lib/perms"
 import { useGoogleCatchUp } from "@/lib/use-google-catch-up"
 import type { Account, AppRow, Meeting, MeetingPurpose } from "@shared/types"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate, formatTime } from "@shared/web/format"
 import { useLanguage } from "@shared/web/language"
@@ -180,21 +180,6 @@ const ALL_COLUMN_HEADERS: TableColumn[] = ALL_COLUMNS.map((f) => {
  * are two independent choices now: switching to Mine must not throw away the
  * fact that somebody is reading in a calendar.
  */
-
-/** THE MINE SLICE'S OWN CACHE KEY.
- *
- * Under the `meetings-` prefix on purpose: the live registry's meetings entry
- * carries `slicePrefix: ["meetings-", …]`, so this key is dropped and re-read on
- * any meetings ping exactly as `meetings-week:` is, and the tab stays live with
- * nothing new registered (R15).
- *
- * WHY IT IS SPELLED HERE RATHER THAN IN `meetingsKey`. It belongs beside its two
- * siblings in `web/lib/live-resources.ts` — one more value on `MeetingListView`,
- * one more branch in `meetingsKey`, one more in `listFetch.meetings` — and that
- * file is another lane's this week. Written locally in the SAME shape so folding
- * it in later is a move rather than a rewrite: same prefix, same sidecar, same
- * primed total. */
-const meetingsMineKey = (teamId: string) => `meetings-mine:${teamId}`
 
 /** THE CALENDAR VIEW'S OWN MONTH READ — its own component, and not a `const`
  * inside `<PagedFind>`'s `children`, because `children` there is a plain
@@ -390,23 +375,16 @@ export function MeetingsScreen({
   // routes/meetings.ts states the trade in full. So this read pays it once, on
   // arrival, and its own `total` IS the badge.
   //
-  // IT ASKS THE SAME DOOR THE TWO READS ABOVE ASK, said plainly rather than left
-  // for a reader to notice: R56's census groups by the FETCHER's receiver, so
-  // `contentApi.meetings` here and `listFetch.meetings` above are two ids to the
-  // check and one door in fact. The reasoned line for this component
-  // (`TWO_READS_ONE_DOOR`) already says why the collection and the week are two
-  // questions; Mine is a third of exactly that kind — a slice the door resolves
-  // and the browser cannot. When this folds into `listFetch.meetings` where it
-  // belongs, it joins that entry and the check sees all three.
-  const mineQ = useCached<Meeting[]>(meetingsMineKey(teamId), () =>
-    contentApi.meetings({ view: "mine" }).then((r) => {
-      // R16 — the exact server total for the badge, off the same response.
-      primeCache(totalKey("meetings-mine", teamId), r.total)
-      // R14 — page one's rows under the key, its next cursor in the sidecar
-      // <LoadMore> reads, so page two of Mine is reachable.
-      primeCache(cursorKey(meetingsMineKey(teamId)), r.nextCursor)
-      return r.meetings
-    })
+  // IT ASKS THE SAME DOOR THE TWO READS ABOVE ASK, and now through the same
+  // receiver: R56's census groups by the FETCHER's receiver, so while this read
+  // spelled `contentApi.meetings` itself it was a second id for one door. The
+  // reasoned line for this component (`TWO_READS_ONE_DOOR`) says why the
+  // collection and the week are two questions; Mine is a third of exactly that
+  // kind — a slice the door resolves and the browser cannot — and it now sits
+  // beside them in `listFetch.meetings`, which is where its key, its total and
+  // its cursor sidecar live too (R14/R16).
+  const mineQ = useCached<Meeting[]>(meetingsKey(teamId, "mine"), () =>
+    listFetch.meetings(teamId, "mine")
   )
   // 9.7 — the repeating entries. `ahead` is the instances beyond the four-week
   // horizon: shown, never stored, because one that far out can still be moved or
@@ -445,7 +423,7 @@ export function MeetingsScreen({
     // door's fallback puts a typed-in meeting with no guest list into its
     // creator's Mine (lib/meetings.ts), so leaving this out would show the new
     // row on two tabs out of three.
-    invalidate(meetingsMineKey(teamId))
+    invalidate(meetingsKey(teamId, "mine"))
     toast.success(t("It's in Meetings."))
   }
 
@@ -526,7 +504,7 @@ export function MeetingsScreen({
           `<PagedFind` looking for `meetingsKey(` — a comment between the two
           pushes the key out of its window. */}
       <PagedFind<Meeting>
-        listKey={tab === "mine" ? meetingsMineKey(teamId) : meetingsKey(teamId, weekView)}
+        listKey={tab === "mine" ? meetingsKey(teamId, "mine") : meetingsKey(teamId, weekView)}
         placeholder={t("Search meetings…")}
         matches={{
           none: t("No meetings match"),
@@ -891,7 +869,7 @@ export function MeetingsScreen({
                 <LoadMore
                   listKey={
                     found.listKey ??
-                    (tab === "mine" ? meetingsMineKey(teamId) : meetingsKey(teamId, weekView))
+                    (tab === "mine" ? meetingsKey(teamId, "mine") : meetingsKey(teamId, weekView))
                   }
                   fetchPage={found.fetchPage}
                   label={t("Load more meetings")}
@@ -940,7 +918,7 @@ export function MeetingsScreen({
               // …AND MINE. A calendar sweep is the single biggest source of new
               // rows in this person's Mine — every entry it brings in carries
               // the guest list that decides the tab.
-              invalidate(meetingsMineKey(teamId))
+              invalidate(meetingsKey(teamId, "mine"))
             }}
           />
           {/* HOW FAR BACK IT HAS GOT. Only after a press, and only while there is

@@ -1688,7 +1688,7 @@ export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
  * can hold several. */
 export const TWO_READS_ONE_DOOR: Record<string, string> = {
   "web/components/meetings/meetings-screen.tsx::MeetingsScreen::listFetch.meetings":
-    "the month and the WEEK are two questions, not one asked twice — `meetingsKey(teamId)` is the collection and `meetingsKey(teamId, weekView)` is the strip above it, which narrows to a week the door itself resolves. Deriving the week client-side would mean the strip could only ever show what page one happened to contain.",
+    "three questions, not one asked three times — `meetingsKey(teamId)` is the collection, `meetingsKey(teamId, weekView)` is the strip above it, and `meetingsKey(teamId, \"mine\")` is the tab for the ones this reader was in the room for. Each narrowing is one the DOOR resolves and the browser cannot: the week, because the list is ordered by start time descending and page one is the furthest-out future, so deriving it client-side would show only what page one happened to contain; and Mine, because \"I was in the room\" is read off the stored guest list with a fenced creator fallback, which no filter over the rows in hand can reproduce.",
   "web/components/process/process-detail.tsx::ProcessDetailScreen::tenancy.processDetail":
     "four reads of one door because a process map can be COMPARED with itself: the current version, a named older version, the map as it stood on a date, and the one being diffed against. Three of the four are null-keyed unless a comparison is open, so an ordinary open costs one. They are four different records that happen to share a door.",
   "web/components/work/work-logs-panel.tsx::WorkLogsPanel::contentApi.workLogs":

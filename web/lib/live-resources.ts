@@ -276,7 +276,17 @@ export const listFetch = {
   // with a cursor rather than a ceiling. Page one lands in the cache, its next
   // cursor in the sidecar <LoadMore> reads, exactly like tickets and sources.
   meetings: (teamId: string, view?: MeetingListView) =>
-    contentApi.meetings(view === "week" ? { view: "week" } : {}).then((r) => {
+    contentApi.meetings(view ? { view } : {}).then((r) => {
+      // MINE IS THE DOOR'S ANSWER, NOT A FILTER OF THE PAGE IN HAND — the same
+      // reason the week is, and one the browser could not fake even if it wanted
+      // to: "I was in the room" is read off the guest list server-side, with a
+      // fenced creator fallback for rows that carry none. `total` here IS Mine's
+      // count, because the door counted the question it listed (R16).
+      if (view === "mine") {
+        primeCache(totalKey("meetings-mine", teamId), r.total)
+        primeCache(cursorKey(meetingsKey(teamId, "mine")), r.nextCursor)
+        return r.meetings
+      }
       if (view === "week") {
         // THE WEEK ASKED OF THE DOOR, as its own read (19 Aug 2026). It used to
         // be the newest page filtered in the browser, on the stated assumption
@@ -427,19 +437,20 @@ export function tasksKey(teamId: string, view: TaskView = "open"): string {
   return view === "open" ? `tasks:${teamId}` : `tasks-${view}:${teamId}`
 }
 
-/** WHICH SLICE OF THE MEETINGS LIST A KEY NAMES. The whole meetings list, or the week the reader
- * is standing in — the one view whose rows the whole meetings list's newest page cannot
- * be trusted to contain (see `listFetch.meetings`). */
-export type MeetingListView = "week"
+/** WHICH SLICE OF THE MEETINGS LIST A KEY NAMES. The whole meetings list, the week the reader
+ * is standing in, or the ones they were in the room for — the two views whose rows the whole
+ * meetings list's newest page cannot be trusted to contain (see `listFetch.meetings`). */
+export type MeetingListView = "week" | "mine"
 
 /** The meetings list's cache key (the paged meetings list). The WHOLE meetings list keeps the
  * bare key it has always had, so every listener, sidecar, prewarm and detail
  * screen that names `meetings:<team>` still lands on it — the same arrangement
  * `tasksKey` makes for its everyday pile. The week's own list sits under
- * `meetings-week:`, which the registry's `slicePrefix: "meetings-"` already
- * drops and re-reads on any meetings ping, so it stays live (R15). */
+ * `meetings-week:` and the reader's own under `meetings-mine:`, both of which the
+ * registry's `slicePrefix: "meetings-"` already drops and re-reads on any meetings
+ * ping, so they stay live (R15) with nothing extra registered. */
 export function meetingsKey(teamId: string, view?: MeetingListView): string {
-  return view === "week" ? `meetings-week:${teamId}` : `meetings:${teamId}`
+  return view ? `meetings-${view}:${teamId}` : `meetings:${teamId}`
 }
 
 /** ONE MONTH OF THE MEETINGS LIST, for the calendar grid and its agenda.
