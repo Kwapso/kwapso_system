@@ -105,3 +105,25 @@ two reads of the same file disagreed about which keys existed.
 `<scratchpad>/<your-lane-name>/`.** Never to the scratchpad root. And before you read a JSON
 file back, assert it carries a key your own schema requires — a file that parses is not
 necessarily your file.
+
+## NEVER APPLY A MIGRATION TO A SHARED DATABASE — added 9 Sep 2026
+
+Measuring against real staging data is encouraged. CHANGING its schema is not.
+
+On 9 Sep 2026 the Kwapso team's staging database was found carrying
+`meetings.superseded_transcript_ids` with NO row in `_migrations`. Nobody knows
+which session put it there and nothing in any report claims it. The consequence
+was not a one-off: `migrateTeams` computes `missing` as TEAM_MIGRATIONS minus
+`_migrations` and `applyMigration` has no catch, so the next run would have hit
+`duplicate column name`, skipped that team WITHOUT stamping `schema_version`, and
+done exactly the same thing on every run after — self-repeating, and invisible
+until somebody deployed.
+
+So: read staging freely. Do not `ALTER`, do not `INSERT` into `_migrations`, do
+not run a migration by hand to see whether it works. If your work needs a column
+that is not there yet, say so in your report and use fixtures — a session that
+says "these numbers are fixture-driven because the migration has not run" is
+worth more than one that quietly makes them real.
+
+Applying migrations is the planner's, in the deploy sequence, where the whole
+estate moves together and a failure is seen.
