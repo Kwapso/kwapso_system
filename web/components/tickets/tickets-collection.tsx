@@ -114,7 +114,11 @@ import { Queue } from "@shared/ui/components/queue/queue"
    pass (their `KIT_COMPONENT_EXEMPT` lines were deleted by the same commit —
    R46's rot-check refuses an exemption for a part that is reached). Neither is
    drawn app-side: `OpenBoard` and `ReadySplit` below supply rows and a pane. */
-import { Kanban, type KanbanColumnDot } from "@shared/ui/components/kanban/kanban"
+/* `KanbanColumnDot` USED TO BE IMPORTED BESIDE IT, for the tone each column
+   head wore. The client took the colour off the column heads on 2026-09-09 (the
+   ruling is written out at `COLUMN` below), the kit's `dot` prop is optional and
+   is simply not passed any more, so the type has nothing left to constrain. */
+import { Kanban } from "@shared/ui/components/kanban/kanban"
 import { Split } from "@shared/ui/components/split/split"
 /* THE LIST VIEW'S TABLE, composed from the kit's own primitives rather than
    drawn through `RecordTable` — the reason is written out at the `triageView
@@ -171,7 +175,15 @@ import { assignableMembers, staffedOn } from "@/lib/members"
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
-import { helpStatusDotTone, waitingDotTone } from "@shared/status-tones"
+/* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
+   still fills the swatch on each option of the Status facet below (`DOT_TONE_FILL`
+   + `helpFacets`), which is a menu of STATUSES and is untouched by the 2026-09-09
+   ruling — she took the colour off the board's COLUMN HEADS, not off the app's
+   idea of what a status colour is. `waitingDotTone` came with it until that day
+   and is gone from `shared/status-tones.ts` entirely: the board's Waiting column
+   was its only caller, and an export nobody imports is a contract nobody agreed
+   to (web/test/dead-exports.test.ts). */
+import { helpStatusDotTone } from "@shared/status-tones"
 import type { DotTone } from "@shared/app-stages"
 import type { TriageGap } from "@shared/triage-readiness"
 import { staffNameFromSnapshot } from "@shared/staff-name"
@@ -418,9 +430,38 @@ export function ticketFacets({
     // (the client, 2026-09-06: "on filter app i wanna see the icon of the app").
     // `choice` is the dense mark size the picker's own option rows use, which is
     // exactly this context.
+    //
+    // AND EACH ONE CARRIES WHOSE IT IS — client ruling, 2026-09-09, on a
+    // screenshot of THIS control: "filter the apps by selected client!"
+    // `within` is the app row's own `accountId` passed straight through, never
+    // a second idea of which apps are whose, and the narrowing itself happens
+    // once in `useFilterBar` (the declaration is on `COLLECTION_FILTERS.help`'s
+    // `appId`; both carry the ruling in full). Three things follow from it and
+    // none of them is decided here: the list narrows to the chosen client's
+    // apps, the control says "Choose a client first." until there is one, and a
+    // stranded app clears itself when the client moves.
+    //
+    // WHY THE BROWSER'S OWN LIST IS THE HONEST SOURCE, and this is the R14
+    // question asked properly rather than waved at. The apps door narrows by
+    // exactly this column when it is asked to (`GET /api/tenancy/apps?accountId=`
+    // → `appsWhere`, workers/tenancy/src/lib/processes.ts), so the door's
+    // answer and this filter's answer are the same expression over the same
+    // field. What makes filtering in hand equal to asking is that `apps` is
+    // BOUNDED and read WHOLE — "an app is a whole built system, and an agency
+    // has tens of them, not thousands" (`listApps`' own header) — so the rows
+    // the browser holds ARE the collection, not a page of it. That is precisely
+    // the property the Client facet beside this one does NOT have, which is why
+    // it reads the door's grouped tally instead of the accounts cache. Two
+    // controls, two sources, one rule: ask whoever holds the whole answer.
+    // A second door read per client pick would buy nothing and cost R56.
     appId: tabFacets.appId
       ? apps
-          .map((a) => ({ value: a.id, label: a.name, mark: <AppMark app={a} size="choice" /> }))
+          .map((a) => ({
+            value: a.id,
+            label: a.name,
+            mark: <AppMark app={a} size="choice" />,
+            within: a.accountId,
+          }))
           .sort((a, b) => a.label.localeCompare(b.label))
       : [],
     // TYPE — the TEAM'S OWN `Ticket type` words, in the client's fixed reading
@@ -628,7 +669,30 @@ export function triageFacets(
       // own option rows, which is exactly this context. An app the ticket names
       // but the apps list does not hold (archived, or not yet arrived) keeps its
       // word and simply has no mark, rather than the option vanishing.
-      return { value, label, mark: row ? <AppMark app={row} size="choice" /> : undefined }
+      //
+      // AND WHOSE IT IS, so this menu narrows to the chosen client exactly as
+      // the list tabs' own App menu does (client ruling, 2026-09-09 — the
+      // declaration and the whole argument are on `COLLECTION_FILTERS.help`'s
+      // `appId`; the narrowing is `useFilterBar`'s). It is the APP'S OWN
+      // `accountId` here too, not the client on the ticket the app turned up
+      // on, and that is the point: this is one screen with two tabs, and an App
+      // control that narrowed by one rule on Triage and another on Open would
+      // be the drift the client has twice told us to stop — two Type menus in
+      // two different orders on this exact screen is the fault that ordering
+      // note three functions up exists to record.
+      //
+      // AN APP THE APPS LIST DOES NOT HOLD IS "OWNED BY NOBODY" (`null`), which
+      // means it is offered under EVERY client rather than under none. Same
+      // direction of failure as the missing mark above: an option we cannot
+      // fully describe keeps its place instead of disappearing, because the
+      // rows behind it are real and a filter that cannot reach them is worse
+      // than one that offers a word without a picture.
+      return {
+        value,
+        label,
+        mark: row ? <AppMark app={row} size="choice" /> : undefined,
+        within: row?.accountId ?? null,
+      }
     })
     .sort((a, b) => a.label.localeCompare(b.label))
   /* THE CLIENT, WEARING ITS OWN FACE — and every fact it needs is already ON
@@ -665,7 +729,17 @@ export function triageFacets(
     // (`COLLECTION_FILTERS.help`): client, app, type. One screen, one reading
     // order, whichever tab a person is standing on.
     { field: "accountId", label: t("Client"), control: "select" as const, options: accountOptions },
-    { field: "appId", label: t("App"), control: "select" as const, options: appOptions },
+    // APP HANGS OFF CLIENT — the same declaration the list tabs make through
+    // `COLLECTION_FILTERS.help`, written out here because this queue builds its
+    // facets from the rows rather than from that table. Same field, same
+    // sentence, same behaviour; `useFilterBar` is the one thing that acts on it.
+    {
+      field: "appId",
+      label: t("App"),
+      control: "select" as const,
+      options: appOptions,
+      dependsOn: { field: "accountId", emptyText: t("Choose a client first.") },
+    },
     // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
     // value a team typed itself, so it is data rather than copy and `t()` would
     // be looking up a sentence that is not in the catalogue (R28's own
@@ -1917,8 +1991,10 @@ function OpenBoard({
      reason two components down, and the same one it made back when the date
      lived in the chips. */
   const { t, lang } = useLanguage()
-  /** THE STAGES IN THE READER'S OWN LANGUAGE. THE DOT IS NOT HERE — it is one
-   * function call below, and 2026-09-07 is the day that stopped being a detail.
+  /** THE STAGES IN THE READER'S OWN LANGUAGE, AND THAT IS ALL A COLUMN HEAD
+   * CARRIES NOW — the name in words and the quiet count. THERE IS NO DOT
+   * ANYWHERE ON THIS BOARD'S HEADS, and 2026-09-09 is the day that became the
+   * whole answer rather than a question about which shade.
    *
    * WRITTEN OUT AS LITERALS INSIDE THE COMPONENT rather than read off
    * `HELP_STATUS` (web/components/deep-link/shape.tsx). That map is a copy TABLE
@@ -1934,45 +2010,54 @@ function OpenBoard({
    * entry was written, instead of the board quietly drawing a fourth column
    * with no name.
    *
-   * ── THE DOT USED TO BE THE FIFTH VALUE IN THIS MAP, AND IT WAS WRONG ──────
+   * ── THE DOT IS GONE, AND SHE ASKED FOR IT TWICE ─────────────────────────
    *
-   * CLIENT, 2026-09-07, over this exact board, verbatim: *"grerat but status
-   * (th header) have no color associated."* She is not asking for a brighter
-   * shade. She is reading a column head whose dot is not the colour this app
-   * gives that status, on a screen that shows her the right one six inches
-   * above: the Status FILTER on this same tab draws each stage's swatch through
-   * `helpStatusDotTone` (see `DOT_TONE_FILL` and `helpFacets` at the top of this
-   * file), so "Triaged" was a BLUE dot in the filter menu and a GREY one on the
-   * column head of the tickets it selects. One stage, two colours, one screen.
+   * CLIENT, 2026-09-09, over this exact board on staging, verbatim: *"remove the
+   * color from the status header!"* and, in the same review, *"column header
+   * should have no color"*. That is a ruling about the OBJECT, not about the
+   * shade on it: there is no dot to re-tone, because she is not asking for a
+   * different one. The kit's `dot` is optional (`dot?: KanbanColumnDot`,
+   * shared/ui/components/kanban/kanban.tsx, and both places that draw it are
+   * gated on `!== undefined`), so the whole of obeying her is not passing it.
    *
-   * THE PARAGRAPH THAT USED TO STAND HERE CLAIMED OTHERWISE — "Taken from that
-   * file's reading rather than re-decided here, because a stage's colour cannot
-   * be chosen twice" — and then wrote four literals that were the tiering of
-   * `shared/status-tones.ts` shifted one rung DOWN: `triaged` was `archived`
-   * where that file says `review`, `scheduled` was `review` where that file says
-   * `building`. A comment promising a single source is not a single source. It
-   * is replaced rather than deleted because the promise was right and only the
-   * spelling was wrong: the answer is now READ, so it cannot drift again and no
-   * comment has to be believed.
+   * WHAT USED TO STAND HERE, AND WHY IT IS REPLACED RATHER THAN DELETED. On
+   * 2026-09-07 she said *"grerat but status (th header) have no color
+   * associated"*, and this file read that as a complaint about WHICH colour: the
+   * Status FILTER six inches above draws each stage's swatch through
+   * `helpStatusDotTone`, and the column heads had four hand-written literals a
+   * rung off that file's tiering, so "Triaged" was blue in the menu and grey on
+   * the head of the tickets it selects. The fix that day made the head READ the
+   * same seam as the filter, and a long paragraph here defended the result —
+   * `triaged` is `review`, `scheduled` and `in_progress` share `building`,
+   * `ready` is `done`, Waiting is `blocked` — including a closing line saying
+   * that if four colours across five columns were not enough for her, "the fix
+   * is a kit release, not a literal here".
    *
-   * WHAT THE FIVE COLUMNS NOW WEAR, and it is `status-tones.ts`'s tiering
-   * verbatim: `triaged` is `review` (blue — somebody has read it and is looking
-   * at it), `scheduled` and `in_progress` are both `building` (charcoal, "in
-   * build / with us" in the kit's own token comment — booked in and being worked
-   * on are the same tier of the same lifecycle), `ready` is `done` (green — every
-   * story closed, only the sending left) and Waiting is `blocked`.
+   * She was reporting the ABSENCE she wanted, not a mismatch. Two days later she
+   * said the same thing in the imperative, twice, which is how a person repeats
+   * an instruction that was answered with something else. The 2026-09-07 reading
+   * was not perverse — one stage wearing two colours on one screen is a real
+   * defect and it is genuinely fixed — but the ruling it was serving never asked
+   * for a corrected dot, and this paragraph exists so nobody restores one by
+   * finding the old argument and thinking it is still live. IT IS NOT. A column
+   * head on this board carries no colour.
    *
-   * TWO COLUMNS SHARE A COLOUR AND THAT IS THE ANSWER, NOT A DEFECT LEFT IN.
-   * `scheduled` and `in_progress` are one tone because the app rules they are
-   * one tier, and the fix for two neighbours wearing charcoal is emphatically
-   * NOT to give this board its own private shade for one of them — that is
-   * precisely the second decision the client's complaint is about. The kit
-   * already rules the case: the dot never carries the state alone, and the name
-   * in words is beside it. It is the same situation the six tones have with
-   * their two greens (`--dot-shipped` and `--dot-done` are one colour, named
-   * twice), which `DOT_TONE_FILL`'s own note at the top of this file spells out.
-   * If four distinct colours across five columns is not enough for her, the
-   * vocabulary is the kit's and the fix is a kit release, not a literal here. */
+   * THE FILTER KEEPS ITS SWATCHES, and that is not the ruling half-applied. She
+   * is reading a BOARD: five heads across the top of a screen, each a word and a
+   * number, where a coloured dot is decoration on a label that already says
+   * everything. The Status facet is a MENU OF STATUSES, where the swatch is the
+   * legend that teaches the colours the ticket chips and the charts use — a
+   * different object answering a different question, and she has never asked
+   * about it. `helpStatusDotTone` is therefore still read, once, at `helpFacets`.
+   *
+   * AND NOTHING ON THE BOARD ASKS FOR A TONE ANY MORE, so `waitingDotTone()` —
+   * added on 2026-09-07 so the fifth column would stop borrowing the tone of the
+   * stage the client had just retired — lost its only caller and has been deleted
+   * from `shared/status-tones.ts` with it. Leaving it there would be a public
+   * name nobody names (web/test/dead-exports.test.ts), which is the seam left
+   * half-wired rather than the seam left honest. The MEANING it carried is not
+   * lost and was never a colour: `waitingClause` (workers/content/src/lib/help.ts)
+   * is what decides who is waiting, and the column below says so in words. */
   const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string }> = {
     triaged: { title: t("Triaged") },
     scheduled: { title: t("Scheduled") },
@@ -2051,15 +2136,12 @@ function OpenBoard({
         ...OPEN_TAB_STATUSES.map((stage) => ({
           id: stage,
           title: COLUMN[stage].title,
-          /* THE STAGE'S OWN TONE, READ — never a literal written here. See the
-             `COLUMN` note above for the client ruling this closes and for the
-             two colours the same stage used to have on this one screen. The six
-             values `helpStatusDotTone` returns ARE the kit's six `dot` names
-             (`DotTone` in shared/app-stages.ts is the same union, restated there
-             because a worker cannot import a `.tsx`), so this satisfies
-             `KanbanColumnDot` structurally and a seventh tone in the kit would
-             fail here rather than paint nothing. */
-          dot: helpStatusDotTone(stage) satisfies KanbanColumnDot,
+          /* NO `dot`, AND THAT IS THE WHOLE OF THE 2026-09-09 RULING — "remove
+             the color from the status header!" / "column header should have no
+             color". The kit's prop is optional and its two draw sites are gated
+             on `!== undefined`, so omitting it is the supported way to say this
+             and no kit change is needed. The argument, and the 2026-09-07 one it
+             replaces, are written out at `COLUMN` above. */
           count: narrowed ? undefined : counts?.[stage],
           /* A PARTITION, NOT A NARROWING, and the difference is the whole of
              R16 on this screen. Two censuses forbid a paged screen from
@@ -2115,24 +2197,25 @@ function OpenBoard({
                once on this screen (R16). The footnote says all of this in the
                reader's own words, because a fifth column beside four is read as
                a fifth bucket unless something says otherwise.
-           THE DOT IS READ, NOT WRITTEN, EVEN THOUGH THIS COLUMN IS NOT A
-           STATUS — and that is the sharpest form of the 2026-09-07 ruling
-           ("status (th header) have no color associated"). `waiting` has no row
-           in `helpStatusDotTone` because it is a predicate, so the honest
-           question is not "which of the six do I like here" but "what colour
-           does this app give the state where the client owes us an answer" —
-           and `shared/status-tones.ts`, the file that owns what a status colour
-           MEANS, now answers it directly through `waitingDotTone()`. It
-           resolves to `blocked`, the tier that file defines as "stuck on
-           somebody OUTSIDE the team", which is this column's own sentence.
-           IT USED TO ASK `helpStatusDotTone("awaiting_validation")`, AND THE
-           CHANGE IS NOT COSMETIC. Borrowing a STAGE's tone to paint a PREDICATE
-           kept the right property — the colour was asked for rather than typed,
-           so a re-tone moved this column without an edit — by the wrong route,
-           and the route stopped existing when the client retired that stage on
-           7 Sep 2026. Hard-coding `"blocked"` here would have dropped the
-           property with the bug; a named seam keeps both, and waiting now owns
-           its colour instead of borrowing one.
+           NO DOT ON THIS HEAD EITHER, AND IT IS THE SAME RULING — client,
+           2026-09-09: "remove the color from the status header!" … "column
+           header should have no color". This column is the one that could most
+           plausibly argue for an exception, because it is not a status and a
+           colour would be the only thing marking it out from the four beside
+           it. It gets none: the FOOTNOTE under the board is what says this
+           column repeats cards from the four before it, in words, and a reader
+           who needs that sentence is not served by a poppy dot instead of it.
+           WHAT WENT WITH IT. Until 2026-09-09 this line read
+           `dot: waitingDotTone()` — a named seam added on 2026-09-07 so the
+           column would stop borrowing the tone of `awaiting_validation`, a stage
+           the client had just retired. The seam was right for the question it
+           answered and the question is no longer asked, so the function is
+           deleted rather than left exported for nobody
+           (web/test/dead-exports.test.ts). Nothing about WAITING moved: it is
+           still a predicate the door derives on every read (`waitingClause`,
+           workers/content/src/lib/help.ts), it is still the identical read the
+           Waiting TAB rests on, and it is still said in words here and in the
+           footnote — which is where it was always carried.
            IT IS NOT A FILTER. No card in this column is read by status at all —
            they come from the door's waiting predicate, below.
            NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
@@ -2142,7 +2225,6 @@ function OpenBoard({
         {
           id: WAITING,
           title: t("Waiting"),
-          dot: waitingDotTone() satisfies KanbanColumnDot,
           count: narrowed ? undefined : waitingTotal,
           cards: (waitingRows ?? []).map(boardCard),
           emptyLabel: t("Nothing is waiting on a client."),

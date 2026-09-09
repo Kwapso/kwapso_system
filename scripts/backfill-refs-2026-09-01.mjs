@@ -1,3 +1,42 @@
+// ── SUPERSEDED 9 SEP 2026. THIS SCRIPT NO LONGER WRITES ANYTHING ────────────
+//
+// It was written on 1 Sep as the apply path for all four kinds. Two things have
+// happened since, and between them they turned `--apply` from unfinished into
+// DESTRUCTIVE:
+//
+//   1. MIGRATION 0068 DID THE CARRY, on 7 Sep, and did it properly — 2,317
+//      stored references rewritten to the formula with every retired string kept
+//      in `ref_aliases`. Tickets, stories, sprints, meetings and the input are
+//      all canonical on staging today (T to 3650, B to 285, S to 102, M to 45,
+//      I to 1, each with a counter one past it). This script cannot see that:
+//      its ticket/story planner only recognises the OLD `<prefix>-<L><digits>`
+//      shape, so a dry run today reports all 1,897 ticket and 285 story refs as
+//      "unparseable" — which is not a fault, it is 0068 having already finished.
+//      Worse, its SPRINT and MEETING planner does not look at the existing value
+//      at all: it renumbers every row from 1 in creation order. Applied now that
+//      would overwrite 100 sprint and 45 meeting references a client may have
+//      been quoted, and orphan every alias 0068 wrote pointing at them.
+//
+//   2. APPS AND WAVES MOVED INTO THE LEDGER. They are numbered by team migration
+//      `0072_the_app_and_the_wave_get_their_number`, which carries the same
+//      `APP_ORDER` below, position for position, plus the guards this script's
+//      plan-and-report shape could not express. The argument for the move is in
+//      that migration's header; the short version is that R55 names a team
+//      migration as the one act allowed to write a `ref`, and its census reads
+//      the workers, not `scripts/` — so a script's `UPDATE apps SET ref = …` is
+//      invisible to the law that exists to police exactly that statement.
+//
+// SO WHAT IS THIS FILE FOR NOW. It is the PROVENANCE record: `APP_ORDER` below
+// is the client's list as she gave it on 1 Sep 2026, and the two stop conditions
+// are the diagnosis that came out of running it. Its dry run is still the
+// instrument that reads live data and reports which entries match — that is how
+// the 27/29 count was measured — so the read half stays. `--apply` refuses.
+//
+// Everything below this line is the file as it was written on 1 Sep 2026, kept
+// verbatim because it is the record of how the diagnosis was reached.
+//
+// ────────────────────────────────────────────────────────────────────────────
+//
 // BACKFILL THE NEW REFERENCE SCHEME ONTO EXISTING ROWS — the 2026-08-31/09-01
 // ruling (shared/workers/refs.ts, `nextTeamRef`, `team_ref_counters`, team
 // migration 0060) only mints the new team-wide shape ("T412", "B188", "S12",
@@ -97,12 +136,39 @@
 // not named anywhere in the client's 29-item list. Both are reported as
 // AMBIGUOUS and neither gets a ref assigned; positions #1–#27 all match
 // exactly one live app each and are unaffected.
+//
+// RE-MEASURED 9 SEP 2026, and it has not moved: 28 apps, 27 of 29 positions
+// matched, the same two unmatched, the same one live app named nowhere in the
+// list. Diagnosed further that day and the answer is worse than a rename —
+// `ERP Kennogroup` has `updated_at` NULL and not one `activity` row, so it has
+// worn that name since the 13 Aug import, a fortnight BEFORE the list was
+// written; and "Players" is not an app at all but an app MODULE, on both of the
+// Padelbase apps she had already listed at #9 and #24. Migration 0072 carries
+// that finding and leaves `ERP Kennogroup` unnumbered.
 
 import { execFileSync } from "node:child_process"
 import { writeFileSync, unlinkSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 
 const APPLY = process.argv.includes("--apply")
+
+// THE APPLY PATH IS CLOSED. See "SUPERSEDED 9 SEP 2026" at the top: since
+// migration 0068 carried the estate on 7 Sep, this script's sprint and meeting
+// planner would renumber 145 already-canonical references from 1, and its
+// ticket and story planner recognises nothing at all. Apps and waves are the
+// ledger's job now (`0072_the_app_and_the_wave_get_their_number`). Refusing
+// here rather than deleting the file keeps the client's own list, and the
+// diagnosis of the two entries that match nothing, where they can be read.
+if (APPLY) {
+  console.error(
+    "This script no longer writes. Migration 0068 carried tickets, stories, sprints, meetings and the\n" +
+      "input on 7 Sep 2026, and applying this plan on top of it would renumber 145 references a client\n" +
+      "may have been quoted and orphan the aliases pointing at them. Apps and waves are numbered by team\n" +
+      "migration 0072_the_app_and_the_wave_get_their_number — roll that out with migrate-teams instead.\n" +
+      "The dry run still reads live data and reports what matches; that is what this file is for now."
+  )
+  process.exit(1)
+}
 const PRODUCTION = process.argv.includes("--production")
 const CONFIRMED = process.argv.includes("--yes-production")
 

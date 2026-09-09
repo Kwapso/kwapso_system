@@ -28,6 +28,7 @@
 
 import { sqlString } from "@shared/workers/d1-rest"
 import {
+  canonicalRef,
   canonicalRefSql,
   REF_ALIAS_TABLE,
   refNumberSql,
@@ -41,6 +42,59 @@ import { APP_STAGES } from "@shared/app-stages"
 import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 
 import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, SPRINT_TYPE_CATALOGUE } from "./seed"
+
+/** THE APP ORDER THE CLIENT DICTATED, 2026-09-01, TRANSCRIBED EXACTLY.
+ *
+ * POSITION IS THE NUMBER. Index 0 is `A0001`, index 21 is `A0022`. This is a
+ * lookup table and not a sequence: nothing here is sorted, deduplicated or
+ * renumbered, and an entry that matches no live app leaves the number it names
+ * unissued rather than shifting the entries after it up. 0072's own header
+ * argues that at length, and names the two entries (#28, #29) that match
+ * nothing in the live estate and why neither may be resolved by inference.
+ *
+ * SPELLINGS ARE HERS AND ARE COMPARED EXACTLY, case included — `aWs` at #15 is
+ * how the account is really spelled in the database, `re-green` really has a
+ * hyphen in it, `196+` really has a plus. A case-insensitive or trimmed compare
+ * would be a kindness that hides a genuine mismatch, which is the one thing this
+ * job must not do.
+ *
+ * IT LIVES IN THE LEDGER because the ledger is what actually wrote the numbers,
+ * and a list of proper nouns that only a script remembers is a list nobody can
+ * audit a stored reference against afterwards. It is read by exactly one
+ * migration, which is frozen the moment it ships;
+ * `scripts/backfill-refs-2026-09-01.mjs` holds the same 29 entries as the
+ * PROVENANCE record of where they came from, and no longer writes anything. */
+const APP_ORDER_2026_09_01: { name: string; account: string }[] = [
+  { name: "CONFIA", account: "Confia" },
+  { name: "S4Y Office", account: "Safety4You" },
+  { name: "196+ awards", account: "196+" },
+  { name: "EmployR", account: "HOGO" },
+  { name: "MAKLAR Pickl", account: "Pickl" },
+  { name: "IFNW", account: "Institut Vividus" },
+  { name: "S4Y Mitarbeiter", account: "Safety4You" },
+  { name: "Comunitapp", account: "Cardenal Reig" },
+  { name: "Padelbase", account: "Padelbase" },
+  { name: "S4Y Schulungszentrum", account: "Safety4You" },
+  { name: "S4Y Extern", account: "Safety4You" },
+  { name: "Looom", account: "Looom" },
+  { name: "VU Solutions", account: "VU Solutions" },
+  { name: "Amstella", account: "Amstella" },
+  { name: "AWS", account: "aWs" },
+  { name: "Amstella Ops", account: "Amstella" },
+  { name: "Assecuranz", account: "Assecuranz" },
+  { name: "re-green", account: "re-green" },
+  { name: "Fuhrpark", account: "HOGO" }, // #19 — the OTHER Fuhrpark is #25
+  { name: "HORST", account: "HOGO" },
+  { name: "ETZI", account: "Etzi Haus" },
+  { name: "Kwapso System", account: "Kwapso" },
+  { name: "FluClinic", account: "FluClinic" },
+  { name: "Academy", account: "Padelbase" },
+  { name: "Fuhrpark", account: "DEMO" }, // #25 — the OTHER Fuhrpark is #19
+  { name: "Kwapso Portal", account: "Kwapso" },
+  { name: "Ontime Fuhrpark", account: "Ontime Logistics" },
+  { name: "Platinum", account: "PLATINUM" }, // matches nothing live — see 0072's header
+  { name: "Players", account: "Padelbase" }, // matches nothing live — see 0072's header
+]
 
 export const TEAM_MIGRATIONS: { version: string; sql: string }[] = [
   {
@@ -4741,6 +4795,128 @@ UPDATE knowledge_sources
 ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
 `,
   },
+
+  {
+    // THE APP AND THE WAVE GET THEIR NUMBER — the last two kinds still wearing
+    // nothing, on the client's own instruction, 9 Sep 2026, verbatim: "number
+    // them. i already gave you the list of the order for exisitng apps!"
+    //
+    // ── WHAT WAS ACTUALLY MISSING ──────────────────────────────────────────
+    //
+    // 0059 gave `apps` and `waves` a `ref` column and a partial unique index and
+    // said, in its own words, that "existing rows get none — there is nothing to
+    // mint one FROM after the fact". 0068 then carried every OTHER kind to the
+    // formula, and could not help these two either: its whole plan starts at
+    // `WHERE ref IS NOT NULL`, so a column that is null on every row is a table
+    // it correctly skips. Measured on staging 9 Sep 2026, the team holding real
+    // client data: 28 apps, 28 nulls; 3 waves, 3 nulls; and no `A` or `W` row in
+    // `team_ref_counters` at all. Every other kind reads back clean — T to 3650,
+    // B to 285, S to 102, M to 45, I to 1, each with a counter one past it.
+    //
+    // So this is a FIRST MINT and not a carry, and that difference decides three
+    // things: nothing is renumbered, nothing is retired, and NOT ONE ROW GOES
+    // INTO `ref_aliases`. There is no old string to remember. An alias row with
+    // nothing on its left-hand side would be a lie in the one table whose whole
+    // job is to be believed.
+    //
+    // ── THE ORDER IS THE CLIENT'S, AND POSITION IS THE NUMBER ──────────────
+    //
+    // `APP_ORDER_2026_09_01` below is her list as given, 29 entries, and its
+    // 1-based position IS the number: entry 1 is `A0001`, entry 22 is `A0022`.
+    // It is not a counter and it is not a sort — it is a lookup table, so a
+    // position whose app is missing leaves a GAP and the numbers either side of
+    // it do not move. Closing a gap would renumber the apps after it, which is
+    // the one thing her instruction forbids: she gave an order, not a count.
+    //
+    // MATCHED ON (app name, account name), BOTH, NEVER THE NAME ALONE. Two live
+    // apps are called `Fuhrpark` and only the account tells them apart — she
+    // named both explicitly, HOGO at #19 and DEMO at #25. A name-only match
+    // would put one of them on the other's number with no way to tell which, so
+    // the plan below joins `accounts` and additionally REFUSES any entry whose
+    // (name, account) pair does not identify exactly one unnumbered app. That
+    // guard is what makes the Fuhrpark case provable rather than lucky.
+    //
+    // ── THE TWO ENTRIES THAT MATCH NOTHING, AND WHY THEY ARE STILL HERE ────
+    //
+    // Her list has 29 entries; the database has 28 apps; and the residue is not
+    // one-for-one. Diagnosed individually against live staging on 9 Sep 2026:
+    //
+    //   #28 "Platinum" (account PLATINUM) — the ACCOUNT called PLATINUM exists
+    //       and holds exactly one app, which is named `ERP Kennogroup`. That app
+    //       has `updated_at` NULL and not a single `activity` row: it has been
+    //       called `ERP Kennogroup` since the 13 Aug 2026 import, a fortnight
+    //       BEFORE she wrote the list, so it was never renamed and "Platinum" is
+    //       not a name it has ever worn. There is a chat space called "Platinum"
+    //       in this team, shared with everyone twice in late August, and that is
+    //       the only other thing in the database wearing the word.
+    //   #29 "Players" (account Padelbase) — no app anywhere is called `Players`,
+    //       and none ever was. What IS called `Players` is an app MODULE, and
+    //       there are two of them, one inside `Padelbase` and one inside
+    //       `Academy` — both apps she had already listed at #9 and #24.
+    //
+    // #29 SETTLES #28. If the list were 29 apps, "Platinum" would be a safe read
+    // for the one app left over. But #29 is demonstrably NOT an app, which means
+    // the list is not a list of apps only — so "the one entry left must be the
+    // one app left" stops being arithmetic and becomes a guess, and the guess
+    // would be printed on a client-facing record forever. `ERP Kennogroup`
+    // therefore ENDS THIS MIGRATION WITH NO NUMBER, and the honest question goes
+    // back to her: is #28 the system we hold as "ERP Kennogroup"? One sentence
+    // from her turns into one more migration; a wrong number does not come back.
+    //
+    // BOTH ENTRIES ARE NEVERTHELESS TRANSCRIBED BELOW, at their own positions,
+    // because the SQL matches on an exact (name, account) pair and therefore
+    // matches nothing today. Dropping them from the list would silently shorten
+    // it; leaving them in records what she actually said, and costs a comparison.
+    //
+    // ── THE COUNTER, AND WHY IT IS PARKED PAST THE WHOLE LIST ──────────────
+    //
+    // Two statements raise `A`, and both only ever go UP (`MAX`, the rule 0068
+    // wrote down):
+    //
+    //   1. to one past the highest number now stored, so the next app minted
+    //      cannot collide with `idx_apps_ref`. This is 0068's statement 3,
+    //      unchanged, and it is the one that matters on a team this list has
+    //      nothing to do with — the smoke team already holds A0001 and A0002,
+    //      minted through the door, and its counter must stay at 3.
+    //   2. to one past the LENGTH OF HER LIST, but ONLY on a team where this
+    //      migration actually numbered something from it. Without this the next
+    //      app created here would mint A0028 — which is a position she has
+    //      already spoken for. The two open positions stay open until she says
+    //      what belongs in them, and a burnt number costs nothing (gaps are
+    //      already the correct outcome here) while a stolen position costs the
+    //      order she dictated.
+    //
+    // ── WAVES HAD NO ORDER, SO THEY GET THE OBJECTIVE ONE ──────────────────
+    //
+    // Waves are not in her list at all. They are numbered by the same rule 0068
+    // uses everywhere it has to choose for itself — oldest `created_at` first,
+    // tie-broken on `id` — which is stable across re-runs and depends on nothing
+    // a person remembers. On staging that produced W0001 `probe wave A
+    // (renamed)`, W0002 `Autumn automation package (example)`, W0003 `Test
+    // draft`, all three created 25 Aug 2026.
+    //
+    // ── WHY THERE IS A SCRATCH TABLE ───────────────────────────────────────
+    //
+    // 0068 learned this the hard way and wrote it down: a window function
+    // seating rows in the table it is writing to has no defined answer. So the
+    // plan is computed into `_numbering_0072` first and the two UPDATEs read
+    // their answer back out of it, exactly as 0068 reads its answer out of the
+    // alias rows it wrote a statement earlier. The table is created IF NOT
+    // EXISTS and emptied on entry (so a run that died half way is not a wedge)
+    // and dropped on the way out, so it is invisible to every schema census —
+    // including R55's own, which scans this ledger for `ref TEXT` columns.
+    //
+    // ── IDEMPOTENT, AND SILENT ON A NEWBORN TEAM ───────────────────────────
+    //
+    // Every plan is gated on `ref IS NULL`, so a second run finds nothing to do:
+    // the UPDATEs match no rows, the scratch table stays empty, and the counter
+    // statements are `MAX`-ed against what is already there. A fresh database
+    // replaying the whole ledger has no apps and no waves, so `HAVING COUNT(*) >
+    // 0` leaves it with no counter rows at all — the state R55 asserts a newborn
+    // team must come out in.
+    version: "0072_the_app_and_the_wave_get_their_number",
+    sql: appAndWaveNumberSql(),
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
@@ -4896,4 +5072,174 @@ CREATE TABLE IF NOT EXISTS ${REF_ALIAS_TABLE} (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ref_aliases_alias ON ${REF_ALIAS_TABLE} (entity_table, alias);
 CREATE INDEX IF NOT EXISTS idx_ref_aliases_row ON ${REF_ALIAS_TABLE} (entity_table, row_id);
 ${perKind}`
+}
+
+/** 0072's SQL. Why there is a scratch table, why the two kinds are not one
+ * recipe, and what becomes of the two positions that match nothing are all
+ * argued at the migration itself; this function only has to be the arithmetic.
+ *
+ * THE FORMULA COMES FROM `refs.ts` AND IS NOT RESPELLED HERE. The apps half can
+ * call `canonicalRef` outright — a position is known while this string is being
+ * built, so the number is padded by the same TypeScript function the mint uses.
+ * The waves half cannot: its number is a `ROW_NUMBER()` that only exists inside
+ * SQLite, so it goes through `canonicalRefSql`, the twin R55 proves agrees with
+ * `canonicalRef` by running both over the same numbers rather than by reading
+ * them. A migration that wrote `'A' || printf('%04d', …)` itself would be a
+ * fifth copy of the rule, which is the fault R55 exists for. */
+function appAndWaveNumberSql(): string {
+  const app = TEAM_REF_KINDS.app
+  const wave = TEAM_REF_KINDS.wave
+  const APPS = TEAM_REF_TABLES.app
+  const WAVES = TEAM_REF_TABLES.wave
+
+  /** ONE STATEMENT PER POSITION, and that is a rule rather than a style.
+   *
+   * The first draft of this was a single `WITH wanted(…) AS (VALUES …)` holding
+   * all 29 rows, which is unremarkable SQL, passes locally, and D1 REFUSES: a
+   * multi-row `VALUES` compiles as a compound SELECT and D1's ceiling is five
+   * terms, not SQLite's 500. A migration that throws leaves every existing team
+   * on the previous schema with the code that needs the new state already
+   * deployed — the 12 Aug 2026 incident, and `workers/tenancy/test/
+   * d1-compound-cap.test.ts` is the law that caught this one before it shipped.
+   *
+   * So the list becomes 29 self-contained statements, generated from the array
+   * rather than typed, which is what that law prescribes. Each carries its own
+   * three guards, so a position that cannot be filled skips itself and takes
+   * nothing else down with it. Every string goes through `sqlString`, so an
+   * apostrophe in a client's name is data and not syntax.
+   *
+   * THREE GUARDS, and every one of them is a refusal rather than a repair:
+   *   · `a.ref IS NULL` — an app that already carries a number keeps it. A first
+   *     mint never overwrites, and this is also what makes the whole migration
+   *     idempotent: on a second run there is nothing left to match.
+   *   · the COUNT(*) = 1 subquery — an entry may only claim a row when its
+   *     (name, account) pair identifies EXACTLY ONE unnumbered app. This is the
+   *     Fuhrpark clause: two live apps share that name and only the account
+   *     separates them, so "exactly one" is asserted here rather than assumed by
+   *     whoever reads the list. A pair matching two rows numbers neither.
+   *   · `NOT EXISTS … x.ref = <the wanted number>` — the number this position
+   *     names must be free. `idx_apps_ref` is a live partial UNIQUE index, so a
+   *     clash would not corrupt anything; it would ABORT this migration and
+   *     every team queued behind it. Skipping leaves a gap, which is already the
+   *     correct outcome for a position that cannot be filled.
+   *
+   * INNER JOIN ON `accounts`, not LEFT: an app with no account at all can never
+   * be one of these entries, because every entry names an account. */
+  const wanted = APP_ORDER_2026_09_01.map((e, i) => {
+    const becomes = sqlString(canonicalRef(app, i + 1))
+    const name = sqlString(e.name)
+    const account = sqlString(e.account)
+    const pair = `a2.name = ${name} AND ac2.name = ${account} AND a2.ref IS NULL`
+    return `
+-- #${i + 1} → ${canonicalRef(app, i + 1)}  ${e.name} (${e.account})
+INSERT INTO _numbering_0072 (entity_table, row_id, becomes)
+SELECT '${APPS}', a.id, ${becomes}
+  FROM ${APPS} a
+  JOIN accounts ac ON ac.id = a.account_id
+ WHERE a.name = ${name} AND ac.name = ${account} AND a.ref IS NULL
+   AND (SELECT COUNT(*) FROM ${APPS} a2 JOIN accounts ac2 ON ac2.id = a2.account_id
+         WHERE ${pair}) = 1
+   AND NOT EXISTS (SELECT 1 FROM ${APPS} x WHERE x.ref = ${becomes});`
+  }).join("\n")
+
+  return `
+-- THE PLAN LIVES HERE FIRST, then the two UPDATEs read their answer back out of
+-- it — 0068's own lesson, written down at its statement 2: a window function
+-- seating rows in the table it is writing to has no defined answer. Dropped at
+-- the end of this migration, so no schema census ever sees it; \`IF NOT EXISTS\`
+-- plus \`DELETE\` on entry so a run that died half way is a re-run and not a
+-- wedge. No column here is called \`ref\`, on purpose — that is the name R55's
+-- schema scan looks for.
+CREATE TABLE IF NOT EXISTS _numbering_0072 (
+  entity_table TEXT NOT NULL,
+  row_id TEXT NOT NULL,
+  becomes TEXT NOT NULL,
+  PRIMARY KEY (entity_table, row_id)
+);
+DELETE FROM _numbering_0072;
+
+-- APPS · the client's dictated order, position by position ────────────────────
+--
+-- One statement per entry, generated from her list — see the note on \`wanted\`
+-- for why this is 29 statements and not one \`VALUES\` chain, and for the three
+-- guards each of them carries.
+${wanted}
+
+UPDATE ${APPS}
+   SET ref = (SELECT becomes FROM _numbering_0072
+               WHERE entity_table = '${APPS}' AND row_id = ${APPS}.id)
+ WHERE ref IS NULL
+   AND id IN (SELECT row_id FROM _numbering_0072 WHERE entity_table = '${APPS}');
+
+-- WAVES · no order was given, so the order is the one nobody has to remember ──
+--
+-- Oldest \`created_at\` first, tie-broken on \`id\`, counted UP FROM A HIGH-WATER
+-- MARK rather than from 1. Same \`mark\` shape as 0068 and for the same two
+-- reasons: a team may already hold canonical wave numbers minted through the
+-- door, and a team's counter can stand PAST rows that no longer exist. Starting
+-- at 1 under either would hand out a number twice, against a live unique index.
+WITH canon AS (
+  SELECT ${refNumberSql("ref")} AS n FROM ${WAVES} WHERE ref = ${canonicalRefSql(wave, "ref")}
+),
+mark AS (
+  SELECT MAX(hw) AS hw FROM (
+    SELECT COALESCE((SELECT MAX(n) FROM canon), 0) AS hw
+    UNION ALL SELECT COALESCE((SELECT next_no - 1 FROM team_ref_counters WHERE kind = '${wave}'), 0)
+  )
+),
+-- The seat is materialised in its own CTE so \`canonicalRefSql\` reads a plain
+-- INTEGER COLUMN, which is the shape it is written for.
+seated AS (
+  SELECT id, (SELECT hw FROM mark) + ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) AS n
+    FROM ${WAVES} WHERE ref IS NULL
+)
+INSERT INTO _numbering_0072 (entity_table, row_id, becomes)
+SELECT '${WAVES}', id, ${canonicalRefSql(wave, "n")} FROM seated;
+
+UPDATE ${WAVES}
+   SET ref = (SELECT becomes FROM _numbering_0072
+               WHERE entity_table = '${WAVES}' AND row_id = ${WAVES}.id)
+ WHERE ref IS NULL
+   AND id IN (SELECT row_id FROM _numbering_0072 WHERE entity_table = '${WAVES}');
+
+-- THE COUNTERS · never below the rows, never below where they already stand ───
+--
+-- \`MAX\` both ways, 0068's statement 3 unchanged, so a counter can only go up.
+-- \`HAVING COUNT(*) > 0\` so a newborn team replaying this whole ledger ends with
+-- no counter row at all rather than one that says nothing — the state R55
+-- asserts a fresh database must come out in.
+INSERT INTO team_ref_counters (kind, next_no)
+SELECT '${app}', MAX(${refNumberSql("ref")}) + 1
+  FROM ${APPS} WHERE ref = ${canonicalRefSql(app, "ref")}
+ HAVING COUNT(*) > 0
+    ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
+
+-- AND PAST THE WHOLE OF HER LIST, but ONLY on a team this list actually applied
+-- to — the guard is the plan itself, so a team that matched nothing (the smoke
+-- team holds A0001 and A0002 and has never heard of any of these names) keeps
+-- the counter the statement above gave it. Without this the statement above is
+-- the only floor, which is one past the HIGHEST POSITION FILLED — on staging
+-- that is ${canonicalRef(app, 28)}, and ${canonicalRef(app, 28)} is position #28 on her list, one of the two
+-- she has spoken for and has not yet been asked about. The floor here is one
+-- past the END of the list instead (${canonicalRef(app, APP_ORDER_2026_09_01.length + 1)}), so every position she dictated stays
+-- hers until she answers. A burnt number costs nothing — gaps are already the
+-- correct outcome here — while a stolen position costs the order she dictated.
+-- \`MAX(<a constant>)\` and not the bare constant: \`HAVING\` is only legal on an
+-- aggregate query, and this needs to be one so that a plan holding NO app rows
+-- yields no row at all rather than a counter set on a team that matched nothing.
+-- Same shape as the two statements either side of it, deliberately.
+INSERT INTO team_ref_counters (kind, next_no)
+SELECT '${app}', MAX(${APP_ORDER_2026_09_01.length + 1})
+  FROM _numbering_0072 WHERE entity_table = '${APPS}'
+ HAVING COUNT(*) > 0
+    ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
+
+INSERT INTO team_ref_counters (kind, next_no)
+SELECT '${wave}', MAX(${refNumberSql("ref")}) + 1
+  FROM ${WAVES} WHERE ref = ${canonicalRefSql(wave, "ref")}
+ HAVING COUNT(*) > 0
+    ON CONFLICT(kind) DO UPDATE SET next_no = MAX(team_ref_counters.next_no, excluded.next_no);
+
+DROP TABLE _numbering_0072;
+`
 }

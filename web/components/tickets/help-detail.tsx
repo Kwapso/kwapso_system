@@ -903,22 +903,24 @@ export function HelpDetailScreen({
         editedByIsClient: ticket.editorIsClient,
       }}
       activity={activity}
-      // THE STAGE STRIP, AT THE TOP OF THE ACTIVITY RAIL — the client asked to
-      // read a ticket's stage history "in activity" ("closed on x, reopen on y,
-      // closed again on z", 2026-09-06, "keep it in activity"). That placement
-      // ruling never changed; what moved is where "in activity" IS. It was the
-      // Activity tab, above the feed; the tab is gone (2026-09-06 · 2026-09-07)
-      // and the slide-in off this footer's Latest activity column is the room
-      // that replaced it, so the strip goes there — above the same feed it was
-      // always written to sit above (ticket-stages.tsx's own header argues why
-      // it belongs beside that feed and not instead of it: the feed cannot say
-      // the SEQUENCE or the arithmetic, and this cannot say what was said).
+      // NO `activityHead` ANY MORE, AND THE STAGE LADDER IS NOT IN THE RAIL —
+      // 2026-09-09. It was passed here, which drew it at the top of the
+      // slide-in behind the footer's `All · N` door, on a reading of the
+      // client's "keep it in activity" (2026-09-06). She has since asked three
+      // times where the progression she commissioned is; the last time,
+      // verbatim: "i still do not see the ticket status rail!! itested closing
+      // with T3024". A component you open a drawer to find cannot answer the
+      // ask it was built for ("I want to have visibility of all the steps"), so
+      // it is drawn on the record itself — in the Conversation panel below, on
+      // the argument written there.
       //
-      // THE ONE RECORD TYPE THAT PASSES THIS. `activityHead` is a slot on
-      // `RecordScreen` rather than something the rail knows about, because a
-      // stage ladder is true of a ticket and of none of the other thirteen
-      // details — the rail must not learn what a ticket is.
-      activityHead={<TicketStages ticketId={helpId} />}
+      // AND IT IS NOT ALSO LEFT HERE. One fact drawn in two places is how the
+      // two drift, and the rail is not losing the history: every status move is
+      // already a row in the feed the rail opens, in prose, one sentence each
+      // ("Alaap set T-0412 to in progress"), which is precisely the "closed on
+      // x, reopen on y, closed again on z" the "keep it in activity" ruling was
+      // about. That ruling is satisfied by the feed, not by a second copy of
+      // the ladder above it.
       onAddNote={can("help", "create") ? activity.addNote : undefined}
       notePlaceholder={t("Add a note")}
     >
@@ -982,6 +984,74 @@ export function HelpDetailScreen({
             )
           return (
             <>
+              {/* WHERE THE TICKET STANDS, ON THE TICKET — 2026-09-09, and this
+                  is the placement the client has now asked for three times
+                  ("i still do not see the ticket status rail!!"). Her original
+                  commission, 2026-09-06: "I want to have visibility of all the
+                  steps, the ones that are done and the ones that are missing. I
+                  also want this graphic to show the timestamps." She chose the
+                  timeline. It had been rendered into the activity rail's
+                  slide-in instead (see `activityHead` on `RecordScreen` above
+                  for the misreading that put it there and why the ruling it
+                  came from is satisfied without it).
+
+                  ── WHY HERE AND NOT IN THE HEADER BAND ─────────────────────
+
+                  The kit's home for a progression is `RecordChrome`'s `hero`
+                  slot, reached through `RecordScreen`'s `headerExtra`, and this
+                  screen is FORBIDDEN that region: client ruling, 2026-08-31,
+                  "what is this 3rd component in the title under the chips? kill
+                  everywhere. chips is the last component of headers!" — the
+                  hero draws directly under the chips row, and the stepper that
+                  used to sit there was dropped on exactly that ruling (the
+                  `chips` comment above carries it). Re-adding a taller
+                  component to the region she twice cleared would be answering
+                  one complaint by reopening another.
+
+                  So it goes at the top of the record's CONTENT instead, which
+                  is the first thing under the tab strip and needs no ruling
+                  bent to get there. Not above the tab strip: the strip escapes
+                  the panel card upward by its own height plus the gap
+                  (`STICKY_TABS`, record-chrome.tsx), so a sibling in front of
+                  `TabsView` is pulled over by that same margin — the geometry
+                  there belongs to the strip and has no room in it for content.
+
+                  ── AND WHY THE CONVERSATION TAB IN PARTICULAR ──────────────
+
+                  It is the tab a ticket opens on (`useRemembered("tab",
+                  "conversation")` above), so it is on screen the moment the
+                  record is, with nothing opened — which is the entire
+                  complaint. It is also the tab whose subject it belongs to: a
+                  thread is people talking about a request while it moves, and
+                  the ladder says how far it has moved. Drawn above every panel
+                  instead, it would sit on top of a timesheet table and a file
+                  list, which is a progress bar as furniture.
+
+                  KNOWN AND ACCEPTED: switch to Overview or Work logs and it is
+                  not on screen. That is a real cost, and it is smaller than the
+                  two alternatives — a region the client has cleared twice, or
+                  the same ladder repeated over six panels. If she wants it on
+                  every tab, this is one wrapper around `renderPanel`'s return
+                  and nothing else changes.
+
+                  NOTHING ON THIS SCREEN DUPLICATES IT, checked rather than
+                  assumed: since the 2026-09-06 chip ruling the ticket's stage
+                  is drawn NOWHERE here — not in the header pills, not in
+                  `overviewItems` (its own comment says so), not in the actions.
+                  This is the only thing on the ticket that says what stage it
+                  is at. */}
+              {/* A FILLED HAIRLINE, NOT A CSS BORDER. `border-b border-border`
+                  is what this first was and the kit's own conformance law
+                  refuses it (`shared/ui/foundations/rules/conformance.mjs`,
+                  borders): a rule is drawn as a 1px element wearing
+                  `bg-border`, so the contrast law can read it like any other
+                  surface. It is here at all because `TabsContent` is a plain
+                  block with no gap of its own — without a rule the ladder and
+                  the first message of the thread read as one column of rows. */}
+              <div className="mb-[var(--space-5)] flex flex-col gap-[var(--space-5)]">
+                <TicketStages ticketId={helpId} status={ticket.status} />
+                <span aria-hidden className="bg-border h-px w-full" />
+              </div>
               {/* READ IT IN YOUR OWN LANGUAGE — above the conversation, because
                   the conversation is what it acts on. Inline rather than in the
                   three-dot menu: this is a thing somebody presses while reading

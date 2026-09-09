@@ -37,12 +37,15 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import * as React from "react"
-import { afterEach, beforeAll, describe, expect, it } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FacetOption, FilterFacet } from "@shared/web/screen-engine/config"
 import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { COLLECTION_FILTERS } from "@/lib/collection-filters"
+import { BASE_RECIPES } from "@/lib/screens"
 
 const ROOT = join(__dirname, "..", "..")
 const ADAPTER = "shared/web/screen-engine/filter-bar.tsx"
@@ -702,5 +705,243 @@ describe("the app's filter row is the design kit's", () => {
       `the kit hovers this pill to --btn-secondary-hover, the same token the other two use`
     ).toBe(false)
     expect(addChip!).toContain("--btn-secondary-hover")
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE FILTERS CASCADE — client ruling, 2026-09-09.
+
+   Her screenshot: Client "Any client", App "Kwapso Portal", and underneath
+   "Nothing matched. Try fewer words, or clear the filters." Verbatim: "very
+   wrong! filter the apps by selected client! Until clint is not selected, show
+   nothing." — "filter by selected client only!" — "whe using fulters this is
+   how they shoudl work: is client has sth (f.e. Kwapos) the filter apps should
+   only show apps of this client. and so on".
+
+   WHAT THESE TESTS ARE FOR, given the ruling is already written out at length
+   on `FilterFacet.dependsOn` and in the adapter's own header. Every one of the
+   three behaviours below is INVISIBLE in a screenshot of a correct screen and
+   invisible to every census in this repo: a prop-presence check (R48/R50/R53's
+   shape) can see that a facet exists and cannot see which options it offers,
+   and the whole fault she reported was a control offering the wrong ones. So
+   they are driven through the real hook, in a real DOM, off real values.
+
+   THE FOURTH IS A CENSUS, and it guards the one thing a declaration can get
+   wrong silently: a `dependsOn` naming a facet that is not in the same row
+   leaves a control that can never be unlocked — permanently reading "Choose a
+   client first." beside no Client control at all.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** THE OWNERSHIP EDGE, in the shape a real screen declares it: an App facet
+ * hanging off a Client one, its options carrying the app row's own
+ * `accountId` as `within` — and one app owned by NOBODY, which is the agency's
+ * own system and the case the null clause exists for. */
+const CASCADING: FilterFacet[] = [
+  { field: "accountId", label: "Client", control: "select", options: CLIENTS },
+  {
+    field: "appId",
+    label: "App",
+    control: "select",
+    dependsOn: { field: "accountId", emptyText: "Choose a client first." },
+    options: [
+      { value: "p1", label: "Bergman Dispatch", within: "a1" },
+      { value: "p2", label: "Northwind Portal", within: "a2" },
+      { value: "p3", label: "Our own dashboard", within: null },
+    ],
+  },
+]
+
+/** The App facet's own closed field, by the words it is showing. `CompactFacet`
+ * draws the placeholder or the chosen option's label inside its trigger, so
+ * this is what a reader actually sees on the control. */
+const facetField = (label: string) => {
+  const group = screen.getByRole("group", { name: label })
+  return within(group).getByRole("button")
+}
+
+/** The kit draws a shut facet as a real disabled `<button>` (`CompactFacet`
+ * state 5: "a fill and an ink. Never an opacity"), so this asks the DOM rather
+ * than a class name — jest-dom is deliberately not set up in this workspace. */
+const isDisabled = (el: HTMLElement) => (el as HTMLButtonElement).disabled === true
+
+/** WHAT THE ROW SAID OUT LOUD. Spied rather than module-mocked: the real toast
+ * seam is the kit's own (R39) and half this file's other assertions read the
+ * adapter's real imports, so swapping the module out here would be a second
+ * truth about the file under test. */
+const said: string[] = []
+beforeAll(() => {
+  vi.spyOn(toast, "info").mockImplementation(((message: string) => {
+    said.push(String(message))
+    return ""
+  }) as never)
+})
+beforeEach(() => {
+  said.length = 0
+})
+
+describe("a filter that hangs off another (client ruling, 2026-09-09)", () => {
+  it("offers nothing until its parent is answered, and says what to do first", () => {
+    render(<Harness facets={CASCADING} />)
+    openPanel()
+    const app = facetField("App")
+    // "Until clint is not selected, show nothing" — read as its OPTIONS and
+    // not as the control. The field keeps its place, exactly as the ticket
+    // form's own App row does, so nothing below it moves as the row is filled
+    // in; what it says is the next act rather than "Any app".
+    expect(app.textContent).toContain("Choose a client first.")
+    expect(isDisabled(app)).toBe(true)
+    // …and the Client control beside it is untouched. A cascade runs DOWN an
+    // ownership edge and only down it: an app does not own its client, so
+    // nothing here may ever narrow the parent's own list.
+    expect(isDisabled(facetField("Client"))).toBe(false)
+  })
+
+  it("offers that client's apps and ours, and no other client's", async () => {
+    render(<Harness facets={CASCADING} />)
+    await pick("Client", "Bergman S.A.")
+    const app = facetField("App")
+    expect(isDisabled(app)).toBe(false)
+    fireEvent.click(app)
+    const listbox = await screen.findByRole("listbox")
+    const offered = within(listbox)
+      .getAllByRole("option")
+      .map((o) => o.textContent)
+    // Bergman's own app, and the one owned by nobody. Northwind's is the
+    // combination her screenshot proves cannot match, and it is gone.
+    expect(offered).toContain("Bergman Dispatch")
+    // OURS SURVIVES THE NARROWING, and this is the assertion most likely to be
+    // "fixed" by somebody reading the client's sentence literally. The ticket
+    // door has no opinion about which client an app belongs to and the ticket
+    // form deliberately offers our own systems for a client's ticket, so those
+    // rows are real; dropping the option would make every one of them
+    // unreachable from this control. See `FacetOption.within`.
+    expect(offered).toContain("Our own dashboard")
+    expect(offered).not.toContain("Northwind Portal")
+  })
+
+  it("clears a stranded selection when the parent moves, and says so", async () => {
+    render(<Harness facets={CASCADING} />)
+    await pick("Client", "Bergman S.A.")
+    await pick("App", "Bergman Dispatch")
+    expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({
+      accountId: "a1",
+      appId: "p1",
+    })
+    // The reader now picks a DIFFERENT client. The app they chose is no longer
+    // a pair that can match — her own fault, arriving from the other direction
+    // — so the toolbar drops it rather than holding an impossible combination.
+    await pick("Client", "Northwind Traders International Holdings Ltd.")
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({ accountId: "a2" })
+    )
+    // NEVER SILENTLY. A filter somebody deliberately set may not disappear
+    // without a word — the pill's count dropping by one is a signal only to
+    // whoever was already watching it.
+    expect(said.at(-1)).toContain("App")
+    expect(said.at(-1)).toContain("Client")
+  })
+
+  it("clears the child when the parent is turned off altogether", async () => {
+    // The other way a selection is stranded, and the one a narrowing test
+    // cannot reach: the reader does not switch clients, they go back to "Any
+    // client". The App value they set is then hanging off nothing — the
+    // control shuts and says "Choose a client first." again — so a value left
+    // behind it would be a filter still narrowing the list from inside a
+    // control that has stopped showing it. That is worse than the fault she
+    // reported: at least hers was visible.
+    render(<Harness facets={CASCADING} />)
+    await pick("Client", "Bergman S.A.")
+    await pick("App", "Bergman Dispatch")
+    await pick("Client", "Any client")
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("values").textContent!)).toEqual({})
+    )
+    expect(isDisabled(facetField("App"))).toBe(true)
+    expect(said.at(-1)).toContain("App")
+  })
+
+  it("derives the narrowing off the ROWS where a facet declares no options", async () => {
+    // The other half of the mechanism, and the one the sprints list uses: a
+    // BOUNDED collection the browser holds whole, whose facets take their
+    // options from the rows. Nothing tags an option here — the rows say which
+    // app sat under which client, so the option list comes off the rows the
+    // chosen client leaves.
+    const derived: FilterFacet[] = [
+      { field: "account", label: "Client", control: "select" },
+      {
+        field: "app",
+        label: "App",
+        control: "select",
+        dependsOn: { field: "account", emptyText: "Choose a client first." },
+      },
+    ]
+    const rows = [
+      { account: "Bergman S.A.", app: "Bergman Dispatch" },
+      { account: "Northwind", app: "Northwind Portal" },
+      // No client at all — ours, and offered under every client for the same
+      // reason `within: null` is.
+      { account: "", app: "Our own dashboard" },
+    ]
+    function DerivedHarness() {
+      const [values, setValues] = React.useState<Record<string, string>>({})
+      const { pill, panel } = useFilterBar({
+        facets: derived,
+        values,
+        data: rows,
+        onChange: (field, value) =>
+          setValues((s) => {
+            const next = { ...s }
+            if (value === "") delete next[field]
+            else next[field] = value
+            return next
+          }),
+        onClearFacets: () => setValues({}),
+      })
+      return (
+        <>
+          {pill}
+          {panel}
+        </>
+      )
+    }
+    render(<DerivedHarness />)
+    openPanel()
+    expect(isDisabled(facetField("App"))).toBe(true)
+    await pick("Client", "Bergman S.A.")
+    fireEvent.click(facetField("App"))
+    const offered = within(await screen.findByRole("listbox"))
+      .getAllByRole("option")
+      .map((o) => o.textContent)
+    expect(offered).toContain("Bergman Dispatch")
+    expect(offered).toContain("Our own dashboard")
+    expect(offered).not.toContain("Northwind Portal")
+  })
+
+  it("every declared `dependsOn` names a facet standing beside it", () => {
+    // A `dependsOn` pointing at a field no facet in the same row offers is a
+    // control that can NEVER be unlocked: it reads "Choose a client first."
+    // for good, beside no Client control at all. Nothing else in this repo can
+    // see that — it is a correct-looking declaration and a dead control — and
+    // it is the one way a pair can be mis-declared rather than mis-derived.
+    const rows: [string, { field: string; dependsOn?: { field: string } }[]][] = [
+      ...Object.entries(COLLECTION_FILTERS),
+      ...Object.entries(BASE_RECIPES).flatMap(([key, r]) =>
+        r.collection ? ([[key, r.collection.filterFacets]] as [string, FilterFacet[]][]) : []
+      ),
+    ]
+    // The census must be measuring something: the pairs are real declarations
+    // and a walk that found none would report success for all of it.
+    const withParents = rows.flatMap(([key, facets]) =>
+      facets.filter((f) => f.dependsOn).map((f) => `${key}.${f.field}`)
+    )
+    expect(withParents.length, "the dependsOn census found nothing to check").toBeGreaterThan(0)
+    for (const [key, facets] of rows)
+      for (const f of facets)
+        if (f.dependsOn)
+          expect(
+            facets.some((other) => other.field === f.dependsOn!.field),
+            `${key}.${f.field} hangs off "${f.dependsOn.field}", which no facet beside it offers — ` +
+              `that control can never be unlocked`
+          ).toBe(true)
   })
 })

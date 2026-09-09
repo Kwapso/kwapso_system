@@ -208,6 +208,34 @@ export interface FacetOption {
    * alone" section, R32's "a mark comes from the chart series"): `useFilterBar`
    * renders this beside `label`, `aria-hidden`, never instead of it. */
   mark?: React.ReactNode
+  /** WHOSE THIS IS — the id of the record that OWNS the one this option names,
+   * on a facet that declares a `dependsOn` (below). An app's `accountId`, a
+   * sprint's `appId`: the record's own owning column, passed straight through
+   * rather than restated, so the relationship a filter narrows by and the
+   * relationship the database stores are one fact.
+   *
+   * `null` MEANS OWNED BY NOBODY, AND SUCH AN OPTION IS OFFERED UNDER EVERY
+   * PARENT. `AppRow.accountId` is null on the agency's OWN systems, and the
+   * ticket door has no opinion about which client an app belongs to
+   * (`appForTicket` checks only that the app is a live row — see
+   * `help-form-dialog.tsx`'s own note, which asks in as many words that nobody
+   * "fix" the ticket form by narrowing its app list to the client's own apps).
+   * A client's ticket about one of our own systems is therefore an ordinary,
+   * intended row; dropping our apps from a narrowed menu would make every one
+   * of those tickets unreachable from the App filter, which is a subtraction
+   * nobody asked for and nobody would see until they went looking. So the
+   * narrowing is by OWNERSHIP and the un-owned are always offered.
+   *
+   * WHAT THIS DELIBERATELY DOES NOT REACH: a row pairing one client with a
+   * DIFFERENT client's app. The door allows it and no screen offers it, so it
+   * is a mis-filed row rather than an intended combination — findable by
+   * search and by the Client filter alone, and not worth keeping every other
+   * client's apps in the menu for. Said out loud because it is the one thing
+   * the narrowing costs.
+   *
+   * `undefined` on a facet with no `dependsOn` is the ordinary case and means
+   * nothing at all — most facets are words with no owner. */
+  within?: string | null
 }
 
 /** One field the user may sort by. `value` is the row field. */
@@ -245,6 +273,74 @@ export interface FilterFacet {
    * adoption exists to end, so the unused one went rather than being ported. */
   control: "select" | "range"
   options?: FacetOption[]
+  /** THE FACET THIS ONE HANGS OFF — client ruling, 2026-09-09, on a screenshot
+   * of her own tickets toolbar reading Client "Any client", App "Kwapso Portal"
+   * and, underneath, "Nothing matched. Try fewer words, or clear the filters."
+   * Verbatim: *"very wrong! filter the apps by selected client! Until clint is
+   * not selected, show nothing."* / *"filter by selected client only!"* /
+   * *"whe using fulters this is how they shoudl work: is client has sth (f.e.
+   * Kwapos) the filter apps should only show apps of this client. and so on"*.
+   *
+   * THE FAULT HER SCREENSHOT PROVES is not that a filter returned nothing. It
+   * is that the row OFFERED a combination that cannot match: the App control
+   * listed every app of every client, so picking one whose tickets belong to a
+   * client she had not selected produced an empty list that reads exactly like
+   * a broken screen. A control whose only possible outcome is disappointment
+   * is the shape this app removes on sight (the ticket form's own module
+   * picker says the same sentence about the same problem).
+   *
+   * "and so on" IS THE WHOLE POINT — she is stating a rule for the filter row,
+   * not asking for a patch to one control. So the narrowing lives HERE, on the
+   * one type every facet in both front doors is declared as, and is applied
+   * once, in `useFilterBar` (filter-bar.tsx). The next pair is one field on a
+   * declaration, never a second implementation.
+   *
+   * WHICH PAIRS THESE ARE IS DERIVED, NOT HAND-LISTED. A facet hangs off
+   * another exactly where the record it names is OWNED by the record the other
+   * names — `apps.account_id`, `sprints.app_id`, `modules.app_id`: real
+   * columns, and the same ones the doors already narrow by (`listApps`'s own
+   * `?accountId=` filter, `workers/tenancy/src/lib/processes.ts`). Nothing is
+   * pinned in a registry that could go stale, because the relationship is not
+   * an opinion: the option carries its owner (`FacetOption.within`) or, for a
+   * facet whose options are DERIVED from the rows, the rows carry it
+   * themselves, and `useFilterBar` reads whichever is there.
+   *
+   * TWO THINGS FOLLOW FROM DECLARING ONE, and both are `useFilterBar`'s:
+   *
+   *  1. WITH A PARENT CHOSEN the option list is narrowed to what that parent
+   *     owns (plus what nobody owns — see `FacetOption.within`).
+   *  2. WITH NO PARENT CHOSEN the control offers nothing and SAYS WHAT TO DO
+   *     FIRST, in `emptyText`. It is drawn disabled, in place, exactly as the
+   *     ticket form draws the same state ("Choose a client first." — the same
+   *     sentence, reused rather than re-authored): a field that vanishes moves
+   *     every control after it as somebody fills the row in, and a filter row
+   *     whose shape changes under the reader is the variation the client has
+   *     twice told us to stop.
+   *
+   * AND A STRANDED SELECTION RESOLVES ITSELF. Picking a different parent while
+   * a child value is set leaves a combination that cannot match — the very
+   * fault — so `useFilterBar` clears the child and SAYS SO. Never silently:
+   * a filter somebody deliberately set may not disappear without a word. The
+   * argument for clearing rather than keeping is in `useFilterBar`'s own note.
+   *
+   * A COUNT ON A NARROWED OPTION MUST DESCRIBE THE NARROWED SET (R16). No
+   * facet in either front door carries `FacetOption.count` today — every
+   * count in this app is a tab badge or a heading, drawn by `formatCount`
+   * from an exact server `COUNT(*)` — so nothing here is currently at risk;
+   * the day one does, it is counted over the rows this narrowing leaves, not
+   * over the collection. */
+  dependsOn?: {
+    /** The FIELD of the facet that owns this one — `accountId` under an App
+     * facet, `appId` under a Sprint facet. It must be a facet declared beside
+     * this one in the same row, or this control can never be unlocked. */
+    field: string
+    /** WHAT THE CONTROL SAYS WHILE THAT PARENT IS UNSET — a whole sentence
+     * naming the next act, already translated by whoever built the facet.
+     * "Choose a client first." exists in the catalogue and is what the ticket
+     * form already says about exactly this question; reuse it rather than
+     * writing a second sentence for one idea (R34). */
+    emptyText: string
+  }
   /** `control:"range"` bounds, passed to both number fields. `step` defaults
    * to 1. */
   min?: number

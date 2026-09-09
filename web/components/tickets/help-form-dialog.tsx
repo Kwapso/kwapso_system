@@ -1,7 +1,20 @@
 "use client"
 
 // Ticket form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
-// Description and Type are required; App and "Raised by" are optional. Type, App
+//
+// WHAT THIS FORM DEMANDS, in one place, because "which fields are required?" is a
+// question people keep having to read 1,000 lines to answer. FOUR:
+//   Description  — always (`descField`).
+//   Title        — since 2026-09-09, her ruling; grandfathered on an imported
+//                  ticket that arrived without one (`titleGrandfathered`).
+//   Type         — since 2026-09-07, her ruling; stands down for a team with no
+//                  ticket types and for a ticket that arrived without one.
+//   Module       — once an app with modules is chosen, and never otherwise.
+// AND THREE IT DOES NOT: Client, App and "Raised by" are optional, each for a
+// reason written at its own config. She named all three on 2026-09-09 while
+// ruling about Title; being named in a sentence is not being ruled about.
+//
+// Type, App
 // and "Raised by" are all LINES OF CHIPS, not dropdowns (the client, 2026-09-07)
 // — the type's words come from the team's own "Ticket type" dropdown values
 // (selectable_data), the apps from the team's own systems, the people from the
@@ -64,7 +77,7 @@ import type { AppModule, AppRow } from "@shared/types"
 import { readFileAsDataUrl } from "@shared/web/file"
 import { useT } from "@shared/web/language"
 
-/** THE TICKET'S NAME, and the first time this form has offered one.
+/** THE TICKET'S NAME, and since 2026-09-09 a ticket raised here HAS one.
  *
  * `title_en` is not a new column — it has been on the row since the Glide
  * import, `updateTicket` and the create door both accept it, `help-detail`
@@ -73,10 +86,37 @@ import { useT } from "@shared/web/language"
  * the first eighty characters of the description, shown above the paragraph it
  * was cut from. The card was repeating itself because nothing else existed.
  *
- * OPTIONAL, because that fallback still works and always will — 788 imported
- * tickets have no English title and a portal caller still cannot send one. A
- * required field here would refuse tickets the door accepts. */
-const titleField = { ...defaultFieldConfig, label: "Title", required: false }
+ * CLIENT, 2026-09-09, verbatim: *"in titcket: client, title, raised by app,
+ * title is required"*. She is naming the fields of this form and then ruling
+ * about ONE of them. Client, App and "Raised by" are the three she listed and
+ * they are NOT made required by having been named — each is optional for a
+ * stated reason that has not changed (see their own configs below: the agency's
+ * own housekeeping questions are about no system, for no client, and were asked
+ * by nobody outside the building). Type was already required, from her ruling of
+ * 2026-09-07. Title joins it, and nothing else moves.
+ *
+ * SO IT IS REQUIRED THROUGH THE SEAM THIS FORM ALREADY HAS, and there is still
+ * exactly one: a boolean into `submit.disabled` and the SAME boolean into the
+ * field's `required`, so the marker at the row's trailing edge (kit v1.2.71
+ * owns that position) and the button that refuses can never disagree. That is
+ * `typeField`'s shape and `moduleField`'s before it; a third validation style
+ * would be the drift both of those exist to avoid.
+ *
+ * REQUIRED ONLY WHERE IT CAN BE ANSWERED — the same sentence, for the same
+ * reason, one case bigger than Type's. `title_en` is nullable and 788 imported
+ * tickets have none (they carry a German one, or nothing at all), so this can be
+ * a rule about the tickets this form RAISES and never about the ones it OPENS.
+ * See `titleGrandfathered`.
+ *
+ * THE DOOR IS UNCHANGED AND STAYS PERMISSIVE. `updateTicket` reads the title
+ * through `optionalText` and the portal's own raise dialog cannot send one at
+ * all, so this is a requirement of THIS screen, exactly as Type's is. A door
+ * that refused an untitled ticket would break the portal and the 788. */
+const titleField = (required: boolean) => ({
+  ...defaultFieldConfig,
+  label: "Title",
+  required,
+})
 /** THE PARAGRAPH, AND IT IS CALLED WHAT IT IS.
  *
  * CLIENT, 2026-09-07: "remove the 'what do you need help with'" — and, two
@@ -470,6 +510,42 @@ export function HelpFormDialog({
   const typeMissing = typeRequired && values.helpType === NONE
   const typeConfig = typeField(typeRequired)
 
+  /** THE TICKET THAT ARRIVED WITH NO TITLE, AND THERE ARE 788 OF THEM.
+   *
+   * Title is required from 2026-09-09, and that is a rule about the tickets this
+   * form RAISES. `typeGrandfathered` one field up makes the identical argument
+   * about about sixty null `help_type`s; this is the same shape over a hole an
+   * order of magnitude bigger, and the trap it avoids is worse in one specific
+   * way. A person who opens an imported ticket to correct a typo would meet a
+   * dead Submit until they NAMED somebody else's two-year-old request — and
+   * unlike a type, which is a choice among four words the app already knows, a
+   * title is a sentence they have to invent. A person in a hurry invents it from
+   * the first line of the description, which is precisely what `ticketTitle`
+   * already shows them for free (`shared/web/ticket-chips.tsx`: English title,
+   * then German, then the first eighty characters of the body). So the form would
+   * be extracting, by hand and one row at a time, a value the app already
+   * derives — and freezing it, wrongly, in a column that then outranks the
+   * derivation forever.
+   *
+   * SO AN UNTITLED TICKET OPENS, SAVES, AND KEEPS ITS DERIVED NAME: no required
+   * marker, Submit works, and `submit` sends `undefined` for an empty box (never
+   * `""`), which `optionalText` leaves as the stored null it found. Nothing is
+   * invented and nothing is cleared.
+   *
+   * IT READS `initial.titleEn` — THE FORM'S OWN FIELD, ON THE TICKET AS OPENED —
+   * and that is deliberate twice over. A ticket with a GERMAN title and no
+   * English one is grandfathered, correctly: `ticketTitle` is already showing
+   * `title_de` everywhere and this form has no box for it, so demanding an
+   * English one would be demanding a translation. And reading `initial` rather
+   * than `values` means it cannot leak into a create (there is no `initial`) and
+   * does not flicker as somebody types: once they save a title, the next open is
+   * an ordinary required edit. The exemption dies with the row it was written
+   * for. */
+  const titleGrandfathered = isEdit && !initial?.titleEn?.trim()
+  const titleRequired = !titleGrandfathered
+  const titleMissing = titleRequired && !values.titleEn.trim()
+  const titleConfig = titleField(titleRequired)
+
   /* ── THE APP CHIPS ─────────────────────────────────────────────────────────
      CLIENT, 2026-09-07: "make app not openable until client is selected, and
      whe it is horizontal pills instead of dropdown."
@@ -587,11 +663,53 @@ export function HelpFormDialog({
      explain. If a real account ever does make a wall of this, the honest fix is a
      cap she can SEE ("and 40 more"), not a control that changes shape behind her.
 
-     NO FACE ON THESE CHIPS, and that is the data's limit rather than a choice:
-     `AccountLink` carries `personName` and no picture at all, so R35's face has
-     nothing to draw from here. `shape: "round"` rides anyway — it is what the
-     row will draw a person WITH the day the link row carries a photo, and it is
-     already what the closed picker passed. */
+     AND EVERY CHIP CARRIES A ROUND AVATAR — client, 2026-09-09: *"in raides by
+     ticket add screen: add avatar in round"*. It is ONE FLAG, `face: true`, and
+     nothing here draws a circle:
+
+       · `shape: "round"` was already on these options and had been since the
+         closed picker, parked for exactly this day. It is the BOX — R35 /
+         `record-mark.tsx`'s ruling that a person in their own right is a circle
+         and a client, an app, a thing is a rounded square.
+       · `face` is what makes the box appear AT ALL. `RowChip` draws its
+         `RecordMark` only `if (picture || mark || face)`, and that gate is right
+         for most pickers — a list of dropdown values with no pictures would
+         otherwise wear a column of grey letters, "inventing an identity none of
+         them has". A contact is not that. `face` is how a picker option says
+         "this is a person, draw them", the identical flag the APP row above
+         passes for the same reason, and the exact case `PickerOption`'s own
+         header says it exists for.
+       · What lands on screen is `<RecordMark shape="round" size="choice">`, the
+         app's ONE person-mark seam, at 24px — which is `--avatar-sm`, the kit
+         avatar's own smallest size, taken from it by name rather than guessed
+         (`BOX` in record-mark.tsx says so). It brings the picture-with-fallback
+         state machine, the cold-load `naturalWidth` check and the `aria-hidden`
+         with it. Reaching past it for the kit's `Avatar` directly would be an
+         eighteenth answer to "what to draw when there is no picture", which is
+         the census that component exists to have ended.
+
+     WHAT A CONTACT ACTUALLY HAS, said plainly because the answer decides what is
+     drawn: A NAME. `AccountLink` (shared/types.ts) carries `id`, `accountId`,
+     `personAccountId`, `personName`, `relationship`, `isMainStakeholder`,
+     `active` — and no picture, because `listAccountLinks`
+     (workers/tenancy/src/lib/accounts.ts) selects `p.name` off the joined person
+     row and nothing else off it. So the honest mark is the INITIAL, which is
+     what `RecordMarkGlyph` falls through to, in the round box, at the kit's own
+     smallest avatar size.
+
+     THE PICTURE IS NOT INVENTED AND THE LINE IS ALREADY WRITTEN FOR IT. A
+     contact IS an account row, and 31 of the 106 individual accounts hold a real
+     face in `logo_url` (`scripts/glide-visuals.mjs` put them there, and
+     record-mark.tsx's header counts them) — so the photographs exist and are one
+     `p.logo_url` away in that SELECT. Adding it is a door change, not a screen
+     one, and it is deliberately not smuggled in here: the day `AccountLink`
+     carries the person's picture, this call site passes it as `picture` and
+     `RecordMark` prefers it over the initial with no other edit anywhere.
+
+     "NOT SAID" GETS NO FACE, and that is the one deliberate asymmetry in the
+     row. It is an escape hatch, not a person, and a round grey "N" would draw a
+     colleague nobody has. It keeps `shape: "round"` so its box, if it ever gets
+     one, is the row's own; it has no `face`, so it has none. */
   const contactChoices = (detailQ.data?.links ?? []).filter((l) => l.active)
   /** The chips, and the TWO empty states this field has that the type row does
    * not — which is why "Not said" is appended only when there is somebody to
@@ -623,7 +741,12 @@ export function HelpFormDialog({
             value: l.personAccountId,
             label: l.personName,
             hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
+            // THE ROUND AVATAR (client, 2026-09-09). The box is `shape`, the
+            // decision to draw one at all is `face`, and the mark inside it is
+            // the person's own initial until `AccountLink` carries a picture —
+            // all three argued above.
             shape: "round" as const,
+            face: true,
           })),
           // "Not said" is the same escape hatch "No app" is one field up, in
           // the same place for the same reason: the row commits on the click,
@@ -722,11 +845,17 @@ export function HelpFormDialog({
         // HOW THIS FORM REFUSES, and there is only one way it does it. Every
         // required field on this form is a boolean in this expression and
         // nothing else: no submit-time throw, no per-field error text, no
-        // second validation style. `typeMissing` joins `moduleMissing` here
-        // (see `typeField`) — and the marker each field draws comes from the
-        // SAME boolean, so the button and the label can never disagree about
-        // what is still outstanding.
-        disabled: !richTextValue(values.description) || typeMissing || moduleMissing,
+        // second validation style. `typeMissing` joined `moduleMissing` here on
+        // 2026-09-07 and `titleMissing` joins both on 2026-09-09 (see
+        // `titleField`) — and the marker each field draws comes from the SAME
+        // boolean, so the button and the label can never disagree about what is
+        // still outstanding.
+        //
+        // FOUR TERMS, FOUR REQUIRED FIELDS, AND THAT IS THE WHOLE LIST. Client,
+        // App and "Raised by" are not here and were not asked for: her sentence
+        // of 2026-09-09 NAMED them and ruled about Title alone.
+        disabled:
+          !richTextValue(values.description) || titleMissing || typeMissing || moduleMissing,
       }}
     >
       {/* THE ORDER IS THE CLIENT'S, 2026-09-07, and it is her own list of seven
@@ -950,8 +1079,20 @@ export function HelpFormDialog({
           costs either a real translation in three languages or a raised
           ceiling. The label is already translated, and the description field
           directly below carries the worked example ("e.g. I can't invite a new
-          member, the button is greyed out") that this one would have echoed. */}
-      <Field config={titleField} htmlFor="help-title" className={fieldSpacing}>
+          member, the button is greyed out") that this one would have echoed.
+
+          AND IT IS REQUIRED (client, 2026-09-09: "title is required"), which is
+          what `titleConfig` carries: `titleField(titleRequired)`, so the
+          `Required` marker at the row's trailing edge — kit v1.2.71 owns that
+          position, "title always left, required always right" — is drawn from
+          the same boolean that disables Submit, and stands down on the one state
+          that genuinely cannot answer, an imported ticket that arrived with no
+          English title. The `<Input>` states nothing about this itself — the kit
+          Field clones `required` onto its single child, so the attribute a
+          screen reader reads, the word a sighted person reads and the button
+          that refuses all come off the one boolean and there is nowhere for a
+          fourth answer to live. */}
+      <Field config={titleConfig} htmlFor="help-title" className={fieldSpacing}>
         <Input
           id="help-title"
           value={values.titleEn}

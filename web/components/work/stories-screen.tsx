@@ -316,7 +316,21 @@ export function StoriesScreen({
         // `assigneeId`) where the frame's facets took the shaped row's words.
         facets={translatedFacets("stories", t, {
           assigneeId: options.members.map((m) => ({ value: m.id, label: m.name })),
-          sprintId: options.sprints.map((sp) => ({ value: sp.id, label: sp.name })),
+          // WHICH APP EACH SPRINT BELONGS TO rides on the option (client
+          // ruling, 2026-09-09 — `COLLECTION_FILTERS.stories`' own `sprintId`
+          // carries it, `useFilterBar` acts on it): pick an app, and the Sprint
+          // control offers that app's sprints and nothing else. `Sprint.appId`
+          // straight through — the column the door itself joins an app's name
+          // through — never a second idea of which sprints are whose. A sprint
+          // sold on its own carries `null` and is offered under every app, for
+          // the reason `FacetOption.within` argues in full: an option owned by
+          // nobody belongs to everybody, and hiding it would make real stories
+          // unreachable from this control.
+          sprintId: options.sprints.map((sp) => ({
+            value: sp.id,
+            label: sp.name,
+            within: sp.appId,
+          })),
           appId: options.apps.map((a) => ({ value: a.id, label: a.name })),
         })}
         fetchPage={(query, cursor) =>

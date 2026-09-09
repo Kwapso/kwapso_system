@@ -783,6 +783,9 @@ describe("R55 — a stored reference is what the formula makes", () => {
     })
 
     it("is a no-op on a newborn team, which replays the whole ledger", () => {
+      // THIS COVERS EVERY NUMBERING MIGRATION, not only 0068: `freshTeamDb`
+      // replays the ledger to the END, so 0072 (apps and waves) is in here too
+      // and its own `HAVING COUNT(*) > 0` is what keeps this zero.
       const db = freshTeamDb()
       const aliases = db.prepare(`SELECT COUNT(*) AS n FROM ${REF_ALIAS_TABLE}`).get() as { n: number }
       expect(aliases.n, "a fresh database has nothing to carry, so the backfill must write nothing").toBe(0)
@@ -791,6 +794,273 @@ describe("R55 — a stored reference is what the formula makes", () => {
         counters.n,
         "a newborn team was given counter rows for kinds it has never minted — `HAVING COUNT(*) > 0` " +
           "is what keeps the backfill silent where there is nothing to reconcile"
+      ).toBe(0)
+      // AND IT LEFT NO SCRATCH BEHIND. 0072 plans through a working table and
+      // drops it; a table still standing here would be a permanent addition to
+      // every team's schema that no migration declares and no census expects.
+      const stray = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '\\_%' ESCAPE '\\'")
+        .all() as { name: string }[]
+      expect(
+        stray.map((t) => t.name).filter((n) => n !== "_migrations"),
+        "a migration left a working table behind in every team database"
+      ).toEqual([])
+    })
+  })
+
+  // ── CLAUSE 7: THE TWO KINDS THAT HAD NEVER BEEN NUMBERED ───────────────────
+  //
+  // Everything above measured the CARRY — 0068 taking an old string to the
+  // formula. Apps and waves were in every one of those loops and contributed
+  // nothing to any of them, because the column was null on every row in the
+  // estate: `KIND_NAMES` includes `app` and `wave`, so "leaves no stored
+  // reference the formula would not have made" asked them the question and got
+  // no rows back, and "leaves no counter able to mint a number a row already
+  // has" hit `if (top.n == null) continue` and skipped them outright. Two
+  // clauses passing over an empty set is the shape this whole law was written
+  // about, and the answer is not to exempt the kinds — it is to make them
+  // non-empty, which migration 0072 is.
+  //
+  // 0072 IS A FIRST MINT AND NOT A CARRY, which is why it is a separate replay
+  // and not another row in the fixture above: there is no old string, so there
+  // is no alias, and asserting an alias here would assert the opposite of what
+  // the migration should do. What it must get right instead is the ORDER — the
+  // client dictated it position by position — and the ambiguity it must refuse
+  // rather than resolve.
+  describe("the first mint carries the order the client dictated", () => {
+    const NUMBERING = "0072_the_app_and_the_wave_get_their_number"
+
+    /** A team database carried to the migration BEFORE the first app/wave mint. */
+    function dbBeforeTheNumbering(): DatabaseSync {
+      const db = new DatabaseSync(":memory:")
+      for (const m of TEAM_MIGRATIONS) {
+        if (m.version === NUMBERING) return db
+        db.exec(m.sql)
+      }
+      throw new Error(`${NUMBERING} is not in TEAM_MIGRATIONS.`)
+    }
+
+    function runNumbering(db: DatabaseSync): void {
+      const m = TEAM_MIGRATIONS.find((x) => x.version === NUMBERING)
+      if (!m) throw new Error(`${NUMBERING} is not in TEAM_MIGRATIONS.`)
+      db.exec(m.sql)
+    }
+
+    /** THE SHAPES STAGING ACTUALLY HELD on 9 Sep 2026, nothing invented. Both
+     * `Fuhrpark`s are real and are the reason the plan matches on (name,
+     * account) — the client named one under HOGO at position 19 and the other
+     * under DEMO at position 25. `aWs` is really spelled that way in the
+     * accounts table and `AWS` really is the app on it. `ERP Kennogroup` is the
+     * one live app her 29-item list names nowhere, and the three waves are the
+     * three that exist, with their real timestamps. */
+    function seedApps(db: DatabaseSync) {
+      db.exec(`
+        INSERT INTO accounts (id, account_type, name, created_at) VALUES
+          ('AC_CONFIA','entity','Confia','2026-01-01'),
+          ('AC_HOGO','entity','HOGO','2026-01-01'),
+          ('AC_DEMO','entity','DEMO','2026-01-01'),
+          ('AC_AWS','entity','aWs','2026-01-01'),
+          ('AC_PLAT','entity','PLATINUM','2026-01-01'),
+          ('AC_PADEL','entity','Padelbase','2026-01-01');
+        INSERT INTO apps (id, account_id, name, created_at) VALUES
+          ('AP_CONFIA','AC_CONFIA','CONFIA','2026-08-13T11:12:45Z'),
+          ('AP_F_HOGO','AC_HOGO','Fuhrpark','2026-08-13T11:12:42Z'),
+          ('AP_F_DEMO','AC_DEMO','Fuhrpark','2026-08-13T11:12:48Z'),
+          ('AP_AWS','AC_AWS','AWS','2026-08-13T11:13:13Z'),
+          ('AP_ERP','AC_PLAT','ERP Kennogroup','2026-08-13T11:12:47Z'),
+          ('AP_PADEL','AC_PADEL','Padelbase','2026-08-13T11:13:02Z'),
+          ('AP_ACAD','AC_PADEL','Academy','2026-08-13T11:12:52Z');
+        INSERT INTO waves (id, account_id, name, created_at) VALUES
+          ('W_MID','AC_CONFIA','Autumn automation package (example)','2026-08-25T10:09:50.646Z'),
+          ('W_LAST','AC_PADEL','Test draft','2026-08-25T16:01:12.354Z'),
+          ('W_FIRST','AC_CONFIA','probe wave A (renamed)','2026-08-25T06:52:51.061Z');
+      `)
+    }
+
+    function numbered(): DatabaseSync {
+      const db = dbBeforeTheNumbering()
+      seedApps(db)
+      runNumbering(db)
+      return db
+    }
+
+    const refOf = (db: DatabaseSync, table: string, id: string) =>
+      (db.prepare(`SELECT ref FROM ${table} WHERE id = ?`).get(id) as { ref: string | null }).ref
+
+    it("puts every app on the number its POSITION in the client's list names", () => {
+      const db = numbered()
+      // POSITION IS THE NUMBER, and the positions are hers: CONFIA is #1,
+      // Padelbase #9, AWS #15, Academy #24. Read off her list, not off any
+      // property of the row — `AP_AWS` is the newest app in this fixture and
+      // gets 15, which is what says this is a lookup and not a sort.
+      expect(refOf(db, "apps", "AP_CONFIA")).toBe("A0001")
+      expect(refOf(db, "apps", "AP_PADEL")).toBe("A0009")
+      expect(refOf(db, "apps", "AP_AWS"), "the account really is spelled `aWs`").toBe("A0015")
+      expect(refOf(db, "apps", "AP_ACAD")).toBe("A0024")
+      // THE AMBIGUITY THE LIST ITSELF FLAGS: two apps called `Fuhrpark`, and
+      // only the account separates them. A name-only match would put one of
+      // these on the other's number with nothing on the row to say which.
+      expect(refOf(db, "apps", "AP_F_HOGO"), "#19 is the HOGO one").toBe("A0019")
+      expect(refOf(db, "apps", "AP_F_DEMO"), "#25 is the DEMO one").toBe("A0025")
+      // GAPS ARE CORRECT. Positions 2-8 and so on name apps this fixture does
+      // not hold, and the entries after them do NOT slide down to close the
+      // hole — she gave an order, not a count.
+      const issued = (
+        db.prepare("SELECT ref FROM apps WHERE ref IS NOT NULL ORDER BY ref").all() as { ref: string }[]
+      ).map((r) => r.ref)
+      expect(issued).toEqual(["A0001", "A0009", "A0015", "A0019", "A0024", "A0025"])
+    })
+
+    it("REFUSES the app it cannot place, rather than giving it the number left over", () => {
+      const db = numbered()
+      // Her list has 29 entries; #28 is "Platinum" on account PLATINUM and #29
+      // is "Players" on Padelbase. Neither names a live app: the one app on
+      // PLATINUM is called `ERP Kennogroup` and has been since the import, and
+      // `Players` is an app MODULE, on two different apps she had already
+      // listed. So the list is not a list of apps only, which is what turns
+      // "the one entry left must be the one app left" from arithmetic into a
+      // guess — and the guess would be printed on a client-facing record.
+      expect(
+        refOf(db, "apps", "AP_ERP"),
+        "an app was numbered by elimination. A wrong permanent number is worse than a missing one, " +
+          "and the remedy for a missing one is one sentence from the client"
+      ).toBeNull()
+    })
+
+    it("numbers waves oldest first, because no order was given for them", () => {
+      const db = numbered()
+      // The rule 0068 uses wherever it has to choose for itself: `created_at`
+      // ascending, tie-broken on `id`. Objective, and stable across re-runs —
+      // the fixture deliberately INSERTS them out of order, so a plan that
+      // seated on insertion order would fail here.
+      expect(refOf(db, "waves", "W_FIRST")).toBe("W0001")
+      expect(refOf(db, "waves", "W_MID")).toBe("W0002")
+      expect(refOf(db, "waves", "W_LAST")).toBe("W0003")
+    })
+
+    it("leaves no stored reference the formula would not have made", () => {
+      // The clause at the top of this file, asked of the two kinds that could
+      // not answer it before.
+      const db = numbered()
+      const wrong: string[] = []
+      let seen = 0
+      for (const name of ["app", "wave"] as TeamRefKindName[]) {
+        const table = TEAM_REF_TABLES[name]
+        const kind = TEAM_REF_KINDS[name]
+        const rows = db.prepare(`SELECT id, ref FROM ${table} WHERE ref IS NOT NULL`).all() as {
+          id: string
+          ref: string
+        }[]
+        seen += rows.length
+        for (const r of rows) if (refNumber(kind, r.ref) === null) wrong.push(`${table}.${r.id} = ${r.ref}`)
+      }
+      expect(wrong, "a first mint stored a string `canonicalRef` would never produce").toEqual([])
+      // THE TRIPWIRE: this clause is a set difference and would pass over an
+      // empty set — which is precisely how it passed for these two kinds while
+      // every app and every wave in the estate wore nothing at all.
+      expect(seen, "the numbering wrote nothing — it is not reading the seeded rows").toBe(9)
+    })
+
+    it("leaves no counter able to mint a number a row already has", () => {
+      const db = numbered()
+      for (const name of ["app", "wave"] as TeamRefKindName[]) {
+        const table = TEAM_REF_TABLES[name]
+        const kind = TEAM_REF_KINDS[name]
+        const top = db
+          .prepare(`SELECT MAX(${refNumberSql("ref")}) AS n FROM ${table} WHERE ref IS NOT NULL`)
+          .get() as { n: number | null }
+        expect(top.n, `${table} holds no numbered row, so this clause proves nothing`).not.toBeNull()
+        const counter = db.prepare("SELECT next_no FROM team_ref_counters WHERE kind = ?").get(kind) as
+          | { next_no: number }
+          | undefined
+        expect(
+          counter?.next_no ?? 0,
+          `the ${kind} counter would mint ${counter?.next_no}, and a row already holds ${top.n} — the ` +
+            "next record created after this migration collides on a live unique index"
+        ).toBeGreaterThan(top.n as number)
+      }
+      // AND THE APP COUNTER IS PARKED PAST HER WHOLE LIST, not merely past the
+      // rows. The highest number issued here is 25; positions 26-29 are hers and
+      // two of them are still open questions, so the next app created must not
+      // be handed one of them.
+      const a = db.prepare("SELECT next_no FROM team_ref_counters WHERE kind = 'A'").get() as {
+        next_no: number
+      }
+      expect(
+        a.next_no,
+        "the next app minted would take a position the client has already spoken for"
+      ).toBeGreaterThan(29)
+    })
+
+    it("does not touch an app that already has a number", () => {
+      // The smoke team's own state: two apps minted through the door since 0059,
+      // wearing A0001 and A0002, and a counter at 3. The client's list has never
+      // heard of either, and a migration that "reconciled" this team would both
+      // renumber a live reference and drag its counter over her positions.
+      const db = dbBeforeTheNumbering()
+      db.exec(`
+        INSERT INTO accounts (id, account_type, name, created_at) VALUES
+          ('AC_S','entity','PORTAL SMOKE · their company','2026-09-07'),
+          ('AC_LOOOM','entity','Looom','2026-01-01');
+        INSERT INTO apps (id, account_id, name, ref, created_at) VALUES
+          ('S1','AC_S','PORTAL SMOKE · their system','A0001','2026-09-07T11:59:26.506Z'),
+          ('S2','AC_S','PORTAL SMOKE · another system','A0002','2026-09-07T11:59:28.332Z');
+        INSERT INTO team_ref_counters (kind, next_no) VALUES ('A', 3);
+      `)
+      runNumbering(db)
+      expect(refOf(db, "apps", "S1")).toBe("A0001")
+      expect(refOf(db, "apps", "S2")).toBe("A0002")
+      expect(
+        (db.prepare("SELECT next_no FROM team_ref_counters WHERE kind = 'A'").get() as { next_no: number })
+          .next_no,
+        "a team the client's list has nothing to do with had its counter dragged over her positions"
+      ).toBe(3)
+
+      // AND THE CASE THAT ACTUALLY EXERCISES THE GUARD: an app the client's list
+      // DOES name, already wearing a number the door minted for it. `Looom` is
+      // position 12; this row holds A0003. Without `ref IS NULL` on the plan the
+      // migration would move it to A0012 — a live reference, on a record a client
+      // may already have quoted, silently rewritten by a rollout. The two rows
+      // above cannot catch that: the list has never heard of either of them, so
+      // no plan row is built for them whether the guard is there or not.
+      db.exec(`
+        INSERT INTO apps (id, account_id, name, ref, created_at)
+          VALUES ('S3','AC_LOOOM','Looom','A0003','2026-09-08T09:00:00.000Z');
+      `)
+      runNumbering(db)
+      expect(
+        refOf(db, "apps", "S3"),
+        "an app that already had a number was renumbered onto its position in the list. A reference is " +
+          "minted once; the order was for the apps that had none"
+      ).toBe("A0003")
+    })
+
+    it("changes nothing the second time it runs", () => {
+      const db = numbered()
+      const snap = () =>
+        JSON.stringify({
+          apps: db.prepare("SELECT id, ref FROM apps ORDER BY id").all(),
+          waves: db.prepare("SELECT id, ref FROM waves ORDER BY id").all(),
+          counters: db.prepare("SELECT kind, next_no FROM team_ref_counters ORDER BY kind").all(),
+        })
+      const first = snap()
+      runNumbering(db)
+      expect(
+        snap(),
+        "a migration that hands out permanent identifiers must be safe to re-run — a rollout that " +
+          "timed out half way through is retried, not abandoned"
+      ).toBe(first)
+    })
+
+    it("writes no alias, because nothing was renamed", () => {
+      const db = numbered()
+      const rows = db
+        .prepare(`SELECT COUNT(*) AS n FROM ${REF_ALIAS_TABLE} WHERE entity_table IN ('apps','waves')`)
+        .get() as { n: number }
+      expect(
+        rows.n,
+        "a first mint retired no string, so an alias row here would point at a name no record ever " +
+          "had — a lie in the one table whose whole job is to be believed"
       ).toBe(0)
     })
   })

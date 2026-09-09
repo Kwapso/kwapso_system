@@ -35,6 +35,10 @@ const door = vi.hoisted(() => ({
    * `beforeEach` puts it back to empty, which is what every case that predates
    * the chip row expects. */
   apps: [] as Record<string, unknown>[],
+  /** The chosen client's OWN people, for the "Raised by" row. A LET for
+   * `door.apps`'s reason — `beforeEach` puts it back to empty, which is what
+   * every case that predates the avatar ruling expects. */
+  links: [] as Record<string, unknown>[],
   accounts: vi.fn(async (_opts: Record<string, unknown> = {}) => ({
     accounts: [
       { id: "acct-bergman", name: "Bergman", code: "BERG", email: null, active: true, accountType: "entity" },
@@ -68,7 +72,10 @@ vi.mock("@/lib/api", async (importOriginal) => {
     tenancy: {
       ...actual.tenancy,
       accounts: door.accounts,
-      accountDetail: async () => ({ account: { id: "acct-bergman", name: "Bergman" }, links: [] }),
+      accountDetail: async () => ({
+        account: { id: "acct-bergman", name: "Bergman" },
+        links: door.links,
+      }),
       appModules: async () => ({ modules: [], total: 0 }),
     },
   }
@@ -82,6 +89,7 @@ import { searchAccounts } from "@/lib/picker-sources"
 afterEach(cleanup)
 beforeEach(() => {
   door.apps = []
+  door.links = []
 })
 
 /** Write the ticket's own words. The description is a RICH-TEXT field now, so it
@@ -93,6 +101,18 @@ const write = (html: string) => {
   const box = document.querySelector('[contenteditable="true"]') as HTMLElement
   box.innerHTML = html
   fireEvent.input(box)
+}
+
+/** Name the ticket. Title joined Description and Type as a required field on
+ * 2026-09-09 ("in titcket: client, title, raised by app, title is required"), so
+ * every case below that asks whether the button is ENABLED has to answer it —
+ * a case that left it blank would be measuring the title rule while claiming to
+ * measure something else. Cases that fire `submit` on the form directly do not
+ * need it: `submitForm` bypasses the disabled button on purpose, because what
+ * they are about is what reaches `onSubmit`. */
+const name = (title: string) => {
+  const box = screen.getByLabelText("Title") as HTMLInputElement
+  fireEvent.change(box, { target: { value: title } })
 }
 
 /** The dialog renders in a PORTAL, so the form is on the document rather than in
@@ -217,6 +237,10 @@ describe("a ticket has a type", () => {
       />
     )
     write("<p>The Tuesday export is empty</p>")
+    // NAMED, so the only thing this case is measuring is the TYPE rule. Title is
+    // required too since 2026-09-09 and has its own describe below; leaving it
+    // blank here would make this assertion pass for the wrong reason.
+    name("Tuesday export is empty")
     // A description alone is no longer enough: Type is required, and the refusal
     // rides the SAME `submit.disabled` seam the module field already used —
     // there is no second validation style on this form.
@@ -245,6 +269,7 @@ describe("a ticket has a type", () => {
       />
     )
     write("<p>Internal: rotate the D1 token</p>")
+    name("Rotate the D1 token")
     expect(submitButton().disabled).toBe(false)
   })
 
@@ -352,5 +377,173 @@ describe("which app the ticket is about", () => {
     const mark = plainest.querySelector(".bg-muted")
     expect(mark).toBeTruthy()
     expect(mark?.textContent).toBe("F")
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "IN TITCKET: CLIENT, TITLE, RAISED BY APP, TITLE IS REQUIRED"
+   — the client, 2026-09-09.
+
+   TWO CLAIMS, AND THE SECOND IS THE ONE A SENTENCE LIKE THAT USUALLY LOSES.
+   She names four fields and rules about ONE of them, so the form has to start
+   refusing an untitled ticket AND has to leave Client, App and "Raised by"
+   exactly as optional as they were. Making four fields required because a
+   sentence listed four nouns is the failure this describe is pointed at.
+
+   AND THE 788. `title_en` is nullable and 788 imported tickets have none, so a
+   rule about what this form RAISES cannot become a rule about what it OPENS —
+   `ticketTitle` already names those rows from their German title or their body,
+   and a dead Submit would make somebody invent a name for a two-year-old
+   request in order to fix a typo. Same grandfathering the type row got, one
+   order of magnitude bigger.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("a ticket has a title", () => {
+  it("refuses a new ticket until it is named", () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+      />
+    )
+    // Everything else this form demands is answered: the description is written
+    // and the team has no ticket types to demand. The title is the only thing
+    // outstanding, so the button's state is this rule and nothing else.
+    write("<p>The Tuesday export is empty</p>")
+    expect(submitButton().disabled).toBe(true)
+    name("Tuesday export is empty")
+    expect(submitButton().disabled).toBe(false)
+    // AND WHITESPACE IS NOT A NAME. `submit` trims before it sends, so a form
+    // that accepted spaces would post `undefined` and quietly leave the ticket
+    // unnamed after refusing the person who left it blank.
+    name("   ")
+    expect(submitButton().disabled).toBe(true)
+  })
+
+  it("marks the field required, through the same seam that disables Submit", () => {
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+      />
+    )
+    // The kit draws the marker off `required` on the control the Field owns, so
+    // the boolean in `submit.disabled` and the one a person SEES are one value.
+    expect((screen.getByLabelText("Title") as HTMLInputElement).required).toBe(true)
+  })
+
+  it("does not trap — or silently name — a ticket that arrived without one", async () => {
+    const onSubmit = vi.fn(async (_input: { titleEn?: string }) => {})
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={onSubmit}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>Tuesday export is empty</p>", titleEn: null }}
+      />
+    )
+    // The box is empty — the screen does not invent a name from the body, which
+    // is what `ticketTitle` already derives for free…
+    expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("")
+    // …the marker stands down…
+    expect((screen.getByLabelText("Title") as HTMLInputElement).required).toBe(false)
+    // …and the form saves anyway.
+    expect(submitButton().disabled).toBe(false)
+    submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    // undefined, not "": `optionalText` leaves the stored null alone.
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ titleEn: undefined })
+  })
+
+  it("demands one again on a ticket that already has one", () => {
+    // The exemption dies with the row it was written for: a titled ticket is an
+    // ordinary required edit, so emptying the box refuses.
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", titleEn: "Tuesday export is empty" }}
+      />
+    )
+    expect(submitButton().disabled).toBe(false)
+    name("")
+    expect(submitButton().disabled).toBe(true)
+  })
+
+  it("leaves the three fields she NAMED optional, because she ruled about one", () => {
+    // Client, App and "Raised by" appear in her sentence and nowhere in the
+    // refusal. A ticket the agency raises about its own housekeeping has no
+    // client, no system and nobody outside who asked — required there would make
+    // it unraisable, which is what each field's own config has always said.
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+      />
+    )
+    write("<p>Internal: rotate the D1 token</p>")
+    name("Rotate the D1 token")
+    // No client, no app, no contact — and the form accepts it.
+    expect(submitButton().disabled).toBe(false)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "IN RAIDES BY TICKET ADD SCREEN: ADD AVATAR IN ROUND" — the client, 2026-09-09.
+
+   READ OFF THE MARK BOX, not off the chip's text, for the reason the app row's
+   own case gives one describe up: the label already contains every letter of the
+   name, so a textContent assertion would pass with no mark drawn at all.
+   `RecordMark` is `aria-hidden` by design, so its class is the handle.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("who raised it", () => {
+  it("draws each contact with a round mark carrying their initial", async () => {
+    door.links = [
+      { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Marta Nilsson", relationship: null, isMainStakeholder: true, active: true },
+      { id: "l2", accountId: "acct-bergman", personAccountId: "p2", personName: "Otto Berg", relationship: null, isMainStakeholder: false, active: true },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("Raised by")
+      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
+      return r
+    })
+    const marta = within(row).getByRole("button", { name: /Marta Nilsson/ })
+    const mark = marta.querySelector(".bg-muted")
+    // THE MARK EXISTS AT ALL — this is the half `shape: "round"` alone never
+    // bought. `RowChip` draws its `RecordMark` only when a picture, a glyph or
+    // `face` says to, and `AccountLink` carries none of the first two.
+    expect(mark).toBeTruthy()
+    // ROUND, which is R35's box for a person in their own right…
+    expect(mark?.className).toContain("rounded-pill")
+    // …and the honest content: `AccountLink` has no picture, so the initial.
+    expect(mark?.textContent).toBe("M")
+
+    // "NOT SAID" IS NOT A PERSON, so it wears no face — a round grey "N" would
+    // draw a colleague nobody has.
+    const notSaid = within(row).getByRole("button", { name: "Not said" })
+    expect(notSaid.querySelector(".bg-muted")).toBeNull()
   })
 })

@@ -1123,9 +1123,29 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // because this lane's own `typeField` hint named the OLD screen name and
   // had to be corrected to "the Choices screen" first, R34, which put the
   // tab's own word in front of the same translator).
-  de: 244,
-  es: 244,
-  ca: 244,
+  //
+  // LOWERED 244 -> 0 in all three, 9 Sep 2026, the client's "translate them."
+  // The 244 the previous entry pinned — every extracted sentence with no
+  // seed/catalogue entry in any of de/es/ca at the time the count was fixed —
+  // is translated by hand in shared/i18n-seed.ts's own R44 pass, per the same
+  // 8 Sep 2026 ruling: translation is the builder's own job and never spends
+  // the owner's key. Read alongside the extraction that ran in the same
+  // change: the true count moved during the pass (peer lanes append to this
+  // seed file continuously), so the number actually answered is not a fixed
+  // 244 read off a snapshot but whatever `npm run lang` plus a fresh
+  // `coverage()` walk reported true and empty immediately before this pin was
+  // written — verified zero, not assumed zero. Two classes of entry inside
+  // that pass are not new prose: several split an existing joined
+  // title+description sentence into the two separate `t(...)` calls the
+  // screen now makes (the wording carried over unchanged from the joined
+  // entry, per the precedent already in this file for "No waves yet."), and
+  // "Regular" filled a scale-option label whose sibling "Compact"/"Large"
+  // happened to already be answered because those two English words are
+  // shared verbatim with `shared/scale.ts`'s own Compact/Comfortable/Large
+  // set. Nothing was left in English on purpose; nothing was deferred.
+  de: 0,
+  es: 0,
+  ca: 0,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

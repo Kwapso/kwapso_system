@@ -682,9 +682,29 @@ const sprintsListRecipe: ScreenRecipe = {
   // The sprint TYPE's glyph, the same one the Overview groups lead with.
   leading: "mark",
   actions: [],
+  // THE APP FACET HANGS OFF THE CLIENT ONE — client ruling, 2026-09-09, stated
+  // as a rule for the filter row rather than for the screen she was looking at
+  // ("whe using fulters this is how they shoudl work … and so on"). A sprint's
+  // app belongs to a client the same way a ticket's does, so the same edge is
+  // here and so is the same fault: Client "Acme" + App "Beta Portal" is a pair
+  // this row would offer and no sprint can satisfy.
+  //
+  // NOTHING SUPPLIES `within` HERE, AND THAT IS THE MECHANISM WORKING RATHER
+  // THAN A GAP. These facets declare no `options` at all — they are DERIVED
+  // from the shaped rows (`facetOptions`, screen-engine/collection.ts), on a
+  // collection that is BOUNDED and read whole, so the rows themselves already
+  // say which app sat under which client and `useFilterBar` derives the
+  // narrowed list from the rows the chosen client leaves. That is why the
+  // relationship needed no registry: on the declared side it is the record's
+  // own owning column, and on this side it is the data.
   collection: listCollection("No sprints yet.", "Search sprints…", [
     { field: "account", label: "Client", control: "select" },
-    { field: "app", label: "App", control: "select" },
+    {
+      field: "app",
+      label: "App",
+      control: "select",
+      dependsOn: { field: "account", emptyText: "Choose a client first." },
+    },
     { field: "state", label: "Status", control: "select" },
   ], { icon: "sprints" }),
 }
@@ -1063,7 +1083,18 @@ function translateCollection(c: CollectionConfig, t: Translate): CollectionConfi
     emptyDescription: c.emptyDescription ? t(c.emptyDescription) : c.emptyDescription,
     searchPlaceholder: c.searchPlaceholder ? t(c.searchPlaceholder) : c.searchPlaceholder,
     sortOptions: c.sortOptions.map((o) => ({ ...o, label: t(o.label) })),
-    filterFacets: c.filterFacets.map((f) => ({ ...f, label: t(f.label) })),
+    // A FACET'S `dependsOn.emptyText` IS COPY AND GOES THROUGH `t` LIKE ITS
+    // LABEL (R28/R33). It is a whole sentence a person reads inside the control
+    // ("Choose a client first."), so a recipe that declared one and skipped
+    // this line would say it in English to somebody who chose German — on a
+    // screen that looks finished, which is the exact failure R28 exists for.
+    filterFacets: c.filterFacets.map((f) => ({
+      ...f,
+      label: t(f.label),
+      ...(f.dependsOn
+        ? { dependsOn: { field: f.dependsOn.field, emptyText: t(f.dependsOn.emptyText) } }
+        : {}),
+    })),
   }
 }
 

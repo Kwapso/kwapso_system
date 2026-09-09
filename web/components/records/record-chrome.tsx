@@ -912,9 +912,22 @@ export function RecordScreen({
    */
   activity?: RailActivity
   /**
-   * Anything that belongs above the feed INSIDE the activity rail. One caller:
-   * the ticket's stage strip. Forwarded to `ActivityRail`'s `head` and argued
-   * there; a record that passes nothing gets a rail holding the feed alone.
+   * Anything that belongs above the feed INSIDE the activity rail. Forwarded to
+   * `ActivityRail`'s `head`; a record that passes nothing gets a rail holding
+   * the feed alone, which as of 2026-09-09 is every record.
+   *
+   * NO CALLER TODAY, AND THE REASON IS WORTH THE THREE LINES. The one caller
+   * was the ticket's stage ladder (`help-detail.tsx`), put here on a reading of
+   * the client's "keep it in activity" that hid the progression she had
+   * commissioned behind the footer's `All · N` door — she asked three times
+   * where it was. It is drawn on the ticket's own Conversation panel now, and
+   * `help-detail.tsx` carries the whole argument at both ends. The slot is kept
+   * rather than deleted because it is the right seam if a record ever does need
+   * something above its feed — a stage ladder is true of a ticket and of none
+   * of the other thirteen details, so the rail must not learn what a ticket is
+   * — but it is UNUSED, and anything added here should be checked against that
+   * history first: a drawer is not a place to put something a person is looking
+   * for. `ActivityRail`'s own `head` prop is uncalled for the same reason.
    */
   activityHead?: React.ReactNode
   /**
