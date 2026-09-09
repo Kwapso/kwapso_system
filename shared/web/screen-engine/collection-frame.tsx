@@ -143,38 +143,114 @@ export function CollectionCreateActionProvider({
  * right) draws no button at all — TEN STATES #10 in the composition's own
  * doc: "the control is then absent, never dimmed". `onImport` absent (no CSV
  * target for this record, or the reader lacks the right) likewise draws
- * nothing — never a button that would 404 or refuse. */
+ * nothing — never a button that would 404 or refuse.
+ *
+ * ── R62 · IT DRAWS BOTH ZEROS, AND THE ADD BUTTON IS THE ONLY DIFFERENCE ──
+ *
+ * The client's ruling, 2026-09-09, verbatim: "the empty because of filters
+ * hosul look the same as empty collection but the add button."
+ *
+ * There are two zeros in this app and they are different FACTS. A RESTING
+ * empty collection holds no rows at all — first run, and the screen exists to
+ * be filled. An EMPTY RESULT holds rows that a search, a tab or a facet has
+ * narrowed to none — nothing is wrong, the reader asked a question with no
+ * answer. Saying "nothing here yet" to somebody mid-search is a false claim
+ * about their data; offering them "Add the first" is worse, because it invites
+ * a duplicate of a record a filter is hiding (27.22's own reason).
+ *
+ * So the FACT is a prop and the LOOK is not: `filtered` swaps the words and
+ * withdraws the two create actions, and changes nothing else. Same wrapper,
+ * same block padding, same `Headline h3`, same `Text sm` measure, same action
+ * row — which is the whole of her sentence. It is enforced rather than
+ * described: `filtered` drops `onCreate`/`onImport` HERE, in the one component,
+ * so a call site cannot hand a create action to a filtered zero by forgetting
+ * to gate it — the same reason R50's `empty` is required rather than optional.
+ *
+ * WHY THE FILTERED HALF USED TO LOOK DIFFERENT, AND WHY IT IS NOT A COPY SWAP.
+ * It drew through the kit's `ShapeStateBody` + `ScreenRegister` instead of this
+ * — a genuinely different box: `px-6 py-[var(--space-8)]` against this file's
+ * un-inset `py-[var(--space-7)]`, so the two zeros started at different x; a
+ * raw `text-2xl` span against `Headline`'s step-plus-tracking; and a
+ * `text-caption`/`max-w-[40ch]` body against `Text size="sm" measure`. Four
+ * differences, none of them a decision anybody made, on the two states a reader
+ * flips between by typing one letter.
+ *
+ * AND IT WAS SHIPPING IN ENGLISH. `ShapeStateBody`'s `noResultsTitle` /
+ * `noResultsDescription` are defaults inside `shared/ui/`, which R28's walk
+ * deliberately does not enter (`resolveImport` returns null for the vendored
+ * kit) — so "No records match" and "Every record is filtered out" were in no
+ * catalogue and translated nowhere, on every filtered zero on the agency door.
+ * The engine passed `emptyTitle` into that call, which `filtered` never reads,
+ * so the collection's own translated sentence was computed and discarded. Both
+ * halves are fixed by the words living here, in an app file the walk reaches,
+ * inside `t(...)`. */
 export function CollectionEmptyState({
   title,
+  filteredTitle,
   description,
+  filteredDescription,
+  filtered = false,
   onCreate,
   onImport,
+  onClearFilters,
   className,
 }: {
   /** The collection's own word for what's missing — `config.emptyText`,
-   * translated at the call site. */
+   * translated at the call site. Read only in the RESTING state: it is a claim
+   * about the collection ("No accounts yet.") and it is plainly untrue while a
+   * search is narrowing one. */
   title: string
+  /** What the FILTERED state says instead. Defaults to "Nothing matched." — a
+   * sentence that is true of every collection, and the one the door-searched
+   * half of the app (`<PagedFind>`) already says. */
+  filteredTitle?: string
   /** 27.21: "One sentence naming the two routes". Defaults below to a
    * sentence that is true of every collection it can land on, for a caller
    * with nothing more specific to say; a collection with a route of its own
-   * says so through `CollectionConfig.emptyDescription`. */
+   * says so through `CollectionConfig.emptyDescription`. Read only in the
+   * RESTING state, for the same reason `title` is: "Records land here when
+   * someone adds one" answers a question nobody mid-search asked. */
   description?: string
+  /** What the FILTERED state says under its title. Defaults to "Try fewer
+   * words, or clear the filters." — the second half of the sentence the
+   * door-searched path (`<PagedFind>`) already says as one line. */
+  filteredDescription?: string
+  /** R62 — WHICH ZERO THIS IS. True when a search term, a tab or a facet is
+   * narrowing a collection that does hold rows. Never guessed: a caller passes
+   * it because it knows what it asked. */
+  filtered?: boolean
   /** The one mango on this register — composition 27.21's own exception to
-   * B3. Absent draws no button (a reader with no create right). */
+   * B3. Absent draws no button (a reader with no create right). WITHDRAWN
+   * when `filtered`, by this component rather than by the caller. */
   onCreate?: () => void
   /** The paper action beside it — absent unless a real import target exists
-   * for this record AND the reader may run it. */
+   * for this record AND the reader may run it. Withdrawn when `filtered` for
+   * the same reason `onCreate` is: it fills a collection that is already full. */
   onImport?: () => void
+  /** The FILTERED state's one way out, where the caller has a handler that can
+   * safely run one — the same act the filter bar's own control runs. Not a
+   * create, so it is not withdrawn; it is the retreat 27.22 allows, and it is
+   * `secondary` because 27.22 forbids mango in this body entirely. */
+  onClearFilters?: () => void
   className?: string
 }) {
   const t = useT()
+  // R62 — THE ADD BUTTON IS THE ONLY DIFFERENCE, and it is subtracted HERE so
+  // that a call site cannot forget to. Everything below this line is drawn the
+  // same in both states.
+  const create = filtered ? undefined : onCreate
+  const importer = filtered ? undefined : onImport
+  const clear = filtered ? onClearFilters : undefined
   return (
     <div
       data-slot="collection-empty-body"
       className={cn("flex min-w-0 flex-col items-start gap-3 py-[var(--space-7)]", className)}
     >
       <Headline as="h3" size="h3">
-        {title}
+        {/* R62 — the FACT decides the sentence. `title` is the collection's own
+            claim about itself and it is only true at rest; a filtered zero says
+            what actually happened instead. */}
+        {filtered ? (filteredTitle ?? t("Nothing matched.")) : title}
       </Headline>
       {/* THE DEFAULT SENTENCE HAS TO BE TRUE ON EVERY COLLECTION IT LANDS ON,
           and until 2026-09-05 it was not. It read "Records land here when
@@ -190,22 +266,29 @@ export function CollectionEmptyState({
           collection with something more specific to say says it through
           `CollectionConfig.emptyDescription` (Contacts, Tickets, Members). */}
       <Text as="p" size="sm" tone="secondary" measure>
-        {description ??
-          (onCreate || onImport
-            ? t("Whatever you add shows up here. The first one takes a minute.")
-            : t("Whatever gets added shows up here."))}
+        {filtered
+          ? (filteredDescription ?? t("Try fewer words, or clear the filters."))
+          : (description ??
+            (create || importer
+              ? t("Whatever you add shows up here. The first one takes a minute.")
+              : t("Whatever gets added shows up here.")))}
       </Text>
-      {(onCreate || onImport) && (
+      {(create || importer || clear) && (
         <div className="mt-2 flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center">
-          {onCreate && (
-            <Button onClick={onCreate} className="gap-1">
+          {create && (
+            <Button onClick={create} className="gap-1">
               <Plus className="size-4" />
               {t("Add the first")}
             </Button>
           )}
-          {onImport && (
-            <Button variant="secondary" onClick={onImport}>
+          {importer && (
+            <Button variant="secondary" onClick={importer}>
               {t("Import a list")}
+            </Button>
+          )}
+          {clear && (
+            <Button variant="secondary" onClick={clear}>
+              {t("Clear filters")}
             </Button>
           )}
         </div>
@@ -229,6 +312,7 @@ function CollectionFrame<T>({
   errorAction,
   useKitPanel = false,
   band,
+  narrowedOutside = false,
 }: {
   config: CollectionConfig
   data: T[]
@@ -301,6 +385,16 @@ function CollectionFrame<T>({
    * by/Archived column swap are NOT this prop, and are not built here.
    */
   band?: React.ReactNode
+  /** R62 — IS SOMEBODY ABOVE US NARROWING THIS LIST? This frame's own
+   * `narrowed` reads the search box and facets IT draws, which is the whole
+   * truth on a bounded collection and only half of it on a GROWING one: there
+   * the search lives in `<PagedFind>` at the door, the frame is handed the
+   * already-narrowed rows with `searchable:false`, and its own query is empty —
+   * so a search that matched nothing read as "the collection is empty" and drew
+   * "Add the first" over a list a term was hiding. That is the R62 bug pointing
+   * the other way, and this is the fact those hosts already hold (`found.active`)
+   * carried down to where the zero state is actually drawn. */
+  narrowedOutside?: boolean
 }) {
   const t = useT()
   const createAction = React.useContext(CreateActionContext)
@@ -423,7 +517,11 @@ function CollectionFrame<T>({
   // read after `selectRows` so it describes the same pass that produced
   // `filtered`. (`asked` is taken in this file — it is the remembered question
   // itself, which is the thing this is a predicate about.)
-  const narrowed = query.trim() !== "" || Object.keys(facetValues).length > 0
+  // `|| narrowedOutside` (R62): on a GROWING collection the search is at the
+  // door and this frame's own query is always empty, so without it every
+  // door-searched zero was read as a resting one.
+  const narrowed =
+    query.trim() !== "" || Object.keys(facetValues).length > 0 || narrowedOutside
 
   // GENUINELY EMPTY, READ EARLY — client, 2 Sep 2026, verbatim: "NEVER
   // TOOLBAR ON EMPTY COLLECTION." Nothing to search, filter or sort when
@@ -652,38 +750,26 @@ function CollectionFrame<T>({
             copy={copy}
             action={errorAction}
           />
-        ) : filtered.length === 0 && narrowed ? (
-          // NO-RESULTS stays on the plain sentence + "Clear filters" — see
-          // COMPOSITION-MISMATCHES.md, the no-results half of this entry,
-          // for why the kit's own richer no-results body (naming the exact
-          // total, the narrowest excluding facet, and its would-show count)
-          // is deliberately not built here yet: it needs computations this
-          // engine doesn't have, not a copy swap.
-          <ShapeStateBody
-            shape="collectionScreen"
-            state="empty"
-            filtered
-            copy={{ emptyTitle: t(config.emptyText), ...copy }}
-            action={
-              Object.keys(facetValues).length > 0 && (
-                <Button
-                  variant="secondary"
-                  onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
-                >
-                  {t("Clear filters")}
-                </Button>
-              )
-            }
-          />
         ) : filtered.length === 0 ? (
-          // GENUINELY EMPTY — the finished register, `CollectionEmptyState`
-          // above, matching `EmptyCollectionScreen`'s `emptyBody`
-          // (states/empty-collection.tsx, 27.21) verbatim: a bold title, one
-          // explanatory sentence, and up to two buttons. The figure strip and
-          // zero-badged tabs are still not adopted — `CollectionConfig` has
-          // no "figures" concept, and inventing one is separate, unscoped
-          // work (COMPOSITION-MISMATCHES.md).
+          // R62 — ONE REGISTER, BOTH ZEROS. It used to be two branches drawing
+          // two different boxes (`ShapeStateBody` when narrowed,
+          // `CollectionEmptyState` when not); the client ruled on 2026-09-09
+          // that they must be the same body minus the add button, so the fact
+          // is a PROP now and the branch is gone. `narrowed` is this frame's
+          // own predicate, computed beside `selectRows` off the same pass that
+          // produced `filtered`, ORed with whatever narrowing a door-searched
+          // host above us is applying (`narrowedOutside`).
+          //
+          // The create/import actions are withdrawn by the component, not here:
+          // handing them over and having them ignored is what makes the law
+          // impossible to forget at the eighteenth call site.
+          //
+          // "Clear filters" only when a FACET is set: `SearchInput` owns its own
+          // displayed text (`defaultValue`, uncontrolled), so a button that also
+          // reset the remembered `query` would claim the box was cleared while
+          // the reader's letters stayed on screen.
           <CollectionEmptyState
+            filtered={narrowed}
             title={copy?.emptyTitle ?? t(config.emptyText)}
             description={
               copy?.emptyDescription ??
@@ -691,6 +777,11 @@ function CollectionFrame<T>({
             }
             onCreate={createAction?.onCreate}
             onImport={createAction?.secondary?.onClick}
+            onClearFilters={
+              Object.keys(facetValues).length > 0
+                ? () => remember((q) => ({ ...q, facetValues: {} }))
+                : undefined
+            }
           />
         ) : (
           <div className="flex flex-col gap-3">
@@ -966,11 +1057,17 @@ function CollectionFrame<T>({
         // pointing at "New ticket" when a filter is hiding twelve of them would
         // be worse than the grey line it replaces.
         //
-        // Drawn through the kit's own composition (`ShapeStateBody`, shape
-        // "collectionScreen") rather than the hand-rolled dashed box this used
-        // to be — the same register the record screens' empty/error states
-        // already draw through. `filtered` picks empty vs no-results for it;
-        // it is never guessed, ch27's own rule for exactly this switch.
+        // R62, 2026-09-09 — AND THE TWO STATES ARE ONE BODY. The client:
+        // "the empty because of filters hosul look the same as empty collection
+        // but the add button." Both halves draw `CollectionEmptyState` now and
+        // the fact rides in as `filtered`; the kit's `ShapeStateBody` no-results
+        // register is gone from this branch, because it was a different box
+        // (`px-6 py-[var(--space-8)]` against `py-[var(--space-7)]`, a raw
+        // `text-2xl` span against `Headline`, `text-caption`/40ch against
+        // `Text sm measure`) AND its words were kit defaults outside R28's walk,
+        // so they shipped in English. `filtered` is still never guessed, which
+        // is ch27's own rule for exactly this switch — it is `narrowed`, this
+        // frame's own predicate.
         //
         // The action is the section's own button, published by the host above
         // (see `CollectionCreateActionProvider`) — the same word and the same
@@ -991,41 +1088,26 @@ function CollectionFrame<T>({
         // button carry it". Dropping the icon is that law, not a shim I could
         // not find; a recipe's `emptyIcon` is simply unread from here now.
         //
-        // GENUINELY EMPTY draws through `CollectionEmptyState` now (same
-        // register `useKitPanel` draws, see its own doc) rather than
-        // `ShapeStateBody` — a bold title, the two-routes sentence, and up to
-        // two buttons, never the icon-only mango this used to stop at.
-        // NO-RESULTS is unchanged: `ShapeStateBody` + "Clear filters", because
-        // a filtered-out list is a different fact and 27.22 draws it
-        // differently (no mango in the body at all).
-        narrowed ? (
-          <ShapeStateBody
-            shape="collectionScreen"
-            state="empty"
-            filtered
-            copy={{ emptyTitle: t(config.emptyText), ...copy }}
-            action={
-              Object.keys(facetValues).length > 0 && (
-                <Button
-                  variant="secondary"
-                  onClick={() => remember((q) => ({ ...q, facetValues: {} }))}
-                >
-                  {t("Clear filters")}
-                </Button>
-              )
-            }
-          />
-        ) : (
-          <CollectionEmptyState
-            title={copy?.emptyTitle ?? t(config.emptyText)}
-            description={
-              copy?.emptyDescription ??
-              (config.emptyDescription ? t(config.emptyDescription) : undefined)
-            }
-            onCreate={createAction?.onCreate}
-            onImport={createAction?.secondary?.onClick}
-          />
-        )
+        // BOTH ZEROS, ONE REGISTER — a bold title, one sentence, and an action
+        // row that holds the two create actions at rest and "Clear filters"
+        // when narrowed. The subtraction happens inside the component (R62), so
+        // this call site hands over the create action unconditionally and
+        // cannot get the gate wrong.
+        <CollectionEmptyState
+          filtered={narrowed}
+          title={copy?.emptyTitle ?? t(config.emptyText)}
+          description={
+            copy?.emptyDescription ??
+            (config.emptyDescription ? t(config.emptyDescription) : undefined)
+          }
+          onCreate={createAction?.onCreate}
+          onImport={createAction?.secondary?.onClick}
+          onClearFilters={
+            Object.keys(facetValues).length > 0
+              ? () => remember((q) => ({ ...q, facetValues: {} }))
+              : undefined
+          }
+        />
       ) : (
         renderItems(visible)
       )}

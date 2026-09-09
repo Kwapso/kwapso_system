@@ -31,7 +31,7 @@ import { Button } from "@shared/ui/components/button/button"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
-import { EmptyLine, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { RecordMark } from "@shared/web/record-mark"
 import { softNavigate } from "@/lib/nav"
@@ -82,7 +82,6 @@ function Group({
   people,
   empty,
   narrowed,
-  concept,
   mainLabel,
 }: {
   title: string
@@ -93,23 +92,18 @@ function Group({
    * kit's own empty register (27.21), like every other empty collection on
    * both front doors (owner ruling, 2026-09-07). */
   narrowed: boolean
-  /** the CONCEPT_ICON key this side's people are — see `EmptyLine`'s own doc:
-   * a bare grey line here reads as a screen that FAILED rather than one with
-   * nothing on it yet, which is exactly the state a brand-new system's own
-   * record meets on both sides. */
-  concept: "members" | "contacts"
   mainLabel: string
 }) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-muted-foreground text-sm font-medium">{title}</h2>
       {people.length === 0 ? (
-        narrowed ? (
-          <EmptyLine concept={concept}>{empty}</EmptyLine>
-        ) : (
-          // No act: who is on a system is set on the system's own form.
-          <CollectionEmptyState title={empty} />
-        )
+        /* R62 — ONE REGISTER, BOTH ZEROS (client, 2026-09-09). The narrowed
+           half was an `EmptyLine`, one grey line beside the full register its
+           own sibling branch drew. No act on either: who is on a system is set
+           on the system's own form, so this panel has no add button for
+           `filtered` to subtract — what it fixes here is the LOOK. */
+        <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (
@@ -198,7 +192,6 @@ export function StakeholdersPanel({
               ? t("Nobody on our side matches that.")
               : t("Nobody from our side is on this yet.")
           }
-          concept="members"
           // "Team lead" is the word the app already uses for this person on the
           // form that sets them — not "main", which is the client side's word.
           mainLabel={t("Team lead")}
@@ -212,7 +205,6 @@ export function StakeholdersPanel({
               ? t("Nobody on the client's side matches that.")
               : t("Nobody from the client's side is on this yet.")
           }
-          concept="contacts"
           mainLabel={t("Main")}
         />
       </div>

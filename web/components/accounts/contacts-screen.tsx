@@ -317,10 +317,16 @@ export function ContactsScreen({
             // `frameSortOptions`). The columns are translated HERE, at the
             // place they are spread on, because `resolveRecipe` translated the
             // recipe before it ever saw them.
+            // R62 — the SENTENCE is no longer pushed down as an `emptyText`
+            // override: the frame draws both zeros from one register and picks
+            // the words off `narrowedOutside` below. Contacts is a GROWING
+            // collection, so its search lives in the `<PagedFind>` above and
+            // the frame's own query is always empty — without that prop a
+            // search matching nothing read as "this collection is empty" and
+            // offered "Add the first" over people a term was hiding.
             const tableRecipe = withDataDrivenCollection(
               { ...recipe, display: "table" as const, fields: translateFields(CONTACT_COLUMNS, t) },
-              data.rows ?? [],
-              found.emptyText
+              data.rows ?? []
             )
             return (
               <>
@@ -333,6 +339,8 @@ export function ContactsScreen({
                   config={tableRecipe.collection as CollectionConfig}
                   order={found.order}
                   actions={visibleActions(tableRecipe, rights, onAction)}
+                  /* R62 — the door above owns the search. */
+                  narrowedOutside={found.active}
                   onRowClick={(row) =>
                     // The SAME intent the recipe engine emitted for these rows
                     // before the table replaced it: the deep-link host maps

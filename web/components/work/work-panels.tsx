@@ -300,10 +300,19 @@ function PagedPanelBody<T>({
         const rows = found.active ? found.rows : restingData
         if (rows === null || rows === undefined) return <Skeleton variant="list" lines={3} />
         if (rows.length === 0) {
-          return found.active ? (
-            <p className="text-muted-foreground text-sm">{found.emptyText}</p>
-          ) : (
-            <CollectionEmptyState title={emptyTitle} onCreate={onNew} />
+          // R62 — ONE REGISTER, BOTH ZEROS (client, 2026-09-09: "the empty
+          // because of filters hosul look the same as empty collection but the
+          // add button"). The narrowed half was a bare grey `<p>` carrying the
+          // find's own sentence, beside the full register the resting half
+          // drew — and this is EVERY nested work panel (Stories, Processes, App
+          // meetings, App tickets, To-dos), so it was the same mismatch five
+          // times. `filtered` picks the words and takes `onNew` away.
+          return (
+            <CollectionEmptyState
+              filtered={found.active}
+              title={emptyTitle}
+              onCreate={onNew}
+            />
           )
         }
         return (

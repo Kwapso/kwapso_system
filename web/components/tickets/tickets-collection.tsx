@@ -164,10 +164,10 @@ import { translatedFacets } from "@/lib/collection-filters"
 import {
   AddButton,
   CollectionCard,
-  EmptyLine,
   ToolbarRow,
   type ToolbarViewSlot,
 } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TriageStrip } from "@/components/tickets/triage-strip"
 import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -1622,9 +1622,21 @@ export function TicketsCollection({
                          belongs in the right of the toolbar, part of the
                          toolbar"). Publishing a second copy of it into an empty
                          panel would have been the same act offered twice. */
-                      <EmptyLine concept="tickets">
-                        {found.emptyText ?? t("No tickets here yet.")}
-                      </EmptyLine>
+                      /* R62, 2026-09-09 — ONE REGISTER FOR BOTH ZEROS. This
+                         was an `EmptyLine`: one grey line with a glyph, on the
+                         app's busiest collection, while every panel beside it
+                         drew the full register. `filtered` picks the words —
+                         "Nothing matched." mid-search, the collection's own
+                         line at rest — and it withdraws the create action, which
+                         is why none is handed over here either way: the BUTTON
+                         is already on screen, `raiseTicket` in the toolbar
+                         directly above this, which is where the client ruled it
+                         belongs ("that button belongs in the right of the
+                         toolbar, part of the toolbar"). */
+                      <CollectionEmptyState
+                        filtered={found.active}
+                        title={t("No tickets here yet.")}
+                      />
                     ) : facet === OPEN && openView === "board" ? (
                       <OpenBoard
                         teamId={teamId}
@@ -3126,17 +3138,22 @@ function TriageQueue({
      about duty in this screen and never two that drifted apart. */
   if (view.waiting.length === 0)
     return (
-      <div className="flex flex-col gap-1">
-        <EmptyLine concept="triage">{t("Nothing waiting.")}</EmptyLine>
-        <p className="text-muted-foreground text-sm">
-          {view.onDuty?.userName
+      /* R62 — THE SAME REGISTER ITS FILTERED TWIN DRAWS (below). This was an
+         `EmptyLine` plus a loose `<p>`; the register carries a title and one
+         sentence, which is exactly the two things this state has to say. Still
+         no action, for the reason above: a button here would be the app
+         inventing a task to hand her. */
+      <CollectionEmptyState
+        title={t("Nothing waiting.")}
+        description={
+          view.onDuty?.userName
             ? // R54: whoever is on triage is one of ours.
               t("No new tickets to sort. {name} is on triage this week.", {
                 name: staffNameFromSnapshot(view.onDuty.userName),
               })
-            : t("No new tickets to sort. Nobody is on triage this week.")}
-        </p>
-      </div>
+            : t("No new tickets to sort. Nobody is on triage this week.")
+        }
+      />
     )
 
   // ── THE CARD IN HAND ────────────────────────────────────────────────────
@@ -3361,7 +3378,16 @@ function TriageQueue({
         // reader who had set the App facet and typed nothing would have been
         // told her search matched nothing — a true-sounding sentence pointing
         // at the wrong control, which is the most expensive kind.
-        <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
+        /* R62 — the same register the resting queue draws below, minus the add
+           button (there is none here on purpose: "a button here would be the app
+           inventing a task"). The sentence is kept rather than defaulted, because
+           it names the THREE controls that can empty this list — see the note
+           above on why it stopped saying "your search". */
+        <CollectionEmptyState
+          filtered
+          title={t("Nothing waiting.")}
+          filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
+        />
       ) : triageView === "list" ? (
         /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
            Her whole brief, verbatim: "Now let's build the list view: 1. Title.

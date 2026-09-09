@@ -18,6 +18,12 @@
     "why": "A drop target, and RULES.md 2.7's own sentence blesses it: form fields and selection controls are the two places a hairline is allowed at all. The dashed edge is also doing work no fill can do — dashed is the one stroke style that reads as PROVISIONAL, which is what an empty drop zone is saying, and the same element restates it in the destructive tone when a file is rejected."
   },
   {
+    "law": "images",
+    "where": "components/image/image.tsx",
+    "what": "object-contain",
+    "why": "This is not a picture choosing to letterbox; it is the component IMPLEMENTING the `fit` prop, and the two branches of a ternary whose default is `cover`. The client's 2026-09-09 ruling is about what a picture does when nobody says otherwise, and nobody saying otherwise already produces cover here — every call site in this repository and every one in the consuming app takes that default except the two that explicitly ask not to. Deleting the branch would also break RULES.md 9.1 outright: a variant value may never be dropped, because an app pinned to an older tag would stop compiling on the day it upgraded. So the escape hatch stays, and this entry is the record that it was weighed rather than overlooked. It rot-checks against the branch itself: the day `fit` stops offering `contain`, this line goes red and is deleted with it."
+  },
+  {
     "law": "palette",
     "where": "components/record-detail/record-detail.tsx",
     "what": "#0000",

@@ -356,7 +356,12 @@ export function StoriesScreen({
           const rows = found.active ? found.rows : storiesLoading ? null : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
           const data = shapeStories(rows, lang, storyMarks)
-          const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
+          // R62 — the SENTENCE is no longer handed down as an `emptyText`
+          // override: the frame draws both zeros from one register now and
+          // picks the words off `narrowedOutside` below, so a search that
+          // matched nothing says "Nothing matched." and offers no "Add the
+          // first" instead of claiming the backlog is empty.
+          const listRecipe = withDataDrivenCollection(recipe, data.rows)
           return (
             <>
               <SectionWithCreate
@@ -380,6 +385,9 @@ export function StoriesScreen({
                   onAction={onAction}
                   onIntent={onIntent}
                   useKitPanel
+                  /* R62 — the door above owns the search, so the frame cannot
+                     see the narrowing from inside. */
+                  narrowedOutside={found.active}
                 />
               </SectionWithCreate>
 

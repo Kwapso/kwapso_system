@@ -709,17 +709,20 @@ export function SelectableScreen({
           // ROWS ONLY — the toolbar above is already real.
           <Skeleton variant="list" lines={5} />
         ) : grouped.length === 0 ? (
-          values.length === 0 ? (
-            // GENUINELY EMPTY — the toolbar above is gone, so this is the
-            // only "New value" (and "Import CSV") left on screen.
-            <CollectionEmptyState
-              title={t("No values yet.")}
-              onCreate={canCreate ? () => setAddOpen(true) : undefined}
-              onImport={canCreate && onImport ? onImport : undefined}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">{t("No values match your search or filter.")}</p>
-          )
+          /* R62 — ONE REGISTER, BOTH ZEROS. Client, 2026-09-09: "the empty
+             because of filters hosul look the same as empty collection but the
+             add button." At rest the toolbar above is gone (R50), so this is
+             the only "New value" (and "Import CSV") left on screen; narrowed,
+             the toolbar stays up and BOTH acts are withdrawn here by the
+             component, so the reader is pointed back at the search that
+             emptied the list rather than invited to add a duplicate of a value
+             a filter is hiding. */
+          <CollectionEmptyState
+            filtered={values.length > 0}
+            title={t("No values yet.")}
+            onCreate={canCreate ? () => setAddOpen(true) : undefined}
+            onImport={canCreate && onImport ? onImport : undefined}
+          />
         ) : (
           <div className="flex flex-col gap-6">
             {grouped.map((g) => (

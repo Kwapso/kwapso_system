@@ -38,12 +38,11 @@ import { RecordMark } from "@shared/web/record-mark"
 import { useCached, useCachedValue, primeCache } from "@shared/web/store"
 import type { ClientDeliverable } from "@shared/types"
 
-import { Button } from "@shared/ui/components/button/button"
-import { Plus } from "@shared/ui/foundations/icons"
 import { invalidate } from "@shared/web/store"
 
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
+import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { handover, support } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
@@ -149,16 +148,11 @@ export function DeliverablesScreen({ ready }: { ready: PortalReady }) {
           // tickets screen was given on 2026-09-05 and the same one the agency
           // door's `CollectionEmptyState` has always drawn. A sentence with
           // nothing to press is where a first-time reader stops.
-          <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-            <p>{t("Nothing here yet.")}</p>
-            <p className="text-sm">
-              {t("When we hand something over and share it with you, it turns up here.")}
-            </p>
-            <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
-              <Plus className="size-3.5" />
-              {t("Ask us something")}
-            </Button>
-          </div>
+          <PortalEmpty
+            title={t("Nothing here yet.")}
+            description={t("When we hand something over and share it with you, it turns up here.")}
+            action={{ label: t("Ask us something"), onClick: () => setRaising(true) }}
+          />
         ) : (
           <div className="flex flex-col gap-8">
             {byApp(rows).map((group) => (

@@ -40,9 +40,11 @@
 //
 // ── AND THE KIT IS OUT OF SCOPE, ON PURPOSE, WITH A NUMBER ──────────────────
 //
-// `shared/ui/` holds FIVE — four `object-contain` classes and one `fit="contain"`
-// prop the hand census that preceded this law could not see — and NONE of them
-// can be fixed here.
+// `shared/ui/` holds ONE, and NONE of them could ever be fixed here.
+// It held FIVE on v1.2.72 — four `object-contain` classes and one `fit="contain"`
+// prop the hand census that preceded this law could not see. v1.2.73 adopted the
+// client's ruling upstream and four of the five went with it; the one below is
+// the `fit` prop's own branch, which cannot go while the prop can still be said.
 // It is a vendored dependency pinned by content hash: a hand-edit under that
 // folder turns the build red on its own (`web/test/vendored-kit.test.ts`), so a
 // law demanding one would be a law demanding a change this repo forbids — red
@@ -91,16 +93,23 @@ const KIT = join(ROOT, "shared", "ui")
 /** How many non-`cover` fits the pinned kit still ships. EXACT: it may fall when
  * the upstream fix is tagged and pulled, and it may never rise.
  *
- * The five on v1.2.72, so a reader can tell at a glance whether the number
- * below still describes the same five:
- *   · components/select/select.tsx      — a select option's mark
+ * THE ONE LEFT ON v1.2.75, and why it is the one that cannot go:
+ *   · components/image/image.tsx — the `fit` prop's own branch,
+ *     `fit === "contain" ? "object-contain" : "object-cover"`. It is not a
+ *     picture drawn `contain`; it is the SEAM that turns the losing word into
+ *     the losing class, and it has to exist for as long as `Image` accepts
+ *     `fit="contain"` at all. So this pin reaching ZERO is not a fix landing
+ *     upstream — it is the kit DELETING the option, which is a wider ruling
+ *     than the one this law was written from. Expect this to sit at 1.
+ *
+ * THE FOUR THAT WENT, at v1.2.73 ("a picture fills its box"), so a reader can
+ * tell this number still describes the same census and not a narrowed matcher:
+ *   · components/select/select.tsx      — a select option's mark, now
+ *                                         `object-cover`; the kit's own note
+ *                                         calls the change "a CORRECTION rather
+ *                                         than a preference"
  *   · components/dropdown-menu/…        — the same mark on a menu item
  *   · components/choice/choice.tsx      — the same mark on a choice row
- *   · components/image/image.tsx        — the `fit` prop's own branch, which is
- *                                         the seam the other three are spelled
- *                                         against and the one that decides
- *                                         whether "contain" remains sayable at
- *                                         all
  *   · components/gallery/gallery.tsx    — a gallery slide, `fit="contain"` at
  *                                         16:9, deliberately letterboxing a
  *                                         portrait. THE PROP CENSUS FOUND THIS
@@ -110,8 +119,10 @@ const KIT = join(ROOT, "shared", "ui")
  *                                         spelled as a prop is invisible to a
  *                                         grep for `object-`. Which is the whole
  *                                         argument for the second census above,
- *                                         demonstrated on the first run. */
-const KIT_CONTAIN_CEILING = 5
+ *                                         demonstrated on the first run — and
+ *                                         it is why this pin fell by four and
+ *                                         not by three. */
+const KIT_CONTAIN_CEILING = 1
 
 /** THE ONE FIT THIS APP KEEPS, and the reason has to survive re-reading because
  * the ruling above has no exceptions clause in it.

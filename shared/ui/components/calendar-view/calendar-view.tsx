@@ -160,8 +160,28 @@ const eventChipVariants = cva(
   {
     variants: {
       tone: {
-        /** The default, and the reason: see the Badge ruling in the header. */
-        quiet: "bg-surface-quiet text-ink-secondary",
+        /** The default, and the reason: see the Badge ruling in the header.
+         *
+         * THE FILL IS `--surface-panel`, NOT `--surface-quiet` — client,
+         * 2026-09-09, over a screenshot of a month grid: "on calendar, the
+         * color of the events should be the beige! #F7F2EB". That hex IS
+         * `--surface-panel` in light (`--kw-soft-paper`), so this is her naming
+         * a token rather than asking for a new colour, and it is taken by name
+         * so the dark palette follows without a second decision.
+         *
+         * WHY IT WAS THE OTHER ONE. `--surface-quiet` is the step this kit
+         * reaches for when a chip must read as a chip against anything —
+         * #E2DDD4, a full step darker. On a month grid it is too much: a day
+         * cell holds three to five of these, so the strongest thing in the
+         * cell became the containers rather than the words in them, which is
+         * what her screenshot shows.
+         *
+         * MEASURED against the day cell's own `--card`, because a chip that
+         * cannot be told from the cell is not a chip: 1.103 light, 1.111 dark,
+         * over the boundary law's 1.05 invisibility gate in both palettes. The
+         * step it replaces measured 1.339 / 1.324, so this is quieter on
+         * purpose and still a shape. */
+        quiet: "bg-surface-panel text-ink-secondary",
         /** The kit's drawn chip. Opt-in, one per view. */
         brand: "bg-surface-brand text-ink-on-accent",
         /** Informational. Charcoal label, as every accent. */

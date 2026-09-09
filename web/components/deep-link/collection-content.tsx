@@ -518,7 +518,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             const rows = found.active ? found.rows : loaded
             if (rows === null) return <Skeleton variant="list" lines={4} />
             const data = shapeAccountsList(rows)
-            const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+            // R62 — the frame draws both zeros from one register and chooses
+            // its words off `narrowedOutside`, so the sentence is no longer
+            // pushed down as an `emptyText` override.
+            const accountsRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
             return (
               // THE SAME ACTION, PUBLISHED DOWNWARDS (screen-bits.tsx's own
               // `SectionWithCreate` does this identically) — the create button
@@ -557,6 +560,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   rights={rights}
                   onAction={onAction}
                   onIntent={onIntent}
+                  /* R62 — the door above owns the search. */
+                  narrowedOutside={found.active}
                 />
                 {/* R14: every company AND every person is a row here — the list
                     pages, and so do the matches when a find is on. */}
@@ -707,7 +712,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             const rows = found.active ? found.rows : loadedSources
             if (rows === null) return <Skeleton variant="list" lines={4} />
             const data = shapeKnowledgeList(rows, names)
-            const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [], found.emptyText)
+            // R62 — as on the accounts branch above.
+            const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
             return (
               <>
                 <SectionWithCreate
@@ -733,6 +739,8 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     onAction={onAction}
                     onIntent={onIntent}
                     useKitPanel
+                    /* R62 — the door above owns the search. */
+                    narrowedOutside={found.active}
                   />
                 </SectionWithCreate>
                 {/* R14: one source per ticket, per article, per account, plus every note

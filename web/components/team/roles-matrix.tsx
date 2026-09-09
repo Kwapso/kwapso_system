@@ -18,67 +18,76 @@
 // So a role no longer opens a page. The matrix IS the overview, a cell is where
 // a right is changed, and nothing on this tab navigates.
 //
-// ── THE AXES ARE THE TRANSPOSE OF THE KIT'S OWN, AND THAT IS THE DESIGN ──────
+// ── THE GRID TURNS, AND THE PROPS SAY THEIR OWN NOUNS AGAIN ──────────────────
 //
 // The kit's `PermissionMatrix` draws "collections down the side, roles across
-// the top" (its own header sentence, CH27.12). The approved design is the other
-// way round: ROLES down the side, the 22 team modules across — four rows and
-// twenty-two columns rather than twenty-two rows and four columns. That is what
-// the client asked for and what she approved, and it is the shape that answers
-// her actual question: a role reads as one horizontal band you can compare
-// against the band above it, and Admin's solid row against the Client role's
-// near-empty one is the sight she asked for.
+// the top" by default (CH27.12). The approved design is the other way round:
+// ROLES down the side, the 22 team modules across — four rows and twenty-two
+// columns. That is what the client asked for and what she approved, and it is
+// the shape that answers her actual question: a role reads as one horizontal
+// band you can compare against the band above it, and Admin's solid row against
+// the Client role's near-empty one is the sight she asked for.
 //
-// The kit's props are named for ITS axes, not for a fixed meaning — `modules` is
-// "the rows" and `roles` is "the columns" (`PermissionModule`'s own doc says as
-// much: "One row. The kit's word for a row is 'collection'; the prop keeps the
-// commission's noun"). So the handover below is deliberate and reads backwards
-// on purpose:
+// UNTIL v1.2.75 THAT SHAPE WAS BOUGHT BY LYING TO THE PROPS. This file handed
+// its ROLES to `modules` and its MODULES to `roles`, because the two props were
+// documented as "the rows" and "the columns" and nothing stopped it. The
+// drawing came out right and one thing did not: `rights` — "which capabilities
+// this collection offers at all" — sits on `PermissionModule`, and after a
+// hand-transpose the module was the COLUMN, so the fact could not be stated.
+// Fifteen of the eighty-eight boxes in every role's band went on looking like
+// switches that decide nothing. That is R36's exact defect, surviving one axis
+// rotation.
 //
-//     kit `modules` (rows)    ← this team's ROLES
-//     kit `roles`   (columns) ← the 22 team modules (shared/team-modules.ts)
-//     kit `capabilities`      ← the four rights, S · C · E · D
+// `orientation="roles-as-rows"` is the kit's answer and it retires the
+// transpose outright. The props now carry their own nouns:
 //
-// `held` is keyed by COLUMN id, which after the transpose is a module key, so
-// each role row carries "what this role holds on each module" — exactly the row
-// of the tall sheet the database already stores. `locked` is per row, which
-// after the transpose is per ROLE, which is exactly right: the Admin role is the
-// locked one.
+//     kit `modules`      ← the 22 team modules (shared/team-modules.ts)
+//     kit `roles`        ← this team's roles
+//     kit `capabilities` ← the four rights, S · C · E · D
 //
-// ── AND HERE IS WHAT THE TRANSPOSE COSTS, SAID OUT LOUD ──────────────────────
+// and the DRAWING still turns, because the orientation turns it. Nothing about
+// the data moves with it: `held`, `rights` and `locked` are facts about the
+// COLLECTION at either orientation, which is precisely why the kit refused the
+// other candidate fix (`rights` on `PermissionRole`) — that one would have
+// invented a product rule nobody has ruled. Its whole argument is in the kit
+// file's header.
 //
-// Kit v1.2.72 added `PermissionModule.rights` — "an unoffered box stops
-// pretending to be a switch". Given it, a slot the collection does not offer
-// keeps its place and loses its control: no well, no letter, an em dash, no tab
-// stop, no tooltip, and it is never counted as held. That is R36's defect fixed
-// inside the kit, and it is exactly what this grid needs: eight of the
-// twenty-two modules offer fewer than four rights (MODULE_OFFERED_RIGHTS), so
-// fifteen of the eighty-eight boxes in every role's band decide nothing.
+// ── WHAT THAT CLOSED, AND WHAT WAS DELETED TO CLOSE IT ───────────────────────
 //
-// IT CANNOT BE USED ON THIS AXIS. `rights` sits on `PermissionModule`, which is
-// the ROW. Whether `delete` exists at all is a fact about the MODULE, and after
-// the transpose the module is the COLUMN. A row-level prop is constant across
-// columns; the fact we need is constant across rows. The two never coincide,
-// because the offered set genuinely differs from module to module — `teams`
-// offers only `edit`, `all_tasks` only `read`, `google_mail` only `create`.
-// Passing `rights` here would be a lie with a prop's authority behind it, so it
-// is not passed, and the two guards this screen inherited from role-detail.tsx
-// carry the honesty in the meantime:
+// `rights` is passed now, per module, off the same `MODULE_OFFERED_RIGHTS` data
+// the door already sends down on each sheet — so this grid still never learns
+// the module list twice. Eight of the twenty-two modules offer fewer than four
+// rights, and 15 of the 88 boxes in every role's band are now DRAWN as what
+// they are: the slot keeps its place, loses its control, and shows the kit's
+// no-value em dash. No well, no letter, no tab stop, no tooltip.
 //
-//   1. a held tick is filtered to the offered rights, so an unoffered box is
-//      never drawn filled; and
-//   2. a press on an unoffered box records nothing — the door would strip it on
-//      save anyway (setRolePermissions), and a draft showing a tick the save
-//      then removes is a lie with a delay on it.
+// THREE THINGS WENT WITH IT, and all three are the kit's job now — this is the
+// deletion the upstream ask was written to earn:
 //
-// THE UPSTREAM ASK, so this comment can be deleted rather than reworded: the
-// kit needs the same prop on `PermissionRole` (the column) — or an
-// `orientation` on the matrix itself, which is the better shape, because then
-// `rights` stays on the collection whichever way the grid is drawn and no
-// consuming application has to think about this at all. Until then a box that
-// decides nothing still LOOKS like a switch on this grid, which is R36's own
-// defect surviving one axis rotation. It is written here, in the file that
-// suffers it, rather than left for somebody to rediscover.
+//   1. `offered()`, the local predicate that asked the same question;
+//   2. the filter that kept a held tick off an unoffered box — the kit does not
+//      count an unoffered capability as held "even if `held` names it";
+//   3. the early return that swallowed a press on an unoffered box — an
+//      unoffered slot is not a tab stop and does not toggle, so there is no
+//      press left to swallow.
+//
+// Keeping any of them would be keeping a second opinion about a question one
+// component now answers, which is how two answers drift apart. Nothing is
+// mis-granted either way — the door strips an unoffered right on save
+// (`setRolePermissions`) and has all along; this was a legibility defect and it
+// is the legibility that is fixed.
+//
+// ── AND THE ROLE'S NAME STOPS SCROLLING AWAY ─────────────────────────────────
+//
+// Twenty-two columns overflow. The grid scrolls in its own box, correctly — the
+// page never scrolls sideways — and until v1.2.75 the row's NAME went with it,
+// so a reader scrolled to the end saw bands of `S C E D` and could not tell
+// Admin from Guest. `stickyNames` pins the name column; `stickyGround` names the
+// paper it must paint to stay opaque, and it is `"panel"` because `TeamPanel`
+// paints `bg-surface-panel` at exactly the width this wide grid exists at (the
+// narrow render below 45rem is a stack of cards and never scrolls sideways).
+// Guessing that ground wrong is visible AT REST as a pale band down the side,
+// which is why the kit made it a required companion rather than a default.
 //
 // ── ONE MANGO ON THIS TAB, AND IT IS NOT HERE ────────────────────────────────
 //
@@ -279,39 +288,70 @@ export function RolesMatrix({
     draft != null &&
     sheets.some((s) => JSON.stringify(draft[s.role.id]) !== JSON.stringify(s.perms.value))
 
-  /** Whether a module offers a right at all (R36 · MODULE_OFFERED_RIGHTS). The
-   * DOOR says — `m.rights`, the same data — so this grid never learns the module
-   * list twice. */
-  const offered = (m: { rights: readonly (keyof RightSet)[] }, r: keyof RightSet) =>
-    m.rights.includes(r)
-
-  // THE COLUMNS ARE THE MODULES, and they come off the first sheet: every role's
-  // sheet carries the same module list in the same order, because the server
-  // builds it from the one shared TEAM_MODULES (shared/team-modules.ts). Taking
-  // it from a sheet rather than importing the catalogue keeps the labels the
-  // door's own, which is where the translated word lives.
-  const moduleColumns = (sheets?.[0]?.perms.modules ?? []).map((m) => ({
-    id: m.key,
-    label: m.label,
-  }))
+  // THE ROLES THAT CANNOT BE CHANGED, as the kit wants them: `locked` is a fact
+  // about a COLLECTION — "which roles' cells are fixed here" — and it is the
+  // same answer on all twenty-two, because what is locked is the Admin ROLE
+  // itself. One list, computed once, handed to every module row.
+  const lockedRoleIds = (sheets ?? []).filter((s) => s.perms.isDefault).map((s) => s.role.id)
 
   // ONE VIEWER, ONE ANSWER. Every sheet carries the same `canEdit` (it is a fact
   // about the viewer, not about the role), so the grid is editable when the
   // viewer may edit roles at all; the Admin row is locked row-by-row above.
   const canSave = sheets != null && sheets.length > 0 && sheets[0].perms.canEdit
 
-  // THE ROWS ARE THE ROLES. `held` is keyed by the COLUMN — a module key after
-  // the transpose — and a held tick is filtered to the rights the module
-  // actually offers, so an unoffered box is never drawn filled whatever the
-  // stored sheet says.
+  // THE MODULES, WHICH ARE THE KIT'S `modules` AGAIN AND ARE DRAWN ACROSS THE
+  // TOP. They come off the first sheet: every role's sheet carries the same
+  // module list in the same order, because the server builds it from the one
+  // shared TEAM_MODULES (shared/team-modules.ts). Taking it from a sheet rather
+  // than importing the catalogue keeps the labels the door's own, which is where
+  // the translated word lives — and now keeps `rights` the door's own too.
+  const moduleColumns =
+    sheets && draft
+      ? (sheets[0]?.perms.modules ?? []).map((m) => ({
+          id: m.key,
+          label: m.label,
+          // R36's fix, and the whole point of this release. `m.rights` is
+          // MODULE_OFFERED_RIGHTS as the door sends it, in the app's own
+          // vocabulary; the kit speaks in capability ids, so it goes through the
+          // one mapping this file already owns.
+          rights: m.rights.map((r) => RIGHT_TO_KIT[r]),
+          // WHAT EACH ROLE HOLDS HERE, keyed by role id. It is read straight off
+          // the draft with NO offered-filter over it: the kit does not count an
+          // unoffered capability as held whatever `held` names, so filtering
+          // here would be a second opinion about a question the component now
+          // answers. See this file's header.
+          held: Object.fromEntries(
+            sheets.map(({ role }) => [
+              role.id,
+              (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
+                .filter((r) => draft[role.id]?.[m.key]?.[r])
+                .map((r) => RIGHT_TO_KIT[r]),
+            ])
+          ),
+          locked: lockedRoleIds,
+        }))
+      : []
+
+  // THE ROLES, WHICH ARE THE ROWS UNDER `orientation="roles-as-rows"`. Nothing
+  // but identity and a name: `held`, `rights` and `locked` are the collection's
+  // facts and live on the module rows above, at either orientation.
   const roleRows =
     sheets && draft
-      ? sheets.map(({ role, perms }) => ({
+      ? sheets.map(({ role }) => ({
           id: role.id,
           // THE ROW HEAD IS THE ROLE, AND PRESSING IT OPENS THE ROLE'S PANEL. A
-          // `PermissionModule.label` is a `React.ReactNode`, which is what makes
+          // `PermissionRole.label` is a `React.ReactNode`, which is what makes
           // this possible without forking anything. The client's own preview
           // draws the shape: the role's name with a quiet meta line under it.
+          //
+          // THE META LINE STAYS INSIDE THE BUTTON rather than moving to the
+          // kit's new `PermissionRole.description`, which v1.2.75 added for
+          // exactly this slot. The description is drawn OUTSIDE the label, so
+          // taking it would shrink the press target to the title alone — and
+          // the whole two-line stack being pressable is the shape the client
+          // approved when she asked for the overview on a row press. The prop
+          // is the better home for prose the row merely SAYS; this line is part
+          // of what she presses.
           //
           // THE TWO ICON BUTTONS THAT STOOD HERE ARE GONE — "rmeove this buttons
           // from th elist view" (client, 2026-09-09). They are in `RolePanel`'s
@@ -354,17 +394,6 @@ export function RolesMatrix({
                     : t("{count} people", { count: String(role.memberCount) })}
               </span>
             </button>
-          ),
-          // The locked Admin role, drawn exactly as a live row and marked with
-          // the kit's own bare phrase beside its name (D4-B).
-          locked: perms.isDefault,
-          held: Object.fromEntries(
-            perms.modules.map((m) => [
-              m.key,
-              (Object.keys(RIGHT_TO_KIT) as (keyof RightSet)[])
-                .filter((r) => offered(m, r) && draft[role.id]?.[m.key]?.[r])
-                .map((r) => RIGHT_TO_KIT[r]),
-            ])
           ),
         }))
       : []
@@ -420,6 +449,10 @@ export function RolesMatrix({
   }
 
   const caps = capabilities(t)
+  /** The word for a box that was never on offer, in the reader's language. It is
+   * said in TWO places that must agree — the legend's third register and every
+   * affected cell's accessible sentence — so it is translated once here. */
+  const notOfferedWord = t("Not offered")
 
   return (
     /* THE CONTAINER — "nothing on top of white background, its a rule!"
@@ -473,12 +506,23 @@ export function RolesMatrix({
       ) : (
         <div className="flex flex-col gap-4">
           <PermissionMatrix
-            // The transpose. See this file's header for why the two props read
-            // backwards and what it costs.
-            modules={roleRows}
-            roles={moduleColumns}
+            // EACH PROP ITS OWN NOUN, and the DRAWING turned by `orientation`
+            // rather than by the handover. See this file's header.
+            modules={moduleColumns}
+            roles={roleRows}
+            orientation="roles-as-rows"
             capabilities={caps}
-            moduleLabel={t("Role")}
+            // The two axis headings. `moduleLabel` is the collections' word
+            // wherever they are, so under this orientation it names the columns
+            // across the top; `roleLabel` names the first column.
+            moduleLabel={t("Module")}
+            roleLabel={t("Role")}
+            // THE NAME COLUMN IS PINNED, because twenty-two columns overflow and
+            // a role's band is unreadable once its name has scrolled off.
+            // `stickyGround` is the paper `TeamPanel` actually paints at the
+            // width this wide grid exists at — see this file's header.
+            stickyNames
+            stickyGround="panel"
             label={t("Roles and what each one may do")}
             state={activeRoles.length === 0 ? "empty" : "ready"}
             emptyTitle={t("No roles yet.")}
@@ -494,34 +538,49 @@ export function RolesMatrix({
             // "ausgestellt" / "expedido" — issued, not permitted — so reusing
             // the key would have put the wrong German under this legend.
             // A NODE LABEL COSTS THE CELL ITS NAME UNLESS THE CALLER GIVES IT
-            // BACK. The kit reads a row's accessible name with
-            // `plain(label, id)` — a string label is used as-is and anything
-            // else falls back to the id, which here would announce a ULID. The
-            // row head above is a node, so the sentence is rebuilt here from the
-            // role's real title. Five parameters, the fifth being the
-            // capabilities the collection does not offer (kit v1.2.72) — it
-            // arrives empty on this grid, because `rights` is not passed; see
-            // this file's header.
-            formatCellLabel={(rowId, moduleLabel, held, locked) => {
-              const title = sheets?.find((sheet) => sheet.role.id === rowId)?.role.title ?? rowId
+            // BACK. The kit reads a name with `plain(label, id)` — a string
+            // label is used as-is and anything else falls back to the id, which
+            // here would announce a ULID. The MODULE's label is a plain string
+            // and arrives intact; the ROLE's is the button node above, so that
+            // half is rebuilt from the role's real title.
+            //
+            // THE PARAMETERS DO NOT ROTATE WITH THE DRAWING. The kit's own note
+            // is explicit: the signature stays `(collection, role, held, locked,
+            // notOffered)` at either orientation, so the same cell announces the
+            // same way in every app. The SENTENCE still leads with the role,
+            // matching the kit's own default and the band a reader is reading.
+            //
+            // THE FIFTH PARAMETER IS NO LONGER EMPTY. It arrives as capability
+            // LABELS — already translated, because `capabilities` carries the
+            // translated words — and it is the only way a reader who cannot see
+            // the em dashes is told which boxes were never on offer. `nothing`
+            // says the role holds none of them, which is a different fact.
+            formatCellLabel={(moduleLabel, roleId, held, locked, notOffered) => {
+              const title = sheets?.find((sheet) => sheet.role.id === roleId)?.role.title ?? roleId
               return `${title} · ${moduleLabel}: ${
                 held.length === 0 ? t("nothing") : held.join(", ")
-              }${locked ? `, ${t("Locked by policy")}` : ""}`
+              }${locked ? `, ${t("Locked by policy")}` : ""}${
+                notOffered.length === 0 ? "" : ` · ${notOffered.join(", ")}: ${notOfferedWord}`
+              }`
             }}
             heldLabel={t("Granted")}
             notHeldLabel={t("Not granted")}
-            onChange={(rowRoleId, colModuleKey, capabilityId, next) => {
-              // The kit hands back (row, column, capability) — after the
-              // transpose that is (role, module, right), not (module, role).
+            // THE LEGEND'S THIRD REGISTER, which only exists now that `rights`
+            // is passed: the kit draws it only when a shown row actually
+            // withholds something, and it teaches the em dash. Passed rather
+            // than defaulted for the same reason the two above are — the kit's
+            // default is English and this screen is read in four languages.
+            notOfferedLabel={notOfferedWord}
+            onChange={(moduleKey, roleId, capabilityId, next) => {
+              // The kit hands back (collection, role, capability) in its own
+              // declared order, which the orientation does not rotate either.
               const right = KIT_TO_RIGHT[capabilityId as PermissionRight]
-              const sheet = sheets?.find((s) => s.role.id === rowRoleId)
-              const row = sheet?.perms.modules.find((m) => m.key === colModuleKey)
-              // A box the module does not offer decides nothing, so a press on
-              // one records nothing.
-              if (row && !offered(row, right)) return
+              // NO UNOFFERED GUARD. An unoffered slot is not a tab stop and does
+              // not toggle, so there is no press here to refuse — see this
+              // file's header for the three deletions this release earned.
               setDraft((prev) => {
                 if (!prev) return prev
-                const cur = prev[rowRoleId]?.[colModuleKey] ?? {
+                const cur = prev[roleId]?.[moduleKey] ?? {
                   read: false,
                   create: false,
                   edit: false,
@@ -532,7 +591,7 @@ export function RolesMatrix({
                 // thing you cannot open is a sheet nobody means. The door does
                 // the same on save; doing it here too keeps the draft honest.
                 if (next && right !== "read") val.read = true
-                return { ...prev, [rowRoleId]: { ...prev[rowRoleId], [colModuleKey]: val } }
+                return { ...prev, [roleId]: { ...prev[roleId], [moduleKey]: val } }
               })
             }}
           />

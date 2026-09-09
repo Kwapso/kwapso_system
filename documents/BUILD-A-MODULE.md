@@ -883,6 +883,26 @@ again, which is the only property that matters here.
   the permission either — every section carries its own `gate` and
   `visibleModuleSettings` is the one place it is asked, which is what stops a
   reader being offered a door that refuses them.
+- **R62 `one-zero-register`** — your collection has TWO empty states and they are
+  different facts: RESTING (no rows at all — first run, and the screen exists to
+  be filled) and FILTERED (rows exist, but a search, a tab or a facet has
+  narrowed them to none). Draw BOTH through ONE component and pass the fact:
+  `<CollectionEmptyState filtered={…} title={…} onCreate={…} />` on the agency
+  door, `<PortalEmpty filtered={…} …>` on the portal. Hand your create action
+  over UNCONDITIONALLY — the register withdraws it on `filtered`, so there is
+  nothing for you to gate and nothing for you to forget; that is R50's own
+  lesson about `empty`, one component down. Two things to get right and both are
+  facts you already hold. (i) `title`/`description` are read only AT REST, so
+  write them as claims about the collection ("No widgets yet.") and let the
+  register say "Nothing matched." when a search is on — "No widgets yet." is
+  simply untrue mid-search. (ii) If your collection GROWS and its search lives
+  in `<PagedFind>` at the door rather than in the frame, pass
+  `narrowedOutside={found.active}` down to `ScreenRenderer`/`RecordTable`:
+  without it the frame's own query is always empty, a search that matched
+  nothing reads as "this collection is empty", and it offers "Add the first"
+  over rows a term is hiding. Never a bare `<p>` for either zero: forty-three of
+  those were the state of this app on 2026-09-08, twelve of them the identical
+  sentence.
 
 **The words** (the ones that catch every new module, every time)
 

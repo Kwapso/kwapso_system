@@ -212,7 +212,9 @@ export function ProcessesScreen({
           const rows = found.active ? found.rows : processesLoading ? null : loaded
           if (rows === null) return <Skeleton variant="list" lines={4} />
           const data = shapeProcessesList(rows)
-          const listRecipe = withDataDrivenCollection(recipe, data.rows, found.emptyText)
+          // R62 — see stories-screen.tsx's identical note: the frame owns
+          // both zeros' words now, chosen by `narrowedOutside` below.
+          const listRecipe = withDataDrivenCollection(recipe, data.rows)
           return (
             <>
               {/* A map lives inside an app, so a team with no apps yet has to be able to
@@ -233,6 +235,8 @@ export function ProcessesScreen({
                   onAction={onAction}
                   onIntent={onIntent}
                   useKitPanel
+                  /* R62 — the door above owns the search. */
+                  narrowedOutside={found.active}
                 />
               </SectionWithCreate>
 

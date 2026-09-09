@@ -3955,6 +3955,7 @@ describe("RULES — the laws of the base", () => {
       "forms-are-not-overlays", // R59: the centred-overlay census below, over both front doors — inverted, so a form it has never seen is caught by having no reason on file
       "image-fills", // R60: web/test/an-image-fills.test.ts — every `object-*` utility AND every `fit="contain"` prop in our own source, plus the pinned, only-falling count of the ones the vendored kit still owes us
       "module-settings-two-doors", // R61: the MODULE_SETTINGS ↔ gear-mount census below, plus the two clauses that keep the Modules index derived and the gate written once
+      "one-zero-register", // R62: web/test/one-zero-register.test.tsx — the two registers' own subtraction guard (read AND rendered), the no-second-register census over both front doors, and the engine's `narrowed`/`narrowedOutside` clause
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -4077,39 +4078,55 @@ describe("offered-rights: no permission switch decides nothing", () => {
   // Team ("All the roles together, I want to have an overview"), so the file to
   // read is `roles-matrix.tsx`.
   //
-  // AND ONE OF THE THREE ASSERTIONS CHANGED SHAPE, WHICH IS WORTH READING
-  // RATHER THAN SKIMMING, BECAUSE IT IS A CAPABILITY THIS BASE LOST.
+  // AND THE UPSTREAM ASK THIS CLAUSE CARRIED HAS NOW LANDED — 2026-09-09, kit
+  // v1.2.75. READ THIS RATHER THAN SKIMMING IT: all three assertions inverted,
+  // and an inverted assertion is exactly what a weakened law looks like from a
+  // distance.
   //
-  // The old third clause was `rights: m.rights.map(…)` — the screen handing the
-  // kit each module's offered set through `PermissionModule.rights`, so an
-  // unoffered box draws an em dash instead of a switch. Kit v1.2.72 finally
-  // makes that prop DO something (v1.2.63 accepted and ignored it), and on the
-  // old grid it would have turned fifteen of the eighty-eight boxes into dashes
-  // the day the kit was vendored.
+  // WHAT THIS CLAUSE USED TO SAY, and why. `PermissionModule.rights` — the
+  // screen handing the kit each module's offered set, so an unoffered box draws
+  // an em dash instead of a switch — could not be passed. The approved grid is
+  // the TRANSPOSE of the kit's own (roles down the side, the 22 modules across)
+  // and `rights` lives on `PermissionModule`, which was the kit's ROW. Whether
+  // `delete` exists at all is a fact about the MODULE, which the transpose made
+  // the COLUMN. So the clause asserted the three things the screen could still
+  // honestly do: READ the door's offered set (`m.rights.includes(r)`), filter a
+  // held tick to it, and refuse a press on anything else. The box that still
+  // LOOKED like a switch was written up as a named regression, with the ask that
+  // would close it — "`rights` on `PermissionRole`, or an `orientation` prop on
+  // the matrix".
   //
-  // The approved grid is the TRANSPOSE of the old one — roles down the side, the
-  // 22 modules across — and `rights` lives on `PermissionModule`, which is the
-  // kit's ROW. Whether `delete` exists at all is a fact about the MODULE, which
-  // is now the COLUMN. A row-level prop is constant across columns and the fact
-  // is constant across rows, so the prop cannot express it and passing it would
-  // be a lie with a prop's authority behind it. THE LAW IS NOT WEAKENED TO SUIT
-  // THE SCREEN: what the third clause asserts instead is that the screen still
-  // READS the door's offered set (`m.rights`) rather than deciding for itself,
-  // which is the property the other two guards are built on — and the box that
-  // still looks like a switch is written up as a real, named regression in
-  // `roles-matrix.tsx`'s own header, with the upstream ask that closes it
-  // (`rights` on `PermissionRole`, or an `orientation` prop on the matrix).
-  it("offered-rights: the Roles screen reads each module's offered rights and refuses a press on any other", () => {
+  // THE KIT SHIPPED THE SECOND ONE. `orientation="roles-as-rows"` turns the
+  // drawing without moving the data, so `rights` goes back on the collection
+  // where it belongs and the transpose is retired. The screen passes it now, and
+  // fifteen of the eighty-eight boxes in every role's band stopped pretending.
+  //
+  // SO THE TWO GUARDS ARE ASSERTED **ABSENT**, and that is a tightening rather
+  // than a loosening. They were a SECOND OPINION about a question the kit now
+  // answers — and the kit answers it in the one place the screen could not
+  // reach: a filtered tick and a swallowed press still left the box DRAWN as a
+  // switch, which was the whole defect. Keeping them would leave two answers to
+  // drift apart, and would let the real fix be reverted while this clause stayed
+  // green on the leftovers. The render proof that the boxes actually close lives
+  // in `web/test/roles-matrix-boxes.test.tsx`, which is the half this law has
+  // never been able to see: `consulted()` above walks `workers/` and `shared/`
+  // for `.ts`, so R36 has never read a line of the GRID.
+  it("offered-rights: the Roles screen hands the kit each module's offered rights", () => {
     const screen = read(join(ROOT, "web", "components", "team", "roles-matrix.tsx"))
-    expect(screen, "the grid no longer reads the offered set off the door's own `rights`").toMatch(
-      /m\.rights\.includes\(r\)/
-    )
-    expect(screen, "a held tick is no longer filtered to the offered rights").toMatch(
-      /\.filter\(\(r\)\s*=>\s*offered\(m,\s*r\)\s*&&/
-    )
-    expect(screen, "onChange no longer refuses a press on an unoffered box").toMatch(
-      /if \(row && !offered\(row, right\)\) return/
-    )
+    expect(
+      screen,
+      "the grid no longer hands the kit the door's own `rights` — an unoffered box is a switch again"
+    ).toMatch(/rights:\s*m\.rights\.map\(/)
+    // THE RATCHET, both halves. Either one coming back means somebody restored
+    // the hand-transpose, because these only exist to paper over it.
+    expect(
+      /\.filter\(\(r\)\s*=>\s*offered\(/.test(screen),
+      "a held tick is being filtered by hand again — the kit does not count an unoffered capability as held"
+    ).toBe(false)
+    expect(
+      /!offered\(row, right\)\) return/.test(screen),
+      "onChange is swallowing a press again — an unoffered slot is not a tab stop and cannot be pressed"
+    ).toBe(false)
   })
 })
 

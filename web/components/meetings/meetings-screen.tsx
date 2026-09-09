@@ -848,6 +848,11 @@ export function MeetingsScreen({
                   onRowClick={(row) =>
                     onIntent({ kind: "open", module: "meetings", id: String(row.id) })
                   }
+                  /* R62 — the DOOR above owns this search, so the table cannot see
+                     the narrowing from inside and its own query is always empty. A
+                     term that matched nothing read as "this collection is empty" and
+                     drew "Add the first" over rows the term was hiding. */
+                  narrowedOutside={found.active}
                 />
               ) : (
                 <ScreenRenderer
@@ -856,6 +861,9 @@ export function MeetingsScreen({
                   rights={rights}
                   onAction={onAction}
                   onIntent={onIntent}
+                  /* R62 — same reason as the table above: the narrowing happens at
+                     the door, one component out, and the frame has to be told. */
+                  narrowedOutside={found.active}
                 />
               )}
 

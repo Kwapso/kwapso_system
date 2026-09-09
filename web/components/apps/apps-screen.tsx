@@ -538,7 +538,15 @@ export function AppsScreen({
           <Skeleton variant="list" lines={4} />
         ) : shown.length === 0 ? (
           narrowed ? (
-            <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
+            /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client,
+               2026-09-09. This was a bare grey line while both branches below
+               draw the full register; `filtered` makes them one body and takes
+               the create action away, so the tab's own "Add the first" cannot
+               appear over a list a search is hiding. The title is the Active
+               tab's own sentence and is unread here — `filtered` says
+               "Nothing matched." instead, because "No apps yet." is a claim
+               about the collection and it is untrue mid-search. */
+            <CollectionEmptyState filtered title={t("No apps yet.")} />
           ) : tab === "inactive" ? (
             // The same register as the Active tab below (owner ruling,
             // 2026-09-07: empty states for everything), with no act — an app

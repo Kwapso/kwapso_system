@@ -452,6 +452,45 @@ The operative sentence is `GAPS.md` GEN-1's: *6 is the radius of a square
 **mark**. A control whose shape is a channel, a disc or a capsule is a pill; a
 control that is a field takes the field's radius; a surface is 24.*
 
+### 4.4 A picture fills its box. It is never letterboxed to fit.
+
+**The rule.** `object-fit: cover`, written `object-cover`. The picture scales
+until it covers the frame and the overflow is trimmed. The kit's `Image`
+defaults to it and every mark that carries a photograph — `AvatarImage`, and
+the option marks on `SelectItem`, `DropdownMenuItem` and `Choice` — draws it.
+
+**The reason.** The client, 2026-09-09: *"everywhere for images: do fill, not
+fit!"* — and she named the price in the same breath. **A wide logo losing its
+ends is the intended consequence, not a side effect to design around.** This
+overrules `KWAPSO-SPEC.md` CH27.28's *"Portrait assets letterbox onto paper
+rather than being cropped to fill"*, which four components in this kit had
+been obeying.
+
+**The second reason, which is the kit's own and survives without the ruling:**
+a box whose contents change shape is not a box. The kit's marks are sized
+squares and its media wells are ratio boxes — constant geometry, on purpose.
+Filling them with pictures that each stop somewhere different inside puts tidy
+geometry under a ragged surface, and the thing a reader actually scans is the
+surface. It is also how one asset came to have two silhouettes: a company logo
+was cropped in the record's mark and letterboxed one row down in the picker
+that chose it.
+
+**`fill` is not the client's "fill".** `object-fit: fill` stretches the picture
+to the frame and distorts it. So do `none` and `scale-down`. There is exactly
+one value that satisfies this rule and it is `cover`.
+
+**The one legitimate exception is a prop, not a component.** `Image` still
+takes `fit="contain"`, because §9.1 forbids dropping a variant value and
+because a call site that must show a whole document page has a real claim. It
+is opt-in, it is never a default, and it is the only `contain` left in this
+repository — recorded as a rot-checked entry in
+`foundations/rules/exemptions.json` rather than as silence.
+
+**Enforced by** the `images` law (§12), which reads the utility, the `fit`
+prop, a component's own `fit` default, and an inline `objectFit` — because the
+hand census that produced this rule missed two sites, and both were spelled as
+a prop.
+
 ---
 
 ## 5 · States
@@ -892,7 +931,7 @@ The full list with reasoning is `manifest.json → notDelivered` and `STATUS.md`
 
 ## 12 · Conformance — running these laws in *your* app
 
-Everything above this line is prose. Three of the rules are now **executable**,
+Everything above this line is prose. Four of the rules are now **executable**,
 and they run against **your** source, not just the kit's:
 
 | Law | What it holds you to | Written in this document at |
@@ -900,6 +939,7 @@ and they run against **your** source, not just the kit's:
 | `radii` | Two radii and no third, spelled a way that does not depend on import order | §4.1, §4.2 |
 | `palette` | Every colour resolves through a token; the raw `--kw-*` ramp is tokens.css's alone | §2.2, §8.3 |
 | `borders` | A boundary is a paper step, a fill, or an inset shadow — never a CSS border | §2.7 |
+| `images` | A picture fills its box and crops to it — never `contain`, `fill`, `none` or `scale-down` | §4.4 |
 
 The kit supplies the rules. **You supply the paths, and your own reviewed
 exceptions.** Nothing about your directory layout is baked into the kit, and
@@ -912,7 +952,7 @@ nothing about the kit's is baked into your build.
 with no change. Confirm it arrived:
 
 ```bash
-ls shared/ui/foundations/rules/          # conformance.mjs, radii.mjs, palette.mjs, borders.mjs, source.mjs
+ls shared/ui/foundations/rules/   # conformance.mjs, radii.mjs, palette.mjs, borders.mjs, images.mjs, source.mjs
 ```
 
 **2 · Run it over your own source.** Name the directories a person's UI is
@@ -963,7 +1003,7 @@ list can only ever shrink.
 "check:kit": "node shared/ui/foundations/rules/conformance.mjs --exemptions web/test/kit-conformance.json web/components web/app web/lib web-portal/components shared/web"
 ```
 
-**Optional:** `--law radii|palette|borders` runs one law alone, which is how to
+**Optional:** `--law radii|palette|borders|images` runs one law alone, which is how
 adopt them one at a time rather than all at once.
 
 ### 12.2 What it needs from you: nothing
@@ -1007,11 +1047,24 @@ follow, and needs no seam: its whole subject is kit source.
 
 The kit also carries rules the app has no twin for, and they are the reason
 this list is not just three: the **contrast law** (implemented), the **boundary
-law** (§2.7, implemented here, enforced nowhere before now), the **`--kw-*`
-ramp** clause (§8.3, folded into `palette`), and four that remain prose —
-`px`-freedom (§1.1), strings-as-props (§7.1), one-motion-class (§6.1) and
-no-colour-only-in-a-media-query (§2.1). **This group is what a second app
+law** (§2.7, implemented here, enforced nowhere before now), the **picture
+law** (§4.4, added 2026-09-09 with the client's ruling that made it), the
+**`--kw-*` ramp** clause (§8.3, folded into `palette`), and four that remain
+prose — `px`-freedom (§1.1), strings-as-props (§7.1), one-motion-class (§6.1)
+and no-colour-only-in-a-media-query (§2.1). **This group is what a second app
 inherits for free.**
+
+The picture law is the clearest case this section makes, and it is worth one
+paragraph because it is the pattern rather than an anecdote. A client sentence
+arrived — *"everywhere for images: do fill, not fit!"* — and the hand census
+taken to apply it **reported nine sites and missed two**, including the
+gallery wall, because a fit can be spelled as a prop and a grep for
+`object-contain` does not find one. The consuming app had **six live sites and
+no law that read any of them**. There was never going to be an app-side twin
+for this: the app's `record-mark.tsx` resolves cover-or-contain from a
+component's own shape, which is an answer to the question, not a check on it.
+So the rule, the census and the exemption all belong here, and the app gets
+them by pinning a tag.
 
 **B · The kit's vocabulary, but the subject is YOUR source — 13 of the 55.**
 `R2` (a record detail's strip is the library's), `R3` (no hand-rolled toggles),
@@ -1066,8 +1119,16 @@ says otherwise" survives that test. "A door on the agency's own material refuses
 a client login" does not, and never will.
 
 **So the honest scope of *"the kit is the only UI input"* is A plus B: 16 of 55
-laws today, of which 4 are executable.** The other 39 are the second app's own
-work, and saying so is the point of this section.
+laws today.** The other 39 are the second app's own work, and saying so is the
+point of this section.
+
+**How many of the kit's laws actually execute is a separate count, and it is
+five:** `check-contrast.mjs`, plus `radii`, `palette`, `borders` and `images`
+in `conformance.mjs`. Two of those five (`radii`, `palette`) are twins of laws
+inside the 16 and should be deleted from the app; the other three are the
+kit's alone and the app has never had them. The two numbers are given apart
+because conflating them is how "the kit checks four things" came to be said
+about two different sets.
 
 ---
 

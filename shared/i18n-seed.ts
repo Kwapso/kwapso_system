@@ -4288,6 +4288,18 @@ export const SEED: Catalogue = {
   "Deactivated": { de: "Deaktiviert", es: "Desactivados", ca: "Desactivats" },
   "Locked by policy": { de: "Durch Richtlinie gesperrt", es: "Bloqueado por política", ca: "Bloquejat per política" },
   "nothing": { de: "nichts", es: "nada", ca: "res" },
+  /* The legend's THIRD register, new with kit v1.2.75 and drawn only once the
+   * grid actually withholds something (it does: 15 of the 88 boxes in a role's
+   * band, R36). It teaches the em dash that stands where a switch would be, and
+   * it names the same state at the end of those cells' spoken sentence.
+   *
+   * "Not offered" is the kit's own word for it and is kept in English so the
+   * screen and the prop agree for whoever reads both. The three translations
+   * are NOT literal: "nicht angeboten" is what a shop does with a product, and
+   * the thing being said here is that the decision does not exist for this
+   * module at all — which is "nicht verfügbar" / "no disponible" in the same
+   * plain register the seed's header sets. */
+  "Not offered": { de: "Nicht verfügbar", es: "No disponible", ca: "No disponible" },
 
   /* ── SETTINGS › TEAM › THE ROLE PANEL, 2026-09-09 ────────────────────────
    * The slide-in a role opens in: "when iclick in role, overview in slide in."

@@ -43,9 +43,33 @@
      forbids. `CardGrid`'s `fluid` is `auto-fit`, so it is not used here — the
      wall in this file is a template, not a second card. Logged as
      GAPS-TRACK2A GAL-1.
-   · NO CROPPING. `Image fit="contain"` at 16:9, which letterboxes a portrait
-     asset onto the quiet ground rather than trimming it. `cover` would cut a
-     face out of the frame, which CH27.28 rules out by name.
+   · THE PICTURE FILLS THE TILE. `Image` at 16:9 on its own `cover` default.
+
+     This bullet read the other way until 2026-09-09, and the reversal is the
+     one thing in this file a reader should not skim. CH27.28 states, by name:
+     *"Portrait assets letterbox onto paper rather than being cropped to
+     fill"*, and this component obeyed it with `fit="contain"`. The client
+     overruled the sentence: *"everywhere for images: do fill, not fit!"* —
+     with a wide asset losing its ends given as the INTENDED consequence, not
+     as a cost to design around. A later client ruling beats the artifact;
+     that is the same order of precedence every override in `KWAPSO-SPEC.md`
+     is recorded under, and it is why this is a change and not a defect.
+
+     It is also the bullet above finally agreeing with itself. CH27.28's own
+     grid sentence is *"the grid fills, it does not stretch — a tile never
+     grows to 400"*: the whole point of `auto-fill` at a 200 minimum is that
+     every tile is the SAME BOX. A wall of identical boxes, each holding a
+     differently-shaped picture floating on quiet paper, is a ragged wall with
+     tidy geometry underneath it — the grid was constant and the thing a
+     reader actually scans was not. Cover makes the picture the same shape as
+     the box that was already constant.
+
+     WHAT IT COSTS, stated rather than buried: a portrait asset now shows its
+     middle. The chapter's worry — *"cover would cut a face out of the
+     frame"* — is real and is not answered by this note; it is answered by
+     the ruling, which chose the trade knowingly. `Image` still takes
+     `fit="contain"`, so a gallery that must letterbox is one prop away
+     (`fit` is not passed through here; see the note at the call site).
    · NO PLACEHOLDER GLYPH. A tile with no picture draws its own title on soft
      paper, at the same 16:9 box. It is `aria-hidden`, because the caption
      under it already carries the title and a screen reader must not hear the
@@ -312,13 +336,19 @@ const Gallery = React.forwardRef<HTMLDivElement, GalleryProps>(
                   )}
                 >
                   {tile.src ? (
-                    /* Contained, never cropped: a portrait asset letterboxes
-                       onto the quiet ground rather than losing its edges. */
+                    /* NO `fit` IS PASSED, and the absence is the decision.
+                       `Image` defaults to `cover`, which is the ruling of
+                       2026-09-09; naming `fit="cover"` here would be a second
+                       copy of that default, in the file least likely to be
+                       revisited when it moves. A tile fills its box because
+                       every picture in this kit does, not because the gallery
+                       asked. `fit` is deliberately not forwarded as a prop of
+                       `Gallery` either: a wall whose tiles could each choose
+                       is the ragged wall the header argues against. */
                     <Image
                       src={tile.src}
                       alt={tile.alt ?? ""}
                       ratio={ratio}
-                      fit="contain"
                       error={tile.error}
                       errorLabel={errorLabel}
                       loadingLabel={loadingLabel}

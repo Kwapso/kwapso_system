@@ -66,6 +66,122 @@
    DOES state are kept: header cells and the first body cell never wrap, which
    is what makes a narrow table overflow rather than crush its name column.
 
+   AND THE OTHER HALF OF THAT ANSWER, WHICH THIS FILE OWED AND DID NOT PAY —
+   `sticky` ON A CELL, 2026-09-09
+   The paragraph above ends a sentence early. A table that scrolls sideways has
+   a second problem the moment it actually does: the column that says WHICH
+   RECORD a row is leaves the viewport with everything else, and a reader
+   scrolled fully to the end is looking at bands of values with nothing naming
+   them. `TableHeader sticky` has always answered exactly this question on the
+   BLOCK axis — pin the part that names the others — and there was no inline
+   twin, so the answer stopped at one of the two axes a table can lose.
+
+   THE CONSUMING APPLICATION FOUND THE MISSING HALF, and where it found it is
+   the argument for the law rather than an anecdote. It drew the kit's own
+   `PermissionMatrix` with the axes transposed — roles down the side, twenty-two
+   modules across — which overflows at every width a person owns, and scrolled
+   to the end the reader saw four bands of `S C E D` with no idea which one was
+   Admin. The kit does not pin it because in the kit's own orientation the
+   columns are roles and it never overflows. NOTHING ABOUT THAT IS THE APP'S
+   BUSINESS: it is a table that can overflow, which is what this primitive is
+   for, and the app could only have fixed it by writing `position: sticky`, a
+   ground, a z-order, an inline-start inset and three row washes into a
+   `className` on the kit's own cells — which is a kit bug wearing an app's
+   diff (`docs/RULES.md` §13, and the client's "the kit is the only UI input").
+
+   IT IS ONE PROP ON THE CELL, NOT A MODE ON THE TABLE. `sticky` on `TableHead`
+   and on `TableCell` pins that cell to the inline start of the scroll
+   container. A table with no scroll gets a cell that is `position: sticky` and
+   never moves, which costs nothing; a table that pins its second column as
+   well passes it twice with an inset the call site knows. The `Table` learns
+   nothing and needs no prop, which is what keeps this out of the sixteen call
+   sites that do not want it.
+
+   THE GROUND IS THE WHOLE OF THE RISK AND IT IS THE SAME RISK `TableHeader`
+   ALREADY TOOK. A pinned cell must be OPAQUE or the scrolled cells read
+   straight through it, and the paper it paints is the paper the table is
+   standing on — which this file cannot see. So it takes `--background`, the
+   page paper, and a table dropped on a card or a panel passes
+   `className="bg-card"` / `"bg-surface-panel"` on the cell, exactly as
+   `TableHeader sticky` has said since it was written (GAPS-D TBL-2).
+
+   AND THE MEASUREMENT THAT MATTERS HERE IS 1.000, WHICH IS THE POINT RATHER
+   THAN THE BUG. Everywhere else in this kit two surfaces at 1.000 is the
+   defect the contrast law hunts; a pinned column is the one place where the
+   correct number against its own ground is exactly 1.000, because the column
+   is a CONTINUATION of the paper and not a panel on top of it. The contrast
+   law already says so in as many words — "an element that names the same token
+   as its ground is a continuation, not a boundary" — and it says it about a
+   sticky strip. What is a bug here is the OTHER shape: a pinned cell naming a
+   paper the table is not standing on, which paints a pale band down the side
+   of a grid at rest. That is why the paper is a call-site decision and why
+   nothing here guesses it.
+
+   THE ROW'S THREE WASHES ARE REPLAYED ON THE PINNED CELL, and they have to be.
+   `TableRow` paints hover, selected and disabled on the `<tr>`; a cell with an
+   opaque fill of its own covers all three, so a pinned name column would sit
+   dead while the rest of its row lit up. The three are restated on the cell in
+   MUTUALLY EXCLUSIVE selectors — disabled, then selected-and-not-disabled,
+   then hover-and-neither — which is `TableRow`'s own precedence
+   (disabled > selected > default) written as CSS that cannot race. PATTERN §4
+   forbids depending on Tailwind's emission order to break a tie; the `:not()`s
+   are what make sure there is never a tie to break.
+
+   THE HOVER WASH IS A SECOND LAYER RATHER THAN A SECOND COLOUR, and that is
+   arithmetic, not taste. `--accent` is `rgba(26,25,24,.05)` — an alpha. An
+   alpha written as this cell's `background-color` REPLACES the opaque paper
+   instead of sitting on it, and the scrolled cells come back through the 95%
+   that is left. So the paper stays the colour layer and the wash goes on the
+   image layer, which paints above it: one element, two facts, and the wash
+   composites over the paper exactly as it composites over the row. Selected
+   and disabled are opaque tokens and need no such thing — they are a plain
+   swap.
+
+   WHAT A PINNED COLUMN DOES NOT GET, STATED RATHER THAN MISSED
+   · NO EDGE. Chapter 13's subtitle is "Colour separates, strokes don't", and
+     the pinned column is the paper rather than a panel on it — there is
+     nothing for a rule to bound. There is also nowhere to draw one: the row's
+     hairline is an inset shadow this file puts on the CELLS through
+     `[&>*]:shadow-…`, which outranks any `shadow-` a cell writes on itself, so
+     an edge here would have to be bought with a selector invented to beat the
+     row. It is not, and this sentence is why.
+   · NO SCROLL PADDING FOR IT. The container carries `scroll-p-1` so a focus
+     ring in an off-screen column is brought fully into view. Tabbing BACKWARDS
+     into a control that is off-screen at the inline START still brings it to
+     the container's edge, which is under the pinned column. A scrollport
+     cannot measure what is pinned to it, so no number is invented here; a call
+     site that knows its own name column's width may pass
+     `containerProps`/`containerClassName` a `scroll-ps-*`. Logged, not guessed
+     (§11.1).
+   · AND NO COVER FROM THE CONTRAST LAW, WHICH IS THE ONE THAT HAD TO BE
+     PROVED RATHER THAN ASSUMED. The pinned paper was written, and then a
+     PROBE put the wrong one under it — `bg-background` on a
+     `--surface-raised` ground, two different names resolving to one colour,
+     1.000 in light, the exact bug shape `check-contrast.mjs` exists to catch.
+     The run came back GREEN. Two more arrangements were tried and came back
+     green as well: the ground on the demo's `Panel`, and the ground on a bare
+     `<div>` wrapping the table. The reason is structural rather than a
+     misspelling — a pinned cell's fill sits behind `Table` → `TableHeader` →
+     `TableRow` → `TableCell`, and the ground walker does not carry a call
+     site's paper through that many component boundaries. (One thing the probe
+     DID fix on the way: `permission-matrix.tsx`'s paper was an object literal
+     indexed inside a render, a shape the walker cannot read at all; it is a
+     module-level table now, which is the `COLUMN_DOT[dot]` form the check
+     states it reads.)
+     SO THE NUMBERS ARE MEASURED HERE INSTEAD, off the same token model the
+     law uses, and confirmed against the browser's own computed styles:
+         pinned paper vs its own ground, named correctly   1.000 / 1.000
+         the guess — page paper on a panel ground          1.103 / 1.079
+         the guess — page paper on a card ground           1.000 / 1.198
+         selected wash on the pin vs a panel ground        1.103 / 1.111
+         disabled wash on the pin vs a panel ground        1.214 / 1.252
+         hover wash over the pin, vs the paper             1.103 / 1.143
+         the row's name on the pinned paper                15.763 / 17.056
+     The hover line is the one worth reading twice: `--accent` over the pinned
+     paper composites to #ECE7E0 light and #272623 dark, which are the SAME
+     two hexes the row's own wash makes over the same ground. The pin does not
+     approximate the row; it repeats it.
+
    RENDERING CONTEXT
    No `"use client"`. Every part forwards props and refs; the one piece of
    logic (the row's exclusive state) is a plain expression, not a hook. These
@@ -474,10 +590,66 @@ const TableRow = React.forwardRef<HTMLTableRowElement, TableRowProps>(
 TableRow.displayName = "TableRow";
 
 /* ============================================================================
+   The pinned column — what one cell wears to stay behind
+   ========================================================================= */
+
+/* THE PIN ITSELF, and the paper under it.
+
+   `start-0` is `inset-inline-start`, so the column pins to the READING start
+   and mirrors in Arabic, Urdu and Persian without a second rule — the same
+   reason `--hairline-start` is spelled the way it is.
+
+   `z-[1]` lifts it over the cells that scroll beneath. It is deliberately not
+   `z-10`: that is `TableHeader sticky`'s, and a sticky header is a positioned
+   element with a stacking context of its own, so the pinned cell inside it is
+   already above every body cell and the two numbers never have to be compared.
+
+   `bg-background` is the page paper and it is a DEFAULT, not an answer — see
+   the file header. A table on a card passes `className="bg-card"`, on a panel
+   `className="bg-surface-panel"`, and tailwind-merge replaces this one. */
+const STICKY_CELL = "sticky start-0 z-[1] bg-background";
+
+/* THE ROW'S THREE WASHES, REPLAYED ON A CELL THAT COVERS THEM.
+
+   Mutually exclusive by construction, in `TableRow`'s own precedence —
+   disabled > selected > default — so no two ever apply at once and Tailwind's
+   emission order is never asked to break a tie (PATTERN §4).
+
+   The hover wash is `--accent`, an ALPHA, so it is drawn as the IMAGE layer
+   over the paper the cell already paints; a background-COLOUR would replace
+   the paper and let the scrolled cells back through. Selected and disabled are
+   opaque tokens and are a plain swap. All three are the same tokens `TableRow`
+   itself uses — there is one answer for a hovered row, one for a chosen record
+   and one for a dead one, and this is not a fourth. */
+const STICKY_CELL_WASHES = [
+  "[tr[aria-disabled]>&]:bg-[var(--btn-disabled-fill)]",
+  "[tr[data-state=selected]:not([aria-disabled])>&]:bg-surface-selected",
+  "[tr:hover:not([data-state=selected]):not([aria-disabled])>&]:bg-[image:linear-gradient(var(--accent),var(--accent))]",
+].join(" ");
+
+/* ============================================================================
    TableHead
    ========================================================================= */
 
-export interface TableHeadProps extends React.ComponentPropsWithoutRef<"th"> {}
+export interface TableHeadProps extends React.ComponentPropsWithoutRef<"th"> {
+  /**
+   * Pin this heading to the inline start of the scroll container, so the
+   * column that names the rows survives a sideways scroll. Off by default: a
+   * pinned column only means anything in a table that overflows, and it paints
+   * an opaque paper this file cannot choose.
+   *
+   * THE PAPER IS THE CALL SITE'S, exactly as it is for `TableHeader sticky`.
+   * It takes `--background`; a table on a card passes `className="bg-card"`
+   * and one on a panel `className="bg-surface-panel"`. A pinned cell that
+   * names the paper it is standing on measures 1.000 against it, and that is
+   * the correct number — it is a continuation of the ground, not a panel over
+   * it. See the file header.
+   *
+   * Pass it on the matching `TableCell` of every row, or the heading pins and
+   * the values do not.
+   */
+  sticky?: boolean;
+}
 
 /**
  * A column heading.
@@ -496,17 +668,25 @@ export interface TableHeadProps extends React.ComponentPropsWithoutRef<"th"> {}
  * THREE BREAKPOINTS
  *  mobile / tablet / desktop — UNCHANGED, and `whitespace-nowrap` is part of
  *  the mobile answer: a header that wrapped would let the table squeeze
- *  instead of overflowing, and the container would never scroll.
+ *  instead of overflowing, and the container would never scroll. `sticky` is
+ *  the same at all three and matters at whichever of them the table overflows.
  *
- * RTL — safe. `text-start` and `px-3` are logical.
+ * RTL — safe. `text-start` and `px-3` are logical, and so is the pin: `start-0`
+ * is `inset-inline-start`, so the pinned column is at the reading start in
+ * Arabic, Urdu and Persian without a second rule.
  */
 const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
-  ({ className, ...props }, ref) => (
+  ({ className, sticky = false, ...props }, ref) => (
     <th
       ref={ref}
       data-slot="table-head"
+      data-sticky={sticky ? "" : undefined}
       className={cn(
         "px-3 text-start align-middle whitespace-nowrap",
+        /* A header row does not hover, is not selected and is not disabled —
+           see this block's own TEN STATES — so the pinned heading takes the
+           paper and none of the row washes. */
+        sticky && STICKY_CELL,
         "text-micro uppercase font-[var(--font-weight-medium)] text-ink-tertiary",
         /* The header's rule is the 20% section hairline, as an inset shadow. */
         "shadow-[var(--hairline-under-strong)]",
@@ -525,7 +705,23 @@ TableHead.displayName = "TableHead";
    TableCell
    ========================================================================= */
 
-export interface TableCellProps extends React.ComponentPropsWithoutRef<"td"> {}
+export interface TableCellProps extends React.ComponentPropsWithoutRef<"td"> {
+  /**
+   * Pin this value to the inline start of the scroll container — the name
+   * column of a table that scrolls sideways. Off by default, and the paper is
+   * the call site's: it takes `--background` and a table on a card or a panel
+   * passes `className="bg-card"` / `"bg-surface-panel"`. The whole argument,
+   * including why 1.000 against that ground is the right number here and the
+   * wrong one everywhere else, is in the file header.
+   *
+   * The cell REPLAYS the row's hover, selected and disabled washes, because an
+   * opaque fill of its own would otherwise cover them and leave a dead band
+   * down the side of a lit row. Nothing else about the cell changes: it is the
+   * same `px-3`, the same middle alignment, and the first cell is still the
+   * kit's name column.
+   */
+  sticky?: boolean;
+}
 
 /**
  * One value.
@@ -535,7 +731,10 @@ export interface TableCellProps extends React.ComponentPropsWithoutRef<"td"> {}
  * column — `--weight-strong` and never wrapping — which is drawn here with
  * `first:` rather than asked of every call site.
  *
- * TEN STATES — the row's block covers all ten. A cell adds nothing: whatever
+ * TEN STATES — the row's block covers all ten, and a `sticky` cell keeps all
+ * ten by REPLAYING three of them rather than by drawing any of its own: hover,
+ * selected and disabled are the row's tokens restated on a cell that would
+ * otherwise cover them with its own paper. A cell adds nothing else: whatever
  * is inside it (a `Badge`, a `Button`, an `Input`) brings its own states, and
  * a cell that drew its own would fight them.
  *
@@ -543,18 +742,24 @@ export interface TableCellProps extends React.ComponentPropsWithoutRef<"td"> {}
  *  mobile / tablet / desktop — UNCHANGED. Ordinary cells WRAP (a long note
  *  must stay readable) and the row grows past 56 when they do — `h-*` is a
  *  minimum on a table row, which is the correct reading: 56 is the row's
- *  height, not a clip.
+ *  height, not a clip. A pinned cell is pinned at all three; it is the mobile
+ *  answer's other half, since mobile is where the table is likeliest to
+ *  overflow.
  *
  * RTL — safe. `px-3` is padding-inline; `first:` is DOM order, which is
- * already the inline-start column in both directions.
+ * already the inline-start column in both directions, and `start-0` pins to
+ * that same edge.
  */
 const TableCell = React.forwardRef<HTMLTableCellElement, TableCellProps>(
-  ({ className, ...props }, ref) => (
+  ({ className, sticky = false, ...props }, ref) => (
     <td
       ref={ref}
       data-slot="table-cell"
+      data-sticky={sticky ? "" : undefined}
       className={cn(
         "px-3 align-middle",
+        sticky && STICKY_CELL,
+        sticky && STICKY_CELL_WASHES,
         // The name column: the kit's one "bold", and it does not wrap.
         "first:font-[var(--font-weight-medium)] first:whitespace-nowrap",
         // A cell holding a checkbox is square at the row height, like its head.
