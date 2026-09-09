@@ -679,6 +679,7 @@ describe("the transcript import is idempotent", () => {
       url: "https://docs.example/DOC_1",
       foundBy: "attachment",
       text: "We agreed to move the driver app forward.",
+      supersededIds: [],
     }
   })
 

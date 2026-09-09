@@ -893,6 +893,7 @@ export async function captureTranscript(
     guard.databaseId,
     `UPDATE meetings SET transcript_file_id = ?, transcript_captured_at = ?, transcript_text = ?,
         transcript_note = ?, transcript_url = ?, transcript_found_by = ?,
+        superseded_transcript_ids = ?,
         updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
       WHERE id = ? AND transcript_captured_at IS NULL RETURNING id`,
     [
@@ -902,6 +903,10 @@ export async function captureTranscript(
       words.note,
       found.url,
       found.foundBy,
+      // EVERY OTHER REAL CANDIDATE THIS HUNT ALREADY READ AND REJECTED — see
+      // migration 0070. Nothing to accumulate on a first capture: this column
+      // was NULL a moment ago, by the WHERE clause this statement just matched.
+      found.supersededIds.length ? found.supersededIds.join(",") : null,
       now,
       actor.id,
       actor.email,
@@ -1041,8 +1046,20 @@ async function refreshTranscript(
     // to point at THAT document — the link a person opens, and the id every
     // later look starts from — or the meeting would quote one file and link to
     // another.
+    //
+    // THE OLD WINNER JOINS THE LOSERS THE MOMENT IT STOPS WINNING. Both halves
+    // of `superseded_transcript_ids` read the row's OWN pre-update columns —
+    // `transcript_file_id` (about to be overwritten, so THIS is the only
+    // statement that will ever see its old value) and the accumulated list
+    // already on the row — so nothing this hunt has ever rejected is forgotten
+    // just because a later hunt rejected something else. See migration 0070.
     `UPDATE meetings SET transcript_text = ?, transcript_note = ?, transcript_file_id = ?,
         transcript_url = ?, transcript_found_by = ?, transcript_attempts = 0,
+        superseded_transcript_ids = TRIM(
+          COALESCE(transcript_file_id || ',', '') ||
+          COALESCE(superseded_transcript_ids || ',', '') ||
+          ?
+        , ','),
         updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ?
       WHERE id = ? AND transcript_captured_at IS NOT NULL
         AND LENGTH(?) > LENGTH(COALESCE(transcript_text, ''))
@@ -1053,6 +1070,7 @@ async function refreshTranscript(
       found.fileId,
       found.url,
       found.foundBy,
+      found.supersededIds.join(","),
       now,
       actor.id,
       actor.email,

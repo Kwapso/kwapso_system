@@ -1214,14 +1214,20 @@ describe("a second door onto something we already hold is folded", () => {
 
   /** A meeting row, planted as the ORACLE the fold reads — never as a fixture the
    * sweep produces. `words` is the second agreement in both directions. */
-  const meeting = (id: string, title: string, opts: { fileId?: string; words?: boolean } = {}) =>
+  const meeting = (
+    id: string,
+    title: string,
+    opts: { fileId?: string; words?: boolean; supersededIds?: string[] } = {}
+  ) =>
     db().exec(
       `INSERT INTO meetings (id, title, starts_at, created_at${opts.fileId ? ", transcript_file_id" : ""}${
         opts.words ? ", transcript_text" : ""
-      })
+      }${opts.supersededIds ? ", superseded_transcript_ids" : ""})
        VALUES ('${id}', '${title}', '2026-08-01T09:00:00.000Z', '2026-08-01T09:00:00.000Z'${
          opts.fileId ? `, '${opts.fileId}'` : ""
-       }${opts.words ? `, 'What was actually said in the room.'` : ""})`
+       }${opts.words ? `, 'What was actually said in the room.'` : ""}${
+         opts.supersededIds ? `, '${opts.supersededIds.join(",")}'` : ""
+       })`
     )
 
   it("a Drive file that IS a meeting's transcript is not filed a second time", async () => {
@@ -1237,6 +1243,28 @@ describe("a second door onto something we already hold is folded", () => {
     meeting("M_EMPTY", "Bergman dispatch rollout", { fileId: "FILE_1" })
     await sweep()
     expect(live(FILE), "the app's own record has nothing in it — keep the copy").toBe(true)
+  })
+
+  // ── A LOSING CANDIDATE IS STILL A CANDIDATE (migration 0070) ───────────────
+  //
+  // The hunt for ONE meeting's transcript can read more than one real Google
+  // document (google-transcript.ts's `fromAttachments`) and keep only the
+  // fullest; the ones it read and rejected are named on the meeting row
+  // (`superseded_transcript_ids`) precisely so this fold — which already knows
+  // how to retire the WINNER's own duplicate by id — retires the losers too,
+  // rather than leaving each one an unrelated-looking `document` source.
+  const FILE_2 = `${IDS.staffUser}:FILE_2`
+
+  it("a runner-up the meeting's own hunt already rejected is folded too", async () => {
+    meeting("M_RUNNERUP", "Bergman dispatch rollout", { fileId: "FILE_1", words: true, supersededIds: ["FILE_2"] })
+    await sweep()
+    expect(live(FILE_2), "the hunt already proved FILE_1 held more of the conversation").toBe(false)
+  })
+
+  it("…but not while the meeting's own row is empty — the same rule as the winner's", async () => {
+    meeting("M_RUNNERUP_EMPTY", "Bergman dispatch rollout", { fileId: "FILE_1", supersededIds: ["FILE_2"] })
+    await sweep()
+    expect(live(FILE_2), "a runner-up is only known-inferior to a winner that is really there").toBe(true)
   })
 
   it("a calendar notice for an event we already hold is folded", async () => {

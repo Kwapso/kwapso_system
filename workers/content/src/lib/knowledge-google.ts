@@ -300,10 +300,16 @@ type FoldTargets = { transcripts: Set<string>; events: Set<string> }
 async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTargets> {
   const [meetings, events] = await Promise.all([
     // R14 hard cap: one team's meetings, stated at the statement.
-    d1Query<{ title: string; transcript_file_id: string | null; words: number }>(
+    d1Query<{
+      title: string
+      transcript_file_id: string | null
+      superseded_transcript_ids: string | null
+      words: number
+    }>(
       cfg,
       guard.databaseId,
-      `SELECT title, transcript_file_id, LENGTH(COALESCE(transcript_text, '')) AS words
+      `SELECT title, transcript_file_id, superseded_transcript_ids,
+              LENGTH(COALESCE(transcript_text, '')) AS words
          FROM meetings WHERE deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
     ),
     // R14 hard cap: the calendar entries this base already mirrors.
@@ -314,13 +320,25 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
         WHERE kind = 'event' AND deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
     ),
   ])
+  // A TRANSCRIPT ONLY COUNTS WHEN THE MEETING REALLY HOLDS THE WORDS. Folding
+  // the Drive copy while the app's own row is empty would leave the base with
+  // neither, which is the one outcome worse than the duplication — and it is
+  // the SAME clause for a runner-up as for the winner, on purpose: a runner-up
+  // is only known-inferior relative to a winner that is genuinely still there.
+  const held = meetings.filter((m) => m.transcript_file_id && m.words > 0)
   return {
-    // A TRANSCRIPT ONLY COUNTS WHEN THE MEETING REALLY HOLDS THE WORDS. Folding
-    // the Drive copy while the app's own row is empty would leave the base with
-    // neither, which is the one outcome worse than the duplication.
-    transcripts: new Set(
-      meetings.filter((m) => m.transcript_file_id && m.words > 0).map((m) => m.transcript_file_id as string)
-    ),
+    transcripts: new Set([
+      ...held.map((m) => m.transcript_file_id as string),
+      // EVERY DOCUMENT A HUNT FOR THIS MEETING HAS EVER READ AND REJECTED — an
+      // ID join exactly like the winner's above, and unconditional beyond the
+      // same "the meeting really holds words" gate: a file lands in this column
+      // only because `fromAttachments`/`refreshTranscript` already proved a
+      // STRICTLY fuller candidate for the same event beat it (google-transcript.ts,
+      // meetings.ts), so there is no "does it hold words" test left to apply a
+      // second time — it held fewer of them than the one that won, and that is
+      // the whole of the decision. See migration 0070.
+      ...held.flatMap((m) => (m.superseded_transcript_ids ?? "").split(",").filter(Boolean)),
+    ]),
     events: new Set([...meetings.map((m) => m.title), ...events.map((e) => e.title)]),
   }
 }

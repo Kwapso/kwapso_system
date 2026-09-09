@@ -4703,7 +4703,37 @@ UPDATE knowledge_sources
    AND event_id IS NULL
    AND EXISTS (SELECT 1 FROM meetings m
                 WHERE m.id = knowledge_sources.origin_row_id
-                  AND m.google_event_id IS NOT NULL AND m.google_event_id <> '');
+                  AND m.google_event_id IS NOT NULL AND m.google_event_id <> '');    // A LOSING CANDIDATE IS STILL A CANDIDATE, AND THE HUNT NOW SAYS SO.
+    //
+    // 0055/8153a8e5 taught route 1 to read EVERY attachment a calendar entry
+    // carries and keep the fullest — a false start and a real transcript are the
+    // same shape, so length is what decides. That fixed which ONE file id a
+    // meeting quotes. It did not touch the OTHER file ids: the Drive lane mirrors
+    // every shared file into `knowledge_sources` on its own, so the document that
+    // lost the hunt — Gemini's abandoned three-second stub, sitting beside the
+    // hour it actually recorded — goes on existing as its own `document` source,
+    // unrelated in the fold's eyes to the meeting whose hunt already read and
+    // discarded it.
+    //
+    // `superseded_transcript_ids` is the file ids of every OTHER candidate a
+    // hunt for THIS meeting has ever read words out of and not chosen — the
+    // losers of `fromAttachments`'s own contest, plus (on a refresh) whichever
+    // file id `transcript_file_id` is about to stop being. Comma-joined text, not
+    // JSON: a Drive file id never carries a comma, and every reader of this
+    // column only ever asks "is X in here", never "give me the list back
+    // ordered". NULL means "none", exactly like every other optional mirror
+    // column on this table.
+    //
+    // It is written ONLY where the winner already is — `meetings.ts`'s two
+    // transcript-writing statements — so it costs no new door and no new write
+    // path, and it is read in exactly one place: `readFoldTargets`
+    // (knowledge-google.ts) widens the SAME set `transcript_file_id` already
+    // feeds, so the existing ID-join fold retires a runner-up exactly as it
+    // retires the winner's own duplicate — no new fold logic, a wider set for
+    // the one that already exists.
+    version: "0071_a_losing_candidate_is_still_a_candidate",
+    sql: `
+ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
 `,
   },
 ]
