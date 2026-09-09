@@ -92,6 +92,22 @@ export type IngestRow = {
   sprintId?: string | null
   /** when the material is FROM. Falls back to the row's own timestamps. */
   recordDate?: string | null
+  /** WHICH CALL THIS IS FROM — Google's own calendar event id, or null.
+   *
+   * READ, NEVER INFERRED. A lane sets this only where Google itself states the
+   * event: the calendar lane, whose `origin_row_id` IS the event id; the meetings
+   * kind, off a `google_event_id` this app has stored since 0012; and the mail
+   * lane, off the `eid=` Google's own robot writes into a calendar notice. No
+   * title matching, no timestamp proximity, no fuzzy grouping. A lane that cannot
+   * say leaves it undefined, and NULL is a correct answer — see migration
+   * `0070_a_source_says_which_call_it_is_from` for what that costs and why a
+   * guess would cost more.
+   *
+   * `eventIdFrom` names which of those three statements was read, exactly as
+   * `meetings.transcript_found_by` does beside it: the three do not prove the
+   * same thing. */
+  eventId?: string | null
+  eventIdFrom?: string | null
   sourceUrl: string | null
   /** TRUE when the row has left the part of the app this kind mirrors — archived,
    * switched off, deleted. The source is DEACTIVATED rather than skipped, which
@@ -1142,6 +1158,7 @@ export const INGEST_KINDS: IngestKind[] = [
         transcript_text: string | null
         transcript_note: string | null
         transcript_url: string | null
+        google_event_id: string | null
         google_event_url: string | null
         google_organizer: string | null
         account_id: string | null
@@ -1158,7 +1175,8 @@ export const INGEST_KINDS: IngestKind[] = [
         // fetch it would be a call per row for the one column that matters.
         `SELECT m.id, m.ref, m.title, m.agenda, m.notes, m.location, m.starts_at,
                 m.transcript_text, m.transcript_note, m.transcript_url,
-                m.google_event_url, m.google_organizer, m.account_id, m.app_id, m.deactivated_at,
+                m.google_event_id, m.google_event_url, m.google_organizer,
+                m.account_id, m.app_id, m.deactivated_at,
                 a.name AS account_name,
                 (SELECT p.name FROM meeting_purposes p WHERE p.id = m.purpose_id) AS purpose_name,
                 COALESCE(m.updated_at, m.created_at) AS sort_at
@@ -1201,6 +1219,11 @@ export const INGEST_KINDS: IngestKind[] = [
           .join("\n\n"),
         accountId: r.account_id,
         appId: r.app_id,
+        // WHICH CALL — the column this app has stored on a meeting since 0012,
+        // read as what it is. A meeting somebody typed by hand has none, and
+        // that is the honest answer rather than a reason to go looking.
+        eventId: r.google_event_id || null,
+        eventIdFrom: r.google_event_id ? "meeting" : null,
         // A meeting is FROM when it happened, not from when somebody typed the
         // row up afterwards.
         recordDate: r.starts_at,
@@ -1989,15 +2012,26 @@ async function sweepKind(
       guard.databaseId,
       `INSERT INTO knowledge_sources
          (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
-          app_id, ticket_id, sprint_id, record_date, title, summary, body, body_bytes,
+          app_id, ticket_id, sprint_id, record_date, event_id, event_id_from,
+          title, summary, body, body_bytes,
           source_url, created_at, creator_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
                      compartment = excluded.compartment, account_id = excluded.account_id,
                      app_id = excluded.app_id, ticket_id = excluded.ticket_id, sprint_id = excluded.sprint_id,
                      record_date = excluded.record_date,
+                     -- AN EVENT IS LEARNED AND NEVER UNLEARNED, which is what
+                     -- COALESCE says here and a plain assignment would not. Three
+                     -- lanes can state this and only one of them ever sees a given
+                     -- row (a calendar entry is not a mail), so an unconditional
+                     -- SET would let the next sweep of the OTHER lane blank an id
+                     -- somebody's backfill had correctly read. Google does not
+                     -- retract which event an artefact belongs to; the sweep must
+                     -- not either.
+                     event_id = COALESCE(excluded.event_id, knowledge_sources.event_id),
+                     event_id_from = COALESCE(excluded.event_id_from, knowledge_sources.event_id_from),
                      owner_user_id = excluded.owner_user_id,
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
@@ -2032,6 +2066,10 @@ async function sweepKind(
         row.ticketId ?? null,
         row.sprintId ?? null,
         row.recordDate ?? null,
+        row.eventId ?? null,
+        // Never a route without an id: the two are one fact and half of it is a
+        // claim about provenance with nothing behind it.
+        row.eventId ? (row.eventIdFrom ?? null) : null,
         row.title,
         // A kind with no summary of its own (Google's four) falls back to its
         // title — the router still has a sentence to route on, and the column

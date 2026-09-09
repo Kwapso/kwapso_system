@@ -897,7 +897,17 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // ever read them again. Same reason as v3, and the same lesson: on a
   // forward-only lane, nulling the hash on a row the cursor has passed does
   // NOTHING. Only a bump walks it back.
-  meeting: { version: 5, digest: "73fb4b8e98d1f6c4" },
+  // RE-PINNED 8 Sep 2026 AT THE SAME VERSION, and the version staying at 5 is
+  // the point — the fifth time this check has been a false alarm and the third
+  // for a reader whose words did not move. The meeting reader gained
+  // `m.google_event_id` in its SELECT and two non-text fields on the row it
+  // returns (`eventId` / `eventIdFrom`, migration
+  // `0070_a_source_says_which_call_it_is_from`). Neither reaches `summary` or
+  // `body`: `git diff` shows no change to either builder, so every meeting
+  // already indexed says exactly what it said before and a bump would re-read
+  // 465 sources to rewrite none of them. What moved is which PARENT the row
+  // carries, which is a column and not a word.
+  meeting: { version: 5, digest: "9c446131f6e8f455" },
   todo: { version: 1, digest: "e00d2b0c6bb86edb" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
@@ -996,7 +1006,18 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // so nothing this digest is ABOUT has changed: no reader says anything new, no
 // per-kind digest above moved, and no textVersion moves. Re-pinned at the new
 // measurement, exactly as the 20 Aug note above records doing.
-const SHARED_DIGEST = "46eeadd4beadc252"
+// 8 Sep 2026: TWO COLUMNS ON THE UPSERT, AND NOT A WORD ON ANY ROW. The insert
+// carries `event_id` / `event_id_from` (migration
+// `0070_a_source_says_which_call_it_is_from`) and `IngestRow` gained the two
+// optional fields that feed them. Both sit outside the kinds table and so land
+// here. They are a PARENT, not a sentence: neither reaches `title`, `summary` or
+// `body`, nothing that goes to the index or to the model moved, and the one
+// per-kind digest that moved with this change (`meeting`, above) moved because
+// its SELECT gained a column — its own words are byte for byte what they were,
+// which its note records. Every other per-kind digest is unchanged, which is the
+// evidence rather than the claim. So no textVersion moves, and a bump here would
+// re-read every row of every kind to rewrite none of them.
+const SHARED_DIGEST = "7a71f801ff00cfc7"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

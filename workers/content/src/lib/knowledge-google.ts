@@ -51,7 +51,7 @@ import { mendMojibake } from "@shared/workers/mojibake"
 import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
-import { googlePresence, type ProbableService } from "./google-api"
+import { calendarEventIdInText, googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import { indexSource } from "./knowledge"
 import { withSyncLease } from "./sync-lease"
@@ -421,6 +421,32 @@ export function googleIngestKinds(
     return r
   }
 
+  /** WHICH CALL A GOOGLE ARTEFACT IS FROM, where Google itself says so.
+   *
+   * MAIL ONLY, AND NARROW ON PURPOSE. Google's calendar robot writes the event
+   * into an invitation, an update, an acceptance and a decline as an `eid` link,
+   * and that is a fact to be read (`calendarEventIdInText`). Nothing else here
+   * is given the same treatment: a Drive document that quotes a calendar link is
+   * quoting somebody's prose, and measured on staging on 8 Sep 2026 not one of
+   * the 80 live Drive sources carries such a link anyway. A Chat message has no
+   * such statement at all.
+   *
+   * It runs AFTER hydration, which is why it lives here and not in the gmail
+   * lane's own mapper: a listing hands back a hundred-character snippet and the
+   * link is far below it. It rides `slice` for the same reason the fold and the
+   * mojibake mend do — a lane added tomorrow is covered because it goes through
+   * this function, not because somebody remembered.
+   *
+   * THE NOTES MAIL IS THE ONE THIS CANNOT REACH, and it is the one that matters
+   * most: 121 "Notes:" messages on staging, not one carrying an eid, a Meet link
+   * or anything else naming the call — only the event's title in quotes, which
+   * is exactly the inference this app does not make. They keep a NULL. */
+  const statedEvent = (service: GoogleService, r: IngestRow): IngestRow => {
+    if (service !== "gmail" || r.eventId) return r
+    const eventId = calendarEventIdInText(r.body)
+    return eventId ? { ...r, eventId, eventIdFrom: "mail" } : r
+  }
+
   /** List cheaply, walk to the cursor, and only THEN pay for the bodies. A Drive
    * listing is one call for fifty files and their text is fifty more, so
    * hydrating before the slice would pay for forty-nine files this tick is not
@@ -443,7 +469,7 @@ export function googleIngestKinds(
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
-    const fold = (r: IngestRow) => folded(service, mended(r), targets)
+    const fold = (r: IngestRow) => statedEvent(service, folded(service, mended(r), targets))
     if (!hydrate || wanted.length === 0) return wanted.map(fold)
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
@@ -582,6 +608,12 @@ export function googleIngestKinds(
               sortAt: at,
               // WHEN THIS IS FROM — the entry's own moment. See the drive lane.
               recordDate: at || null,
+              // THE ENTRY IS THE EVENT. `externalId` is Google's own event id —
+              // the same string the meetings table stores as `google_event_id`
+              // and the same one a calendar notice carries in its `eid` — so this
+              // is a fact read off the item, not a match made against it.
+              eventId: item.externalId || null,
+              eventIdFrom: item.externalId ? "origin" : null,
               title: item.title,
               body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
                 .filter(Boolean)
