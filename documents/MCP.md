@@ -245,7 +245,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **280 doors, 218 with a tool, 62 with a written reason**, the
+  red build. Today: **281 doors, 218 with a tool, 63 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE doors of the direct upload (permission to PUT a file, which hands
@@ -271,7 +271,14 @@ Today it covers:
   every one of which `query_records` already answers better with `groupBy` (type
   × status, client × type, by app, and the raised-as × current-type matrix over
   the `raisedAsType` field), so a tool here would be a rigid duplicate of a
-  general one — and the two
+  general one — the knowledge base's TWO PICTURE doors (one record's
+  neighbourhood, and the whole corpus grouped by account), which assemble nodes
+  and links for a canvas to draw rather than answering a question: every
+  relationship in the first is a foreign key the grammar already exposes one at a
+  time, and the second is capped at the number of dots an SVG can draw, so the
+  payload that makes the screen legible is the one a tool can least use —
+  `list_knowledge` answers the arithmetic behind it exactly, per account, over
+  the same fence — and the two
   record-counts doors, one per worker, which bundle a record's child totals so a
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,

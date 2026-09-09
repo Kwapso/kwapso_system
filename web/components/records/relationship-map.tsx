@@ -160,7 +160,10 @@ const colourFor = (table: string) => KIND_COLOUR[table] ?? "var(--chart-5)"
  * screen of its own — the node is still drawn and still says what it is, it
  * simply is not a door. The mapping is the app's own segments (web/lib/pages.ts);
  * a table absent here has no page, which is a fact rather than an omission. */
-const RECORD_PATH: Record<string, string> = {
+/** WHERE A RECORD LIVES, by table. EXPORTED because `knowledge-shape.tsx` draws
+ * a second picture of the same records and the two must not disagree about
+ * where a click goes — one table of destinations, two drawings. */
+export const RECORD_PATH: Record<string, string> = {
   accounts: "accounts",
   apps: "apps",
   help: "tickets",
@@ -170,11 +173,21 @@ const RECORD_PATH: Record<string, string> = {
   processes: "processes",
   meetings: "meetings",
   tasks: "tasks",
-  // Reached from a meeting's map, which now gathers the sources that came out
-  // of that call — and from a source's own map, which is where a Google email
-  // or a Drive file finally gets a neighbourhood. Without this line those nodes
-  // draw and cannot be opened, which is the shape R40 exists to catch on stored
-  // files: everything works except the last step, the only one a person has.
+  // REACHED TWO WAYS NOW, and the second arrived the same day as the first.
+  // From a meeting's map, which gathers the sources that came out of that call,
+  // and from a source's own map, which is where a Google email or a Drive file
+  // finally gets a neighbourhood — `RECORD_EDGES` gained four edges with
+  // `knowledge_sources` at the near end. And from the whole-corpus shape, which
+  // groups every source by the account it is filed under.
+  //
+  // The branch that drew the shape was written while the first sentence was
+  // still false ("RECORD_EDGES draws no edge with a knowledge source at either
+  // end") and both landed within the hour, which is why this line says what is
+  // true rather than what either half remembered.
+  //
+  // Without this line those nodes draw and cannot be opened — the shape R40
+  // exists to catch on stored files: everything works except the last step, the
+  // only one a person actually has.
   knowledge_sources: "knowledge",
 }
 

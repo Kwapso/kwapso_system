@@ -203,6 +203,56 @@ export const INVITE_SWEEP_CAP = 25
  * inside one request with room for the embedding calls each row costs. */
 export const INGEST_SOURCES_PER_PRESS = 40
 
+/* ---- How much of the knowledge base ONE PICTURE may draw -------------------- */
+
+/** SOURCE NODES the whole-corpus shape may DRAW (R14).
+ *
+ * THE ONE READ IN THIS APP THAT LEGITIMATELY WANTS THE WHOLE SET, and it still
+ * does not get it. `knowledge` is a `GROWING_COLLECTIONS` row — the sweep only
+ * ever adds — so the list beside this picture PAGES, and a cap there would be a
+ * slower refusal. A PICTURE CANNOT PAGE. A cursor into a drawing hands somebody
+ * the second half of a shape whose first half has scrolled away, which is not an
+ * answer to any question a map is asked; `record-map.ts` made that argument first
+ * and this is the same one at corpus scale.
+ *
+ * SO THE CAP FALLS ON THE DOTS AND NEVER ON THE ARITHMETIC. Each cluster is
+ * sized and labelled by an EXACT count over the whole corpus (R16, through the
+ * one `countCollection` seam), and the nodes drawn inside it are a sample capped
+ * here. That is the split that makes a bounded picture honest rather than
+ * merely small: the question this screen exists to answer — which clients are
+ * dense with knowledge and which are thin — is answered by the counts, which are
+ * never capped, while the texture is answered by the dots, which are. A picture
+ * that says "450" and draws two hundred of them is right; one that draws all it
+ * has and lets the reader infer the size is wrong the moment it is capped at all.
+ *
+ * 1,500 because this is drawn as SVG, one focusable, clickable element per node
+ * — which is what makes a node openable with a keyboard and readable by a screen
+ * reader, where a canvas is a picture of a graph with nothing in it. Measured on
+ * staging (2026-09-08): the agency's own base is 3,967 live sources, so the
+ * picture samples and says so.
+ *
+ * PAST IT, THE READER NARROWS RATHER THAN PAGES: the same door takes the
+ * collection's own `compartment` filter, and one client's material is far under
+ * this ceiling — 450 at the largest on staging. That is the paging story, and it
+ * is the toolbar the reader already has. */
+export const KNOWLEDGE_SHAPE_SOURCES = 1500
+
+/** ANCHOR NODES — accounts, apps and sprints — one picture may draw (R14).
+ *
+ * SEPARATE FROM THE CAP ABOVE, and it has to be. The anchors are DERIVED from
+ * the sources drawn, so bounding only the sources bounds the anchors at the same
+ * number, and 1,500 sources each hanging off a different account is 3,000 nodes
+ * from a constant that says 1,500. Two constants, so the node total is the sum
+ * of two things this file names rather than a product of one of them and the
+ * shape of somebody's data.
+ *
+ * 200 is generous against what an agency has: 134 live accounts, 28 apps and 112
+ * sprints on staging. The clusters are ordered by size before it bites, so the
+ * ceiling falls on the tail — the thin accounts, which are the ones a reader
+ * least needs to pick out of a picture and which the count beside it still
+ * reports. */
+export const KNOWLEDGE_SHAPE_ANCHORS = 200
+
 /* ---- How much of a mailbox the knowledge base may read --------------------- */
 
 /** PAGES OF MAIL ONE SWEEP LISTS, fifty to a page.

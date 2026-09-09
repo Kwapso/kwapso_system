@@ -876,6 +876,23 @@ export function knowledgeKey(teamId: string): string {
   return `knowledge:${teamId}`
 }
 
+/** THE SHAPE'S cache key — the same collection drawn as a picture rather than a
+ * list, so it hangs off the same teamId and one narrowing.
+ *
+ * A DERIVED CACHE HAS NO ROW TO PATCH: adding a source, correcting one or taking
+ * one away changes what the picture is made of, and the shape cannot be edited
+ * in place the way the list's row can. So it rides the knowledge entry's `deps`
+ * below and is DROPPED rather than patched — re-read only when a screen is
+ * actually showing it, which is the same treatment the ticket pulse gets for the
+ * same reason. */
+/** The family every narrowing of the picture shares — read by the key below and
+ * by the knowledge entry's own `slicePrefix`, both in this file, so it is not
+ * exported. `RECORD_MAP_PREFIX` above IS, because a component names it. */
+const KNOWLEDGE_SHAPE_PREFIX = "knowledge:shape:"
+export function knowledgeShapeKey(teamId: string, compartment: string | null): string {
+  return `${KNOWLEDGE_SHAPE_PREFIX}${teamId}:${compartment ?? ""}`
+}
+
 /** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
  * once a list is paged, filtering the loaded page by raiser would show "my
  * tickets in the newest 50" under a badge counting all of them (R16). */
@@ -1280,6 +1297,11 @@ export const TEAM_RESOURCES: Record<
     // The source's own history — the Activity tab on its screen — and the
     // by-id read the detail falls back to when the row is past page one.
     deps: (_t, id) => [`activity:record:knowledge_sources:${id}`, `knowledge:one:${id}`],
+    // …AND THE PICTURE OF THE WHOLE BASE (R15). A ping names one row, and this
+    // key is a drawing of every row, so it cannot be named per-compartment from
+    // here — the prefix drops every narrowing of it at once, which is the same
+    // seam the relationship map uses for the identical reason.
+    slicePrefix: KNOWLEDGE_SHAPE_PREFIX,
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.
