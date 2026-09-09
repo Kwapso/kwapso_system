@@ -170,6 +170,12 @@ const RECORD_PATH: Record<string, string> = {
   processes: "processes",
   meetings: "meetings",
   tasks: "tasks",
+  // Reached from a meeting's map, which now gathers the sources that came out
+  // of that call — and from a source's own map, which is where a Google email
+  // or a Drive file finally gets a neighbourhood. Without this line those nodes
+  // draw and cannot be opened, which is the shape R40 exists to catch on stored
+  // files: everything works except the last step, the only one a person has.
+  knowledge_sources: "knowledge",
 }
 
 /* ------------------------------- the control ------------------------------ */

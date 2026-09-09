@@ -237,8 +237,44 @@ describe("the Connections tab — three states, not one", () => {
   })
 })
 
-describe("the Connections tab itself — never offered for a table the door will refuse", () => {
-  it("a source mirrored from outside this database (an email) gets no Connections tab at all", () => {
+describe("WHERE the Connections tab stands — the origin row, else the source itself", () => {
+  // THIS SUITE REPLACES ONE THAT ASSERTED THE OPPOSITE, and the reversal is the
+  // point rather than a correction. Until `RECORD_EDGES` carried the source's own
+  // relationships, a source mirrored from outside this database had NOTHING to
+  // draw — `getKnowledgeMap` refuses any `originTable` outside ACTIVITY_GATE_MAP,
+  // permanently — so hiding the tab was the honest answer and the old test
+  // pinned it. It now has something: the call it came out of (migration 0070),
+  // and the account, app and sprint it is filed under. So the tab is offered to
+  // every source, and what these tests pin is WHICH RECORD the map stands on,
+  // which is the part a reader cannot see and a regression would not announce.
+  //
+  // NO PERMISSION CHANGED to make this work: `knowledge_sources` has been a key
+  // of ACTIVITY_GATE_MAP (`knowledge`) all along, which is the same right this
+  // screen is already gated on. ACTIVITY_GATE_MAP is untouched by this lane.
+  /** The (table, id) the screen actually asked the door for. */
+  function recordWhatItAsked() {
+    const asked: { table: string; id: string }[] = []
+    door.recordMap = async (table: string, id: string) => {
+      asked.push({ table, id })
+      return { focus: null, nodes: [], links: [], total: 0, capped: false }
+    }
+    return asked
+  }
+
+  it("a mirrored source stands on its ORIGIN row — the record somebody came looking for", () => {
+    const source = makeSource({ id: "SRC-DRAWABLE", originTable: "accounts", originRowId: "ACC-DRAWABLE" })
+    primeTeam(source)
+    const asked = recordWhatItAsked()
+    render(<KnowledgeDetailScreen teamId={TEAM} sourceId={source.id} />)
+
+    expect(screen.getByRole("tab", { name: /Connections/ })).toBeTruthy()
+    expect(asked, "the account's neighbourhood is richer than the copy's").toContainEqual({
+      table: "accounts",
+      id: "ACC-DRAWABLE",
+    })
+  })
+
+  it("an EMAIL gets the tab now, standing on itself — never on `google_gmail`", () => {
     const source = makeSource({
       id: "SRC-GMAIL",
       kind: "email",
@@ -246,19 +282,41 @@ describe("the Connections tab itself — never offered for a table the door will
       originRowId: "gmail:msg-1",
     })
     primeTeam(source)
+    const asked = recordWhatItAsked()
     render(<KnowledgeDetailScreen teamId={TEAM} sourceId={source.id} />)
 
-    // MUTATION-PROVEN: revert `mapKey`'s `mapDrawable` check back to
-    // `item?.originTable && item?.originRowId` alone, and this goes red — the
-    // tab reappears, offering a map `getKnowledgeMap` will refuse every time.
-    expect(screen.queryByRole("tab", { name: /Connections/ })).toBeNull()
+    expect(
+      screen.getByRole("tab", { name: /Connections/ }),
+      "1,313 of 4,838 sources on staging are one of the four external kinds"
+    ).toBeTruthy()
+    expect(asked).toContainEqual({ table: "knowledge_sources", id: "SRC-GMAIL" })
+    expect(
+      asked.some((a) => a.table === "google_gmail"),
+      "asking for a table the door refuses is the bug the old gate existed to stop"
+    ).toBe(false)
   })
 
-  it("a source mirrored from a table the door draws still gets the tab", () => {
-    const source = makeSource({ id: "SRC-DRAWABLE", originTable: "accounts", originRowId: "ACC-DRAWABLE" })
+  it("a typed note — no origin at all — stands on itself too", () => {
+    const source = makeSource({ id: "SRC-NOTE", kind: "note", originTable: null, originRowId: null })
     primeTeam(source)
+    const asked = recordWhatItAsked()
     render(<KnowledgeDetailScreen teamId={TEAM} sourceId={source.id} />)
 
     expect(screen.getByRole("tab", { name: /Connections/ })).toBeTruthy()
+    expect(asked).toContainEqual({ table: "knowledge_sources", id: "SRC-NOTE" })
+  })
+
+  it("…and a source with nothing attached says so, rather than looking broken", async () => {
+    const source = makeSource({ id: "SRC-LONELY", kind: "note", originTable: null, originRowId: null })
+    primeTeam(source)
+    const focus = { table: "knowledge_sources", id: "SRC-LONELY", label: "Mapland GmbH" }
+    door.recordMap = async () => ({ focus, nodes: [focus], links: [], total: 0, capped: false })
+    openConnectionsTab(source)
+
+    // The whole reason the old gate hid the tab was that a tab which always
+    // fails teaches people not to press it. An empty answer is not a failure —
+    // it is the kit's own register, and it is reached rather than refused.
+    expect(await screen.findByText("Nothing is linked to this yet.")).toBeTruthy()
+    expect(screen.queryByText("Couldn't load this record's connections.")).toBeNull()
   })
 })
