@@ -767,3 +767,75 @@ describe("no law reads a file the stripper quietly shortened", () => {
       expect(why.length, `${rel} needs a real reason`).toBeGreaterThan(40)
   })
 })
+
+/** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. Data, rot-checked both
+ * ways, so a file that no longer has one turns this red and the line is deleted.
+ *
+ * `shared/ui/` is the only entry there can currently be: the kit is a pinned
+ * DEPENDENCY this repo may not hand-edit (`web/test/vendored-kit.test.ts`
+ * recomputes its content hash), so the fix is upstream in Kwapso/kwapso-ui-ux
+ * and a sync is what will clear the line. */
+const CONTROL_BYTE_OK: Record<string, string> = {
+  "shared/ui/components/collection-frame/use-remembered-view.ts":
+    "the VENDORED KIT joins the offered view names on a raw NUL to make a comparison key. Correct code and a sensible sentinel, but this repo may not hand-edit shared/ui/ at all, so it can only be spelled as an escape upstream. Delete this line when a kit sync brings the fix down",
+}
+
+describe("no source file is invisible to a text search", () => {
+  it("carries no raw control byte, which makes grep skip the WHOLE file in silence", () => {
+    // WHY THIS IS A GUARD ON THE GUARD.
+    //
+    // Every law in this repo is a source scan. This suite exists because a scan
+    // stands on a walk and a stripper; it turns out it also stands on the file
+    // being READABLE AS TEXT by the tools a person reaches for.
+    //
+    // `grep` classifies a file holding a raw control byte as BINARY and skips
+    // it, printing nothing and exiting 1, in a way that is indistinguishable
+    // from an honest zero matches. No warning, no different exit code.
+    //
+    // On 8 Sep 2026 that cost two separate sessions a false conclusion each.
+    // `web/components/deep-link/deep-link-screen.tsx` (889 lines, the record
+    // screen's whole tab strip) answered every grep with nothing, and was
+    // reported to the owner as DELETED. It had not been touched. The same shape
+    // turned up hours later on a second file. Both times the byte was deliberate
+    // and correct (a NUL used as a join separator, the ZIP magic number in a
+    // fixture); the defect was writing it as a RAW BYTE instead of an escape,
+    // which is identical at runtime and is the whole difference between a file
+    // the toolchain can read and one it silently cannot.
+    //
+    // TAB, NEWLINE and CARRIAGE RETURN are excluded: they are whitespace, they
+    // do not trip the binary heuristic, and a file full of tabs is fine.
+    //
+    // Read by CHARACTER CODE rather than by a regex: a character class spelling
+    // this range is exactly what `no-control-regex` exists to refuse, and a
+    // suppression comment on the one check whose whole subject is control
+    // characters would be a small lie in both directions.
+    const isControl = (n: number): boolean => n < 0x20 && n !== 9 && n !== 10 && n !== 13
+    const firstControl = (text: string): number => {
+      for (let i = 0; i < text.length; i++) if (isControl(text.charCodeAt(i))) return i
+      return -1
+    }
+    const offenders: string[] = []
+    for (const file of everySourceOfOurs()) {
+      const at = firstControl(file.source)
+      if (at === -1) continue
+      const line = file.source.slice(0, at).split("\n").length
+      const code = file.source.charCodeAt(at).toString(16).padStart(4, "0").toUpperCase()
+      offenders.push(`${file.rel}:${line}  U+${code}`)
+    }
+    const unlisted = offenders.filter((o) => !CONTROL_BYTE_OK[o.split(":")[0]])
+    expect(
+      unlisted,
+      "a raw control byte makes this file invisible to grep. Write the byte as " +
+        'an escape ("\\u0000", "\\u0003") instead: identical at runtime.'
+    ).toEqual([])
+
+    // Rot check, the other way. An exemption for a file that no longer holds one
+    // is a record of a problem somebody already fixed, and it rots into cover for
+    // the next occurrence of it.
+    const seen = new Set(offenders.map((o) => o.split(":")[0]))
+    for (const [rel, why] of Object.entries(CONTROL_BYTE_OK)) {
+      expect(seen.has(rel), `CONTROL_BYTE_OK lists ${rel}, which is clean now: delete the line`).toBe(true)
+      expect(why.length, `${rel} needs a real reason`).toBeGreaterThan(40)
+    }
+  })
+})
