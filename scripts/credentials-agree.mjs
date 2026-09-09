@@ -44,14 +44,26 @@ import { execFileSync } from "node:child_process"
 const PRODUCTION = process.argv.includes("--production")
 const API = PRODUCTION ? "https://agency.kwapso.app" : "https://agency-staging.kwapso.app"
 
-/** The admin key, from the Keychain, never echoed. Same rule as every other
- * credential reader here: an explicit environment variable wins, because an
- * override is always a deliberate act. */
+/** ONE KEY PER ENVIRONMENT, and the reason is the failure this file found on
+ * its own first production run.
+ *
+ * There was one Keychain entry, `kwapso-admin-key`, and it was staging's. Asked
+ * against production it came back 403 — the door alive, the key wrong — and the
+ * production deploy stopped at the first step rather than at `migrations:check`
+ * four minutes in. Two environments were always going to hold two different
+ * secrets; what was missing was two places to keep them.
+ *
+ * Never echoed, never written to a file: piped from `security` into this
+ * process and compared only by whether a door opens. An explicit `ADMIN_KEY` in
+ * the environment still wins, because an override is always deliberate. */
+const ADMIN_KEYCHAIN = { staging: "kwapso-admin-key", production: "kwapso-admin-key-production" }
+
 function adminKey() {
   if (process.env.ADMIN_KEY) return process.env.ADMIN_KEY
   if (process.platform !== "darwin") return ""
+  const service = ADMIN_KEYCHAIN[PRODUCTION ? "production" : "staging"]
   try {
-    return execFileSync("security", ["find-generic-password", "-s", "kwapso-admin-key", "-w"], {
+    return execFileSync("security", ["find-generic-password", "-s", service, "-w"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim()
@@ -128,7 +140,7 @@ if (PRODUCTION) {
 // the credential for.
 const admin = adminKey()
 if (!admin) {
-  console.log("  NO  admin key: not in the Keychain at all (kwapso-admin-key).")
+  console.log(`  NO  admin key: not in the Keychain at all (${ADMIN_KEYCHAIN[PRODUCTION ? "production" : "staging"]}).`)
   results.push("drift")
 } else {
   results.push(

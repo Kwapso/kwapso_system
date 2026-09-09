@@ -93,6 +93,18 @@ const VARIANTS = {
   // the very pairing this whole exercise is about. Whether that costs the win
   // back is a question for the trace, not for reasoning.
   unclipRound: `${CARD}{overflow:visible !important;} ${BODY}{border-bottom-left-radius:var(--radius) !important;border-bottom-right-radius:var(--radius) !important;}`,
+  // THE ONE THAT MIGHT BE FREE. `unclip` composites and wins, and squares the
+  // card's bottom corners - screenshotted, one property apart, 9 Sep 2026 -
+  // because the body is square and paints the CARD'S OWN TONE into them
+  // against a different ground. `unclipRound` fixes the picture by putting the
+  // radius back on the scroller and loses the whole win with it.
+  //
+  // So: leave the body square and give it NOTHING TO PAINT. The card already
+  // paints `--surface-raised` and its own radius; a transparent body lets that
+  // rounded ground show through at the corners while the scroller keeps no
+  // radius of its own. If this composites AND keeps the corners it costs
+  // nothing visible at all, which is the only version worth shipping.
+  unclipClear: `${CARD}{overflow:visible !important;} ${BODY}{background:transparent !important;}`,
 }
 
 const pctl = (xs, p) => { const s = [...xs].sort((a, b) => a - b); return s.length ? Math.round(s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))] * 100) / 100 : 0 }
