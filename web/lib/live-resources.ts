@@ -1297,11 +1297,24 @@ export const TEAM_RESOURCES: Record<
     // The source's own history — the Activity tab on its screen — and the
     // by-id read the detail falls back to when the row is past page one.
     deps: (_t, id) => [`activity:record:knowledge_sources:${id}`, `knowledge:one:${id}`],
-    // …AND THE PICTURE OF THE WHOLE BASE (R15). A ping names one row, and this
-    // key is a drawing of every row, so it cannot be named per-compartment from
-    // here — the prefix drops every narrowing of it at once, which is the same
-    // seam the relationship map uses for the identical reason.
-    slicePrefix: KNOWLEDGE_SHAPE_PREFIX,
+    // …AND BOTH PICTURES THIS ROW APPEARS IN (R15). A ping names one row and
+    // neither of these keys can be derived from it, so each family is dropped
+    // whole — the same seam, twice, for two different drawings.
+    //
+    //   the SHAPE — the whole base grouped by account. One row's arrival or
+    //   retirement changes a cluster's size, and the key carries a compartment
+    //   this ping cannot know.
+    //
+    //   the record MAP — added 9 Sep 2026, and it is the half that would have
+    //   gone stale silently. A source now sits on TWO maps: its own, and the
+    //   MEETING's, which gathers every artefact that came out of that call. So a
+    //   source gaining an event id (the sweep does this unattended), being
+    //   retired as a duplicate, or being renamed changes a picture keyed by a
+    //   record id this ping has never heard of. Every other collection whose
+    //   rows appear on a map already drops this family; knowledge did not,
+    //   because until the map learned to draw a knowledge source there was
+    //   nothing of its to be stale.
+    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

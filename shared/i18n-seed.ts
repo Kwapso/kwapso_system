@@ -3488,6 +3488,29 @@ export const SEED: Catalogue = {
     es: "Todavía no hay nada en la base de conocimiento.",
     ca: "Encara no hi ha res a la base de coneixement.",
   },
+  /* ── A CALL'S OWN CONNECTIONS TAB (9 Sep 2026) ───────────────────────────
+   * The meeting screen's map. Same register as the knowledge base's beside it:
+   * plain, short, sentence case. "Call" rather than "meeting" in the empty
+   * sentence because the reader is standing ON the meeting and the word for
+   * what came out of it is the conversation, not the record. */
+  "Nothing is filed against this call yet.": {
+    de: "Zu diesem Gespräch ist noch nichts abgelegt.",
+    es: "Todavía no hay nada archivado sobre esta llamada.",
+    ca: "Encara no hi ha res arxivat sobre aquesta trucada.",
+  },
+  /* The long one says what WOULD fill it, in two clauses: what Google has to
+   * say for an artefact to arrive, and the three fields that show here anyway. */
+  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The client, the system and the reason we met show here too, once they are set.":
+    {
+      de: "E-Mails, Chatverläufe und Mitschriften gehören zu einem Gespräch, wenn Google sagt, zu welchem Termin sie gehören. Kunde, System und der Grund des Treffens erscheinen hier ebenfalls, sobald sie gesetzt sind.",
+      es: "Los correos, los chats y las transcripciones se unen a una llamada cuando Google dice a qué evento pertenecen. El cliente, el sistema y el motivo de la reunión también aparecen aquí, una vez definidos.",
+      ca: "Els correus, els xats i les transcripcions s'uneixen a una trucada quan Google diu a quin esdeveniment pertanyen. El client, el sistema i el motiu de la reunió també apareixen aquí, un cop definits.",
+    },
+  "This meeting doesn't have a map to draw.": {
+    de: "Für dieses Meeting gibt es keine Karte.",
+    es: "Esta reunión no tiene un mapa que dibujar.",
+    ca: "Aquesta reunió no té cap mapa per dibuixar.",
+  },
   "Nothing is filed under an account yet.": {
     de: "Noch nichts unter einem Konto abgelegt.",
     es: "Todavía no hay nada archivado bajo una cuenta.",

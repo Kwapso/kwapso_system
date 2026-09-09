@@ -50,6 +50,7 @@ import { ArrowSquareOut, FileText, PencilSimple, Power, Video } from "@shared/ui
 
 import type { Account, AppRow, Meeting, MeetingPersonLink, MeetingPurpose } from "@shared/types"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
+import { ConnectionsPanel } from "@/components/records/connections-panel"
 import { OverviewList } from "@/components/records/overview-list"
 import { WorkLogsPanel, workLogsTotalKey } from "@/components/work/work-logs-panel"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
@@ -64,7 +65,7 @@ import {
   RECORD_TABS_CONFIG,
   type RecordAction,
 } from "@/components/records/record-chrome"
-import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey } from "@/lib/live-resources"
+import { appsKey, listFetch, meetingPeopleKey, meetingsKey, meetingTranscriptKey, recordMapKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { RecordMark } from "@shared/web/record-mark"
@@ -161,6 +162,28 @@ export function MeetingDetailScreen({
   // panel is blank exactly when somebody is deciding whether to open it.
   useRecordCounts("meetings", have ? meetingId : null)
   const timeTotal = useCachedValue<number | null>(workLogsTotalKey("meetings", meetingId))
+
+  // WHAT THIS CALL IS CONNECTED TO — the record map, read when the MEETING opens
+  // rather than when the tab is clicked, for the same reason `useRecordCounts`
+  // above gives: the badge is counted off this read (R16), and a badge that only
+  // arrives with the panel is blank exactly when somebody is deciding whether to
+  // open it.
+  //
+  // THE EDGE THAT MADE THIS WORTH DRAWING is the one a knowledge source carries:
+  // an artefact says which Google calendar event it came out of, so a call now
+  // gathers the email, the chat log and the transcript about that same half-hour
+  // — none of which is a row in this database, and none of which had a
+  // neighbourhood at all before (workers/content/src/lib/record-map.ts).
+  //
+  // It also draws the edges a meeting has always had: the client, the system and
+  // why we met. So the tab is offered on EVERY meeting rather than gated on the
+  // Google event id — measured on staging 9 Sep 2026, 192 of 460 live meetings
+  // have at least one edge, and 148 of those have no artefacts at all and are
+  // reached only through the account/app/purpose lines. Gating on the event id
+  // would have hidden a real map from most of the meetings that have one.
+  const mapQ = useCached(have ? recordMapKey("meetings", meetingId) : null, () =>
+    content.recordMap("meetings", meetingId)
+  )
 
   const accountsQ = useCached<Account[]>(have && canEdit ? `accounts:${teamId}` : null, () =>
     tenancy.accounts().then((r) => r.accounts)
@@ -369,6 +392,17 @@ export function MeetingDetailScreen({
             },
           ]
         : []),
+      // WHAT THIS CALL IS CONNECTED TO (owner, 9 Sep 2026: "yes ofc"). Offered on
+      // every meeting: the badge is R16's exact count through the one seam, which
+      // renders NOTHING at zero, so a call with no connections shows a plain word
+      // and not a "0" — and the panel then says why in the kit's own register.
+      {
+        value: "map",
+        label: t("Connections"),
+        icon: "network",
+        badge: formatCount(mapQ.data?.total ?? 0),
+        badgeVariant: "" as const,
+      },
       // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a meeting's history
       // is reached from the ink footer's Latest activity column now, and opens in
       // a slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
@@ -547,6 +581,27 @@ export function MeetingDetailScreen({
         renderPanel={(panel) => {
           if (panel.value === "overview")
             return <OverviewList items={overviewItems} />
+          if (panel.value === "map")
+            return (
+              <ConnectionsPanel
+                teamId={teamId}
+                read={mapQ}
+                // THE EMPTY CASE IS THE COMMON ONE HERE and it is written rather
+                // than defaulted — 268 of 460 live meetings have no account, no
+                // app, no purpose and no artefacts (staging, 9 Sep 2026), so the
+                // majority of readers meet this sentence rather than the picture.
+                // It names WHAT is missing and does not guess WHY: an artefact
+                // reaches a call only when Google itself said which event it
+                // belongs to, and Google says nothing on most of them — but the
+                // same blank also covers a call with no client and no purpose,
+                // so a sentence blaming Google would be wrong half the time.
+                emptyTitle={t("Nothing is filed against this call yet.")}
+                emptyDescription={t(
+                  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The client, the system and the reason we met show here too, once they are set."
+                )}
+                refusedText={t("This meeting doesn't have a map to draw.")}
+              />
+            )
           if (panel.value === "time")
             return (
               <WorkLogsPanel

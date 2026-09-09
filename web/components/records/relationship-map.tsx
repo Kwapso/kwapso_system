@@ -200,6 +200,8 @@ export function RelationshipMap({
   links,
   total,
   capped,
+  emptyTitle,
+  emptyDescription,
 }: {
   teamId: string
   focus: MapNode | null
@@ -207,6 +209,16 @@ export function RelationshipMap({
   links: MapLink[]
   total: number
   capped: boolean
+  /** WHAT THIS RECORD SAYS WHEN IT IS CONNECTED TO NOTHING, in the screen's own
+   * words. A prop rather than the one sentence this file used to hard-code,
+   * because the empty case stopped being rare the day a second screen drew this:
+   * 268 of 460 live meetings have no account, no app, no purpose and no
+   * artefacts (staging, 9 Sep 2026), so on that screen the empty register is the
+   * majority reading and "Nothing is linked to this yet." is vaguer than the
+   * screen can afford to be. Defaults to the original, so the knowledge base's
+   * own wording is unchanged. */
+  emptyTitle?: string
+  emptyDescription?: string
 }) {
   const t = useT()
   const focusKey = focus ? `${focus.table}:${focus.id}` : ""
@@ -227,6 +239,28 @@ export function RelationshipMap({
 
   const hrefFor = (n: MapNode) =>
     RECORD_PATH[n.table] ? `/t/${teamId}/${RECORD_PATH[n.table]}/${n.id}` : null
+
+  // NOTHING TO DRAW MEANS NOTHING IS DRAWN, and this is a register rather than
+  // an empty picture. Below this line the component renders a 26rem plate, a
+  // "0 connected" badge and three zoom buttons that move a single dot — chrome
+  // for a picture that does not exist, with the one useful sentence pushed under
+  // all of it and, on a laptop, under the fold.
+  //
+  // IT MATTERS BECAUSE THE EMPTY CASE IS NOT RARE. Measured on staging, 9 Sep
+  // 2026: 268 of 460 live meetings have no account, no app, no purpose and no
+  // artefacts, and 520 of the 809 knowledge sources mirrored from outside this
+  // database still reach nothing. So on both screens that draw this, the
+  // majority reading is this branch — the client's own standing ruling ("there
+  // should be empty states for everything, I'm sure the UI/UX kit has it") is
+  // about exactly this, and the kit's register IS the empty state. An inert
+  // control is worse than an absent one: it invites a press that does nothing.
+  if (links.length === 0)
+    return (
+      <CollectionEmptyState
+        title={emptyTitle ?? t("Nothing is linked to this yet.")}
+        description={emptyDescription}
+      />
+    )
 
   return (
     <div className="flex flex-col gap-4">
@@ -328,12 +362,8 @@ export function RelationshipMap({
           a sighted person uses to actually GO somewhere, because a line between
           two circles is not a link and a sentence is. One payload, two
           renderings; there is no second query and no second fence. */}
-      {links.length === 0 ? (
-        // The kit's register (27.21), not a grey `<li>` in an otherwise empty
-        // list — owner ruling, 2026-09-07. No act: a link is made on the
-        // record it links from, not from this picture of them.
-        <CollectionEmptyState title={t("Nothing is linked to this yet.")} />
-      ) : (
+      {/* The empty case never reaches here — it is answered above, before any
+          chrome is drawn. What follows is always a real list. */}
       <ul className="flex flex-col gap-1 text-sm">
         {links.map((l, i) => {
           const a = at.get(l.from)
@@ -354,7 +384,6 @@ export function RelationshipMap({
           )
         })}
       </ul>
-      )}
     </div>
   )
 }
