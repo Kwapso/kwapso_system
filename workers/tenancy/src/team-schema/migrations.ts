@@ -4703,7 +4703,12 @@ UPDATE knowledge_sources
    AND event_id IS NULL
    AND EXISTS (SELECT 1 FROM meetings m
                 WHERE m.id = knowledge_sources.origin_row_id
-                  AND m.google_event_id IS NOT NULL AND m.google_event_id <> '');    // A LOSING CANDIDATE IS STILL A CANDIDATE, AND THE HUNT NOW SAYS SO.
+                  AND m.google_event_id IS NOT NULL AND m.google_event_id <> '');
+`,
+  },
+
+  {
+    // A LOSING CANDIDATE IS STILL A CANDIDATE, AND THE HUNT NOW SAYS SO.
     //
     // 0055/8153a8e5 taught route 1 to read EVERY attachment a calendar entry
     // carries and keep the fullest — a false start and a real transcript are the
