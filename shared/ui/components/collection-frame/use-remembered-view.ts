@@ -175,6 +175,18 @@ const deviceStore: RememberedViewStore = {
  * An application with its own per-user preference store should drive `view`
  * and `onViewChange` from that instead and not import this file at all.
  */
+/** THE SEPARATOR THE OFFERED VIEWS ARE JOINED ON, spelled as an ESCAPE and
+ * named rather than typed as a raw byte into three string literals.
+ *
+ * Identical at runtime; the difference is on disk. ONE raw control byte makes
+ * `grep` classify the whole FILE as binary and skip it in silence - no output,
+ * exit 1, and nothing to tell that apart from an honest zero matches. The
+ * consuming app hit exactly that on 8 Sep 2026 and reported a 889-line file as
+ * DELETED; its own source scan now fails on a raw control byte and carries a
+ * reasoned exemption for THIS file, which it may not hand-edit. A NUL is still
+ * the right sentinel - no view name can contain one. */
+const SEP = "\u0000"
+
 export function useRememberedView({
   views,
   storageKey,
@@ -204,7 +216,7 @@ export function useRememberedView({
   /* The set of offered keys, so the effect below can reject a stale value
      without depending on the identity of the `views` array — routes build it
      inline and a new array every render would re-read storage every render. */
-  const offered = views.map((option) => option.value).join(" ");
+  const offered = views.map((option) => option.value).join(SEP);
 
   useIsomorphicLayoutEffect(() => {
     const stored = store.read(storageKey);
@@ -212,13 +224,13 @@ export function useRememberedView({
     /* A view the collection no longer offers is discarded rather than
        honoured. Otherwise dropping `gallery` from a collection leaves every
        reader who had chosen it looking at nothing. */
-    if (!offered.split(" ").includes(stored)) return;
+    if (!offered.split(SEP).includes(stored)) return;
     setView(stored);
   }, [storageKey, offered, store]);
 
   /* If the route changes what it offers and the current view goes with it,
      fall back rather than render a body that is no longer in the list. */
-  const stillOffered = offered.split(" ").includes(view);
+  const stillOffered = offered.split(SEP).includes(view);
   const resolved = stillOffered ? view : fallback;
 
   const onViewChange = React.useCallback(

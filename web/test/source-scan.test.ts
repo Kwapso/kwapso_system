@@ -771,14 +771,15 @@ describe("no law reads a file the stripper quietly shortened", () => {
 /** WHERE A RAW CONTROL BYTE IS ALLOWED TO SIT, and why. Data, rot-checked both
  * ways, so a file that no longer has one turns this red and the line is deleted.
  *
- * `shared/ui/` is the only entry there can currently be: the kit is a pinned
- * DEPENDENCY this repo may not hand-edit (`web/test/vendored-kit.test.ts`
- * recomputes its content hash), so the fix is upstream in Kwapso/kwapso-ui-ux
- * and a sync is what will clear the line. */
-const CONTROL_BYTE_OK: Record<string, string> = {
-  "shared/ui/components/collection-frame/use-remembered-view.ts":
-    "the VENDORED KIT joins the offered view names on a raw NUL to make a comparison key. Correct code and a sensible sentinel, but this repo may not hand-edit shared/ui/ at all, so it can only be spelled as an escape upstream. Delete this line when a kit sync brings the fix down",
-}
+ * EMPTY, AND IT GOT THERE THE WAY AN EXEMPTION IS SUPPOSED TO. It opened with
+ * one entry, for the vendored kit's `use-remembered-view.ts`, and the reason
+ * named the condition under which the line would disappear: the kit is a pinned
+ * dependency this repo may not hand-edit (`web/test/vendored-kit.test.ts`
+ * recomputes its content hash), so the fix could only be made upstream in
+ * Kwapso/kwapso-ui-ux and a sync would clear it. That is what happened, the same
+ * day, in kit v1.2.74. An exemption whose reason cannot be read as an
+ * instruction is a permanent one. */
+const CONTROL_BYTE_OK: Record<string, string> = {}
 
 describe("no source file is invisible to a text search", () => {
   it("carries no raw control byte, which makes grep skip the WHOLE file in silence", () => {
