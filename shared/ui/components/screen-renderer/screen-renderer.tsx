@@ -102,7 +102,7 @@ import {
   TABS_STRIP_GAP,
 } from "../tabs/tabs";
 import { Badge } from "../badge/badge";
-import { Title } from "../title/title";
+import { Title, type TitleStep } from "../title/title";
 import { Skeleton } from "../skeleton/skeleton";
 
 /* ============================================================================
@@ -197,6 +197,36 @@ export interface ScreenTab {
 
 /** Wide staff screen, or the narrow calm one. §9's two doors. */
 export type ScreenDensity = "comfortable" | "calm";
+
+/**
+ * THE HEADING STEP EACH DOOR TAKES — one record, read by everything that
+ * draws a screen's own name.
+ *
+ * IT IS HERE, AND IT IS ONE OBJECT, BECAUSE IT WAS THREE COPIES. The same two
+ * values were written down in three places: `SHAPE_HEADING_SIZE`
+ * (compositions/states/states.tsx), whose own doc-comment says it matches
+ * "`ScreenRenderer` exactly"; `ScreenShell`, which imports that constant and
+ * is therefore correct by construction; and THIS FILE, which typed
+ * `density === "calm" ? "h3" : "h2"` inline, a few lines below, and matched
+ * only by coincidence. A constant one file imports and another file retypes
+ * is not one decision — it is two that happen to agree, which is exactly the
+ * shape the consuming app's own record-title law was written to catch after
+ * a default on one path and a class on the other set the same heading at two
+ * sizes for a week. `SHAPE_HEADING_SIZE` is now this object, re-exported
+ * under its own name for the shapes that already import it.
+ *
+ * THE VALUES ARE UNCHANGED BY THE 2026-09-08 LADDER CHANGE, DELIBERATELY.
+ * `Title` gained the two rungs above h2 that day, so this record is no longer
+ * PINNED at 32 by a ceiling — it is typed `TitleStep`, the whole ladder, and
+ * whether a door's page title should climb to the scale's own "Page title"
+ * rung (display-m · 56) is now a one-line decision in one place instead of a
+ * component limitation. It is a visible change on every screen in both doors,
+ * so it is the client's to make and it is not made here.
+ */
+export const SCREEN_TITLE_STEP: Record<ScreenDensity, TitleStep> = {
+  comfortable: "h2",
+  calm: "h3",
+};
 
 /**
  * The screen, as data. Every field is optional except `body`, and `body` may
@@ -947,7 +977,10 @@ const ScreenRenderer = React.forwardRef<HTMLDivElement, ScreenRendererProps>(
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Title
                   as="h1"
-                  size={density === "calm" ? "h3" : "h2"}
+                  /* The door's own step, read rather than retyped — see
+                     `SCREEN_TITLE_STEP`, which is the constant this line used
+                     to be a second copy of. */
+                  size={SCREEN_TITLE_STEP[density]}
                   rule={false}
                   eyebrow={
                     eyebrow !== undefined || count !== undefined ? (

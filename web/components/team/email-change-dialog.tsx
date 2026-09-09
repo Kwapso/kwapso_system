@@ -9,12 +9,12 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@shared/ui/components/dialog/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@shared/ui/components/sheet/sheet"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
@@ -88,16 +88,42 @@ export function EmailChangeDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Change your email")}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      {/* A FORM IS A SLIDE-IN — client ruling, 2026-09-09, over a screenshot
+          of the "New access token" dialog: "This should be a slide-in, like
+          all the other screens. The only ones that are overlays are the
+          warnings, such as archive or delete, and so on." She was shown one
+          dialog and answered about the CLASS, so it binds here. Law R59; not
+          a style preference, and not to be reverted as one.
+
+          THIS ONE IS WARNING-ADJACENT AND IS STILL A FORM. Changing the
+          address you sign in with is a consequential act, and the temptation
+          is to read "consequential" as "warning" and leave it centred. It is
+          not: her line draws the boundary at what the surface DOES, not at
+          how much it matters — a warning ASKS ("archive this? delete this?")
+          and is answered yes or no, while this one COLLECTS (an address,
+          then a six-digit code). The revoke check in `access-tokens.tsx` is
+          the warning on the same kind of dangerous material, and it stays an
+          `AlertDialog`. Collecting is a form; a form is a drawer.
+
+          NO `SheetFooter` HERE, DELIBERATELY. Each of the two steps owns its
+          own controls — "Email me a code" is the form's submit, and the
+          quiet "Use a different email" / "Resend code" pair belongs to the
+          code step and to nothing else. Hoisting either into a pinned foot
+          would make one action bar out of two different steps' controls. The
+          body is short at both steps (one field, or one code input), so
+          nothing falls below the fold; verified at 1280 and 390 rather than
+          assumed. Whichever branch renders is `SheetContent`'s ONE non-slot
+          child and takes the drawer's scrolling body treatment. */}
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>{t("Change your email")}</SheetTitle>
+          <SheetDescription>
             {step === "email"
               ? `You currently sign in with ${currentEmail}.`
               : `Enter the 6-digit code sent to ${email.trim()}.`}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {step === "email" ? (
           <form
@@ -157,7 +183,7 @@ export function EmailChangeDialog({
             </div>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   )
 }

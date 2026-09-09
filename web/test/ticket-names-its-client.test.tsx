@@ -120,7 +120,12 @@ const name = (title: string) => {
 const submitForm = () => fireEvent.submit(document.querySelector("form") as HTMLFormElement)
 
 describe("raising a ticket in the agency app", () => {
-  it("asks which client it is for", () => {
+  // "Client" UNTIL 2026-09-09, when she corrected the word: "the filter client
+  // is the company, so it's the account. Rename client to account everywhere we
+  // said client." The FIELD did not move — it is still `accountId`, still the
+  // same picker, still the same door — so this test's subject is unchanged and
+  // only the label it looks for follows the screen.
+  it("asks which account it is for", () => {
     render(
       <HelpFormDialog
         open
@@ -131,9 +136,9 @@ describe("raising a ticket in the agency app", () => {
       />
     )
     // The question is on the form at all — this is the half that was missing.
-    expect(screen.getByText("Client")).toBeTruthy()
+    expect(screen.getByText("Account")).toBeTruthy()
     // …and it is a real control a person can open, pointed at by that label.
-    const control = screen.getByLabelText("Client")
+    const control = screen.getByLabelText("Account")
     expect(control.getAttribute("role")).toBe("combobox")
   })
 
@@ -183,9 +188,9 @@ describe("raising a ticket in the agency app", () => {
         initial={{ description: "Tuesday export is empty", accountId: "acct-bergman" }}
       />
     )
-    expect(screen.getByText(/can't be moved to another client/i)).toBeTruthy()
-    // The company is NAMED, from its own record — a client past page one used to
-    // be shown to its own ticket as "this client".
+    expect(screen.getByText(/can't be moved to another account/i)).toBeTruthy()
+    // The company is NAMED, from its own record — an account past page one used
+    // to be shown to its own ticket as "this account".
     await waitFor(() => expect(screen.getByText(/^Bergman,/)).toBeTruthy())
     submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
@@ -330,8 +335,24 @@ describe("which app the ticket is about", () => {
     // The field is still THERE — a row that vanished would move every field
     // under it as somebody fills the form in, inside an order the client fixed
     // field by field.
-    expect(row.textContent).toContain("Choose a client first.")
-    expect(within(row).queryAllByRole("button")).toHaveLength(0)
+    expect(row.textContent).toContain("Choose an account first.")
+    // AND IT IS A LOCKED CONTROL RATHER THAN A LINE OF TEXT — client,
+    // 2026-09-09: "unify how to 'choose x first' looks. i prefer how currently
+    // is the modules. make the same for apps." The Module row one field down has
+    // always been a disabled select wearing its placeholder; this row drew the
+    // same sentence as a bare paragraph. Exactly one control, and it offers no
+    // app: the gate is the whole of what is on the row.
+    const controls = within(row).queryAllByRole("button")
+    expect(controls, "the gate is not drawn as a control").toHaveLength(1)
+    expect(
+      (controls[0] as HTMLButtonElement).disabled,
+      "the gate can be pressed — it must read as locked, not as an app nobody named"
+    ).toBe(true)
+    // The sentence IS the control's name. `aria-label` would replace the
+    // content and announce a nameless dimmed button, which is why the shell
+    // deliberately carries none.
+    expect(controls[0].textContent).toContain("Choose an account first.")
+    expect(within(row).queryByRole("button", { name: /Padelbase/ })).toBeNull()
   })
 
   it("draws one pill per app, each wearing its own face, once a client is set", async () => {

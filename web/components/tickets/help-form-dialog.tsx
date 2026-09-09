@@ -171,7 +171,7 @@ const typeField = (required: boolean) => ({
 })
 const accountField = {
   ...defaultFieldConfig,
-  label: "Client",
+  label: "Account",
   required: false,
   helpText: "The company this is for. Their contacts see it in their portal; leave it off for our own questions.",
 }
@@ -213,7 +213,7 @@ const contactField = {
   ...defaultFieldConfig,
   label: "Raised by",
   required: false,
-  helpText: "The person at that client who asked. Not always whoever types it in.",
+  helpText: "The person at that account who asked. Not always whoever types it in.",
 }
 
 // "NOTHING CHOSEN", as a value a control can actually hold. Radix Select can't
@@ -384,9 +384,9 @@ export function HelpFormDialog({
   // rather than a question, because the door will refuse any attempt to change
   // it. Its NAME now comes from the account's own record rather than from a page
   // of the list: the detail is already being read for the contacts below it, and
-  // a company past page one used to be shown to its own ticket as "this client".
+  // a company past page one used to be shown to its own ticket as "this account".
   const fixedAccount = initial?.accountId
-    ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this client") }
+    ? { id: initial.accountId, name: detailQ.data?.account.name ?? t("this account") }
     : null
 
   /* ── THE TYPE CHIPS ────────────────────────────────────────────────────────
@@ -722,12 +722,20 @@ export function HelpFormDialog({
    * this form now has a FIXED ORDER the client dictated field by field, and a
    * row that appears and disappears inside a fixed order moves every field under
    * it as somebody fills the form in. So the field keeps its place and SAYS why
-   * it is empty ("Choose a client first.", the same sentence the module picker
+   * it is empty ("Choose an account first.", the same sentence the module picker
    * has always said one field up about its app, and — since 2026-09-07, the
    * client's own second correction — the very same sentence the APP row says
    * about its client), which is a reason rather than a vanishing act, and it is
    * honest about the agency's own tickets, which have no client on purpose and
    * will read that line for good.
+   *
+   * AND SINCE 2026-09-09 IT IS SAID INSIDE A LOCKED CONTROL rather than as a
+   * bare line of text — her ruling that every "choose x first" gate wears the
+   * shape the Module row already wore. The argument is written out on the App
+   * row above; nothing in this call site changed, because the change is in the
+   * one component both rows are drawn from (`RecordPicker`'s row layout, whose
+   * empty state is now the control layout's own shell). This row inherits it,
+   * and so does its SECOND empty state below.
    *
    * A CLIENT WITH NO CONTACTS is the second, and it gets the sentence rather
    * than a lone "Not said" chip: one black chip on an otherwise empty line looks
@@ -889,7 +897,7 @@ export function HelpFormDialog({
       <Field config={accountField} htmlFor="help-account" className={fieldSpacing}>
         {fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="help-account">
-            {fixedAccount.name}, a ticket can&apos;t be moved to another client.
+            {fixedAccount.name}, a ticket can&apos;t be moved to another account.
           </p>
         ) : (
           <RecordPicker
@@ -900,7 +908,7 @@ export function HelpFormDialog({
             // for the same reason: an app row that is only offered once a client
             // is named must not keep an answer from before one was. Without
             // this, picking a client, picking an app and then going back to
-            // "Ours, no client" leaves the row showing "Choose a client first."
+            // "Ours, no account" leaves the row showing "Choose an account first."
             // while `values.appId` still holds an app — and that one WOULD be
             // saved, silently, because `appForTicket` has no opinion about which
             // client an app belongs to. The contact rides along because it has
@@ -916,10 +924,47 @@ export function HelpFormDialog({
                 raisedByContactId: NONE,
               }))
             }
-            search={(term) => searchAccounts(term, { type: "entity" })}
+            // THE NAME AND NOTHING ELSE — client, 2026-09-09: *"in add/edit for
+            // tickets for accounts, i only need the nme (no email no others)."*
+            //
+            // WHAT THE OPTION CARRIED. `searchAccounts` (web/lib/picker-sources.ts)
+            // builds every account option through the one `accountOption` seam
+            // — value, label, picture, `shape: "square"`, `face: true` — and
+            // then adds a `hint` of its own: `[a.code, a.email].join(" · ")`.
+            // `PickerOption.hint` is drawn by `RecordPicker` as a SECOND LINE
+            // under the name, in `text-xs text-muted-foreground`. So a row read
+            // "Bergström Handels AB" over "KW-0031 · info@bergstrom.se" — the
+            // email and the "others" she named, and the only two things on the
+            // row that are not the name.
+            //
+            // WHAT IT CARRIES NOW: the name, and the ROUND MARK BESIDE IT,
+            // which is deliberately kept. A face is not "email and others" —
+            // it is the same icon the accounts list, the app facet and every
+            // other select in the app now draw, put there by her OWN ruling of
+            // the same day ("for accounts include icon in select components and
+            // filters", `accountOption`'s header). Two rulings from one person
+            // on one day: one adds the picture, one removes the text. Taking the
+            // icon out here would be answering the second by undoing the first.
+            //
+            // AND ONLY ON THIS FORM, because that is the scope of her sentence
+            // — "in add/edit for tickets". Nine other dialogs ask the same door
+            // for the same accounts and still show the hint, which is where the
+            // code and the email earn their place: they are two of the three
+            // fields the door SEARCHES, so a row that matched on an email
+            // nobody could see looks like a wrong answer. That argument is
+            // weakest exactly here, on a form where the person raising a ticket
+            // already knows which client they mean. So the subtraction is a
+            // `.map` at this call site rather than a flag on the shared
+            // function: one screen changed, nine untouched, and no second way
+            // to ask the accounts door.
+            search={(term) =>
+              searchAccounts(term, { type: "entity" }).then((rows) =>
+                rows.map(({ hint: _hint, ...option }) => option)
+              )
+            }
             searchKey={pickerKey("companies", teamId)}
-            emptyOption={{ value: NONE, label: t("Ours, no client") }}
-            placeholder={t("Ours, no client")}
+            emptyOption={{ value: NONE, label: t("Ours, no account") }}
+            placeholder={t("Ours, no account")}
             searchPlaceholder={t("Search companies…")}
             emptyText={t("No company matched.")}
             disabled={busy}
@@ -958,6 +1003,35 @@ export function HelpFormDialog({
           in the same sentence the module row one field down has always said
           about ITS app.
 
+          AND SINCE 2026-09-09 IT SAYS IT IN THE SAME SHAPE. Client ruling, on a
+          staging screenshot of this dialog: *"unify how to 'choose x first'
+          looks. i prefer how currently is the modules. make the same for
+          apps."* Both rows already said the identical sentence; they DREW it
+          two different ways, and her screenshot is the pair side by side. The
+          MODULE row below is a control-layout picker held `disabled` with its
+          placeholder in it — a real select, visibly locked. THIS row is a chip
+          row, and a chip row with no chips drew the sentence as a bare
+          paragraph in the space the control should occupy: grey text floating
+          in a column of form fields, which reads as a note ABOUT the form
+          rather than as the form's own control, and which is 16px shorter than
+          the chips that replace it, so every field below jumped the moment a
+          client was named.
+
+          NOTHING IS CHANGED HERE FOR IT, and that is the point. `RecordPicker`
+          now draws its row-layout empty state in the control layout's own
+          locked shell (`PickerShell`, off the shared `shellClass`), so "the app
+          field looks like the module field" is one piece of geometry rather
+          than two that agree on the day somebody wrote them. This call site
+          still passes the same sentence it always passed; the ruling landed on
+          the component both rows are built from. The App row, the Raised-by row
+          below and any future one-row picker all inherit it — which is what
+          stops the next gate from being a third drawing of one idea. */}
+      {/* ── HER OTHER TWO RULINGS OF 2026-09-09 ARE ON THIS FORM TOO ─────────
+          The Account picker directly above shows the NAME ALONE (its own note
+          carries what the option used to carry and why the icon stayed), and
+          the Closed tab's columns changed for the SECOND time that day — see
+          `helpTabColumns`, web/lib/live-resources.ts.
+
           AND ON AN APP'S OWN SCREEN THERE IS NO QUESTION TO ASK. `fixedApp`
           means the form was opened from the app itself, so which system this is
           about is a fact about where you are standing — the prop's own note has
@@ -991,7 +1065,7 @@ export function HelpFormDialog({
             emptyText={
               chosenAccountId || appAlreadyNamed
                 ? t("No apps yet.")
-                : t("Choose a client first.")
+                : t("Choose an account first.")
             }
             disabled={busy}
           />
@@ -1144,7 +1218,7 @@ export function HelpFormDialog({
           onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
           options={contactOptions}
           searchPlaceholder={t("Search contacts…")}
-          emptyText={chosenAccountId ? t("No contacts yet.") : t("Choose a client first.")}
+          emptyText={chosenAccountId ? t("No contacts yet.") : t("Choose an account first.")}
           disabled={busy}
         />
       </Field>

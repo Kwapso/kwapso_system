@@ -248,12 +248,30 @@ export const MODULE_RIGHTS = ["read", "create", "edit", "delete"] as const
  * A module absent from this map offers all four. Only the exceptions are here,
  * so the list can only shrink as doors get written.
  *
- * THE COLUMNS ARE STILL DRAWN. The library's permission matrix takes
- * `modules: {key, label}[]` and renders a fixed four columns; hiding a box per
- * row needs a `rights?: Right[]` on that contract, which is a library change
- * and this repo does not fork the library. Until it lands, this map is the
- * truth and the grid is one line behind it. Nothing is mis-granted in the
- * meantime: an unoffered right is one no door reads. */
+ * THE PROP LANDED, AND THE GRID TURNED UNDER IT — both on 2026-09-09, and the
+ * two have to be read together.
+ *
+ * This note used to say the library's matrix "renders a fixed four columns" and
+ * that hiding a box per row "needs a `rights?: Right[]` on that contract, which
+ * is a library change and this repo does not fork the library." The library
+ * change LANDED: kit v1.2.72 ships `PermissionModule.rights` — "an unoffered box
+ * stops pretending to be a switch" — and an unoffered slot keeps its place and
+ * loses its control: no well, no letter, an em dash, no tab stop, no tooltip,
+ * and it is never counted as held whatever the stored sheet says.
+ *
+ * THE SAME DAY, THE SCREEN THAT WOULD HAVE USED IT WAS REPLACED. The client
+ * asked for every role on ONE grid, roles down the side and these modules
+ * across (web/components/team/roles-matrix.tsx), which is the TRANSPOSE of the
+ * kit's own axes — and `rights` sits on the kit's ROW. Whether a module offers
+ * `delete` is a fact about the module, and the module is now the COLUMN, so the
+ * prop cannot say it. The grid is therefore STILL one line behind this map, for
+ * a different reason than before and with a different fix: not "a library change
+ * nobody has made" but "`rights` on `PermissionRole` too, or an `orientation` on
+ * the matrix". The matrix file's own header carries the ask.
+ *
+ * Nothing is mis-granted in the meantime, which is why this is a legibility
+ * defect and not a security one: an unoffered right is one no door reads, the
+ * screen never draws it held, and a press on it writes nothing. */
 export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHTS)[number][]> = {
   // The team's own settings, and the screen recipes that came with `screens`.
   // Reading a team is `whoAmI`, not a right; a team is created at signup and is

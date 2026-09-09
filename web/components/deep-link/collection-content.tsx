@@ -601,7 +601,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     // The account NAMES a source is filed under — the list says "Bergman S.A.",
     // never `account:01J…`. `accountsQ` is gated to the accounts/contacts
     // screens (use-screen-data.ts), so it is empty on THIS one; `companiesQ`
-    // asks the door directly (2026-08-31 — the same "A client" bug app-detail
+    // asks the door directly (2026-08-31 — the same "An account" bug app-detail
     // had, here because the fallback map was never populated at all rather
     // than paged past). Merged with whatever `accountsQ` happens to already
     // hold (a warm cache from a recent visit to Accounts costs nothing extra).

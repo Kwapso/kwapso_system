@@ -281,7 +281,7 @@ function shapeSprints(sprints: Sprint[], today: string, lang: Language, marks?: 
       // facet says the SAME three words the Overview groups under, so narrowing
       // this list and reading that one are one question asked twice rather than
       // two vocabularies for one idea.
-      account: s.accountName ?? "No client",
+      account: s.accountName ?? "No account",
       app: s.appName ?? "No app",
       state: STATE_HEADING[sprintState(s, today)],
     })),

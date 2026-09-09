@@ -67,7 +67,12 @@
 //     caller that needs "leave it off" puts it in `options` as its own chip,
 //     where it reads as one of the choices rather than as an escape hatch.
 //   • NO `placeholder`. Nothing is closed, so nothing has to say what it would
-//     hold.
+//     hold — `emptyText` is the row's only sentence, and since 2026-09-09 it is
+//     said inside the control layout's own locked shell (`PickerShell`) rather
+//     than as a bare paragraph. That is the client's ruling that the two
+//     layouts' "choose x first" states must look like one thing, and it is why
+//     the trigger's geometry is a shared `shellClass` rather than a class list
+//     spelled at the one place that used to draw it.
 //
 // AND ONE THING IT ADDS: `leadValue`, the option promoted to the front of the
 // line with a divider after it. Today it is the ticket's CURRENT type, which is
@@ -265,6 +270,90 @@ export function Swatch({ colour }: { colour: string }) {
   )
 }
 
+/** THE INK A CONTROL SAYS ITS PLACEHOLDER IN, named because it is now said in
+ * two places and because it is the line the contrast judgement below turns on.
+ *
+ * IT IS `--muted-foreground` AND NOT THE BUTTON'S OWN DISABLED LABEL, and that
+ * is load-bearing rather than incidental. `button.tsx` paints a disabled control
+ * `--btn-disabled-fill` / `--btn-disabled-label` (= `--ink-disabled`), which the
+ * kit deliberately exempts from the contrast law — "disabled means disabled".
+ * Measured against the fill it sits on, `--ink-disabled` is **1.82:1 in light**
+ * (#a8a59f on `--surface-quiet` #E2DDD4) and **2.95:1 in dark** (#76746f on
+ * #2F2D28): fine for a button whose WORD a person has already read and is being
+ * told they may not press, and not fine at all for a sentence that is the only
+ * instruction on the row. This span carries its own colour and therefore wins
+ * over the inherited one, which lands the placeholder at **4.86:1 in light**
+ * (#5f5d59 on #E2DDD4) and **7.03:1 in dark** (#bdb9b1 on #2F2D28) — both over
+ * the 4.5:1 body floor, in both palettes, checked by eye on the form as well as
+ * by arithmetic. So a locked picker is legible while still reading as locked:
+ * the FILL and the missing hairline strength say "you may not touch this", and
+ * the words stay readable enough to act on. Do not "tidy" this into the button's
+ * own disabled ink. */
+const PLACEHOLDER_INK = "text-muted-foreground min-w-0 truncate"
+
+/** THE CONTROL'S OWN GEOMETRY, in one place because TWO branches of this file
+ * draw it: the trigger the control layout opens a list from, and the LOCKED
+ * shell the row layout shows when it has nothing to offer (client, 2026-09-09 —
+ * see that branch for her ruling). One string is what makes "the app field looks
+ * like the module field" a fact rather than two class lists that happen to agree
+ * on the day they were written.
+ *
+ * Square, not pill: this is a form control sitting in a column of inputs, and
+ * the library's own Select trigger is the shape a person reads as one.
+ *
+ * THE GREY OUTLINE, 2026-08-31 — client-reported on this exact dialog's
+ * screenshot: the two picker fields ("Whose system it is", "Stage") sat beside
+ * plain Input/Textarea fields as a solid filled swatch with no edge, while every
+ * other field around them drew the field hairline. `--btn-secondary-fill`
+ * already IS `--card` — the same tone `input.tsx` and `textarea.tsx` fill with —
+ * so the two were never a colour mismatch; a BUTTON carries no border in any
+ * state (button.tsx's own law) and a FIELD does, drawn as this inset-shadow
+ * hairline (never a CSS `border`), which is the one thing missing here. Two
+ * strengths, same as `input.tsx`'s `disabled` split: `--hair-strong` at rest,
+ * the weaker `--hair` once the control is disabled — so a picker a form has
+ * locked reads as locked the same way a text field does. Focus needs nothing
+ * added: tokens.css §8 rings every control the same way already, button or
+ * field. */
+function shellClass(disabled: boolean | undefined): string {
+  return cn(
+    "min-h-9 min-w-0 flex-1 justify-between gap-2 rounded-[var(--radius)] px-3 font-normal",
+    disabled ? "shadow-[var(--hairline)]" : "shadow-[var(--hairline-strong)]"
+  )
+}
+
+/** A PICKER WITH NOTHING TO OFFER, DRAWN AS THE LOCKED CONTROL IT IS.
+ *
+ * The whole of the client's 2026-09-09 ruling in one component: the sentence
+ * ("Choose an account first.", "No contacts yet.") goes INSIDE the control's own
+ * shape instead of standing beside it as a paragraph. The argument, the caret
+ * and the honest asymmetry are all written at the call site in the row branch;
+ * what lives here is only that it is the same `Button` in the same
+ * `shellClass`, wearing the same caret and the same placeholder ink the trigger
+ * wears when nothing is chosen — so the two cannot come apart.
+ *
+ * NO `id` AND NO `ariaLabel`. The row branch's own wrapper is the
+ * `role="group"` that carries both, and a second name on the control inside it
+ * would hide the sentence: `aria-label` REPLACES an element's content as its
+ * accessible name, so labelling this "App" would announce a nameless dimmed
+ * button and swallow the one instruction on the row. Unlabelled, the button's
+ * name IS the sentence, which is what a reader needs to hear.
+ *
+ * `disabled` rather than `aria-disabled`: there is genuinely nothing to do here
+ * until the field above is answered, so the control should not take focus on the
+ * way down a form. */
+function PickerShell({ text }: { text: string }) {
+  return (
+    <div className="flex w-full items-center gap-1">
+      <Button type="button" variant="secondary" disabled className={shellClass(true)}>
+        <span className={`${PLACEHOLDER_INK} flex-1 text-start`} title={text}>
+          {text}
+        </span>
+        <CaretUpDown className="shrink-0 opacity-50" />
+      </Button>
+    </div>
+  )
+}
+
 export function RecordPicker({
   id,
   ariaLabel,
@@ -332,7 +421,7 @@ export function RecordPicker({
    * control. Without it (and without a matching row in `options`) a record being
    * EDITED shows its own id until the door happens to return it. */
   selectedLabel?: string
-  /** The "leave it off" row, where a form has one ("No app", "Ours, no client").
+  /** The "leave it off" row, where a form has one ("No app", "Ours, no account").
    * Rendered first, and it is what the clear X goes back to. */
   emptyOption?: { value: string; label: string }
   disabled?: boolean
@@ -577,13 +666,57 @@ export function RecordPicker({
       // reads comes from `ariaLabel` and the call site must pass it. What the id
       // buys is that the attribute names a real element instead of a ghost.
       <div id={id} role="group" aria-label={ariaLabel ?? searchPlaceholder} className={className}>
-        {/* A ROW WITH NOTHING IN IT IS A REAL STATE AND SAYS SO. The control
-            layout has the same sentence inside its palette (`CommandEmpty`);
-            here there is no palette to put it in, so it takes the chips' own
-            place. It is not hypothetical: a team can deactivate every ticket
-            type on the Choices screen, and a line that simply drew nothing
-            would read as a screen that had failed to finish loading. */}
-        {(options ?? []).length === 0 && <p className="text-muted-foreground text-sm">{emptyText}</p>}
+        {/* A ROW WITH NOTHING IN IT IS A REAL STATE AND SAYS SO — AND SINCE
+            2026-09-09 IT SAYS IT INSIDE A CONTROL RATHER THAN AS A BARE LINE OF
+            TEXT.
+
+            CLIENT RULING, 2026-09-09, on a staging screenshot of the ticket
+            form: "unify how to 'choose x first' looks. i prefer how currently is
+            the modules. make the same for apps." Her screenshot has the two
+            states side by side and the difference is exactly this line. The
+            MODULE field is a control-layout picker held `disabled` with its
+            placeholder in it, so the gate is a real, visibly locked select. The
+            APP field is a row, and a row with no options drew the identical
+            sentence as a naked `<p>` where the control should be — a paragraph
+            of grey text floating in a column of form fields, which reads as a
+            note about the form rather than as the form's own control. Two
+            drawings of one idea, and she picked the one that looks like a
+            control.
+
+            SO THE ROW BORROWS THE CONTROL LAYOUT'S OWN TRIGGER — `PickerShell`
+            below, which both this branch and the trigger further down are built
+            from, so "the same as Module" is one piece of geometry and not two
+            that agree today. Same height, same `--radius`, same secondary fill,
+            same disabled hairline, same caret, same `text-muted-foreground`
+            placeholder ink. There is nothing here for the two to drift on.
+
+            IT KEEPS THE FIELD'S PLACE AND ITS SIZE, which is the argument
+            `help-form-dialog.tsx` already makes at length about these exact two
+            rows: this form has a FIXED ORDER the client dictated field by field,
+            and a row that changes height inside a fixed order moves every field
+            under it as somebody fills the form in. The bare `<p>` was a 20px
+            line where a 36px control was about to appear, so every field below
+            App jumped the moment a client was named. The gate is now the height
+            the control is.
+
+            THE ONE HONEST ASYMMETRY, said out loud rather than hidden: this gate
+            wears the caret, and when it unlocks it becomes CHIPS rather than a
+            list that opens. The caret is what makes it read as "a select that is
+            locked" instead of "a box that failed" — it is the shape she chose —
+            and the alternative, a control with no affordance at all, reads as
+            broken, which is the one thing a disabled control may not do. It
+            carries no `role="combobox"` for the same reason the caret is only
+            skin: this branch is not a combobox and will not become one.
+
+            IT IS NOT HYPOTHETICAL AND IT IS NOT ONLY THE GATE. A team can
+            deactivate every ticket type on the Choices screen ("Your team has no
+            ticket types set up yet."), and a client can have no contacts ("No
+            contacts yet.") — those sentences take the same shell, because
+            "nothing to offer" is one state whatever the reason, and drawing the
+            reason two ways would be the split she has just closed. */}
+        {(options ?? []).length === 0 ? (
+          <PickerShell text={emptyText} />
+        ) : (
         <div className="flex flex-wrap items-center gap-2">
           {lead && (
             // `suggested` and `chosen` are two DIFFERENT questions asked of the
@@ -614,6 +747,7 @@ export function RecordPicker({
             <RowChip key={o.value} option={o} chosen={value === o.value} disabled={disabled} onPick={choose} />
           ))}
         </div>
+        )}
         {note && (
           // THE REASON LINE, under the chips. It is the row's own explanation of
           // what a click here will do, and it is the reason no confirm button is
@@ -662,31 +796,16 @@ export function RecordPicker({
       role="combobox"
       aria-expanded={open}
       disabled={disabled}
-      // Square, not pill: this is a form control sitting in a column of inputs,
-      // and the library's own Select trigger is the shape a person reads as one.
-      //
-      // THE GREY OUTLINE, 2026-08-31 — client-reported on this exact dialog's
-      // screenshot: the two picker fields ("Whose system it is", "Stage") sat
-      // beside plain Input/Textarea fields as a solid filled swatch with no
-      // edge, while every other field around them drew the field hairline.
-      // `--btn-secondary-fill` already IS `--card` — same tone `input.tsx` and
-      // `textarea.tsx` fill with — so the two were never a colour mismatch;
-      // a BUTTON carries no border in any state (button.tsx's own law) and a
-      // FIELD does, drawn as this inset-shadow hairline (never a CSS
-      // `border`), which is the one thing missing here. Two strengths, same
-      // as `input.tsx`'s `disabled` split: `--hair-strong` at rest, the
-      // weaker `--hair` once the control is disabled — so a picker a form
-      // has locked reads as locked the same way a text field does. Focus
-      // needs nothing added: tokens.css §8 rings every control the same way
-      // already, button or field.
-      className={cn(
-        "min-h-9 min-w-0 flex-1 justify-between gap-2 rounded-[var(--radius)] px-3 font-normal",
-        disabled ? "shadow-[var(--hairline)]" : "shadow-[var(--hairline-strong)]"
-      )}
+      // THE SHAPE, THE RADIUS AND THE HAIRLINE ARE `shellClass` (top of this
+      // file) — one string, because the row layout's locked shell draws the
+      // identical control and the client has ruled that the two must look the
+      // same. Its own note carries the 2026-08-31 argument for the grey outline
+      // and the two hairline strengths.
+      className={shellClass(disabled)}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {personMark}
-        <span className={chosen ? "min-w-0 truncate" : "text-muted-foreground min-w-0 truncate"} title={label}>
+        <span className={chosen ? "min-w-0 truncate" : PLACEHOLDER_INK} title={label}>
           {label}
         </span>
       </span>

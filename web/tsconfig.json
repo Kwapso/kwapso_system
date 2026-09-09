@@ -71,6 +71,7 @@
     // use can now turn the build red on a sync. That is the trade being made
     // on purpose — a kit screen that does not compile under Next is something
     // to learn at the sync, not on the day somebody first imports it.
+    "../.next-slidein/types/**/*.ts",
     ".next-avatar-verify/types/**/*.ts",
     ".next-borderfix-verify/types/**/*.ts",
     ".next-breadcrumbs-verify/types/**/*.ts",

@@ -43,6 +43,19 @@ export const GLOSSARY = {
   // this word, not Archive's. So the word is gone from the definition too: a
   // term the app is not allowed to say should not survive as prose here.
   deactivate: { term: "Activate / deactivate", def: "Turn a record on or off without deleting it. Off, it stops being offered, and its history and access survive." },
+  // THE WORD THE SCREENS NOW SAY TOO (her ruling, 2026-09-09): "the filter
+  // client is the company, so it's the account. Rename client to account
+  // everywhere we said client. This was a mistake." The dictionary was already
+  // right — the column is `account_id`, the type is `Account`, the door is
+  // /api/tenancy/accounts — and the INTERFACE was the half saying Client for
+  // this same record. So the facets, the columns, the pickers and the
+  // possessives moved onto this word; nothing about the data model did.
+  //
+  // WHAT DID NOT MOVE, and must not be "finished" later: "client" is still the
+  // right word for the RELATIONSHIP and for the PERSON in it — a portal login
+  // who raises a ticket, replies, is emailed, or may never read the agency's
+  // own notes. R34's registry note refuses to ban the word for exactly that
+  // reason, and `clientVisibility` below is that sense, not this one.
   account: { term: "Account", def: "A company or a person you work with, both live in the same list." },
   // THE OTHER HALF OF `account`, WHICH HAD NO ENTRY (R6, decided 2026-08-19).
   // It is a tab on Accounts with its own server count, the account detail's
@@ -100,7 +113,7 @@ export const GLOSSARY = {
   assistantCredit: { term: "Credit", def: "One request to the assistant. Your team gets a batch free each day, and an admin can add more to the balance." },
   knowledgeBase: { term: "Knowledge base", def: "Everything the assistant is allowed to read, in one place, you can add to it, correct it, and take things out." },
   source: { term: "Source", def: "One piece of material in the knowledge base: a note you wrote, or something the app keeps in step for you." },
-  compartment: { term: "Compartment", def: "The slice of the knowledge base a question is answered from, one client's world, or the agency's own." },
+  compartment: { term: "Compartment", def: "The slice of the knowledge base a question is answered from, one account's world, or the agency's own." },
   citation: { term: "Citation", def: "The source an answer came from. Every answer names its own; an answer with no source isn't one." },
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },

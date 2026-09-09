@@ -59,11 +59,13 @@ function leadingMarkFor(leading: React.ReactNode): React.ReactNode {
       mark?: string | null
       name?: string | null
       shape?: "square" | "round"
-      fit?: "cover" | "contain"
     }
-    const round = p.shape === "round"
-    const cover = (p.fit ?? (round ? "cover" : "contain")) === "cover"
-    return <RecordMarkGlyph picture={p.picture} mark={p.mark} name={p.name} cover={cover} />
+    // NO FIT TO CARRY ACROSS ANY MORE. This used to re-derive `RecordMark`'s
+    // `fit` from the element's own props so the unwrapped glyph cropped the way
+    // the wrapped one would have; the prop is gone (R60, client 2026-09-09 —
+    // every image fills), so the glyph's own unconditional `object-cover` is
+    // already the answer and there is nothing left to keep in step.
+    return <RecordMarkGlyph picture={p.picture} mark={p.mark} name={p.name} />
   }
   return leading
 }

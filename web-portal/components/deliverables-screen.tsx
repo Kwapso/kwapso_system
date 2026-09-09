@@ -188,8 +188,11 @@ export function DeliverablesScreen({ ready }: { ready: PortalReady }) {
                         <RecordMark
                           picture={reachableHere(d.imageUrl) ? d.imageUrl : null}
                           name={d.kind || d.title}
+                          // No `fit`: every picture fills its box (R60, client
+                          // 2026-09-09), so the `cover` this line used to spell
+                          // out is now the mark's only behaviour, on both front
+                          // doors.
                           size="tile"
-                          fit="cover"
                         />
                         <div className="min-w-0 flex-1">
                           {d.kind && (

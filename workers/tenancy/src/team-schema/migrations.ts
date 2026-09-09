@@ -49,8 +49,11 @@ import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, SPRINT_TYPE_CATALOGUE } from "
  * lookup table and not a sequence: nothing here is sorted, deduplicated or
  * renumbered, and an entry that matches no live app leaves the number it names
  * unissued rather than shifting the entries after it up. 0072's own header
- * argues that at length, and names the two entries (#28, #29) that match
- * nothing in the live estate and why neither may be resolved by inference.
+ * argues that at length. It named TWO entries that matched nothing in the live
+ * estate and why neither could be resolved by inference; the client answered
+ * one of them on 9 Sep 2026 (#28 is the app the PLATINUM account holds, under
+ * either of its two names — see `alsoKnownAs` at that entry), and #29 is still
+ * unanswered and still leaves its number unissued.
  *
  * SPELLINGS ARE HERS AND ARE COMPARED EXACTLY, case included — `aWs` at #15 is
  * how the account is really spelled in the database, `re-green` really has a
@@ -64,7 +67,7 @@ import { COMPANY_VOCABULARY, INTERNAL_VOCABULARY, SPRINT_TYPE_CATALOGUE } from "
  * migration, which is frozen the moment it ships;
  * `scripts/backfill-refs-2026-09-01.mjs` holds the same 29 entries as the
  * PROVENANCE record of where they came from, and no longer writes anything. */
-const APP_ORDER_2026_09_01: { name: string; account: string }[] = [
+const APP_ORDER_2026_09_01: { name: string; account: string; alsoKnownAs?: string[] }[] = [
   { name: "CONFIA", account: "Confia" },
   { name: "S4Y Office", account: "Safety4You" },
   { name: "196+ awards", account: "196+" },
@@ -92,7 +95,13 @@ const APP_ORDER_2026_09_01: { name: string; account: string }[] = [
   { name: "Fuhrpark", account: "DEMO" }, // #25 — the OTHER Fuhrpark is #19
   { name: "Kwapso Portal", account: "Kwapso" },
   { name: "Ontime Fuhrpark", account: "Ontime Logistics" },
-  { name: "Platinum", account: "PLATINUM" }, // matches nothing live — see 0072's header
+  // #28 — SHE ANSWERED ON 9 SEP 2026: "Yes, what we now call Platinum (this is
+  // the current name) is what we before called Kennogroup." So this entry names
+  // a real app, and `alsoKnownAs` is the only reason the migration can find it:
+  // her sentence is a statement that TWO NAMES DENOTE ONE APP, and the database
+  // was last seen wearing the older of them. See 0072's header for the full
+  // reasoning and for why the pair guard, not this list, is what proves it.
+  { name: "Platinum", account: "PLATINUM", alsoKnownAs: ["ERP Kennogroup"] },
   { name: "Players", account: "Padelbase" }, // matches nothing live — see 0072's header
 ]
 
@@ -4841,6 +4850,42 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     // Her list has 29 entries; the database has 28 apps; and the residue is not
     // one-for-one. Diagnosed individually against live staging on 9 Sep 2026:
     //
+    // ── #28 IS ANSWERED, AND THIS ENTRY WAS AMENDED RATHER THAN SUPERSEDED ──
+    //
+    // She replied the same day, 9 Sep 2026, verbatim: "Yes, what we now call
+    // Platinum (this is the current name) is what we before called Kennogroup."
+    // So position #28 IS the app the PLATINUM account holds, and the paragraph
+    // below — which refused to guess it — is kept word for word because it is
+    // the record of what was and was not known before she said so.
+    //
+    // AN EDIT TO A SHIPPED MIGRATION IS NORMALLY A LIE, and the header of this
+    // file says so in its second load-bearing sentence: `migrateTeams` applies
+    // these in sequence from wherever a team has reached, so a team that has run
+    // 0072 will never run it again and an edit here would be invisible to it.
+    // That is why the amendment had to be established rather than assumed, and
+    // this is how: **0072 exists only on this branch.** It was introduced by the
+    // HEAD commit (`f29755be`, 9 Sep 2026) and `origin/main`'s copy of this
+    // ledger still ends at `0071_a_losing_candidate_is_still_a_candidate`. The
+    // robot is not a tool, it is the DEPLOYED tenancy worker applying the list
+    // BUNDLED INTO IT (scripts/check-team-migrations.mjs writes that lesson out
+    // at length — it is the deadlock of 27 Aug 2026), and no deployed tenancy
+    // has ever carried this entry. A worker that has never heard of 0072 cannot
+    // have run it, on staging or anywhere else. `npm run migrations:check --
+    // staging` reads `teams.schema_version` off the core database and will say
+    // the same thing out loud for anyone who wants it from the estate rather
+    // than from the history.
+    //
+    // WHICH NAME THE MATCH IS WRITTEN AGAINST. Her sentence says the app is NOW
+    // called Platinum; the diagnosis below found the row still called `ERP
+    // Kennogroup` on the morning of the same day, with `updated_at` NULL. Both
+    // can be true — "what we call it" is not "what the row says" — and the
+    // difference is not something this file may guess at, so the entry names
+    // BOTH (`alsoKnownAs`) and lets the guards decide. The COUNT(*) = 1 test is
+    // widened with the match, so if that account ever holds one app under each
+    // name the pair identifies two rows and numbers neither, exactly as it does
+    // for the two Fuhrparks. There is no spelling of this that numbers the wrong
+    // app: the worst case is the gap we already had.
+    //
     //   #28 "Platinum" (account PLATINUM) — the ACCOUNT called PLATINUM exists
     //       and holds exactly one app, which is named `ERP Kennogroup`. That app
     //       has `updated_at` NULL and not a single `activity` row: it has been
@@ -4859,14 +4904,20 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     // the list is not a list of apps only — so "the one entry left must be the
     // one app left" stops being arithmetic and becomes a guess, and the guess
     // would be printed on a client-facing record forever. `ERP Kennogroup`
-    // therefore ENDS THIS MIGRATION WITH NO NUMBER, and the honest question goes
-    // back to her: is #28 the system we hold as "ERP Kennogroup"? One sentence
-    // from her turns into one more migration; a wrong number does not come back.
+    // therefore ended the FIRST draft of this migration with no number, and the
+    // honest question went back to her: is #28 the system we hold as "ERP
+    // Kennogroup"? One sentence from her turns into one number; a wrong number
+    // does not come back. **She said yes** — see the amendment above, which is
+    // where #28 now gets its number and why an edit to this entry is honest.
+    // #29 IS STILL UNANSWERED AND STILL UNNUMBERED, and the argument above is
+    // unchanged for it: it is demonstrably not an app, so nothing may be
+    // inferred into it. A0029 stays unissued.
     //
     // BOTH ENTRIES ARE NEVERTHELESS TRANSCRIBED BELOW, at their own positions,
-    // because the SQL matches on an exact (name, account) pair and therefore
-    // matches nothing today. Dropping them from the list would silently shorten
-    // it; leaving them in records what she actually said, and costs a comparison.
+    // and #29's still matches nothing because the SQL requires an exact (name,
+    // account) pair. Dropping either from the list would silently shorten it and
+    // move every position after it; leaving them in records what she actually
+    // said, and costs a comparison.
     //
     // ── THE COUNTER, AND WHY IT IS PARKED PAST THE WHOLE LIST ──────────────
     //
@@ -4880,11 +4931,16 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     //      minted through the door, and its counter must stay at 3.
     //   2. to one past the LENGTH OF HER LIST, but ONLY on a team where this
     //      migration actually numbered something from it. Without this the next
-    //      app created here would mint A0028 — which is a position she has
-    //      already spoken for. The two open positions stay open until she says
-    //      what belongs in them, and a burnt number costs nothing (gaps are
-    //      already the correct outcome here) while a stolen position costs the
-    //      order she dictated.
+    //      app created here would mint a number she has already spoken for.
+    //      IT IS STILL 30 NOW THAT #28 IS FILLED, and that is the property to
+    //      re-check whenever this list is touched: the floor is the list's
+    //      LENGTH plus one, and answering a position does not change how many
+    //      positions there are — 29 entries, `A0030` reserved, before and after.
+    //      What changed is which floor binds: statement 1 now reaches A0029
+    //      (one past the highest number stored) instead of A0028, and 30 is
+    //      still the higher of the two, so #29 stays hers until she answers.
+    //      A burnt number costs nothing (gaps are already the correct outcome
+    //      here) while a stolen position costs the order she dictated.
     //
     // ── WAVES HAD NO ORDER, SO THEY GET THE OBJECTIVE ONE ──────────────────
     //
@@ -5127,16 +5183,36 @@ function appAndWaveNumberSql(): string {
    * be one of these entries, because every entry names an account. */
   const wanted = APP_ORDER_2026_09_01.map((e, i) => {
     const becomes = sqlString(canonicalRef(app, i + 1))
-    const name = sqlString(e.name)
     const account = sqlString(e.account)
-    const pair = `a2.name = ${name} AND ac2.name = ${account} AND a2.ref IS NULL`
+    /** THE NAMES THIS POSITION ANSWERS TO — hers first, then any the client has
+     * told us is the SAME APP under a different word.
+     *
+     * ONE ENTRY HAS ONE TODAY (#28) and the reason is written at the entry. An
+     * `IN` list rather than a second statement per alias, because two statements
+     * could both match and number one app twice under two positions; one
+     * statement with a widened name test cannot. And an `IN` over string
+     * LITERALS is an expression list, not a compound SELECT — the D1 ceiling
+     * this migration is shaped around (`d1-compound-cap.test.ts`) counts
+     * SELECT terms, so this costs nothing against it.
+     *
+     * IT DOES NOT LOOSEN ONE GUARD. The COUNT(*) test below is widened with it,
+     * so an account holding BOTH an `ERP Kennogroup` and a `Platinum` — the one
+     * way an alias could become an ambiguity — matches two rows and numbers
+     * neither, which is the Fuhrpark refusal doing exactly its job on a second
+     * shape. The account is still required, the target number must still be
+     * free, and a numbered app is still never overwritten. */
+    const names = [e.name, ...(e.alsoKnownAs ?? [])].map(sqlString)
+    const nameTest = (col: string) =>
+      names.length === 1 ? `${col} = ${names[0]}` : `${col} IN (${names.join(", ")})`
+    const pair = `${nameTest("a2.name")} AND ac2.name = ${account} AND a2.ref IS NULL`
+    const alias = e.alsoKnownAs?.length ? `  [or ${e.alsoKnownAs.join(", ")}]` : ""
     return `
--- #${i + 1} → ${canonicalRef(app, i + 1)}  ${e.name} (${e.account})
+-- #${i + 1} → ${canonicalRef(app, i + 1)}  ${e.name} (${e.account})${alias}
 INSERT INTO _numbering_0072 (entity_table, row_id, becomes)
 SELECT '${APPS}', a.id, ${becomes}
   FROM ${APPS} a
   JOIN accounts ac ON ac.id = a.account_id
- WHERE a.name = ${name} AND ac.name = ${account} AND a.ref IS NULL
+ WHERE ${nameTest("a.name")} AND ac.name = ${account} AND a.ref IS NULL
    AND (SELECT COUNT(*) FROM ${APPS} a2 JOIN accounts ac2 ON ac2.id = a2.account_id
          WHERE ${pair}) = 1
    AND NOT EXISTS (SELECT 1 FROM ${APPS} x WHERE x.ref = ${becomes});`
@@ -5218,12 +5294,14 @@ SELECT '${app}', MAX(${refNumberSql("ref")}) + 1
 -- to — the guard is the plan itself, so a team that matched nothing (the smoke
 -- team holds A0001 and A0002 and has never heard of any of these names) keeps
 -- the counter the statement above gave it. Without this the statement above is
--- the only floor, which is one past the HIGHEST POSITION FILLED — on staging
--- that is ${canonicalRef(app, 28)}, and ${canonicalRef(app, 28)} is position #28 on her list, one of the two
--- she has spoken for and has not yet been asked about. The floor here is one
--- past the END of the list instead (${canonicalRef(app, APP_ORDER_2026_09_01.length + 1)}), so every position she dictated stays
--- hers until she answers. A burnt number costs nothing — gaps are already the
--- correct outcome here — while a stolen position costs the order she dictated.
+-- the only floor, which is one past the HIGHEST POSITION FILLED — on staging,
+-- now that #28 is answered, that is ${canonicalRef(app, APP_ORDER_2026_09_01.length)}, and ${canonicalRef(app, APP_ORDER_2026_09_01.length)} is position #29 on her
+-- list, the one she has spoken for and has not yet been asked about. The floor
+-- here is one past the END of the list instead (${canonicalRef(app, APP_ORDER_2026_09_01.length + 1)}) — DERIVED from the list's
+-- own length, so answering a position never moves it: 29 entries before and 29
+-- after, and the reservation stays where it was. Every position she dictated
+-- stays hers until she answers. A burnt number costs nothing — gaps are already
+-- the correct outcome here — while a stolen position costs the order she dictated.
 -- \`MAX(<a constant>)\` and not the bare constant: \`HAVING\` is only legal on an
 -- aggregate query, and this needs to be one so that a plan holding NO app rows
 -- yields no row at all rather than a counter set on a team that matched nothing.

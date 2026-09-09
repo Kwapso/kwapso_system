@@ -100,21 +100,143 @@ const SCRIM = ["fixed inset-0 z-[60]", "bg-scrim", "motion-scrim"] as const;
    ------------------------------------------------------------------------- */
 const POSITIONER = [
   "pointer-events-none fixed inset-0 z-[60]",
-  "grid grid-cols-[minmax(0,auto)] place-items-center",
-  // Mobile takes the panel inset (24), tablet and up take the kit's scrim
-  // inset (32). See the breakpoint note on DialogContent.
-  "p-[var(--space-6)] sm:p-[var(--space-7)]",
+  "grid grid-cols-[minmax(0,auto)]",
 ] as const;
 
+/* ----------------------------------------------------------------------------
+   PRESENTATION — WHERE THE ONE SURFACE LANDS. Four answers, one modal.
+
+   `overlay` is the drawing this file has always made and is the DEFAULT, so
+   the 115 call sites that pass nothing get the same classes they got
+   yesterday — the one-sentence test in docs/RULES.md §0, held on purpose.
+   `sheet` is the kit's bottom sheet at every width; `fullscreen` is the
+   surface with no gutter and no corner; `responsive` is `overlay` at 45rem
+   and up and `sheet` below it.
+
+   WHY THIS IS HERE AND NOT AT A CALL SITE. The consuming app's screen engine
+   draws exactly these four presentations, and could only do so by reaching
+   past this component to the Radix primitive underneath it — its own law
+   (kwapso-system R39, `UI_PACKAGE_EXEMPT`) records the reach as the app's
+   last exemption and names the fix: "a `presentation` prop on the kit's
+   DialogContent. Delete this line the day it ships." A second dialog drawn
+   from the same primitive is two dialogs that can disagree about a scrim, a
+   radius or an entrance without either file changing. This is the one.
+
+   WHY `responsive` IS NOT THE DEFAULT, STATED SO IT IS NOT MISTAKEN FOR AN
+   OVERSIGHT. The client's rule of 2026-09-04 — "everythung that's slisde in
+   in desktop, should be slide up in mobile" — is about panels that ARRIVE
+   FROM THE SIDE, and `sheet.tsx` applied it to `left` and `right` and left
+   `top` and `bottom` alone for that reason. A centred modal does not arrive
+   from a side; it rises 8 and fades. Whether every modal on a phone should
+   become a bottom sheet is therefore a ruling this rule does not already
+   contain, and it is a change to 115 screens. The prop makes it one word
+   per call site, or one default here, the day it is ruled. Logged, not
+   guessed.
+
+   THE GEOMETRY BELOW 45rem IS `sheet.tsx`'S, LINE FOR LINE. The narrow
+   half of `responsive` is the `sheet` presentation with `max-[45rem]:` in
+   front of each class and nothing else changed, so the two cannot drift —
+   the same construction `NARROW_BOTTOM` uses in `sheet.tsx`, for the same
+   reason it gives: "Two kinds of bottom sheet on one phone would be a worse
+   answer than the side drawer we started with." The cap is the same 85dvh,
+   the corners are the same top pair, and the grabber below is the drawer's
+   own grabber (27.2: "On narrow it rises from the bottom as a sheet with a
+   grabber"), so a dialog that lands as a sheet reads as THE sheet.
+
+   ONE THING IS DELIBERATELY NOT THE DRAWER'S: the 32 inset. `.kw-drawer`
+   hands its body 24 and `.kw-modal` states 32, and this surface is still a
+   modal's content — the h3 title, the 14/300 body, the action row — that
+   has landed somewhere else. The presentation changes where it lands, not
+   what it is, and shrinking the inset "would break the one measurement the
+   kit does state" (the breakpoint note on DialogContent, unchanged).
+
+   WHY THE BREAKPOINT IS `45rem` AND NOT `sm:` (40rem). The sheet's own
+   threshold is 45rem — 720px at the authoring base, the figure ch27.2,
+   ch27.4, ch27.14 and ch27.37 all state — and the drawer flips there. A
+   modal that became a sheet at 40rem would be a sheet on a viewport the
+   drawer still treats as a desktop; one threshold for both surfaces, so
+   the phone is one thing. Above it `responsive` takes the overlay's 32
+   gutter directly: the 24 gutter `overlay` draws below `sm` never shows,
+   because below 45rem there is no gutter at all.
+
+   WHY CSS AND NOT `matchMedia`, in one sentence borrowed from `sheet.tsx`:
+   a JS read at render gives the server the desktop answer and the client
+   the phone answer, and a media query has no first frame to get wrong.
+   ------------------------------------------------------------------------- */
+export type DialogPresentation = "responsive" | "overlay" | "sheet" | "fullscreen";
+
+/* The grid's alignment and gutter, per presentation. `place-items-center`
+   sets both axes; the narrow overrides are the two longhands, so a later
+   `align-items: end` beats the shorthand's own and `justify-items: stretch`
+   lets the surface take the track. The gutter for `sheet` and `fullscreen`
+   is none: a surface pinned to an edge has nothing to be inset from. */
+const LANDING: Record<DialogPresentation, string> = {
+  /** `.kw-modal`: centred, 24 gutter on a phone, the kit's 32 from `sm`. */
+  overlay: "place-items-center p-[var(--space-6)] sm:p-[var(--space-7)]",
+  /** Pinned to the block end, full width, no gutter. */
+  sheet: "items-end justify-items-stretch",
+  /** Every edge. */
+  fullscreen: "place-items-stretch",
+  /** `overlay` from 45rem up, `sheet` below — each class the other's. */
+  responsive: [
+    "place-items-center min-[45rem]:p-[var(--space-7)]",
+    "max-[45rem]:items-end max-[45rem]:justify-items-stretch",
+  ].join(" "),
+};
+
 /* `.kw-modal` — 460 wide, box radius, overlay shadow, 32 inset. `max-w-full`
-   is the kit's own rule, so the same class is the phone treatment. */
+   is the kit's own rule, so the same class is the phone treatment. The
+   surface's own classes — what does not change with where it lands. */
 const CONTENT = [
-  "pointer-events-auto relative flex w-[28.75rem] max-w-full flex-col",
-  "max-h-full overflow-y-auto",
+  "pointer-events-auto relative flex flex-col",
+  "overflow-y-auto",
   "bg-popover text-popover-foreground",
-  "rounded-[var(--radius)] shadow-xl", // shadow-xl is bridged to --shadow-overlay
+  "shadow-xl", // shadow-xl is bridged to --shadow-overlay
   "p-[var(--space-7)]",
+  // One class, every presentation: motion.css §3d reads `data-presentation`
+  // off this element the way §3a reads `data-side` off the sheet's, so the
+  // sheet travel and the narrow flip are decided in the stylesheet.
   "motion-dialog",
+] as const;
+
+/* The `sheet` presentation's own four, and — with `max-[45rem]:` in front
+   of each, nothing else — the narrow half of `responsive`. Written out
+   twice rather than derived so a reader can see they are the same lines. */
+const SHEET_SHAPE = "w-full max-h-[85dvh] rounded-t-[var(--radius)] rounded-b-none";
+const NARROW_SHEET_SHAPE = [
+  "max-[45rem]:w-full",
+  "max-[45rem]:max-h-[85dvh]",
+  "max-[45rem]:rounded-t-[var(--radius)]",
+  "max-[45rem]:rounded-b-none",
+].join(" ");
+
+/* The surface's size and corners, per presentation. `rounded-t-*` beside
+   `rounded-b-none` rather than `rounded-none` first, for the reason
+   `sheet.tsx` gives at `NARROW_BOTTOM`: they touch four different corners
+   between them and share none, so emission order cannot change the result. */
+const SHAPE: Record<DialogPresentation, string> = {
+  /** 460, never wider than its gutter, never taller than its track. */
+  overlay: "w-[28.75rem] max-w-full max-h-full rounded-[var(--radius)]",
+  /** The kit's bottom sheet: 85dvh cap, corners on the top pair only. */
+  sheet: SHEET_SHAPE,
+  /** The whole track, no corner — a page, not a card. */
+  fullscreen: "h-full w-full max-h-full rounded-none",
+  /** The overlay's, then the sheet's below 45rem. */
+  responsive: `w-[28.75rem] max-w-full max-h-full rounded-[var(--radius)] ${NARROW_SHEET_SHAPE}`,
+};
+
+/* THE GRABBER — `sheet.tsx`'s, in the same tone at the same size: 42 × 4, a
+   pill in the strong hairline tone, 10 from the top, centred. Absolute
+   rather than in flow because this surface carries the modal's 32 inset and
+   a flow grabber would sit 32 down; the drawer has no inset of its own and
+   can let it flow. Decorative — dismissal is the scrim, the ✕ and Escape,
+   all of which Radix already owns — so it is `aria-hidden` and takes no
+   pointer. `hidden` and `block` are given per case rather than stacked, for
+   the reason the drawer gives: two `display` utilities of equal specificity
+   would leave the winner to emission order. */
+const GRABBER = [
+  "pointer-events-none absolute inset-x-0 top-[var(--space-2h)] mx-auto",
+  "h-1 w-[2.625rem] rounded-pill bg-[var(--hair-strong)]",
 ] as const;
 
 /* `.kw-drawer__close` — a 32 pill in the panel tone carrying secondary ink.
@@ -149,6 +271,15 @@ export interface DialogContentProps
    * Urdu and Persian.
    */
   closeLabel?: string;
+  /**
+   * Where the surface lands. `overlay` (the default) is the centred card
+   * this component has always drawn; `sheet` is the kit's bottom sheet at
+   * every width; `fullscreen` fills the viewport; `responsive` is `overlay`
+   * from 45rem up and `sheet` below it, decided by a media query and never
+   * by a viewport read. See the PRESENTATION note above for why the default
+   * is unchanged and why the threshold is the drawer's own 45rem.
+   */
+  presentation?: DialogPresentation;
 }
 
 /**
@@ -198,23 +329,59 @@ export interface DialogContentProps
  *  overflow-y-auto`) rather than pushing the page, so a long dialog on a phone
  *  in landscape stays reachable.
  *
+ *  The three lines above describe `presentation="overlay"`, the default, and
+ *  are unchanged. `responsive` is that surface from 45rem up and, below it,
+ *  the bottom sheet `sheet.tsx` draws — full width, capped at 85dvh, rounded
+ *  on its top pair, a grabber at its top — anchored by a media query so the
+ *  server and the client paint the same first frame. `sheet` is that sheet at
+ *  every width and `fullscreen` is the track with no gutter and no corner at
+ *  every width; neither restacks. Measured in verify/dialog-presentation.
+ *
  * RTL — safe. The dialog is centred by `place-items-center`, not by a
  * translate, and the close chip is placed with `end-*`. No physical side is
- * named anywhere in this file.
+ * named anywhere in this file; a sheet is pinned to the block end, which has
+ * no direction.
  */
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, showClose = true, closeLabel = "Close", ...props }, ref) => (
+>(
+  (
+    {
+      className,
+      children,
+      showClose = true,
+      closeLabel = "Close",
+      presentation = "overlay",
+      ...props
+    },
+    ref,
+  ) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay data-slot="dialog-overlay" className={cn(SCRIM)} />
-    <div data-slot="dialog-positioner" className={cn(POSITIONER)}>
+    <div
+      data-slot="dialog-positioner"
+      data-presentation={presentation}
+      className={cn(POSITIONER, LANDING[presentation])}
+    >
       <DialogPrimitive.Content
         ref={ref}
         data-slot="dialog-content"
-        className={cn(CONTENT, className)}
+        /* motion.css §3d selects on this. Radix sets data-state itself. */
+        data-presentation={presentation}
+        className={cn(CONTENT, SHAPE[presentation], className)}
         {...props}
       >
+        {presentation === "sheet" || presentation === "responsive" ? (
+          <span
+            data-slot="dialog-grabber"
+            aria-hidden="true"
+            className={cn(
+              GRABBER,
+              presentation === "sheet" ? "block" : "hidden max-[45rem]:block",
+            )}
+          />
+        ) : null}
         {children}
         {showClose ? (
           <DialogPrimitive.Close

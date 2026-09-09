@@ -31,6 +31,7 @@ import { ViewSwitch } from "@shared/ui/components/collection-frame/view-switch"
 import { List, ChartBarHorizontal } from "@shared/ui/foundations/icons"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
+import { RecordMark } from "@shared/web/record-mark"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
@@ -171,7 +172,7 @@ export function WaveFinder({
       ? [
           {
             field: "accountId",
-            label: t("Client"),
+            label: t("Account"),
             control: "select" as const,
             // No `searchable` flag here: a facet declares its OPTIONS and
             // nothing about how they are picked over (`FilterFacet`,
@@ -183,7 +184,19 @@ export function WaveFinder({
             // (2026-09-02 through v1.2.26) could search, only scroll — the
             // kit's `CompactFacet` (v1.2.27) answers it now, and the toolbar's
             // own search box beside it is untouched.
-            options: clients.map((a) => ({ value: a.id, label: a.name })),
+            // EACH ONE WEARING ITS OWN FACE — client ruling, 2026-09-09:
+            // "for accounts include icon in select components and filters".
+            // `size="choice"` is the dense mark size the picker rows and the
+            // tickets toolbar's own facets already use; drawn for EVERY option
+            // and not only the ones with a logo, because `RecordMark` falls
+            // through to the account's initial and only 48 of 134 accounts on
+            // staging carry a picture — a mark that appeared only where the
+            // data happened to be would leave two rows in three blank.
+            options: clients.map((a) => ({
+              value: a.id,
+              label: a.name,
+              mark: <RecordMark picture={a.logoUrl} name={a.name} size="choice" />,
+            })),
           },
         ]
       : []),
@@ -301,7 +314,7 @@ export function WaveFinder({
           options={[
             { value: "newest", label: t("Newest first") },
             { value: "name", label: t("Name") },
-            { value: "client", label: t("Client") },
+            { value: "client", label: t("Account") },
             { value: "runs", label: t("When it runs") },
             { value: "sprints", label: t("Sprints inside it") },
           ]}

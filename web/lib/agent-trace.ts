@@ -305,7 +305,10 @@ export function traceFor(
     // A ROLE'S price sits on the same card, on the same settings screen, for the
     // same reason: it is a handful of lines read whole, with no per-row URL.
     case "set_role_rate":
-      return { path: `/t/${teamId}`, highlight: "main" }
+      // The internal rate card's own section. It used to be spelled `/t/<team>`
+      // — the team overview, which carried the rates tab strip — and that screen
+      // was deleted on 2026-09-09, so the trace names the card's own segment.
+      return { path: seg(teamId, "internal-rates"), highlight: "main" }
 
     /* ----------------------------- the work engine -------------------------- */
     // These all used to land on one Work page, because there was one — the
@@ -416,10 +419,13 @@ export function traceFor(
       return { path: `${seg(teamId, "members")}/${str(input, "userId")}`, highlight: "main" }
 
     /* --------------------------------- team -------------------------------- */
-    // Rename the team → the team Overview (the bare /t/<team> path), where the new
-    // name now shows. (Not the edit dialog — the rename is already saved.)
+    // Rename the team → /kwapso, the agency's own Details page, which titles
+    // itself with the team's name and is where the name and logo are edited now.
+    // It used to be the bare `/t/<team>` team overview; the client deleted that
+    // screen on 2026-09-09 ("This overview about the team should not even
+    // exist"), and a trace may not land on a screen that is not there.
     case "update_team":
-      return { path: `/t/${teamId}`, highlight: "main" }
+      return { path: "/kwapso", highlight: "main" }
 
     // Reads (list_*, and anything else) — nothing to open on screen.
     default:

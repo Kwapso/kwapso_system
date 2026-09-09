@@ -61,7 +61,7 @@ export function triageGaps(t: TriageSubject): TriageGap[] {
  * outside the i18n catalogue (R28 walks the front doors' import closure). */
 export const TRIAGE_GAP_ENGLISH: Record<TriageGap, string> = {
   type: "a ticket type",
-  client: "a client",
+  client: "an account",
   app: "an app",
   raisedBy: "who raised it",
 }

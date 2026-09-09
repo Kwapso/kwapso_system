@@ -39,6 +39,10 @@
 // taking the position the eyebrow row used to hold — the same ruling kills the
 // eyebrow one sentence earlier, so it cannot also be asking for one.
 
+// Type-only: this file renders no hooks and no state of its own — `action` is a
+// node it is handed and places, so React is imported for the type and nothing else.
+import type * as React from "react"
+
 import { Badge } from "@shared/ui/components/badge/badge"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { formatCount } from "@shared/web/format-count"
@@ -49,11 +53,35 @@ import { useT } from "@shared/web/language"
 export function CollectionHeading({
   sectionKey,
   total,
+  action,
 }: {
   /** the module-registry key — the title comes from there, never a literal. */
   sectionKey: string
   /** the exact server total (undefined while loading → the chip renders nothing). */
   total: number | undefined
+  /** THE SCREEN'S OWN DOOR, pinned to the far right of the title line. One
+   * control, icon-only, and it is deliberately NOT the collection's.
+   *
+   * WHY IT IS NOT IN THE TOOLBAR, which is where this app puts a button. The
+   * client's 2026-08-31 ruling — "never align the button with the tabs … that
+   * button belongs in the right of the toolbar, part of the toolbar" — was
+   * about "Raise ticket", and it is right about it: creating a ticket is
+   * something you do TO the collection, so it belongs in the row that searches,
+   * filters and sorts that collection. A module's settings gear is not about
+   * the collection at all, and R50 makes the difference load-bearing rather
+   * than philosophical: `<ToolbarRow>` returns null on an empty collection,
+   * before any slot is considered, so a gear in `actions` would disappear from
+   * a team that has no tickets yet — which is the exact moment somebody goes
+   * looking for the ticket types. A door out of a screen cannot be gated on
+   * the screen having rows.
+   *
+   * ONE CONTROL, and the title still leads. `justify-between` only appears when
+   * something is passed, so every screen that passes nothing renders the
+   * byte-identical `<h1>` it rendered before this prop existed — the eyebrow
+   * ruling ("nothing above it") and the no-glyph ruling (nothing before the
+   * word) both stand untouched, because this sits AFTER the word, on the far
+   * side of the line. */
+  action?: React.ReactNode
 }) {
   // ARBITRATION (R16 iii): a counted tab strip wins THE COUNT. It does not win
   // the page's name.
@@ -75,7 +103,7 @@ export function CollectionHeading({
   const section = TEAM_SECTIONS.find((s) => s.key === sectionKey)
   const title = section?.title ?? sectionKey
   const badge = countStandsDown ? "" : formatCount(total)
-  return (
+  const heading = (
     /* CLIENT CORRECTION, 2026-08-31, verbatim: "title on main screens still
        way too small! it's currently smaller than in detail screens. makes no
        sense." The reference "Kwapso UI Kit.dc.html" scale names this step
@@ -92,5 +120,15 @@ export function CollectionHeading({
       {t(title)}
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
     </Headline>
+  )
+  // NOTHING PASSED, NOTHING WRAPPED — the heading is returned exactly as it was
+  // before `action` existed, so the fourteen screens that do not take a door out
+  // are not asked to pay a div for a prop they never use.
+  if (!action) return heading
+  return (
+    <div className="flex items-start justify-between gap-3">
+      {heading}
+      {action}
+    </div>
   )
 }

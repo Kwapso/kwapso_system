@@ -193,7 +193,7 @@ export function SprintDetailScreen({
     // always describing. The DATES are still the ones somebody agreed; this
     // number is what to expect, said beside them.
     { label: t("Type"), value: kindLine },
-    { label: t("Client"), value: sprint.accountName || "Ours, no client" },
+    { label: t("Account"), value: sprint.accountName || "Ours, no account" },
     { label: t("App"), value: sprint.appName || "—" },
     // THE PACKAGE IT WAS SOLD INSIDE. A sprint can be sold on its own, so "—" is
     // an ordinary answer rather than a gap. Where there IS a wave the name is a

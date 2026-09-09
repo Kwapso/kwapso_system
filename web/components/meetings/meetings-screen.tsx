@@ -47,6 +47,7 @@ import { translatedFacets } from "@/lib/collection-filters"
 import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
 import { RecordTable, visibleActions, type TableColumn } from "@/components/records/record-table"
+import { RecordMark } from "@shared/web/record-mark"
 import { shapeMeetingsList } from "@/components/deep-link/shape"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { appsKey, listFetch, meetingsKey, meetingsMonthKey, totalKey } from "@/lib/live-resources"
@@ -89,7 +90,7 @@ import { useLanguage } from "@shared/web/language"
 const ALL_COLUMNS = [
   field("name", "Meeting"),
   field("when", "When"),
-  field("client", "Client"),
+  field("client", "Account"),
   field("app", "App"),
   field("where", "Where"),
   field("state", "Status"),
@@ -398,7 +399,28 @@ export function MeetingsScreen({
         // lists and are DROPPED rather than drawn empty for whoever cannot — the
         // same rule the bounded recipes follow about a facet with no options.
         facets={translatedFacets("meetings", t, {
-          accountId: (accountsQ.data ?? []).map((a) => ({ value: a.id, label: a.name })),
+          // THE ACCOUNT, WEARING ITS OWN FACE — client ruling, 2026-09-09: "for
+          // accounts include icon in select components and filters". The
+          // tickets toolbar's own Account facet has drawn one since 2026-09-07
+          // and this one drew a word, so the same record was a picture on one
+          // screen's filter and a bare name on the next.
+          //
+          // `size="choice"` is the dense mark size every picker option and every
+          // other marked facet uses — the same one the app facet beside it on
+          // the tickets toolbar takes — so nothing here decides a new size.
+          //
+          // AND IT IS DRAWN FOR EVERY ROW, never only for the rows that have a
+          // logo: `RecordMark` falls through to the account's own initial on
+          // `bg-muted`, which is the deliberate placeholder rather than an empty
+          // box. That matters more here than anywhere: on staging only 48 of 134
+          // accounts carry a picture, so the fallback IS the common case and a
+          // mark drawn only where the data happened to be would be a ragged
+          // column of two thirds nothing.
+          accountId: (accountsQ.data ?? []).map((a) => ({
+            value: a.id,
+            label: a.name,
+            mark: <RecordMark picture={a.logoUrl} name={a.name} size="choice" />,
+          })),
           purposeId: (purposesQ.data ?? [])
             .filter((pp) => pp.active)
             .map((pp) => ({ value: pp.id, label: pp.name })),
@@ -761,7 +783,13 @@ export function MeetingsScreen({
         onOpenChange={setOpen}
         draftKey={`meeting:add:${teamId}`}
         teamId={teamId}
-        accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW, NOT A COPY OF TWO OF ITS FIELDS. `PickableRecord`
+        // (web/lib/pickable.ts) is deliberately the loosest shape that carries a
+        // face, and an `Account` structurally satisfies it — so the `.map((a) =>
+        // ({ id, name }))` that used to sit here was the exact line that type
+        // exists to end, dropping `logoUrl` one hop before the picker that draws
+        // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
         appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         onSubmit={add}

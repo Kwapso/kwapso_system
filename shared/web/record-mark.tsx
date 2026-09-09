@@ -17,33 +17,53 @@
 // THE RULE, in one sentence: a record shows its picture, and where it has none it
 // shows a deliberate mark in the same box, at the same size, in the same slot.
 //
-// THE BOX AND THE FIT ARE TWO QUESTIONS, and reading them as one is what this
-// component got wrong first. The BOX says what KIND OF RECORD this is. The FIT
-// says what kind of PICTURE it is holding. They correlate — most circles hold
-// faces and most squares hold wordmarks — but they are not the same question,
-// and the day they disagreed the coupling had to go:
+// THE BOX IS A QUESTION. THE FIT IS NOT ONE ANY MORE (client, 2026-09-09).
 //
 //   • the BOX. A CLIENT is a rounded square, whether it is a company or a sole
 //     trader, because both sit in one column of one list and two shapes there
 //     read as two kinds of thing when the product has one. A PERSON IN THEIR OWN
 //     RIGHT — a team member, a staff profile — stays a circle. An APP, an ASSET
 //     is a rounded square like the client it belongs to.
-//   • the FIT. A FACE is cropped to its box (`object-cover`) — a face shown whole
-//     inside a square is a face with grey bars down its sides. A LOGO is shown
-//     WHOLE (`object-contain`); a wordmark is the usual case and cropping one to
-//     a square is how a logo becomes unreadable.
+//   • the FIT is `object-cover`, ALWAYS. A picture fills its box and is cropped
+//     to it; it is never shrunk to sit whole inside one. See below.
 //   • the FALLBACK is the record type's own glyph where the type has one (the
 //     team's type mark, an app's stage mark), and the first letter of its name
 //     where it does not. Never an empty box, and never a broken picture.
 //
-// WHY THE TWO CAME APART. Accounts were drawn a circle for an individual and a
-// square for a company, which is the honest rule and was, side by side in one
-// list, the wrong-looking one. Squaring the individuals is a one-word change —
-// except that 31 of the 106 individual accounts hold a REAL FACE in `logo_url`
-// (`scripts/glide-visuals.mjs` put them there), so squaring them while the fit
-// still followed the shape would have letterboxed all 31 in the same commit that
-// was meant to tidy them up. Hence `fit`: the caller squares the box and keeps
-// the crop, and neither decision is hidden inside the other.
+// THE FIT USED TO BE A `fit` PROP, AND THE CLIENT REMOVED IT — 2026-09-09,
+// blanket and unhedged: *"everywhere for images: do fill, not fit!"* R60 is that
+// ruling as a law (`web/test/an-image-fills.test.ts`) and this file is its
+// biggest single site, so the argument the prop used to carry is recorded here
+// rather than deleted with it.
+//
+// WHAT THE PROP WAS FOR. The FIT and the BOX were split apart on 19 Aug 2026
+// because they genuinely disagreed once: accounts were drawn a circle for an
+// individual and a square for a company, which is the honest rule and was, side
+// by side in one list, the wrong-looking one. Squaring the individuals was a
+// one-word change — except that 31 of the 110 individual accounts hold a REAL
+// FACE in `logo_url` (`scripts/glide-visuals.mjs` put them there; counted live
+// on staging again on 2026-09-09), and the fit still followed the shape, so
+// squaring them would have letterboxed all 31 in the commit meant to tidy them
+// up. Hence `fit`: the caller squared the box and kept the crop.
+//
+// WHY IT IS GONE ANYWAY, and this is the part worth being straight about. The
+// prop's DEFAULT for a square was `contain`, and the reasoning was that a
+// wordmark is the usual case for a company and cropping one to a square is how a
+// logo becomes unreadable. That is still TRUE, and the client has ruled against
+// it knowing what it costs: a wide wordmark in a 24px square now loses its ends
+// and shows the middle. She has been told and it is the intent — *"do fill, not
+// fit"* is a ruling about how the product LOOKS as a whole, and what it was
+// weighed against is real: on staging 48 of 134 accounts carry a picture at all,
+// so on nearly two rows in three the box holds a letter on `bg-muted` and is the
+// same solid square either way. A contained logo beside those reads as a smaller,
+// paler, differently-shaped mark in a column that is otherwise flush — grey bars
+// down the sides of one row in three. One shape, filled, is what she asked for.
+//
+// SO THERE IS NOTHING LEFT TO PASS. `fit` was removed rather than defaulted to
+// `cover`, because a prop whose only legal value is the default is a hole the
+// next `contain` climbs back in through, and R60's census reads the CLASS NAME:
+// a ternary here would put the losing string back in this file and turn the law
+// red where it stands.
 //
 // A PICTURE THAT FAILS TO LOAD FALLS BACK TO THE MARK. That is the whole reason
 // this holds state rather than being a ternary, and the reason it is a component
@@ -169,7 +189,6 @@ export function RecordMarkGlyph({
   picture: stored,
   mark,
   name,
-  cover = false,
 }: {
   /** The stored path to the record's own picture, if it has one. */
   picture?: string | null
@@ -177,10 +196,6 @@ export function RecordMarkGlyph({
   mark?: string | null
   /** The record's name — the last resort is its first letter. */
   name?: string | null
-  /** Crop to fill (a face) vs show whole (a logo) — the same choice
-   * `RecordMark`'s `fit` resolves; passed in already-resolved because the
-   * caller here already built the `<RecordMark>` this replaces and knows it. */
-  cover?: boolean
 }) {
   const [failed, setFailed] = React.useState<string | null>(null)
   const picture = safeSrc(stored ?? undefined)
@@ -196,7 +211,9 @@ export function RecordMarkGlyph({
       }}
       src={picture}
       alt=""
-      className={`size-full ${cover ? "object-cover" : "object-contain"}`}
+      // FILL, NEVER FIT (R60, client 2026-09-09). Unconditional: see this
+      // file's header for what the old `fit` prop weighed and why it lost.
+      className="size-full object-cover"
       onError={() => setFailed(picture)}
     />
   ) : (
@@ -209,7 +226,6 @@ export function RecordMark({
   mark,
   name,
   shape = "square",
-  fit,
   size = "row",
   className = "",
 }: {
@@ -225,11 +241,6 @@ export function RecordMark({
   /** The BOX. A person in their own right is a circle; a client, an app, an asset
    * — everything else — is a rounded square (R31: two radii). */
   shape?: "square" | "round"
-  /** The FIT, when it does not follow the box. Defaults to the shape's own answer
-   * (a circle crops, a square contains), which is right nearly everywhere; pass it
-   * explicitly for the case the default gets wrong — a FACE drawn in a SQUARE,
-   * which is every individual client on the accounts list. */
-  fit?: "cover" | "contain"
   /** Defaults to `row`. `choice` (24px) is for a checklist's own checkbox row
    * and for `record-picker.tsx`'s closed control + open candidate list — see
    * the header on `BOX` above for why. `row` stays the size for an ordinary
@@ -239,8 +250,6 @@ export function RecordMark({
   className?: string
 }) {
   const round = shape === "round"
-  // The fit follows the box unless the caller separates them.
-  const cover = (fit ?? (round ? "cover" : "contain")) === "cover"
   return (
     <span
       aria-hidden
@@ -248,7 +257,7 @@ export function RecordMark({
         round ? "rounded-pill" : "rounded-[var(--radius)]"
       } ${BOX[size]} ${className}`}
     >
-      <RecordMarkGlyph picture={picture} mark={mark} name={name} cover={cover} />
+      <RecordMarkGlyph picture={picture} mark={mark} name={name} />
     </span>
   )
 }

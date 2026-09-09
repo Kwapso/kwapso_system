@@ -14,6 +14,10 @@ import { waves as wavesApi, waveOneKey, wavesKey } from "@/lib/api/waves"
 // a list primes its total in the same round-trip.
 
 import { content as contentApi, tenancy } from "@/lib/api"
+// THE COLLECTION'S WHOLE SORT VOCABULARY, so the per-tab rule below SUBTRACTS
+// from the one list rather than holding a second copy of it. One-way: that file
+// knows nothing about tabs and must not learn.
+import { COLLECTION_SORTS } from "@/lib/collection-sorts"
 import {
   HELP_STATUSES,
   OPEN_TAB_STATUSES,
@@ -170,6 +174,13 @@ export const listFetch = {
         // tab. `helpFacetFilter` returns the door's own query now, so there is
         // nothing left to forget.
         ...helpFacetFilter(facet),
+        // …AND THE TAB'S OWN RESTING ORDER, which is empty for every tab that
+        // opens in the door's own fallback. It rides the RESTING read as well
+        // as `<PagedFind>`'s `fetchPage` because the cursor this call primes
+        // below is minted under whatever ordering the door used: a resting page
+        // fetched in one order and a "Load more" asked in another is a 400 from
+        // the paging seam, by design (shared/workers/sorting.ts, property 3).
+        ...helpTabOrder(facet),
       })
       .then((r) => {
         primeCache(totalKey(`help-facet:${scope}:${facet}`, teamId), r.total)
@@ -805,6 +816,28 @@ export function clientToolsKey(teamId: string): string {
   return `client_tools:${teamId}`
 }
 
+/** EVERY ROLE'S PERMISSION SHEET AT ONCE — the Team tab's roles matrix
+ * (web/components/team/roles-matrix.tsx), which draws all of them on one grid
+ * because that is what the client asked the matrix to be: "All the roles
+ * together, I want to have an overview" (2026-09-09).
+ *
+ * A SECOND KEY BESIDE `role-perms:<roleId>`, not a replacement for it. The door
+ * answers per role, and the grid needs every row before it can draw one, so it
+ * fans out and caches the ANSWER SET under one key rather than mounting a hook
+ * per row — which React would refuse anyway, since the row count is data. Roles
+ * are a bounded collection (R14: a team has a handful), so the fan-out has a
+ * ceiling the collection itself enforces.
+ *
+ * IT IS DROPPED WHENEVER A ROLE MOVES — `member_roles`'s own `deps` below names
+ * it, beside the per-role key it already named. That is what keeps the grid the
+ * right WIDTH as well as the right content: a role created or deactivated by a
+ * colleague drops this whole answer set, and the refetch reads the new role list
+ * on its way past. A key that tried to encode the role ids instead would go
+ * stale silently, because nothing would be dropping the old one. */
+export function rolePermsAllKey(teamId: string): string {
+  return `role-perms-all:${teamId}`
+}
+
 /** One account's rate card, and the margin computed on it. Both keyed by the
  * ACCOUNT: a card is read on its account's screen, and a margin is about one
  * account. */
@@ -1149,6 +1182,205 @@ export function helpTabFacets(facet: HelpFacet): HelpTabFacets {
   }
 }
 
+/** THE ONE STAGE A TAB CAN BE PINNED TO, or null when it spans more than one.
+ *
+ * The same derivation `helpTabFacets` already makes about a tab's span, handed
+ * back as a single word instead of a set — because two rulings below turn on
+ * "this tab contains exactly resolved tickets and nothing else", and a second
+ * spelling of that question is how the two answers come to disagree. A DERIVED
+ * tab (Waiting) answers null here for the reason clause two gives: the statuses
+ * in its query are scaffolding, not a description of the tab. */
+function helpTabPinnedStatus(facet: HelpFacet): HelpStatus | null {
+  const query = helpFacetFilter(facet)
+  // CLAUSE TWO, unchanged and re-used rather than re-argued: a key outside the
+  // toolbar's own four means the tab's `status` list is scaffolding borrowed
+  // from Open (Waiting), not a description of what the tab holds.
+  const derived = Object.keys(query).some(
+    (key) => !(HELP_TOOLBAR_FACET_FIELDS as readonly string[]).includes(key)
+  )
+  if (derived || query.status === undefined) return null
+  const words = query.status
+    .split(",")
+    .map((word) => word.trim())
+    .filter((word): word is HelpStatus => (HELP_STATUSES as readonly string[]).includes(word))
+  return words.length === 1 ? words[0] : null
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   WHAT THE CLOSED TAB SHOWS, AND WHAT IT MAY BE ORDERED BY.
+
+   ── THE CLIENT RULED ON THIS TWICE ON 2026-09-09, AND THE SECOND READING
+      IS NOT A MISREADING OF THE FIRST ────────────────────────────────────
+
+   FIRST, that morning:
+
+     "in closed tickets, I want to be able to sort by created date and closed
+      date only. Remove the rest. ID, created date, closed date. Remove the
+      rest."
+
+   That was built exactly as written: three columns — `ref`, `created`,
+   `closed` — and two sort names.
+
+   THEN, reviewing it on staging the same day:
+
+     "columns for close: title (with id), type, app, raised closed"
+
+   This REPLACES the column half. It is a revision, not a correction of our
+   reading: her first sentence genuinely said "ID, created date, closed date",
+   we drew that, she looked at it, and a tab of bare reference numbers turned
+   out to be a list nobody can scan — a `T0412` says which ticket it is only to
+   somebody who already knows. So the TITLE comes back, and the number comes
+   back WITH it rather than beside it.
+
+   THE SORT HALF IS UNTOUCHED AND MUST STAY UNTOUCHED. Her second sentence says
+   nothing about ordering, and "title, type, app" are not orders she has asked
+   for — widening `helpTabSorts` back to match the wider column set would be
+   inventing a ruling out of the shape of another one. Two subtractions were
+   never the same subtraction, and only one of them has been revised.
+
+   ── WHERE THE NUMBER GOES NOW ────────────────────────────────────────────
+
+   "title (with id)" is a pairing this app already has ONE drawing of:
+   `RecordRef` inside `REF_LEADS_NAME` (shared/web/record-ref.tsx), the black
+   chip in front of the name — her own earlier instruction, "put the ID before
+   the title to the left, with the usual black chip design", and a law rather
+   than a habit (`web/test/one-black-chip.test.ts` is the census that holds it:
+   a reference belongs in that chip and never glued into a title as text). The
+   `title` column has drawn it that way on every other tab all along, so the
+   Closed tab does not get a new cell — it gets the same one.
+
+   AND SO `ref` IS NO LONGER A COLUMN OF ITS OWN. It existed for about a day,
+   for the one tab that had no title for the number to lead. Nothing names it
+   now, and a column no tab may ask for is not optionality — it is a second way
+   to draw a reference sitting one edit away from being used, which is exactly
+   what `one-black-chip.test.ts` exists to prevent. It is gone from the
+   vocabulary, from `TICKET_COLUMN_ORDER` and from the table.
+
+   ── THE RESULT, AND WHY IT IS SPELLED AS THE DEFAULT PLUS ONE ─────────────
+
+   Title · Type · App · Raised · Closed is her four-column ruling of 2026-09-06
+   with the closing date added to the end. Written that way below rather than
+   as five literals, because that is what it IS: the Closed tab is now every
+   other tab plus the one fact only it can tell the truth about. A fifth column
+   added to `TICKET_COLUMNS_DEFAULT` tomorrow reaches this tab without anybody
+   remembering this paragraph.
+
+   ── WHY IT IS A RULE OVER TOKENS AND NOT AN `if (facet === CLOSED)` ───────
+
+   `helpTabFacets` above already decided the same shape of question for the
+   toolbar's filters — which controls a tab may offer, computed from the tab's
+   own token — and the argument it makes carries over word for word: a
+   vocabulary that lives inside the thing it decorates cannot be checked, and an
+   over-offered control looks exactly like a correctly-offered one. So both
+   functions below take a TOKEN and are driven directly by
+   `web/test/closed-tab-shows-less.test.ts` over every tab on the strip.
+
+   ── THE ONE PART THAT IS DERIVED RATHER THAN DICTATED ─────────────────────
+
+   `closed` — the column and the sort — is offered ONLY where the tab pins
+   exactly the `resolved` stage. That is not her sentence, it is the DATA's:
+   `setStatus` (workers/content/src/lib/help.ts) NULLs `resolved_at` on every
+   move to a non-resolved status, which the owner blessed on 2026-09-06 with the
+   closure kept in the activity trail instead ("closed on x, reopen on y, closed
+   again on z"). So on any tab that can hold an open ticket the column would be
+   empty on most rows and — worse — would say "never closed" about a ticket that
+   has been closed twice. On a tab pinned to `resolved` every row carries a
+   stamp by construction, and the column tells the truth by the same construction.
+   Written as a derivation so a second resolved-only tab gets the same answer
+   without anybody remembering this paragraph.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** One column of the shared ticket table (`TicketRowsTable`,
+ * web/components/tickets/tickets-collection.tsx). The names are the FACTS a row
+ * shows, not the cells that draw them. */
+export type TicketColumn = "title" | "type" | "app" | "created" | "closed"
+
+/** LEFT TO RIGHT, ONCE, FOR EVERY TAB. A tab chooses WHICH facts it shows and
+ * never in what order they sit — the header row and the body row are both laid
+ * out by this list, which is the one thing that makes it impossible for a
+ * four-column tab to label its cells wrong. It is also her order in both of the
+ * rulings that survive: the name of the thing (carrying its number), then its
+ * facts, then the dates, oldest question first. */
+export const TICKET_COLUMN_ORDER: readonly TicketColumn[] = [
+  "title",
+  "type",
+  "app",
+  "created",
+  "closed",
+]
+
+/** THE FOUR EVERY TAB DRAWS, in the client's own order of 2026-09-06
+ * (Title · Type · App · Raised). The reference is not a column and is not
+ * missing: the number leads the TITLE inside that cell, which is where she put
+ * it ("put the ID before the title to the left"), drawn by the one component
+ * that draws a reference anywhere in either front door. */
+export const TICKET_COLUMNS_DEFAULT: readonly TicketColumn[] = ["title", "type", "app", "created"]
+
+/** WHICH COLUMNS ONE TAB'S TABLE DRAWS. */
+export function helpTabColumns(facet: HelpFacet): readonly TicketColumn[] {
+  return helpTabPinnedStatus(facet) === "resolved"
+    ? // HER REVISED SET, 2026-09-09 (second reading): "columns for close: title
+      // (with id), type, app, raised closed". Spelled as the default plus the
+      // closing date because that is what it is — every other tab's row, plus
+      // the one fact only a resolved-pinned tab can state without lying. "(with
+      // id)" needs nothing here: the `title` cell has led with the black
+      // `RecordRef` chip since her 2026-09-06 ruling and does so on every tab.
+      [...TICKET_COLUMNS_DEFAULT, "closed"]
+    : TICKET_COLUMNS_DEFAULT
+}
+
+/** WHICH ORDERS ONE TAB MAY BE PUT IN, and which of them it opens in.
+ *
+ * `options` are names from `COLLECTION_SORTS.help` — the collection's whole
+ * vocabulary, which the door has to know in full — narrowed to this tab.
+ *
+ * `defaultSort` IS NOT ALWAYS THE COLLECTION'S DEFAULT, and that is the one
+ * thing here that has to reach the DOOR rather than only the control. The
+ * collection opens on `rank`, the drag-order somebody arranged by hand; the
+ * Closed tab may not offer it any more, so a control sitting on a name that is
+ * not in its own menu would draw an empty field over rows in an order nothing
+ * on screen names. It opens on `created` instead — which is very nearly the
+ * order it already opened in, since a resolved ticket rarely carries a rank and
+ * `COALESCE(rank, id)` is then a ULID, i.e. creation order — so the ruling
+ * changes what a reader can DO without changing what they arrive at.
+ * `helpTabOrder` below is what makes that true at the door instead of only in
+ * the dropdown. */
+export type HelpTabSorts = { options: string[]; defaultSort: string }
+
+export function helpTabSorts(facet: HelpFacet): HelpTabSorts {
+  if (helpTabPinnedStatus(facet) === "resolved")
+    return { options: ["created", "closed"], defaultSort: "created" }
+  return {
+    // EVERY OTHER TAB IS UNCHANGED, minus the one name that would be a lie on
+    // it. Subtracted from the collection's own list rather than re-spelled, so
+    // a seventh option added to `COLLECTION_SORTS.help` reaches every tab that
+    // should have it without a second edit here.
+    options: COLLECTION_SORTS.help.options.map((o) => o.value).filter((v) => v !== "closed"),
+    defaultSort: COLLECTION_SORTS.help.defaultSort,
+  }
+}
+
+/** THE TAB'S RESTING ORDER, AS THE DOOR'S OWN QUERY — spread into the resting
+ * read (`listFetch.helpFacet` above) and into `<PagedFind>`'s `fetchPage`,
+ * BEFORE the toolbar's own query so a reader's pick still wins.
+ *
+ * WHY IT IS NEEDED AT ALL. `<PagedFind>` deliberately does not send the default
+ * order (paged-find.tsx: "a screen sitting on it reads the collection's own
+ * cache key and looks exactly as it did before sorting existed"), so a tab whose
+ * default is not the DOOR's fallback has to say so itself — otherwise the
+ * control would read "Newest first" while `resolveOrdering` fell back to `rank`.
+ *
+ * WHY IT IS A FUNCTION OF ITS OWN AND NOT A KEY IN `helpFacetFilter`. That
+ * function's keys are read as the tab's NARROWING: `helpTabFacets` calls any key
+ * outside the toolbar's four a sign that the tab is derived, and a `sort` key
+ * smuggled in there would quietly withhold a Status facet from every tab that
+ * pinned an order. An ordering is not a filter, and the two must not arrive in
+ * one bag. */
+export function helpTabOrder(facet: HelpFacet): Record<string, string> {
+  const { defaultSort } = helpTabSorts(facet)
+  return defaultSort === COLLECTION_SORTS.help.defaultSort ? {} : { sort: defaultSort }
+}
+
 /** WHERE THE DOOR'S PER-CLIENT TALLY LANDS — one grouped `COUNT(*)` per client
  * over the WHOLE ticket collection (`countTicketFacets`, workers/content/src/
  * lib/help.ts), primed by every resting ticket read whichever tab is open.
@@ -1211,7 +1443,11 @@ export const TEAM_RESOURCES: Record<
     idField: "id",
     fetchOne: (id) => tenancy.role(id),
     fetchList: (t) => listFetch.roles(t),
-    deps: (t, id) => [`my-perms:${t}`, `role-perms:${id}`],
+    // …and the Team tab's all-roles grid, which reads every role's sheet under
+    // one key (`rolePermsAllKey`): a role created, renamed or deactivated
+    // changes the grid's WIDTH as well as its content, and nothing else drops
+    // it.
+    deps: (t, id) => [`my-perms:${t}`, `role-perms:${id}`, rolePermsAllKey(t)],
   },
   invites: {
     key: (t) => `invites:${t}`,

@@ -20,6 +20,7 @@
 
 import type { PickerOption } from "@/components/records/record-picker"
 import { content, tenancy } from "@/lib/api"
+import { accountOption } from "@/lib/pickable"
 
 /** The cache prefix a picker's answers land under. TEAM-SCOPED, like every key
  * in the app: a picker that cached "the companies matching Berg" without saying
@@ -40,17 +41,23 @@ export async function searchAccounts(
 ): Promise<PickerOption[]> {
   const r = await tenancy.accounts({ q: term || undefined, type: opts.type, archived: "no" })
   return r.accounts.map((a) => ({
-    value: a.id,
-    label: a.name,
-    // The code and the email are what tell two people called Marta apart, and
-    // they are two of the three fields the door itself searched — so a row that
-    // matched on an email nobody could see used to look like a wrong answer.
+    // THE FACE (R35), through the ONE seam that says what an account looks
+    // like as an option (`accountOption`, web/lib/pickable.ts). It carries the
+    // logo — which arrived on every one of these rows and was dropped here, one
+    // line before the picker, so the accounts LIST drew a company's mark and the
+    // picker that chooses the same company drew a word — the square box, and
+    // `face`, which is the half added on 2026-09-09 for the client's ruling
+    // ("for accounts include icon in select components and filters"): two
+    // accounts in three have no picture, and without the flag those rows drew
+    // nothing at all beside the seventeen that do.
+    //
+    // The HINT is this door's own and nothing in the shared seam has an opinion
+    // about it: the code and the email are what tell two people called Marta
+    // apart, and they are two of the three fields the door itself searched — so
+    // a row that matched on an email nobody could see used to look like a wrong
+    // answer.
+    ...accountOption(a),
     hint: [a.code, a.email].filter(Boolean).join(" · ") || undefined,
-    // AND THE LOGO (R35). It arrived on every one of these rows and was dropped
-    // here, one line before the picker, so the accounts LIST drew a company's
-    // mark and the picker that chooses the same company drew a word.
-    picture: a.logoUrl,
-    shape: "square" as const,
   }))
 }
 

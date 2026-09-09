@@ -140,11 +140,11 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
     "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
     "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
-  "web/components/deep-link/shape.tsx:91":
+  "web/components/deep-link/shape.tsx:90":
     "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
-    "on 7 Sep 2026, when `shapeActivity` gained a named return type — " +
+    "on 7 Sep 2026, when `shapeActivity` gained a named return type, and to :90 on 9 Sep 2026 when `TeamMeta` left the import block with the deleted team-overview shaper — " +
     "`ActivityFeedRow` — and the import and its note landed above this line.)",
   "web/components/work/work-panels.tsx:1491":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +

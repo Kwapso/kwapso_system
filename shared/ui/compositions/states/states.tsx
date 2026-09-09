@@ -64,6 +64,7 @@ import * as React from "react";
 
 import {
   ScreenRegister,
+  SCREEN_TITLE_STEP,
   type ScreenDensity,
   type ScreenRegisterTone,
   type ScreenState,
@@ -347,11 +348,26 @@ export const SHAPE_SHELL: Record<ScreenDensity, string> = {
   calm: "gap-[var(--space-7)] mx-auto w-full max-w-[60rem]",
 };
 
-/** The heading step each door takes, matching `ScreenRenderer` exactly. */
-export const SHAPE_HEADING_SIZE: Record<ScreenDensity, "h2" | "h3"> = {
-  comfortable: "h2",
-  calm: "h3",
-};
+/**
+ * The heading step each door takes, matching `ScreenRenderer` exactly — and
+ * since 2026-09-08 it does not merely MATCH it, it IS it.
+ *
+ * This used to be two values retyped here with a one-line note promising they
+ * agreed with `ScreenRenderer`'s. They did, and `ScreenShell` imported this
+ * one, and `ScreenRenderer` itself typed a THIRD copy inline — three writings
+ * of one decision, held together by a comment. The record now lives beside the
+ * `ScreenDensity` type it is keyed by (`SCREEN_TITLE_STEP`) and this name is
+ * an alias, kept because eleven shapes and `RecordChrome` import it by this
+ * name and a rename would be churn for nothing.
+ *
+ * THE TYPE WIDENED WITH IT, AND THAT MATTERED MORE THAN THE VALUES. It read
+ * `Record<ScreenDensity, "h2" | "h3">`, which looked like a rule about doors
+ * and was in fact `Title`'s own ladder ending at 32, copied. Nothing could ask
+ * for a larger step because no larger step existed; the consuming app reached
+ * past it from outside with a descendant selector and wrote a law to police
+ * the reaching. `Title` has the rungs now, and the type is `TitleStep`.
+ */
+export const SHAPE_HEADING_SIZE = SCREEN_TITLE_STEP;
 
 export { ShapeStateBody };
 export type { ScreenDensity };

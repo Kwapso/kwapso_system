@@ -14,6 +14,7 @@ import {
   ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  CENTRED_DIALOG_OK,
   CLIENT_REACHABLE_EXEMPT,
   COMPOSITION_EXEMPT,
   DEAF_EXEMPT,
@@ -3951,6 +3952,8 @@ describe("RULES — the laws of the base", () => {
       "one-door-per-unit", // R56: the read census below, over both front doors, grouped by component and by door
       "component-folders", // R57: web/test/component-folders.test.ts — the folder set DERIVED from web/components/README.md's own rows
       "named-paths", // R58: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
+      "forms-are-not-overlays", // R59: the centred-overlay census below, over both front doors — inverted, so a form it has never seen is caught by having no reason on file
+      "image-fills", // R60: web/test/an-image-fills.test.ts — every `object-*` utility AND every `fit="contain"` prop in our own source, plus the pinned, only-falling count of the ones the vendored kit still owes us
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -4062,15 +4065,43 @@ describe("offered-rights: no permission switch decides nothing", () => {
 
   // THE SCREEN READS THE SAME DATA. The door hands each module its offered
   // rights (`getRolePermissions`, tested in workers/tenancy/test/roles.test.ts);
-  // this holds the Roles screen to three things with them: it hands the kit the
-  // subset as `rights` (the prop the next kit tag draws from), it never shows a
-  // held tick on an unoffered box, and a press on one records nothing. Read off
-  // the source, because the screen is a host-composed component with a cache
-  // and a door behind it and a render harness would prove less than it looked.
-  it("offered-rights: the Roles screen hands the kit each module's offered rights and refuses a press on any other", () => {
-    const screen = read(join(ROOT, "web", "components", "team", "role-detail.tsx"))
-    expect(screen, "the matrix rows no longer carry `rights` from the door").toMatch(
-      /rights:\s*m\.rights\.map\(\(r\)\s*=>\s*RIGHT_TO_KIT\[r\]\)/
+  // this holds the Roles screen to what it does with them. Read off the source,
+  // because the screen is a host-composed component with a cache and a door
+  // behind it and a render harness would prove less than it looked.
+  //
+  // THE SCREEN MOVED AND THE CLAUSE MOVED WITH IT, 2026-09-09. It used to read
+  // `web/components/team/role-detail.tsx` — one role at /t/<teamId>/roles/<id>,
+  // modules down the side and that one role across the top. The client's ruling
+  // deleted the per-role page and put EVERY role on one grid inside Settings ›
+  // Team ("All the roles together, I want to have an overview"), so the file to
+  // read is `roles-matrix.tsx`.
+  //
+  // AND ONE OF THE THREE ASSERTIONS CHANGED SHAPE, WHICH IS WORTH READING
+  // RATHER THAN SKIMMING, BECAUSE IT IS A CAPABILITY THIS BASE LOST.
+  //
+  // The old third clause was `rights: m.rights.map(…)` — the screen handing the
+  // kit each module's offered set through `PermissionModule.rights`, so an
+  // unoffered box draws an em dash instead of a switch. Kit v1.2.72 finally
+  // makes that prop DO something (v1.2.63 accepted and ignored it), and on the
+  // old grid it would have turned fifteen of the eighty-eight boxes into dashes
+  // the day the kit was vendored.
+  //
+  // The approved grid is the TRANSPOSE of the old one — roles down the side, the
+  // 22 modules across — and `rights` lives on `PermissionModule`, which is the
+  // kit's ROW. Whether `delete` exists at all is a fact about the MODULE, which
+  // is now the COLUMN. A row-level prop is constant across columns and the fact
+  // is constant across rows, so the prop cannot express it and passing it would
+  // be a lie with a prop's authority behind it. THE LAW IS NOT WEAKENED TO SUIT
+  // THE SCREEN: what the third clause asserts instead is that the screen still
+  // READS the door's offered set (`m.rights`) rather than deciding for itself,
+  // which is the property the other two guards are built on — and the box that
+  // still looks like a switch is written up as a real, named regression in
+  // `roles-matrix.tsx`'s own header, with the upstream ask that closes it
+  // (`rights` on `PermissionRole`, or an `orientation` prop on the matrix).
+  it("offered-rights: the Roles screen reads each module's offered rights and refuses a press on any other", () => {
+    const screen = read(join(ROOT, "web", "components", "team", "roles-matrix.tsx"))
+    expect(screen, "the grid no longer reads the offered set off the door's own `rights`").toMatch(
+      /m\.rights\.includes\(r\)/
     )
     expect(screen, "a held tick is no longer filtered to the offered rights").toMatch(
       /\.filter\(\(r\)\s*=>\s*offered\(m,\s*r\)\s*&&/
@@ -4677,5 +4708,154 @@ describe("R46 — every kit component and foundation is reached, or a reasoned e
       `KIT_COMPONENT_EXEMPT pins a part that is now reached, or that no longer exists — ` +
         `delete the line: ${stale.join(", ")}`
     ).toEqual([])
+  })
+})
+
+describe("R59 — a form is a slide-in; a warning is an overlay", () => {
+  // R59 — A FORM IS A SLIDE-IN; A WARNING IS AN OVERLAY.
+  //
+  // THE CLIENT, 2026-09-09, over a screenshot of the "New access token" dialog:
+  //     "This should be a slide-in, like all the other screens. The only ones
+  //      that are overlays are the warnings, such as archive or delete, and so
+  //      on."
+  //
+  // She was shown ONE dialog and answered about the CLASS, so this is a law and
+  // not a fix. A surface that COLLECTS — a form, an editor, a picker — is the
+  // kit's `Sheet`: it slides in from the inline end on desktop and, below 45rem,
+  // becomes the bottom sheet capped at 85dvh that her 2026-09-04 ruling asked
+  // for ("everythung that's slisde in in desktop, should be slide up in
+  // mobile"), implemented centrally in `shared/ui/components/sheet/sheet.tsx`
+  // so no call site can get the narrow half wrong. A surface that ASKS a yes/no
+  // question about something that already exists is an `AlertDialog`, centred.
+  //
+  // WHY THIS CHECK IS INVERTED, which is the only interesting decision in it.
+  // The obvious law is "a form may not be a centred overlay", and the obvious
+  // check is to look inside every `<DialogContent>` for a form. That was
+  // written first and thrown away: it finds four of the five real offenders and
+  // misses `role-picker-dialog.tsx` completely, because a radio group plus an
+  // onClick that writes is a form with no `<form>`, no `onSubmit` and no
+  // `FormShell` anywhere in it. Widening the pattern until it caught that one
+  // would have caught the two innocent viewers too, and a law tuned until it
+  // agrees with today's five files is a hand-kept list wearing a regex.
+  //
+  // So the law does not try to recognise a form at all. It holds EVERY centred
+  // overlay to a written reason, and lets the two surfaces that are genuinely
+  // neither pay two lines for it. The property that buys: a form added next
+  // month reaches for a `Dialog`, has no line, and is red the day it is
+  // written — whatever it is made of.
+  //
+  //
+  // AND `presentation` IS NOT THE ANSWER, WHICH NEEDS SAYING BECAUSE IT LOOKS
+  // LIKE IT. Kit v1.2.72 (synced into this tree 2026-09-09, alongside this
+  // work) added a `presentation` prop to `DialogContent` — "responsive" |
+  // "overlay" | "sheet" | "fullscreen" — and a reader who wants a form to
+  // slide in will reach for it first. NONE of the four is a desktop slide-in,
+  // read off that file's own tables rather than off the names: `overlay` is
+  // centred; `sheet` is the BOTTOM sheet at every width, including a 1920
+  // monitor; `fullscreen` has no gutter and no corner; and `responsive` is
+  // `overlay` at 45rem and up — CENTRED on a desktop — flipping to the bottom
+  // sheet only below it. Its own header says why in as many words: "A centred
+  // modal does not arrive from a side; it rises 8 and fades", and whether
+  // every modal on a phone should become a bottom sheet is "a ruling this
+  // rule does not already contain." So `presentation="responsive"` on a form
+  // would leave it exactly where the client said it must not be, and only fix
+  // the phone. The shape she asked for — in from the inline end on desktop,
+  // up from the bottom on a phone — is `Sheet side="right"`, a different
+  // component, and it is what the app's other ~35 forms already use through
+  // `FormShellDialog`. The law is deliberately blind to the prop for this
+  // reason: a `<DialogContent>` is a finding whatever `presentation` it
+  // carries, because three of the four are still centred on a desktop and the
+  // fourth is a bottom sheet on a monitor.
+  // THE EXEMPTION IS A RATCHET AND NOT A DOOR. It is rot-checked both ways —
+  // a pin whose file no longer mounts a centred overlay must go — and, the
+  // clause with the teeth, an EXEMPT overlay that grows form machinery turns
+  // the build red where it stands. Without that second clause the list is
+  // exactly the loophole the law exists to close: add a line, then add a form
+  // under it.
+  it("forms-are-not-overlays: every centred Dialog is a warning-shaped exception, and no exempt one collects", () => {
+    // The form-machinery signals. NOT the law's subject — the subject is every
+    // centred overlay — but the rot-check on the exemptions, so a viewer that
+    // quietly becomes a form cannot keep its pin.
+    const COLLECTS =
+      /\bFormShell\b|<form[\s>]|onSubmit|<Field[\s>]|<Input[\s>]|<Textarea[\s>]|<Checkbox[\s>]|<RadioGroup[\s>]|<DatePicker[\s>]|<FileUpload[\s>]|<Choice[\s>]/
+
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
+    const centred: string[] = []
+    let filesScanned = 0
+    let alertMounts = 0
+    let sheetMounts = 0
+
+    for (const f of sourceFiles(roots, {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      const src = stripComments(f.source)
+      // `<AlertDialogContent` contains `<DialogContent` nowhere — the tag is a
+      // different identifier — but count it first anyway, because it is this
+      // check's canary and must be read off the same stripped source.
+      if (src.includes("<AlertDialogContent")) alertMounts++
+      if (src.includes("<SheetContent")) sheetMounts++
+      if (src.includes("<DialogContent")) centred.push(f.rel)
+    }
+
+    // TRIPWIRE 1 — the walk. A scan that opened nothing reports "no centred
+    // overlays anywhere", which is the same green as a perfectly clean app.
+    expect(
+      filesScanned,
+      "R59 — the modal census walked no files at all. The scan is blind (a moved root, a broken sourceFiles call); fix it before trusting the result"
+    ).toBeGreaterThan(100)
+
+    // TRIPWIRE 2 — the LOAD-BEARING CANARY. The two shapes this law steers
+    // between must both still be visible to it. If the kit renamed its exports
+    // or `stripComments` ate the JSX, `<DialogContent` would match nothing and
+    // this law would pass while enforcing nothing at all — and these two counts
+    // are the known-true facts that only hold if the derivation still works.
+    // The app has fourteen warnings and forty-odd drawers; the floors are set
+    // well under both so ordinary work never trips them.
+    expect(
+      alertMounts,
+      "R59 — the census found NO <AlertDialogContent> anywhere. Either the kit renamed it (so this law now guards nothing) or the app stopped drawing warnings — either way the scan is lying; fix it before trusting the centred-overlay count"
+    ).toBeGreaterThan(5)
+    expect(
+      sheetMounts,
+      "R59 — the census found NO <SheetContent> anywhere. The slide-in is the shape this law steers TOWARD, so a zero here means the scan cannot see the correct answer either; fix it before trusting the result"
+    ).toBeGreaterThan(5)
+
+    // THE LAW. A centred overlay is the warning shape, and a warning is an
+    // AlertDialog — so a `Dialog` in a front door is a surface that is neither,
+    // and it says which in writing.
+    const unlisted = centred.filter((f) => !(f in CENTRED_DIALOG_OK))
+    expect(
+      unlisted,
+      `a centred <Dialog> with no reason on file (R59) — the client ruled 2026-09-09 that a form, an editor or a picker is a SLIDE-IN (the kit's <Sheet side="right">, which also becomes the bottom sheet below 45rem) and only a warning is an overlay; move it to a Sheet, or make it an AlertDialog if it is really a yes/no warning, or add a reasoned CENTRED_DIALOG_OK line if it is genuinely neither: ${unlisted.join(", ")}`
+    ).toEqual([])
+
+    // THE RATCHET. A pin for a file that no longer mounts a centred overlay is
+    // a record of an argument nobody is having, so the list can only shrink.
+    const stale = Object.keys(CENTRED_DIALOG_OK).filter((f) => !centred.includes(f))
+    expect(
+      stale,
+      `CENTRED_DIALOG_OK pins a file that no longer draws a centred <DialogContent> — delete the line (R59's exemptions may only shrink): ${stale.join(", ")}`
+    ).toEqual([])
+
+    // THE CLAUSE WITH THE TEETH. An exemption says "this surface is neither a
+    // form nor a warning". The moment it collects anything, that sentence is
+    // false and the pin is the law being smuggled around rather than applied.
+    const collecting = Object.keys(CENTRED_DIALOG_OK).filter((f) =>
+      COLLECTS.test(stripComments(read(join(ROOT, f))))
+    )
+    expect(
+      collecting,
+      `CENTRED_DIALOG_OK pins a centred overlay that now COLLECTS something — a field, a choice or a submit makes it a form, and the client's 2026-09-09 ruling puts a form in a slide-in. Move it to a <Sheet> and delete the line: ${collecting.join(", ")}`
+    ).toEqual([])
+
+    // Every exception is an argument somebody made, not a name on a list.
+    for (const [f, why] of Object.entries(CENTRED_DIALOG_OK))
+      expect(
+        why.length,
+        `${f} is an exception to R59 — that needs a real reason, and one the client can rule on`
+      ).toBeGreaterThan(30)
   })
 })

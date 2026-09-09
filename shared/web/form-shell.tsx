@@ -358,10 +358,19 @@ export function FormShell({
   submit?: SubmitConfig
   onSubmit?: (e: React.FormEvent) => void
   /**
-   * `FormShellDialog` only — never set this from a form. That wrapper's panel is
+   * PANEL WRAPPERS ONLY — never set this from a form. A wrapper's panel is
    * already edge-to-edge, so the shell fills it (`h-full`) instead of sizing to
    * content under an 85dvh cap. Every one of this shell's 37 real callers still
    * only ever passes title/subtitle/children/footer/submit/onSubmit.
+   *
+   * "`FormShellDialog` only" until 2026-09-09, when the client's slide-in
+   * ruling (Law R59) gave the app a SECOND legitimate wrapper:
+   * `web/components/team/access-tokens.tsx` builds its own `Sheet` because its
+   * panel has two faces sharing one open state — the create form, then the
+   * one-time secret — and `FormShellDialog` renders a `FormShell`
+   * unconditionally and has nowhere to put the second. It mirrors this
+   * wrapper's `SheetContent` decisions rather than inventing its own; the
+   * clause it is exempt from is "never from a FORM", which still holds.
    */
   fill?: boolean
   /**

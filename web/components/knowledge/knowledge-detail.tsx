@@ -141,7 +141,7 @@ export function KnowledgeDetailScreen({
   // THE ONE ACCOUNT THIS SOURCE IS FILED UNDER, read by id — app-detail.tsx's
   // own bug, here too, 2026-08-31: this used to come off the SAME paged
   // accounts list above (`accountsQ.data`), and accounts PAGE (R14), so a
-  // source filed under an account outside page one read "A client" forever,
+  // source filed under an account outside page one read "An account" forever,
   // not just before the page arrived. `item` isn't known yet on the branch
   // where this hook still has to run before the loading guard below, so the
   // id is read optionally.
@@ -254,7 +254,7 @@ export function KnowledgeDetailScreen({
   // one shows is different: one is kept in step with a record, the other was
   // read out of a document you can open.
   const textOwnedElsewhere = mirrored || item.fileUrl !== null
-  const filedUnder = item.accountId ? (filedAccountQ.data?.name ?? "A client") : "The agency"
+  const filedUnder = item.accountId ? (filedAccountQ.data?.name ?? "An account") : "The agency"
   const overviewItems = [
     { label: t("Type"), value: KNOWLEDGE_KIND[item.kind] ?? item.kind },
     { label: t("Filed under"), value: filedUnder },
@@ -538,7 +538,13 @@ export function KnowledgeDetailScreen({
         onOpenChange={setEditingOpen}
         draftKey={`knowledge:edit:${sourceId}`}
         teamId={teamId}
-        accountOptions={(accountsQ.data ?? []).map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW, NOT A COPY OF TWO OF ITS FIELDS. `PickableRecord`
+        // (web/lib/pickable.ts) is deliberately the loosest shape that carries a
+        // face, and an `Account` structurally satisfies it — so the `.map((a) =>
+        // ({ id, name }))` that used to sit here was the exact line that type
+        // exists to end, dropping `logoUrl` one hop before the picker that draws
+        // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
+        accountOptions={accountsQ.data ?? []}
         // Only the apps this caller may OPEN (8.11) — the door refuses any other,
         // so offering one would be offering a refusal.
         appOptions={(appsQ.data ?? [])

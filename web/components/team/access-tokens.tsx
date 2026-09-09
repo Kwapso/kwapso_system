@@ -17,11 +17,10 @@ import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import {
-  Dialog,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@shared/ui/components/dialog/dialog"
+import { Sheet, SheetContent } from "@shared/ui/components/sheet/sheet"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -239,9 +238,55 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         </div>
       )}
 
-      {/* Create — FormShell (Law R4). After creating, the same dialog shows the
-       * secret ONCE with a copy button; it is never retrievable again. */}
-      <Dialog
+      {/* Create — FormShell (Law R4), IN A SLIDE-IN (Law R59).
+       *
+       * THIS IS THE SCREEN THE CLIENT WAS LOOKING AT. On 2026-09-09, over a
+       * screenshot of this exact "New access token" dialog, she ruled:
+       * "This should be a slide-in, like all the other screens. The only ones
+       * that are overlays are the warnings, such as archive or delete, and so
+       * on." It is recorded here, at the point where the presentation is
+       * chosen, so that nobody reverts it as a style preference later. It is
+       * not a preference and it is not about this one dialog: she was shown
+       * one and answered about the class, which is why R59 derives its subject
+       * instead of listing this file.
+       *
+       * THE TWO SURFACES ON THIS SCREEN LAND IN DIFFERENT BUCKETS, and that is
+       * the point rather than an inconsistency. Tokens are dangerous material,
+       * so the whole screen reads as warning-adjacent and the lazy move is to
+       * leave all of it centred. Her line is drawn by what a surface DOES:
+       * - THIS one COLLECTS a name and creates a credential → a form → a
+       *   drawer. Its second face (the secret, shown once) is the same act
+       *   finishing, on the same panel, so it moves with it.
+       * - The REVOKE check further down ASKS a yes/no question about something
+       *   that already exists → a warning → it stays an `AlertDialog`, centred,
+       *   untouched by this change. "such as archive or delete, and so on" is
+       *   exactly that control.
+       *
+       * WHY THIS ONE HAND-BUILDS ITS PANEL INSTEAD OF USING `FormShellDialog`,
+       * which is how the app's other ~35 forms became drawers: that wrapper
+       * renders a `FormShell` unconditionally, and this dialog has TWO faces
+       * sharing one open state — the form, then the one-time secret reveal.
+       * The wrapper has nowhere to put the second one. So the Sheet is built
+       * here and mirrors the wrapper's own `SheetContent` decisions rather
+       * than inventing new ones: `side="right"` (all the app's panels), the
+       * same width clamp (a form panel is one width across the app), `p-0`
+       * because `FormShell` owns its own edges. Two differences, both
+       * deliberate: `showClose` is left at its default, because this caller
+       * passes `FormShell` no `onCancel` and so draws no Cancel button — the
+       * kit's ✕ chip is then the only dismiss control, and a panel with none
+       * would be a worse bug than the one being fixed; and `overflow-hidden`
+       * is NOT set, because `form-shell.tsx` moved clipping off the animated
+       * element on purpose (its "FOCUS RING'S OUTER EDGE" note).
+       *
+       * `fill` on the FormShell below is the same reason `FormShellDialog`
+       * passes it: the panel is already edge-to-edge and full-height, so the
+       * shell fills it rather than sizing to content under an 85dvh cap. The
+       * commit control then sits on the panel's own bottom edge at every
+       * height, which is the whole reason the drawer is better here.
+       *
+       * After creating, the same panel shows the secret ONCE with a copy
+       * button; it is never retrievable again. */}
+      <Sheet
         open={createOpen}
         onOpenChange={(o) => {
           if (busy) return
@@ -249,10 +294,10 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
           if (!o) setSecret(null)
         }}
       >
-        {/* p-0: this dialog has two faces and one of them is a FormShell, which
-            owns its own edges (see shared/web/form-shell.tsx). The other face
-            re-states the padding for itself, one line down. */}
-        <DialogContent className="gap-0 overflow-hidden p-0">
+        <SheetContent
+          side="right"
+          className="w-[clamp(26.25rem,34vw,40rem)] max-w-[min(100%,40rem)] p-0"
+        >
           {secret ? (
             <div className="flex flex-col gap-4 p-6">
               <DialogTitle>{t("Copy your token now")}</DialogTitle>
@@ -300,6 +345,7 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
             </div>
           ) : (
             <FormShell
+              fill
               onSubmit={(e) => {
                 e.preventDefault()
                 void create()
@@ -332,8 +378,8 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
               </Field>
             </FormShell>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Revoke — destructive, so confirm. */}
       <AlertDialog open={!!revoking} onOpenChange={(o) => !busy && !o && setRevoking(null)}>

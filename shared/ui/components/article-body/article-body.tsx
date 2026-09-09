@@ -35,7 +35,24 @@
 
    Ruling 13's pull-quote is chapter 13's, and it is the one serif in the
    system: `SerrifCondensed` at the h3 step on `--tracking-serif`, "one per
-   page". A `blockquote` inside the prose is drawn as that.
+   page". A `blockquote` inside the prose is drawn as that BY DEFAULT.
+
+   THE SECOND QUOTE REGISTER — `quote="passage"`, 2026-09-07. The kit's
+   law-book does not rule on quotes at all: `blockquote` appears in none of
+   docs/RULES.md, PATTERN.md, BUILD-A-COMPONENT.md, BUILD-A-SCREEN.md or
+   TOKENS.md, and until now this file drew every one as the pull-quote, with
+   no way to opt out. The case that had no answer was logged in
+   manifest.json → notDelivered: a quoted reply inside a ticket or a meeting
+   note — several per page, none of them editorial — which is the ORDINARY
+   shape of user-authored prose, because an editor that emits HTML emits
+   `<blockquote>` for a quote a person typed mid-sentence. A pull-quote is
+   the author raising their voice; a passage is somebody else's words,
+   lowered. Drawing the second as the first made every quoted reply a
+   headline. The register the entry recommended is built as written: sans at
+   the body step, quiet ink, marked by a rule rather than by the serif, with
+   the editorial pull-quote kept as the default so nothing that draws one
+   today changes. Which ink and which rule were decided by measurement, at
+   `PASSAGE_QUOTE` below.
 
    THE LAW THIS FILE OBEYS
    · The measure is `--measure-body`, and it is capped ONCE, on the root.
@@ -133,13 +150,10 @@ const PROSE = [
   "[&_:is(strong,b)]:font-[var(--font-weight-medium)] [&_:is(strong,b)]:text-foreground",
   "[&_:is(em,i)]:italic",
 
-  /* ---- the one serif ------------------------------------------------- */
-  // Chapter 13's pull-quote. One per page is an editorial rule, not one a
-  // component can hold, so nothing here counts them.
-  "[&_blockquote]:font-[family-name:var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)]",
-  "[&_blockquote]:text-2xl [&_blockquote]:text-foreground",
-  "[&_blockquote]:my-[var(--space-8)]",
+  /* ---- quotes, the half both registers share ------------------------- */
+  // A quote's own paragraphs take the quote's ink, whichever register it is.
   "[&_blockquote_p]:text-inherit",
+  // The attribution under either register: the caption step, sans, tertiary.
   "[&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)]",
   "[&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal",
   "[&_blockquote_footer]:text-ink-tertiary",
@@ -172,6 +186,85 @@ const PROSE = [
   "[&_:is(time,data)]:tabular-nums",
 ].join(" ");
 
+/* ----------------------------------------------------------------------------
+   THE TWO QUOTE REGISTERS. Each is the whole of what a `blockquote` wears
+   beyond the shared half above, so neither has to undo the other: the pull
+   sets a family, a step, an ink and a margin, and the passage sets an ink
+   and a rule and lets the family, the step and the flow come from the body.
+   That is why the passage's list is short — its register IS the absence of
+   the serif, and writing `font-sans` here would restate a fact the root
+   already holds.
+   ------------------------------------------------------------------------- */
+
+/* Chapter 13's pull-quote, exactly as it has always been drawn. One per page
+   is an editorial rule, not one a component can hold, so nothing counts them. */
+const PULL_QUOTE = [
+  "[&_blockquote]:font-[family-name:var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)]",
+  "[&_blockquote]:text-2xl [&_blockquote]:text-foreground",
+  "[&_blockquote]:my-[var(--space-8)]",
+].join(" ");
+
+/* A quoted passage: somebody else's words inside the author's prose.
+
+   NO FAMILY, NO STEP, NO MARGIN OF ITS OWN. It runs in the body's sans at
+   the body's size and sits inside the flow's own 14 (`[&>*+*]`), which is
+   what makes it a paragraph somebody else wrote rather than a heading the
+   author raised. Several per page is the ordinary case.
+
+   THE INK IS `--ink-tertiary` — one tier under the body's secondary, which
+   is what "quiet" means on this ladder — and it is legible where it lands,
+   measured off tokens.css against the darkest paper prose meets in each
+   palette: 5.899 on `--surface-panel` in light and 7.928 on `--card` in
+   dark, against 4.5.
+
+   THE MARK IS A RULE IN THAT SAME INK, NOT A HAIRLINE. The natural reach is
+   `--hair-strong`, the section rule's tone — and it measures 1.526 light /
+   2.185 dark against a 3:1 floor for a mark that carries meaning, the
+   "system's accepted failure" `permission-matrix.tsx` records and mitigates
+   with a letter. A quote has no letter to mitigate with: the rule IS the
+   register's whole signal, so it takes the ink and measures what the ink
+   measures. `currentColor`, so the two cannot drift apart. 2 is one of
+   the two widths that live off the scale as grid lines (RULES §1.2); the
+   inset after it is the list's drawn 20, so a quote and a list share one
+   left edge.
+
+   AN INSET SHADOW, NOT A BORDER — CHANGED ON THE WAY IN, 2026-09-09. This
+   register was written against v1.2.64, where `border-s-2 border-current`
+   was the ordinary spelling for a rule. The boundary law arrived after it
+   (`foundations/rules/borders.mjs`, v1.2.70): a CSS border is a finding,
+   and an inset shadow is one of the three remedies it names. That is the
+   whole reason for the change, and it is worth being exact about what the
+   change does NOT buy — see the paragraph after next.
+
+   THE SHAPE IS `comments.tsx`'S, which draws a quoted reply's inline-start
+   rule exactly this way — `shadow-[var(--hairline-start)]` beside a logical
+   inset. This one is 2px in the ink rather than 1px in `--hair`, which no
+   `--hairline-*` shape holds, so it is written out the way `tabs.tsx`
+   writes its own 2px inset rule (`inset 0 -0.125rem 0 var(--foreground)`)
+   rather than minting a token for a single use. The inset stays `ps-5` and
+   stays logical; the shadow's offset is physical, which is the same trade
+   `--hairline-start` itself makes — recorded here rather than dropped,
+   because the line it replaces said "logical, so it mirrors".
+
+   NEITHER LAW READS THIS RULE, AND THE SWAP DID NOT CHANGE THAT. MEASURED,
+   2026-09-09, not assumed. `borders.mjs` never saw the border: a utility
+   behind an arbitrary variant (`[&_blockquote]:border-s-2`) is outside what
+   it parses — the bare spelling is judged, the prefixed one is not — so
+   this was found by hand and not by the gate. And `check-contrast.mjs` does
+   not pick the shadow up either: `strokes read` sits at 1,239 before and
+   after, and still 1,239 with the variant prefix removed, because the
+   colour is `currentColor` and this law measures token VALUES against a
+   ground. `border-current` had that same property, so the contrast
+   argument above was never gate-checked and still is not. THAT is why
+   `verify/article-quote` reads the computed `box-shadow` off a real
+   document in both palettes: for this one mark the browser is the only
+   instrument there is. Do not "restore" the check's silence to a claim
+   that it passed. */
+const PASSAGE_QUOTE = [
+  "[&_blockquote]:text-ink-tertiary",
+  "[&_blockquote]:shadow-[inset_0.125rem_0_0_currentColor] [&_blockquote]:ps-5",
+].join(" ");
+
 const articleBodyVariants = cva(["min-w-0 text-ink-secondary", PROSE], {
   variants: {
     /**
@@ -196,8 +289,21 @@ const articleBodyVariants = cva(["min-w-0 text-ink-secondary", PROSE], {
       true: "max-w-[var(--measure-body)]",
       false: "",
     },
+    /**
+     * Which register a `blockquote` inside the prose is drawn in. `pull` is
+     * chapter 13's editorial pull-quote and the default; `passage` is a
+     * quoted passage — somebody else's words, several per page. One prop
+     * for the whole body, because the markup arrives authored and a
+     * component cannot mark quotes it never sees.
+     */
+    quote: {
+      /** Chapter 13: the serif at the h3 step, primary ink, 48 above and below. */
+      pull: PULL_QUOTE,
+      /** Sans at the body step, tertiary ink, a 2px rule in that ink at the inline start. */
+      passage: PASSAGE_QUOTE,
+    },
   },
-  defaultVariants: { size: "default", measure: true },
+  defaultVariants: { size: "default", measure: true, quote: "pull" },
 });
 
 export interface ArticleBodyProps
@@ -300,6 +406,9 @@ const ArticleBody = React.forwardRef<HTMLDivElement, ArticleBodyProps>(
       className,
       size = "default",
       measure = true,
+      /* Must agree with `defaultVariants`: a destructure default wins over
+         cva's, silently (BUILD-A-COMPONENT §6). */
+      quote = "pull",
       eyebrow,
       heading,
       headingAs = "h2",
@@ -365,7 +474,7 @@ const ArticleBody = React.forwardRef<HTMLDivElement, ArticleBodyProps>(
           ref={ref as React.Ref<HTMLDivElement>}
           data-slot="article-body"
           data-state="default"
-          className={cn(articleBodyVariants({ size, measure }), className)}
+          className={cn(articleBodyVariants({ size, measure, quote }), className)}
           {...props}
         />
       );
@@ -377,7 +486,7 @@ const ArticleBody = React.forwardRef<HTMLDivElement, ArticleBodyProps>(
         data-slot="article-body"
         data-state={state}
         aria-busy={loading || undefined}
-        className={cn(articleBodyVariants({ size, measure }), className)}
+        className={cn(articleBodyVariants({ size, measure, quote }), className)}
         {...props}
       >
         {eyebrow !== undefined && eyebrow !== null ? (

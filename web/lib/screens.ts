@@ -174,62 +174,13 @@ export const MODULE_PERMISSION: Record<string, string> = {
 
 /* --------------------------------- team --------------------------------- */
 
-/** Team overview — the team's metadata (Overview), the landing screen at
- * /t/<teamId>. Edit team is gated by teams:edit.
- *
- * ITS ACTIVITY FEED WAS A SECOND TAB HERE UNTIL 2026-09-06, when the client
- * killed the Activity tab across the app: a record's history is read from the
- * footer's Latest activity column and opens in a slide-in off it
- * (web/components/records/activity-panel.tsx carries the ruling). The feed itself is
- * unchanged and still read — `use-screen-data.ts` fetches it and the host still
- * shapes it into this screen's `sets.activity` for whatever draws it next.
- *
- * NO SCREEN GATE, on purpose. Reading a team is `whoAmI`, not a right — the
- * matrix offers no `teams:read` box (MODULE_OFFERED_RIGHTS says why), so a
- * role built from scratch cannot hold the right, and gating the LANDING
- * screen on it locked such a role out of the app's front page. Same rule as
- * the company page in pages.ts: every member may see the team's face; what is
- * inside is gated piece by piece (the Edit action on `teams:edit`, the
- * activity feed by R18's per-module subtraction at its own door). */
-const teamDetailRecipe: ScreenRecipe = {
-  type: "detail",
-  binding: { module: "team" },
-  fields: [],
-  actions: [
-    {
-      id: "team.edit",
-      label: "Edit team",
-      action: "team.edit",
-      variant: "secondary",
-      gate: { module: "teams", right: "edit" },
-    },
-  ],
-  // A TEAM IS A COMPANY-SHAPED RECORD, so its mark is a rounded square and its
-  // logo is shown WHOLE (library v0.11.0 `avatarShape`). A wordmark cropped to a
-  // circle is a wordmark nobody can read — the same rule `RecordMark` keeps for
-  // every bespoke screen, finally sayable on a recipe one.
-  header: { title: "name", avatar: "image", avatarShape: "square" as const },
-  tabs: [
-    {
-      key: "overview",
-      label: "Overview",
-      icon: CONCEPT_ICON.overview,
-      block: {
-        kind: "description",
-        columns: 1,
-        rows: [
-          { label: "Created", column: "created" },
-          { label: "Created by", column: "createdBy" },
-          { label: "Last updated", column: "updated" },
-        ],
-      },
-    },
-    // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
-    // is reached from the record footer's Latest activity column and opens in a
-    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
-    // the ruling and the argument.
-  ],
-}
+/* THE TEAM DETAIL RECIPE IS GONE — CLIENT RULING, 2026-09-09: "This overview
+ * about the team should not even exist." It was one description block (Created /
+ * Created by / Last updated) with an Edit action, drawn at `/t/<teamId>`. That
+ * address now soft-navigates to Settings › Team; web/lib/pages.ts, where the
+ * section used to be declared, carries the whole decision and what happened to
+ * the two things the screen owned. */
+
 
 /* -------------------------------- members -------------------------------- */
 
@@ -698,12 +649,16 @@ const sprintsListRecipe: ScreenRecipe = {
   // relationship needed no registry: on the declared side it is the record's
   // own owning column, and on this side it is the data.
   collection: listCollection("No sprints yet.", "Search sprints…", [
-    { field: "account", label: "Client", control: "select" },
+    // ACCOUNT, NOT CLIENT — her 2026-09-09 correction, applied to every facet
+    // that names this record (the note that carries the argument sits on the
+    // tickets facet in web/lib/collection-filters.ts). The FIELD is the shaped
+    // row's own `account` key and did not move; only the word did.
+    { field: "account", label: "Account", control: "select" },
     {
       field: "app",
       label: "App",
       control: "select",
-      dependsOn: { field: "account", emptyText: "Choose a client first." },
+      dependsOn: { field: "account", emptyText: "Choose an account first." },
     },
     { field: "state", label: "Status", control: "select" },
   ], { icon: "sprints" }),
@@ -732,7 +687,10 @@ const appsListRecipe: ScreenRecipe = {
   leading: "mark",
   actions: [],
   collection: listCollection("No apps recorded yet.", "Search apps…", [
-    { field: "account", label: "Client", control: "select" },
+    // ACCOUNT, NOT CLIENT — the same 2026-09-09 correction as the sprints
+    // facet above; the argument is written out once, on the tickets facet in
+    // web/lib/collection-filters.ts.
+    { field: "account", label: "Account", control: "select" },
     { field: "stage", label: "Stage", control: "select" },
     { field: "state", label: "Archived", control: "select" },
   ], { icon: "apps" }),
@@ -901,10 +859,11 @@ const purposesDetailRecipe: ScreenRecipe = {
 /** The in-code BASE recipe for each screen key — the shipped default every team
  * inherits. A team can OVERRIDE one via the config store (per-team `screens`
  * table); the resolver merges override-over-base. Keys are `<module>.<view>`.
- * Roles DETAIL has no recipe — its permission grid has no engine block, so the
- * host composes it from the library PermissionMatrix (see role-detail.tsx). */
+ * Roles has no DETAIL recipe and, since 2026-09-09, no detail SCREEN either:
+ * the client folded every role's permission sheet onto one grid on Settings ›
+ * Team, which the host composes from the library PermissionMatrix (see
+ * roles-matrix.tsx). The grid never had an engine block and still does not. */
 export const BASE_RECIPES: Record<string, ScreenRecipe> = {
-  "team.detail": teamDetailRecipe,
   "members.list": membersListRecipe,
   "members.detail": memberDetailRecipe,
   "roles.list": rolesListRecipe,
@@ -1085,7 +1044,7 @@ function translateCollection(c: CollectionConfig, t: Translate): CollectionConfi
     sortOptions: c.sortOptions.map((o) => ({ ...o, label: t(o.label) })),
     // A FACET'S `dependsOn.emptyText` IS COPY AND GOES THROUGH `t` LIKE ITS
     // LABEL (R28/R33). It is a whole sentence a person reads inside the control
-    // ("Choose a client first."), so a recipe that declared one and skipped
+    // ("Choose an account first."), so a recipe that declared one and skipped
     // this line would say it in English to somebody who chose German — on a
     // screen that looks finished, which is the exact failure R28 exists for.
     filterFacets: c.filterFacets.map((f) => ({

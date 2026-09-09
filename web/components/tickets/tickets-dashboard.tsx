@@ -823,7 +823,7 @@ function WhoHasMore({
               // row does not answer — which is a record not worth sending a
               // reader to. Same ruling as the per-system panel above, for the
               // same reason.
-              const name = c.accountName ?? t("Unnamed client")
+              const name = c.accountName ?? t("Unnamed account")
               return (
                 <div key={c.accountId} className="flex min-w-0 items-center gap-2">
                   <RowName
@@ -1810,7 +1810,7 @@ export function TicketsDashboard({
       : [
           {
             field: "accountId",
-            label: t("Client"),
+            label: t("Account"),
             control: "select" as const,
             options: (accountsQ.data ?? [])
               .filter((a) => a.active)

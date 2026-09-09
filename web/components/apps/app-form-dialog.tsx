@@ -42,7 +42,7 @@ import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import type { SelectableValue } from "@shared/types"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { RecordMark } from "@shared/web/record-mark"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
@@ -96,12 +96,12 @@ const logoField = {
   ...defaultFieldConfig,
   label: "Logo",
   required: false,
-  helpText: "The client's own mark. Without one the tile shows the stage.",
+  helpText: "The account's own mark. Without one the tile shows the stage.",
 }
 const aboutField = { ...defaultFieldConfig, label: "About", required: false, helpText: "What this system is, in a sentence or two." }
 const contextField = {
   ...defaultFieldConfig,
-  label: "Client context",
+  label: "Account context",
   required: false,
   helpText: "The situation it was built into.",
 }
@@ -128,7 +128,7 @@ const stakeholderField = {
   ...defaultFieldConfig,
   label: "Their contacts",
   required: false,
-  helpText: "The client's own contacts for this system.",
+  helpText: "The account's own contacts for this system.",
 }
 const mainStakeholderField = {
   ...defaultFieldConfig,
@@ -334,7 +334,7 @@ export function AppFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term, { type: "entity" })}
           searchKey={pickerKey("companies", teamId)}
-          options={accounts.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+          options={accounts.map(accountOption)}
           placeholder={t("One of ours")}
           searchPlaceholder={t("Search companies…")}
           emptyText={t("No company matched.")}
@@ -381,8 +381,22 @@ export function AppFormDialog({
               aria-hidden
               className="bg-muted grid size-12 shrink-0 place-items-center overflow-hidden rounded-[var(--radius)] text-2xl leading-none"
             >
+              {/* FILL, NEVER FIT (R60, client 2026-09-09), and this is the site
+                  where the ruling is easiest to argue AGAINST and still right.
+                  The tempting exemption: a preview of a file somebody has just
+                  picked and not yet uploaded should show them the file, whole,
+                  so a crop cannot make them "fix" artwork that is fine. It reads
+                  well and it is backwards. This box is a PREVIEW of the app's
+                  mark, and that mark is an `AppMark` -> `RecordMark` everywhere
+                  else in the product (the apps grid, the tiles, every picker
+                  option, the ticket facets) — all of which now crop. A contained
+                  preview would be the one place in the app that shows the logo
+                  as it will NEVER appear again, which is the misleading version:
+                  the person would approve a wordmark whole and meet its middle
+                  third on the next screen. Same box, same crop, same size class
+                  the mark uses, so what is confirmed here is what ships. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoPreview} alt="" className="size-full object-contain" />
+              <img src={logoPreview} alt="" className="size-full object-cover" />
             </span>
           )}
           <FileUpload accept="image/*" multiple={false} onFilesSelected={pickLogo} />
@@ -522,7 +536,7 @@ export function AppFormDialog({
           <div className="flex flex-col gap-2" id="app-stakeholders">
             {contacts.length === 0 ? (
               <p className="text-muted-foreground text-sm">
-                {t("Nobody is on this client's books yet.")}
+                {t("Nobody is on this account's books yet.")}
               </p>
             ) : (
               contacts.map((c) => (

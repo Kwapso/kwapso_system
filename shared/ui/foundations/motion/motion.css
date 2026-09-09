@@ -479,6 +479,69 @@
 
 
 /* ============================================================================
+   3d · `.motion-dialog[data-presentation]` — A DIALOG THAT LANDS AS A SHEET
+
+   `DialogContent` now takes `presentation="responsive" | "overlay" | "sheet"
+   | "fullscreen"` (components/dialog/dialog.tsx, the PRESENTATION note). Two
+   of the four land as the bottom sheet — `sheet` at every width, `responsive`
+   below 45rem — and a surface that arrives from the block end must TRAVEL
+   from it, not rise 8 and fade in place. §3's own division of labour says
+   which duration: `--duration-overlay` "for a surface travelling its own
+   full width or height, i.e. a sheet", against `--duration-entrance` for
+   "the 8px rise of a dialog, which barely travels at all". So below the
+   threshold the NAME and the DURATION both change, and this block restates
+   the full shorthand rather than swapping `animation-name` alone the way §3a
+   does — §3a keeps `--duration-overlay` because a side drawer already had
+   it; a dialog does not.
+
+   THE SAME SHAPE AS §3a, AND FOR THE SAME REASONS. The primitive sets ONE
+   attribute (`data-presentation`, the way `Sheet` sets `data-side`); the
+   stylesheet reads it; the component keeps its one class, `.motion-dialog`,
+   and writes no duration and no curve. The narrow half is a media query and
+   not a `matchMedia` read, because a JS read at render gives the server one
+   answer and the client another, and a media query has no first frame to
+   get wrong. The threshold is the drawer's own `45rem`, in the range syntax
+   (`width < 45rem`) for the reason §3a records: Tailwind's `max-[45rem]:`
+   compiles to the same comparison, so the MOTION and the GEOMETRY in
+   dialog.tsx flip on the same pixel.
+
+   THE SPECIFICITY, WHICH IS THE PART THAT BITES HERE TOO. §3's base rules
+   are `.motion-dialog` (0,1,0) for the entrance and
+   `.motion-dialog[data-state="closed"]` (0,2,0) for the exit. A sheet
+   entrance written as `.motion-dialog[data-presentation="sheet"]` alone is
+   ALSO (0,2,0) and sits later in the file — so on the closed frame it would
+   OUTSCORE the base exit by order and the sheet would play its entrance on
+   the way out. Both rules below therefore carry `data-state`, at (0,3,0),
+   so each matches exactly one state and the base exit never ties with an
+   entrance. `alert-dialog` sets no `data-presentation` and is untouched:
+   nothing here matches an element without the attribute.
+
+   `overlay` AND `fullscreen` NEED NO RULE. Both keep §3's rise: `overlay`
+   because it is the dialog; `fullscreen` because §6.2's entrance signature —
+   fade plus a rise — is stated "for a panel, dialog or page", and a surface
+   with no gutter is the page. Reduced motion needs nothing: only tokens are
+   named for durations, and tokens.css §9 zeroes them. Measured, both the
+   axis of travel and the duration that plays, in verify/dialog-presentation.
+   ========================================================================= */
+
+.motion-dialog[data-presentation="sheet"][data-state="open"] {
+  animation: motion-sheet-in-bottom var(--duration-overlay) var(--ease-entrance) both;
+}
+.motion-dialog[data-presentation="sheet"][data-state="closed"] {
+  animation: motion-sheet-out-bottom var(--duration-exit) var(--ease-exit) both;
+}
+
+@media (width < 45rem) {
+  .motion-dialog[data-presentation="responsive"][data-state="open"] {
+    animation: motion-sheet-in-bottom var(--duration-overlay) var(--ease-entrance) both;
+  }
+  .motion-dialog[data-presentation="responsive"][data-state="closed"] {
+    animation: motion-sheet-out-bottom var(--duration-exit) var(--ease-exit) both;
+  }
+}
+
+
+/* ============================================================================
    4 · DROPDOWN, POPOVER, TOOLTIP, HOVER-CARD, SELECT, COMMAND — OPEN/CLOSE
    Anchored surfaces. The rise is tight (4px) and takes its direction from
    the side the surface opened on, so the surface always appears to come OUT

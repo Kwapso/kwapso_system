@@ -542,7 +542,44 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "named-paths",
     status: "enforced",
   },
+  {
+    id: "R59",
+    dimension: "ui",
+    law: "A FORM IS A SLIDE-IN; A WARNING IS AN OVERLAY. The client's ruling, 2026-09-09, over a screenshot of the \"New access token\" dialog: \"This should be a slide-in, like all the other screens. The only ones that are overlays are the warnings, such as archive or delete, and so on.\" A surface that COLLECTS — a form, an editor, a picker — presents as the kit's `Sheet`, which slides in from the inline end on desktop and, below 45rem, becomes the bottom sheet capped at 85dvh that her 2026-09-04 ruling asked for. A surface that ASKS a yes/no question about something that already exists is an `AlertDialog`, centred. The check does NOT try to recognise a form, because a regex that decides what a form looks like has a hole the week somebody writes one differently: it INVERTS, and holds every centred-overlay mount — every `<DialogContent>` across `web/`, `web-portal/` and `shared/web/` — to a reasoned `CENTRED_DIALOG_OK` line. A new form added next month reaches for a `Dialog`, has no line, and is red on the day it is written. The law is deliberately blind to kit v1.2.72's new `presentation` prop, which looks like the answer and is not: of its four values `overlay` and `responsive` are both CENTRED on a desktop (`responsive` flips to the bottom sheet only below 45rem), `sheet` is a bottom sheet on a 1920 monitor, and `fullscreen` is a page — so a `<DialogContent>` is a finding whatever it carries. The shape the client asked for is `Sheet side=\"right\"`, a different component, and the one the app's other ~35 forms already use. Two rot-checks make the list a ratchet rather than a loophole: an entry whose file no longer mounts a centred overlay must go, and an EXEMPT overlay that grows form machinery (a `<form>`, a `FormShell`, a `<Field>`, an `<Input>`) turns the build red where it stands — which is the exact way an exemption would otherwise be used to smuggle back the thing the law forbids.",
+    why: "The ruling was already the app's practice and was enforced by nobody, which is the shape that always rots. `FormShellDialog` moved ~35 forms from the centred `Dialog` to a `Sheet` on 2026-08-31 and its header argues the case at length — but it argued it for its own call sites, so the five forms that never adopted the shell stayed centred under a green build, and one of them was the screen the client happened to screenshot. Detecting the fault directly was tried first and abandoned: a form-machinery scan finds four of the five and misses `role-picker-dialog.tsx` outright, because a radio group and an onClick that writes is a form with no `<form>` in it. The inversion costs two exemption lines today and cannot miss a sixth. The two it costs are honest ones and are referred back to the client rather than sorted: `agent-usage-dialog.tsx` (read where the credits went) and `record-calendar.tsx` (what is on this day) are neither forms nor warnings, and she has ruled on neither.",
+    checkId: "forms-are-not-overlays",
+    status: "enforced",
+  },
+  {
+    id: "R60",
+    dimension: "ui",
+    law: "AN IMAGE FILLS ITS BOX; IT IS NEVER SHRUNK TO FIT INSIDE ONE. The client's ruling, 2026-09-09, blanket and unhedged: \"everywhere for images: do fill, not fit!\" Every picture either front door draws is `object-cover` — it fills the box it is given and is CROPPED to it — never `object-contain`, `object-fill`, `object-none` or `object-scale-down`. TWO CENSUSES, because there are two ways to say the losing word: the CLASS, written into a className anywhere under `web/app`, `web/components`, `web/lib`, the portal's three, and `shared/web`; and the PROP, `fit=\"contain\"` handed to the kit's own `Image`, which turns exactly that value into exactly that class. Without the second half the law is a one-line evasion — delete the className, pass the prop, ship the same pixels green — and it earned its place on the first run by catching a fit in the kit's gallery that the hand census the law was written from had missed for being spelled as a prop. The vendored kit is OUT of the requirement and IN the count: `shared/ui/` holds five of these and none can be fixed here (it is hash-pinned; a hand-edit is red on its own), so `KIT_CONTAIN_CEILING` pins the number for exact equality the way R44 pins a translation debt — it falls when the upstream fix is tagged and pulled, and can never rise. One reasoned, rot-checked `OBJECT_FIT_OK` line is the way out and there is exactly one: a ticket ATTACHMENT's preview, where the picture is the content rather than a mark standing for a record whose name is beside it. And one clause is held directly rather than by census: `RecordMark`, which draws almost every picture in the product, may not grow a `fit` prop again — it had one, its square DEFAULT was `contain`, and a default applies to every caller who never made the choice.",
+    why: "The cost is real and was accepted knowingly, which is why the law says it out loud rather than hiding it: a wide wordmark in a small square LOSES ITS ENDS. What it was weighed against is the aggregate — a marked column where a contained logo sits smaller, paler and a different shape from the filled face beside it and the letter tile below it, grey bars down one row in three. On staging only 48 of 134 accounts hold a picture at all, so most boxes are a solid letter tile either way and the contained ones were the odd shape out rather than the norm. A law rather than six edits for R32's reason about colour and R35's about thirteen placeholders: a fit is invisible to every other check here and only visible in aggregate, and the census this was written from found NINE `object-contain` against eleven `object-cover` without one of the nine being wrong on its own screen. Nobody files that as a bug.",
+    checkId: "image-fills",
+    status: "enforced",
+  },
 ]
+
+/** R59 — A CENTRED OVERLAY (`<DialogContent>`) THAT IS NEITHER A FORM NOR A
+ * WARNING, and the reason it is allowed to stay centred.
+ *
+ * Keyed by repo-relative path. The client's line sorts a surface by what it
+ * DOES — collecting is a form and gets a drawer, asking a yes/no question about
+ * an existing thing is a warning and gets an `AlertDialog` — and a surface that
+ * only SHOWS is on neither side of it. Both entries here are that, and both are
+ * open questions for her rather than settled decisions by us.
+ *
+ * Rot-checked in both directions, so this list can only shrink: a file here that
+ * no longer mounts a centred overlay is a line nobody can justify, and a file
+ * here that GROWS form machinery is the law being smuggled around — either turns
+ * the build red. Adding a line to make a red build green is the one use of this
+ * list that is never correct; if the surface collects anything, it is a drawer. */
+export const CENTRED_DIALOG_OK: Record<string, string> = {
+  "web/components/assistant/agent-usage-dialog.tsx":
+    "A READ-ONLY USAGE PANEL — where the team's AI credits went, drawn as an ActivityFeed. It collects nothing (no field, no choice, no commit control; its only button is the kit's own close chip) and it asks nothing, so neither of the client's two buckets fits. Its sibling behind the next badge, agent-history-dialog.tsx, looks identical and IS a drawer, because every row there is a button that picks a thread — the pair is the clearest statement of where this law draws its line. Referred to the client 2026-09-09: a panel you only read may belong in the drawer with everything else, or the centre may be right for something you close without answering.",
+  "web/components/records/record-calendar.tsx":
+    "THE DAY LIST BEHIND A '+N more' CHIP — the records that did not fit in a month-grid cell, each one a link to its own screen. It is a disambiguation step for a click that has already happened, closer to a menu than to a screen: it collects nothing and asks nothing, and it is deliberately small and transient in a way a full-height drawer would contradict. Referred to the client 2026-09-09 with the usage panel above; if she rules that everything non-warning slides in, both lines go and both files move.",
+}
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
  * no gated read tool, and a reason why that is right rather than an oversight.
@@ -1292,6 +1329,11 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["t(o.label)"],
     why: "VALUE_SORTS, the same reasoning again — Choices' own Value/Group sort vocabulary, translated where `<SortControl>` reads it (`VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
   },
+  "web/components/screens/module-settings-screen.tsx": {
+    kinds: ["property"],
+    via: ["t(page.title)", "t(section.title)"],
+    why: "MODULE_SETTINGS — the same shape as every copy table above, and the reason it is one is the client's own ruling of 2026-09-09 (*\"a lot of them are specific to the module\"*): a module's settings page is DATA, so that the second module is an entry in a list rather than a screen somebody writes. A page's `title`/`description` and each section's sit beside the `segment` the URL is built from and the `types` the vocabulary is keyed on, which are names of data and are never translated — so the words cannot be split off into a `t(...)` at the constant without splitting the row that holds them, and `t` is a hook a module-level table could not call anyway. Every one of the four is read through `t` on the way to the screen (`t(page.title)`, `t(page.description)`, `t(section.title)`, `t(section.description)`), and the gear reads the page title through `t` a second time for its own tooltip and accessible name.",
+  },
   "web/components/work/tasks-screen.tsx": {
     kinds: ["field-label", "property"],
     via: ["translateFields(columns, t)", "t(tab.label)"],
@@ -1700,6 +1742,8 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
  * list is worse than dead — it is wrong. Rot-checked in both directions: an
  * entry whose component now passes `sort` fails the build. */
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
+  "web/components/team/members-gallery.tsx#MembersGallery":
+    "A GALLERY OF THE PEOPLE ON THE TEAM, and the client named its toolbar slot by slot on 2026-09-09: search, a Role filter, Invites, and the plus. There is no order to offer that anybody would ask for. The wall carries four facts — a round mark, the full name, the role chip and the email — and three of them order the same way (a person's name IS the row, an email sorts by the same name in a worse spelling, and a role is the FILTER one slot along, not a second control asking the same question). The one field that would genuinely sequence a team, the date somebody joined, is deliberately not on the card: the row this replaced spent a whole line on \"<role> · joined <date>\" and \"this takes too much space\" is the correction that produced the gallery. A sort picker offering a single option over a bounded, alphabetical wall of nine cards is a control that answers nothing.",
   "web/components/work/tasks-screen.tsx#TasksScreen":
     "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
   "web/components/apps/stakeholders-panel.tsx#StakeholdersPanel":
@@ -2627,13 +2671,17 @@ export const TAB_COUNT_EXCEPTIONS: Record<string, string> = {
 export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // Engine-recipe details (web/lib/screens.ts) — a `description` block is the
   // record's own fields, so there is no collection to count.
-  "team.detail.overview": "the team's own metadata (created, created by, last updated) — one record, not a collection.",
   "members.detail.overview": "one member's role, joined date and email — one record, not a collection.",
   "invites.detail.overview": "one invite's role, status and dates — one record, not a collection.",
   // Bespoke details (host-composed) — the panel is the record itself.
-  "role-detail.permissions":
-    "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
-  "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
+  //
+  // `team.detail.overview` AND THE TWO `role-detail` LINES LEFT THIS MAP ON
+  // 2026-09-09, and the reason is the same for all three: the tabs are gone
+  // because the SCREENS are. The client's ruling deleted the team overview
+  // outright ("This overview about the team should not even exist") and folded
+  // every role's permission sheet onto one matrix in Settings › Team, so a role
+  // no longer opens a page with tabs to badge. web/lib/pages.ts and
+  // web/components/team/roles-matrix.tsx carry the whole of it.
   "selectable-detail.overview":
     "one dropdown value's own fields — its group, its word, whether it is active, whether it is one of the defaults, and the four enrichments (emoji, German label, description, standard days). One record, not a collection. It is the R2 MINIMUM on purpose: a dropdown value has no collection hanging off it at all, so Overview + Activity is the whole record and the second tab is the only one that can carry a number.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
@@ -3067,7 +3115,7 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "states/empty-collection.tsx":
     "REALIZED, in substance — not a direct import. The composition's own `emptyBody` register (Headline + Text + up to two Buttons, no dashed placeholder) is a real seam now, `CollectionEmptyState` in `shared/web/screen-engine/collection-frame.tsx`, drawn by BOTH of the engine's genuinely-empty branches (kit-panel and legacy) and reused verbatim by every hand-rolled nested collection this app has (work-panels.tsx and its dozen siblings) — one register, not a fourth reinvention of 'a bare grey line'. 2026-09-01: it used to stop at an icon-only mango with no sentence and no second action, which is the client's own 'very wrong' screenshot; it now carries composition 27.21's exact two-button register — 'Add the first' (the one carved-out labelled mango) beside 'Import a list', the second only where a call site actually has a real import target for that record type. The rest of the composition (a figure strip of zero-reading stats, per-tab zero-badges) is still not adopted: `CollectionConfig` has no 'figures' or per-tab zero-badge concept, and inventing either is separate, unscoped scope.",
   "states/new-empty-record.tsx":
-    "MISMATCH. There is no standalone screen to replace: every record-detail file (`role-detail.tsx`, `sprint-detail.tsx`, `story-detail.tsx`, and others) hand-rolls its own empty-copy into its own `CollectionFrame`/`ShapeStateBody` call. A real equivalent exists, just scattered across as many files as there are record types — not a gap, a different shape.",
+    "MISMATCH. There is no standalone screen to replace: every record-detail file (`sprint-detail.tsx`, `story-detail.tsx`, `help-detail.tsx`, and others) hand-rolls its own empty-copy into its own `CollectionFrame`/`ShapeStateBody` call. A real equivalent exists, just scattered across as many files as there are record types — not a gap, a different shape.",
   "states/no-results.tsx":
     "MISMATCH, a real but non-urgent one. The composition's register states the exact total count, the single narrowest-excluding facet, and a live would-show-if-cleared number for that one facet — genuinely richer than this app's plain sentence, but the middle claim requires the engine to answer a question it has never had to (re-running row selection per candidate facet, with real unresolved edge cases: ties, a facet excluding every row alone, a search term interacting with a facet). This app's existing 'Clear filters' button already works, so the plain sentence is not a dead end — plain-and-correct beats rich-and-speculative until a dedicated pass builds and tests the computation against real filtered data.",
   "templates/collection-screen.tsx":

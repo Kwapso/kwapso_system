@@ -207,7 +207,7 @@ export function WaveDetailScreen({
   )
 
   const overviewItems = [
-    { label: t("Client"), value: wave.accountName || "—" },
+    { label: t("Account"), value: wave.accountName || "—" },
     {
       label: t("What the package is for"),
       value: wave.goal ? <RichText html={wave.goal} /> : "—",

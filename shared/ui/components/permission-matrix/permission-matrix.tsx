@@ -260,6 +260,67 @@
    its type, so no call site's import breaks on the day the model changed;
    they are two lines and cost nothing to delete once the apps have moved.
 
+   A COLLECTION MAY OFFER FEWER THAN THE MATRIX DRAWS — `rights`, 2026-09-07
+   Every cell had four boxes whether or not four decisions existed behind
+   them, and an inert box looks exactly like a live one. The consuming
+   application counted: FIFTEEN OF EIGHTY-EIGHT boxes decided nothing — one
+   whole collection had four boxes and no door behind any of them — and an
+   owner who ticked one was told they had granted something. The switch was
+   drawn because the GRID has four capabilities, and nobody had ever asked
+   whether the COLLECTION has four.
+
+   `PermissionModule.rights` is that question. Absent, every capability is
+   offered and every grid drawn before today is unchanged. Given, it is the
+   subset this collection offers at all, and the difference from `held` is the
+   whole point: `held` says whether a role HAS the capability, `rights` says
+   whether the capability EXISTS here to be given.
+
+   THE SLOT KEEPS ITS PLACE AND LOSES ITS CONTROL. Not its place, because
+   position is what carries the meaning in approach A — four collections
+   drawing four, two, four and three slots would put every letter under a
+   different column and there would be nothing left to read down, which is the
+   one property the whole drawing was chosen for. So the unoffered slot is the
+   same 1.375rem in the same order, and what it drops is the well and the
+   letter:
+
+     · NO FILL AND NO HAIRLINE. The well IS the switch — a paper well behind
+       override 42's edge is what says "there is a control here and it is
+       off". Where there is no control there is nothing to put a well around.
+     · THE KIT'S OWN NO-VALUE EM DASH, in `--ink-tertiary`. Not a coined mark:
+       the demo already draws `—` for a value that is not there in five
+       places. And NOT "draw nothing", which is the reading rule 5.4 invites
+       — because a not-held slot's own edge measures 1.526 light / 2.185 dark,
+       this file's recorded accepted failure, so an empty slot beside a
+       not-held one would differ by an edge below the 3:1 floor and a reader
+       could not tell "no switch" from "switch, off". That is the very defect
+       this prop exists to remove, rebuilt inside the kit. The dash measures
+       6.506 / 7.928 against 4.5 — the same measurement the letter relies on
+       — and is legible whether or not the wells around it are.
+     · NEVER A CONTROL, in either run. A live run becomes a group of
+       checkboxes with a HOLE in it, not a group with a dead member: no
+       button, no tab stop, and no tooltip, because the tooltip on a live slot
+       says the capability's word and naming a capability that is not on offer
+       is the sentence this prop exists to stop the grid saying.
+     · NOT COUNTED. `holds` returns false for an unoffered capability whatever
+       the sheet says — the two can disagree when a right is withdrawn from a
+       collection, and a capability that does not exist here cannot be one
+       somebody has. Nothing is written and nothing is corrected; the grid
+       simply does not count it.
+     · SAID IN WORDS. The cell's accessible sentence names the capabilities
+       this collection does not offer, once per cell, and the slot is
+       `aria-hidden` — the same rule `LockMark` follows. `formatCellLabel`
+       takes them as a FIFTH PARAMETER rather than a second prop: a function
+       of four parameters is assignable to a type of five, so no call site
+       breaks, and word order stays in the formatter a caller already owns.
+
+   AND THE LEGEND GAINS ITS THIRD REGISTER, which the locked one never earned.
+   A legend turns a mark that is not words into words; the lock's mark IS
+   words on the row a few millimetres away, and this one is an em dash. It is
+   drawn only when a shown row actually withholds something — a register
+   teaching a mark the grid does not contain is a mark the reader holds for
+   nothing — and it shows the dash WHERE IT LIVES, one hole in a run of wells,
+   because position is the part that has to be learnt.
+
    CAPABILITIES ARE A PROP, SO A FIFTH IS A DATA ENTRY
    `capabilities` defaults to `PERMISSION_CAPABILITIES` — the client's four
    actions and nothing else is invented. The header, the cells, the run's
@@ -453,6 +514,30 @@ export interface PermissionModule {
    */
   held?: Readonly<Record<string, readonly string[]>>;
   /**
+   * WHICH CAPABILITIES THIS COLLECTION OFFERS AT ALL. Absent — the default —
+   * every capability in `capabilities` is offered, which is every grid drawn
+   * before this prop existed.
+   *
+   * A SWITCH AND A DECISION ARE NOT THE SAME THING. `held` says whether a
+   * role has a capability here; this says whether the capability EXISTS here
+   * to be given. A collection nobody can add to has no create switch, and a
+   * grid that draws one anyway tells a reader they granted something when
+   * they ticked it — the box is inert, and an inert box looks exactly like a
+   * live one.
+   *
+   * An unoffered capability KEEPS ITS PLACE and loses its control: the slot
+   * draws the kit's own no-value em dash instead of a well and a letter, is
+   * never a tab stop and never toggles, is not counted as held even if `held`
+   * names it, and is named in the cell's accessible sentence. The place is
+   * kept because position is what carries the meaning in this drawing — four
+   * collections drawing four, two, four and three slots would put every
+   * letter under a different column and there would be nothing left to read
+   * down.
+   *
+   * Ids not in `capabilities` are ignored; an empty array offers nothing.
+   */
+  rights?: readonly string[];
+  /**
    * Roles whose cell cannot be changed here. `true` locks the whole row.
    *
    * The CELLS are unchanged by this — D4-B: a locked run is drawn exactly as a
@@ -528,6 +613,19 @@ export interface PermissionMatrixProps
   /** The legend's word for a slot that is not. */
   notHeldLabel?: string;
   /**
+   * THE WORDS FOR A CAPABILITY THIS COLLECTION DOES NOT OFFER — `rights`.
+   * They name the state in every cell's accessible sentence, and they label
+   * the legend's third register.
+   *
+   * THE LEGEND EARNS THAT REGISTER, unlike the locked one that left it: a
+   * legend turns a mark that is not words into words, the lock's mark IS
+   * words on the row a few millimetres away, and this mark is an em dash. It
+   * is drawn only when a shown row actually withholds something, because a
+   * register teaching a mark the grid does not contain is a mark the reader
+   * has to hold for nothing.
+   */
+  notOfferedLabel?: string;
+  /**
    * THE MARK'S OWN WORDS — the artifact's phrase, ch10. Drawn BARE, running
    * on from the collection's name after an em dash in `--ink-tertiary`, on
    * any row holding a locked cell; raised in a `Tooltip` over any locked run;
@@ -566,12 +664,23 @@ export interface PermissionMatrixProps
    * The accessible name of a whole cell, built from the collection, the role
    * and the capabilities it holds. Defaulted, and a prop because word order
    * differs between languages: a run announced as four letters says nothing.
+   *
+   * `notOffered` — the fifth argument — is the capabilities this collection
+   * does not offer at all, in `capabilities` order. It is a NEW PARAMETER and
+   * not a new prop: a function of four parameters is assignable to a type of
+   * five, so every existing `formatCellLabel` still compiles and still
+   * behaves, and a caller who wants the clause in a different place in their
+   * sentence has it in the formatter they already own rather than in a second
+   * one they have to discover. The default appends it after the lock's clause
+   * — it is the coarser fact, and it is the same reason the lock's clause
+   * sits after the held list.
    */
   formatCellLabel?: (
     moduleLabel: string,
     roleLabel: string,
     held: readonly string[],
     locked: boolean,
+    notOffered: readonly string[],
   ) => string;
   /**
    * The accessible name of ONE slot. Defaulted, and a prop for the same
@@ -603,12 +712,29 @@ function isLocked(
   return false;
 }
 
-/** True when this role holds this capability on this row. */
+/**
+ * True when this collection offers this capability at all. Absent `rights` is
+ * every capability, so a grid written before the prop existed is unchanged.
+ */
+function offers(module: PermissionModule, capabilityId: string): boolean {
+  return module.rights === undefined || module.rights.includes(capabilityId);
+}
+
+/**
+ * True when this role holds this capability on this row.
+ *
+ * AN UNOFFERED CAPABILITY IS NEVER HELD, whatever `held` says. The two can
+ * disagree — a right withdrawn from a collection leaves rows behind it — and
+ * there is only one honest reading of the disagreement: a capability that
+ * does not exist here cannot be one somebody has. The sheet is not corrected
+ * and nothing is written; the grid simply does not count it.
+ */
 function holds(
   module: PermissionModule,
   roleId: string,
   capabilityId: string,
 ): boolean {
+  if (!offers(module, capabilityId)) return false;
   return (module.held?.[roleId] ?? []).includes(capabilityId);
 }
 
@@ -666,6 +792,42 @@ function slotSkin(held: boolean): string {
     : "bg-card text-ink-tertiary shadow-[var(--hairline-strong)]";
 }
 
+/**
+ * THE THIRD SKIN, AND IT IS THE ABSENCE OF ONE — an unoffered capability.
+ *
+ * NO FILL AND NO EDGE, because the well IS the switch. A slot's paper well
+ * behind override 42's hairline is what says "there is a control here and it
+ * is off"; where there is no control there is nothing to draw a well around,
+ * so the slot keeps only its 1.375rem place in the run.
+ *
+ * AND A MARK, WHICH IS WHY THIS IS NOT "DRAW NOTHING". Rule 5.4 says prefer
+ * nothing to a placeholder and never invent a dash to fill a hole — that is
+ * about a VALUE THAT HAS NOT ARRIVED, where a dash claims knowledge the
+ * component does not have. This is the opposite case: the dash IS the
+ * knowledge. And the empty box cannot carry it, for a reason this file
+ * already has written down: a not-held slot's own edge measures **1.526 light
+ * / 2.185 dark**, the system's accepted failure, so an empty slot beside a
+ * not-held one would differ by an edge that is below the 3:1 floor. A reader
+ * could not tell "no switch" from "switch, off" — which is R36's whole defect
+ * reproduced inside the kit. The mark is `--ink-tertiary`, **6.506 / 7.928**
+ * against 4.5, the same ink and the same measurement the letter already
+ * relies on; it is legible whether or not the wells around it are.
+ *
+ * THE GLYPH IS THE KIT'S OWN NO-VALUE EM DASH, not a coined one — the mark
+ * the demo already draws for a value that is not there in five places
+ * (`last selected: —`, an unfilled description term, a token with no value,
+ * a row hidden from the reader, an imported record with no VAT). It is not a
+ * string prop: it is the same glyph in Arabic, Urdu and Persian, and the
+ * WORDS for this state are `notOfferedLabel`, which is a prop. It carries
+ * `aria-hidden` for the reason `LockMark` does — the cell's own sentence
+ * already names every capability the row does not offer, and announcing it
+ * per slot as well would read the same fact five times.
+ */
+const SLOT_UNOFFERED = "text-ink-tertiary";
+
+/** The kit's own mark for a value that is not there. See `SLOT_UNOFFERED`. */
+const NO_VALUE = "—";
+
 /** The run's shell. One shape, rounded at its two ends only. */
 const RUN_SHELL =
   "inline-flex shrink-0 items-center overflow-hidden rounded-[var(--radius-select)]";
@@ -682,17 +844,26 @@ const RUN_SHELL =
 function LegendRun({
   capabilities,
   held,
+  offered,
 }: {
   capabilities: readonly PermissionCapability[];
   held: (index: number) => boolean;
+  /** Absent — every slot is a switch, which is the two original registers. */
+  offered?: (index: number) => boolean;
 }) {
   return (
     <span aria-hidden="true" className={RUN_SHELL}>
-      {capabilities.map((capability, index) => (
-        <span key={capability.id} className={cn(SLOT_SHAPE, slotSkin(held(index)))}>
-          {initialOf(capability)}
-        </span>
-      ))}
+      {capabilities.map((capability, index) =>
+        offered !== undefined && !offered(index) ? (
+          <span key={capability.id} className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}>
+            {NO_VALUE}
+          </span>
+        ) : (
+          <span key={capability.id} className={cn(SLOT_SHAPE, slotSkin(held(index)))}>
+            {initialOf(capability)}
+          </span>
+        ),
+      )}
     </span>
   );
 }
@@ -769,6 +940,7 @@ function LockMark({ children }: { children: React.ReactNode }) {
 function PermissionRun({
   capabilities,
   isHeld,
+  isOffered,
   locked,
   lockedLabel,
   cellLabel,
@@ -777,6 +949,13 @@ function PermissionRun({
 }: {
   capabilities: readonly PermissionCapability[];
   isHeld: (capability: PermissionCapability) => boolean;
+  /**
+   * Whether this collection offers the capability at all. An unoffered slot
+   * is the same drawing in both runs and in neither is it a control — a live
+   * run is a group of checkboxes with a HOLE in it, not a group with a dead
+   * member.
+   */
+  isOffered: (capability: PermissionCapability) => boolean;
   locked: boolean;
   /** The lock's phrase, raised on hover over a locked run. */
   lockedLabel: string;
@@ -809,9 +988,14 @@ function PermissionRun({
           <span
             key={capability.id}
             aria-hidden="true"
-            className={cn(SLOT_SHAPE, slotSkin(isHeld(capability)))}
+            className={cn(
+              SLOT_SHAPE,
+              isOffered(capability)
+                ? slotSkin(isHeld(capability))
+                : SLOT_UNOFFERED,
+            )}
           >
-            {initialOf(capability)}
+            {isOffered(capability) ? initialOf(capability) : NO_VALUE}
           </span>
         ))}
       </span>
@@ -836,6 +1020,24 @@ function PermissionRun({
     <span className={RUN_SHELL} role="group" aria-label={cellLabel}>
       {capabilities.map((capability) => {
         const held = isHeld(capability);
+
+        /* NOT A DEAD CONTROL — NO CONTROL. It keeps its place and takes the
+           no-value mark, with no button, no tab stop and no tooltip: the
+           tooltip on a live slot says the capability's WORD, and naming a
+           capability that is not on offer here is the sentence this prop
+           exists to stop the grid saying. The fact is in the cell's own
+           accessible name, once. */
+        if (!isOffered(capability)) {
+          return (
+            <span
+              key={capability.id}
+              aria-hidden="true"
+              className={cn(SLOT_SHAPE, SLOT_UNOFFERED)}
+            >
+              {NO_VALUE}
+            </span>
+          );
+        }
 
         return (
           <Tooltip key={capability.id}>
@@ -870,10 +1072,18 @@ function PermissionRun({
  * TEN STATES
  *  1. default        — a header of micro uppercase ROLE names on the section
  *                      rule, then one 56 row per collection carrying one
- *                      four-slot run per role, and the legend under it.
+ *                      four-slot run per role, and the legend under it. A
+ *                      collection may offer FEWER capabilities than the grid
+ *                      draws (`rights`): the slot keeps its place and takes
+ *                      the kit's no-value em dash instead of a well and a
+ *                      letter, so the columns still line up and the reader
+ *                      can tell a decision that does not exist from one that
+ *                      is merely off.
  *  2. hover          — the ROW takes `--accent`, the kit's neutral wash,
  *                      which is `TableRow`'s own treatment; a changeable SLOT
- *                      raises its capability's word in a `Tooltip`. Neither
+ *                      raises its capability's word in a `Tooltip`, and an
+ *                      unoffered slot raises nothing, because there is no
+ *                      capability there to name. Neither
  *                      is an opacity, and the slot's own fill does NOT move
  *                      on hover: `checkbox.tsx` draws no hover on a mark
  *                      (override 42) and a run whose slots lit under the
@@ -914,11 +1124,17 @@ function PermissionRun({
  *  9. selected       — a held capability IS the selection, and it is the
  *                      slot's own checked state. There is no selected ROW
  *                      here: a permission grid has no bulk bar, because 27.12
- *                      gives it one action and that action is the change.
+ *                      gives it one action and that action is the change. A
+ *                      capability the collection does not offer can never be
+ *                      selected, whatever `held` says — an unoffered slot is
+ *                      not a switch that happens to be off.
  * 10. read-only      — no `onChange`: every run is a labelled mark and the
  *                      screen reads completely. Deliberately NOT the locked
  *                      skin — a reference table is not a frozen form, and 120
  *                      greyed marks would say the opposite of what is true.
+ *                      An unoffered slot is read-only in a third sense and is
+ *                      drawn the same way in every run: there is nothing to
+ *                      change, rather than nothing you may change now.
  *
  * THREE BREAKPOINTS
  *  mobile   — BELOW 45rem THE MATRIX TURNS, which is CH27.12's own narrow
@@ -966,6 +1182,7 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
       legend = true,
       heldLabel = "held",
       notHeldLabel = "not held",
+      notOfferedLabel = "not offered",
       /* Sentence case since D4-B: it is a chip's label on a row now, not a
          clause in a legend. Inside an accessible name it reads identically. */
       lockedLabel = "Locked by policy",
@@ -986,9 +1203,21 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
   ) => {
     const describeCell =
       formatCellLabel ??
-      ((collection: string, role: string, held: readonly string[], locked: boolean) =>
+      ((
+        collection: string,
+        role: string,
+        held: readonly string[],
+        locked: boolean,
+        notOffered: readonly string[],
+      ) =>
         `${role} · ${collection}: ${held.length === 0 ? nothingLabel : held.join(", ")}${
           locked ? `, ${lockedLabel}` : ""
+        }${
+          /* The row's own shape, after the role's. `nothing` already says the
+             role holds none of them; only this says which of them were never
+             on offer, and a reader who cannot see the dashes has no other way
+             to be told. */
+          notOffered.length === 0 ? "" : ` · ${notOffered.join(", ")}: ${notOfferedLabel}`
         }`);
 
     const describeLock =
@@ -1011,6 +1240,16 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
         ? "empty"
         : state;
     const columns = shownRoles.length + 1;
+
+    /* Does any shown row withhold a capability? Off the rows themselves, not
+       off a prop, so the legend's third register cannot survive the data that
+       earned it. */
+    const hasUnoffered = shownModules.some((module) =>
+      capabilities.some((capability) => !offers(module, capability.id)),
+    );
+    /* Where the legend puts its hole: the second slot, or the last one in a
+       run too short to have a second. */
+    const gap = Math.min(1, capabilities.length - 1);
 
     /* A 7.5rem name column, and one run plus `TableCell`'s own `px-3` inset
        per role. Derived from both counts so nothing has to be re-typed when
@@ -1049,14 +1288,21 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
       const heldWords = capabilities
         .filter((capability) => holds(module, role.id, capability.id))
         .map((capability) => capability.label);
+      /* In `capabilities` order, not `rights` order — the same rule the run
+         itself follows, so the sentence and the slots read left to right
+         together. */
+      const notOfferedWords = capabilities
+        .filter((capability) => !offers(module, capability.id))
+        .map((capability) => capability.label);
 
       return (
         <PermissionRun
           capabilities={capabilities}
           isHeld={(capability) => holds(module, role.id, capability.id)}
+          isOffered={(capability) => offers(module, capability.id)}
           locked={locked}
           lockedLabel={lockedLabel}
-          cellLabel={describeCell(name, roleName, heldWords, locked)}
+          cellLabel={describeCell(name, roleName, heldWords, locked, notOfferedWords)}
           slotLabel={(capability, held) =>
             describeSlot(name, roleName, capability.label, held)
           }
@@ -1290,11 +1536,26 @@ const PermissionMatrix = React.forwardRef<HTMLDivElement, PermissionMatrixProps>
                 <span className="text-badge">{notHeldLabel}</span>
               </span>
 
-              {/* THERE IS NO THIRD REGISTER. The locked one left with the
-                  locked skin (D4-B): a legend turns a mark that is not words
-                  into words, and the lock's mark is already the words, on the
-                  row it applies to. Drawing a locked run here would repeat one
-                  of the two registers beside it exactly. */}
+              {/* THE THIRD REGISTER, AND IT IS DRAWN ONLY WHEN THE GRID HAS
+                  ONE. The locked register left this row with the locked skin
+                  (D4-B) because the lock's mark is already words on the row;
+                  this mark is an em dash, which is exactly what a legend is
+                  for. The register shows it WHERE IT LIVES — one hole in a
+                  run of wells, not a lone dash — because position is what the
+                  reader has to learn, and a dash on its own teaches the glyph
+                  and not the reading. `gap` is the second slot where there is
+                  one and the last otherwise, so a two-capability or a
+                  one-capability grid draws a legend that is still true. */}
+              {hasUnoffered ? (
+                <span className="inline-flex items-center gap-[var(--space-2h)]">
+                  <LegendRun
+                    capabilities={capabilities}
+                    held={() => false}
+                    offered={(index) => index !== gap}
+                  />
+                  <span className="text-badge">{notOfferedLabel}</span>
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

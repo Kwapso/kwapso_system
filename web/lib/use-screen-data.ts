@@ -181,7 +181,7 @@ export function useScreenData({
   // EVERY COMPANY, as a safety net for the list's "filed under" names —
   // 2026-08-31: `accountsQ` above is gated to the accounts/contacts screens, so
   // it was `undefined` while browsing Knowledge and every source's account
-  // name fell to "A client" whether or not it was in page one. `companiesKey`
+  // name fell to "An account" whether or not it was in page one. `companiesKey`
   // (waves-screen.tsx's own fix for the same paged-list problem) asks the
   // door the narrow question directly rather than depending on another
   // screen's cache having warmed it first.

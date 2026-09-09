@@ -20,7 +20,9 @@
 //
 // Write UI is URL-driven (?panel / ?confirm) so Back closes it and links are
 // shareable; it reuses the existing tested dialogs. The role permission grid has
-// no engine block, so its detail is host-composed (role-detail.tsx).
+// no engine block, and since 2026-09-09 no detail screen either — every role's
+// sheet is one host-composed grid on Settings › Team (roles-matrix.tsx), and
+// `/t/<teamId>/roles/<id>` soft-navigates there (module-content.tsx).
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
@@ -48,6 +50,7 @@ import { HomeScreen } from "@/components/screens/home-screen"
 import { ProfileScreen } from "@/components/screens/profile-screen"
 import { KwapsoScreen } from "@/components/screens/kwapso-screen"
 import { SettingsScreen } from "@/components/screens/settings-screen"
+import { ModuleSettingsScreen, moduleSettingsPage } from "@/components/screens/module-settings-screen"
 import { InvitationsScreen } from "@/components/screens/invitations-screen"
 import { toast } from "@shared/ui/components/sonner/sonner"
 
@@ -418,9 +421,28 @@ export function DeepLinkScreen() {
   // never known about (it reads `TEAM_SECTIONS`, and /settings is not one).
   // Lifted out of their branch below so the trail and the tab set are built
   // from ONE array on both sides of that early return.
+  //
+  // A MODULE'S OWN SETTINGS PAGE IS THE ONE ACCOUNT SCREEN WITH A LEVEL UNDER
+  // IT. `/settings/tickets` parses as the settings screen showing `tickets` —
+  // the app's ordinary (module, id) grammar, read once more (the whole argument
+  // is in `web/components/screens/module-settings-screen.tsx`'s header). So it
+  // is the one account address that carries a TRAIL rather than a single word,
+  // and the trail is what puts Settings back on the strip beside it: the gear
+  // takes a reader off the Tickets screen, and this is what says where they
+  // now are without pretending they arrived from anywhere.
+  //
+  // AN UNKNOWN SEGMENT GETS NO SECOND CRUMB, deliberately. `moduleSettingsPage`
+  // returns nothing for `/settings/nonsense`, the trail stays the one word
+  // "Settings", and the screen below renders `NoAccess` — a made-up address
+  // never gets a tab, and a tab is never labelled with something the reader
+  // typed.
+  const moduleSettings =
+    module === "settings" && recordId ? moduleSettingsPage(recordId) : undefined
   const screenCrumbs: Crumb[] = accountModule
     ? accountTitle
-      ? [{ label: t(accountTitle) }]
+      ? moduleSettings
+        ? [{ label: t(accountTitle), href: "/settings" }, { label: t(moduleSettings.title) }]
+        : [{ label: t(accountTitle) }]
       : []
     : crumbs
   // EVERY CRUMB IS A PLACE, AND ITS `href` IS THAT PLACE'S ADDRESS — except the
@@ -674,7 +696,22 @@ export function DeepLinkScreen() {
         {/* `?tab=` is the same rail-link mechanism the Kwapso screen's own
             `initialTab` already uses (see above) — e.g. `ManageDropdownsLink`
             opens `/settings?tab=choices` straight onto the Choices tab. */}
-        {module === "settings" && <SettingsScreen active={active} initialTab={query.tab} />}
+        {/* SETTINGS, AND ONE MODULE'S SHARE OF IT — the SAME `?tab=` screen it
+            has always been, plus the second segment the grammar always allowed:
+            `/settings/tickets` is the settings screen showing `tickets` exactly
+            as `/accounts/BERG` is the accounts screen showing BERG. The client
+            ruled the module page FULL SCREEN ("It cannot be a slide-in… I would
+            rather it be full screen", 2026-09-09), so it REPLACES this screen
+            rather than opening over it — same shell, same chrome, its own
+            address and its own workspace tab. `ModuleSettingsScreen` refuses a
+            segment it has no page for, so nothing here has to know which
+            modules have settings. */}
+        {module === "settings" &&
+          (recordId ? (
+            <ModuleSettingsScreen active={active} segment={recordId} />
+          ) : (
+            <SettingsScreen active={active} initialTab={query.tab} />
+          ))}
         {module === "profile" && <ProfileScreen active={active} />}
         {module === "invitations" && <InvitationsScreen active={active} />}
         </RememberedScreen>

@@ -912,7 +912,7 @@ export function AppMeetingsPanel({
         one: t("1 meeting matches"),
         many: t("{count} meetings match"),
       }}
-      // "Client" comes off the top-level menu: an app belongs to one account
+      // "Account" comes off the top-level menu: an app belongs to one account
       // always (the owner's ruling), so every meeting here is already that
       // account's and ordering by it would be furniture.
       sorts={translatedSorts("meetings", t).filter((o) => o.value !== "client")}

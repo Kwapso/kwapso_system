@@ -38,11 +38,30 @@
 // is honest about its limit: a first-page render of a PDF is a real piece of
 // work and this is not it.
 //
-// CONTAINED, NOT COVERED. `fit="contain"` letterboxes the whole picture onto
-// the quiet ground rather than trimming it to the box — the ruling the kit's
-// own gallery chapter makes ("the brand shows the whole artefact"; "cover would
-// cut a face out of the frame"). For telling two screenshots apart it is the
-// difference between the answer and a crop of the answer.
+// CONTAINED, NOT COVERED — AND IT IS NOW THE APP'S ONLY ONE (R60). `fit="contain"`
+// letterboxes the whole picture onto the quiet ground rather than trimming it to
+// the box — the ruling the kit's own gallery chapter makes ("the brand shows the
+// whole artefact"; "cover would cut a face out of the frame"). For telling two
+// screenshots apart it is the difference between the answer and a crop of the
+// answer.
+//
+// THE CLIENT RULED THE OTHER WAY ON 2026-09-09 — *"everywhere for images: do
+// fill, not fit!"* — and this file is the ONE site kept back from it, as the
+// single `OBJECT_FIT_OK` line in `web/test/an-image-fills.test.ts`, which is
+// where the argument is written out in full. In short: every other picture that
+// law governs is a MARK standing FOR a record whose name is written beside it,
+// so a crop costs the edges of an identity the word already carries. This one IS
+// the content, with no word beside it saying what was lost — a portrait
+// screenshot cropped to the well's 16/9 shows a band from its middle and hides
+// the error message at the top, which is the reason somebody attached it, and
+// nothing on screen says so because a crop looks exactly like a picture that was
+// always that shape.
+//
+// IT IS FLAGGED FOR HER, NOT DECIDED AGAINST HER. Her ruling was made over marks
+// in select components and filters, and this is the one place in the app it does
+// not obviously describe. If she says it does, the fix is two edits: `cover`
+// here, and delete the exemption line — which the law's own rot-check will
+// demand in the same breath.
 //
 // WHAT IT COSTS, said out loud. These are the ORIGINAL bytes: a ticket may
 // carry fifty attachments (TICKET_ATTACHMENT_CAP) of up to 10MB each, and

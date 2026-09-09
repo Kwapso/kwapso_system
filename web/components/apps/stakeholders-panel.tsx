@@ -50,7 +50,9 @@ type Side = {
 function PersonRow({ p, mainLabel }: { p: Side; mainLabel: string }) {
   return (
     <li className="flex flex-wrap items-center gap-2 px-3 py-2">
-      <RecordMark picture={p.photo} name={p.name} shape="round" fit="cover" />
+      {/* No `fit`: every picture fills its box (R60, client 2026-09-09), so the
+          `cover` this line used to spell out is the mark's only behaviour. */}
+      <RecordMark picture={p.photo} name={p.name} shape="round" />
       {/* The kit's `link` variant: no box, inherited ink, underline on hover.
           The overrides are layout only — the name flexes and truncates inside
           the row, against a base skin that is `shrink-0 justify-center`. */}

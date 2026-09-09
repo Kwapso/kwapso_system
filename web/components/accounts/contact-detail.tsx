@@ -404,9 +404,11 @@ export function ContactDetailScreen({
       // `scripts/glide-visuals.mjs` carried thirty-one real faces into it, none
       // of which this screen has ever drawn. The band follows the row rather
       // than disagreeing with it: a record cannot be a circle on its own screen
-      // and a square in the list that links to it. `fit` keeps the face cropped.
-      // No photo falls back to the initial.
-      leading={<RecordMark picture={account.logoUrl} name={account.name} fit="cover" size="band" />}
+      // and a square in the list that links to it. The face is cropped to the
+      // square — every picture is, since R60 (client, 2026-09-09), so the `fit`
+      // this line used to pass says nothing the mark does not already do. No
+      // photo falls back to the initial.
+      leading={<RecordMark picture={account.logoUrl} name={account.name} size="band" />}
       // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
       // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
       // The prop this line used to pass is deleted from `RecordScreen` itself

@@ -142,7 +142,28 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   // the census entry beside it — cheap. Reinstating a lost route to a thousand
   // archived tickets is not.
   help: [
-    { field: "accountId", label: "Client" },
+    // THE WORD IS ACCOUNT, AND IT WAS CLIENT UNTIL 2026-09-09. Her correction,
+    // on this very row: "Hey, you got it wrong. The filter client is the
+    // company, so it's the account. Let's do something: rename client to
+    // account everywhere we said client. This was a mistake." She is fixing a
+    // VOCABULARY mistake, not asking for a data-model change — the field below
+    // is still `accountId`, the door still parses `accountId`, the column is
+    // still `help.account_id`. Nothing under the label moved.
+    //
+    // WHY THIS LINE IS WHERE THE NOTE GOES: this is the control she was looking
+    // at. The same word had to move on the facet's own dependant ("Choose an
+    // account first." below), on the meetings facet further down, on the
+    // meetings SORT (`collection-sorts.ts`), on the sprints and apps facets
+    // (`web/lib/screens.ts`) and on every picker and column that named the same
+    // record — a facet whose label and whose empty sentence disagree is a row
+    // saying two words for one thing, which is the fault she reported.
+    //
+    // DO NOT RENAME IT BACK, and do not "finish" it either: "client" is still
+    // the right word for the RELATIONSHIP and the PERSON in it — the portal
+    // login who raises a ticket, the person we email an answer to, the one who
+    // may never read the agency's own notes. R34's registry note refuses to
+    // ban the word for exactly that reason. See shared/glossary.ts § account.
+    { field: "accountId", label: "Account" },
     // ROWS, NOT A CLOSED VOCABULARY: the door matches an app's id, and the
     // tickets screen fills these from the apps list it already holds — which
     // is BOUNDED (a team's own systems), so page one is the collection and the
@@ -159,7 +180,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     // about which apps are whose; it is the app record's own field, reaching a
     // control that had been ignoring it.
     //
-    // "Choose a client first." IS THE TICKET FORM'S OWN SENTENCE for exactly
+    // "Choose an account first." IS THE TICKET FORM'S OWN SENTENCE for exactly
     // this state, said by its App row when no client is named yet
     // (help-form-dialog.tsx). One idea, one sentence (R34) — and it is already
     // in the catalogue, answered in all three languages, so this control adds
@@ -167,7 +188,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     {
       field: "appId",
       label: "App",
-      dependsOn: { field: "accountId", emptyText: "Choose a client first." },
+      dependsOn: { field: "accountId", emptyText: "Choose an account first." },
     },
     // THE TEAM'S OWN `Ticket type` WORDS, so the options cannot be declared
     // here: this is a per-team, editable vocabulary (`selectable_data`), not a
@@ -217,7 +238,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     },
   ],
   meetings: [
-    { field: "accountId", label: "Client" },
+    { field: "accountId", label: "Account" },
     { field: "purposeId", label: "Why we met" },
     // NO STATUS FILTER, and the reason changed under this line while it was
     // being written. It used to offer Scheduled and Held; `held` was retired the

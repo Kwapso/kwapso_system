@@ -165,7 +165,12 @@ export function HomeScreen({ active }: { active: ActiveTeam }) {
   ].filter((l) => can(l.need, "read"))
 
   const ADMIN = [
-    { title: t("Team"), desc: t("Members, roles and invites"), icon: Users, href: ctx.team ? `/t/${ctx.team.id}` : "/settings" },
+    // THE TEAM LIVES ON A SETTINGS TAB NOW — client ruling, 2026-09-09 ("Only
+    // in the settings, under the tab"). This card used to point at the team
+    // overview at `/t/<teamId>`, which no longer draws a screen; it points at
+    // the tab that holds the members gallery and the roles matrix instead, so
+    // the card lands on the thing its own description names.
+    { title: t("Team"), desc: t("Members, roles and invites"), icon: Users, href: "/settings?tab=team" },
     { title: t("Settings"), desc: t("Your account and teams"), icon: Gear, href: "/settings" },
   ]
 

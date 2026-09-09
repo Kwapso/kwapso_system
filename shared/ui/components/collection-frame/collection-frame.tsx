@@ -127,8 +127,9 @@
 
    The same toolbar is drawn again in kit chapter 19 ("Collection views · 24
    view types · one toolbar contract"), where the hairline rule between the
-   toolbar groups is a 1-wide, 22-tall bar at 14% ink — this file uses
-   `Separator orientation="vertical"`, which is the same rule at `--border`.
+   toolbar groups is a 1-wide, 22-tall bar at 14% ink — drawn as
+   `Separator orientation="vertical"`, which is the same rule at `--border`,
+   and drawn by `ToolbarRow` since the row moved there.
 
    The two registers are the kit's own:
      · `kwapso-ui.css` → `.kw-empty` — the in-place register: centred column,
@@ -159,7 +160,13 @@
      soft-paper toolbar").
    · The toolbar order is fixed by the component, not by the call site. That
      is the entire reason the search, filter and view-switch slots are three
-     separate props instead of one `toolbar` node.
+     separate props instead of one `toolbar` node. Since 2026-09-08 the
+     component that fixes it is `ToolbarRow`, which this frame renders and
+     which is reachable on its own — the slots and their order are unchanged
+     and are now stated in one file rather than welded into this one. Read
+     `components/toolbar-row/toolbar-row.tsx` for the whole argument,
+     including why it does not have a sixth `sort` slot and does not hide
+     itself over an empty collection.
    · An unqualified `<Badge>` is quiet. The record count is a quiet chip;
      mango is opt-in and one per view.
    · Blocks are separated by colour, not by strokes. The one hairline here is
@@ -170,9 +177,10 @@
 
    RENDERING CONTEXT
    No `"use client"`. This module holds no state, calls no hook and creates no
-   handler during its own render — it forwards nodes and props. `Tabs` and
-   `DropdownMenu` are themselves client components and carry their own
-   directive; a server component may render them unchanged.
+   handler during its own render — it forwards nodes and props. `Tabs` is
+   itself a client component and carries its own directive, as does the
+   `DropdownMenu` inside `ToolbarRow`; a server component may render them
+   unchanged.
    ========================================================================= */
 
 import * as React from "react";
@@ -180,17 +188,13 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "../../lib/utils";
 import { Badge } from "../badge/badge";
-import { Button } from "../button/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "../dropdown-menu/dropdown-menu";
-import { Separator } from "../separator/separator";
 import { Spinner } from "../spinner/spinner";
 import { Tabs, TabsCount, TabsList, TabsTrigger, TABS_STRIP_GAP } from "../tabs/tabs";
-import { Title } from "../title/title";
-import { DotsThree } from "../../foundations/icons";
+import { Title, type TitleStep } from "../title/title";
+/* `Button`, `DropdownMenu`, `Separator` and `DotsThree` left this file with
+   the toolbar on 2026-09-08 — the overflow menu and the group rules are drawn
+   by `ToolbarRow` now, and nothing else here reached for any of them. */
+import { ToolbarRow } from "../toolbar-row/toolbar-row";
 
 /* ============================================================================
    CollectionRegister — the empty / error / busy notice a collection shows
@@ -579,8 +583,12 @@ export interface CollectionFrameProps
   eyebrow?: React.ReactNode;
   /** The heading. A node, not a string, so it hardcodes nothing. */
   heading?: React.ReactNode;
-  /** The heading step. `Title`'s ladder: 32 / 24 / 20. */
-  headingSize?: "h2" | "h3" | "h4";
+  /** The heading step. `Title`'s ladder — the WHOLE of it since 2026-09-08
+   *  (56 / 44 / 32 / 24 / 20), named as `TitleStep` rather than retyped here
+   *  as the three rungs the ladder used to end at. The default is `Title`'s
+   *  own, which is the scale's "Section title" and is right for a collection
+   *  heading inside a screen; a frame that IS the screen names a rung. */
+  headingSize?: TitleStep;
   /** The heading element, so a page keeps a real outline. */
   headingAs?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "div";
   /**
@@ -873,55 +881,14 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
         </Badge>
       );
 
-    /* -- The action group -------------------------------------------------
-       "The 4th+ action collapses under a '···' icon button rather than adding
-       more pills." Counted off `React.Children`, so a call site passes its
-       controls as ordinary children and never has to think about the rule. */
-    const actionList = React.Children.toArray(actions);
-    const visibleActions = actionList.slice(0, Math.max(0, maxActions));
-    const overflowActions = actionList.slice(Math.max(0, maxActions));
+    /* THE ACTION GROUP IS `ToolbarRow`'s NOW — 2026-09-08. The `React.Children`
+       count, the `···` overflow, the pinned `shrink-0` group and the note about
+       the one width budget this row cannot balance all moved with the row; this
+       file passes `actions`, `maxActions` and `moreActionsLabel` straight
+       through and counts nothing. `hasToolbar` went with them: `ToolbarRow`
+       returns `null` when every slot is empty, which is the same question asked
+       by the component that can actually see the answer. */
 
-    /* PINNED, AND IT DOES NOT WRAP. `flex-wrap` was here so a fourth pill
-       could drop to a second line; nothing may drop to a second line any
-       more (see the toolbar row's own note), and the overflow menu below is
-       the answer to "too many pills" that the kit already had. `shrink-0`
-       is what keeps the charcoal `+` at full size while the lane beside it
-       gives up width — the client's "at least i need to have the + button"
-       is a promise about a control being THERE, and a squashed pill is a
-       different way of breaking it.
-
-       THE ONE BUDGET THIS ROW CANNOT BALANCE, STATED SO NOBODY REDISCOVERS
-       IT AS A BUG. `maxActions` counts pills; it does not measure them. A
-       caller that passes two LABELLED pills and the `+` to a 380 phone hands
-       this group 204px of a 245px toolbar, and the lane beside it is left
-       with 30 — one row still, and every control still named and still in the
-       tab order, but the search field is mostly scrolled out of sight. There
-       is no CSS answer: something has to give, and the two things that must
-       not are the `+` (the client's item 3) and the page's own horizontal
-       scroll. The answer is the kit's existing one, taken earlier — pass a
-       smaller `maxActions`, and the surplus folds under the `···` this group
-       already draws. No route in either door passes toolbar pills at all
-       today, which is why this is a note and not a mechanism. */
-    const actionGroup = actionList.length ? (
-      <div
-        data-slot="collection-frame-actions"
-        className="ms-auto flex shrink-0 flex-nowrap items-center gap-2"
-      >
-        {visibleActions}
-        {overflowActions.length ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" aria-label={moreActionsLabel}>
-                <DotsThree />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">{overflowActions}</DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
-    ) : null;
-
-    const hasToolbar = Boolean(search || filters || period || viewSwitch || actionGroup);
     const hasHeader =
       eyebrow !== undefined || heading !== undefined || countChip !== null;
 
@@ -1063,303 +1030,50 @@ const CollectionFrame = React.forwardRef<HTMLElement, CollectionFrameProps>(
                 is the only one that does. */}
             {band ? <div data-slot="collection-frame-band">{band}</div> : null}
 
-            {hasToolbar ? (
-              <div
-                data-slot="collection-frame-toolbar"
-                /* ONE ROW. AT EVERY WIDTH. CLIENT, 2026-09-04, VERBATIM:
-                   "i want that toolbar is a single row like in the pdf i gave
-                   you long ago wiuth designs".
+            {/* THE TOOLBAR IS `ToolbarRow` NOW — 2026-09-08, and the ~300
+                lines of measured argument that used to sit here moved with it
+                rather than being summarised away. Read
+                `components/toolbar-row/toolbar-row.tsx`: the one-row rebuild
+                of 2026-09-04, the scrolling lane and why it is `relative`, the
+                elastic search slot's floor, the chip slot as the row's shock
+                absorber, the `sm:` group rules, and the pinned action group
+                with its `···` overflow are all there, unchanged, with their
+                measurements.
 
-                   WHAT THIS USED TO BE, AND WHAT IT MEASURED. This element
-                   carried `flex-wrap`, and the search slot below carried
-                   `basis-full` under `sm`, which is a deliberate instruction
-                   to break the row. Measured in verify/toolbar-one-row before
-                   the change, on the frame's own specimens: at 1440 the full
-                   slot set drew TWO rows (90px tall against a 41px control);
-                   at 834 the typical set — search, filters, sort, view, `+` —
-                   drew TWO (90px); at 380 the full set drew FIVE (285px) and
-                   the typical set FOUR (236px). A contract that says "toolbar
-                   order never changes: search, then filters, then view
-                   switcher" was being read down a column on a phone.
+                WHY IT LEFT THIS FILE. The contract was reachable only by
+                adopting this whole frame — its heading, count chip, figure
+                strip, tab strip, one soft-paper panel, three registers, body
+                and pager. A screen whose body is a month grid or a chart
+                cannot do that for a search box and a `+`, so it writes a bare
+                `<div className="flex justify-end">` instead; the consuming app
+                wrote that four times, then wrote a private toolbar of its own,
+                which then could not receive this row's later rulings and still
+                wraps to a second line at the widths the 2026-09-04 change was
+                made to fix. Extracting costs this file nothing — the same
+                markup, from one module instead of two — and it is what makes
+                that a bug somebody can fix rather than a component somebody
+                has to rewrite.
 
-                   THE MECHANISM, AND WHY IT IS THIS ONE. The row is now an
-                   outer flex that never wraps, holding TWO children: a
-                   SCROLLING LANE with the four ordered slots in it, and the
-                   action group pinned outside the lane at the inline end. The
-                   lane absorbs every width problem by scrolling its own
-                   inline axis; the row's height is therefore its tallest
-                   control's height at every width, which is the only
-                   definition of "one row" that can be measured rather than
-                   eyeballed.
-
-                   THIS IS THE KIT'S OWN STATED ANSWER, NOT A NEW ONE.
-                   `sort-control.tsx` has said it in writing for as long as it
-                   has existed — "Where a toolbar runs out of room, the toolbar
-                   scrolls — that is the composition's decision and `FilterBar`
-                   states the same answer for the same reason" — and
-                   `FilterBar`'s header reasons it out at length for its own
-                   chip row: a scroller "keeps every chip one swipe away, keeps
-                   both focus targets per chip reachable by keyboard, and costs
-                   no chrome". All this change does is apply the answer the kit
-                   already gave for one slot to the row that slot sits in.
-
-                   WHAT WAS TRIED AND REJECTED, in order:
-
-                   · FOLDING THE SECONDARY SLOTS INTO A `···` DROPDOWN below
-                     `sm`. Rejected on two counts. The slots are not menu
-                     items — `SortControl` and `ViewSwitch` are Radix Selects
-                     and `FilterBar` is a live row of two-target chips, and a
-                     Select inside a menu is a focus trap with two roving
-                     tab-stop owners. And `FilterBar`'s header already refuses
-                     the shape on its own merits: "the moment they are hidden,
-                     people forget they are on and read a filtered list as an
-                     empty one."
-
-                   · FOLDING THEM INTO AN IN-FLOW DISCLOSURE under the row,
-                     which is the shape the client's 2026-09-02 ruling would
-                     want if anything had to fold ("the expanded toolbar
-                     shoudl not be an overlay, but literaly expand the
-                     space"). Rejected because it needs open/closed state and
-                     a width the component measures, and this module's
-                     RENDERING CONTEXT note is load-bearing: no `"use
-                     client"`, no state, no hook. Buying one row on a phone
-                     with a client boundary on every collection in both doors,
-                     plus a hydration correction the reader would watch
-                     happen, is the wrong trade for a problem CSS settles.
-
-                   · RENDERING THE FOLDED SLOTS TWICE and letting media
-                     queries show one copy. Rejected outright: it doubles
-                     every control in the accessible tree, so the same "Sort
-                     by" is announced twice and tabbed through twice.
-
-                   WHAT THIS COSTS, STATED. On a phone the lane is wider than
-                   the screen and the reader swipes it. Nothing is hidden
-                   behind a control, nothing changes its accessible name,
-                   nothing leaves the tab order, and a browser scrolls a
-                   focused control into view on its own. The one thing the
-                   reader loses is seeing all five slots at once at 380, which
-                   no arrangement of a 245px-wide toolbar could have given
-                   them. */
-                className="flex flex-nowrap items-center gap-3"
-              >
-                <div
-                  data-slot="collection-frame-toolbar-lane"
-                  /* THE LANE. `min-w-0` is what lets it be narrower than its
-                     content — without it a flex item's automatic minimum size
-                     is its content, the lane never scrolls, and the PAGE
-                     scrolls instead, which is the one outcome forbidden
-                     outright.
-
-                     The vertical padding and the negative margin that cancels
-                     it are a pair and must stay one: `overflow-x` other than
-                     `visible` forces `overflow-y` to `auto` as well, so a
-                     control's 1px `:focus-visible` outline (tokens.css §8,
-                     `--focus-width` 1px at `--focus-offset` 0) would be shaved
-                     off at the lane's top and bottom edge. `--space-1` is four
-                     times the ring and the smallest token that clears it; the
-                     matching negative margin gives the space back, so the
-                     row's measured height is still one control's height and
-                     nothing below it moves.
-
-                     `relative` IS LOAD-BEARING AND IS NOT THE ANCHOR THE
-                     FILTERS WRAPPER BELOW REFUSES. Read both notes together
-                     before removing either.
-
-                     A scroll container clips its overflow, but it does NOT
-                     clip an absolutely positioned descendant unless it is
-                     that descendant's containing block — and a `static`
-                     element never is. `SortControl` and `ViewSwitch` each
-                     carry a `.sr-only` span, which the kit positions
-                     absolutely, and inside a lane scrolled 400px past its own
-                     edge those 1px spans sit 900px out. Measured with the lane
-                     `static`: at 834 the document's scrollWidth was 908
-                     against a clientWidth of 834, and the PAGE scrolled
-                     sideways by 74px — the one outcome this whole change is
-                     forbidden to produce, caused by two spans nobody can see.
-                     `relative` makes the lane their containing block, so the
-                     lane's own overflow clips them and the page stays still.
-
-                     What the wrapper below refuses is publishing a POSITIONING
-                     ANCHOR for a host's own floating panel, in a place a call
-                     site cannot edit, for a shape the client's 2026-09-02
-                     ruling rejects ("not an overlay, but literaly expand the
-                     space"). Nothing about that changes here: everything in
-                     this kit that legitimately floats is Radix-portalled and
-                     reads its trigger, not an ancestor, and a panel that a
-                     toolbar control opens still belongs in `toolbarPanel`
-                     below, in flow. This `relative` exists to CONTAIN what is
-                     already inside the lane, not to offer a hook to anything
-                     outside it. */
-                  className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-3 overflow-x-auto py-[var(--space-1)] my-[calc(var(--space-1)*-1)]"
-                >
-                {search ? (
-                  /* The search is the row's ONE ELASTIC SLOT: it takes the
-                     slack when there is slack and gives it back first when
-                     there is not. `basis-full` — the old instruction to take a
-                     line of its own below `sm` — is gone; that single class
-                     was the difference between a one-row and a four-row
-                     toolbar at 380.
-
-                     The floor is `--space-11` — 8rem, which is 120px at this
-                     system's 15px root and RESCALES with the text-size
-                     control rather than pinning a pixel — and it is a real
-                     floor, not a nicety. `flex-1` resolves to `flex: 1 1 0%`, and a
-                     flex item with a zero basis has zero shrink WEIGHT, so
-                     when the lane overflows every pixel of the deficit is
-                     taken from the slots that do have a basis and the search
-                     would sit at 0 wide — present in the tree, invisible on
-                     the screen. A minimum stops that, and 128 is the narrowest
-                     the field's own glyph, its placeholder and its clear
-                     control still read as a search field, and it is a token
-                     rather than a number picked to fit. */
-                  <div className="min-w-[var(--space-11)] flex-1">{search}</div>
-                ) : null}
-
-                {search && (filters || period || viewSwitch) ? (
-                  <Separator
-                    orientation="vertical"
-                    decorative
-                    /* STILL `sm:` AND STILL ABSENT ON A PHONE, and now for a
-                       second reason on top of the first. The first stands: a
-                       rule earns its keep by separating two groups the eye
-                       reads as one run. The second is arithmetic — three
-                       separators cost 3px of rule and 36px of gap, which is a
-                       quarter of the 245px a 380 phone gives this toolbar,
-                       spent on marks rather than controls. */
-                    className="hidden h-[1.375rem] sm:block"
-                  />
-                ) : null}
-
-                {/* THIS WRAPPER CARRIES NO `position`, AND THAT IS THE
-                    ANSWER RATHER THAN AN OMISSION — settled 2026-09-02.
-
-                    The question came in as "anything a host puts in `filters`
-                    has nothing to anchor against". It does not need one. The
-                    client's ruling the same day is that a toolbar control's
-                    panel EXPANDS THE SPACE and is not an overlay, so the
-                    place for it is `toolbarPanel` below, in flow — and adding
-                    `relative` here would be publishing the anchor for exactly
-                    the shape the ruling refuses, in the one file a call site
-                    cannot edit. Everything that legitimately floats off a
-                    control in this system is Radix-portalled (`Select`,
-                    `Popover`, `DropdownMenu`, `Tooltip`) and positions itself
-                    against its own trigger with collision detection; a
-                    positioned ancestor is not what any of them read.
-
-                    The wrapper STAYS, though, and does not simply go: it
-                    earns its utilities. `flex … gap-2` is what lets a
-                    `filters` slot hold more than one control at the chip
-                    measure instead of the toolbar's own `gap-3`; `min-w-0` is
-                    what lets it shrink at all inside the flex lane. Dropping
-                    it would change the layout of every call site to fix a
-                    problem nothing has.
-
-                    `flex-wrap` IS GONE, 2026-09-04, and its old job — "a long
-                    facet row breaks rather than pushes the view switch off the
-                    line" — is now done sideways instead of downwards. Breaking
-                    downwards is precisely what made this toolbar four rows
-                    tall at 380 and two at 834: a slot that grows downwards
-                    inside a row makes the row grow downwards. A `FilterBar`
-                    given `chips="line"` holds its chips on one line and
-                    scrolls them, which is the shape that component reasons out
-                    at length in its own header.
-
-                    THE CHIP SLOT IS THE ROW'S SHOCK ABSORBER, AND THAT IS A
-                    CHOICE BETWEEN TWO WORKING ARRANGEMENTS. With `shrink-0`
-                    here the chips keep their intrinsic width and the LANE
-                    carries every deficit — one scroller, simple, and measured
-                    at 834 it pushed the view switch clean off the visible lane
-                    while three filter chips sat in full view. The view switch
-                    is a primary control and a chip is a record of something
-                    the reader did a moment ago; the primary control is not the
-                    one that should go off-screen first. So the chips shrink
-                    instead, down to a floor of `--space-11`, and scroll inside
-                    themselves — which at 834 leaves search, chips, sort and
-                    view all visible on one row, and at 380 leaves the lane to
-                    carry what is still left over. The floor is what stops the
-                    slot being squeezed to nothing: a zero-width scroller is a
-                    set of active filters the reader cannot see, and
-                    `FilterBar`'s header is explicit that people who cannot see
-                    their filters "read a filtered list as an empty one". */}
-                {filters ? (
-                  <div
-                    className={cn(
-                      "flex min-w-[var(--space-11)] items-center gap-2",
-                      /* THE FRAME'S OWN GUARANTEE, NOT A REQUEST OF THE CALL
-                         SITE. `collection-screen.tsx` passes `chips="line"`
-                         and gets the one-line chip row that way, but this
-                         frame is also handed a bare `FilterBar` by
-                         `notifications.tsx`, by `view-preview.tsx` and by the
-                         book's own collection specimens, none of which knows
-                         about the prop and none of which should have to. Left
-                         to itself a `FilterBar` releases its chip row to
-                         `flex-wrap` from `sm` up, and a wrapping row inside
-                         this slot is the toolbar growing a second line from
-                         the inside — the one thing the client's ruling of
-                         2026-09-04 forbids, reintroduced by a call site that
-                         did nothing wrong.
-
-                         So the row that owns the contract enforces it, on the
-                         one child it is allowed to know by name. The
-                         precedent for reaching a descendant's `data-slot`
-                         from the component that positions it is `split.tsx`'s
-                         selected-row inks and `progress-dashboard.tsx`'s fill;
-                         the selector is class-plus-attribute, so it outranks
-                         `FilterBar`'s own single-class `sm:flex-wrap` however
-                         the two land in the sheet. A caller that genuinely
-                         wants a wrapping facet row wants it OUTSIDE this
-                         toolbar — `band` and `toolbarPanel` are both in flow
-                         and neither is a row. */
-                      "[&_[data-slot=filter-bar-chips]]:flex-nowrap",
-                      "[&_[data-slot=filter-bar-chips]]:overflow-x-auto",
-                    )}
-                  >
-                    {filters}
-                  </div>
-                ) : null}
-
-                {filters && (period || viewSwitch) ? (
-                  <Separator
-                    orientation="vertical"
-                    decorative
-                    className="hidden h-[1.375rem] sm:block"
-                  />
-                ) : null}
-
-                {/* `shrink-0` from here down. The period stepper's words and
-                    the view switch's current-view label are TEXT, and text
-                    given less room than it needs either wraps — a second row
-                    by another name — or ellipses away the one thing the
-                    control exists to tell you. They keep their intrinsic
-                    width and the lane scrolls past them. */}
-                {period ? <div className="flex shrink-0 items-center">{period}</div> : null}
-
-                {period && viewSwitch ? (
-                  <Separator
-                    orientation="vertical"
-                    decorative
-                    className="hidden h-[1.375rem] sm:block"
-                  />
-                ) : null}
-
-                {viewSwitch ? (
-                  <div className="flex shrink-0 items-center">{viewSwitch}</div>
-                ) : null}
-                </div>
-
-                {/* OUTSIDE THE LANE, ON PURPOSE. The action group is the one
-                    thing in this row that may not scroll away: the client's
-                    item 3 is "everytime i see a collection, on the toolbar, at
-                    least i need to have the + button (yes, on every view
-                    unless specifically specified)", and a `+` that is present
-                    but two swipes off the inline edge of a 380 phone is a
-                    control the reader has to go looking for. Pinning it here
-                    is also what makes the lane's scroll safe to reason about:
-                    the row has one scrolling child and one fixed child, in
-                    that order, at every width. */}
-                {actionGroup}
-              </div>
-            ) : null}
+                NOTHING HERE CHANGES SHAPE. The row is `ground="bare"` because
+                this frame's own panel already paints the soft paper it stands
+                on and already spends `gap-5` under it, which is the same
+                number the standalone row pays as its own trailing margin. The
+                panel a toolbar control opens stays THIS file's `toolbarPanel`,
+                a sibling below, for the same reason: there is already a place
+                in flow here, and routing it through the row would nest it a
+                box deeper for nothing. `data-slot` is passed through so the
+                element keeps the name every probe has always known it by. */}
+            <ToolbarRow
+              data-slot="collection-frame-toolbar"
+              ground="bare"
+              search={search}
+              filters={filters}
+              period={period}
+              viewSwitch={viewSwitch}
+              actions={actions}
+              maxActions={maxActions}
+              moreActionsLabel={moreActionsLabel}
+            />
 
             {/* What a toolbar control opened. A sibling of the toolbar and of
                 the body, so it takes the panel column's own gap and PUSHES

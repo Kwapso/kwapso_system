@@ -57,7 +57,7 @@ import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 // EVERY URL THAT REACHES AN ATTRIBUTE GOES THROUGH THE SEAM, including these.
 // Google's own icon host and our own thumbnail path are both perfectly safe
@@ -457,15 +457,15 @@ export function GoogleSourceDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
-          emptyOption={{ value: AGENCY, label: t("Ours, not a client's") }}
-          placeholder={t("Ours, not a client's")}
+          options={accountOptions.map(accountOption)}
+          emptyOption={{ value: AGENCY, label: t("Ours, not an account's") }}
+          placeholder={t("Ours, not an account's")}
           searchPlaceholder={t("Search accounts…")}
           emptyText={t("No account matched.")}
           disabled={busy}
         />
         <p className="text-muted-foreground mt-1.5 text-xs">
-          {t("Questions about that client are answered from what is in here. Leave it as ours if the")} {noun} {t("is not about one.")}
+          {t("Questions about that account are answered from what is in here. Leave it as ours if the")} {noun} {t("is not about one.")}
         </p>
       </Field>
     </FormShellDialog>

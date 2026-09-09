@@ -30,7 +30,6 @@ import type {
   KnowledgeSource,
   Meeting,
   MeetingPurpose,
-  TeamMeta,
   TeamMember,
   TeamRole,
 } from "@shared/types"
@@ -92,29 +91,9 @@ export function shapeActivity(items: ActivityItem[], lang: Language): ActivityFe
   }))
 }
 
-export function shapeTeamDetail(opts: {
-  teamId: string
-  name: string
-  logoUrl: string | null
-  meta: TeamMeta
-  activity: ActivityItem[]
-  lang: Language
-}): ScreenData {
-  return {
-    record: {
-      id: opts.teamId,
-      name: opts.name,
-      image: opts.logoUrl ?? "",
-      created: formatDateTime(opts.meta.createdAt, opts.lang),
-      // R54 — the team's own audit line. The creator is the colleague who made
-      // the team; the email fallback is handed to the seam too, which returns an
-      // address whole rather than cutting it at the "@".
-      createdBy: staffNameFromSnapshot(opts.meta.creatorName) || opts.meta.creatorEmail || "",
-      updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
-    },
-    sets: { activity: shapeActivity(opts.activity, opts.lang) },
-  }
-}
+/* `shapeTeamDetail` is gone with the screen it fed — the team overview, deleted
+ * on the client's 2026-09-09 ruling. web/lib/pages.ts carries the decision. */
+
 
 export function shapeMembersList(members: TeamMember[], lang: Language): ScreenData {
   return {
@@ -317,7 +296,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
  * somebody is scanning for, and the detail screen names it in full. */
 function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
   if (!source.accountId) return "The agency"
-  return accountNames?.get(source.accountId) ?? "A client"
+  return accountNames?.get(source.accountId) ?? "An account"
 }
 
 export function shapeKnowledgeList(
@@ -449,16 +428,15 @@ export function shapeAccountsList(
         // EVERY CLIENT IS A SQUARE, the sole traders included. They were drawn
         // circles, which is the honest shape for a person and the wrong one HERE:
         // one list, one column, and two shapes in it reading as two kinds of
-        // record when a client is a client. The crop stays with them — 31 of
-        // these hold a real face, and `fit` is what keeps squaring the box from
-        // letterboxing every one (shared/web/record-mark.tsx).
-        mark: (
-          <RecordMark
-            picture={a.logoUrl}
-            name={a.name}
-            fit={a.accountType === "individual" ? "cover" : "contain"}
-          />
-        ),
+        // record when a client is a client.
+        //
+        // AND THE CROP IS NO LONGER THIS ROW'S DECISION EITHER (R60, client
+        // 2026-09-09: "everywhere for images: do fill, not fit!"). This line
+        // used to read `a.accountType` to crop the 31 sole traders who hold a
+        // real face and contain the companies' wordmarks; every picture fills
+        // its box now, so the type is not consulted here at all
+        // (shared/web/record-mark.tsx's header carries what that cost).
+        mark: <RecordMark picture={a.logoUrl} name={a.name} />,
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,

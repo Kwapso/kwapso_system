@@ -311,7 +311,7 @@ export interface FilterFacet {
    *     owns (plus what nobody owns — see `FacetOption.within`).
    *  2. WITH NO PARENT CHOSEN the control offers nothing and SAYS WHAT TO DO
    *     FIRST, in `emptyText`. It is drawn disabled, in place, exactly as the
-   *     ticket form draws the same state ("Choose a client first." — the same
+   *     ticket form draws the same state ("Choose an account first." — the same
    *     sentence, reused rather than re-authored): a field that vanishes moves
    *     every control after it as somebody fills the row in, and a filter row
    *     whose shape changes under the reader is the variation the client has
@@ -336,7 +336,7 @@ export interface FilterFacet {
     field: string
     /** WHAT THE CONTROL SAYS WHILE THAT PARENT IS UNSET — a whole sentence
      * naming the next act, already translated by whoever built the facet.
-     * "Choose a client first." exists in the catalogue and is what the ticket
+     * "Choose an account first." exists in the catalogue and is what the ticket
      * form already says about exactly this question; reuse it rather than
      * writing a second sentence for one idea (R34). */
     emptyText: string

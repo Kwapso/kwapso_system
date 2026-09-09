@@ -71,9 +71,14 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
     })
   })
 
-  it("update_team → the team overview (bare /t/<team>), where the new name now shows", () => {
+  // THE TEAM OVERVIEW IS GONE (client, 2026-09-09) and a trace may not land on
+  // a screen that is not there. /kwapso is the agency's own Details page: it
+  // titles itself with the team's name and carries the name/logo edit, so it is
+  // where a rename is visible now. workers/data-ops/test/trace-parity.test.ts's
+  // TEAM_IMPLICIT_PATHS carries the same reasoning for the parity census.
+  it("update_team → /kwapso, the page that shows the team's name", () => {
     expect(traceFor("update_team", { name: "Acme" }, TEAM)).toEqual({
-      path: `/t/${TEAM}`,
+      path: "/kwapso",
       highlight: "main",
     })
   })

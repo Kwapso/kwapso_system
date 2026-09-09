@@ -1362,7 +1362,7 @@ export const SEED: Catalogue = {
    * seed is the layer that survives a regeneration and wins at runtime. */
   "+{n} more": { de: "+{n} weitere", es: "+{n} más", ca: "+{n} més"},
   "1 step takes longer than it used to and has no explanation yet.": { de: "1 Schritt dauert länger als früher und hat noch keine Erklärung.", es: "1 paso tarda más que antes y aún no tiene explicación.", ca: "1 pas triga més que abans i encara no té explicació."},
-  "A block of delivery work for one client, with a start, an end and a price.": { de: "Ein Block an Lieferarbeit für einen Kunden, mit Beginn, Ende und Preis.", es: "Un bloque de trabajo de entrega para un cliente, con un inicio, un final y un precio.", ca: "Un bloc de treball d'entrega per a un client, amb un inici, un final i un preu."},
+  "A block of delivery work for one account, with a start, an end and a price.": { de: "Ein Block an Lieferarbeit für einen Kunden, mit Beginn, Ende und Preis.", es: "Un bloque de trabajo de entrega para una cuenta, con un inicio, un final y un precio.", ca: "Un bloc de treball d'entrega per a un compte, amb un inici, un final i un preu."},
   "A new version of the app is ready.": { de: "Eine neue Version der App ist bereit.", es: "Hay una nueva versión de la app lista.", ca: "Hi ha una nova versió de l'app a punt."},
   "A system we built for somebody. Processes live inside one.": { de: "Ein System, das wir für jemanden gebaut haben. Prozesse leben darin.", es: "Un sistema que construimos para alguien. Los procesos viven dentro de uno.", ca: "Un sistema que hem construït per a algú. Els processos viuen a dins."},
   "A way of working inside one of your apps. You'll add its steps next.": { de: "Eine Arbeitsweise innerhalb einer Ihrer Apps. Die Schritte fügen Sie als Nächstes hinzu.", es: "Una forma de trabajar dentro de una de tus apps. A continuación añadirás sus pasos.", ca: "Una manera de treballar dins d'una de les teves apps. Tot seguit hi afegiràs els passos."},
@@ -1589,6 +1589,23 @@ export const SEED: Catalogue = {
   "Raise a ticket": { de: "Ein Ticket erstellen", es: "Crear un ticket", ca: "Obrir un ticket"},
   "Raised as": { de: "Eingegangen als", es: "Recibido como", ca: "Rebut com a"},
   "Recently added": { de: "Zuletzt hinzugefügt", es: "Añadido recientemente", ca: "Afegit recentment"},
+  /* APPENDED BY THE client→account RENAME LANE, 9 Sep 2026, and it is not that
+   * lane's own string either — same story as "Recently closed" below. The
+   * tickets column picker names the reference column "ID". The three languages
+   * all say ID for it, which is the answer rather than an absence: it is an
+   * abbreviation every one of them has borrowed, and writing "Kennung" /
+   * "identificador" here would put a word on a column header that no German or
+   * Spanish reader is looking for. Written down because an entry that repeats
+   * the English looks like a placeholder and is not one. */
+  ID: { de: "ID", es: "ID", ca: "ID" },
+
+  /* APPENDED BY THE client→account RENAME LANE, 9 Sep 2026, and it is not that
+   * lane's own string. The tickets sort menu gained "Recently closed" in the
+   * concurrent sort-columns lane; the rename lane ran `npm run lang`, which
+   * extracted it, and R44's ceiling is 0 in all three — so the choice was to
+   * translate it here or to raise a ceiling that may only fall. Same register
+   * as its siblings above: past participle plus adverb, sentence case. */
+  "Recently closed": { de: "Zuletzt geschlossen", es: "Cerrado recientemente", ca: "Tancat recentment"},
   "Recently changed": { de: "Zuletzt geändert", es: "Modificado recientemente", ca: "Modificat recentment"},
   "Recording that it stopped is how its whole time becomes a saving. The step keeps its place in this version and in every older one, nothing is deleted.": { de: "Wenn Sie festhalten, dass er nicht mehr stattfindet, wird seine ganze Zeit zur Ersparnis. Der Schritt behält seinen Platz in dieser und in jeder älteren Version, nichts wird gelöscht.", es: "Registrar que dejó de ocurrir es lo que convierte todo su tiempo en ahorro. El paso mantiene su sitio en esta versión y en todas las anteriores, no se borra nada.", ca: "Registrar que ha deixat de passar és el que converteix tot el seu temps en estalvi. El pas manté el seu lloc en aquesta versió i en totes les anteriors, no s'esborra res."},
   "Rename": { de: "Umbenennen", es: "Renombrar", ca: "Reanomenar"},
@@ -1669,10 +1686,10 @@ export const SEED: Catalogue = {
   "We can't find that ticket.": { de: "Wir finden dieses Ticket nicht.", es: "No encontramos ese ticket.", ca: "No trobem aquest ticket."},
   "We'll email you a six-digit code, or you can use Google. No password to remember.": { de: "Wir senden Ihnen einen sechsstelligen Code per E-Mail, oder Sie nutzen Google. Kein Passwort zum Merken.", es: "Te enviaremos por correo un código de seis dígitos, o puedes usar Google. Sin contraseña que recordar.", ca: "T'enviarem per correu un codi de sis xifres, o pots fer servir Google. Cap contrasenya per recordar."},
   "What I read": { de: "Was ich gelesen habe", es: "Lo que he leído", ca: "El que he llegit"},
-  "What it's called, when it runs, and what it was sold for. The client and the app it covers stay as they are.": { de: "Wie er heißt, wann er läuft und wofür er verkauft wurde. Der Mandant und die App, die er abdeckt, bleiben unverändert.", es: "Cómo se llama, cuándo se ejecuta y por cuánto se vendió. El cliente y la app que cubre se quedan como están.", ca: "Com es diu, quan s'executa i per quant es va vendre. El client i l'app que cobreix es queden com estan."},
+  "What it's called, when it runs, and what it was sold for. The account and the app it covers stay as they are.": { de: "Wie er heißt, wann er läuft und wofür er verkauft wurde. Der Kunde und die App, die er abdeckt, bleiben unverändert.", es: "Cómo se llama, cuándo se ejecuta y por cuánto se vendió. La cuenta y la app que cubre se quedan como están.", ca: "Com es diu, quan s'executa i per quant es va vendre. El compte i l'app que cobreix es queden com estan."},
   "What was asked": { de: "Was gefragt wurde", es: "Lo que se pidió", ca: "El que es va demanar"},
   "Where the tickets are sitting": { de: "Wo die Tickets gerade stehen", es: "Dónde están los tickets", ca: "On són els tickets"},
-  "Which client is it for?": { de: "Für welchen Mandanten ist es?", es: "¿Para qué cliente es?", ca: "Per a quin client és?"},
+  "Which account is it for?": { de: "Für welchen Kunden ist es?", es: "¿Para qué cuenta es?", ca: "Per a quin compte és?"},
   "Working…": { de: "Wird bearbeitet…", es: "Trabajando…", ca: "Treballant…"},
   "Write a profile": { de: "Ein Profil schreiben", es: "Escribir un perfil", ca: "Escriure un perfil"},
   "Write it again": { de: "Neu schreiben", es: "Escribirlo otra vez", ca: "Tornar-ho a escriure"},
@@ -1697,7 +1714,7 @@ export const SEED: Catalogue = {
   "something": { de: "etwas", es: "algo", ca: "alguna cosa"},
   "space": { de: "Space", es: "espacio", ca: "espai"},
   "the baseline": { de: "der Ausgangswert", es: "la línea base", ca: "la línia base"},
-  "this client": { de: "diesem Mandanten", es: "este cliente", ca: "aquest client"},
+  "this account": { de: "diesem Kunden", es: "esta cuenta", ca: "aquest compte"},
   "this team": { de: "dieses Team", es: "este equipo", ca: "aquest equip"},
   "this version": { de: "diese Version", es: "esta versión", ca: "aquesta versió"},
   "today": { de: "heute", es: "hoy", ca: "avui"},
@@ -1757,7 +1774,7 @@ export const SEED: Catalogue = {
    * exact sibling of the line above it, one field further down the same form,
    * so it is deliberately the same sentence with one noun changed. Written by
    * hand rather than sent to the model for that reason: the two have to match. */
-  "Choose a client first.": { de: "Wählen Sie zuerst einen Kunden.", es: "Elige primero un cliente.", ca: "Tria primer un client."},
+  "Choose an account first.": { de: "Wählen Sie zuerst einen Kunden.", es: "Elige primero una cuenta.", ca: "Tria primer un compte."},
   "Colour": { de: "Farbe", es: "Color", ca: "Color"},
   "Compare with": { de: "Vergleichen mit", es: "Comparar con", ca: "Compara amb"},
   "Connect everything": { de: "Alles verbinden", es: "Conectar todo", ca: "Connecta-ho tot"},
@@ -1849,7 +1866,7 @@ export const SEED: Catalogue = {
   "Your invite has been accepted, so nothing is waiting on you. Open the portal at the address your invite came from, and sign in with this same email address.": { de: "Ihre Einladung wurde angenommen, es wartet also nichts auf Sie. Öffnen Sie das Portal unter der Adresse, von der Ihre Einladung kam, und melden Sie sich mit derselben E-Mail-Adresse an.", es: "Tu invitación ya está aceptada, así que no hay nada pendiente. Abre el portal en la dirección desde la que llegó tu invitación e inicia sesión con este mismo correo.", ca: "La teva invitació ja està acceptada, així que no hi ha res pendent. Obre el portal a l'adreça des d'on va arribar la invitació i inicia sessió amb aquest mateix correu."},
   "Your reply": { de: "Ihre Antwort", es: "Tu respuesta", ca: "La teva resposta"},
   "Yours unless you say otherwise, an unassigned task is a task nobody picks up.": { de: "Ihre, sofern Sie nichts anderes sagen – eine nicht zugewiesene Aufgabe nimmt niemand auf.", es: "Tuya salvo que digas lo contrario: una tarea sin asignar es una tarea que nadie recoge.", ca: "Teva llevat que diguis el contrari: una tasca sense assignar és una tasca que ningú no agafa."},
-  "a client": { de: "ein Kunde", es: "un cliente", ca: "un client"},
+  "an account": { de: "ein Kunde", es: "una cuenta", ca: "un compte"},
   "a ticket type": { de: "ein Tickettyp", es: "un tipo de ticket", ca: "un tipus de tiquet"},
   "an app": { de: "eine App", es: "una aplicación", ca: "una aplicació"},
   "e.g. We shipped this on Tuesday — try it and tell us if it is still wrong.": { de: "z. B. Wir haben das am Dienstag ausgeliefert – probieren Sie es aus und sagen Sie uns, ob es noch falsch ist.", es: "p. ej. Lo publicamos el martes; pruébalo y dinos si sigue estando mal.", ca: "p. ex. Ho vam publicar dimarts; prova-ho i digues-nos si continua malament."},
@@ -2096,10 +2113,10 @@ export const SEED: Catalogue = {
     es: "Una reunión que ya tenemos",
     ca: "Una reunió que ja tenim",
   },
-  "A package of sprints a client bought. You'll plan the sprints inside it next.": {
+  "A package of sprints an account bought. You'll plan the sprints inside it next.": {
     de: "Ein Paket aus Sprints, das ein Kunde gekauft hat. Sie planen als Nächstes die Sprints darin.",
-    es: "Un paquete de sprints que un cliente compró. A continuación planearás los sprints dentro de él.",
-    ca: "Un paquet de sprints que un client ha comprat. A continuació planificaràs els sprints dins d'ell.",
+    es: "Un paquete de sprints que una cuenta compró. A continuación planearás los sprints dentro de él.",
+    ca: "Un paquet de sprints que un compte ha comprat. A continuació planificaràs els sprints dins d'ell.",
   },
   "A part of their company, like Operations or Finance.": {
     de: "Ein Teil ihres Unternehmens, zum Beispiel Operations oder Finanzen.",
@@ -2354,15 +2371,15 @@ export const SEED: Catalogue = {
     es: "Cada ahorro en este map se mide a partir de hoy, aquí y en el portal propio del cliente. Moverlo cambia esas cifras sin modificar un solo paso.",
     ca: "Cada estalvi en aquest map es mesura a partir d'avui, aquí i al portal propi del client. Moure'l canvia aquestes xifres sense canviar cap pas.",
   },
-  "File this map under a client and their roles can be named here.": {
+  "File this map under an account and their roles can be named here.": {
     de: "Lege diese map bei einem Kunden ab und seine Rollen können hier benannt werden.",
-    es: "Archiva este map bajo un cliente y sus roles pueden nombrarse aquí.",
-    ca: "Arxiva aquest map sota un client i els seus rols es poden nomenar aquí.",
+    es: "Archiva este map bajo una cuenta y sus roles pueden nombrarse aquí.",
+    ca: "Arxiva aquest map sota un compte i els seus rols es poden nomenar aquí.",
   },
-  "File this map under a client and their tools can be named here.": {
+  "File this map under an account and their tools can be named here.": {
     de: "Lege diese map bei einem Kunden ab und seine Werkzeuge können hier benannt werden.",
-    es: "Archiva este map bajo un cliente y sus herramientas pueden nombrarse aquí.",
-    ca: "Arxiva aquest map sota un client i les seves eines es poden nomenar aquí.",
+    es: "Archiva este map bajo una cuenta y sus herramientas pueden nombrarse aquí.",
+    ca: "Arxiva aquest map sota un compte i les seves eines es poden nomenar aquí.",
   },
   "Flights and bookings Gmail put there itself.": {
     de: "Flüge und Buchungen, die Gmail dort selbst ablegt.",
@@ -2513,10 +2530,10 @@ export const SEED: Catalogue = {
     ca: "Mapa els processos, crea dues automatitzacions, prova, forma.",
   },
   "Margin": { de: "Wirkung", es: "Impacto", ca: "Impacte" },
-  "Matched to {name} on this client's record.": {
+  "Matched to {name} on this account's record.": {
     de: "Zu {name} im Datensatz dieses Kunden zugeordnet.",
-    es: "Coincide con {name} en el registro de este cliente.",
-    ca: "Coincideix amb {name} al registre d'aquest client.",
+    es: "Coincide con {name} en el registro de esta cuenta.",
+    ca: "Coincideix amb {name} al registre d'aquest compte.",
   },
   "Measured from": { de: "Gemessen von", es: "Medido desde", ca: "Mesurat des de" },
   "Meetings and appointments": {
@@ -2538,11 +2555,6 @@ export const SEED: Catalogue = {
     de: "Kein Kalender ist benannt, daher wird kein Kalender gelesen.",
     es: "No hay ningún calendario nombrado, así que no se lee ningún calendario.",
     ca: "No hi ha cap calendari anomenat, així que no es llegeix cap calendari.",
-  },
-  "No client matched.": {
-    de: "Kein Kunde gefunden.",
-    es: "Ningún cliente coincide.",
-    ca: "Cap client coincideix.",
   },
   "No departments yet. Add the parts of their company, so a role can say where it sits.": {
     de: "Noch keine Abteilungen. Fügen Sie die Bereiche ihres Unternehmens hinzu, damit eine Rolle angeben kann, wo sie sitzt.",
@@ -2609,25 +2621,25 @@ export const SEED: Catalogue = {
     es: "Aún no hay waves.",
     ca: "Encara no hi ha waves.",
   },
-  "A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards.": {
+  "A wave is a package of sprints an account bought — sell it first, plan the sprints inside it afterwards.": {
     de: "Eine Wave ist ein Paket von Sprints, das ein Kunde gekauft hat — zuerst verkaufen, die Sprints darin danach planen.",
-    es: "Una wave es un paquete de sprints que un cliente ha comprado — véndela primero, planifica los sprints dentro de ella después.",
-    ca: "Una wave és un paquet de sprints que un client ha comprat — ven-la primer, planifica els sprints dins d'ella després.",
+    es: "Una wave es un paquete de sprints que una cuenta ha comprado — véndela primero, planifica los sprints dentro de ella después.",
+    ca: "Una wave és un paquet de sprints que un compte ha comprat — ven-la primer, planifica els sprints dins d'ella després.",
   },
   "Nobody named yet": {
     de: "Noch niemand benannt",
     es: "Aún no hay nadie nombrado",
     ca: "Encara no hi ha ningú anomenat",
   },
-  "Not one of this client's roles yet. Keeping it changes nothing until somebody records the role.": {
+  "Not one of this account's roles yet. Keeping it changes nothing until somebody records the role.": {
     de: "Noch keine der Rollen dieses Kunden. Das Beibehalten ändert nichts, bis jemand die Rolle erfasst.",
-    es: "Aún no hay ninguno de los roles de este cliente. Mantenerlo no cambia nada hasta que alguien registre el rol.",
-    ca: "Encara no hi ha cap dels rols d'aquest client. Mantenir-lo no canvia res fins que algú registri el rol.",
+    es: "Aún no hay ninguno de los roles de esta cuenta. Mantenerlo no cambia nada hasta que alguien registre el rol.",
+    ca: "Encara no hi ha cap dels rols d'aquest compte. Mantenir-lo no canvia res fins que algú registri el rol.",
   },
-  "Not one of this client's tools yet. Keeping it changes nothing until somebody records the tool.": {
+  "Not one of this account's tools yet. Keeping it changes nothing until somebody records the tool.": {
     de: "Noch keines der Werkzeuge dieses Kunden. Das Beibehalten ändert nichts, bis jemand das Werkzeug erfasst.",
-    es: "Aún no hay ninguna de las herramientas de este cliente. Mantenerla no cambia nada hasta que alguien registre la herramienta.",
-    ca: "Encara no hi ha cap de les eines d'aquest client. Mantenir-la no canvia res fins que algú registri l'eina.",
+    es: "Aún no hay ninguna de las herramientas de esta cuenta. Mantenerla no cambia nada hasta que alguien registre la herramienta.",
+    ca: "Encara no hi ha cap de les eines d'aquest compte. Mantenir-la no canvia res fins que algú registri l'eina.",
   },
   "Nothing connected. A process that hands its work to another can say so here.": {
     de: "Nichts verbunden. Ein Prozess, der seine Arbeit an einen anderen übergibt, kann das hier angeben.",
@@ -2777,7 +2789,7 @@ export const SEED: Catalogue = {
     es: "Guardado. {count} fuentes liberadas — el asistente las volverá a leer desde el principio.",
     ca: "Desat. {count} fonts alliberades — l’assistent les tornarà a llegir des del principi.",
   },
-  "Search clients…": { de: "Suche nach Kunden…", es: "Buscar clientes…", ca: "Cerca clients…" },
+  "Search accounts…": { de: "Kunden durchsuchen…", es: "Buscar cuentas…", ca: "Cerca comptes…" },
   "Sections": { de: "Abschnitte", es: "Secciones", ca: "Seccions" },
   "Sell a wave": { de: "Verkaufen Sie eine Wave", es: "Vende una wave", ca: "Ven una wave" },
   "Sends the work back to": {
@@ -3500,11 +3512,11 @@ export const SEED: Catalogue = {
   },
   /* The long one says what WOULD fill it, in two clauses: what Google has to
    * say for an artefact to arrive, and the three fields that show here anyway. */
-  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The client, the system and the reason we met show here too, once they are set.":
+  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The account, the system and the reason we met show here too, once they are set.":
     {
       de: "E-Mails, Chatverläufe und Mitschriften gehören zu einem Gespräch, wenn Google sagt, zu welchem Termin sie gehören. Kunde, System und der Grund des Treffens erscheinen hier ebenfalls, sobald sie gesetzt sind.",
-      es: "Los correos, los chats y las transcripciones se unen a una llamada cuando Google dice a qué evento pertenecen. El cliente, el sistema y el motivo de la reunión también aparecen aquí, una vez definidos.",
-      ca: "Els correus, els xats i les transcripcions s'uneixen a una trucada quan Google diu a quin esdeveniment pertanyen. El client, el sistema i el motiu de la reunió també apareixen aquí, un cop definits.",
+      es: "Los correos, los chats y las transcripciones se unen a una llamada cuando Google dice a qué evento pertenecen. La cuenta, el sistema y el motivo de la reunión también aparecen aquí, una vez definidos.",
+      ca: "Els correus, els xats i les transcripcions s'uneixen a una trucada quan Google diu a quin esdeveniment pertanyen. El compte, el sistema i el motiu de la reunió també apareixen aquí, un cop definits.",
     },
   "This meeting doesn't have a map to draw.": {
     de: "Für dieses Meeting gibt es keine Karte.",
@@ -3886,13 +3898,13 @@ export const SEED: Catalogue = {
   "Open requests on this app. Most work stands on its own.": { de: "Offene Anfragen zu dieser App. Die meiste Arbeit steht für sich.", es: "Solicitudes abiertas de esta app. La mayoría del trabajo se sostiene por sí solo.", ca: "Sol·licituds obertes d'aquesta app. La majoria del treball es manté per si sol."},
   "Our team. Only they and an admin open this app's page.": { de: "Unser Team. Nur sie und ein Administrator öffnen die Seite dieser App.", es: "Nuestro equipo. Solo ellos y un administrador abren la página de esta app.", ca: "El nostre equip. Només ells i un administrador obren la pàgina d'aquesta app."},
   "Set once. Leave it blank for one of our own.": { de: "Einmal festgelegt. Leer lassen für eine unserer eigenen.", es: "Se define una vez. Déjalo en blanco para una de las nuestras.", ca: "Es defineix una vegada. Deixa-ho en blanc per a una de les nostres."},
-  "The client's own contacts for this system.": { de: "Die eigenen Kontakte des Kunden für dieses System.", es: "Los propios contactos del cliente para este sistema.", ca: "Els propis contactes del client per a aquest sistema."},
-  "The client's own mark. Without one the tile shows the stage.": { de: "Das eigene Zeichen des Kunden. Ohne eines zeigt die Kachel die Phase.", es: "La marca propia del cliente. Sin ella, la ficha muestra la etapa.", ca: "La marca pròpia del client. Sense cap, la fitxa mostra l'etapa."},
+  "The account's own contacts for this system.": { de: "Die eigenen Kontakte des Kunden für dieses System.", es: "Los propios contactos de la cuenta para este sistema.", ca: "Els propis contactes del compte per a aquest sistema."},
+  "The account's own mark. Without one the tile shows the stage.": { de: "Das eigene Zeichen des Kunden. Ohne eines zeigt die Kachel die Phase.", es: "La marca propia de la cuenta. Sin ella, la ficha muestra la etapa.", ca: "La marca pròpia del compte. Sense cap, la fitxa mostra l'etapa."},
   "The company this is for. Their contacts see it in their portal; leave it off for our own questions.": { de: "Das Unternehmen, für das dies ist. Deren Kontakte sehen es in ihrem Portal; für eigene Fragen leer lassen.", es: "La empresa para la que es esto. Sus contactos lo ven en su portal; déjalo vacío para nuestras propias preguntas.", ca: "L'empresa per a la qual és això. Els seus contactes ho veuen al seu portal; deixa-ho buit per a les nostres pròpies preguntes."},
   "The flat price for this block of work. Leave it at zero if it isn't sold separately.": { de: "Der Festpreis für diesen Arbeitsblock. Bei null lassen, wenn er nicht separat verkauft wird.", es: "El precio fijo de este bloque de trabajo. Déjalo en cero si no se vende por separado.", ca: "El preu fix d'aquest bloc de treball. Deixa'l a zero si no es ven per separat."},
   "The one who marks work on this app done.": { de: "Wer die Arbeit an dieser App als erledigt markiert.", es: "Quien marca como terminado el trabajo en esta app.", ca: "Qui marca com a acabada la feina d'aquesta app."},
   "The part of your system this is about. It helps us route it to the right person.": { de: "Der Teil Ihres Systems, um den es geht. Das hilft uns, es an die richtige Person weiterzuleiten.", es: "La parte de tu sistema de la que se trata. Nos ayuda a dirigirlo a la persona adecuada.", ca: "La part del teu sistema de què es tracta. Ens ajuda a adreçar-ho a la persona adequada."},
-  "The person at that client who asked. Not always whoever types it in.": { de: "Die Person bei diesem Kunden, die gefragt hat. Nicht immer, wer es eintippt.", es: "La persona de ese cliente que lo pidió. No siempre quien lo escribe.", ca: "La persona d'aquell client que ho ha demanat. No sempre qui ho escriu."},
+  "The person at that account who asked. Not always whoever types it in.": { de: "Die Person bei diesem Kunden, die gefragt hat. Nicht immer, wer es eintippt.", es: "La persona de esa cuenta que lo pidió. No siempre quien lo escribe.", ca: "La persona d'aquell compte que ho ha demanat. No sempre qui ho escriu."},
   "The role whose hours this takes. It is what prices the saving.": { de: "Die Rolle, deren Stunden das kostet. Das bestimmt den Preis der Ersparnis.", es: "El rol cuyas horas se dedican a esto. Es lo que pone precio al ahorro.", ca: "El rol les hores del qual dedica això. És el que posa preu a l'estalvi."},
   "The side of the split this step continues. It hangs under that one instead of joining the two back together.": { de: "Die Seite der Verzweigung, die dieser Schritt fortsetzt. Er hängt an dieser Seite, statt die beiden wieder zusammenzuführen.", es: "El lado de la bifurcación que continúa este paso. Queda bajo ese lado en vez de reunir los dos de nuevo.", ca: "El costat de la bifurcació que continua aquest pas. Queda sota aquest costat en lloc de tornar a unir els dos."},
   "The situation it was built into.": { de: "Die Situation, in die hinein es gebaut wurde.", es: "La situación en la que se construyó.", ca: "La situació en què es va construir."},
@@ -4041,7 +4053,7 @@ export const SEED: Catalogue = {
   "Manage choices": { de: "Optionen verwalten", es: "Gestionar opciones", ca: "Gestionar opcions" },
   "Mango": { de: "Mango", es: "Mango", ca: "Mango" },
   "Members & roles": { de: "Mitglieder & Rollen", es: "Miembros y roles", ca: "Membres i rols" },
-  "No client": { de: "Kein Kunde", es: "Sin cliente", ca: "Sense client" },
+  "No account": { de: "Kein Kunde", es: "Sin cuenta", ca: "Sense compte" },
   "No contacts match": { de: "Keine Kontakte passen", es: "No hay contactos que coincidan", ca: "Cap contacte coincideix" },
   "No departments yet.": { de: "Noch keine Abteilungen.", es: "Aún no hay departamentos.", ca: "Encara no hi ha departaments." },
   "No inputs match": { de: "Keine Angaben passen", es: "No hay aportaciones que coincidan", ca: "Cap aportació coincideix" },
@@ -4141,7 +4153,7 @@ export const SEED: Catalogue = {
   "Undo": { de: "Rückgängig machen", es: "Deshacer", ca: "Desfer" },
   "Undo the last one": { de: "Die letzte rückgängig machen", es: "Deshacer la última", ca: "Desfer l'última" },
   "Unlit paper, off-beige type.": { de: "Unbeleuchtetes Papier, cremefarbene Schrift.", es: "Papel apagado, texto beige.", ca: "Paper apagat, text beix." },
-  "Unnamed client": { de: "Unbenannter Kunde", es: "Cliente sin nombre", ca: "Client sense nom" },
+  "Unnamed account": { de: "Unbenannter Kunde", es: "Cuenta sin nombre", ca: "Compte sense nom" },
   "Up to {limit}.": { de: "Bis zu {limit}.", es: "Hasta {limit}.", ca: "Fins a {limit}." },
   "View": { de: "Ansicht", es: "Vista", ca: "Vista" },
   "Visible to the client": { de: "Für den Kunden sichtbar", es: "Visible para el cliente", ca: "Visible per al client" },
@@ -4183,4 +4195,118 @@ export const SEED: Catalogue = {
   "{count} {type}": { de: "{count} {type}", es: "{count} {type}", ca: "{count} {type}" },
   "{name} is on triage this week, so the queue is theirs.": { de: "{name} macht diese Woche die Triage, die Warteschlange gehört also dieser Person.", es: "{name} está de triaje esta semana, así que la cola es suya.", ca: "{name} fa el triatge aquesta setmana, així que la cua és seva." },
   "{position} of {total}": { de: "{position} von {total}", es: "{position} de {total}", ca: "{position} de {total}" },
+  /* ── CLIENT BECAME ACCOUNT (her ruling, 2026-09-09) ───────────────────────
+   * "Hey, you got it wrong. The filter client is the company, so it's the
+   * account. Let's do something: rename client to account everywhere we said
+   * client. This was a mistake."
+   *
+   * WHAT THE WORD NOW MEANS, so nobody renames it back. The RECORD — the
+   * company or person the work is for, `accounts.id`, the thing a facet, a
+   * column, a picker or a possessive ("this account's roles") names — is
+   * ACCOUNT, and the glossary always said so. The screens said Client for the
+   * same record, which is the mistake she is correcting: one thing had two
+   * names and the filter row was where she met it.
+   *
+   * WHAT KEPT THE WORD "CLIENT", and why it is not an oversight. A CLIENT is
+   * the RELATIONSHIP and the PERSON in it — someone with a portal login who
+   * raises a ticket, replies, is emailed, sends an input back, or may never
+   * read the agency's own notes ("no client login can reach it"). R34's own
+   * registry note refuses to ban the word for exactly this reason. Renaming
+   * those to "account" would put a company where a person is doing something,
+   * which is a wrong sentence rather than a consistent one.
+   *
+   * THE THREE LANGUAGES, settled here rather than per string. The word for the
+   * RECORD is Kunde/Kunden · cuenta/cuentas · compte/comptes — the vocabulary
+   * block at the top of this file already fixed it on `Account`/`Accounts`,
+   * and every renamed sentence below is brought onto it. German loses
+   * "Mandant" outright: it was a third word for the record on three strings,
+   * against Kunde on twenty. Spanish and Catalan move off cliente/client for
+   * the record only; a sentence about the client PERSON keeps them, the same
+   * split the English keeps.
+   *
+   * These entries are here rather than left to the generator because they are
+   * a rename, not new copy: the English key moved, so the machine's answer for
+   * the old key no longer applies to anything, and R44's ceiling is 0. */
+  "Account context": { de: "Kundenkontext", es: "Contexto de la cuenta", ca: "Context del compte" },
+  "An account": { de: "Ein Kunde", es: "Una cuenta", ca: "Un compte" },
+  "Pick the account": { de: "Kunde auswählen", es: "Elige la cuenta", ca: "Tria el compte" },
+  "Which account": { de: "Welcher Kunde", es: "Qué cuenta", ca: "Quin compte" },
+  "Ours, no account": { de: "Unseres, kein Kunde", es: "El nuestro, sin cuenta", ca: "Nostre, sense compte" },
+  "Ours, not an account's": { de: "Unseres, nicht das eines Kunden", es: "El nuestro, no de una cuenta", ca: "Nostre, no d'un compte" },
+  "Nobody is on this account's books yet.": { de: "Niemand ist in den Büchern dieses Kunden verzeichnet.", es: "Todavía no hay nadie en los registros de esta cuenta.", ca: "Encara no hi ha ningú als registres d'aquest compte." },
+  "Filing it under an account is how a question about them finds it first.": { de: "Wenn Sie es unter einem Kunden ablegen, wird eine Frage über sie dort zuerst gefunden.", es: "Archivarlo bajo una cuenta es como se encuentra primero una pregunta sobre ellos.", ca: "Arxivar-ho sota un compte és com es troba primer una pregunta sobre ells." },
+  "Questions about that account are answered from what is in here. Leave it as ours if the": { de: "Fragen zu diesem Kunden werden aus dem beantwortet, was hier steht. Lassen Sie es als unseres, wenn", es: "Las preguntas sobre esa cuenta se responden con lo que hay aquí. Déjalo como nuestro si el", ca: "Les preguntes sobre aquest compte es responen amb el que hi ha aquí. Deixa-ho com a nostre si el" },
+
+  /* ── SETTINGS › TEAM, 2026-09-09 ────────────────────────────────────────
+   * The members gallery and the roles matrix, and the words the permission
+   * legend needs. `See` · `Create` · `Edit` · `Delete` are the four rights as a
+   * READER meets them; the four MARKS on the grid stay S · C · E · D in every
+   * language, because Editar and Eliminar collide on E in both Spanish and
+   * Catalan (web/components/team/roles-matrix.tsx says so at the capability
+   * list). So these are the words the legend maps those four marks onto.
+   * `Granted` / `Not granted` are capitalised on purpose: this app already says
+   * a lowercase `granted` about a staff CERTIFICATE, seeded as "ausgestellt" /
+   * "expedido" — issued, not permitted. */
+  "See": { de: "Sehen", es: "Ver", ca: "Veure" },
+  "Create": { de: "Erstellen", es: "Crear", ca: "Crear" },
+  "Granted": { de: "Erteilt", es: "Concedido", ca: "Concedit" },
+  "Not granted": { de: "Nicht erteilt", es: "No concedido", ca: "No concedit" },
+  "Roles and what each one may do": { de: "Rollen und was jede darf", es: "Roles y lo que puede hacer cada uno", ca: "Rols i què pot fer cadascun" },
+  "Changes are saved when you press Save.": { de: "Änderungen werden gespeichert, wenn Sie auf Speichern klicken.", es: "Los cambios se guardan cuando pulsas Guardar.", ca: "Els canvis es desen quan prems Desa." },
+  "Couldn't load the roles.": { de: "Die Rollen konnten nicht geladen werden.", es: "No se han podido cargar los roles.", ca: "No s'han pogut carregar els rols." },
+  "A role is a set of rights you can give somebody. Create one to start.": { de: "Eine Rolle ist ein Satz von Rechten, den Sie jemandem geben können. Erstellen Sie eine, um zu beginnen.", es: "Un rol es un conjunto de permisos que puedes dar a alguien. Crea uno para empezar.", ca: "Un rol és un conjunt de permisos que pots donar a algú. Crea'n un per començar." },
+  "Role created.": { de: "Rolle erstellt.", es: "Rol creado.", ca: "Rol creat." },
+  "No members yet.": { de: "Noch keine Mitglieder.", es: "Todavía no hay miembros.", ca: "Encara no hi ha membres." },
+  "No members match what you're looking for.": { de: "Keine Mitglieder passen zu Ihrer Suche.", es: "Ningún miembro coincide con lo que buscas.", ca: "Cap membre coincideix amb el que busques." },
+  "Invite someone": { de: "Jemanden einladen", es: "Invitar a alguien", ca: "Convida algú" },
+  "Invite sent.": { de: "Einladung gesendet.", es: "Invitación enviada.", ca: "Invitació enviada." },
+  "Invites waiting to be accepted": { de: "Einladungen, die noch angenommen werden müssen", es: "Invitaciones pendientes de aceptar", ca: "Invitacions pendents d'acceptar" },
+  "No invites are waiting.": { de: "Es sind keine Einladungen offen.", es: "No hay invitaciones pendientes.", ca: "No hi ha invitacions pendents." },
+  "Edit name and logo": { de: "Name und Logo bearbeiten", es: "Editar nombre y logotipo", ca: "Edita el nom i el logotip" },
+  "{count} person": { de: "{count} Person", es: "{count} persona", ca: "{count} persona" },
+  "{count} people": { de: "{count} Personen", es: "{count} personas", ca: "{count} persones" },
+  "Deactivated": { de: "Deaktiviert", es: "Desactivados", ca: "Desactivats" },
+  "Locked by policy": { de: "Durch Richtlinie gesperrt", es: "Bloqueado por política", ca: "Bloquejat per política" },
+  "nothing": { de: "nichts", es: "nada", ca: "res" },
+
+  /* ── SETTINGS › TEAM › THE ROLE PANEL, 2026-09-09 ────────────────────────
+   * The slide-in a role opens in: "when iclick in role, overview in slide in."
+   * Three strings, and the two counted ones are the whole reason the panel is
+   * not a second copy of the matrix — they say how MUCH of the app a role
+   * touches, which the grid never states anywhere.
+   *
+   * "areas" is deliberate. The code's word is `module` and the kit's word for
+   * the axis is `collection`; neither is a word a manager reading this panel
+   * would use, and "permissions" is banned outright (R34 · GLOSSARY_SYNONYMS —
+   * the Roles screen once headed this same matrix "Permissions" while two other
+   * screens called it an access right). "Areas" competes with no glossary term.
+   *
+   * WHOLE SENTENCES WITH HOLES IN THEM, never a number glued to a translated
+   * noun (R28) — and the two holes are named rather than positional, so German
+   * and Catalan can put the count where their own grammar wants it. */
+  "No description yet.": { de: "Noch keine Beschreibung.", es: "Todavía no hay descripción.", ca: "Encara no hi ha descripció." },
+  "Sees {count} of {total} areas": { de: "Sieht {count} von {total} Bereichen", es: "Ve {count} de {total} áreas", ca: "Veu {count} de {total} àrees" },
+  "Can change {count} of {total} areas": { de: "Kann {count} von {total} Bereichen ändern", es: "Puede cambiar {count} de {total} áreas", ca: "Pot canviar {count} de {total} àrees" },
+
+  /* ── SETTINGS › ONE MODULE'S OWN PAGE, 2026-09-09 ─────────────────────────
+   * The Tickets pilot of the client's ruling that settings be grouped by
+   * MODULE as well as by kind ("a lot of them are specific to the module").
+   * Six strings: the page's own title and sentence, and one pair per
+   * vocabulary section. They live in `MODULE_SETTINGS`
+   * (web/components/screens/module-settings-screen.tsx), a copy TABLE read
+   * back through `t` on the way to the screen — the same shape as every other
+   * table pinned in TRANSLATED_WHERE_READ, and pinned there for the same
+   * reason: the words sit beside the URL segment and the `selectable_data`
+   * group names, which are names of DATA and are never translated.
+   *
+   * "Ticket" stays "Ticket" in all three, from the vocabulary block at the top
+   * of this file; a stage is a Phase / etapa / etapa, as everywhere else in
+   * this app's mouth. Seeded in all three rather than left to the generator so
+   * TRANSLATION_CEILING stays at 0/0/0 (R44 — the pin falls and never rises). */
+  "Ticket settings": { de: "Ticket-Einstellungen", es: "Ajustes de tickets", ca: "Configuració dels tickets" },
+  "The words and rules this team's tickets run on.": { de: "Die Wörter und Regeln, nach denen die Tickets dieses Teams laufen.", es: "Las palabras y reglas con las que funcionan los tickets de este equipo.", ca: "Les paraules i regles amb què funcionen els tickets d'aquest equip." },
+  "Ticket types": { de: "Ticket-Typen", es: "Tipos de ticket", ca: "Tipus de ticket" },
+  "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.": { de: "Die Arten, als die ein Ticket eröffnet werden kann. Jede ist ein Reiter in der Ticketliste und ein Filter daneben.", es: "Los tipos con los que se puede abrir un ticket. Cada uno es una pestaña en la lista de tickets y un filtro al lado.", ca: "Els tipus amb què es pot obrir un ticket. Cadascun és una pestanya a la llista de tickets i un filtre al costat." },
+  "Ticket statuses": { de: "Ticket-Status", es: "Estados de ticket", ca: "Estats de ticket" },
+  "The words for the stages a ticket moves through. The stages themselves are fixed; what you set here is what each one is called.": { de: "Die Wörter für die Phasen, die ein Ticket durchläuft. Die Phasen selbst sind fest; hier legen Sie fest, wie jede heißt.", es: "Las palabras para las etapas por las que pasa un ticket. Las etapas en sí son fijas; aquí defines cómo se llama cada una.", ca: "Les paraules per a les etapes per les quals passa un ticket. Les etapes en si són fixes; aquí defineixes com es diu cadascuna." },
 }

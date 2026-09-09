@@ -851,8 +851,12 @@ describe("R55 — a stored reference is what the formula makes", () => {
      * account) — the client named one under HOGO at position 19 and the other
      * under DEMO at position 25. `aWs` is really spelled that way in the
      * accounts table and `AWS` really is the app on it. `ERP Kennogroup` is the
-     * one live app her 29-item list names nowhere, and the three waves are the
-     * three that exist, with their real timestamps. */
+     * app her list calls "Platinum" at #28 — she confirmed on 9 Sep 2026 that
+     * the two names are one app ("what we now call Platinum … is what we before
+     * called Kennogroup"), and it is seeded under the OLDER name deliberately,
+     * because that is the name the database was last measured wearing and
+     * therefore the one the entry's `alsoKnownAs` has to find. The three waves
+     * are the three that exist, with their real timestamps. */
     function seedApps(db: DatabaseSync) {
       db.exec(`
         INSERT INTO accounts (id, account_type, name, created_at) VALUES
@@ -908,23 +912,59 @@ describe("R55 — a stored reference is what the formula makes", () => {
       const issued = (
         db.prepare("SELECT ref FROM apps WHERE ref IS NOT NULL ORDER BY ref").all() as { ref: string }[]
       ).map((r) => r.ref)
-      expect(issued).toEqual(["A0001", "A0009", "A0015", "A0019", "A0024", "A0025"])
+      expect(issued).toEqual(["A0001", "A0009", "A0015", "A0019", "A0024", "A0025", "A0028"])
     })
 
-    it("REFUSES the app it cannot place, rather than giving it the number left over", () => {
+    it("finds #28 under the name the database actually wears", () => {
       const db = numbered()
-      // Her list has 29 entries; #28 is "Platinum" on account PLATINUM and #29
-      // is "Players" on Padelbase. Neither names a live app: the one app on
-      // PLATINUM is called `ERP Kennogroup` and has been since the import, and
-      // `Players` is an app MODULE, on two different apps she had already
-      // listed. So the list is not a list of apps only, which is what turns
-      // "the one entry left must be the one app left" from arithmetic into a
-      // guess — and the guess would be printed on a client-facing record.
+      // HER ANSWER, 9 Sep 2026: "Yes, what we now call Platinum (this is the
+      // current name) is what we before called Kennogroup." Her list says
+      // "Platinum"; the row says `ERP Kennogroup`; the two are one app. The
+      // entry therefore carries BOTH names and the plan matches on either, which
+      // is what makes this test the one that would fail if somebody "tidied" the
+      // alias away and left the match on her word alone — the migration would
+      // then find nothing and #28 would silently stay a gap.
       expect(
         refOf(db, "apps", "AP_ERP"),
-        "an app was numbered by elimination. A wrong permanent number is worse than a missing one, " +
-          "and the remedy for a missing one is one sentence from the client"
-      ).toBeNull()
+        "#28 was not numbered — the match is written against a name this row does not wear"
+      ).toBe("A0028")
+    })
+
+    it("REFUSES an app it cannot place, rather than giving it the number left over", () => {
+      // #29 IS STILL UNANSWERED and must stay unissued. "Players" on Padelbase
+      // names no app anywhere and never did — it is an app MODULE, on two
+      // different apps she had already listed at #9 and #24 — so the list is not
+      // a list of apps only, which is what turns "the one entry left must be the
+      // one app left" from arithmetic into a guess. The guess would be printed
+      // on a client-facing record forever.
+      const db = numbered()
+      const holders = db.prepare("SELECT id FROM apps WHERE ref = 'A0029'").all()
+      expect(
+        holders,
+        "an app was numbered by elimination onto position #29. A wrong permanent number is worse " +
+          "than a missing one, and the remedy for a missing one is one sentence from the client"
+      ).toEqual([])
+    })
+
+    it("numbers NEITHER when the two names of one position are two live apps", () => {
+      // THE PRICE OF THE ALIAS, PAID EXPLICITLY. #28 answers to two names, so
+      // the one way it could become an ambiguity is an account holding one app
+      // under each. The COUNT(*) = 1 guard is widened with the match for exactly
+      // this: the pair then identifies two rows and numbers neither, which is
+      // the Fuhrpark refusal doing its job on a second shape. Both rows keep
+      // nothing, and the gap is once again the correct outcome.
+      const db = dbBeforeTheNumbering()
+      seedApps(db)
+      db.exec(`
+        INSERT INTO apps (id, account_id, name, created_at)
+          VALUES ('AP_PLAT','AC_PLAT','Platinum','2026-09-09T08:00:00.000Z');
+      `)
+      runNumbering(db)
+      expect(
+        [refOf(db, "apps", "AP_ERP"), refOf(db, "apps", "AP_PLAT")],
+        "an alias resolved an ambiguity instead of refusing it — one of these two was given #28 " +
+          "with nothing on either row to say which of them she meant"
+      ).toEqual([null, null])
     })
 
     it("numbers waves oldest first, because no order was given for them", () => {
@@ -958,7 +998,7 @@ describe("R55 — a stored reference is what the formula makes", () => {
       // THE TRIPWIRE: this clause is a set difference and would pass over an
       // empty set — which is precisely how it passed for these two kinds while
       // every app and every wave in the estate wore nothing at all.
-      expect(seen, "the numbering wrote nothing — it is not reading the seeded rows").toBe(9)
+      expect(seen, "the numbering wrote nothing — it is not reading the seeded rows").toBe(10)
     })
 
     it("leaves no counter able to mint a number a row already has", () => {
@@ -980,9 +1020,12 @@ describe("R55 — a stored reference is what the formula makes", () => {
         ).toBeGreaterThan(top.n as number)
       }
       // AND THE APP COUNTER IS PARKED PAST HER WHOLE LIST, not merely past the
-      // rows. The highest number issued here is 25; positions 26-29 are hers and
-      // two of them are still open questions, so the next app created must not
-      // be handed one of them.
+      // rows. The highest number issued here is 28 now that she has answered
+      // #28; positions 26, 27 and 29 are still hers and #29 is still an open
+      // question, so the next app created must not be handed one of them. The
+      // floor is derived from the LIST'S LENGTH, so answering a position moves
+      // the rows and never the reservation — this assertion read
+      // `toBeGreaterThan(29)` before #28 was filled and still does.
       const a = db.prepare("SELECT next_no FROM team_ref_counters WHERE kind = 'A'").get() as {
         next_no: number
       }

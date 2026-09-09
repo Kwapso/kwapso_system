@@ -151,10 +151,15 @@ import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { TicketChips, ticketTitle, type TicketChipFacts } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
-import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+// THE LABELS ONLY. The collection's DEFAULT sort used to be read here too and
+// is not any more: which order a tab opens in is a per-tab answer now
+// (`helpTabSorts`), and a screen holding both would be two places deciding one
+// thing — with the tab's answer silently losing on whichever prop forgot.
+import { translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import {
   AddButton,
@@ -196,13 +201,19 @@ import {
   helpFacetFilter,
   helpFacetKey,
   helpKey,
+  helpTabColumns,
   helpTabFacets,
+  helpTabOrder,
+  helpTabSorts,
   listFetch,
+  TICKET_COLUMN_ORDER,
+  TICKET_COLUMNS_DEFAULT,
   OPEN_FACET,
   totalKey,
   triageKey,
   WAITING_FACET,
   type HelpFacet,
+  type TicketColumn,
 } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -410,18 +421,18 @@ export function ticketFacets({
       ? clients
           .map((a) => {
             const known = accounts.get(a.accountId)
-            const label = a.accountName ?? t("A client")
+            const label = a.accountName ?? t("An account")
             return {
               value: a.accountId,
               label,
-              mark: (
-                <RecordMark
-                  picture={known?.logoUrl ?? null}
-                  name={label}
-                  size="choice"
-                  fit={known?.accountType === "individual" ? "cover" : "contain"}
-                />
-              ),
+              // FILL, NEVER FIT (R60, client 2026-09-09). This used to read the
+              // account's TYPE to decide the crop — a sole trader's photograph
+              // cropped, a company's wordmark contained — which is why `known`
+              // was looked up at all. The ruling removed that choice from the
+              // product, so the lookup is now only for the LOGO, and an account
+              // this screen's page-one cache has never heard of falls through to
+              // its own initial exactly as it always did.
+              mark: <RecordMark picture={known?.logoUrl ?? null} name={label} size="choice" />,
             }
           })
           .sort((a, b) => a.label.localeCompare(b.label))
@@ -438,7 +449,7 @@ export function ticketFacets({
     // once in `useFilterBar` (the declaration is on `COLLECTION_FILTERS.help`'s
     // `appId`; both carry the ruling in full). Three things follow from it and
     // none of them is decided here: the list narrows to the chosen client's
-    // apps, the control says "Choose a client first." until there is one, and a
+    // apps, the control says "Choose an account first." until there is one, and a
     // stranded app clears itself when the client moves.
     //
     // WHY THE BROWSER'S OWN LIST IS THE HONEST SOURCE, and this is the R14
@@ -607,7 +618,7 @@ const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultD
  * THE APP'S LABEL IS THE ROW'S OWN `appName` (R35, and the reason the triage
  * door was widened today): resolving `appId` against the apps cache this screen
  * happens to hold would have been the page-one bug in a dropdown — a facet that
- * quietly says "A client" for every app past the window. The name rides the row
+ * quietly says "An account" for every app past the window. The name rides the row
  * now, so the words in this menu and the words on the card are one answer.
  *
  * A FACET WITH NOTHING TO OFFER IS NOT DRAWN, the same subtraction
@@ -705,18 +716,22 @@ export function triageFacets(
      name, so nothing has to be resolved at all.
      A Map by id for the same reason the apps one is: one pass, and one option
      per client however many of its tickets are in the pile.
-     THE SHAPE IS A SQUARE with the logo contained, which is what a CLIENT wears
-     everywhere in this app (`shape.tsx`'s accounts list carries the ruling: one
-     list, one column, and two shapes in it read as two kinds of record). The
-     crop a sole trader's photograph needs is not available here — the triage
-     row carries a name and a logo and not the account TYPE — so the contain is
-     unconditional, which letterboxes a face rather than cropping one. That is
-     the safe direction of the two: a whole picture in the wrong box beats a
-     cropped one, and the WORD beside it is the name either way. */
+     THE SHAPE IS A SQUARE, which is what a CLIENT wears everywhere in this app
+     (`shape.tsx`'s accounts list carries the ruling: one list, one column, and
+     two shapes in it read as two kinds of record).
+     AND THE FIT IS NO LONGER A QUESTION HERE, which retired the awkwardest half
+     of this note. It used to read: the crop a sole trader's photograph needs is
+     not available on this row — a triage row carries a name and a logo and not
+     the account TYPE — so the contain is unconditional, letterboxing a face
+     rather than cropping one, on the reasoning that a whole picture in the wrong
+     box beats a cropped one. R60 (client, 2026-09-09: "everywhere for images: do
+     fill, not fit!") makes every picture fill its box, so this row and the list
+     tab's own facet now draw the identical mark from the identical two facts,
+     and the type it could not see is a type nothing needs. */
   const accountsSeen = new Map<string, { label: string; logo: string | null }>()
   for (const w of rows)
     if (w.accountId)
-      accountsSeen.set(w.accountId, { label: w.accountName ?? t("A client"), logo: w.accountLogo })
+      accountsSeen.set(w.accountId, { label: w.accountName ?? t("An account"), logo: w.accountLogo })
   const accountOptions = [...accountsSeen]
     .map(([value, { label, logo }]) => ({
       value,
@@ -728,7 +743,7 @@ export function triageFacets(
     // HER ORDER, and the same order the list tabs' toolbar reads in
     // (`COLLECTION_FILTERS.help`): client, app, type. One screen, one reading
     // order, whichever tab a person is standing on.
-    { field: "accountId", label: t("Client"), control: "select" as const, options: accountOptions },
+    { field: "accountId", label: t("Account"), control: "select" as const, options: accountOptions },
     // APP HANGS OFF CLIENT — the same declaration the list tabs make through
     // `COLLECTION_FILTERS.help`, written out here because this queue builds its
     // facets from the rows rather than from that table. Same field, same
@@ -738,7 +753,7 @@ export function triageFacets(
       label: t("App"),
       control: "select" as const,
       options: appOptions,
-      dependsOn: { field: "accountId", emptyText: t("Choose a client first.") },
+      dependsOn: { field: "accountId", emptyText: t("Choose an account first.") },
     },
     // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
     // value a team typed itself, so it is data rather than copy and `t()` would
@@ -1272,6 +1287,39 @@ export function TicketsCollection({
     return { views: [list], value: "list", onValueChange: () => {} }
   })()
 
+  /* THE TOOLBAR'S ORDER CONTROL FOR THE TAB THAT IS OPEN — client, 2026-09-09:
+     "in closed tickets, I want to be able to sort by created date and closed
+     date only. Remove the rest."
+
+     PER TAB BY THE SAME RULE THE FACETS TAKE, and settled in the same place for
+     the same reason: `helpTabSorts` (web/lib/live-resources.ts) reads the tab
+     TOKEN and is driven directly by a test, which a control set spelled inside
+     a render can never be. Its whole argument — including why `closed` is the
+     one name DERIVED (a tab pinned to the resolved stage) rather than dictated
+     — is written out there. Read it before changing anything here.
+
+     A FILTER OVER THE COLLECTION'S OWN OPTIONS, NOT A SECOND LIST OF THEM: the
+     labels stay the ones `translatedSorts` already put through the reader's
+     language (R28), and this can only SUBTRACT. A tab cannot invent a sort the
+     door has never heard of, because there is nothing here to invent one from.
+
+     WHAT THE CONTROL DRAWS ON CLOSED: two options — a real choice, so the
+     ordinary chip. Neither the empty case nor the one-option case arises from
+     her ruling (two names are two), and if a later one ever cut it to one, the
+     chip should go rather than shrink: `showSort` in paged-find.tsx already
+     withdraws it at zero. That is deliberately the OPPOSITE of `ViewSwitch`'s
+     ruling one slot along, where a lone view draws a static label — a view pill
+     names WHERE YOU ARE among places you could be, so it still says something
+     alone; a sort names an ACT, and "Newest first" beside no alternative is a
+     fact about the list that the list is already showing.
+
+     COMPUTED HERE AND NOT AT THE PROP, for the reason `ticketFacets` gives just
+     below: `facets-ask-the-door` and `paged-sort` both read a FIXED window
+     after the `<PagedFind>` tag, and an argument this long inside it would push
+     the props those censuses have to see out the far end. */
+  const tabSorts = helpTabSorts(facet)
+  const sortOptions = translatedSorts("help", t).filter((o) => tabSorts.options.includes(o.value))
+
   /** THE TOOLBAR'S FILTERS FOR THE TAB THAT IS OPEN — see `ticketFacets`. */
   const helpFacets = ticketFacets({
     facet,
@@ -1285,7 +1333,24 @@ export function TicketsCollection({
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
-        <CollectionHeading sectionKey="tickets" total={shownTotal} />
+        {/* THE GEAR — *"on each module, we have a settings gear"* (client,
+            2026-09-09), top right of the screen, icon only. It goes in the
+            heading's own `action` slot and NOT in the toolbar, because
+            `<ToolbarRow>` draws nothing at all on an empty collection (R50) and
+            a team with no tickets yet is precisely when somebody goes looking
+            for the ticket types. `ModuleSettingsGear` draws itself or nothing —
+            it asks the settings page's own gate rather than repeating it here,
+            so a reader who may see tickets but not the team's vocabulary is
+            never offered a door that would refuse them.
+
+            ONE LINE, AND IT HAS TO STAY ONE LINE. `rules.test.ts`'s R16 ii
+            census asks whether any component file CONTAINS the literal
+            `<CollectionHeading sectionKey="tickets"` — a substring, not a
+            parse — so breaking these props across lines makes the Tickets
+            screen read as a collection with no heading at all and turns
+            `counted-collections` red. Proved on 2026-09-09 by doing exactly
+            that. */}
+        <CollectionHeading sectionKey="tickets" total={shownTotal} action={<ModuleSettingsGear teamId={teamId} segment="tickets" />} />
         {/* ONE STRIP, DRAWN THROUGH THE ONE SEAM — the client's 2026-08-31
             rulings, both on this exact screen: "there can never be 2 rows of
             tabs … just never", "toolbar must be inside of card background",
@@ -1434,8 +1499,9 @@ export function TicketsCollection({
                 one: t("1 ticket matches"),
                 many: t("{count} tickets match"),
               }}
-              sorts={translatedSorts("help", t)}
-              defaultSort={COLLECTION_SORTS.help.defaultSort}
+              // PER TAB — built above as `sortOptions`; the rule is `helpTabSorts`.
+              sorts={sortOptions}
+              defaultSort={tabSorts.defaultSort}
               // R50 — whichever tab is open, `scopedQ` is its own resting read
               // (the "all" list, or the sub-tab's own facet read), so this is
               // the one honest "is THIS tab's collection empty" answer.
@@ -1506,6 +1572,9 @@ export function TicketsCollection({
                     scope: "all",
                     view: "live",
                     ...helpFacetFilter(facet),
+                    // …then the tab's own resting ORDER (`helpTabOrder`, and
+                    // its header says why it is not a key in the filter above).
+                    ...helpTabOrder(facet),
                     ...query,
                     cursor,
                   })
@@ -1569,7 +1638,18 @@ export function TicketsCollection({
                     ) : facet === READY && readyView === "split" ? (
                       <ReadySplit teamId={teamId} rows={rows} onOpen={openTicket} />
                     ) : (
-                      <TicketRowsTable rows={rows} onOpen={openTicket} label={t("Tickets")} />
+                      // WHICH COLUMNS THIS TAB SHOWS — `helpTabColumns`, the
+                      // rule beside the facets' and the sorts' (client,
+                      // 2026-09-09: "ID, created date, closed date. Remove the
+                      // rest," about Closed). Every other tab gets the four she
+                      // ruled on 2026-09-06 and this call site does not know
+                      // which is which.
+                      <TicketRowsTable
+                        rows={rows}
+                        onOpen={openTicket}
+                        label={t("Tickets")}
+                        columns={helpTabColumns(facet)}
+                      />
                     )}
                     <LoadMore
                       listKey={
@@ -1641,6 +1721,23 @@ type TicketFace = {
   titleDe: string | null
   titleEn: string | null
   description: string
+  /** WHEN IT WAS CLOSED, and the ONE optional fact on this type.
+   *
+   * Optional because the two row shapes genuinely differ about it rather than
+   * because one of them forgot: `HelpTicket` carries `resolvedAt` on every row,
+   * and `TriageWaiting` — the queue's own door read — cannot, because a ticket
+   * in triage has not been triaged, let alone closed. Requiring it here would
+   * mean widening the triage door with a column that is NULL by definition and
+   * that nothing on that screen draws, which is a write with no reader.
+   *
+   * What keeps it from being a hole is that the CLOSED column is not a choice a
+   * call site makes: `helpTabColumns` (web/lib/live-resources.ts) hands it out
+   * only for a tab pinned to the `resolved` stage, and the only body that draws
+   * such a tab is the paged one, whose rows are `HelpTicket`. The cell draws an
+   * em dash if it ever arrives empty, so an unexpected absence reads as a
+   * missing answer rather than as a broken row — the same treatment `appName`
+   * already gets one line up. */
+  resolvedAt?: string | null
 }
 
 /** ONE TABLE FOR EVERY TAB THAT SHOWS ROWS — client, 2026-09-06: "For the tabs
@@ -1689,12 +1786,31 @@ function TicketRowsTable<T extends TicketFace>({
   rows,
   onOpen,
   label,
+  columns = TICKET_COLUMNS_DEFAULT,
   decide,
 }: {
   rows: readonly T[]
   onOpen: (id: string) => void
   /** The table's own accessible name, for a reader who arrives out of context. */
   label: string
+  /** WHICH FACTS THIS TAB SHOWS, and in which order — client, 2026-09-09: "ID,
+   * created date, closed date. Remove the rest," about the Closed tab.
+   *
+   * A PROP RATHER THAN A BRANCH ON THE TAB, for the reason `decide` gives one
+   * paragraph down: this file draws a header and a cell per name and does not
+   * know what "Closed" is. WHICH names a tab may pass is `helpTabColumns`
+   * (web/lib/live-resources.ts), beside the rule that already decides the same
+   * question for the toolbar's filters, and it is tested there rather than
+   * asserted here. The default is the four she ruled on 2026-09-06 (Title ·
+   * Type · App · Raised) and is read from the same file, so "every other tab is
+   * unchanged" is one constant rather than a claim about call sites.
+   *
+   * SHE REVISED THE CLOSED SET LATER THE SAME DAY — "columns for close: title
+   * (with id), type, app, raised closed" — which is the four above plus the
+   * closing date. Nothing in this file changed for it except the loss of the
+   * `ref` column that her first reading had needed; the number is back inside
+   * the title cell, where it has been on every other tab all along. */
+  columns?: readonly TicketColumn[]
   decide?: {
     /** The column's header. Say what the cells DO, or pass "" to leave it
      * announced-only — triage passes "" for the reason it always did. */
@@ -1705,14 +1821,38 @@ function TicketRowsTable<T extends TicketFace>({
   }
 }) {
   const { t, lang } = useLanguage()
-  const columns = decide ? 5 : 4
+  const span = columns.length + (decide ? 1 : 0)
+  /** WHAT EACH COLUMN IS CALLED. One map rather than a header spelled at the
+   * point it is drawn, so a tab that shows three of these and a tab that shows
+   * four cannot end up calling one fact two things. "Raised" rather than "Date"
+   * for the created column is the client's own pick ("i choose raised"); the ID
+   * column's word is the one she used in the ruling that created it. */
+  const HEADING: Record<TicketColumn, string> = {
+    title: t("Title"),
+    type: t("Type"),
+    app: t("App"),
+    created: t("Raised"),
+    closed: t("Closed"),
+  }
   return (
     <Table
       // The kit's own specimen width for a table that knows its column count.
       // Below it the container scrolls on the inline axis rather than crushing
       // the title column — the kit's stated mobile answer, and the reason it
       // never restacks a table into cards.
-      minWidth="42rem"
+      //
+      // IT FOLLOWS THE COLUMN COUNT. 42rem is the kit's own four-column
+      // specimen, and it was a constant while there was only one shape. The
+      // Closed tab is the four plus a second date (client, 2026-09-09, her
+      // revised set), so it asks for the specimen plus that column's own width
+      // rather than squeezing six more rem out of the title — a reference and a
+      // date may not truncate, so the title is the only thing that CAN give,
+      // and it is the one column somebody is reading.
+      //
+      // (It briefly went the other way: her first reading of the same day left
+      // this tab with three narrow columns and no title at all, and this line
+      // dropped to 28rem for it. That shape is gone.)
+      minWidth={columns.length > 4 ? "48rem" : "42rem"}
       aria-label={label}
     >
       <TableHeader>
@@ -1724,10 +1864,15 @@ function TicketRowsTable<T extends TicketFace>({
             lights under the pointer and then refuses the click is read as broken
             rather than as inert. */}
         <TableRow className="hover:bg-transparent">
-          <TableHead>{t("Title")}</TableHead>
-          <TableHead>{t("Type")}</TableHead>
-          <TableHead>{t("App")}</TableHead>
-          <TableHead>{t("Raised")}</TableHead>
+          {/* THE HEADER AND THE ROW ARE PUT IN ORDER BY THE SAME LIST, which is
+              what stops a three-column tab from labelling its cells wrong. The
+              cells below are written out in `TICKET_COLUMN_ORDER`'s order and
+              each one is gated on the SAME `columns.includes`, so `columns` is a
+              SET the caller passes and never a sequence: two places cannot
+              disagree about the order because only one of them decides it. */}
+          {TICKET_COLUMN_ORDER.filter((c) => columns.includes(c)).map((c) => (
+            <TableHead key={c}>{HEADING[c]}</TableHead>
+          ))}
           {decide && (
             // NO HEADER OVER THE ACTIONS when the caller passes none — client,
             // asked directly: "no header". Every other header names what the
@@ -1745,87 +1890,105 @@ function TicketRowsTable<T extends TicketFace>({
         {rows.map((w) => (
           <React.Fragment key={w.id}>
             <TableRow onClick={() => onOpen(w.id)} className="cursor-pointer">
-              <TableCell>
-                {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
-                    title to the left, with the usual black chip design."
-                    `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
-                    since 7 Sep 2026 it is the ONLY thing in either front door
-                    that draws one: this cell used to spell the badge out itself
-                    and three other surfaces spelled the identical lozenge out
-                    beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
-                    row that puts it in front — the "before the title to the
-                    left" half of her sentence, held as one string rather than
-                    as a shape each call site remembers. Both the absent case (a
-                    ticket with no number draws nothing) and `shrink-0` (a long
-                    title truncates and the number never does, because an id
-                    with its tail cut off is not useless, it is WRONG) live
-                    inside the component now. */}
-                <span className={REF_LEADS_NAME}>
-                  <RecordRef value={w.ref} />
-                  {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
-                      TBL-5): the call site puts a `Button variant="link"` in the
-                      first cell and that control owns the press. So the mouse
-                      gets the whole row, the keyboard and a screen reader get a
-                      real focusable control with the row's own name as its
-                      label, and neither is a second-class way in. It stops the
-                      click propagating so one press is never two `onOpen` calls.
+              {/* THE NUMBER HAD A COLUMN OF ITS OWN HERE FOR ONE DAY, and the
+                  reason it is gone is worth a line so nobody re-adds it. The
+                  client's first ruling of 2026-09-09 ("ID, created date, closed
+                  date") left the Closed tab with no title, so the reference
+                  became the leading column and took the row's navigation
+                  control with it. Her second ruling the same day put the title
+                  back — "columns for close: title (with id), type, app, raised
+                  closed" — which puts the number back where every other tab has
+                  always had it: inside the title cell, in front of the name, as
+                  the black `RecordRef` chip. One drawing of a reference, which
+                  is what `web/test/one-black-chip.test.ts` is the census for. */}
+              {columns.includes("title") && (
+                <TableCell>
+                  {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
+                      title to the left, with the usual black chip design."
+                      `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
+                      since 7 Sep 2026 it is the ONLY thing in either front door
+                      that draws one: this cell used to spell the badge out itself
+                      and three other surfaces spelled the identical lozenge out
+                      beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
+                      row that puts it in front — the "before the title to the
+                      left" half of her sentence, held as one string rather than
+                      as a shape each call site remembers. Both the absent case (a
+                      ticket with no number draws nothing) and `shrink-0` (a long
+                      title truncates and the number never does, because an id
+                      with its tail cut off is not useless, it is WRONG) live
+                      inside the component now. */}
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={w.ref} />
+                    {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
+                        TBL-5): the call site puts a `Button variant="link"` in the
+                        first cell and that control owns the press. So the mouse
+                        gets the whole row, the keyboard and a screen reader get a
+                        real focusable control with the row's own name as its
+                        label, and neither is a second-class way in. It stops the
+                        click propagating so one press is never two `onOpen` calls.
 
-                      `variant="link"` is not a box (no height, no padding), so
-                      it inherits the cell's own type rather than drawing a
-                      control inside a row; `block` plus a measure is what lets a
-                      long title end in an ellipsis instead of pushing the other
-                      three columns off the screen. */}
-                  <Button
-                    variant="link"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpen(w.id)
-                    }}
-                    className="block max-w-[32rem] truncate text-start"
-                  >
-                    {ticketTitle(w)}
-                  </Button>
-                </span>
-              </TableCell>
-              <TableCell>
-                <span className="flex items-center gap-2">
-                  {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
-                      screenshot of this exact column: "for type, kill the
-                      emojis. this is legacy. in current system we use colors."
+                        `variant="link"` is not a box (no height, no padding), so
+                        it inherits the cell's own type rather than drawing a
+                        control inside a row; `block` plus a measure is what lets a
+                        long title end in an ellipsis instead of pushing the other
+                        three columns off the screen. */}
+                    <Button
+                      variant="link"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpen(w.id)
+                      }}
+                      className="block max-w-[32rem] truncate text-start"
+                    >
+                      {ticketTitle(w)}
+                    </Button>
+                  </span>
+                </TableCell>
+              )}
+              {columns.includes("type") && (
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
+                        screenshot of this exact column: "for type, kill the
+                        emojis. this is legacy. in current system we use colors."
 
-                      WHAT STOOD HERE was the team's own glyph for the kind, read
-                      off the `Ticket type` dropdown value through `markMap` and
-                      drawn beside the pill. The stored glyphs are untouched (see
-                      the note beside the facets above); the READ is gone, and
-                      with it the argument this comment used to make — that
-                      dropping it "would have quietly deleted a capability nobody
-                      asked to lose". Somebody asked. A pictograph in front of a
-                      coloured pill was two marks for one fact, and the ruling
-                      picks the one the rest of the app already uses.
+                        WHAT STOOD HERE was the team's own glyph for the kind, read
+                        off the `Ticket type` dropdown value through `markMap` and
+                        drawn beside the pill. The stored glyphs are untouched (see
+                        the note beside the facets above); the READ is gone, and
+                        with it the argument this comment used to make — that
+                        dropping it "would have quietly deleted a capability nobody
+                        asked to lose". Somebody asked. A pictograph in front of a
+                        coloured pill was two marks for one fact, and the ruling
+                        picks the one the rest of the app already uses.
 
-                      THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
-                      the triage card's chips and the type picker draw — client:
-                      "Type with the colors, same as we have with the chips."
-                      `Swatch` + `ticketTypeColour` rather than a second lozenge
-                      that agrees with them today: the whole reason
-                      `lib/type-colours.ts` is one file is that a type's colour
-                      cannot be decided twice.
+                        THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
+                        the triage card's chips and the type picker draw — client:
+                        "Type with the colors, same as we have with the chips."
+                        `Swatch` + `ticketTypeColour` rather than a second lozenge
+                        that agrees with them today: the whole reason
+                        `lib/type-colours.ts` is one file is that a type's colour
+                        cannot be decided twice.
 
-                      A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
-                      so with an em dash: a column with a pill on four rows and a
-                      hole on the fifth reads as the broken row rather than the
-                      untyped one. */}
-                  <Badge variant="secondary" size="pill">
-                    <Swatch colour={ticketTypeColour(w.helpType)} />
-                    {w.helpType ?? "—"}
-                  </Badge>
-                </span>
-              </TableCell>
-              {/* THE TWO QUIET COLUMNS, as her reference draws them: the facts,
-                  in secondary ink, so the title and the coloured pill are what
-                  the eye lands on going down the page. An em dash for an absent
-                  app — a blank cell looks like a rendering fault rather than a
-                  missing answer.
+                        A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
+                        so with an em dash: a column with a pill on four rows and a
+                        hole on the fifth reads as the broken row rather than the
+                        untyped one. */}
+                    <Badge variant="secondary" size="pill">
+                      <Swatch colour={ticketTypeColour(w.helpType)} />
+                      {w.helpType ?? "—"}
+                    </Badge>
+                  </span>
+                </TableCell>
+              )}
+              {/* THE QUIET COLUMNS — app, and the two dates below it — as her
+                  reference draws them: the facts, in secondary ink, so the title
+                  and the coloured pill are what the eye lands on going down the
+                  page. ("The two" while there were two; the Closed tab has a
+                  third and no title above it, which is the one tab where the
+                  quiet ink is the whole row.) An em dash for an absent app — a
+                  blank cell looks like a rendering fault rather than a missing
+                  answer.
 
                   THE APP IS TEXT, NOT A LINK, AND THAT IS R37-SHAPED: a link
                   inside a row whose whole job is to open the TICKET gives one
@@ -1833,14 +1996,39 @@ function TicketRowsTable<T extends TicketFace>({
                   matter of pixels. Nothing is lost — the app is a FACET in the
                   toolbar above, and the ticket's own screen is one row-click
                   away with the app link on it. */}
-              <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
-              <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-                {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
-                    formatter and the reader's own language, so one ticket cannot
-                    carry two spellings of one day across two views of one
-                    collection. */}
-                {formatDate(w.createdAt, lang)}
-              </TableCell>
+              {columns.includes("app") && (
+                <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
+              )}
+              {columns.includes("created") && (
+                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                  {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
+                      formatter and the reader's own language, so one ticket cannot
+                      carry two spellings of one day across two views of one
+                      collection. */}
+                  {formatDate(w.createdAt, lang)}
+                </TableCell>
+              )}
+              {/* THE DAY IT WAS CLOSED — client, 2026-09-09. Same ink, same
+                  formatter and same language as the Raised column beside it,
+                  because they are two spellings of one kind of fact and a
+                  reader compares them going across the row.
+
+                  THIS COLUMN ONLY EVER APPEARS ON A TAB PINNED TO THE
+                  `resolved` STAGE, and that is the whole reason it can be
+                  trusted: a reopen NULLs `resolved_at` (the owner's ruling of
+                  2026-09-06 — the closure survives in the activity trail, "closed
+                  on x, reopen on y, closed again on z"), so anywhere an open
+                  ticket could appear this cell would say "never closed" about a
+                  ticket that has been closed twice. `helpTabColumns` is what
+                  makes that a rule rather than a call site being careful. The em
+                  dash is the same treatment the App column gets: if one ever
+                  does arrive empty it reads as a missing answer, not a broken
+                  row. */}
+              {columns.includes("closed") && (
+                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                  {w.resolvedAt ? formatDate(w.resolvedAt, lang) : "—"}
+                </TableCell>
+              )}
               {decide && (
                 <TableCell className="text-end whitespace-nowrap">{decide.cell(w)}</TableCell>
               )}
@@ -1855,7 +2043,7 @@ function TicketRowsTable<T extends TicketFace>({
                 else in the document. */}
             {decide?.strip?.(w) && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns} className="bg-surface-quiet">
+                <TableCell colSpan={span} className="bg-surface-quiet">
                   {decide.strip(w)}
                 </TableCell>
               </TableRow>
@@ -2575,7 +2763,7 @@ function TriageQueue({
    * strings are outside the translation catalogue and a screen's are not. */
   const GAP_WORD: Record<TriageGap, string> = {
     type: t("a ticket type"),
-    client: t("a client"),
+    client: t("an account"),
     app: t("an app"),
     raisedBy: t("who raised it"),
   }

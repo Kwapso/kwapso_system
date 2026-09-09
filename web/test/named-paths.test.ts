@@ -44,6 +44,8 @@ const ROOT = join(HERE, "..", "..")
 
 /** A path our own words name on purpose, knowing it is not there. */
 const GONE_ON_PURPOSE: Record<string, string> = {
+  "web/components/team/role-detail.tsx":
+    "the per-role screen the client deleted on 2026-09-09 (\"I want to see the roles much differently… all the roles together\"). Every role's sheet is one grid on Settings › Team now (roles-matrix.tsx), and half a dozen comments — module-content.tsx's `roles` branch, the roles matrix's own header, web/lib/pages.ts, R36's screen clause in rules.test.ts — name this path precisely BECAUSE it is gone, which is what makes each of those sentences readable",
   "web/lib/use-live-refetch.ts":
     "R15's retired half. RULES.md, CACHING.md and the registry all say this hook was deleted when paging moved to cursors over the shared store — naming it is the whole point of the sentence",
   "web/lib/live-bus.ts":

@@ -2,7 +2,9 @@
  * and may not do. Keys are the kit's folder names; each `render` draws the real
  * export with made-up content and spreads `p.of("<Export>")` onto every export
  * the properties panel offers options for. */
+import { Badge } from "../../../shared/ui/components/badge/badge"
 import { Button } from "../../../shared/ui/components/button/button"
+import { SearchInput } from "../../../shared/ui/components/search-input/search-input"
 import {
   Table,
   TableBody,
@@ -20,6 +22,7 @@ import { Tiles, type TileItem } from "../../../shared/ui/components/tiles/tiles"
 import { Timeline, type TimelineEvent } from "../../../shared/ui/components/timeline/timeline"
 import { Title } from "../../../shared/ui/components/title/title"
 import { Toggle } from "../../../shared/ui/components/toggle/toggle"
+import { ToolbarRow } from "../../../shared/ui/components/toolbar-row/toolbar-row"
 import { ToggleGroup, ToggleGroupItem } from "../../../shared/ui/components/toggle-group/toggle-group"
 import {
   Tooltip,
@@ -32,7 +35,7 @@ import { Headline, Hint, Text } from "../../../shared/ui/components/typography/t
 import { Video } from "../../../shared/ui/components/video/video"
 import { VisibilityProvider, Visible } from "../../../shared/ui/components/visibility/visibility"
 import { WebEmbed } from "../../../shared/ui/components/web-embed/web-embed"
-import { CalendarBlank, Info, Kanban, ListBullets, PencilSimple, Ticket } from "../../../shared/ui/foundations/icons"
+import { CalendarBlank, Info, Kanban, ListBullets, PencilSimple, Plus, Ticket } from "../../../shared/ui/foundations/icons"
 import type { Samples } from "./index"
 
 const noop = () => {}
@@ -270,6 +273,26 @@ export const samples: Samples = {
       >
         Acme Logistics
       </Title>
+    ),
+  },
+  /* NEW AT KIT v1.2.72 — the kit's own toolbar row, which used to live inside
+   * `CollectionFrame` and is a part in its own right now. Drawn with the four
+   * slots a real collection screen fills: a search box, a filter chip, a sort
+   * control and the create button. */
+  "toolbar-row": {
+    render: (p) => (
+      <ToolbarRow
+        search={<SearchInput placeholder="Search accounts…" aria-label="Search accounts" />}
+        filters={<Badge variant="outline">Filter · 2</Badge>}
+        viewSwitch={<Badge variant="outline">List</Badge>}
+        actions={
+          <Button>
+            <Plus size={14} aria-hidden="true" />
+            New account
+          </Button>
+        }
+        {...p.of("ToolbarRow")}
+      />
     ),
   },
   toggle: {

@@ -326,6 +326,21 @@ const TICKET_ORDER = "COALESCE(rank, id)"
 export const TICKET_SORTS: SortMenu<TicketRow> = {
   rank: { expr: TICKET_ORDER, dir: "desc", key: (r) => r.rank ?? r.id },
   created: { expr: "created_at", dir: "desc", key: (r) => r.created_at },
+  /** WHEN IT WAS CLOSED — client, 2026-09-09, about the Closed tab: "I want to
+   * be able to sort by created date and closed date only."
+   *
+   * `resolved_at`, AND IT IS ONLY HONEST WHERE THE TAB PINS `status = resolved`.
+   * `setStatus` NULLs this column on any move to a non-resolved status (the
+   * reopen — see its own block below, and the owner's ruling that the closure
+   * lives on in the activity trail instead), so on a tab spanning open work it
+   * would be null on nearly every row: an order over nothing, and a column that
+   * says a ticket was never closed when it was closed twice. On the Closed tab
+   * every row carries a stamp by construction, which is why the SCREEN offers
+   * this name there and nowhere else (`helpTabSorts`, web/lib/live-resources.ts).
+   * The door still knows it on every read — a menu is a vocabulary, not a
+   * policy, and `nullSafe` in the sorting seam already makes a null a POSITION
+   * rather than a lost row for anyone who asks anyway. */
+  closed: { expr: "resolved_at", dir: "desc", key: (r) => r.resolved_at },
   updated: { expr: "COALESCE(updated_at, created_at)", dir: "desc", key: (r) => r.updated_at ?? r.created_at },
   status: { expr: "status", dir: "asc", key: (r) => r.status },
   kind: { expr: "help_type", dir: "asc", key: (r) => r.help_type },
