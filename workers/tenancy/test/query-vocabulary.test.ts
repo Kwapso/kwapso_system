@@ -34,8 +34,9 @@
 //
 // SCOPE, said plainly: the values test can only judge a column the fixture
 // actually fills, so it is a floor and not a census. The wider instrument is
-// scripts/query-vocabulary-audit.mjs, which asks the same question of live
-// staging data and is what found this one.
+// scripts/query-bench.mjs, which runs this same engine over the real staging
+// rows and prints the `unmatched` values a request named nothing with — the
+// "NAMED NOTHING" line — which is how this one was found.
 
 import { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"

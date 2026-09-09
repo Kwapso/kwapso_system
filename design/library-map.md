@@ -19,7 +19,8 @@ describes. The kit's copy lives at `~/Desktop/design-mothership/tokens/library-m
 `shared/ui/styles.css` — 69 of them, of which 35 are the `--color-*` aliases the
 `@theme inline` block exposes to Tailwind, so there are **34 real tokens** plus
 `--radius` and its four steps. Plus the six values `shared/web/brand-theme.tsx`
-injects from `shared/brand.ts`.
+injected from `shared/brand.ts` — that layer is gone (see the chain below), and
+naming it is how this record stays readable.
 
 **How to read a row.** The library's token NAME is what all 94 components
 reference, so the names survive the reskin and only their VALUES change. A row

@@ -128,7 +128,7 @@
 // so "click out" and "press Cancel" are one decision seen through two doors,
 // never two that can drift. Rendered only when a caller passes `onCancel` —
 // today that is `FormShellDialog` alone; the two bare-`FormShell` callers
-// (`access-tokens.tsx`'s centred `Dialog`, `web-portal/needs-name.tsx`'s
+// (`access-tokens.tsx`'s centred `Dialog`, `web-portal/components/needs-name.tsx`'s
 // mandatory onboarding step, which has nothing to cancel TO) pass none and
 // gain nothing, which is correct for both.
 //
@@ -221,7 +221,7 @@
 //
 // Two more, off the same client pass, both scoped to `FormShellDialog` only
 // (the bare `FormShell` callers — `access-tokens.tsx`'s centred `Dialog`,
-// `web-portal/needs-name.tsx`'s onboarding step — have no Cancel button and
+// `web-portal/components/needs-name.tsx`'s onboarding step — have no Cancel button and
 // are untouched).
 //
 // 1 · "on add/edit, we do not need the x on top (we already have the cancel

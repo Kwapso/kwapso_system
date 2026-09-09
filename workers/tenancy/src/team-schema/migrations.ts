@@ -170,8 +170,9 @@ CREATE TABLE selectable_data (
 -- and writeActivity). That was true before it was written down anywhere, which
 -- is the problem with it having been true: an invariant nobody states is one the
 -- next person can break without knowing it existed. Stated here, and asserted by
--- shared/test/activity-verbs.test.ts, which fails on any UPDATE or DELETE
--- against this table anywhere in the workers.
+-- workers/tenancy/test/activity-trail.test.ts ("no worker updates or deletes a
+-- row in the activity table"), which fails on any UPDATE or DELETE against this
+-- table anywhere in the workers.
 --
 -- verb and origin arrive in 0062 and are NULL on every row older than it —
 -- see that migration for why neither is backfilled.
