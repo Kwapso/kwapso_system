@@ -1199,6 +1199,29 @@ export type Account = {
   /** may this account see money figures on its own work? `null` on the way OUT
    * to a client login — the agency's own switch ABOUT them, never for them. */
   commercialsVisible: boolean | null
+  /** WHERE THIS PERSON WORKS, AND WHAT THEY DO THERE — the contacts table's two
+   * middle columns (client, 2026-09-09: "for contacts lets do view table, also
+   * add column role after account").
+   *
+   * They are read off `account_links`, not off `parentAccountId`, and the two
+   * travel together on purpose: `relationship` is the role somebody holds AT a
+   * company ("CEO", "Site Manager", "Webflow Developer"), so a role taken from
+   * one link beside a company taken from the parent pointer would be two cells
+   * describing two different facts. ONE link answers both — the one that matches
+   * the parent pointer where there is one, then the main stakeholder, then the
+   * first by company name (workers/tenancy/src/lib/accounts.ts, `LINKED_COMPANY`).
+   *
+   * `null` is ORDINARY on both, and on 110 real contacts it is 22 and 45 of them:
+   * a person nobody has filed under a company yet, and a link where nobody typed
+   * what she does. The screen draws an em dash, the same as an unset app on the
+   * tickets list — it is not an error and must not read as one.
+   *
+   * Always `null` on a COMPANY row (a company is nobody's contact) and always
+   * `null` on the way out to a client login, the same sentence
+   * `commercialsVisible` makes one line up: a person can be a contact at two
+   * companies, and one of them may sit outside the caller's fence. */
+  companyName?: string | null
+  relationship?: string | null
   /** false once archived (deactivate-never-delete) */
   active: boolean
   /** the audit block, for the detail Overview tab (the same shape every record

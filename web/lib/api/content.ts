@@ -1112,8 +1112,13 @@ export const content = {
      * cannot be lost on the way to the door — the meetings list pages, and every one of
      * these narrows the whole of it rather than the page in hand. */
     opts: {
-      /** which slice of the meetings list the screen is standing on */
-      view?: "upcoming" | "week" | "all"
+      /** which slice of the meetings list the screen is standing on.
+       *
+       * `mine` is THE MEETINGS THE CALLER WAS IN THE ROOM FOR — the client's
+       * own words, 2026-09-09. It takes no address: the door answers it against
+       * the session (`guard.userId` + `actor.email`) and refuses to read one off
+       * the wire, so there is deliberately nothing here to pass. */
+      view?: "upcoming" | "week" | "mine" | "all"
       /** the meetings list's search box, answered by the DOOR — the list pages, and the
        * meeting somebody digs for is the OLD one. */
       q?: string

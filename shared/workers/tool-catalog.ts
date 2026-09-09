@@ -521,14 +521,14 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
-      "Companies and people in one list (people need the contacts right). `type` is 'entity' or 'individual'; `archived` 'yes'/'no'; `cursor` pages.",
+      "Companies and people in one list (people need the contacts right). `type` is 'entity' or 'individual'; `archived` and `portal` 'yes'/'no'; `cursor` pages.",
     detail:
-      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `portal` ('yes' for only the people who can sign in to the client portal, 'no' for only those who cannot; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. A person's row also carries `companyName` and `relationship`, the company they are a contact of and what they do there; both are empty on a company and on a person nobody has linked. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal`, `individualTotal` and `individualPortalTotal` are a different question, how many companies, how many people and how many of those people can sign in, across the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
-    schema: obj({ q: S, type: S, archived: S, parentId: S, sort: S, dir: S, cursor: S }),
+    schema: obj({ q: S, type: S, archived: S, portal: S, parentId: S, sort: S, dir: S, cursor: S }),
     buildQuery: (i) => {
       const q: string[] = []
-      for (const key of ["q", "type", "archived", "parentId", "sort", "dir", "cursor"])
+      for (const key of ["q", "type", "archived", "portal", "parentId", "sort", "dir", "cursor"])
         if (str(i, key)) q.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return q.length ? `?${q.join("&")}` : ""
     },

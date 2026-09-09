@@ -3954,6 +3954,7 @@ describe("RULES — the laws of the base", () => {
       "named-paths", // R58: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
       "forms-are-not-overlays", // R59: the centred-overlay census below, over both front doors — inverted, so a form it has never seen is caught by having no reason on file
       "image-fills", // R60: web/test/an-image-fills.test.ts — every `object-*` utility AND every `fit="contain"` prop in our own source, plus the pinned, only-falling count of the ones the vendored kit still owes us
+      "module-settings-two-doors", // R61: the MODULE_SETTINGS ↔ gear-mount census below, plus the two clauses that keep the Modules index derived and the gate written once
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -4857,5 +4858,215 @@ describe("R59 — a form is a slide-in; a warning is an overlay", () => {
         why.length,
         `${f} is an exception to R59 — that needs a real reason, and one the client can rule on`
       ).toBeGreaterThan(30)
+  })
+})
+
+describe("R61 — a module's settings have two doors and one derivation", () => {
+  // R61 — A MODULE'S SETTINGS HAVE TWO DOORS AND ONE DERIVATION.
+  //
+  // THE CLIENT, 2026-09-09, in two halves that only work together:
+  //     "on each module, we have a settings gear … somewhere in the settings,
+  //      we have a tab that says 'Module' or 'Business Logic' (or whatever you
+  //      define as a good word) to find the module once"
+  //     "everything around settings should be under settings screen
+  //      concentrated (and 'quick access' through the gear in each module) but
+  //      not in random places across the app"
+  //     "Does every module get the gear? Only the ones with something to set."
+  //
+  // Two entrances onto ONE page, which is only true for as long as both are
+  // computed from the same fact. `MODULE_SETTINGS` is that fact — the modules
+  // with something to set — and `visibleModuleSettings` is the one expression
+  // that narrows it to what a given reader may open. The screen asks it, the
+  // gear asks it, and `moduleSettingsIndex` (the Modules tab's rows) asks it.
+  //
+  // WHY A LAW AND NOT A COMMENT, WHICH IS THE ONLY QUESTION HERE. The pilot
+  // shipped with the second entrance unbuilt and nine lines of prose telling
+  // whoever built it to ask the same function. That is a rule addressed to a
+  // future reader, and it held for exactly as long as one person read it. The
+  // arithmetic is the argument: the index is the deliverable and FILLING it is
+  // later work, so the next several edits to `MODULE_SETTINGS` are somebody
+  // adding a module while looking at Tickets — and the gear lives in that
+  // module's own collection file, which they need not open. Forget it and the
+  // build is green with a settings page nobody standing on the module can
+  // find; add a gear for a module the table does not list and the build is
+  // green with a control that renders `null` for ever, indistinguishable on
+  // screen from a module that simply has no settings. Neither is visible to
+  // any other check in this repo.
+  //
+  // AND IT IS WRITTEN WHILE THE INDEX HAS ONE ROW ON PURPOSE. With one module
+  // the pair is trivially in step, so the law costs nothing today — which is
+  // the only moment at which writing it is free, and the last moment at which
+  // it is easy. Nothing below counts rows: every clause is a set relation or a
+  // per-segment fact, so one module satisfies it exactly as eight would, and
+  // the tripwires are about whether the census can SEE rather than how much it
+  // found (a floor of "more than one" would have been a law that only starts
+  // working after the mistake it exists to prevent).
+  it("module-settings-two-doors: a module with settings has a gear, the index is derived, and the gate is asked once", () => {
+    const HOST_REL = "web/components/screens/module-settings-screen.tsx"
+    const TAB_REL = "web/components/screens/settings-screen.tsx"
+    const host = stripComments(read(join(ROOT, HOST_REL)))
+    const tab = stripComments(read(join(ROOT, TAB_REL)))
+
+    // ── i · THE TABLE, off its own literal ──────────────────────────────────
+    // Sliced rather than imported, and that is deliberate: `MODULE_SETTINGS` is
+    // NOT exported (the gear, the screen and the index all live beside it), and
+    // exporting a constant so a test can read it would loosen the very thing
+    // this law is protecting. The slice ends at the first `]` in column zero,
+    // which is the array's own close — every `],` inside it is indented.
+    const tableAt = host.indexOf("const MODULE_SETTINGS")
+    expect(
+      tableAt,
+      "R61 — MODULE_SETTINGS is not in " + HOST_REL + " under that name. It is the fact both doors are computed from; if it moved or was renamed, teach this law the new spelling rather than deleting it"
+    ).toBeGreaterThan(-1)
+    const closeAt = host.indexOf("\n]", tableAt)
+    expect(closeAt, "R61 — could not find the end of the MODULE_SETTINGS array").toBeGreaterThan(tableAt)
+    const table = host.slice(tableAt, closeAt)
+    const declared = [...table.matchAll(/^\s*segment:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1])
+
+    // TRIPWIRE 1 — THE PARSE. A set relation against an empty set is empty, so
+    // a regex that stopped matching would report a perfectly paired app. This
+    // is also a ratchet with a real meaning: settings-by-module is a shipped
+    // feature (client, 2026-09-09), and a build in which NO module has anything
+    // to set has deleted it rather than tidied it.
+    expect(
+      declared.length,
+      "R61 — read no `segment:` out of MODULE_SETTINGS. Either the table is empty (settings-by-module shipped 2026-09-09 with Tickets as the pilot — if it is genuinely being withdrawn, that is a decision to take with the client, not a green build) or the slice above stopped matching the file"
+    ).toBeGreaterThan(0)
+    expect(new Set(declared).size, "R61 — MODULE_SETTINGS declares a segment twice").toBe(declared.length)
+
+    // TRIPWIRE 2, AND A CLAUSE AT THE SAME TIME — a declared segment is a real
+    // module. `/settings/<segment>` is the app's ordinary (module, id) grammar
+    // (`parseScreenPath`), so a segment naming no module is an address nothing
+    // in the app can link to. It doubles as proof that the slice above parsed
+    // WORDS rather than noise: a broken regex yields strings, and strings that
+    // are not module names fail here rather than passing quietly.
+    const notModules = declared.filter((s) => !(s in MODULE_PERMISSION))
+    expect(
+      notModules,
+      `R61 — MODULE_SETTINGS declares a segment that names no module in MODULE_PERMISSION (web/lib/screens.ts), so /settings/<segment> is an address nothing links to: ${notModules.join(", ")}`
+    ).toEqual([])
+
+    // ── ii · THE GEARS, off every mount in the app ──────────────────────────
+    const mounts: { segment: string; rel: string }[] = []
+    let filesScanned = 0
+    for (const f of sourceFiles([join(WEB, "app"), join(WEB, "components")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      // Comments off: the gear's own definition file talks about `<ModuleSettingsGear`
+      // at length, and a census that read prose would find a mount in the file
+      // that only describes one.
+      for (const m of stripComments(f.source).matchAll(
+        /<ModuleSettingsGear\b[^>]*?\bsegment=\{?"([a-z0-9-]+)"/g
+      ))
+        mounts.push({ segment: m[1], rel: f.rel })
+    }
+
+    // TRIPWIRE 3 — the walk happened at all.
+    expect(
+      filesScanned,
+      "R61 — the gear census walked no files. The scan is blind (a moved root, a broken sourceFiles call); fix it before trusting the result"
+    ).toBeGreaterThan(100)
+
+    // TRIPWIRE 4 — the component this law is about still exists under the name
+    // the mount regex looks for. Without this, renaming the export would make
+    // BOTH halves of clause (i) read zero mounts against a table that still has
+    // entries — which fails loudly, correctly — but deleting the component AND
+    // the table together would pass silently, and that is the pair this pins.
+    expect(
+      /export function ModuleSettingsGear\b/.test(host),
+      "R61 — " + HOST_REL + " no longer exports `ModuleSettingsGear`. The gear is the client's own 'quick access' (2026-09-09); if it was renamed, teach this law the new name — the census below looks for `<ModuleSettingsGear` and would otherwise find nothing and say so"
+    ).toBe(true)
+
+    // THE LAW, FIRST DIRECTION — a module with settings has a gear. Without it
+    // the page exists and nobody standing on the module can reach it, which is
+    // precisely the half of her instruction the settings tab does not cover:
+    // the tab is where you go when you do not know where to go, the gear is for
+    // when you are already there.
+    const noGear = declared.filter((s) => !mounts.some((m) => m.segment === s))
+    expect(
+      noGear,
+      `R61 — these modules have settings and no gear anywhere in web/: ${noGear.join(", ")}. ` +
+        `Mount <ModuleSettingsGear teamId={teamId} segment="<segment>" /> in that screen's CollectionHeading ` +
+        `action slot (not the toolbar — R50 draws no toolbar on an empty collection, which is exactly when ` +
+        `somebody goes looking for the settings). If the gear is passed a variable rather than a literal, ` +
+        `this census cannot read it: spell the segment out, the way the table does.`
+    ).toEqual([])
+
+    // …AND THE SECOND — a gear on a module with nothing to set. It renders
+    // `null` for ever, so it is invisible on screen and looks exactly like a
+    // module that has no settings; nothing but this would ever report it.
+    const stray = mounts.filter((m) => !declared.includes(m.segment))
+    expect(
+      stray.map((m) => `${m.segment} (${m.rel})`),
+      "R61 — a gear names a module MODULE_SETTINGS does not declare, so it draws nothing at all and always will. " +
+        "Either add that module's page to MODULE_SETTINGS or remove the gear"
+    ).toEqual([])
+
+    // ONE GEAR PER MODULE. Two doors out of one screen is two placements to
+    // keep in step and two things to find, and the client's word was singular:
+    // "on each module, we have a settings gear".
+    const twice = declared.filter((s) => mounts.filter((m) => m.segment === s).length > 1)
+    expect(
+      twice.map((s) => `${s} (${mounts.filter((m) => m.segment === s).map((m) => m.rel).join(", ")})`),
+      "R61 — more than one gear for the same module. One module, one gear, one place to find it"
+    ).toEqual([])
+
+    // ── iii · THE INDEX IS DERIVED, NOT LISTED ─────────────────────────────
+    // The Modules tab is the client's own "find the module once". A hand-written
+    // row would work today and be wrong the first time somebody adds a module —
+    // and it would be wrong SILENTLY, because a missing row is a module you
+    // simply do not see rather than an error.
+    const panelAt = tab.indexOf('panel.value === "modules"')
+    expect(
+      panelAt,
+      "R61 — settings-screen.tsx draws no Modules panel. It is the second of the two doors the client asked for (2026-09-09, \"a tab that says 'Module' … to find the module once\"); if the panel was renamed, teach this law the new value rather than deleting it"
+    ).toBeGreaterThan(-1)
+    const nextPanel = tab.indexOf("panel.value ===", panelAt + 1)
+    const panel = tab.slice(panelAt, nextPanel === -1 ? undefined : nextPanel)
+    expect(
+      panel.includes("moduleSettingsIndex("),
+      "R61 — the Modules panel does not call moduleSettingsIndex. The rows must be derived from MODULE_SETTINGS through the same visibleModuleSettings the gear asks, so a module gains a page, a gear and a row in one edit"
+    ).toBe(true)
+    // …and it names no module of its own. Scoped to the PANEL rather than the
+    // file on purpose: this screen legitimately spells `team`, `choices` and
+    // other words that could one day also be a settings segment, and a law that
+    // failed on that would be a law people learn to work around.
+    const handListed = declared.filter((s) => panel.includes(`"${s}"`))
+    expect(
+      handListed,
+      `R61 — the Modules panel spells a module segment itself (${handListed.join(", ")}), which means a row somewhere is hand-kept. The index is moduleSettingsIndex's answer and nothing else; a segment written here is a row that will fall behind the table`
+    ).toEqual([])
+
+    // ── iv · ONE GATE, ASKED ONCE ──────────────────────────────────────────
+    // Her instruction was that a reader who may see tickets but not the team's
+    // vocabulary is not offered a door that refuses them. Three surfaces obey it
+    // by asking one function; three surfaces each spelling `selectable_data` is
+    // how one of them eventually spells it differently. `visibleModuleSettings`
+    // holds the only `can(` in the file — the gear and the screen take `can`
+    // from `usePermissions` and pass it in, and the tab never touches a right at
+    // all, it calls `moduleSettingsIndex(can)`.
+    const gateCalls = [...host.matchAll(/\bcan\(/g)].length
+    expect(
+      gateCalls,
+      "R61 — " + HOST_REL + " asks `can(` " + gateCalls + " times; the gate belongs in visibleModuleSettings and nowhere else, so that the gear, the page and the Modules row are refused and offered together. If a second call is genuinely needed, it is a change to how this screen gates and wants the client's ruling, not a second copy of this one"
+    ).toBe(1)
+
+    // …and all three consumers actually route through it. Sliced by body, so a
+    // consumer that grows its own condition is caught where it is written.
+    for (const fn of ["moduleSettingsIndex", "ModuleSettingsScreen", "ModuleSettingsGear"]) {
+      const at = host.indexOf(`export function ${fn}`)
+      expect(at, `R61 — ${HOST_REL} no longer exports ${fn}`).toBeGreaterThan(-1)
+      const ends = ["moduleSettingsIndex", "ModuleSettingsScreen", "ModuleSettingsGear"]
+        .map((o) => host.indexOf(`export function ${o}`))
+        .filter((i) => i > at)
+      const body = host.slice(at, ends.length ? Math.min(...ends) : undefined)
+      expect(
+        body.includes("visibleModuleSettings("),
+        `R61 — ${fn} does not ask visibleModuleSettings. All three surfaces (the gear, the page, the Modules index) answer "is there a page here for this reader" with ONE expression; a second way of asking it is how a gear starts leading somewhere that refuses the person who pressed it`
+      ).toBe(true)
+    }
   })
 })

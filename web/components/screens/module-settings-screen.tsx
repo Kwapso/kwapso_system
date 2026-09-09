@@ -20,14 +20,32 @@
 //     carries the argument for why it is there and not in the toolbar.
 //
 //     THE SECOND ENTRANCE — a Modules tab on
-//     `web/components/screens/settings-screen.tsx` — IS NOT BUILT YET, and this
-//     says so rather than describing it as though it were. The pilot is one
-//     module, and one module is exactly the case where a whole tab listing the
-//     modules that have settings lists one row. It is written down here (with
-//     her sentence above it) so the next person builds it against her words
-//     rather than rediscovering them; when they do, both doors go to the same
-//     URL and ask `visibleModuleSettings` the same question, so they cannot
-//     drift into two screens that disagree.
+//     `web/components/screens/settings-screen.tsx` — IS BUILT, later the same
+//     day, against the rest of her sentence: *"everything around settings
+//     should be under settings screen concentrated (and 'quick access' through
+//     the gear in each module) but not in random places across the app."* So
+//     the gear is the SHORTCUT and the tab is the PLACE, and neither is a copy
+//     of the other: the tab is an INDEX of rows, each row opening the very URL
+//     that module's gear points at. One page, two entrances.
+//
+//     THE TAB IS CALLED "MODULES", and the word was picked rather than
+//     defaulted to. She offered two — *"a tab that says 'Module' or 'Business
+//     Logic' (or whatever you define as a good word)"* — and the app already
+//     treats "module" as a first-class noun: `TEAM_MODULES` is the estate of
+//     them, and the roles matrix on the Team tab has one COLUMN per module. So
+//     on the settings screen the word now arrives twice, one tab apart, meaning
+//     the same thing both times. "Business Logic" would have been a third name
+//     for the same set, and a rule this app already lives by is that a thing
+//     has one name.
+//
+//     THE INDEX IS DERIVED, WHICH IS THE WHOLE POINT OF IT. It reads
+//     `moduleSettingsIndex` below — `MODULE_SETTINGS` filtered through the SAME
+//     `visibleModuleSettings` the gear asks — so a module that gains a settings
+//     page gains a row and a gear in one edit, and a hand-kept list of rows can
+//     never fall behind the table. R61 (`module-settings-two-doors`,
+//     `web/test/rules.test.ts`) holds the two doors to each other off the disk:
+//     a module in this table with no gear mounted anywhere, or a gear on a
+//     module this table does not list, turns the build red.
 //
 //   • *"It cannot be a slide-in because things can get quite complex here, and
 //     it's different by module. I would rather it be full screen."* — so this
@@ -45,8 +63,11 @@
 //     — so `MODULE_SETTINGS` is a LIST, not a map over every module, and a
 //     module with nothing to set is simply absent from it. `visibleModuleSettings`
 //     is the one function that answers "is there a page here for this reader",
-//     and the gear and this screen both ask it rather than each working it out
-//     (the Modules tab will be its third caller — see above).
+//     and the gear, this screen and the Modules tab's index all ask it rather
+//     than each working it out. Her answer governs the tab exactly as it governs
+//     the gear: a module absent from the table has no row, for the same reason
+//     it has no gear, and there is nothing to keep in step because there is only
+//     one question being asked.
 //
 // ── WHY THE ADDRESS IS `/settings/<segment>` ────────────────────────────────
 //
@@ -199,20 +220,27 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
 /** THE ONE ANSWER TO "IS THERE A PAGE HERE, FOR THIS READER" — the sections of
  * `segment`'s page that `can` may see, or an empty array.
  *
- * TWO CALLERS AND ONE RULE, both in this file: `ModuleSettingsGear` asks it to
- * decide whether to draw at all, and `ModuleSettingsScreen` asks it to decide
- * what to render. (The Modules tab named in this file's header will be the
- * third; it does not exist yet.) The instruction that made it a function was
- * exact — *a reader who may see tickets but not edit the team's vocabulary
- * should not get a gear that leads to a refusal* — and a gear whose condition
- * is written out separately from the page's own gate is a gear that will
- * eventually disagree with it.
+ * THREE CALLERS AND ONE RULE, all three in this file: `ModuleSettingsGear` asks
+ * it to decide whether to draw at all, `ModuleSettingsScreen` asks it to decide
+ * what to render, and `moduleSettingsIndex` — the Modules tab's rows — asks it
+ * once per module to decide which rows exist. The instruction that made it a
+ * function was exact — *a reader who may see tickets but not edit the team's
+ * vocabulary should not get a gear that leads to a refusal* — and a gear whose
+ * condition is written out separately from the page's own gate is a gear that
+ * will eventually disagree with it. The tab inherits that for nothing: it never
+ * spells a right, it asks this.
  *
- * NOT EXPORTED, and that is a rule of this repo rather than a preference:
+ * THE ONE `can(...)` IN THIS FILE IS THE ONE ON THE LINE BELOW, and R61 holds
+ * it there. Three surfaces gating on one expression is the property; three
+ * surfaces each holding their own copy of `selectable_data:read` is how a
+ * reader ends up with a row they cannot open.
+ *
+ * STILL NOT EXPORTED, and that is a rule of this repo rather than a preference:
  * `web/test/dead-exports.test.ts` counts an `export` nothing in ANOTHER file
  * names as dead, because that is precisely the case where the keyword buys
- * nothing. Both of its callers are below. The day the Modules tab is built, the
- * keyword comes back in the same change that adds the import — never before it.
+ * nothing. All three of its callers are in this file — the Modules tab reaches
+ * it through `moduleSettingsIndex` rather than importing it directly, which is
+ * also what keeps the tab from being able to ask a slightly different question.
  *
  * EMPTY MEANS BOTH "no such page" and "nothing on it you may see", and the two
  * do not need telling apart: neither one should be offered a door. */
@@ -227,6 +255,47 @@ function visibleModuleSettings(segment: string, can: Can): ModuleSettingsSection
  * the Modules row's label) whether or not it is about to render the sections. */
 export function moduleSettingsPage(segment: string): ModuleSettingsPage | undefined {
   return MODULE_SETTINGS.find((p) => p.segment === segment)
+}
+
+/** THE MODULES TAB'S ROWS — every module with something THIS reader may set,
+ * each with the sections that will actually be on the page when they arrive.
+ *
+ * *"somewhere in the settings, we have a tab that says 'Module' or 'Business
+ * Logic' … to find the module once"* (client, 2026-09-09). This is the index
+ * behind that sentence, and it is a DERIVATION rather than a list, which is the
+ * only interesting thing about it. Three properties fall out of that and none of
+ * them has to be maintained:
+ *
+ *   • A ROW EXISTS EXACTLY WHEN A GEAR DOES. Both are `visibleModuleSettings`
+ *     returning something, so the answer is computed once and rendered twice.
+ *     Adding the second module's settings is still one entry in `MODULE_SETTINGS`
+ *     — it grows a page, a gear and a row together, and nobody has to remember
+ *     the third. R61 (`module-settings-two-doors`) proves the pair off the disk
+ *     rather than trusting this sentence.
+ *
+ *   • THE GATE IS INHERITED, NOT RESTATED. A reader who may not read
+ *     `selectable_data` gets an empty `sections` for Tickets, so the row is
+ *     filtered out here for the same reason the gear returns `null` there. Her
+ *     rule about not offering a door that refuses applies to a ROW as much as to
+ *     an icon — arguably more, because a row is labelled and looks like content.
+ *
+ *   • THE ROW CAN SAY WHAT IS ON THE PAGE. It carries the visible SECTIONS, not
+ *     just the page, so the tab can print "Ticket types · Ticket statuses"
+ *     underneath the name instead of a bare noun. An index whose rows are only
+ *     nouns is a menu; one that says what is inside is scannable. And because
+ *     the sections are the FILTERED ones, the subtitle never promises a block
+ *     this particular reader will not be shown.
+ *
+ * SORTED BY NOTHING — `MODULE_SETTINGS`'s own order is the order, the same way
+ * `TEAM_SECTIONS` is on the Team tab. When it holds one entry that is not a
+ * decision; when it holds eight it is the one place to reorder them. */
+export function moduleSettingsIndex(
+  can: Can
+): { page: ModuleSettingsPage; sections: ModuleSettingsSection[] }[] {
+  return MODULE_SETTINGS.map((page) => ({
+    page,
+    sections: visibleModuleSettings(page.segment, can),
+  })).filter((row) => row.sections.length > 0)
 }
 
 export function ModuleSettingsScreen({

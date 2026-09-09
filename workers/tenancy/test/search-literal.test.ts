@@ -47,7 +47,7 @@ beforeEach(() => {
 
 /** A caller holding `contacts:read` — companies AND people. Held constant so
  * what is measured here is the ESCAPING, not the narrowing. */
-const SEES_PEOPLE = { mayListPeople: true }
+const SEES_PEOPLE = { mayListPeople: true, maySeeLogins: true }
 
 describe("the accounts search matches what was typed", () => {
   it("an underscore is a character, not 'any character'", async () => {

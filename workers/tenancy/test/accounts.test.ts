@@ -600,7 +600,7 @@ describe("granting a login: the person is picked off the account, never typed in
 
 /** A caller holding `contacts:read`. The narrowing a caller WITHOUT it gets is
  * its own describe block below. */
-const SEES_PEOPLE = { mayListPeople: true }
+const SEES_PEOPLE = { mayListPeople: true, maySeeLogins: true }
 
 describe("the paged list (R14/R16)", () => {
   it("returns an exact total and an opaque cursor that reaches page two", async () => {
@@ -821,7 +821,7 @@ describe("the reference code", () => {
 // the CSV export all go through one `accountsWhere`, so a role without the right
 // cannot see a person by asking a different way.
 describe("without the contacts right, the collection is the companies", () => {
-  const BLIND = { mayListPeople: false }
+  const BLIND = { mayListPeople: false, maySeeLogins: false }
 
   it("the list drops every person — and its total drops with them (R16)", async () => {
     const all = await listAccounts(cfg, guard, staff, SEES_PEOPLE)
@@ -871,6 +871,170 @@ describe("the two tab badges beside the accounts list", () => {
     expect(narrowed.total).toBe(whole.entityTotal)
     expect(narrowed.entityTotal).toBe(whole.entityTotal)
     expect(narrowed.individualTotal).toBe(whole.individualTotal)
+  })
+})
+
+// ── THE CONTACTS TABLE'S TWO MIDDLE COLUMNS ─────────────────────────────────
+//
+// The client, 2026-09-09: "for contacts lets do view table, also add column role
+// after account". Account and Role ride the account ROW now, read off
+// `account_links` by two correlated subqueries in `ACCOUNT_COLUMNS`.
+//
+// WHY THIS IS A DOOR TEST AND NOT A SCREEN ONE. Every claim below is about SQL,
+// and this suite runs the real migration in real SQLite — which is the only
+// thing that could have caught what the first draft got wrong. It preferred the
+// link that agrees with the parent pointer, in the subquery's ORDER BY, and
+// SQLite refuses an outer correlated reference THERE while allowing it in the
+// WHERE: a statement that parses, typechecks, and 500s on the first request. A
+// mocked door would have shipped it.
+describe("a contact's row carries where she works and what she does there", () => {
+  const rowFor = async (id: string) => {
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "individual" })
+    return page.rows.find((r) => r.id === id)
+  }
+
+  it("reads BOTH cells off the SAME link, so the two cannot describe two companies", async () => {
+    // Marta is a contact of Bergman Marine AND Bergman S.A. (the fixture's whole
+    // reason to exist). Neither link is flagged main stakeholder, so the order
+    // falls to company name: Marine before S.A. What matters is not WHICH one
+    // wins — it is that the role beside it came off the same row.
+    const marta = await rowFor(IDS.victimPerson)
+    expect(marta?.companyName).toBe("Bergman Marine")
+    expect(marta?.relationship).toBe("Operations")
+  })
+
+  it("the MAIN STAKEHOLDER link wins over the alphabet", async () => {
+    db().prepare("UPDATE account_links SET is_main_stakeholder = 1 WHERE id = ?").run(IDS.victimLink)
+    const marta = await rowFor(IDS.victimPerson)
+    expect(marta?.companyName, "the flag is the team's own answer to 'which company is the one'").toBe(
+      "Bergman S.A."
+    )
+  })
+
+  it("an UNLINKED contact is ordinary, not an error — both cells are simply empty", async () => {
+    // Luis hangs UNDER Bergman S.A. by parent pointer and has no link row at
+    // all, which is the case that proves this reads the LINK: a parent-pointer
+    // implementation would name his company here.
+    const luis = await rowFor(IDS.victimContact)
+    expect(luis, "the fixture's parented-but-unlinked contact").toBeTruthy()
+    expect(luis?.companyName).toBeNull()
+    expect(luis?.relationship).toBeNull()
+  })
+
+  it("a link with no role gives a company and no role — half-filled is a real state", async () => {
+    db().prepare("UPDATE account_links SET relationship = NULL WHERE id = ?").run(IDS.victimSecondLink)
+    db().prepare("UPDATE account_links SET is_main_stakeholder = 0 WHERE id = ?").run(IDS.victimLink)
+    const marta = await rowFor(IDS.victimPerson)
+    expect(marta?.companyName).toBe("Bergman Marine")
+    expect(marta?.relationship, "the screen draws an em dash here, and it is not a fault").toBeNull()
+  })
+
+  it("an UNLINKED contact stays unlinked when her only link is deactivated", async () => {
+    // Deactivate, never delete — so a retired link must not keep naming a company
+    // the person no longer works at.
+    await setLinkActive(cfg, guard, staff, actor, IDS.victimLink, false)
+    await setLinkActive(cfg, guard, staff, actor, IDS.victimSecondLink, false)
+    const marta = await rowFor(IDS.victimPerson)
+    expect(marta?.companyName).toBeNull()
+    expect(marta?.relationship).toBeNull()
+  })
+
+  it("a COMPANY carries neither — a company is nobody's contact", async () => {
+    const page = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "entity" })
+    expect(page.rows.length).toBeGreaterThan(0)
+    expect(page.rows.every((r) => r.companyName === null && r.relationship === null)).toBe(true)
+  })
+
+  it("neither reaches a client login — the fence is on the ROW, and a link is not", async () => {
+    // A person can be a contact at two companies and only one of them has to be
+    // inside a portal caller's fence, so the projection withholds both outright
+    // rather than trusting the outer WHERE to have covered a second table.
+    const client = await accountScope(cfg, { ...guard, userId: IDS.victimUser })
+    const page = await listAccounts(cfg, guard, client, SEES_PEOPLE, { type: "individual" })
+    expect(page.rows.length, "the client can see people at all").toBeGreaterThan(0)
+    expect(page.rows.every((r) => r.companyName === null && r.relationship === null)).toBe(true)
+  })
+})
+
+// ── THE IN PORTAL TAB ────────────────────────────────────────────────────────
+//
+// Client, 2026-09-09: "also tabs here: All, In portal". Six of her 110 contacts
+// can sign in, and page one is fifty rows — so this is a DOOR filter or it is a
+// slice of page one wearing a badge that counts all six.
+describe("who can sign in: the portal filter and its badge", () => {
+  const people = () => listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "individual" })
+
+  it("narrows to the people holding a login, and counts exactly those", async () => {
+    const inPortal = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
+      type: "individual",
+      portal: "yes",
+    })
+    expect(inPortal.rows.map((r) => r.id).sort()).toEqual(
+      [IDS.victimPerson, IDS.victimContact, IDS.burglarPerson].sort()
+    )
+    expect(inPortal.total, "the count answers the same question the rows do (R16)").toBe(
+      inPortal.rows.length
+    )
+  })
+
+  it("the badge counts the COLLECTION, and is the same number from either tab", async () => {
+    const all = await people()
+    const inPortal = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
+      type: "individual",
+      portal: "yes",
+    })
+    expect(all.individualPortalTotal).toBe(3)
+    // A badge on a tab nobody has pressed: it does not move when the list under
+    // it is narrowed, exactly like entityTotal/individualTotal beside it.
+    expect(inPortal.individualPortalTotal).toBe(all.individualPortalTotal)
+    expect(all.individualPortalTotal).toBeLessThan(all.individualTotal)
+  })
+
+  it("`portal: no` is the complement, and the two add up to the people", async () => {
+    const all = await people()
+    const out = await listAccounts(cfg, guard, staff, SEES_PEOPLE, { type: "individual", portal: "no" })
+    expect(out.total + all.individualPortalTotal).toBe(all.individualTotal)
+    expect(out.rows.some((r) => r.id === IDS.clientPerson), "Nadia holds no login").toBe(true)
+  })
+
+  it("a REVOKED login leaves the tab — the row survives, the answer changes", async () => {
+    await setPortalAccessActive(cfg, guard, staff, actor, IDS.burglarPortal, false)
+    const inPortal = await listAccounts(cfg, guard, staff, SEES_PEOPLE, {
+      type: "individual",
+      portal: "yes",
+    })
+    expect(inPortal.rows.map((r) => r.id)).not.toContain(IDS.burglarPerson)
+    expect(inPortal.total).toBe(2)
+    expect((await people()).individualPortalTotal).toBe(2)
+  })
+
+  it("it answers to portal_users:read — without it the login table reads as empty", async () => {
+    // NOT a refusal in the middle of a list, and not a silently ignored filter
+    // either: nobody is in the portal and everybody is out of it, which is one
+    // coherent answer. The badge is zero through the SAME clause the rows go
+    // through, the way individualTotal is zero without the contacts right.
+    const noLogins = { mayListPeople: true, maySeeLogins: false }
+    const inPortal = await listAccounts(cfg, guard, staff, noLogins, {
+      type: "individual",
+      portal: "yes",
+    })
+    expect(inPortal.rows).toEqual([])
+    expect(inPortal.total).toBe(0)
+    expect(inPortal.individualPortalTotal).toBe(0)
+
+    const out = await listAccounts(cfg, guard, staff, noLogins, { type: "individual", portal: "no" })
+    const all = await listAccounts(cfg, guard, staff, noLogins, { type: "individual" })
+    expect(out.total, "the complement is the whole list, so no membership is inferable").toBe(all.total)
+  })
+
+  it("it is FENCED: a pinned caller's badge counts only their own world", async () => {
+    const burglar = await accountScope(cfg, { ...guard, userId: IDS.burglarUser })
+    const page = await listAccounts(cfg, guard, burglar, SEES_PEOPLE, {
+      type: "individual",
+      portal: "yes",
+    })
+    expect(page.rows.map((r) => r.id)).toEqual([IDS.burglarPerson])
+    expect(page.individualPortalTotal).toBe(1)
   })
 })
 

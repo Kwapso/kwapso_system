@@ -133,8 +133,20 @@ async function contactSight(cfg: D1Rest, guard: MemberGuard, scope: AccountScope
   // Said as a POSITIVE test on `kind`, never as "not staff": the same inversion
   // `accountScope` warns about in its own header would fail open on precisely
   // the people the fence exists for.
-  if (scope.kind === "portal") return { mayListPeople: true }
-  return { mayListPeople: await hasRight(cfg, guard, "contacts", "read") }
+  // WHO CAN SIGN IN is the OTHER narrowing an accounts read applies, resolved
+  // here beside the first because the LIST door needs it now too: the contacts
+  // screen's In portal tab sends `portal=yes`, which is the question the detail
+  // door has always asked about one account ("may this caller see `portalUsers`?")
+  // asked about a whole collection. Same right, same answer, one helper.
+  //
+  // No `scope.kind` special case, deliberately: this is the caller's own ROLE,
+  // and the role is what decided the detail door's answer for a client login
+  // already. `moduleRights` memoises per request, so asking twice in one request
+  // — which `getAccountDetail` still does, for the reason written there — is one
+  // query.
+  const maySeeLogins = await hasRight(cfg, guard, "portal_users", "read")
+  if (scope.kind === "portal") return { mayListPeople: true, maySeeLogins }
+  return { mayListPeople: await hasRight(cfg, guard, "contacts", "read"), maySeeLogins }
 }
 
 /** GET /api/tenancy/accounts — the caller's accounts, paged (R14: this list grows
@@ -168,6 +180,13 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
   return pagedJson("accounts", page, {
     entityTotal: page.entityTotal,
     individualTotal: page.individualTotal,
+    // …AND THE CONTACTS SCREEN'S SECOND TAB (client, 2026-09-09: "also tabs
+    // here: All, In portal"). Six of this team's 110 contacts can sign in, so
+    // this is the one badge that would be most tempting to compute from the
+    // page in hand and most wrong: page one is fifty rows and the six are
+    // wherever they are. Counted by the door over the same WHERE the tab's own
+    // rows come back through (R16).
+    individualPortalTotal: page.individualPortalTotal,
   })
 }
 
@@ -186,10 +205,17 @@ export async function getAccounts(request: Request, env: Env): Promise<Response>
 function accountQuery(url: URL): AccountFilters {
   const rawType = queryText(url.searchParams.get("type"), "Type")
   const rawArchived = queryText(url.searchParams.get("archived"), "Archived")
+  // WHO CAN SIGN IN — the contacts screen's In portal tab, asked of the door
+  // because it PAGES (see `AccountFilters.portal`). Allow-listed to the same two
+  // words `archived` uses rather than trusted: a value outside the pair is
+  // dropped, so the tab is either the question or the whole list, never a
+  // statement built from request text.
+  const rawPortal = queryText(url.searchParams.get("portal"), "Portal")
   return {
     q: queryText(url.searchParams.get("q"), "Search"),
     type: rawType === "entity" || rawType === "individual" ? rawType : undefined,
     archived: rawArchived === "yes" || rawArchived === "no" ? rawArchived : undefined,
+    portal: rawPortal === "yes" || rawPortal === "no" ? rawPortal : undefined,
     parentId: queryText(url.searchParams.get("parentId"), "Parent"),
   }
 }
@@ -206,7 +232,7 @@ function accountQuery(url: URL): AccountFilters {
  * worst of the three possible answers, and worse here than anywhere: the columns
  * lead with the import format, so re-importing a silently-truncated export is
  * data loss wearing a round trip's clothes. Over the cap the caller narrows with
- * q / type / archived / parentId (the same four the screen's find bar
+ * q / type / archived / portal / parentId (the same five the screen's find bar
  * and `list_accounts` take), or reads the paged list. Both surfaces get this
  * same sentence from this same door. */
 export async function getAccountsExport(request: Request, env: Env): Promise<Response> {
@@ -271,6 +297,16 @@ export async function getAccountDetail(request: Request, env: Env): Promise<Resp
   // not a permission — the Portal-access tab was hidden client-side for months
   // while the server shipped the rows to anyone with `accounts:read`, which is
   // the defect this door's own header is about.
+  //
+  // THE LINE ABOVE STAYS WRITTEN OUT HERE, and that is deliberate rather than
+  // an oversight now that `contactSight` resolves the same right (2026-09-09,
+  // for the list door's In portal filter). `workers/data-ops/test/ai-cost-gate.test.ts`
+  // reads THIS handler's own source for that exact call — "a read gated on one
+  // module must not ship another module's rows" — and a law that reads a
+  // handler is a law a seam can quietly walk out from under. It costs nothing
+  // to leave it: `moduleRights` memoises per request and per module (the
+  // WeakMap on the guard in shared/workers/gating.ts), so the two calls are one
+  // query and the second is the same promise.
   const { mayListPeople } = await contactSight(cfg, guard, scope)
   return json({
     ...detail,

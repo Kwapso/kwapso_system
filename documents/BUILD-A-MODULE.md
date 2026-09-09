@@ -865,6 +865,24 @@ again, which is the only property that matters here.
   that is the CONTENT rather than a mark standing for a record — an uploaded
   file's preview, say — that is an `OBJECT_FIT_OK` line with the argument
   written out, and the list holds exactly one today.
+- **R61 `module-settings-two-doors`** — this one only applies if your module has
+  something to SET (a vocabulary, a threshold, a rule of its own); most do not,
+  and *"only the ones with something to set"* is the client's own answer, so
+  having no settings page is a perfectly good outcome and costs you nothing
+  here. If it does: add ONE entry to `MODULE_SETTINGS`
+  (`web/components/screens/module-settings-screen.tsx`) — that is the whole
+  registration, and it gives you the full-screen page at `/settings/<segment>`,
+  a row on Settings › Modules and the gear on your own screen from one place.
+  Then mount `<ModuleSettingsGear teamId={teamId} segment="<segment>" />` in your
+  collection heading's `action` slot (never the toolbar — R50 draws no toolbar at
+  all on an empty collection, which is exactly when somebody goes looking for the
+  settings). Exactly one gear per segment, and your `segment` must be a real
+  `MODULE_PERMISSION` key. Do NOT write a row on the Modules tab and do not spell
+  your module's segment in `settings-screen.tsx`: the index is derived from the
+  table through `moduleSettingsIndex`, so the row already exists. Do not restate
+  the permission either — every section carries its own `gate` and
+  `visibleModuleSettings` is the one place it is asked, which is what stops a
+  reader being offered a door that refuses them.
 
 **The words** (the ones that catch every new module, every time)
 

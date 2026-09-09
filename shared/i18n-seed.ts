@@ -114,6 +114,13 @@ export const SEED: Catalogue = {
   Triage: { de: "Sichtung", es: "Clasificación", ca: "Classificació" },
   Scheduled: { de: "Geplant", es: "Programado", ca: "Programat" },
   "In progress": { de: "In Arbeit", es: "En curso", ca: "En curs" },
+  /* THE CONTACTS SCREEN'S SECOND TAB (client, 2026-09-09: "also tabs here: All,
+   * In portal") — the contacts who can sign in to the client portal. Filed
+   * beside the statuses because that is what it is: a state a contact is in,
+   * not a place. "Portal" is the glossary's own word and stays untranslated
+   * inside the phrase in all three, the way "Sprint" and "Ticket" do above —
+   * the agency says "das Portal" to its German clients. */
+  "In portal": { de: "Im Portal", es: "En el portal", ca: "Al portal" },
   Ready: { de: "Fertig", es: "Listo", ca: "Llest" },
   Resolved: { de: "Erledigt", es: "Resuelto", ca: "Resolt" },
   "In review": { de: "In Prüfung", es: "En revisión", ca: "En revisió" },
@@ -4053,6 +4060,11 @@ export const SEED: Catalogue = {
   "Manage choices": { de: "Optionen verwalten", es: "Gestionar opciones", ca: "Gestionar opcions" },
   "Mango": { de: "Mango", es: "Mango", ca: "Mango" },
   "Members & roles": { de: "Mitglieder & Rollen", es: "Miembros y roles", ca: "Membres i rols" },
+  /* The Meetings strip's middle tab (client ruling, 2026-09-09: "tabs for
+     meetings: this week, mine, all"). It means THE ONES I WAS IN THE ROOM FOR,
+     so it agrees in gender and number with the collection it narrows —
+     `Termine` / `Reuniones` / `Reunions`. */
+  Mine: { de: "Meine", es: "Mías", ca: "Meves" },
   "No account": { de: "Kein Kunde", es: "Sin cuenta", ca: "Sense compte" },
   "No contacts match": { de: "Keine Kontakte passen", es: "No hay contactos que coincidan", ca: "Cap contacte coincideix" },
   "No departments yet.": { de: "Noch keine Abteilungen.", es: "Aún no hay departamentos.", ca: "Encara no hi ha departaments." },
@@ -4078,6 +4090,14 @@ export const SEED: Catalogue = {
   "Nothing here": { de: "Nichts hier", es: "Nada aquí", ca: "Res aquí" },
   "Nothing in Meetings this week.": { de: "Diese Woche nichts in Terminen.", es: "Nada en Reuniones esta semana.", ca: "Res a Reunions aquesta setmana." },
   "Nothing in Meetings yet.": { de: "Noch nichts in Terminen.", es: "Aún nada en Reuniones.", ca: "Encara res a Reunions." },
+  /* The Mine tab's empty state — it says the RULE the tab uses (attendance),
+     because a person who sees an empty Mine beside a full All will otherwise
+     assume the tab is broken rather than that they were in no meetings. */
+  "Nothing in Meetings you were in.": {
+    de: "Nichts in Terminen, bei denen Sie dabei waren.",
+    es: "Nada en Reuniones en las que hayas estado.",
+    ca: "Res a Reunions on hagis estat.",
+  },
   "Nothing in the triage queue matches what you asked for.": { de: "Nichts in der Sichtungswarteschlange passt zu Ihrer Anfrage.", es: "Nada en la cola de clasificación coincide con lo que buscas.", ca: "Res a la cua de classificació coincideix amb el que busques." },
   "Nothing matched that.": { de: "Nichts passt dazu.", es: "Nada coincide con eso.", ca: "Res no hi coincideix." },
   "Nothing matched. Try fewer words, or clear the filters.": { de: "Nichts gefunden. Weniger Wörter versuchen oder die Filter zurücksetzen.", es: "Nada coincide. Prueba con menos palabras o borra los filtros.", ca: "Res no coincideix. Prova amb menys paraules o esborra els filtres." },
@@ -4309,4 +4329,20 @@ export const SEED: Catalogue = {
   "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.": { de: "Die Arten, als die ein Ticket eröffnet werden kann. Jede ist ein Reiter in der Ticketliste und ein Filter daneben.", es: "Los tipos con los que se puede abrir un ticket. Cada uno es una pestaña en la lista de tickets y un filtro al lado.", ca: "Els tipus amb què es pot obrir un ticket. Cadascun és una pestanya a la llista de tickets i un filtre al costat." },
   "Ticket statuses": { de: "Ticket-Status", es: "Estados de ticket", ca: "Estats de ticket" },
   "The words for the stages a ticket moves through. The stages themselves are fixed; what you set here is what each one is called.": { de: "Die Wörter für die Phasen, die ein Ticket durchläuft. Die Phasen selbst sind fest; hier legen Sie fest, wie jede heißt.", es: "Las palabras para las etapas por las que pasa un ticket. Las etapas en sí son fijas; aquí defines cómo se llama cada una.", ca: "Les paraules per a les etapes per les quals passa un ticket. Les etapes en si són fixes; aquí defineixes com es diu cadascuna." },
+
+  /* ── The Modules tab's one sentence (client, 2026-09-09) ──────────────────
+   * The index on Settings › Modules — *"a tab that says 'Module' or 'Business
+   * Logic' … to find the module once"*. `Modules` itself is already in the
+   * vocabulary block at the top of this file; this is the line under the tab
+   * that explains why a list of the modules with settings is SHORT — it is the
+   * whole of what stops a one-row index reading as a broken one, so it is
+   * seeded in all three rather than left to the generator, and it says the same
+   * three things in each: what is in the list, that a row and that module's own
+   * gear are one page, and that a module with nothing to set is simply absent.
+   *
+   * "Zahnrad" / "engranaje" / "engranatge" is the gear as an OBJECT on screen,
+   * which is what she called it; none of the three languages wants the English
+   * word here. Seeded in all three so TRANSLATION_CEILING stays at 0/0/0
+   * (R44 — the pin falls and never rises). */
+  "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed.": { de: "Die Module, an denen es etwas einzustellen gibt. Jede Zeile öffnet dieselbe Seite wie das Zahnrad auf der eigenen Seite des Moduls; ein Modul ohne Einstellungen steht nicht in der Liste.", es: "Los módulos con algo que configurar. Cada fila abre la misma página que el engranaje en la pantalla del propio módulo, y un módulo sin nada que configurar no aparece en la lista.", ca: "Els mòduls amb alguna cosa a configurar. Cada fila obre la mateixa pàgina que l'engranatge a la pantalla del mòdul mateix, i un mòdul sense res a configurar no apareix a la llista." },
 }

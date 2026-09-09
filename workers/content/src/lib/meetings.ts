@@ -253,8 +253,19 @@ export type MeetingFilter = {
   /** 'upcoming' is what has not started yet, BY THE CLOCK — it used to be
    * "everything nobody has ticked", which is a different set the moment somebody
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
-   * 'all' shows the lot, cancelled ones included. */
+   * 'all' shows the lot, cancelled ones included; 'mine' is the meetings the
+   * CALLER was in the room for (client ruling, 2026-09-09 — see `caller`). */
   view?: string
+  /** WHO IS ASKING — the session's own user id and address, set by the door from
+   * the guard and the actor and NEVER read off the query string.
+   *
+   * It is not a filter a caller may spell, and that is the whole reason it sits
+   * apart from the six above. "Mine" is a question about the person holding the
+   * request; an `?attendee=` a caller could type would be a different capability
+   * (whose meetings is Alaap in), decided by nobody, exposed on the machine
+   * surface by R19 the moment it was parsed, and impossible to take back. The
+   * door supplies it; nothing on the wire can. */
+  caller?: { userId: string; email: string }
   /** ONE CALENDAR MONTH, `YYYY-MM`. The meetings list is ordered by start time DESCENDING
    * and it PAGES, so "the month on screen" is not a question the loaded page can
    * answer: on 19 Aug 2026 page one ran from June 2027 to August 2027 while the
@@ -325,6 +336,78 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     const { from, to } = thisWeek()
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
+  }
+  // ── "MINE" MEANS I WAS IN THE ROOM ────────────────────────────────────────
+  //
+  // THE CLIENT'S RULING, 2026-09-09, in her own words when she was told the tab
+  // did not exist: *"i was in the room"*. Not "I created it", not "I am the
+  // organiser", not "it is on an account I look after. ATTENDANCE.
+  //
+  // WHAT THE ROW ACTUALLY HOLDS. There is no attendance table. A meeting that
+  // came from Google carries `google_attendees_json`, the guest list mirrored
+  // whole (`mirrorOf` below writes `JSON.stringify(event.attendees)`), each
+  // entry a `MeetingGuest` with an `email`. A meeting somebody typed in here
+  // carries nothing at all — the column is NULL, because only the sweep ever
+  // writes it. So this is two sentences, not one.
+  //
+  // 1 · THE ADDRESS IS IN THE GUEST LIST. Matched as TEXT against the JSON,
+  //     which is exactly what the `q` search two blocks down already does over
+  //     the same column and for the same reason — the mirror is the only place
+  //     the people are. The needle is the address WRAPPED IN ITS OWN QUOTES
+  //     (`%"aurora@kwapso.com"%`) rather than bare: an unanchored `%addr%`
+  //     would match `xaurora@kwapso.com` too, and a quoted string in this blob
+  //     is either an `email` or the `name` beside it, which is the same person
+  //     either way. `likeLiteral` is what stops an `_` in an address — they are
+  //     common — meaning "any character".
+  //
+  //     The address is the caller's OWN, and it is the same identity
+  //     `ourStaffAmong` resolves an attendee to (LOWER(users.email)). That
+  //     helper is not called here on purpose: it goes the other way (addresses →
+  //     staff) and it reads the GLOBAL core database, so using it would mean a
+  //     second round trip in the middle of building a WHERE, on every page of a
+  //     paged list. The RULE is shared; the read is not.
+  //
+  // 2 · THERE IS NO GUEST LIST AT ALL — fall back to who recorded it. A meeting
+  //     nobody synced from a calendar has no attendance to test, so on the
+  //     attendance rule alone it would be in NOBODY's Mine, for ever: 458 live
+  //     meetings on staging, 251 with a guest list, which leaves ~207 rows that
+  //     would silently belong to no one. The person who wrote a meeting down is
+  //     the only person the row knows was involved with it, and for the typed-in
+  //     case that is the honest answer.
+  //
+  //     IT IS FENCED TO ROWS WITH NO LIST, and that fence is load-bearing rather
+  //     than tidy. On a row that CAME from Google, `creator_id` is whoever
+  //     pressed sync, not whoever was invited — so an unfenced
+  //     `OR creator_id = ?` would put every meeting the first syncer ever
+  //     imported into that one person's Mine and no one else's, which is the
+  //     opposite of the ruling. Where the list is empty (`[]`, what the sweep
+  //     writes for a solo calendar block) the same `creator_id` IS the person
+  //     whose calendar it was read from, and they were in that room alone.
+  //
+  // WHAT IT COSTS, SAID PLAINLY (R14). A LIKE over a JSON blob cannot use an
+  // index, so this is a full scan of `meetings` — for the rows AND, through the
+  // one `whereFor` both statements share, for the exact COUNT(*) behind the
+  // badge. At 458 rows that is nothing. This table only grows, and the
+  // structural answer is a denormalised link table (`meeting_attendees(meeting_id,
+  // email)`, indexed on the address) which would also make the `q` search's own
+  // guest-list scan an index seek. That is a MIGRATION and a backfill, so it is
+  // written down here and raised with the lead rather than built in silence.
+  if (filter.view === "mine") {
+    if (filter.caller) {
+      where.push(
+        `((m.google_attendees_json IS NOT NULL AND LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')
+          OR (COALESCE(TRIM(m.google_attendees_json), '') IN ('', '[]') AND m.creator_id = ?))`
+      )
+      params.push(`%"${likeLiteral(filter.caller.email.toLowerCase())}"%`, filter.caller.userId)
+    } else {
+      // NOBODY IS ASKING, SO NOBODY WAS IN THE ROOM. A question about the caller
+      // with no caller attached narrows to NOTHING rather than to everything —
+      // the same rule `month` and `transcript` follow one step further on. The
+      // door always attaches one (routes/meetings.ts), so this is the shape of
+      // the failure rather than a path anything takes: it fails to an empty
+      // list, never to the whole agency's diary wearing somebody's name.
+      where.push("1 = 0")
+    }
   }
   // THE MONTH A CALENDAR IS SHOWING. A half-open range, so a meeting at
   // 23:59:59 on the 31st belongs to the month and one at 00:00 on the 1st of the

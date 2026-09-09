@@ -58,7 +58,7 @@ async function findAccounts(filters: Parameters<typeof listAccounts>[4]): Promis
 /** A caller holding `contacts:read` — the whole book, companies and people. The
  * narrowing this parameter exists for has its own cases in accounts.test.ts;
  * here it is held constant so a FILTER's arithmetic is what is being measured. */
-const SEES_PEOPLE = { mayListPeople: true }
+const SEES_PEOPLE = { mayListPeople: true, maySeeLogins: true }
 
 /** The same question asked of the database directly, in SQL this file wrote. The
  * door builds its own; comparing the two is what makes this a test rather than a

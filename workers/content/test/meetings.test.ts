@@ -452,6 +452,120 @@ describe("a meeting that has no words SAYS so, and the list can find the ones th
   })
 })
 
+// ── "MINE" MEANS I WAS IN THE ROOM ──────────────────────────────────────────
+//
+// The client's ruling, 2026-09-09. Asked for "tabs for meetings: this week,
+// mine, all" and told that Mine did not exist, she said what it meant in six
+// words: *"i was in the room"*. Not "I created it", which is the thing the row
+// actually stored and therefore the thing this would have quietly become.
+//
+// Every case below is a way that substitution shows up, and each one is a
+// DIFFERENT row shape rather than a restatement: the guest list names me; the
+// guest list names somebody else; there is no guest list at all; there is a
+// guest list that does not name me on a row I imported. The last is the one that
+// matters most, because it is the case where attendance and authorship give
+// opposite answers and the row's own `creator_id` is the wrong one.
+describe("mine — the meetings this person was in the room for", () => {
+  /** Put a guest list on a meeting the way the calendar sweep does — the mirror
+   * column, whole, as JSON. Nothing else in the app writes it. */
+  const guests = (id: string, emails: string[]) =>
+    db()
+      .prepare("UPDATE meetings SET google_attendees_json = ?, from_calendar = 1 WHERE id = ?")
+      .run(JSON.stringify(emails.map((e) => ({ email: e, name: e, response: "accepted" }))), id)
+
+  const mine = async (): Promise<{ titles: string[]; total: number }> => {
+    const res = await call(IDS.staffUser, "GET /api/content/meetings", undefined, "?view=mine")
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { meetings: Meeting[]; total: number }
+    return { titles: body.meetings.map((m) => m.title), total: body.total }
+  }
+
+  it("is the guest list, not the author — a meeting I was invited to is mine, one I only imported is not", async () => {
+    const inTheRoom = await arrange({ title: "I was there", startsAt: "2026-09-01T10:00:00.000Z" })
+    const notInTheRoom = await arrange({ title: "I only synced it", startsAt: "2026-09-02T10:00:00.000Z" })
+    guests(inTheRoom.id, ["someone@else.example", "staff@kwapso.app"])
+    // THE CASE THE TWO RULES DISAGREE ABOUT, and the whole reason this test
+    // exists. Both rows were created by this caller — on a swept row
+    // `creator_id` is whoever pressed sync, not whoever was invited — so a
+    // `creator_id` rule would call BOTH of them mine and the ruling would have
+    // been implemented backwards under a green build.
+    guests(notInTheRoom.id, ["someone@else.example", "third@party.example"])
+    expect((await mine()).titles).toEqual(["I was there"])
+  })
+
+  it("a meeting with NO guest list falls back to whoever wrote it down — otherwise it is in nobody's Mine", async () => {
+    // ~207 of the 458 live meetings on staging have no guest list, because only
+    // the calendar sweep ever writes one. On the attendance rule alone every one
+    // of them would belong to no one for ever, which is a worse answer than a
+    // slightly looser one: the person who recorded a meeting is the only person
+    // the row knows was involved with it.
+    await arrange({ title: "I typed this in", startsAt: "2026-09-03T10:00:00.000Z" })
+    expect((await mine()).titles).toEqual(["I typed this in"])
+  })
+
+  it("…and that fallback is fenced to the author — somebody else's typed-in meeting is not mine", async () => {
+    const theirs = await arrange({ title: "Someone else's note", startsAt: "2026-09-04T10:00:00.000Z" })
+    db().prepare("UPDATE meetings SET creator_id = 'U_SOMEBODY_ELSE' WHERE id = ?").run(theirs.id)
+    expect((await mine()).titles).toEqual([])
+  })
+
+  it("an EMPTY guest list is still 'no guest list' — a solo calendar block is mine", async () => {
+    // The sweep writes `[]` rather than NULL for an entry with nobody on it, and
+    // it reads the CALLER'S OWN calendar with the caller's own token — so on
+    // that row `creator_id` is the person whose diary it came off, and they were
+    // in that room alone. NULL and `[]` have to mean the same thing here or half
+    // the fallback silently does not apply.
+    const solo = await arrange({ title: "Focus block", startsAt: "2026-09-05T10:00:00.000Z" })
+    db().prepare("UPDATE meetings SET google_attendees_json = '[]', from_calendar = 1 WHERE id = ?").run(solo.id)
+    expect((await mine()).titles).toEqual(["Focus block"])
+  })
+
+  it("the address is matched WHOLE — a longer address that ends with mine is not me", async () => {
+    // `%staff@kwapso.app%` would match `notstaff@kwapso.app`. The needle is the
+    // address inside its own JSON quotes, which is what makes the match an
+    // equality rather than a suffix test.
+    const nearMiss = await arrange({ title: "Not my invitation", startsAt: "2026-09-06T10:00:00.000Z" })
+    guests(nearMiss.id, ["notstaff@kwapso.app"])
+    expect((await mine()).titles).toEqual([])
+  })
+
+  it("R16: the badge counts the same question the rows answered", async () => {
+    const a = await arrange({ title: "Mine A", startsAt: "2026-09-07T10:00:00.000Z" })
+    const b = await arrange({ title: "Mine B", startsAt: "2026-09-08T10:00:00.000Z" })
+    const other = await arrange({ title: "Not mine", startsAt: "2026-09-09T10:00:00.000Z" })
+    guests(a.id, ["staff@kwapso.app"])
+    guests(b.id, ["STAFF@KWAPSO.APP"]) // Google echoes whatever case was typed
+    guests(other.id, ["someone@else.example"])
+    const { titles, total } = await mine()
+    expect(titles.sort()).toEqual(["Mine A", "Mine B"])
+    expect(total, "a count over a different WHERE from the rows is the R16 fault").toBe(2)
+  })
+
+  it("a cancelled meeting is out of Mine, exactly as it is out of every view but All", async () => {
+    const called = await arrange({ title: "Called off", startsAt: "2026-09-10T10:00:00.000Z" })
+    guests(called.id, ["staff@kwapso.app"])
+    await call(IDS.staffUser, "POST /api/content/meetings/active", { id: called.id, active: false })
+    expect((await mine()).titles).toEqual([])
+  })
+
+  it("the mine question is answered against the SESSION, never against a word on the wire", async () => {
+    // There is no `?attendee=` and there must never be one: "whose meetings is
+    // Alaap in" is a different capability, and R19 would put it on the machine
+    // surface the moment the door parsed it. Passing one changes nothing.
+    const theirs = await arrange({ title: "Someone else's call", startsAt: "2026-09-11T10:00:00.000Z" })
+    guests(theirs.id, ["someone@else.example"])
+    const res = await call(
+      IDS.staffUser,
+      "GET /api/content/meetings",
+      undefined,
+      "?view=mine&attendee=someone%40else.example&caller=someone%40else.example"
+    )
+    const body = (await res.json()) as { meetings: Meeting[]; total: number }
+    expect(body.meetings.map((m) => m.title)).toEqual([])
+    expect(body.total).toBe(0)
+  })
+})
+
 describe("nothing in this app writes to a calendar", () => {
   const GONE: [string, unknown][] = [
     ["POST /api/content/google/calendar/events", { summary: "New", start: "x", end: "y" }],

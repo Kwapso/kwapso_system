@@ -558,6 +558,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "image-fills",
     status: "enforced",
   },
+  {
+    id: "R61",
+    dimension: "ui",
+    law: "A MODULE'S SETTINGS HAVE TWO DOORS AND ONE DERIVATION. The client's ruling, 2026-09-09: a settings gear on each module's own screen — *\"Only the ones with something to set\"* — and *\"somewhere in the settings, we have a tab that says 'Module' or 'Business Logic' … to find the module once\"*, because *\"everything around settings should be under settings screen concentrated (and 'quick access' through the gear in each module) but not in random places across the app.\"* Two entrances, one page, and therefore ONE question: `visibleModuleSettings` in `web/components/screens/module-settings-screen.tsx` is the only expression that decides whether a module has settings THIS reader may open, and the gear, the page itself and the Modules tab's index all ask it. THREE CLAUSES, all derived off the disk. (i) THE PAIR: every `segment` in `MODULE_SETTINGS` has exactly ONE `<ModuleSettingsGear segment=\"…\">` mounted somewhere in `web/`, and every gear mounted names a segment that table declares — a module with settings and no gear is a page nobody standing on that module can find, and a gear on a module with nothing to set renders `null` forever and is a door drawn on a wall. (ii) THE INDEX IS DERIVED: the Modules panel on `settings-screen.tsx` calls `moduleSettingsIndex` and spells NO module segment of its own, so rows cannot be hand-kept and cannot fall behind the table. (iii) ONE GATE: the settings host contains exactly one `can(` call — the one inside `visibleModuleSettings` — so the tab, the gear and the page cannot come to hold three copies of one permission. A declared segment must also be a real `MODULE_PERMISSION` key, which is both a clause (a settings page whose segment names no module is an address nothing links to) and the census's proof that it parsed words rather than noise.",
+    why: "Everything about this shape is correct today and NOTHING held it there: the pilot's own file spent nine lines explaining that the second entrance was not built yet and that whoever built it must ask the same function — an instruction to a future reader, which is the form a rule takes right up until it is ignored. The failure mode is not hypothetical, it is arithmetic: the index is the deliverable and FILLING it is later work, so the next several edits to `MODULE_SETTINGS` will each be somebody adding a module's settings page while looking at Tickets, and the gear and the row are in two different files neither of which they have to open. One of the two gets forgotten, the build stays green, and the symptom is a module you can configure from the settings tab but not from its own screen — or worse, the other way round, since a gear on a module the table does not list draws nothing at all and looks exactly like a module with no settings. A one-row index is also the worst possible moment to write this law and the best: with one module the pair is trivially in step, so the check costs nothing to satisfy and is the only thing that will still be true at eight. Clause (iii) is the one that is not about drift but about refusal — she asked for a gear that never leads to a page that turns you away, and a tab that restated the gate would have been a second place to get that wrong.",
+    checkId: "module-settings-two-doors",
+    status: "enforced",
+  },
 ]
 
 /** R59 — A CENTRED OVERLAY (`<DialogContent>`) THAT IS NEITHER A FORM NOR A
@@ -1343,6 +1351,11 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["field-label"],
     via: ["translateFields(ALL_COLUMNS, t)"],
     why: "the meetings All view, host-composed for the same reason and translated through the same one call.",
+  },
+  "web/components/accounts/contacts-screen.tsx": {
+    kinds: ["field-label"],
+    via: ["translateFields(CONTACT_COLUMNS, t)"],
+    why: "the contacts table's three column headings — Contact, Account, Role — the client's own 2026-09-09 ruling (\"for contacts lets do view table, also add column role after account\"). Same shape as the meetings All view one line up and the same single read: the columns are the HOST's, spread onto the recipe AFTER `resolveRecipe` has translated it, so `translateRecipe` never sees them and `translateFields` at the point they are spread in is the one place they can ask. Declared at module level because a `TableColumn` array is a constant and `t` is a hook.",
   },
   "web/components/knowledge/google-connections.tsx": {
     kinds: ["property"],

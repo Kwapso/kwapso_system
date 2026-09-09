@@ -57,7 +57,80 @@ type AccountRow = {
   creator_name: string | null
   updated_at: string | null
   editor_name: string | null
+  /** the two `LINKED_COMPANY` columns — null on a company row, and null on a
+   * person nobody has linked yet */
+  company_name: string | null
+  relationship: string | null
 }
+
+/** WHERE A PERSON WORKS AND WHAT THEY DO THERE, as two columns on the account
+ * row — the Account and Role columns of the contacts table (client, 2026-09-09:
+ * "for contacts lets do view table, also add column role after account").
+ *
+ * ── WHY THE LINK AND NOT THE PARENT POINTER ──────────────────────────────────
+ *
+ * A contact carries both: `parent_account_id` says which tree she sits in, and
+ * `account_links` says which companies she is a CONTACT of and what she does at
+ * each ("CEO", "Teamleiter", "Site Manager" — the real values on this team's own
+ * 65 filled-in links). Only the link carries the role, so taking the company
+ * from one place and the role from the other would put two cells about two
+ * different companies side by side on one row. Both come off the link, and the
+ * `ORDER BY` is what makes it the SAME link twice rather than two races:
+ *
+ *   1. the MAIN STAKEHOLDER, which is the team's own answer to "which of her
+ *      companies is the one";
+ *   2. then the first company by name;
+ *   3. then the link's own id, so the order is TOTAL. That last line is not
+ *      tidiness — the two expressions below are two separate subqueries, and
+ *      the only thing making them agree about which link they are reading is
+ *      that no two rows can tie.
+ *
+ * ── WHY THE PARENT POINTER IS NOT CONSULTED, THOUGH IT WOULD BE BETTER ───────
+ *
+ * The first draft preferred the link that AGREES with `parent_account_id`, so
+ * the Account column would say what the row's own summary line says. SQLite
+ * refuses it: an outer correlated reference is legal in a subquery's WHERE and
+ * ILLEGAL in its ORDER BY — `ORDER BY (l.account_id = accounts.parent_account_id)`
+ * is `no such column: accounts.parent_account_id` at runtime, on a statement
+ * that parses fine and that no mock in this repo would have caught (found by
+ * running it against real SQLite before shipping it).
+ *
+ * The ways back are a two-branch COALESCE — which silently splits the pair the
+ * moment the parent's link has a blank role, i.e. exactly the case this seam
+ * exists to keep together — or picking a link ID in one subquery and reading it
+ * in two more. Both buy an ordering that only bites on a contact linked to TWO
+ * live companies, and 88 of this team's 110 contacts have one link or none. The
+ * cheap, total, deterministic order wins, and the reason it is not the better
+ * one is written here rather than looking like nobody thought of it.
+ *
+ * ── WHY IT IS A SUBQUERY AND NOT A JOIN ──────────────────────────────────────
+ *
+ * The list PAGES by key (R14): the ORDER BY, the "everything after this row"
+ * predicate and the cursor are one `Ordering` over the `accounts` row. A join
+ * that can match twice would multiply rows underneath all three and page two
+ * would start somewhere page one did not stop. A correlated subquery reading one
+ * value per row cannot, and `idx_account_links_person` is the index it uses.
+ *
+ * The company's NAME is a second, nested subquery rather than a `JOIN accounts c`
+ * for a related scoping reason: an alias on `accounts` inside the subquery
+ * SHADOWS the outer table, so `accounts.id` in the WHERE stops resolving. Read
+ * from one scope further in, both names are in view.
+ *
+ * NOT PART OF THE FENCE, and it must not be read as one. This says which company
+ * is on the row; `accountsWhere` is what says whether the row may be seen at
+ * all, and `toAccount` nulls both fields for a client login (see there).
+ *
+ * ONLY FOR A PERSON. A company is nobody's contact, so the CASE keeps the
+ * subquery off 24 of every 134 rows and keeps the answer honest rather than
+ * empty-by-accident. */
+const LINKED_COMPANY = (field: string) => `CASE WHEN account_type = 'individual' THEN (
+    SELECT ${field} FROM account_links l
+     WHERE l.person_account_id = accounts.id AND l.deactivated_at IS NULL
+     ORDER BY l.is_main_stakeholder DESC,
+              (SELECT c.name FROM accounts c WHERE c.id = l.account_id) ASC,
+              l.id ASC
+     LIMIT 1
+  ) END`
 
 /** The audit names ride along on every read: every record's Overview tab shows
  * the same block (who made it, who touched it last), and the list's keyset pages
@@ -65,7 +138,9 @@ type AccountRow = {
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
   street, postal_code, city, country, industry, about, logo_url, cover_url, code,
   currency, locale, timezone, commercials_visible, deactivated_at,
-  created_at, creator_name, updated_at, editor_name`
+  created_at, creator_name, updated_at, editor_name,
+  ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
+  ${LINKED_COMPANY("l.relationship")} AS relationship`
 
 // THE ADDRESS IS FOUR FIELDS NOW, and `address` is not one of them. The column
 // still exists — 0024 backfilled `street` from it and left it alone, because
@@ -103,6 +178,15 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
  * `accountRowOrThrow` below is the raw read updateAccount uses for that. */
 function toAccount(r: AccountRow, scope: AccountScope): Account {
   const ours = scope.kind === "portal"
+  // THE LINK'S TWO FACTS, READ BEFORE THE PROJECTION DECIDES WHO MAY HAVE THEM.
+  // Written as a plain copy off the row rather than inline in the object below,
+  // because inline they would be a conditional expression and this base's ONE
+  // shape for "a field is this column" is `field: r.column` — the shape the
+  // machine surface's own description census reads a door's response contract
+  // out of (workers/mcp/test/described-contracts.test.ts). A field a tool
+  // description may not name is a field the model is not told about; the
+  // alternative was a reasoned vocabulary line apologising for a spelling.
+  const contact = { companyName: r.company_name ?? null, relationship: r.relationship ?? null }
   return {
     id: r.id,
     accountType: r.account_type === "individual" ? "individual" : "entity",
@@ -123,6 +207,18 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     locale: r.locale,
     timezone: r.timezone,
     commercialsVisible: ours ? null : r.commercials_visible === 1,
+    // WHERE SHE WORKS AND WHAT SHE DOES THERE — the contacts table's two middle
+    // columns, and the third pair of fields this projection withholds from a
+    // client login. Not because a role is a secret: because a person can be a
+    // contact at two companies (that is the whole reason companies and people
+    // stayed one table), and only ONE of them has to be inside a portal
+    // caller's fence for this cell to name the other one. The fence is on the
+    // ROW; this value is read from a table beside it, so the safe answer is the
+    // one that cannot be got wrong later. The portal draws neither today, and
+    // the day it wants a contact's role it can have one that is fenced on
+    // purpose rather than one that arrived by accident.
+    companyName: ours ? null : contact.companyName,
+    relationship: ours ? null : contact.relationship,
     active: r.deactivated_at == null,
     createdAt: r.created_at,
     createdByName: ours ? null : r.creator_name,
@@ -176,6 +272,17 @@ export type AccountFilters = {
   /** "yes" = only the put-away ones, "no" = only the live ones, absent = both */
   archived?: "yes" | "no"
   parentId?: string
+  /** WHO CAN SIGN IN — the contacts screen's second tab (client, 2026-09-09:
+   * "also tabs here: All, In portal"). "yes" = only the people holding a LIVE
+   * portal login, "no" = only the people without one, absent = both.
+   *
+   * A FILTER RATHER THAN A CLIENT-SIDE SLICE, and the arithmetic is why: six of
+   * this team's 110 contacts can log in, and page one is fifty rows. Narrowing
+   * the loaded page would show whichever of the six happened to be in it, under
+   * a badge counting all six — the exact shape R14 and R16 exist to refuse. The
+   * door has to answer it, so the rows, the `total` beside them and the CSV
+   * export all say the same thing. */
+  portal?: "yes" | "no"
 }
 
 /** MAY THIS CALLER LIST PEOPLE? — the `contacts` right, arriving as a boolean
@@ -194,7 +301,22 @@ export type AccountFilters = {
  * is aimed at, the contact who raised a ticket — and the owner asked for exactly
  * that. What this right governs is ENUMERATION: you cannot read the address
  * book, but a name already on a record in front of you is still a name. */
-export type ContactSight = { mayListPeople: boolean }
+export type ContactSight = {
+  mayListPeople: boolean
+  /** MAY THIS CALLER SEE WHO CAN SIGN IN — the `portal_users` right, arriving
+   * beside the contacts one and for exactly the same reason it is not a filter:
+   * it is a NARROWING the caller cannot un-ask.
+   *
+   * Handing out a login is its own decision and has its own switch on the
+   * matrix ("a bigger decision than editing a phone number"), and the accounts
+   * detail door has always used it to decide whether `portalUsers` comes back
+   * at all. The `portal` FILTER asks the same question one collection wider —
+   * "which of these people can sign in?" — so it answers to the same right.
+   * Without it the login table is, as far as this door is concerned, EMPTY:
+   * nobody is in the portal and everybody is outside it, which is one coherent
+   * answer rather than a refusal in the middle of a list. */
+  maySeeLogins: boolean
+}
 
 /** WHAT THE ACCOUNTS LIST MAY BE ORDERED BY, and nothing else — the caller sends
  * one of these NAMES and the SQL beside it is ours (shared/workers/sorting.ts).
@@ -251,6 +373,36 @@ function accountsWhere(
   // never delete) — this only says which of the two the caller asked for, so the
   // exact total beside it counts the same question the rows answer.
   if (opts.archived) filters.push(`deactivated_at IS ${opts.archived === "yes" ? "NOT NULL" : "NULL"}`)
+  // WHO CAN SIGN IN. A LIVE grant only — `portal_users` keeps the revoked row
+  // (deactivate, never delete), so a membership test that ignored
+  // `deactivated_at` would put every offboarded contact back on the In portal
+  // tab. The exact question `accountScope` itself asks one file over.
+  //
+  // AND THE SUBQUERY CARRIES ITS OWN FENCE. `portal_users` is an account-owned
+  // table with its own clause on `account_id`; borrowing the outer query's fence
+  // would be reading one table through another table's stamp, which is the shape
+  // this file's header refuses. For staff the clause is empty and this is a bare
+  // membership test, which is what it looks like.
+  //
+  // AND IT ANSWERS TO `portal_users:read` (see `ContactSight.maySeeLogins`).
+  // For a caller without it the login table reads as EMPTY, so "in the portal"
+  // is nobody and "not in the portal" is everybody — no row is withheld that
+  // the caller could otherwise see, and no membership is inferable from the
+  // complement, because the complement is the whole list.
+  if (opts.portal) {
+    if (!sight.maySeeLogins) {
+      if (opts.portal === "yes") filters.push("0 = 1")
+    } else {
+      const logins = accountScopeClause(scope, "account_id")
+      filters.push(
+        `id ${opts.portal === "yes" ? "IN" : "NOT IN"} (SELECT account_id FROM portal_users${where([
+          logins.sql,
+          "deactivated_at IS NULL",
+        ])})`
+      )
+      params.push(...logins.params)
+    }
+  }
   if (opts.parentId) {
     filters.push("parent_account_id = ?")
     params.push(opts.parentId)
@@ -264,7 +416,14 @@ export async function listAccounts(
   scope: AccountScope,
   sight: ContactSight,
   opts: AccountFilters & { cursor?: string | null; ordering?: Ordering<AccountRow> } = {}
-): Promise<Page<Account> & { total: number; entityTotal: number; individualTotal: number }> {
+): Promise<
+  Page<Account> & {
+    total: number
+    entityTotal: number
+    individualTotal: number
+    individualPortalTotal: number
+  }
+> {
   const { sql: base, params } = accountsWhere(scope, opts, sight)
   // THE ORDER, AND THE THREE PLACES THAT MUST AGREE ON IT. The ORDER BY, the
   // "everything after this row" predicate and the value the next cursor is
@@ -282,10 +441,24 @@ export async function listAccounts(
   // while you typed would be answering the question you are about to ask rather
   // than the one you are looking at. Same shape as the ticket strip's All / My /
   // Archived badges, and for the same reason.
+  //
+  // ZERO IS A REAL ANSWER ON THE THIRD ONE. A caller without `portal_users:read`
+  // gets `individualPortalTotal: 0` beside an In portal tab that opens on
+  // nothing — through the SAME `accountsWhere` the rows go through, never a
+  // special case, exactly as `individualTotal` is zero without the contacts
+  // right. A badge computed on a second code path is a badge that eventually
+  // disagrees with the list under it.
   const companies = accountsWhere(scope, { type: "entity" }, sight)
   const people = accountsWhere(scope, { type: "individual" }, sight)
+  // …AND THE THIRD BADGE, for the same reason: the contacts screen's own strip
+  // is All / In portal (client, 2026-09-09), and the number on the tab somebody
+  // has not pressed has to be the door's COUNT(*) of that tab's own question,
+  // not the length of anything. Built from the SAME `accountsWhere` as the rows
+  // it badges, so the tab and the list it opens can never disagree — and zero
+  // without the contacts right, like `individualTotal` beside it.
+  const inPortal = accountsWhere(scope, { type: "individual", portal: "yes" }, sight)
 
-  const [rows, counted, entityTotal, individualTotal] = await Promise.all([
+  const [rows, counted, entityTotal, individualTotal, individualPortalTotal] = await Promise.all([
     // PAGE_SIZE + 1 is how hasMore is known without a second query.
     d1Query<AccountRow>(
       cfg,
@@ -304,6 +477,7 @@ export async function listAccounts(
     // People tab badged from a second code path is a People tab that eventually
     // disagrees with the list under it.
     countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${people.sql}`, people.params),
+    countCollection(cfg, guard.databaseId, `SELECT 1 FROM accounts${inPortal.sql}`, inPortal.params),
   ])
 
   const page = toPage(rows, PAGE_SIZE, (r) => [ordering.key(r), r.id], ordering.sig)
@@ -313,6 +487,7 @@ export async function listAccounts(
     total: counted,
     entityTotal,
     individualTotal,
+    individualPortalTotal,
   }
 }
 
