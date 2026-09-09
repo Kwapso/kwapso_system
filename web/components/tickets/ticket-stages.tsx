@@ -82,11 +82,11 @@
 // ── THE REOPEN IS DRAWN WHERE IT HAPPENED ───────────────────────────────────
 //
 // Her sentence is a sequence — "closed on x, reopen on y, closed again on z" —
-// so a ticket that came back out of `resolved` gets EXTRA rungs below the first
+// so a ticket that came back out of `resolved` gets EXTRA rungs AFTER the first
 // climb rather than a counter in a corner: the ladder, then the stages of the
 // second climb in the order it really took them, the first of them wearing
 // "Reopened", then whatever of the ladder that climb has not reached yet. Read
-// top to bottom it is her sentence, with the dates on it.
+// along the rail it is her sentence, with the dates on it.
 //
 // ── THE NUMBER IS WORKING DAYS ──────────────────────────────────────────────
 //
@@ -97,16 +97,56 @@
 // only", deliberately: she had exactly that subtitle removed from the
 // closing-time panel on 6 Sep 2026.
 //
-// ── IT IS THE KIT'S OWN STEPPER, NOT A LADDER DRAWN HERE ────────────────────
+// ── IT RUNS ACROSS, NOT DOWN — 2026-09-09, AND THE CLIENT SAID SO TWICE ─────
 //
-// `StatusStepper variant="steps" orientation="vertical"` is the kit's wizard
-// rail: a column of mark-beside-label rows, and the done / current / later
-// skins — the tick, the one mango, the disabled fill and ink — are its, not
-// redrawn here. Everything this file adds rides in `label`, which the kit
-// types as a `ReactNode` for exactly this. `maxVisible={0}` turns off the
-// kit's "over five stages the tail folds into +n": a fold is right for a hero
-// pill row a client reads at a glance and wrong here, where the folded tail
-// would be precisely the stages she asked to be able to see.
+// She was shown options on 2026-09-06 and picked one. It was then built as the
+// kit's VERTICAL wizard rail — a column of mark-beside-label rows — and her
+// answer on seeing it, verbatim: "now i see it!! but we chose an horizontal
+// deesign (not this vertical) that also shoudl show the dates". So the drawing
+// she chose is the kit's OTHER `steps` rail and always was.
+//
+// `StatusStepper variant="steps" orientation="horizontal"` is chapter 15's
+// "Stepper — programme phases": equal columns, a 26 mark over a hairline
+// connector that fills behind every stage already done, and the stage's words
+// beneath it. The done / current / later skins — the tick, the one mango, the
+// disabled fill and ink — are the kit's, not redrawn here. Everything this
+// file adds rides in `label`, which the kit types as a `ReactNode` for exactly
+// this. `maxVisible={0}` turns off the kit's "over five stages the tail folds
+// into +n": a fold is right for a hero pill row a client reads at a glance and
+// wrong here, where the folded tail would be precisely the stages she asked to
+// be able to see.
+//
+// ── WHAT IT DOES WHEN THERE IS NOT ROOM, WHICH ON A PHONE THERE NEVER IS ────
+//
+// SIX EQUAL COLUMNS AT A FLOOR OF `STAGE_COLUMN`, AND PAST THAT THE RAIL
+// SCROLLS SIDEWAYS INSIDE ITS OWN BOX. Not the page: the scroll lives on the
+// `overflow-x-auto` wrapper here, so nothing widens the record behind it
+// (R29 — one page width). Above the floor the columns simply share the room
+// they are given and no scrollbar appears at all, which is the desktop case
+// for an ordinary six-stage ticket.
+//
+// IT DOES NOT FALL BACK TO THE VERTICAL RAIL BELOW 45rem, and that is a
+// decision rather than an omission. She chose ONE drawing; a phone that
+// silently drew the other would mean she and the account manager are looking
+// at two different pictures of the same ticket while talking to each other on
+// a call, which is the kit's own stated reason for refusing a width-triggered
+// fold in this very component ("a fold that only happened on a phone…",
+// status-stepper.tsx). The rail is the same everywhere and the narrow screen
+// pays for it in a swipe.
+//
+// The wrapper is a real tab stop (`tabIndex`, `role="group"` named by the
+// eyebrow above it). A region that scrolls and cannot be reached from the
+// keyboard is a region a keyboard reader cannot read the end of.
+//
+// ── AND THE FACTS STACK UNDER THE NAME ──────────────────────────────────────
+//
+// The kit gives each stage an EQUAL column and truncates what will not fit
+// (`min-w-0` + `truncate`). A single `·`-joined line of date, clock and count
+// would therefore be cut at the first of them in a column narrow enough to fit
+// six across a laptop. So each fact takes its own line and truncates on its
+// own, which puts the DATE — the half of her sentence that was missing — on
+// the line directly under the stage's name, where it cannot be the thing that
+// gets cut.
 
 import * as React from "react"
 
@@ -117,7 +157,7 @@ import { HELP_STATUSES, RETIRED_HELP_STATUSES } from "@shared/types"
 import type { HelpStatus, HelpStatusEver, TicketStageHistory, TicketStageSpan } from "@shared/types"
 import type { Language } from "@shared/i18n"
 import { content as contentApi } from "@/lib/api"
-import { formatDateTime } from "@shared/web/format"
+import { formatDate, formatTime } from "@shared/web/format"
 import { helpStagesKey } from "@/lib/live-resources"
 import { useCached } from "@shared/web/store"
 import { useLanguage } from "@shared/web/language"
@@ -268,23 +308,45 @@ function buildRungs(
   return { rungs, current }
 }
 
-/** The facts hung off a rung's name, in one line, or nothing at all where
- * there is no record of the move. `·` separators rather than a right-aligned
- * column: the kit's vertical rail sizes its label to its own content, so a
- * second column would need this file to override the kit's own layout. */
-function rungFacts(span: TicketStageSpan | null, t: (s: string, v?: Record<string, string | number>) => string, lang: Language): string {
-  if (!span) return ""
-  const facts = [formatDateTime(span.from, lang)]
+/** THE WIDTH ONE STAGE IS NEVER SQUEEZED BELOW, and therefore the width the
+ * whole rail scrolls past. Read off the longest thing a column has to say
+ * rather than picked: the widest stage name the ladder holds is "Waiting on
+ * you" (the retired stage, which real tickets still carry) and the widest fact
+ * line is a date — both land inside 120px at the caption step, which is this
+ * number. Below it the words start being cut; above it six stages still fit
+ * across an ordinary record column with no scrollbar at all. */
+const STAGE_COLUMN = "7.5rem"
+
+/** The record of a visit, one fact per line, or nothing at all where there is
+ * no record of the move. Stacked rather than `·`-joined for the reason this
+ * file's header gives: an equal column truncates, and the DATE must not be
+ * what gets cut.
+ *
+ * THE DAY AND THE CLOCK ARE TWO LINES, THROUGH TWO SHARED FORMATTERS. It was
+ * one `formatDateTime`, which is right for a full-width activity row and too
+ * long for a column six of which fit on a laptop. `formatTime` exists in the
+ * seam for exactly this — "the clock time alone, for a row whose DAY is
+ * already said" — so nothing is lost and nothing is hand-formatted. */
+function rungLines(
+  span: TicketStageSpan | null,
+  t: (s: string, v?: Record<string, string | number>) => string,
+  lang: Language
+): string[] {
+  if (!span) return []
+  const lines = [
+    formatDate(span.from, lang),
+    [formatTime(span.from, lang), t("{count}d", { count: span.workingDays })].join(" · "),
+  ]
   // THE OPEN RUNG. `to === null` is the stage the ticket is in NOW, and its
-  // number is counted to the moment the door answered — so it is marked rather
-  // than left to read as a finished span that happens to be last.
-  if (span.to === null) facts.push(t("Still here"))
-  facts.push(t("{count}d", { count: span.workingDays }))
-  return facts.join(" · ")
+  // number is counted to the moment the door answered — so it is said rather
+  // than left to read as a finished span whose count has stopped moving.
+  if (span.to === null) lines.push(t("Still here"))
+  return lines
 }
 
 export function TicketStages({ ticketId, status }: { ticketId: string; status: HelpStatus }) {
   const { t, lang } = useLanguage()
+  const headingId = React.useId()
   const stagesQ = useCached<TicketStageHistory>(helpStagesKey(ticketId), () =>
     contentApi.helpStages(ticketId)
   )
@@ -292,50 +354,82 @@ export function TicketStages({ ticketId, status }: { ticketId: string; status: H
 
   const { rungs, current } = buildRungs(history?.spans ?? [], status)
 
-  const stages: StatusStage[] = rungs.map((rung) => {
-    const facts = rungFacts(rung.span, t, lang)
-    return {
-      id: rung.key,
-      label: (
-        <span className="inline-flex items-center gap-[var(--space-1h)]">
-          <span>{stageLabel(rung.status, t)}</span>
-          {rung.reopened ? (
+  const stages: StatusStage[] = rungs.map((rung) => ({
+    id: rung.key,
+    // ONE BLOCK PER LINE INSIDE THE KIT'S OWN LABEL. The kit's label span is
+    // `block w-full truncate`, so a `block` child inherits the width and gets
+    // its OWN ellipsis: the column clips each line separately instead of
+    // clipping one long line at its first fact.
+    label: (
+      <>
+        <span className="block truncate">{stageLabel(rung.status, t)}</span>
+        {rung.reopened ? (
+          // The one thing here that is not a line of text. It stays a Badge —
+          // this is the moment the ticket came back, and her sentence
+          // ("reopen on y") is the reason the rail has these rungs at all.
+          <span className="block">
             <Badge variant="warning" size="pill">
               {t("Reopened")}
             </Badge>
-          ) : null}
-          {facts ? <span className="text-muted-foreground">· {facts}</span> : null}
-        </span>
-      ),
-    }
-  })
+          </span>
+        ) : null}
+        {rungLines(rung.span, t, lang).map((line) => (
+          <span key={line} className="text-muted-foreground block truncate">
+            {line}
+          </span>
+        ))}
+      </>
+    ),
+  }))
 
   return (
     <div className="flex flex-col gap-[var(--space-3)]">
-      <span className="text-muted-foreground text-caption">{t("Stages")}</span>
-      <StatusStepper
-        stages={stages}
-        current={current}
-        variant="steps"
-        orientation="vertical"
-        // Every rung, always — see this file's header on the fold.
-        maxVisible={0}
-        label={t("Stages")}
-        // The tick has no words of its own and the kit's default for them is
-        // English. The catalogue already answers this one.
-        doneLabel={t("Done")}
-        // THE NUMBER IS THE LADDER'S, NOT THE ROW'S. The kit hands this the
-        // row's 1-based index; a reopened ticket has more rows than stages, so
-        // without this a second climb would number its stages 07, 08, 09 and
-        // invent a ladder twice as long as the one that exists. Two tabular
-        // digits in the reader's own numbering system, exactly as the kit's own
-        // default does it — only the value is different.
-        formatNumber={(value) =>
-          new Intl.NumberFormat(lang, { minimumIntegerDigits: 2, useGrouping: false }).format(
-            rungs[value - 1]?.number ?? value
-          )
-        }
-      />
+      <span id={headingId} className="text-muted-foreground text-caption">
+        {t("Stages")}
+      </span>
+      {/* THE RAIL SCROLLS, THE PAGE NEVER DOES (R29). `min-w-0` so a flex
+          ancestor cannot let this box grow to its content instead of clipping
+          it; `tabIndex` because a scrolling region no keyboard can reach is a
+          region whose last stage nobody can read; `role`/`aria-labelledby` so
+          that tab stop announces the eyebrow above it rather than nothing. */}
+      <div
+        role="group"
+        aria-labelledby={headingId}
+        tabIndex={0}
+        className="min-w-0 overflow-x-auto pb-[var(--space-2)]"
+      >
+        <StatusStepper
+          stages={stages}
+          current={current}
+          variant="steps"
+          // HER OWN WORD, 2026-09-09: "we chose an horizontal deesign (not
+          // this vertical)". See the header.
+          orientation="horizontal"
+          // THE FLOOR UNDER ONE COLUMN, AND SO THE WIDTH THE RAIL SCROLLS
+          // PAST. The kit's steps rail is `flex w-full` with `flex-1` columns,
+          // so a min-width on the rail itself is the one place the floor can
+          // live: above it the columns share the room, below it the wrapper
+          // above takes over and this scrolls.
+          style={{ minWidth: `calc(${rungs.length} * ${STAGE_COLUMN})` }}
+          // Every rung, always — see this file's header on the fold.
+          maxVisible={0}
+          label={t("Stages")}
+          // The tick has no words of its own and the kit's default for them is
+          // English. The catalogue already answers this one.
+          doneLabel={t("Done")}
+          // THE NUMBER IS THE LADDER'S, NOT THE ROW'S. The kit hands this the
+          // row's 1-based index; a reopened ticket has more rows than stages, so
+          // without this a second climb would number its stages 07, 08, 09 and
+          // invent a ladder twice as long as the one that exists. Two tabular
+          // digits in the reader's own numbering system, exactly as the kit's own
+          // default does it — only the value is different.
+          formatNumber={(value) =>
+            new Intl.NumberFormat(lang, { minimumIntegerDigits: 2, useGrouping: false }).format(
+              rungs[value - 1]?.number ?? value
+            )
+          }
+        />
+      </div>
       {/* NEVER SWALLOW (ERROR-HANDLING.md) — but a failed read costs this
           drawing its timestamps, not its position, so the ladder above stays
           and the failure is said under it. This is an ERROR and not an empty
