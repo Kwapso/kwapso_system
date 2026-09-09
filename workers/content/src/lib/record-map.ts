@@ -230,6 +230,56 @@ const LABEL_COLUMN: Record<string, string> = {
   account_links: "",
 }
 
+/** TABLES WHOSE ROWS THE APP RETIRES RATHER THAN DELETES, so the map can leave
+ * a retired one out of somebody's neighbourhood.
+ *
+ * ── WHY THIS ARRIVED WITH THE KNOWLEDGE EDGES AND NOT BEFORE ───────────────
+ *
+ * The map has never filtered a retired row, and until now that was invisible
+ * rather than correct. Measured on staging (9 Sep 2026) across every table these
+ * edges touch: apps 0 retired, accounts 0, sprints 0, waves 0, processes 0,
+ * deliverables 0, meeting_purposes 0, meetings 5, portal_users 1,
+ * account_links 2 — and `knowledge_sources` 886. One table holds 886 of the 894
+ * retired rows in the whole map, so the clause that was missing had almost
+ * nothing to act on and nobody could have noticed it was absent.
+ *
+ * IT MATTERS NOW BECAUSE OF WHAT RETIRES A SOURCE. The knowledge base folds its
+ * own duplicates away — 726 of the 851 rows carrying an event id are retired,
+ * every one of them stamped by `kwapso` rather than by a person. Standing on a
+ * meeting WITHOUT this clause gathers 58 live artefacts and 404 retired ones: a
+ * seven-to-one wall of exactly the duplicates phase 2 exists to hide, drawn as
+ * though they were the record. The feature would have made the problem it was
+ * built beside look worse.
+ *
+ * A MAP IS A PICTURE OF THE SHAPE THINGS ARE IN NOW. "Deactivate, never delete"
+ * keeps the row and its audit; it does not make the row a neighbour. The FOCUS
+ * is exempt — opening the map on a retired record is a deliberate act and it
+ * still draws itself — and only the far end of each edge is filtered.
+ *
+ * DATA, AND ROT-CHECKED AGAINST THE SCHEMA rather than trusted: record-map's own
+ * suite reads `deactivated_at` off each table in a real database built from the
+ * migrations and fails if this set and the schema disagree in either direction.
+ * So a table that gains the column, or loses it, cannot leave this stale. */
+export const RETIRABLE = new Set([
+  "accounts",
+  "account_links",
+  "apps",
+  "deliverables",
+  "knowledge_sources",
+  "meeting_purposes",
+  "meetings",
+  "portal_users",
+  "processes",
+  "sprints",
+  "waves",
+])
+
+/** `AND o.deactivated_at IS NULL`, where the far table HAS that column. Built
+ * once so the list and the R16 count below can never carry different versions of
+ * it — the failure `sourcesWhere` in knowledge.ts already names: a count is
+ * exact about the wrong question the moment the two clauses drift. */
+const liveOnly = (table: string) => (RETIRABLE.has(table) ? ` AND o.deactivated_at IS NULL` : "")
+
 const key = (n: { table: string; id: string }) => `${n.table}:${n.id}`
 
 /** ONE RECORD'S NEIGHBOURHOOD.
@@ -288,9 +338,10 @@ export async function neighbourhood(
       toCol === "id"
         ? sqlString(id)
         : `(SELECT f.${toCol} FROM ${table} f WHERE f.id = ${sqlString(id)})`
-    const where = outward
-      ? `n.id = ${sqlString(id)} AND o.${toCol} = n.${edge.column}`
-      : `o.${edge.column} = ${farValue}`
+    const where =
+      (outward
+        ? `n.id = ${sqlString(id)} AND o.${toCol} = n.${edge.column}`
+        : `o.${edge.column} = ${farValue}`) + liveOnly(other)
     const from = outward
       ? `FROM ${table} n JOIN ${other} o ON o.${toCol} = n.${edge.column}`
       : `FROM ${other} o`
@@ -312,7 +363,7 @@ export async function neighbourhood(
           // THE SAME PREDICATE AS THE LIST ABOVE, `farValue` included. R16 is
           // about the number being exact; it is exact about the WRONG question
           // the moment the count and the list stop asking the same one.
-          `SELECT 1 FROM ${other} o WHERE o.${edge.column} = ${farValue}`
+          `SELECT 1 FROM ${other} o WHERE o.${edge.column} = ${farValue}${liveOnly(other)}`
         )
     for (const r of shown) {
       const node: MapNode = { table: other, id: r.id, label: r.label ?? r.id }

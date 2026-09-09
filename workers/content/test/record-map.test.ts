@@ -26,7 +26,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import worker from "../src/index"
-import { edgesFor, NEIGHBOURS_PER_EDGE, RECORD_EDGES } from "../src/lib/record-map"
+import { edgesFor, NEIGHBOURS_PER_EDGE, RECORD_EDGES, RETIRABLE } from "../src/lib/record-map"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 
 const db = () => holder.db as DatabaseSync
@@ -342,5 +342,77 @@ describe("the fence is on the new edges too", () => {
     expect(tables, "the client is gone").not.toContain("accounts")
     expect(tables, "and the call the reader MAY see is still there").toContain("meetings")
     expect(tables).toContain("apps")
+  })
+})
+
+describe("a retired row is not a neighbour", () => {
+  // THE BUG THIS CLOSES, measured on staging 9 Sep 2026. The knowledge base folds
+  // its own duplicates away — 726 of the 851 sources carrying an event id are
+  // retired, every one stamped by `kwapso` rather than a person — so standing on
+  // a meeting gathered 58 live artefacts and 404 retired ones. A seven-to-one
+  // wall of exactly the duplicates phase 2 exists to hide, drawn as the record.
+  //
+  // The clause was missing from the map since it shipped and could not have been
+  // noticed: of the 894 retired rows across every table these edges touch, 886
+  // are in `knowledge_sources` and the rest are single figures.
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO meetings (id, account_id, title, google_event_id, starts_at, created_at)
+        VALUES ('M_RET', 'A_MAP', 'The Tuesday call', 'GCAL_EVENT_R', '2026-03-01T10:00:00Z', '2026-03-01');
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, title, created_at)
+        VALUES ('KS_LIVE', 'email', 'google_gmail', 'u1:live', 'agency',
+                'GCAL_EVENT_R', 'The one that survived', '2026-03-01');
+      -- Folded away by the app itself, exactly as the duplicate sweeps stamp it.
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, title, created_at, deactivated_at, deactivator_name)
+        VALUES ('KS_DEAD', 'email', 'google_gmail', 'u1:dupe', 'agency',
+                'GCAL_EVENT_R', 'A duplicate the base retired', '2026-03-01',
+                '2026-03-02', 'kwapso');
+    `)
+  })
+
+  it("a call gathers what survived, not what the base folded away", async () => {
+    const { body } = await map("meetings", "M_RET")
+    const ids = (body.nodes as { id: string }[]).map((n) => n.id)
+    expect(ids).toContain("KS_LIVE")
+    expect(ids, "the retired duplicate is what this whole clause is for").not.toContain("KS_DEAD")
+  })
+
+  it("…and the COUNT agrees with the picture (R16)", async () => {
+    const { body } = await map("meetings", "M_RET")
+    const nodes = body.nodes as { id: string }[]
+    // A count that kept the retired rows would over-report by exactly the rows
+    // the list refused to draw — the drift `sourcesWhere` in knowledge.ts names.
+    expect(body.total).toBe(nodes.length - 1)
+  })
+
+  it("but the FOCUS may be retired — opening it is a deliberate act", async () => {
+    const { status, body } = await map("knowledge_sources", "KS_DEAD")
+    expect(status).toBe(200)
+    expect((body.focus as { label: string }).label).toBe("A duplicate the base retired")
+  })
+
+  it("RETIRABLE matches the SCHEMA, both ways — rot-checked, never hand-trusted", () => {
+    // DERIVED from a real database built from the migrations, so a table that
+    // gains `deactivated_at` (or loses it) cannot leave the set stale. Both
+    // directions: a table in the set without the column would put invalid SQL in
+    // front of a reader, and one with the column missing from the set is a hole
+    // exactly like the one this suite exists for.
+    const tables = new Set(RECORD_EDGES.flatMap((e) => [e.from, e.to]))
+    const missing: string[] = []
+    const invented: string[] = []
+    for (const t of tables) {
+      const cols = db()
+        .prepare(`SELECT name FROM pragma_table_info(?)`)
+        .all(t)
+        .map((r) => (r as { name: string }).name)
+      expect(cols.length, `${t} is named by an edge but is not a table`).toBeGreaterThan(0)
+      const has = cols.includes("deactivated_at")
+      if (has && !RETIRABLE.has(t)) missing.push(t)
+      if (!has && RETIRABLE.has(t)) invented.push(t)
+    }
+    expect(missing, `these tables retire rows and the map would still draw them: ${missing}`).toEqual([])
+    expect(invented, `RETIRABLE names tables with no deactivated_at column: ${invented}`).toEqual([])
   })
 })
