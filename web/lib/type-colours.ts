@@ -163,7 +163,7 @@ const TYPE_ORDER = ["issue", "question", "request", "extra"] as const
  * length of the list (i.e. after all four) for a word the order has never
  * heard of, including a ticket with no type at all. Never negative: a caller
  * sorting on this can add nothing and subtract nothing. */
-export function ticketTypeRank(value: string | null | undefined): number {
+function ticketTypeRank(value: string | null | undefined): number {
   if (!value) return TYPE_ORDER.length
   const at = (TYPE_ORDER as readonly string[]).indexOf(value.trim().toLowerCase())
   return at === -1 ? TYPE_ORDER.length : at

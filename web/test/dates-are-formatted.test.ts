@@ -84,7 +84,7 @@ import { join } from "node:path"
  * was allowed because it was a decision rather than a leak: a table column
  * somebody clicks to sort had to compare correctly, and the comparison WAS the
  * rendered text, so the date on screen had to be spelled for the comparator
- * instead of for the reader. `web/components/record-table.tsx` now takes a
+ * instead of for the reader. `web/components/records/record-table.tsx` now takes a
  * `sortKey`/`sortType` per column and compares the RAW value off the row, so a
  * sortable date column no longer buys its order with its own legibility, and
  * the two columns that were paying (Tasks' Deadline and Closed) render
@@ -123,29 +123,30 @@ const ROOTS = [
  * pattern it was pinned for is a stale exemption, exactly as much a failure
  * as an unlisted offender — so the list can only shrink or stay current. */
 const RAW_DATE_EXEMPT: Record<string, string> = {
-  "web/components/record-calendar.tsx:149":
+  "web/components/records/record-calendar.tsx:149":
     "the month heading needs the reader's own LONG month name + year — " +
     "shared/web/format.ts has no formatter for that shape (formatMonth is " +
     "the short-month AXIS one) — so it calls Intl directly, with the real " +
     "`lang` (this line used to pass `undefined`, which is the bug R1 of this " +
     "pass fixed).",
-  "web/components/record-calendar.tsx:159":
+  "web/components/records/record-calendar.tsx:159":
     "the weekday headings need the reader's own weekday names alone, and no " +
     "formatter in shared/web/format.ts produces that shape either — Intl " +
     "directly, with the real `lang` (also used to pass `undefined`).",
-  "web/lib/use-record-activity.ts:160":
+  "web/lib/use-record-activity.ts:167":
     "`dateTime: a.createdAt` feeds the kit's `<time dateTime>` attribute " +
     "(ActivityFeed's own `dateTime` field) — machine-readable, never text a " +
     "person reads. The line right above it, `timestamp: formatRelative(...)`, " +
     "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
-    "actor's trim and its reasoning above this line.)",
+    "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
+    "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
   "web/components/deep-link/shape.tsx:91":
-    "same shape as use-record-activity.ts:160 — `dateTime: a.createdAt` " +
+    "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
     "on 7 Sep 2026, when `shapeActivity` gained a named return type — " +
     "`ActivityFeedRow` — and the import and its note landed above this line.)",
-  "web/components/work-panels.tsx:1491":
+  "web/components/work/work-panels.tsx:1491":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +

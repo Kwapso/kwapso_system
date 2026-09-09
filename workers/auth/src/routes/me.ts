@@ -134,7 +134,7 @@ export async function scale(request: Request, env: Env): Promise<Response> {
  * around the floating content card, everything behind the app, not the rail
  * alone (the field reads "Background" now, renamed from "Sidebar"). `scale`'s
  * twin, one field along: both are one word about one reader, both are read
- * off `SessionUser` by `web/components/app-shell.tsx`, and both must survive
+ * off `SessionUser` by `web/components/shell/app-shell.tsx`, and both must survive
  * a device change.
  *
  * R20, positionally: `body.spine` sits as `requireText`'s first argument and

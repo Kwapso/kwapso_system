@@ -70,8 +70,9 @@ shape is worth more than the space it takes.
 | `ai-spend.mjs` | Prices the estate off `agent_usage_log`, read-only. COSTS.md is the write-up. |
 | `measure-preamble.mjs` | Reproduces the assistant's preamble and makes **no model call**. |
 | `query-bench.mjs` · `agent-routing-bench.mjs` · `kb-bench.mjs` + `kb-bench-questions.mjs` · `knowledge-retrieval-bench.mjs` · `defect-fixes-bench.mjs` | Benches. Several call a model: read the header before running one. |
+| `scroll-cadence-bench.mjs` | Whether scrolling is SMOOTH, which is a different measurement from `speed-bench.mjs`'s FAST. Counts frames the compositor actually presented (`PipelineReporter`) rather than `requestAnimationFrame` deltas, which report a flat 60fps whatever the compositor is doing. `--calibrate` proves the instrument discriminates before any number off it is believed. Headed Chrome, no model call. |
 | `i18n-gaps.mjs` | Which strings have no translation, per language. LANGUAGES.md explains what the number means. |
-| `google-sweep.mjs` | Exercises the Google read doors by hand. The four singular ones (`/drive/file`, `/gmail/message`, `/calendar/event/transcript`, `/chat/spaces`) are reached from **here and nowhere else** — see `web/test/reachable-screens.test.ts`, which now says so. |
+| `google-sweep.mjs` | Exercises the Google read doors by hand, against a real connection. No screen calls the seven Google read doors: each is a tool on the ASSISTANT's catalogue (`google_drive_files`, `google_drive_file`, `google_mail_search`, `google_mail_message`, `google_calendar_events`, `google_meeting_transcript`, `google_chat_spaces` — `workers/data-ops/src/lib/tools.ts`), so a person reaches it through `agent_chat` under their own rights. Deliberately NOT on MCP: R43 allows an asymmetry that is a reasoned line, and all 21 Google tools are one — `GOOGLE_MCP_EXCLUSION`, MCP.md §3, a leaked personal access token must not reach a mailbox, and `web/test/reachable-screens.test.ts`'s read census holds every GET door to exactly that: a screen, a tool, or a written reason. |
 
 ### Repairs you might need again
 

@@ -16,7 +16,7 @@
 //
 // TWO SEAMS, ONE DECISION. Both places the app hands a record heading to the kit
 // go through `clampRecordHeading`, and this reads that off disk rather than
-// trusting a comment: the twelve bespoke details (web/components/record-chrome.tsx)
+// trusting a comment: the twelve bespoke details (web/components/records/record-chrome.tsx)
 // and every recipe-driven detail on BOTH front doors
 // (shared/web/screen-engine/screen-renderer.tsx). Deleting either call site
 // turns this red.
@@ -27,7 +27,7 @@ import { join } from "node:path"
 import { cleanup, render } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { RecordScreen } from "@/components/record-chrome"
+import { RecordScreen } from "@/components/records/record-chrome"
 
 afterEach(cleanup)
 
@@ -63,7 +63,7 @@ describe("a record's own name is clamped to two lines", () => {
 
   it("both record-heading seams apply it — read off disk, not off a comment", () => {
     for (const file of [
-      "web/components/record-chrome.tsx",
+      "web/components/records/record-chrome.tsx",
       "shared/web/screen-engine/screen-renderer.tsx",
     ]) {
       const src = read(file)

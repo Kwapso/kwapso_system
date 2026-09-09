@@ -65,6 +65,24 @@ export type RecordEdge = {
   column: string
   /** what it points at */
   to: string
+  /** WHICH COLUMN ON THE FAR END THE POINTER MATCHES. Absent means `id`, which
+   * is every edge this table held for its first year and still most of them.
+   *
+   * IT EXISTS FOR ONE REAL CASE rather than for generality. A knowledge source
+   * says which call it came out of by carrying GOOGLE'S OWN calendar event id
+   * (`knowledge_sources.event_id`, migration 0070, whose own comment is
+   * emphatic: "GOOGLE'S OWN calendar event id and nothing else"). The matching
+   * local record is the meeting that has been storing that same id in
+   * `google_event_id` since 0012, under a unique index. So the join is
+   * `meetings.google_event_id = knowledge_sources.event_id`, and an edge table
+   * that can only say `o.id = n.<column>` cannot express it at all.
+   *
+   * THE ALTERNATIVE WAS A SECOND COLUMN holding the meeting's own id, and 0070
+   * refused it in advance for a reason that still holds: a second spelling of a
+   * fact is a second place for it to drift. Teaching the map to follow the key
+   * that already exists costs one optional field here; teaching the schema to
+   * repeat itself costs a migration, a backfill and a reconciliation for ever. */
+  toColumn?: string
   /** what the line MEANS, read from `from` to `to`. */
   relation: string
 }
@@ -100,6 +118,43 @@ export const RECORD_EDGES: readonly RecordEdge[] = [
   { from: "deliverables", column: "app_id", to: "apps", relation: "was handed over on" },
   // Why we met.
   { from: "meetings", column: "purpose_id", to: "meeting_purposes", relation: "was held for" },
+  // ── WHAT THE ASSISTANT WAS ALLOWED TO READ, AND WHERE IT CAME FROM ────────
+  //
+  // A knowledge source had no edges at all until now, so opening the map on one
+  // answered "nothing is linked to this" about a row that is, by construction, a
+  // copy of something. That was invisible because the Connections tab stands on
+  // the source's ORIGIN row rather than on the source — which works for the
+  // thirteen origin tables that are real rows here, and cannot work at all for
+  // the four that name an external system (`google_gmail`, `google_calendar`,
+  // `google_chat`, `google_drive` — 1,313 of 4,838 sources, measured by
+  // connections_fix_1). Those four have no local row to stand on. They do have
+  // these.
+  //
+  // THE EVENT EDGE IS THE ONE THAT PAYS FOR THE `toColumn` FIELD, and it is the
+  // one that gives that material a neighbourhood it has never had: an email, a
+  // chat log and a transcript about the same half-hour all point at the same
+  // Google event, so standing on the MEETING gathers them (the backward reading
+  // of this line), and standing on any one of them reaches the call. Before
+  // migration 0070 nothing in the schema could say that two of them were about
+  // the same half-hour.
+  //
+  // account / app / sprint are the universal parents 0070 deliberately did NOT
+  // duplicate ("a stray thread has an account and no event"), so a source with
+  // no event is still not an orphan.
+  //
+  // `ticket_id` IS DELIBERATELY LEFT OUT, and it is the tempting one because the
+  // column is right there and populated. On staging (measured 8 Sep 2026) 2,050
+  // of its 2,053 live uses hold the source's OWN `origin_row_id` — the source is
+  // the mirror OF that ticket — so the line says "this is a copy of that", which
+  // is a sentence about the mirroring machinery rather than about the business.
+  // Read from the other end it is worse: every one of those 2,050 tickets would
+  // gain a permanent extra node on its own map saying the knowledge base has a
+  // copy of it. This table's own rule is that an edge must be a sentence
+  // somebody would say out loud, and that one is not.
+  { from: "knowledge_sources", column: "event_id", toColumn: "google_event_id", to: "meetings", relation: "came out of" },
+  { from: "knowledge_sources", column: "account_id", to: "accounts", relation: "is filed under" },
+  { from: "knowledge_sources", column: "app_id", to: "apps", relation: "is about" },
+  { from: "knowledge_sources", column: "sprint_id", to: "sprints", relation: "is about" },
 ] as const
 
 /** WHAT THIS CALLER MAY READ, as a set of TABLES — the same map the activity
@@ -166,9 +221,64 @@ const LABEL_COLUMN: Record<string, string> = {
   tasks: "title",
   todos: "title",
   meeting_purposes: "name",
+  // A source's own words. Without this a knowledge node reads as a ULID, which
+  // is the one thing this map exists not to be — and it is reached from BOTH
+  // ends now: standing on a source, and standing on the call several of them
+  // came out of.
+  knowledge_sources: "title",
   portal_users: "",
   account_links: "",
 }
+
+/** TABLES WHOSE ROWS THE APP RETIRES RATHER THAN DELETES, so the map can leave
+ * a retired one out of somebody's neighbourhood.
+ *
+ * ── WHY THIS ARRIVED WITH THE KNOWLEDGE EDGES AND NOT BEFORE ───────────────
+ *
+ * The map has never filtered a retired row, and until now that was invisible
+ * rather than correct. Measured on staging (9 Sep 2026) across every table these
+ * edges touch: apps 0 retired, accounts 0, sprints 0, waves 0, processes 0,
+ * deliverables 0, meeting_purposes 0, meetings 5, portal_users 1,
+ * account_links 2 — and `knowledge_sources` 886. One table holds 886 of the 894
+ * retired rows in the whole map, so the clause that was missing had almost
+ * nothing to act on and nobody could have noticed it was absent.
+ *
+ * IT MATTERS NOW BECAUSE OF WHAT RETIRES A SOURCE. The knowledge base folds its
+ * own duplicates away — 726 of the 851 rows carrying an event id are retired,
+ * every one of them stamped by `kwapso` rather than by a person. Standing on a
+ * meeting WITHOUT this clause gathers 58 live artefacts and 404 retired ones: a
+ * seven-to-one wall of exactly the duplicates phase 2 exists to hide, drawn as
+ * though they were the record. The feature would have made the problem it was
+ * built beside look worse.
+ *
+ * A MAP IS A PICTURE OF THE SHAPE THINGS ARE IN NOW. "Deactivate, never delete"
+ * keeps the row and its audit; it does not make the row a neighbour. The FOCUS
+ * is exempt — opening the map on a retired record is a deliberate act and it
+ * still draws itself — and only the far end of each edge is filtered.
+ *
+ * DATA, AND ROT-CHECKED AGAINST THE SCHEMA rather than trusted: record-map's own
+ * suite reads `deactivated_at` off each table in a real database built from the
+ * migrations and fails if this set and the schema disagree in either direction.
+ * So a table that gains the column, or loses it, cannot leave this stale. */
+export const RETIRABLE = new Set([
+  "accounts",
+  "account_links",
+  "apps",
+  "deliverables",
+  "knowledge_sources",
+  "meeting_purposes",
+  "meetings",
+  "portal_users",
+  "processes",
+  "sprints",
+  "waves",
+])
+
+/** `AND o.deactivated_at IS NULL`, where the far table HAS that column. Built
+ * once so the list and the R16 count below can never carry different versions of
+ * it — the failure `sourcesWhere` in knowledge.ts already names: a count is
+ * exact about the wrong question the moment the two clauses drift. */
+const liveOnly = (table: string) => (RETIRABLE.has(table) ? ` AND o.deactivated_at IS NULL` : "")
 
 const key = (n: { table: string; id: string }) => `${n.table}:${n.id}`
 
@@ -216,11 +326,24 @@ export async function neighbourhood(
     const other = outward ? edge.to : edge.from
     const otherLabel = LABEL_COLUMN[other]
     const select = `SELECT o.id${otherLabel ? `, o.${otherLabel} AS label` : ", NULL AS label"}`
-    const where = outward
-      ? `n.id = ${sqlString(id)} AND o.id = n.${edge.column}`
-      : `o.${edge.column} = ${sqlString(id)}`
+    // WHICH KEY THE FAR END IS MATCHED ON — `id` unless the edge says otherwise
+    // (see `toColumn`). The two readings need it in two different places, and
+    // the BACKWARD one is where it is easy to get wrong: standing on a meeting,
+    // the sources that came out of it do not carry that meeting's id, they carry
+    // the Google event id it stores. So the value is looked up in the statement
+    // rather than assumed to be the focus's own id — a subquery, so the whole
+    // edge is still ONE round trip and one moment.
+    const toCol = edge.toColumn ?? "id"
+    const farValue =
+      toCol === "id"
+        ? sqlString(id)
+        : `(SELECT f.${toCol} FROM ${table} f WHERE f.id = ${sqlString(id)})`
+    const where =
+      (outward
+        ? `n.id = ${sqlString(id)} AND o.${toCol} = n.${edge.column}`
+        : `o.${edge.column} = ${farValue}`) + liveOnly(other)
     const from = outward
-      ? `FROM ${table} n JOIN ${other} o ON o.id = n.${edge.column}`
+      ? `FROM ${table} n JOIN ${other} o ON o.${toCol} = n.${edge.column}`
       : `FROM ${other} o`
     const rows = await d1Query<{ id: string; label: string | null }>(
       cfg,
@@ -237,7 +360,10 @@ export async function neighbourhood(
       : await countCollection(
           cfg,
           guard.databaseId,
-          `SELECT 1 FROM ${other} o WHERE o.${edge.column} = ${sqlString(id)}`
+          // THE SAME PREDICATE AS THE LIST ABOVE, `farValue` included. R16 is
+          // about the number being exact; it is exact about the WRONG question
+          // the moment the count and the list stop asking the same one.
+          `SELECT 1 FROM ${other} o WHERE o.${edge.column} = ${farValue}${liveOnly(other)}`
         )
     for (const r of shown) {
       const node: MapNode = { table: other, id: r.id, label: r.label ?? r.id }

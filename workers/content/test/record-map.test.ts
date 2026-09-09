@@ -26,7 +26,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import worker from "../src/index"
-import { edgesFor, NEIGHBOURS_PER_EDGE, RECORD_EDGES } from "../src/lib/record-map"
+import { edgesFor, NEIGHBOURS_PER_EDGE, RECORD_EDGES, RETIRABLE } from "../src/lib/record-map"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 
 const db = () => holder.db as DatabaseSync
@@ -179,5 +179,240 @@ describe("the map is bounded by construction", () => {
       expect(ACTIVITY_GATE_MAP[e.to], `edge to "${e.to}" maps to no module`).toBeTruthy()
       expect(e.relation.length, `the edge ${e.from}→${e.to} says nothing`).toBeGreaterThan(2)
     }
+  })
+})
+
+describe("a knowledge source has a neighbourhood — including the four that name no row here", () => {
+  // THE GAP THIS CLOSES. The Connections tab stands on a source's ORIGIN row,
+  // which works for the thirteen origin tables that are real rows in this
+  // database and cannot work for the four that name an external system
+  // (`google_gmail`, `google_calendar`, `google_chat`, `google_drive` — 1,313 of
+  // 4,838 sources on staging). Those four have no local row to stand on, so the
+  // tab was hidden and the material had no neighbourhood at all. They do have an
+  // account, an app, and — since migration 0070 — the Google event they came out
+  // of, which is what these edges follow.
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO meetings (id, account_id, title, google_event_id, starts_at, created_at)
+        VALUES ('M_MAP', 'A_MAP', 'The Tuesday call', 'GCAL_EVENT_9', '2026-03-01T10:00:00Z', '2026-03-01');
+      -- The same half-hour, three ways: Google's own calendar entry, the email
+      -- notice about it, and the chat log. None of them is a row in this database
+      -- and all three carry the one event id.
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             account_id, app_id, event_id, event_id_from, title, created_at)
+        VALUES ('KS_MAIL', 'email', 'google_gmail', 'u1:mail-1', 'agency',
+                'A_MAP', 'APP_MAP', 'GCAL_EVENT_9', 'mail', 'Notes: The Tuesday call', '2026-03-01');
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, event_id_from, title, created_at)
+        VALUES ('KS_CHAT', 'message', 'google_chat', 'u1:chat-1', 'agency',
+                'GCAL_EVENT_9', 'origin', 'Chat about Tuesday', '2026-03-01');
+    `)
+  })
+
+  it("stands on the SOURCE and draws the call, the client and the system", async () => {
+    const { status, body } = await map("knowledge_sources", "KS_MAIL")
+    expect(status).toBe(200)
+    const nodes = body.nodes as { table: string; id: string; label: string }[]
+    expect(nodes.map((n) => `${n.table}:${n.id}`).sort()).toEqual(
+      ["accounts:A_MAP", "apps:APP_MAP", "knowledge_sources:KS_MAIL", "meetings:M_MAP"].sort()
+    )
+    // Its own words, not a ULID — reached from both ends now.
+    expect((body.focus as { label: string }).label).toBe("Notes: The Tuesday call")
+    expect(nodes.find((n) => n.id === "M_MAP")?.label).toBe("The Tuesday call")
+  })
+
+  it("gathers the SIBLINGS when you stand on the call — the point of the event edge", async () => {
+    const { body } = await map("meetings", "M_MAP")
+    const nodes = body.nodes as { table: string; id: string }[]
+    // Both artefacts about that half-hour, neither of which is a row here.
+    expect(nodes.filter((n) => n.table === "knowledge_sources").map((n) => n.id).sort()).toEqual([
+      "KS_CHAT",
+      "KS_MAIL",
+    ])
+    const links = body.links as { from: string; to: string; relation: string }[]
+    expect(links).toContainEqual({
+      from: "knowledge_sources:KS_MAIL",
+      to: "meetings:M_MAP",
+      relation: "came out of",
+    })
+  })
+
+  it("matches GOOGLE'S event id and never the meeting's own id", async () => {
+    // THE ASSERTION THE `toColumn` FIELD EXISTS FOR. `event_id` is Google's id
+    // (migration 0070: "GOOGLE'S OWN calendar event id and nothing else"), so a
+    // source carrying the MEETING's primary key is naming something else
+    // entirely and must not be drawn. Without `toColumn` this row is exactly what
+    // the old `o.id = n.<column>` join would have matched — and the real ones
+    // above are exactly what it would have missed.
+    db().exec(`
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, title, created_at)
+        VALUES ('KS_WRONG', 'email', 'google_gmail', 'u1:mail-2', 'agency',
+                'M_MAP', 'Names the row id, not the event', '2026-03-02');
+    `)
+    const { body } = await map("meetings", "M_MAP")
+    const ids = (body.nodes as { id: string }[]).map((n) => n.id)
+    expect(ids, "the meeting's own id is not a Google event id").not.toContain("KS_WRONG")
+    expect(ids).toContain("KS_MAIL")
+    const back = await map("knowledge_sources", "KS_WRONG")
+    expect(
+      (back.body.nodes as { table: string }[]).some((n) => n.table === "meetings"),
+      "read from the source's side either"
+    ).toBe(false)
+  })
+
+  it("counts the same question it lists (R16)", async () => {
+    // THE COUNT FOLLOWS THE SUBQUERY, and this is where that could silently rot.
+    // The backward reading counts through `countCollection` on its own statement,
+    // so a count that resolved the far key differently from the list would report
+    // a number about a different question — here, `event_id = 'M_MAP'`, which is
+    // zero. Asserted as a DIFFERENCE rather than as a fixed number, so the
+    // meeting's other edges (its account) cannot make the test pass by accident.
+    const before = (await map("meetings", "M_MAP")).body.total as number
+    const nodes = (await map("meetings", "M_MAP")).body.nodes as { id: string }[]
+    expect(before, "nothing is capped here, so every neighbour is on the page").toBe(
+      nodes.length - 1
+    )
+    db().exec(`DELETE FROM knowledge_sources WHERE id = 'KS_CHAT'`)
+    const after = (await map("meetings", "M_MAP")).body.total as number
+    expect(after, "one sibling fewer, counted rather than measured off the page").toBe(before - 1)
+  })
+
+  it("a source with no account, no app and no event is honestly empty", async () => {
+    db().exec(`
+      INSERT INTO knowledge_sources (id, kind, compartment, title, created_at)
+        VALUES ('KS_NOTE', 'note', 'agency', 'A note somebody typed', '2026-03-03');
+    `)
+    const { status, body } = await map("knowledge_sources", "KS_NOTE")
+    expect(status).toBe(200)
+    expect((body.focus as { label: string }).label).toBe("A note somebody typed")
+    expect(body.links).toEqual([])
+    expect(body.total).toBe(0)
+  })
+
+  it("draws NO edge for ticket_id — the mirror pointer is not a relationship", () => {
+    // 2,050 of 2,053 live uses hold the source's own origin_row_id (staging,
+    // 8 Sep 2026), so the line would say "this is a copy of that" and every one
+    // of those tickets would gain a permanent extra node. Pinned so the column
+    // being right there does not invite it back in without the argument.
+    expect(
+      RECORD_EDGES.some((e) => e.from === "knowledge_sources" && e.column === "ticket_id")
+    ).toBe(false)
+  })
+})
+
+describe("the fence is on the new edges too", () => {
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO meetings (id, account_id, title, google_event_id, starts_at, created_at)
+        VALUES ('M_MAP', 'A_MAP', 'The Tuesday call', 'GCAL_EVENT_9', '2026-03-01T10:00:00Z', '2026-03-01');
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             account_id, app_id, event_id, title, created_at)
+        VALUES ('KS_MAIL', 'email', 'google_gmail', 'u1:mail-1', 'agency',
+                'A_MAP', 'APP_MAP', 'GCAL_EVENT_9', 'Notes: The Tuesday call', '2026-03-01');
+    `)
+  })
+
+  it("a caller who may not read meetings does not learn the call exists", async () => {
+    deny("meetings")
+    const { body } = await map("knowledge_sources", "KS_MAIL")
+    expect(
+      (body.nodes as { table: string }[]).some((n) => n.table === "meetings"),
+      "the call is the FAR end — absent, not greyed and not counted"
+    ).toBe(false)
+    expect(body.total, "a count of things you may not see is itself the fact").toBe(2)
+  })
+
+  it("…and without `knowledge:read` there is no map at all, from either side", async () => {
+    // NOT THE SYMMETRIC CASE I FIRST WROTE, and the difference is worth keeping.
+    // `knowledge` is the DOOR's own gate, not just one end of this edge, so
+    // taking it away does not quietly drop the source nodes from a meeting's
+    // map — it refuses the whole read. That is a stronger answer than the one
+    // the test was reaching for, and the test now asserts what actually happens
+    // rather than what the edge table alone would suggest.
+    deny("knowledge")
+    expect((await map("meetings", "M_MAP")).status).toBe(403)
+    expect((await map("knowledge_sources", "KS_MAIL")).status).toBe(403)
+  })
+
+  it("subtracts one module at a time, not all of them", async () => {
+    deny("accounts")
+    const { body } = await map("knowledge_sources", "KS_MAIL")
+    const tables = (body.nodes as { table: string }[]).map((n) => n.table)
+    expect(tables, "the client is gone").not.toContain("accounts")
+    expect(tables, "and the call the reader MAY see is still there").toContain("meetings")
+    expect(tables).toContain("apps")
+  })
+})
+
+describe("a retired row is not a neighbour", () => {
+  // THE BUG THIS CLOSES, measured on staging 9 Sep 2026. The knowledge base folds
+  // its own duplicates away — 726 of the 851 sources carrying an event id are
+  // retired, every one stamped by `kwapso` rather than a person — so standing on
+  // a meeting gathered 58 live artefacts and 404 retired ones. A seven-to-one
+  // wall of exactly the duplicates phase 2 exists to hide, drawn as the record.
+  //
+  // The clause was missing from the map since it shipped and could not have been
+  // noticed: of the 894 retired rows across every table these edges touch, 886
+  // are in `knowledge_sources` and the rest are single figures.
+  beforeEach(() => {
+    db().exec(`
+      INSERT INTO meetings (id, account_id, title, google_event_id, starts_at, created_at)
+        VALUES ('M_RET', 'A_MAP', 'The Tuesday call', 'GCAL_EVENT_R', '2026-03-01T10:00:00Z', '2026-03-01');
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, title, created_at)
+        VALUES ('KS_LIVE', 'email', 'google_gmail', 'u1:live', 'agency',
+                'GCAL_EVENT_R', 'The one that survived', '2026-03-01');
+      -- Folded away by the app itself, exactly as the duplicate sweeps stamp it.
+      INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment,
+             event_id, title, created_at, deactivated_at, deactivator_name)
+        VALUES ('KS_DEAD', 'email', 'google_gmail', 'u1:dupe', 'agency',
+                'GCAL_EVENT_R', 'A duplicate the base retired', '2026-03-01',
+                '2026-03-02', 'kwapso');
+    `)
+  })
+
+  it("a call gathers what survived, not what the base folded away", async () => {
+    const { body } = await map("meetings", "M_RET")
+    const ids = (body.nodes as { id: string }[]).map((n) => n.id)
+    expect(ids).toContain("KS_LIVE")
+    expect(ids, "the retired duplicate is what this whole clause is for").not.toContain("KS_DEAD")
+  })
+
+  it("…and the COUNT agrees with the picture (R16)", async () => {
+    const { body } = await map("meetings", "M_RET")
+    const nodes = body.nodes as { id: string }[]
+    // A count that kept the retired rows would over-report by exactly the rows
+    // the list refused to draw — the drift `sourcesWhere` in knowledge.ts names.
+    expect(body.total).toBe(nodes.length - 1)
+  })
+
+  it("but the FOCUS may be retired — opening it is a deliberate act", async () => {
+    const { status, body } = await map("knowledge_sources", "KS_DEAD")
+    expect(status).toBe(200)
+    expect((body.focus as { label: string }).label).toBe("A duplicate the base retired")
+  })
+
+  it("RETIRABLE matches the SCHEMA, both ways — rot-checked, never hand-trusted", () => {
+    // DERIVED from a real database built from the migrations, so a table that
+    // gains `deactivated_at` (or loses it) cannot leave the set stale. Both
+    // directions: a table in the set without the column would put invalid SQL in
+    // front of a reader, and one with the column missing from the set is a hole
+    // exactly like the one this suite exists for.
+    const tables = new Set(RECORD_EDGES.flatMap((e) => [e.from, e.to]))
+    const missing: string[] = []
+    const invented: string[] = []
+    for (const t of tables) {
+      const cols = db()
+        .prepare(`SELECT name FROM pragma_table_info(?)`)
+        .all(t)
+        .map((r) => (r as { name: string }).name)
+      expect(cols.length, `${t} is named by an edge but is not a table`).toBeGreaterThan(0)
+      const has = cols.includes("deactivated_at")
+      if (has && !RETIRABLE.has(t)) missing.push(t)
+      if (!has && RETIRABLE.has(t)) invented.push(t)
+    }
+    expect(missing, `these tables retire rows and the map would still draw them: ${missing}`).toEqual([])
+    expect(invented, `RETIRABLE names tables with no deactivated_at column: ${invented}`).toEqual([])
   })
 })

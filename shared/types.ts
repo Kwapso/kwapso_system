@@ -95,7 +95,7 @@ export type TeamMember = {
    * list, and therefore in every dropdown built from it. That is right for the
    * admin screens (they are a member; somebody has to be able to see and remove
    * them) and wrong everywhere work is handed out, which is what the front door
-   * uses this to decide (web/lib/people.ts). The fact is a `portal_users` row in
+   * uses this to decide (web/lib/members.ts). The fact is a `portal_users` row in
    * the team's own database, the same table the account fence reads. */
   isClient: boolean
   joinedAt: string
@@ -157,7 +157,9 @@ export type SelectableValue = {
  * (key + label), the saved value, the role title, and whether it's the locked
  * Admin role (shown view-only). */
 export type RolePermissions = {
-  modules: { key: string; label: string }[]
+  /** `rights` is WHICH of the four this module offers (R36, `MODULE_OFFERED_RIGHTS`),
+   * so the Roles screen draws only the boxes that decide something. */
+  modules: { key: string; label: string; rights: readonly (keyof RightSet)[] }[]
   value: PermissionValue
   isDefault: boolean
   title: string
@@ -233,6 +235,18 @@ export type ActiveContext = {
   memberCount: number
   /** every team you belong to — feeds the team switcher */
   teams: TeamSummary[]
+  /** WHO IS ASKING — the same answer `/api/auth/me` gives, carried here so the
+   * agency app boots on ONE request instead of two. The tenancy door already
+   * resolved the caller through auth to answer at all; handing that answer back
+   * costs nothing and saves the browser a full round trip on every cold open
+   * (MAX_REQUESTS_BEFORE_FIRST_PAINT, shared/workers/limits.ts). */
+  user: SessionUser
+  /** YOUR OWN RIGHTS in the current team — the same sheet `/api/tenancy/
+   * my-permissions` answers, read in the same wave as the fence that decides
+   * whether you may see this context at all. Null when there is no team to have
+   * rights in. The web app primes its `my-perms` cache from this, so the one
+   * hook nothing can render without is warm before the first screen asks. */
+  permissions: PermissionValue | null
 }
 
 /** One row of a record's Activity tab (and the team-wide feed). The same row
@@ -255,6 +269,16 @@ export type ActivityItem = {
    * safe direction: it leaves a name whole rather than truncating one. */
   actorIsClient: boolean
   createdAt: string
+  /** WHICH OF THE EIGHT (shared/workers/activity-verbs.ts). `type` is the
+   * sentence a person reads; this is the word a filter can stand on. Written on
+   * every row since the column landed; older rows answer null. */
+  verb: string | null
+  /** WHICH DOOR THE CHANGE CAME THROUGH — the agency app, the client portal, a
+   * machine token, the assistant, a cron. Every surface writes the same row
+   * through the same seam, so without this the trail cannot tell you which one
+   * a change came from; with it, "did Alex do this or did Alex's token?" is a
+   * question the feed answers. `unknown` where the writer could not say. */
+  origin: string | null
 }
 
 /** A team's Overview-tab metadata (who made it + when). */
@@ -348,7 +372,7 @@ export type HelpStatus = (typeof HELP_STATUSES)[number]
  * shape that leaves a stage reachable by anybody who types its name.
  *
  * AND WHY NOT SIMPLY DROP IT EVERYWHERE. Because `stageLabel`
- * (web/components/ticket-stages.tsx) would then have no case for it, and a
+ * (web/components/tickets/ticket-stages.tsx) would then have no case for it, and a
  * timeline row on a real ticket would draw either nothing or the raw enum. A
  * person reading their own ticket's history is owed the same words we used at
  * the time — "Waiting on you" — for ever. */
@@ -373,7 +397,7 @@ export type HelpStatusEver = HelpStatus | RetiredHelpStatus
  * DIVISION it draws outlived the gate that used it, because it was never really
  * about permission: these are the kinds that cost money, which is why the
  * tickets dashboard ranks clients by exactly this set ("who has more scoped
- * work", web/components/tickets-dashboard.tsx). Keeping the old name over the
+ * work", web/components/tickets/tickets-dashboard.tsx). Keeping the old name over the
  * surviving half would have left an identifier promising a wait that no longer
  * happens. */
 const SCOPED_TICKET_TYPES = ["extra", "request", "feedback"] as const
@@ -596,7 +620,7 @@ export const CLOSURE_TREND_MONTHS = 12
  * the hover readout and the hit area's accessible name ("{median} days, from
  * {count} closed"), so "how much is this point standing on" is answerable per
  * month, by anybody, without the chart deciding for them. See
- * `ClosureTrend` in `web/components/tickets-dashboard.tsx` for why nothing else
+ * `ClosureTrend` in `web/components/tickets/tickets-dashboard.tsx` for why nothing else
  * was added. */
 
 /** A support ticket (team-wide; the My/All tabs filter by raiser). The built-in

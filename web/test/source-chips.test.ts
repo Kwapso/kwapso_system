@@ -57,7 +57,7 @@ describe("every chip has a word a person can read", () => {
   // screen as its raw key — the failure the knowledge Kind filter already had
   // once, where "sprint" and "account_links" sat beside "From a ticket".
   const panel = readFileSync(
-    join(__dirname, "..", "components", "agent-panel.tsx"),
+    join(__dirname, "..", "components", "assistant", "agent-panel.tsx"),
     "utf8"
   )
   const map = /const LABEL: Record<string, string> = \{([\s\S]*?)\n  \}/.exec(panel)

@@ -5,6 +5,7 @@
 // Re-running the seed is idempotent (upsert by table_key), so it's safe at deploy.
 
 import { json } from "@shared/workers/http"
+import { MEASUREMENT_SOURCES } from "@shared/workers/error-log"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { adminGuard } from "@shared/workers/gating"
 import { foldSignature, signatureOf } from "@shared/workers/error-signature"
@@ -46,7 +47,9 @@ export async function getErrors(request: Request, env: Env): Promise<Response> {
      FROM error_logs ${where} ORDER BY at DESC LIMIT ${limit}`
   )
   const rows = await (status === "all" ? stmt : stmt.bind(status)).all()
-  return json({ errors: rows.results ?? [] })
+  // Which sources carry no stack BY DESIGN (error-log.ts): a reader counting
+  // `stack IS NULL` must be able to subtract them without opening the source.
+  return json({ errors: rows.results ?? [], measurementSources: MEASUREMENT_SOURCES })
 }
 
 /** POST /api/data-ops/admin/errors/resolve { id, note } — close an error with the

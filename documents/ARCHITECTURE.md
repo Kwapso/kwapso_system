@@ -118,7 +118,8 @@ sequenceDiagram
 - **Per-team databases.** A GLOBAL D1 core holds identity and everything that has
   to be true across teams: `users`, `teams`, `team_members` (the card catalog:
   user → team → role id), the session and sign-in tables, the MCP tokens, the AI
-  meter (`agent_credits`, `agent_usage`, `agent_usage_log`), the error log, the
+  meter (`agent_credits`, `agent_usage`, `agent_usage_log`, and `credit_grants`,
+  who topped a balance up), the error log, the
   sharding alarms (`db_alerts`, `db_growth`, `team_module_databases`,
   `team_module_moves`), `account_activity`, `email_change_logs` and the import
   registry. Every team then gets **its own D1 database** holding its own tables:
@@ -145,12 +146,20 @@ sequenceDiagram
   fact. They do not: `requireMember` resolves ONE `guard.databaseId` from
   `teams.database_id`, nothing consults `team_module_databases`, and those two
   functions have no callers outside the sharding lib — so the mover's drain would
-  empty the database the app is still reading and report success. And wiring them
-  is not the whole job: `d1QueryAcross` refuses `LIMIT`, `ORDER BY` and `COUNT`
-  across more than one database (a concatenation cannot answer them), while every
-  collection here pages (R14), sorts and counts exactly (R16). Cross-shard paging
-  is an owner-level decision, not a patch. The refusal and the flag are held
-  together by a census in `workers/tenancy/test/merged-read-guard.test.ts`.
+  empty the database the app is still reading and report success. *(Fact updated
+  7 Sep 2026: the SECOND half of this blocker is gone. `d1QueryAcross` used to
+  refuse `LIMIT`, `ORDER BY` and `COUNT` outright; it now MERGES — each shard
+  answers its own top n under the same ordering, the seam sorts the union by the
+  statement's own keys, parsed off its tail, and cuts to n — and a collection
+  count has its own merge in `countCollectionAcross` (`shared/workers/count.ts`),
+  which sums the per-shard bounded counts and clamps once. What it still refuses
+  is an OFFSET, a raw aggregate, and an ordering it cannot read as bare columns.
+  So what is left is ROUTING — nothing outside the sharding lib resolves a
+  module's databases — plus a keyset CURSOR that means the same position on every
+  shard, which OFFSET's refusal is exactly about. That is still an owner-level
+  decision rather than a patch, and it is now one decision rather than two.)* The
+  refusal, the merge and the flag are held together by
+  `workers/tenancy/test/merged-read-guard.test.ts`.
   Maintenance via x-admin-key endpoints.
   Those endpoints are published by the gateway's PREFIX forward, so they answer on the
   public internet: `guardMaintenance` throttles them to 12 calls a minute per address and
@@ -213,8 +222,9 @@ platform, **what gets a DO instance, and what does NOT:**
   sign-out event pings that user's channel (their devices). Each ping is
   **row-level** (`{resource, id, op}`), NOT one-DO-per-record. *(Fact updated
   26 Aug 2026: "one channel" is no longer "one instance". Since §7's split of
-  14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (4) `TeamChannel` instances,
-  `team:<id>#0…3`, plus one `TeamInterest` registry at `team:<id>!interest`; the
+  14 Aug 2026 a TEAM's channel is `REALTIME_SHARDS` (9 since 7 Sep 2026, derived) `TeamChannel` instances,
+  `team:<id>#0` … `team:<id>#<REALTIME_SHARDS−1>`, plus one `TeamInterest` registry at
+  `team:<id>!interest`; the
   realtime worker's `/publish` door owns the fan-out, so a publisher still names
   `team:<id>` and a listener joins the shard of `shardFor(userId)`. A USER's
   channel is still one instance. This bullet used to say "one instance per team",
@@ -316,7 +326,7 @@ on top follows [CACHING.md](CACHING.md).
 | GET /api/data-ops/import/sample | data-ops | a downloadable sample CSV for a target, a good-file template (AGENTIC-IMPORT §10) |
 | GET /api/data-ops/import/batches | data-ops | the team's import history, newest first, summaries only (who, when, files → tables, totals) |
 | POST /api/data-ops/admin/seed-targets | data-ops | seed the global import catalog (owner-only, x-admin-key) |
-| POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key) |
+| POST /api/data-ops/admin/grant-credits | data-ops | top up a team's AI credits (owner-only, x-admin-key; every grant writes a `credit_grants` row in the same batch as the balance) |
 | GET /api/data-ops/agent/usage | data-ops | the team's AI quota snapshot (free + credits) |
 | POST /api/data-ops/agent/chat | data-ops | run one agent turn (answer, or propose/take an action act-as-you); accepts attached CSVs, planned through the import batch engine, run via run_import_batch behind the confirm panel (AGENTIC-IMPORT §8.5) |
 | POST /api/data-ops/agent/confirm | data-ops | approve/decline a proposed dangerous action; resume the turn |
@@ -536,7 +546,7 @@ on top follows [CACHING.md](CACHING.md).
   manifest (`web/app/manifest.ts`, name/description from `shared/brand.ts`) +
   brand-monogram icons (`web/public/icons/*`, swappable via `brand.logoUrl`) +
   per-mode `theme-color`, so it is installable to a home screen / dock. A library
-  bottom `Sheet` (`web/components/install-prompt.tsx`) drives it: Chrome / Edge /
+  bottom `Sheet` (`web/components/shell/install-prompt.tsx`) drives it: Chrome / Edge /
   Android use the captured `beforeinstallprompt` (a real "Install" button); iOS
   Safari (which fires no such event) gets the guided "Share → Add to Home Screen"
   walkthrough. **Trigger rules:** never when already installed; never on a
@@ -587,11 +597,24 @@ at. The owner then chose to raise it instead. Both were reasonable; this section
 where it ended up and what is still true.
 
 **The change (14 Aug 2026).** A team's channel is now **split across
-`REALTIME_SHARDS` (4) objects**, and listeners **declare what they want to hear**.
+`REALTIME_SHARDS` objects**, and listeners **declare what they want to hear**.
+
+**And the count stopped being a number (7 Sep 2026).** It was `4`, beside a
+comment saying four "clears the yardstick's 25,000 only once combined with
+subscription scoping" — a sentence conceding that the shard count did not clear
+the target on its own and leaned on a saving nobody had measured on a real
+tenant. It is now `ceil(REALTIME_PEAK_LISTENERS_PER_TEAM ÷
+REALTIME_SHARD_WATCH_SOCKETS)` = **9**: enough shards that a team at peak sits
+under the WATCH line on every one of them, 27,000 watched sockets against a
+25,000 peak. What made a wider fan-out affordable was the `TeamInterest`
+registry below — with it the publish side stops scaling with the shard count.
+A deploy drops no ping: `shardFor` is a modulo, listeners already connected stay
+where they are, and the fan-out reaches 0…N-1, a superset of where they sit.
 
 - **The split lives in the realtime worker's `/publish` door**, not at the publishers.
   A publisher still makes one call naming `team:<id>`; the door fans it out to
-  `team:<id>#0…3`. All hundred-odd `publishChange` call sites are untouched, which is
+  `team:<id>#0` … `team:<id>#<REALTIME_SHARDS−1>`. All hundred-odd `publishChange` call sites
+  are untouched, which is
   the point, a fan-out written at the publisher would have been a hundred chances to
   write it differently. Listeners join the shard of `shardFor(userId)`, so one person's
   devices land together and a reconnect returns to the same object.
@@ -662,8 +685,10 @@ sockets, so do not go looking for that metric. These three are real:
    rather than visiting it. Either turns "occasional visitors" into "concurrent
    sessions", which is what the numbers above rest on.
 
-**When one fires, in order:** raise `REALTIME_SHARDS` (one line, and the client and the
-fan-out read the same constant so they cannot disagree); then narrow the agency's
+**When one fires, in order:** raise the peak the shard count is derived from (one line
+in `shared/workers/realtime.ts`, and the client and the fan-out read the same constant
+so they cannot disagree — since 7 Sep 2026 the count follows the peak rather than being
+chosen beside it); then narrow the agency's
 subscription, which needs the activity feed to listen for something narrower than
 "anything". The third step this list used to end with — route pings to interested
 shards rather than to all of them — was built in August 2026 (`TeamInterest`; fact
@@ -679,9 +704,9 @@ its largest tenant is a few hundred people or a few hundred thousand.
 
 | accepted | why it stays | the trigger |
 |---|---|---|
-| Base64 uploads through the worker (not presigned direct-to-R2) | changes the client contract *and* the capability-URL model SCOPE ch.06 records | a file cap above ~25 MB, or the 128 MB isolate budget being hit in practice |
+| ~~Base64 uploads through the worker (not presigned direct-to-R2)~~ **BUILT 2026-09-07, and OFF** | the bytes stopped being BUFFERED on 17 Aug 2026 — `/upload-stream` on knowledge, deliverables, brand-assets and staff takes the file as the request body, so the ceiling is the platform's and not a 128 MB isolate's — and on 7 Sep 2026 they stopped passing through the worker at all: `POST /api/content/uploads/presign` hands the browser a signed PUT straight to `<account>.r2.cloudflarestorage.com`, and `/uploads/confirm` (plus `knowledge/upload-confirm`) turns the key into the record's reference. The capability-URL model SCOPE ch.06 records is not widened: the grant is PUT-only, to ONE server-minted key, for `PRESIGN_TTL_SECONDS` (300), and the READ path is still `/media/<key>`. **It is built and inert** — `presignConfigured` is false with no `R2_ACCESS_KEY_ID` secret, no deployed environment has one, and the client falls back to the streaming door byte for byte (`web/lib/api/content.ts` `putDirect` → `sendFile`). | turning it ON, which waits on the write-only credential scoped to the two buckets that `shared/workers/presign.ts` makes the condition of the switch — the account-wide key measured on 7 Sep 2026 could read and delete other companies' objects and does not qualify |
 | ~~The module mover is one non-resumable request~~ **RESUMED 2026-08-17** | progress lives in `team_module_moves` (db/core/0023), not in a stack frame: bounded copy batches per call, a per-table cursor, an idempotent `INSERT OR IGNORE`, and a claim a killed Worker cannot strand. A killed call is continued by calling again, and routing is still flipped last so an interrupted move is never a doubled read. | the FIRST real move, the resumption logic is unit-proven against an in-memory D1, never against Cloudflare's |
-| No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards) | nothing paged is on the split path, and refusing beats answering wrongly | the first time a PAGED module has to be split |
+| ~~No cross-shard merge (`d1QueryAcross` refuses a paged or counted read across shards)~~ **MERGED 2026-09-07** | it sorts and cuts now — each shard answers its own top n, the seam sorts the union by the statement's own ORDER BY keys and cuts to `LIMIT` — and `countCollectionAcross` sums the per-shard bounded counts. It still refuses an OFFSET, a raw aggregate, and an ordering it cannot parse, because those have no honest local answer. Nothing is on the split path yet either way: `SPLIT_READS_WIRED` is `false` | a keyset CURSOR that names the same position on every shard, which is what OFFSET's refusal is about — and, before that, ROUTING (§1 above) |
 | The crons rotate their team window rather than queueing | rotation makes a late team late, not skipped | more than ~600 teams |
 | R16's exact `COUNT(*)` on every feed page | it is a **Law** (RULES.md), changing it means rule, registry and check together | an activity table past ~5M rows in one team |
 | ~~Per-caller rate limiting on ordinary doors~~ **BUILT 2026-08-17** *(fact updated 26 Aug 2026: this row used to record the limiter as held down)* | the reasoning that kept it out of the gateways stands — neither decodes a session, so neither can key a limiter on a user, and per-IP puts one office behind one bucket — so it sits where the caller is already known: `teamContext` (`shared/workers/gating.ts` → `shared/workers/rate-limit.ts`) checks `callerHasBudget` once per request, keyed on the resolved user id, `CALLER_REQUESTS_PER_MINUTE` (600, `shared/workers/limits.ts`) per caller per worker, before the membership read, failing OPEN (a broken safety valve must not become the outage). The `CALLER_LIMIT` binding rides tenancy, content, data-ops and mcp (the `/mcp` desk keys `machine:<user_id>` so a token loop is refused before it fans out) | a paid tier where a caller's cost is somebody else's bill (the number, and where it sits, get renegotiated) |

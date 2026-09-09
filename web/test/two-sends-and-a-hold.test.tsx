@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { Toaster, toast } from "@shared/ui/components/sonner/sonner"
 
-import { ReplyComposer, useReplySend } from "@/components/reply-composer"
+import { ReplyComposer, useReplySend } from "@/components/tickets/reply-composer"
 
 /** Every door call the composer made, in order. */
 type Sent = { text: string; andClose: boolean; leaving: boolean }

@@ -24,7 +24,7 @@ import type { SortOption } from "@shared/web/screen-engine/config"
 /** One collection's sort control: what it offers, and which of those the DOOR
  * falls back to when the screen asks for nothing. The default is never sent —
  * a screen sitting on it reads the collection's own cache key and looks exactly
- * as it did before sorting existed (web/components/paged-find.tsx). */
+ * as it did before sorting existed (web/components/records/paged-find.tsx). */
 export type CollectionSort = { defaultSort: string; options: SortOption[] }
 
 /** THE PAGED COLLECTIONS' sort menus, keyed by the collection's name in

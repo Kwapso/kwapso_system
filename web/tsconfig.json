@@ -56,7 +56,7 @@
     // [under vite]; under Next it is a StaticImageData" — stopped being true
     // at kit v1.2.3, which reads every asset import through
     // shared/ui/lib/asset-url.ts. Both of its other clauses were already
-    // false: "neither door imports them" (web/components/record-chrome.tsx
+    // false: "neither door imports them" (web/components/records/record-chrome.tsx
     // imports templates/record-chrome), and "the kit's own `npm run check`
     // typechecks them upstream" — upstream checks them under VITE, which is
     // the one toolchain that cannot see a Next-only fault.

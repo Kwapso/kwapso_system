@@ -20,8 +20,37 @@
 // ── HOW TO RUN IT ───────────────────────────────────────────────────────────
 //
 //   node --experimental-transform-types scripts/agent-routing-bench.mjs --dry
+//   node --experimental-transform-types scripts/agent-routing-bench.mjs --self-test
+//   node --experimental-transform-types scripts/agent-routing-bench.mjs --dry --whole-catalogue
 //   node --experimental-transform-types scripts/agent-routing-bench.mjs
 //   node --experimental-transform-types scripts/agent-routing-bench.mjs --verbose
+//
+// ── WHAT THIS MEASURED BEFORE 2026-09-06, AND WHY IT WAS WRONG ─────────────
+//
+// This bench built its tools with `toolSpecs()` — no arguments — which returns
+// the WHOLE catalogue. `toolSpecs`'s own comment says it: "`loaded` absent = the
+// whole catalogue, exactly as before this existed." That was correct until the
+// two-stage catalogue landed on 2026-09-06, after which a step sends the CORE
+// tools plus an index of NAMES and fetches the rest with `load_tools`.
+//
+// So for as long as the split has existed, this bench has been measuring the
+// routing accuracy of a catalogue the assistant no longer sends — and it had
+// been nominated as the gate before the split shipped. It would have passed or
+// failed for reasons unrelated to the change and charged about $0.23 to do it.
+// A green here was not evidence about the split; do not read an older run as if
+// it were.
+//
+// It now builds what a step builds (`toolSpecs(undefined, loaded)` and
+// `stageOneSystem`, both IMPORTED so they cannot drift), takes the extra step
+// when the model asks for a tool, and reports the fetch path separately from the
+// score. Three questions are marked `deferred` because their door is outside the
+// core seven, so a run that never fetches is a run that says so.
+//
+// `--self-test` proves that loop against a scripted model over no network, for
+// nothing. `--whole-catalogue` restores the old shape ON PURPOSE, to be compared:
+// if a normal run and that one produce the same sizes and the same score, this
+// bench is not seeing the split, and "the split costs nothing" and "the bench is
+// blind" are the same output.
 //
 // `--dry` spends NOTHING: it builds the prompt, prints its size and the question
 // set, and stops. Run it first — it is how you learn what the real run will cost
@@ -86,9 +115,24 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const DRY = process.argv.includes("--dry")
 const VERBOSE = process.argv.includes("--verbose")
+/** THE CANARY, and it is not optional reading before you trust a number.
+ *
+ * `--whole-catalogue` sends all 166 tool definitions the way this bench did
+ * before 2026-09-06 — no index, no `load_tools`. It exists to be COMPARED with
+ * a normal run: if the two produce the same preamble size and the same score,
+ * this bench is not seeing the two-stage split, and "the split costs nothing" and
+ * "the bench is blind" are the same output. Run `--dry` both ways first; the
+ * sizes must differ by about 70%. */
+const WHOLE = process.argv.includes("--whole-catalogue")
+/** Runs the whole loop against a SCRIPTED model, over no network, for nothing.
+ * The fetch path is the thing this rewrite exists to exercise, and a path that is
+ * only exercised by a paid run is one nobody checks before paying. */
+const SELF_TEST = process.argv.includes("--self-test")
 
-const { systemFor } = await import(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
-const { toolSpecs } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
+import { importTs } from "./lib/import-ts.mjs"
+
+const { systemFor } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
+const { toolSpecs, stageOneSystem, CORE_TOOL_NAMES } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
 const { DEFAULT_AGENT_MODEL } = await import(join(REPO, "workers", "data-ops", "src", "lib", "model.ts"))
 // DYNAMIC, like the three above and for the same reason: the `@shared/*` hook is
 // registered when shared-alias.mjs EVALUATES, and a static import in this file
@@ -143,7 +187,18 @@ const QUESTIONS = [
   { q: "Raise a ticket for Assecuranz about the failed file import.", want: "live" },
   { q: "Invite maria@fluclinic.se to the team as an admin.", want: "live" },
   { q: "Change ticket 3144 to resolved.", want: "live" },
-  { q: "Is the knowledge base up to date?", want: "live" },
+  { q: "Is the knowledge base up to date?", want: "live", deferred: true },
+  // ── the two-stage catalogue's own question ────────────────────────────
+  // `deferred: true` marks a question whose door is NOT in the core seven, so
+  // answering it REQUIRES calling `load_tools` first. Without at least one of
+  // these a run exercises only the core tools and measures exactly what the
+  // pre-split bench measured — a green that proves nothing about the split.
+  //
+  // Chosen because the grammar cannot reach them: `query_records` covers the
+  // record modules, so a question it can answer would never need a fetch. A rate
+  // card and somebody's Google Drive are outside it.
+  { q: "What is an hour of each role worth to us?", want: "live", deferred: true },
+  { q: "Which files are in our Google Drive?", want: "live", deferred: true },
 ]
 
 /* ------------------------------ the verdict ------------------------------ */
@@ -174,7 +229,25 @@ function parseArgs(raw) {
   }
 }
 
-const tools = toolSpecs()
+/* ── WHAT A STEP ACTUALLY SENDS ────────────────────────────────────────────
+ *
+ * THIS LINE USED TO BE `toolSpecs()`, AND THAT IS WHY THIS REWRITE EXISTS.
+ * `toolSpecs()` with no arguments returns the WHOLE catalogue — the function's
+ * own comment says so: "`loaded` absent = the whole catalogue, exactly as before
+ * this existed." Since the two-stage catalogue landed on 2026-09-06 a step sends
+ * the CORE tools plus an index of names and fetches the rest with `load_tools`,
+ * so this bench was measuring the routing accuracy of a catalogue the assistant
+ * no longer sends. It would have passed or failed for reasons unrelated to the
+ * change, and charged for the privilege. It was nominated as the gate before the
+ * split shipped; it could not have answered the question.
+ *
+ * `stageOneSystem` is IMPORTED rather than reproduced, so the preface and the
+ * index here are the same bytes `runPlanLoop` sends. A hand-typed copy would
+ * drift the first time either was reworded and the run would still produce a
+ * number. */
+const stageOneTools = toolSpecs(undefined, new Set())
+const tools = WHOLE ? toolSpecs() : stageOneTools
+const systemSent = WHOLE ? system : stageOneSystem(system)
 
 /** THE MODEL THE DEPLOYMENT ACTUALLY RUNS — read off wrangler.jsonc, never off
  * model.ts's constant. `selectModel` is `env.AGENT_MODEL || DEFAULT_AGENT_MODEL`
@@ -196,9 +269,14 @@ const ACCOUNT_HINT = process.env.CLOUDFLARE_ACCOUNT_ID || "the kwapso Cloudflare
 const runModel = process.env.BENCH_CF_MODEL || deployedModel()
 
 if (DRY) {
-  console.log(`system prompt   ${system.length.toLocaleString()} chars  (~${Math.round(system.length / 4).toLocaleString()} tokens)`)
+  console.log(`system prompt   ${systemSent.length.toLocaleString()} chars  (~${Math.round(systemSent.length / 4).toLocaleString()} tokens)${WHOLE ? "" : "  (includes the tool-name index)"}`)
   const toolChars = JSON.stringify(tools).length
-  console.log(`tool catalogue  ${tools.length} tools, ${toolChars.toLocaleString()} chars  (~${Math.round(toolChars / 4).toLocaleString()} tokens)`)
+  console.log(
+    `tool catalogue  ${tools.length} tools, ${toolChars.toLocaleString()} chars  (~${Math.round(toolChars / 4).toLocaleString()} tokens)` +
+      (WHOLE
+        ? `   [--whole-catalogue: the PRE-SPLIT shape, for comparison only]`
+        : `   [stage one: ${CORE_TOOL_NAMES.size} core tools; the other ${toolSpecs().length - tools.length} are named in the index above]`)
+  )
   console.log(`questions       ${QUESTIONS.length}  (${QUESTIONS.filter((q) => q.want === "knowledge").length} knowledge, ${QUESTIONS.filter((q) => q.want === "live").length} live)`)
   // WHICH MODEL, AND THEREFORE WHOSE BILL. Said here rather than assumed,
   // because the answer changed and this line did not: `selectModel` reads
@@ -222,7 +300,7 @@ if (DRY) {
   // under, on the one screen whose whole job is to say what a run costs before
   // it runs. Derived from the preamble this run will actually send and the rate
   // card in shared/workers/pricing.ts, so it moves when either does.
-  const stepTokens = Math.round((system.length + toolChars) / 3.8223) // query-bench.mjs's calibration
+  const stepTokens = Math.round((systemSent.length + toolChars) / 3.8223) // query-bench.mjs's calibration
   const runInput = stepTokens * QUESTIONS.length
   const estimate = aiCostUsd(runModel, { input: runInput })
   console.log(
@@ -253,7 +331,25 @@ function workersAiModel(name) {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          // TOOL CALLS AND TOOL RESULTS TRAVEL, not just prose. The two-stage
+          // catalogue makes a turn MULTI-STEP — the model asks for a tool, gets a
+          // receipt, then answers — and flattening that into user turns would
+          // measure a conversation the assistant never has. This is the same
+          // chat-completions shape `workersAiBody` sends in the worker.
+          messages: messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            ...(m.toolCalls?.length
+              ? {
+                  tool_calls: m.toolCalls.map((c) => ({
+                    id: c.id,
+                    type: "function",
+                    function: { name: c.name, arguments: JSON.stringify(c.input ?? {}) },
+                  })),
+                }
+              : {}),
+            ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {}),
+          })),
           tools: tools.map((t) => ({
             type: "function",
             function: { name: t.name, description: t.description, parameters: t.schema },
@@ -303,23 +399,132 @@ function workersAiModel(name) {
   }
 }
 
+/** A MODEL THAT NEEDS A DEFERRED TOOL, OVER NO NETWORK, FOR NOTHING.
+ *
+ * `--self-test` proves the fetch loop before anybody pays to use it. It scripts
+ * the one behaviour the rewrite exists to measure — see a name in the index, call
+ * `load_tools`, then call the fetched tool — and asserts three things a paid run
+ * could not tell you apart:
+ *
+ *   · stage one really does WITHHOLD the tool (it is not quietly in the core);
+ *   · the loop WIDENS after the fetch, so step two is offered it;
+ *   · the fetched call is what gets SCORED, and `load_tools` is not.
+ *
+ * It also refuses to pass on an empty catalogue, which is the shape every wrong
+ * measurement in this repo's history has taken. */
+function scriptedModel(target) {
+  let call = 0
+  const offered = []
+  return {
+    name: "self-test (no network)",
+    offered,
+    async complete(messages, tools) {
+      offered.push(tools.map((t) => t.name))
+      call++
+      if (call === 1)
+        return {
+          text: "",
+          toolCalls: [{ id: "c1", name: "load_tools", input: { names: [target] } }],
+          usage: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
+          neurons: null,
+        }
+      return {
+        text: "",
+        toolCalls: [{ id: "c2", name: target, input: {} }],
+        usage: { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
+        neurons: null,
+      }
+    },
+  }
+}
+
 // One path, because there is only one: every model this can reach is a Workers
 // AI model, so the run goes over the REST door with the account token.
-const model = workersAiModel(runModel)
+const model = SELF_TEST ? scriptedModel("list_role_rates") : workersAiModel(runModel)
+
 
 const spend = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 }
 const rows = []
 
+/** THE FETCH PATH, RUN THE WAY THE LOOP RUNS IT.
+ *
+ * A question the core tools cannot answer costs one extra step: the model calls
+ * `load_tools`, the loop widens what it may call, and the NEXT reply carries the
+ * real tool. So the bench has to take that step too — otherwise every deferred
+ * tool reads as "the model never called it", which is the same output as a model
+ * that genuinely could not route, and the two would be indistinguishable.
+ *
+ * TWO STEPS, not twelve. This bench measures the FIRST door a question opens; it
+ * is not a plan runner. One fetch is what a routing decision needs, and a model
+ * that wants a second is telling us something worth seeing in the report rather
+ * than being carried until it succeeds. */
+const MAX_FETCH_STEPS = 2
+
+async function askOne(item) {
+  const loaded = new Set()
+  const fetched = []
+  const convo = [
+    { role: "system", content: systemSent },
+    { role: "user", content: item.q },
+  ]
+  let reply
+  for (let step = 0; step < MAX_FETCH_STEPS; step++) {
+    reply = await model.complete(convo, WHOLE ? tools : toolSpecs(undefined, loaded))
+    for (const k of Object.keys(spend)) spend[k] += reply.usage?.[k] ?? 0
+    const loads = reply.toolCalls.filter((t) => t.name === "load_tools")
+    if (!loads.length) break
+    // Mirror `runPlanLoop`: the LOOP reads the call's own input and widens, and
+    // the model gets a receipt. A tool result is data, never the thing that
+    // grants reach — same rule in the worker.
+    for (const c of loads)
+      for (const n of Array.isArray(c.input?.names) ? c.input.names : [])
+        if (typeof n === "string") { loaded.add(n); fetched.push(n) }
+    convo.push({ role: "assistant", content: reply.text ?? "", toolCalls: reply.toolCalls })
+    for (const c of loads)
+      convo.push({
+        role: "tool",
+        toolCallId: c.id,
+        toolName: "load_tools",
+        content: JSON.stringify({ loaded: [...loaded], unknown: [], note: "Their full instructions are available from your next step onward — call them directly." }),
+      })
+  }
+  return { reply, fetched }
+}
+
+if (SELF_TEST) {
+  const TARGET = "list_role_rates"
+  const fail = (why) => {
+    console.error(`SELF-TEST FAILED: ${why}`)
+    process.exit(1)
+  }
+  if (!stageOneTools.length) fail("stage one offered NO tools — an empty catalogue measures nothing")
+  if (toolSpecs().length <= stageOneTools.length)
+    fail(`stage one (${stageOneTools.length}) is not smaller than the whole catalogue (${toolSpecs().length}) — the split is not being applied`)
+  if (stageOneTools.some((t) => t.name === TARGET)) fail(`${TARGET} is in stage one, so it cannot exercise the fetch path — pick another target`)
+  if (!stageOneSystem(system).includes(TARGET)) fail(`${TARGET} is not named in the index, so the model could never know to ask for it`)
+
+  const { reply, fetched } = await askOne({ q: "What is an hour of each role worth to us?", want: "live", deferred: true })
+  const scored = reply.toolCalls.map((t) => t.name).filter((n) => n !== "load_tools")
+  if (!fetched.includes(TARGET)) fail(`the loop did not record the fetch (fetched: ${JSON.stringify(fetched)})`)
+  if (model.offered.length < 2) fail("only one model call was made — the loop did not take the second step")
+  if (model.offered[0].includes(TARGET)) fail("step one was offered the deferred tool — stage one is not withholding it")
+  if (!model.offered[1].includes(TARGET)) fail("step two was NOT offered the fetched tool — the loop did not widen")
+  if (!scored.includes(TARGET)) fail(`the fetched call was not scored (scored: ${JSON.stringify(scored)})`)
+  if (scored.includes("load_tools")) fail("load_tools was scored as a door — it opens none")
+
+  console.log("SELF-TEST PASSED — the fetch path works, and nothing was spent.")
+  console.log(`  step 1 offered ${model.offered[0].length} tools, without ${TARGET}`)
+  console.log(`  step 2 offered ${model.offered[1].length} tools, with it`)
+  console.log(`  scored: ${scored.join(", ")}   (load_tools correctly not scored)`)
+  process.exit(0)
+}
+
 for (const item of QUESTIONS) {
-  const reply = await model.complete(
-    [
-      { role: "system", content: system },
-      { role: "user", content: item.q },
-    ],
-    tools
-  )
-  for (const k of Object.keys(spend)) spend[k] += reply.usage?.[k] ?? 0
-  const called = reply.toolCalls.map((t) => t.name)
+  const { reply, fetched } = await askOne(item)
+  // The judgement is about the door the question OPENS, so `load_tools` — which
+  // opens no door and answers nothing — is not one of the names scored. Counted
+  // separately below, because whether the fetch happened is its own question.
+  const called = reply.toolCalls.map((t) => t.name).filter((n) => n !== "load_tools")
   // DID IT ASK FOR A COUNT, OR FOR A PAGE TO COUNT BY HAND? Reported beside the
   // score and deliberately NOT part of it: this bench's number is compared run
   // to run and model to model, and a judge that changed mid-comparison would
@@ -331,7 +536,7 @@ for (const item of QUESTIONS) {
     item.counts === true
       ? reply.toolCalls.some((t) => t.name !== ASK && t.input?.countOnly === true)
       : null
-  rows.push({ ...item, called, countedProperly, pass: judge(item.want, called) })
+  rows.push({ ...item, called, fetched, countedProperly, pass: judge(item.want, called) })
   if (VERBOSE && reply.text) console.log(`   ${item.q}\n   → ${reply.text.slice(0, 200)}\n`)
 }
 
@@ -353,6 +558,36 @@ console.log(`live questions going to a live read first    ${score(by("live"))}`)
 console.log(`overall                                      ${score(rows)}`)
 console.log(`${ASK} called anywhere in the turn           ${rows.filter((r) => r.called.includes(ASK)).length}/${rows.length}`)
 console.log(`tool calls per question                      ${(rows.reduce((n, r) => n + r.called.length, 0) / rows.length).toFixed(2)}`)
+
+// ── THE FETCH PATH, REPORTED SEPARATELY FROM THE SCORE ──────────────────────
+//
+// The score says which door a question opened. This says whether the two-stage
+// catalogue WORKED — and it is reported apart from the score because a run where
+// nothing needed a deferred tool would produce a fine score while measuring the
+// same thing the pre-split bench measured.
+if (!WHOLE) {
+  const need = rows.filter((r) => r.deferred)
+  const fetchedAny = rows.filter((r) => r.fetched.length)
+  console.log()
+  console.log(`questions needing a tool outside the core    ${need.length}`)
+  console.log(`  …of those that fetched one                 ${need.filter((r) => r.fetched.length).length}/${need.length}`)
+  console.log(`load_tools called on any question            ${fetchedAny.length}/${rows.length}`)
+  if (fetchedAny.length)
+    console.log(`  names fetched                              ${[...new Set(fetchedAny.flatMap((r) => r.fetched))].sort().join(", ")}`)
+  // THE LOUD ONE. If nothing fetched, this run says nothing about the split, and
+  // the number above it must not be quoted as if it did.
+  if (!fetchedAny.length)
+    console.log(
+      `\n  !! NOT ONE QUESTION FETCHED A TOOL. This run exercised the core tools only,\n` +
+        `     which is what the bench measured BEFORE the two-stage catalogue. Its score\n` +
+        `     is not evidence about the split. Check that ${need.length} deferred question(s)\n` +
+        `     really do need a tool outside CORE_TOOL_NAMES before trusting the figure.`
+    )
+} else {
+  console.log()
+  console.log(`  (--whole-catalogue: the PRE-SPLIT shape. Compare with a normal run;`)
+  console.log(`   if the two scores and preamble sizes match, this bench is not seeing the split.)`)
+}
 // BESIDE THE SCORE, NEVER INSIDE IT — see `countedProperly`.
 const counting = rows.filter((r) => r.countedProperly !== null)
 if (counting.length)

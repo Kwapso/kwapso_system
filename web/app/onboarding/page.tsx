@@ -74,16 +74,20 @@ import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { SignOut } from "@shared/ui/foundations/icons"
 import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { clearAllFormDrafts } from "@shared/web/use-form-draft"
+import { reportError } from "@shared/web/log"
 
 import { ApiFailure, auth, tenancy } from "@/lib/api"
-import { BrandMark } from "@/components/brand-mark"
+import { forgetEverything } from "@/lib/nav-memory"
+import { BrandMark } from "@/components/shell/brand-mark"
 import { personInitials } from "@/lib/identity"
 import { fileToDataUrl } from "@/lib/image"
 import { useT } from "@shared/web/language"
 import { MarkLoader, useMarkHold } from "@shared/web/mark-loader"
 import { TEAM_CREATION_CLOSED } from "@shared/product"
-import { InvitationsPanel } from "@/components/invitations"
+import { InvitationsPanel } from "@/components/team/invitations"
 import { SpineChoice } from "@shared/web/spine-section"
 import { toSpine, type Spine } from "@shared/spine"
 
@@ -108,6 +112,57 @@ const spineField = {
  * the two places that read it — a string literal that has to match a worker is a
  * string literal somebody will mistype. */
 const CLIENT_LOGIN = "client_login"
+
+/** THE WAY BACK OFF A TERMINAL SCREEN, and the reason this file needed one.
+ *
+ * Two of the three screens below END: "You're not in a team" (the invite
+ * expired, or somebody was removed) and "You're in the right place" (a client
+ * login standing at the agency's door). Both are correct, both say a true
+ * sentence, and until 7 Sep 2026 both drew a light/dark toggle and NOTHING
+ * ELSE. Walked in a browser against staging with a real teamless session, the
+ * "You're not in a team" screen had exactly three controls on it and all three
+ * changed the colour scheme.
+ *
+ * The person most likely to be standing there is the person who signed in with
+ * the WRONG ADDRESS — an invite goes to one mailbox and they type another,
+ * which is the single most common way to arrive teamless. The screen tells
+ * them to ask for a new invite "to this email address" and gives them no way
+ * to find out which address that is, no way to try the other one, and no way
+ * to leave. Clearing a cookie was the only exit from a state the product puts
+ * people in on purpose.
+ *
+ * The portal's own equivalent (web-portal/components/no-access.tsx) has had
+ * this button since it was written, with the same reasoning in its header and
+ * the same deliberate absence of a "request access" — access is still a
+ * decision somebody makes about a person they know. This is that screen's
+ * sibling finally getting the same escape, from the same seams: the failure is
+ * REPORTED rather than swallowed, because the session cookie is HttpOnly and
+ * only the server's Set-Cookie clears it, so a sign-out that quietly failed
+ * would look exactly like one that worked and leave the next person on a
+ * shared device signed in as this one. */
+function SignOutEscape() {
+  const t = useT()
+  async function signOut() {
+    try {
+      await auth.logout()
+    } catch (e) {
+      reportError("onboarding.signOut", e)
+      toast.error(t("We couldn't sign you out. Check your connection and try again."))
+      return
+    }
+    clearAllFormDrafts() // one person's unsaved drafts never leak to the next
+    forgetEverything() // …and neither do their places (profile-menu.tsx says why)
+    location.assign("/login")
+  }
+  return (
+    <div className="mt-6 flex justify-center">
+      <Button variant="secondary" onClick={() => void signOut()}>
+        <SignOut className="size-3.5" />
+        {t("Sign out")}
+      </Button>
+    </div>
+  )
+}
 
 export default function OnboardingPage() {
   const t = useT()
@@ -294,6 +349,11 @@ export default function OnboardingPage() {
           <p className="text-muted-foreground mt-4 text-sm">
             {t("Your invite has been accepted, so nothing is waiting on you. Open the portal at the address your invite came from, and sign in with this same email address.")}
           </p>
+          {/* Still nothing that tries to send them onward — this build cannot
+              know the portal's address (the note above says why). Signing out
+              is not that: it is the way OFF this screen, for the person who
+              used the wrong address of their own two. */}
+          <SignOutEscape />
         </div>
       </main>
     )
@@ -352,6 +412,12 @@ export default function OnboardingPage() {
                 if (teams.length > 0) router.replace("/home")
               }}
             />
+            {/* AND THE WAY OUT. The panel is empty for exactly the people this
+                screen is for — an expired invite is filtered out of the list
+                the door returns, so "your invite expired" and "you were
+                removed" render identically as "No invites waiting for you."
+                Without this button that is where the app ends. */}
+            <SignOutEscape />
           </div>
         ) : (
         <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>

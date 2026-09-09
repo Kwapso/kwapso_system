@@ -939,7 +939,7 @@ export async function countTicketFacets(
  * aggregate rows and are capped at one.
  *
  * EVERY DURATION HERE IS COUNTED IN WORKING DAYS, through the one shared
- * expression (`businessDaysSql`, shared/workers/business-days.ts) and never by
+ * expression (`workingDaysSql`, shared/business-days.ts) and never by
  * subtracting two `julianday`s at the chart that needs it. The client's ruling,
  * 6 Sep 2026: "the time counts monday-friday! saturday and sunday do not count
  * towards how long it took! very very important!" That seam's own header carries
@@ -2160,7 +2160,7 @@ export function refuseDirectResolve(status: HelpStatus): void {
  * WHAT SURVIVES IT. Every `help_status_events` row that recorded a real
  * `awaiting_validation → new` move stays exactly where it is — team migration
  * 0069 touches `help.status` and never the history — and `stageLabel`
- * (web/components/ticket-stages.tsx) still draws those rungs as "Waiting on
+ * (web/components/tickets/ticket-stages.tsx) still draws those rungs as "Waiting on
  * you". The `validated_at` values stay too. Nothing that happened is unhappened
  * by the door that made it happen going away. */
 

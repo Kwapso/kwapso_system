@@ -11,20 +11,20 @@ import * as React from "react"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { type ScreenQuery } from "@shared/web/screen-engine/recipe"
 
-import { AccountFormDialog } from "@/components/account-form-dialog"
-import { KnowledgeFormDialog } from "@/components/knowledge-form-dialog"
-import { KnowledgeUploadDialog } from "@/components/knowledge-upload-dialog"
-import { HelpFormDialog } from "@/components/help-form-dialog"
-import { RolePickerDialog } from "@/components/role-picker-dialog"
-import { RoleFormDialog } from "@/components/role-form-dialog"
-import { InviteDialog } from "@/components/invite-dialog"
-import { TeamEditDialog } from "@/components/team-edit-dialog"
+import { AccountFormDialog } from "@/components/accounts/account-form-dialog"
+import { KnowledgeFormDialog } from "@/components/knowledge/knowledge-form-dialog"
+import { KnowledgeUploadDialog } from "@/components/knowledge/knowledge-upload-dialog"
+import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
+import { RolePickerDialog } from "@/components/team/role-picker-dialog"
+import { RoleFormDialog } from "@/components/team/role-form-dialog"
+import { InviteDialog } from "@/components/team/invite-dialog"
+import { TeamEditDialog } from "@/components/team/team-edit-dialog"
 import { ConfirmAction } from "@/components/deep-link/confirm-action"
 import {
   InternalRecordDialog,
   brandAssetFields,
   purposeFields,
-} from "@/components/internal-record-dialog"
+} from "@/components/team/internal-record-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,7 +147,13 @@ export function WritePanels({
   // this list is the server's answer rather than a second opinion formed here.
   // A caller staffed to nothing gets an empty list and the dialog leaves the
   // option out — an option that can only end in a refusal is not an option.
-  const appsQ = useCached<AppRow[]>(teamId ? appsKey(teamId) : null, () =>
+  //
+  // AND IT WAITS FOR A PANEL TO EXIST. This is the option list of a dialog, and
+  // it was read on every screen in the team area whether or not any dialog was
+  // open — on a cold deep link, one of the requests a person waited through to
+  // see a record they had not asked to edit. `query.panel` is the URL segment that
+  // decides whether any of these dialogs draws at all, so it is the honest gate.
+  const appsQ = useCached<AppRow[]>(teamId && query.panel ? appsKey(teamId) : null, () =>
     listFetch.apps(teamId as string)
   )
   const openableApps = React.useMemo(

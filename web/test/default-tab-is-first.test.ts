@@ -27,7 +27,7 @@ const WEB = join(HERE, "..")
  */
 describe("the ticket strip's default tab", () => {
   it("is the tab drawn first, not a tab that used to be first", () => {
-    const src = readFileSync(join(WEB, "components/tickets-collection.tsx"), "utf8")
+    const src = readFileSync(join(WEB, "components/tickets/tickets-collection.tsx"), "utf8")
 
     // The GENERIC ARGUMENT is optional here. Pinned as `useRemembered<HelpFacet>`,
     // this broke on any purely local retype — widening the union, aliasing it, or

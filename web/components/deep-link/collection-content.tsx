@@ -22,35 +22,36 @@ import {
 } from "@shared/web/screen-engine/screen-renderer"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
-import { Download, UploadSimple, Plus } from "@shared/ui/foundations/icons"
+import { Download, Graph, ListBullets, UploadSimple, Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
 
-import { WavesScreen } from "@/components/waves-screen"
-import { ProcessesScreen } from "@/components/processes-screen"
-import { AppsScreen } from "@/components/apps-screen"
-import { SprintsScreen } from "@/components/sprints-screen"
-import { StoriesScreen } from "@/components/stories-screen"
-import { TasksScreen } from "@/components/tasks-screen"
-import { TimeScreen } from "@/components/time-screen"
-import { MeetingsScreen } from "@/components/meetings-screen"
-import { TicketsCollection } from "@/components/tickets-collection"
+import { WavesScreen } from "@/components/work/waves-screen"
+import { ProcessesScreen } from "@/components/process/processes-screen"
+import { AppsScreen } from "@/components/apps/apps-screen"
+import { SprintsScreen } from "@/components/work/sprints-screen"
+import { StoriesScreen } from "@/components/work/stories-screen"
+import { TasksScreen } from "@/components/work/tasks-screen"
+import { TimeScreen } from "@/components/work/time-screen"
+import { MeetingsScreen } from "@/components/meetings/meetings-screen"
+import { TicketsCollection } from "@/components/tickets/tickets-collection"
 import {
   BrandLibraryScreen,
   PurposesScreen,
-} from "@/components/internal-screens"
+} from "@/components/team/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
-import { CollectionHeading } from "@/components/collection-heading"
-import { ContactsScreen } from "@/components/contacts-screen"
-import { AskTheAssistant } from "@/components/ask-the-assistant"
-import { LoadMore } from "@/components/load-more"
-import { PagedFind } from "@/components/paged-find"
+import { CollectionHeading } from "@/components/records/collection-heading"
+import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
+import { ContactsScreen } from "@/components/accounts/contacts-screen"
+import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
+import { LoadMore } from "@/components/records/load-more"
+import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import { content as contentApi, tenancy } from "@/lib/api"
 import { accountsKey, knowledgeKey } from "@/lib/live-resources"
 import { invalidate } from "@shared/web/store"
-import { GoogleSyncButton } from "@/components/google-sync"
-import { CountedAbove } from "@/components/counted-tabs"
+import { GoogleSyncButton } from "@/components/knowledge/google-sync"
+import { CountedAbove } from "@/components/records/counted-tabs"
 import { formatCount } from "@shared/web/format-count"
 import {
   shapeAccountsList,
@@ -82,6 +83,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     invitesQ,
     accountsQ,
     knowledgeQ,
+    knowledgeShapeQ,
     companiesQ,
     brandQ,
     purposesQ,
@@ -571,7 +573,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
       </CountedAbove>
     )
   }
-  // CONTACTS — its own file (`@/components/contacts-screen`), not a branch
+  // CONTACTS — its own file (`@/components/accounts/contacts-screen`), not a branch
   // drawn out here — see that file's own header for why: `web/test/
   // rules.test.ts`'s tab-nesting census counts how many times the TabsView
   // element appears PER FILE, and Accounts (above) already carries one in
@@ -651,6 +653,19 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           // R50 — the resting read's own row count.
           restingEmpty={loadedSources.length === 0}
           listKey={knowledgeKey(teamId as string)}
+          // R53 — the row builds the switch from this config; the call site
+          // never draws a `<ViewSwitch>` of its own. TWO bodies over ONE
+          // collection: the list answers "what does it know?", the shape
+          // answers "where is what it knows, and where is there none?" — a
+          // question a list of rows cannot be read for at all.
+          view={{
+            views: [
+              { value: "list", label: t("List"), icon: <ListBullets className="size-4" /> },
+              { value: "shape", label: t("Shape"), icon: <Graph className="size-4" /> },
+            ],
+            value: ctx.knowledgeView,
+            onValueChange: (v: string) => ctx.setKnowledgeView(v === "shape" ? "shape" : "list"),
+          }}
           placeholder={t("Search")}
           matches={{
             none: t("No sources match"),
@@ -679,6 +694,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
           }
         >
           {(found) => {
+            // THE PICTURE IS THE WHOLE BASE, so it stands outside the paged
+            // rows rather than being drawn from them — `found` narrows the
+            // fifty in the browser and the shape is a door of its own. It is
+            // still INSIDE this toolbar because the switch that chose it is a
+            // slot on this row (R53), and a body reached by a control belongs
+            // under that control.
+            if (ctx.knowledgeView === "shape") {
+              if (!knowledgeShapeQ.data) return <Skeleton variant="list" lines={4} />
+              return <KnowledgeShape teamId={teamId as string} {...knowledgeShapeQ.data} />
+            }
             const rows = found.active ? found.rows : loadedSources
             if (rows === null) return <Skeleton variant="list" lines={4} />
             const data = shapeKnowledgeList(rows, names)

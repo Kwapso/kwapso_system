@@ -57,6 +57,41 @@ instance is for the rare contended hot entity.
   `workers/data-ops/test/import-idempotency.test.ts`. **The rule: a write a client can
   retry must be idempotent.**
 
+## Two people editing the same record: LAST SAVE WINS (ruled 2026-09-07)
+
+The owner's ruling, verbatim: *"I would just assume everything happens
+sequentially. If somebody just saves or clicks submit on an edit screen for the
+same record that I'm currently editing, I would technically hit the save button
+1 or 2 seconds after them. Sequentially, I propagate the latest change, and that
+is what should be reflected."*
+
+So there is **no lock, no merge and no prompt on a record edit**, and that is a
+decision rather than an omission. What happens concretely, with a form open on a
+record a colleague saves:
+
+- their save lands as a row-level live patch (`patchRow`, the R1/R15 seam), so
+  the ROW on screen moves to theirs — the collection, the badge, the detail all
+  show their version;
+- the FORM does not move. `useFormDraft` (R7) seeds from `initial` only on the
+  inactive→active edge and never while the form is open, so a new `initial` off
+  a patched row cannot reach the values you are typing;
+- nothing warns and nothing asks. When you save, the record becomes your draft,
+  whole — which is the ruling: the later save is the one that stands.
+
+**This is an invariant, not an emergent property.** It falls out of one
+`initialRef` inside `useFormDraft`, so an innocent
+`useEffect(() => setValues(initial), [initial])` added to any one dialog would
+overwrite somebody's typing with their colleague's and break nothing else.
+`web/test/last-save-wins.test.tsx` holds it through a real dialog over a real
+cached read (store → host → dialog → form), with the ROW as its canary — a store
+that never patched at all would otherwise pass.
+
+**When last-save-wins is the wrong answer, use a real tool from the list above.**
+It is right for a record somebody OWNS the editing of (a role's description, a
+ticket's fields) and wrong for a counter, a balance or an allocation, where two
+saves must both be reflected rather than one replacing the other. Those are the
+atomic-UPDATE and Durable-Object cases, not this one.
+
 ## While a write is in flight
 Serialized or not, the user should never see a dead UI, show feedback
 (button spinner + disabled, optimistic update, toast). See the **Loading &

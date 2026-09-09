@@ -536,7 +536,7 @@ export function triageKey(teamId: string): string {
  * every one of these numbers stops being true, under every filter. Dropping a
  * key nobody is subscribed to fetches nothing at all, so a team who never opens
  * the tab pays nothing for it. */
-export const HELP_DASHBOARD_PREFIX = "help-dashboard:"
+const HELP_DASHBOARD_PREFIX = "help-dashboard:"
 export function helpDashboardKey(
   teamId: string,
   accountId = "",
@@ -670,7 +670,7 @@ export function brandAssetsKey(teamId: string): string {
  *
  * WRITTEN HERE RATHER THAN IN THE PANEL, and that is the difference from the
  * ticket's twin rather than a stylistic choice. `helpAttachmentsKey` lives in
- * `web/components/help-attachments.tsx`, so `TEAM_RESOURCES.help` — which is
+ * `web/components/tickets/help-attachments.tsx`, so `TEAM_RESOURCES.help` — which is
  * `lib`, and must not import a component — cannot NAME it, and does not: a
  * ticket's attachment list is dropped by nothing at all, so a screenshot a
  * colleague adds appears on their screen and not on yours. Putting the story's
@@ -681,7 +681,7 @@ export function storyAttachmentsKey(storyId: string): string {
 }
 /** …AND THE TICKET'S, for the same reason and after the same bug.
  *
- * This lived in `web/components/help-attachments.tsx` and carried a comment
+ * This lived in `web/components/tickets/help-attachments.tsx` and carried a comment
  * saying "the ticket's own deps carry this". They did not. They could not: this
  * file is `lib`, `lib` must not import a component, so `TEAM_RESOURCES.help`
  * below had no way to NAME the key even though the resource it needed was
@@ -874,6 +874,23 @@ export function selectableOneKey(teamId: string, valueId: string): string {
 /** The knowledge-source list's cache key. */
 export function knowledgeKey(teamId: string): string {
   return `knowledge:${teamId}`
+}
+
+/** THE SHAPE'S cache key — the same collection drawn as a picture rather than a
+ * list, so it hangs off the same teamId and one narrowing.
+ *
+ * A DERIVED CACHE HAS NO ROW TO PATCH: adding a source, correcting one or taking
+ * one away changes what the picture is made of, and the shape cannot be edited
+ * in place the way the list's row can. So it rides the knowledge entry's `deps`
+ * below and is DROPPED rather than patched — re-read only when a screen is
+ * actually showing it, which is the same treatment the ticket pulse gets for the
+ * same reason. */
+/** The family every narrowing of the picture shares — read by the key below and
+ * by the knowledge entry's own `slicePrefix`, both in this file, so it is not
+ * exported. `RECORD_MAP_PREFIX` above IS, because a component names it. */
+const KNOWLEDGE_SHAPE_PREFIX = "knowledge:shape:"
+export function knowledgeShapeKey(teamId: string, compartment: string | null): string {
+  return `${KNOWLEDGE_SHAPE_PREFIX}${teamId}:${compartment ?? ""}`
 }
 
 /** The ticket list's cache key. My/All is a SERVER scope, not a client filter:
@@ -1280,6 +1297,24 @@ export const TEAM_RESOURCES: Record<
     // The source's own history — the Activity tab on its screen — and the
     // by-id read the detail falls back to when the row is past page one.
     deps: (_t, id) => [`activity:record:knowledge_sources:${id}`, `knowledge:one:${id}`],
+    // …AND BOTH PICTURES THIS ROW APPEARS IN (R15). A ping names one row and
+    // neither of these keys can be derived from it, so each family is dropped
+    // whole — the same seam, twice, for two different drawings.
+    //
+    //   the SHAPE — the whole base grouped by account. One row's arrival or
+    //   retirement changes a cluster's size, and the key carries a compartment
+    //   this ping cannot know.
+    //
+    //   the record MAP — added 9 Sep 2026, and it is the half that would have
+    //   gone stale silently. A source now sits on TWO maps: its own, and the
+    //   MEETING's, which gathers every artefact that came out of that call. So a
+    //   source gaining an event id (the sweep does this unattended), being
+    //   retired as a duplicate, or being renamed changes a picture keyed by a
+    //   record id this ping has never heard of. Every other collection whose
+    //   rows appear on a map already drops this family; knowledge did not,
+    //   because until the map learned to draw a knowledge source there was
+    //   nothing of its to be stale.
+    slicePrefix: [KNOWLEDGE_SHAPE_PREFIX, RECORD_MAP_PREFIX],
   },
   // Tickets — row-level live. A status change / new reply (postHelpReply
   // pings `help` too) patches just that ticket in the cached "all" set.

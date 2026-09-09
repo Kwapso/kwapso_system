@@ -14,7 +14,7 @@ scroll, so: the two tiers, in order.
 
 **GLOBAL core** (`kwapso-core`, reached by `env.DB`), identity and billing across teams:
 `users` · `teams` · `team_members` · `email_change_logs` · `account_activity` ·
-`importable_databases` · `agent_usage` · `agent_credits` · `agent_usage_log` ·
+`importable_databases` · `agent_usage` · `agent_credits` · `credit_grants` · `agent_usage_log` ·
 `mcp_tokens` · `error_logs` · the sharding machinery, `team_module_databases` +
 `team_module_moves` + `db_alerts` + `db_growth` (where a module lives, the mover's
 resumable ledger, and the size + rate watch) ·
@@ -206,12 +206,46 @@ the global core DB so the gate can check it without opening a team database.
 ### agent_credits. KEEP (BUILT 2026-06-23, GLOBAL, `db/core/0010`)
 Purpose: the **purchasable** half of the AI agent quota (the owner's credit-based
 model). Real data: `team_id`, `balance` (AI credits remaining, never negative),
-`lifetime_granted` (total ever granted, for the admin view), `updated_at`. Once a
+`lifetime_granted` (total ever granted, returned as `lifetimeGranted` by the grant
+door itself — a balance is spent down, so nothing else records what a team was ever
+given; it said "for the admin view" until 7 Sep 2026 and no admin view was ever
+built), `updated_at`. Once a
 team's free daily allowance is used up it spends from this balance; when both are
 empty the agent is blocked. Top-ups are an owner action today
 (`POST /api/data-ops/admin/grant-credits`, x-admin-key); real payments wire in
 later against this same balance (the grant action is the seam). Lives in the
 global core DB so the gate can spend a unit without opening a team database.
+**This table says what the balance IS, never who moved it** — `updated_at` is a
+timestamp and not an audit block. Who granted is `credit_grants`, below.
+
+### credit_grants. KEEP (BUILT 2026-09-07, GLOBAL, `db/core/0030`)
+Purpose: **who topped this team up, and when.** One row per grant. Real data:
+`id`, `team_id`, `granted_at`, `amount` (always positive), `actor`, `request_id`.
+Written by `grantCredits` (`shared/workers/credits.ts`) in the SAME `env.DB.batch`
+as the balance it moves, so the money and its record commit together or neither
+does — the shape `email_change_logs` and the email switch already use
+(`workers/auth/src/lib/email-change.ts`). The record is a REQUIRED ARGUMENT of
+that function rather than a follow-up call, so the payment integration that wires
+into the same seam later cannot grant silently either.
+
+**Why it is its own table and not a row in `agent_usage_log`:** that log is a
+SPEND ledger — its own migration calls a row "how many AI units that command
+consumed", and three readers sum it as spend (`readUsageLog` behind the quota
+badge, `scripts/ai-spend.mjs`, the nightly ops digest). A +500 top-up sitting in
+it would be counted as a turn and as five hundred credits spent by every one of
+them unless all three learned to subtract, which is three subtractions a future
+reader can forget. It is also why grants do NOT appear in the assistant's usage
+dialog: that view answers "where did our credits go", and an arrival is not a
+departure.
+
+**`actor` is as honest as the door can be.** `POST /api/data-ops/admin/grant-credits`
+opens on `adminGuard`, which proves possession of the owner's key and nothing
+about a person, so the row says `owner-key` and invents no name. `request_id` is
+the id the gateway minted for that click (`shared/workers/trace.ts`, the same
+value `error_logs.request_id` joins on) — it is what tells two identical grants a
+second apart apart. Before this table a leaked owner key could top a balance up
+untraceably: you could read the total ever granted and the minute the row last
+moved, and nothing else. Kept forever, like every other audit table here.
 
 ### agent_usage_log. KEEP (BUILT 2026-07-01, GLOBAL, `db/core/0011`)
 Purpose: the usage TRAIL behind the panel's "where did my credits go" view.
@@ -271,9 +305,14 @@ created for.
 ### error_logs. KEEP (BUILT 2026-07-03, GLOBAL, `db/core/0012`)
 Purpose: the central error store (ERROR-HANDLING.md), one row per UNEXPECTED
 failure (worker crash or client-side error), never a clean GuardError refusal.
-Real data: `id`, `at`, `source`, `place`, `message`, `stack` (capped), optional
-`team_id`/`user_id`/`url`, and the resolve workflow (`status` open→resolved,
-`resolved_at`, `resolution_note`). Owner-only doors (x-admin-key):
+Real data: `id`, `at`, `source`, `place`, `message` (the CAUSE — a refusal's
+`detail` where it has one, never our own sentence), `stack` (capped; absent by
+declaration on a MEASUREMENT source such as `slow-door`, see
+`MEASUREMENT_SOURCES` in `shared/workers/error-log.ts`), optional
+`team_id`/`user_id`/`url` (the page only, query string stripped) and
+`request_id` (`db/core/0020`; the request's trace id, or on unattended work the
+tick's own `tick:<job>:<ISO>`), and the resolve workflow (`status`
+open→resolved, `resolved_at`, `resolution_note`). Owner-only doors (x-admin-key):
 `GET /api/data-ops/admin/errors` + `POST /api/data-ops/admin/errors/resolve`.
 Lives in the global core DB, system health is cross-team; each environment has
 its own core DB so staging/production histories never mix.
@@ -315,7 +354,7 @@ Sessions are judged by **expiry, not age**: `expires_at` slides forward while a
 session is in use, so an age-based sweep would sign out every long-lived user.
 
 Nothing anyone might have to answer for is touched: activity, account activity,
-`agent_usage_log`, invite audits and every audit block stay. `error_logs` is the
+`agent_usage_log`, `credit_grants`, invite audits and every audit block stay. `error_logs` is the
 one that moved, and only because it was already documented as a 90-day history
 with nothing enforcing it, a rate ceiling (`db/core/0019`) bounds how fast a
 store fills, never how full it gets. **A retention window for `account_activity`
@@ -333,6 +372,18 @@ plus everyone else) the tables grew monotonically while a green nightly job
 reported success. 40 × 5,000 = 200,000 rows per table per night, no statement any
 larger than the one that already worked. A run that hits the PASS ceiling is
 recorded to `error_logs`, not merely logged (R12).
+
+### cron_heartbeats. KEEP (BUILT 2026-09-07, GLOBAL, `db/core/0029`). DID THE TICK COME
+Purpose: the one fact every scheduled handler could not record — that a tick
+never came. One row per job (`knowledge-sweep`, `morning-digest`, `nightly`;
+the list is `CRON_JOBS` in `shared/workers/cron-heartbeat.ts`, held equal to
+the two wranglers' cron triggers and to the rows the migration seeds):
+`last_run_at` moves on every tick that ran to its end, `last_ok_at` only on a
+tick that recorded no failure. Tenancy's nightly reads content's two beats and
+content's morning tick reads tenancy's; a beat older than twice its period is
+one `error_logs` row (`cron/watch`) the ops digest mails. Seeded at apply time
+so a schedule that never fires on a fresh environment is still noticed. Three
+rows, upserted; nothing to retain or sweep.
 
 ### db_growth. KEEP (BUILT 2026-08-14, GLOBAL, `db/core/0022`). HOW LONG HAVE I GOT
 Purpose: the half of the growth watch the size alarm never had. `db_alerts` says a
@@ -514,7 +565,7 @@ beyond sprint types: a mark is what a type mark renders, a description is what a
 picker's hint line shows, and a curated foreign label is what an agency writes
 once for a client who reads another language. `standard_days` is the only narrow
 one, and it is a number nobody else has to look at. The starting values live in
-`SPRINT_TYPE_CATALOGUE` (`workers/tenancy/src/team-schema.ts`), a starting
+`SPRINT_TYPE_CATALOGUE` (`workers/tenancy/src/team-schema/seed.ts`), a starting
 vocabulary like the ticket types, editable on the team's own Dropdown values
 screen, and both the seed and the migration are pick-or-create, so a team that
 already has "Implementation" keeps its own row, its own id and its own history
@@ -799,7 +850,7 @@ again. `idx_activity_feed (created_at DESC, id DESC)` serves the unfiltered page
 `related_table IN (…)` page and lets the R16 `COUNT(*)` beside it read an index
 rather than the widest table in the database. (`meetings` has carried exactly this
 index for exactly this reason since `0021`.) The count is still O(rows-it-counts),
-that is R16's price, and it is settled in [ARCHITECTURE.md §7](ARCHITECTURE.md) (the scaling decision, LOCKED). *(It used to cite `scaling-review.md`, the audit report behind that section — deleted 29 Aug 2026 and in no clone; README item 27 says so.)*
+that is R16's price, and it is settled in [ARCHITECTURE.md §7](ARCHITECTURE.md) (the scaling decision, LOCKED). *(It used to cite `scaling-review.md`, the audit report behind that section — deleted 29 Aug 2026 and in no clone; README's document map says so under that name.)*
 `idx_activity_actor_feed (creator_id, created_at DESC, id DESC)` is the third, added
 in `0062` for the question the other two cannot answer: **what has this person
 done?** None of the first three led with `creator_id` and nothing queried the table
@@ -861,13 +912,22 @@ audit block and is displayed as history where it belongs) and the owner's
 AI-credit grant, which changes no team record and so has no `related_table` to
 hang on. Everything else writes a line.
 
-**READING ONE PERSON'S OR ONE RECORD'S HISTORY ACROSS BOTH TABLES.** There are
-two trails and they are split by DATABASE BOUNDARY, not by feature: identity
-events live in the global `account_activity` (the person's own history, across
-every team) and team events live in each team's `activity`. That is legitimate —
-a per-team table cannot hold "you changed your email", which belongs to the
-person and not to any one team — but it means a full history is two reads, and
-until now nothing said how to do them:
+**READING ONE PERSON'S HISTORY ACROSS BOTH TABLES.** There are two trails and
+they are split by DATABASE BOUNDARY, not by feature: identity events live in the
+global `account_activity` (the person's own history, across every team) and team
+events live in each team's `activity`. That is legitimate — a per-team table
+cannot hold "you changed your email", which belongs to the person and not to any
+one team — but it means a full history is two reads, and until now nothing said
+how to do them:
+
+> **A RECORD's history is NOT two reads, and this heading used to say it was.**
+> `account_activity` has exactly five columns — `id`, `user_id`, `type`,
+> `description`, `created_at` (`db/core/0007`) — and no `related_table` /
+> `related_row_id` pair, so it cannot name a record even in principle; its `type`
+> is one of `name_changed` / `photo_changed` / `email_changed`. **A ticket's or a
+> story's whole life is in the team `activity` table alone**, and step 1 below is
+> the entire recipe for it. Only a PERSON spans both, which is why the join
+> further down is on the person and could not have been on anything else.
 
 1. **The team half** — `GET /api/tenancy/activity?scope=record&table=<t>&id=<id>`
    for one record, `?scope=team` for the whole team (R18 subtracts the caller's
@@ -947,7 +1007,7 @@ UPDATE the way the archive toggle's does, because on this statement zero rows
 changed already MEANS the ring refusal, and a no-op reported as "that would put
 the account inside itself" is a sentence that isn't true. **Who moves one**: a
 CONTACT is moved from her own record (the parent-account control on her Overview,
-`web/components/contact-detail.tsx`) — people change jobs; a COMPANY is moved by
+`web/components/accounts/contact-detail.tsx`) — people change jobs; a COMPANY is moved by
 the assistant (`set_account_parent`) or an import column, because a company an
 agency takes on is its own thing and its create/edit form deliberately never asks.
 
@@ -1104,7 +1164,27 @@ them. Four tables, one per job:
   source can be a 300-page contract and a page of fifty of them would be tens of
   megabytes on the way to a screen showing titles. `app_id` / `ticket_id` /
   `sprint_id` / `record_date` are the rest of the notebook a question is routed
-  by. `body_bytes` is how much material there really is, so a screen can say
+  by. `event_id` / `event_id_from` (team migration
+  `0070_a_source_says_which_call_it_is_from`) say WHICH CALL a source came from,
+  where Google itself said so and nowhere else: one meeting produces a calendar
+  entry, several RSVP notices, a Gemini notes document and a "Notes:" mail, and
+  before this nothing in the schema could say two of them were about the same
+  half-hour — on 8 Sep 2026 the assistant answered about that week's planning
+  call from a 1,179-character stub while a 73,141-character transcript sat beside
+  it. Three routes fill it and `event_id_from` names which was read, exactly as
+  `meetings.transcript_found_by` does beside it: `origin` (a calendar source's
+  own `origin_row_id` IS the event id), `meeting` (`meetings.google_event_id`,
+  stored since 0012) and `mail` (the `eid=` Google's robot writes into a notice,
+  base64url of `"<eventId> <calendarId>"` — read by
+  `scripts/backfill-source-events.mjs`, because SQLite has no base64). **NULL is
+  a correct answer and most rows keep one.** Measured on staging that day: the
+  Gemini notes DOCUMENT states no event anywhere — 0 of 80 live Drive sources
+  carry a calendar link, an `eid` or even a Meet link — and neither do the 121
+  "Notes:" mails that hold the minutes. Matching those on their title is the one
+  thing this must never do; a wrong parent is worse than none, because the base
+  then answers confidently from the wrong artefact. It is NOT on the vector: the
+  index carries nine metadata keys and this is not a tenth, so nothing about what
+  is searched changed with it (R26). `body_bytes` is how much material there really is, so a screen can say
   "the first part of 412 KB" rather than presenting an excerpt as the whole
   thing. `index_error` is why a source could not be indexed whole, in words,
   nothing here is ever silently trimmed. Deactivating means "stop reading this":
@@ -1906,7 +1986,7 @@ fact, not a record anybody curates.
   themselves, so a database built from the file today never has them, `0025`
   drops them `IF EXISTS`, for the teams that ran the old versions.
 - **The per-team migration list is `TEAM_MIGRATIONS` in
-  `workers/tenancy/src/team-schema.ts`**, **fifty-five today (26 Aug 2026),
+  `workers/tenancy/src/team-schema/migrations.ts`**, **fifty-five today (26 Aug 2026),
   `0001_team_base` through `0055_transcript_gives_up`** (this line has now
   drifted twice — it said "eleven, through `0011_ticket_work_engine`" while the
   sections above documented `0012` to `0020`, then "twenty-seven, through

@@ -1,5 +1,15 @@
 # CI safety net: every push re-checks types (web + all workers) and runs the
 # unit/integration tests. A red X here = do not deploy.
+#
+# THE NODE VERSION IS NOT A DETAIL, AND IT IS NOT TYPED HERE TWICE BY ACCIDENT.
+# It must equal `.nvmrc` and package.json's `engines.node`, and
+# web/test/node-version-agrees.test.ts fails the build when the three disagree.
+# Earned on 8 Sep 2026: a test began importing `node:sqlite`, a built-in that
+# exists on Node 24 and not on 22. Every developer machine was on 24, the repo
+# declared 22, and CI honoured the declaration — so the gate everyone ran and
+# the gate CI ran were testing different things. Four commits went red here
+# while `npm run check` stayed green on three laptops, and the only signal was
+# an email nobody could read.
 name: CI
 on:
   push:
@@ -19,7 +29,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run check

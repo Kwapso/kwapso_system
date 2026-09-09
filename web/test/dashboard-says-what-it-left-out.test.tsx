@@ -51,7 +51,7 @@ vi.mock("@shared/web/store", async (importOriginal) => {
   }
 })
 
-import { TicketsDashboard } from "@/components/tickets-dashboard"
+import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
 
 afterEach(cleanup)
 

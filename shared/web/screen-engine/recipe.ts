@@ -173,7 +173,7 @@ export interface ScreenHeader {
    * now there are no - under no case - images on title. remove it everywhere."
    * `screen-renderer.tsx` used to build an `<Avatar>` from this column (with an
    * initials fallback) and hand it to `RecordDetail`'s `mark`; it hands the kit
-   * nothing now, exactly as `web/components/record-chrome.tsx` already did on
+   * nothing now, exactly as `web/components/records/record-chrome.tsx` already did on
    * the bespoke path.
    *
    * The FIELD survives for the same reason record-chrome keeps its own inert

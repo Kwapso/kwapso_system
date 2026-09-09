@@ -19,17 +19,27 @@
  * the same reason node_modules is: it is a DEPENDENCY. Its own repo lints it;
  * linting a vendored copy we may not edit would only produce unactionable red.
  *
- * CLONING USES THE PLAIN REPOSITORY URL, and that is a fix rather than a
- * simplification. This carried `https://alaap-kwapso@github.com/…` on the
- * reasoning that the kit needs a different GitHub identity from the machine's
- * default. A username in the URL does not SELECT a credential — it forces git
- * to look one up for that exact user, and when the helper has nothing filed
- * under it git falls through to an interactive password prompt. There is no
- * terminal on this path, so the prompt failed as `could not read Password …
- * Device not configured` and the vendor step died at `git clone`, on 7 Sep
- * 2026, with the tag sitting correctly on the remote. The plain URL lets the
- * configured helper answer, which it does — the same URL the kit's own
- * checkout pushes through.
+ * CLONING CARRIES THE `alaap-kwapso` IDENTITY, and both halves of that were
+ * learned the hard way, so both are written down.
+ *
+ * A username in the URL does not SELECT a credential — it forces git to look
+ * one up for that exact user, and when the keychain has nothing filed under it
+ * git falls through to an interactive password prompt. There is no terminal on
+ * the vendor path, so on 7 Sep 2026 the prompt failed as `could not read
+ * Password … Device not configured` and the step died at `git clone` with the
+ * tag sitting correctly on the remote. That is why the identity was taken out.
+ *
+ * AND THE PLAIN URL IS WORSE, measured on 8 Sep 2026 during the main ×
+ * feat/ui-ux merge: `https://github.com/Kwapso/kwapso-ui-ux.git` lets the
+ * machine's DEFAULT credential answer, and that account cannot see this
+ * repository, so the clone returns `Repository not found` — a 404 that reads
+ * like a deleted repo rather than a wrong account. The identity URL cloned
+ * v1.2.70 on the first attempt on the same machine in the same minute.
+ *
+ * So the failure is not the username; it is a keychain with nothing filed
+ * under it. If this prompts, file the `alaap-kwapso` credential rather than
+ * removing the identity — removing it swaps a loud failure for a misleading
+ * one.
  */
 
 import { execSync } from "node:child_process"
@@ -41,7 +51,7 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const TARGET = join(ROOT, "shared", "ui")
-const REPO = "https://github.com/Kwapso/kwapso-ui-ux.git"
+const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
 
 /** The kit's deliverable surface. demo/, verify/, mini-app/ and the GAPS
  * paper trail stay upstream — they are the workshop, not the product. */

@@ -30,7 +30,7 @@ import * as React from "react"
  * red), and the kit's `Title` deliberately sets `min-w-0` and does not clamp —
  * a section header is not always a record's name. So the clamp is applied
  * APP-SIDE, on the node the app hands the kit, in the two places the app has a
- * record heading at all: `web/components/record-chrome.tsx` (the twelve bespoke
+ * record heading at all: `web/components/records/record-chrome.tsx` (the twelve bespoke
  * detail screens) and `shared/web/screen-engine/screen-renderer.tsx` (every
  * recipe-driven detail, on both front doors).
  *
@@ -49,10 +49,10 @@ export function clampRecordHeading(title: React.ReactNode): React.ReactNode {
 
 /** THE RECORD TITLE'S OWN STEP — h1/44, the "Record heading" rung.
  *
- * MOVED HERE FROM `web/components/record-chrome.tsx`, 2026-09-06, BECAUSE IT
+ * MOVED HERE FROM `web/components/records/record-chrome.tsx`, 2026-09-06, BECAUSE IT
  * WAS ONLY EVER APPLIED ON ONE OF THE TWO PATHS. This app draws a record
  * detail two ways — thirteen hand-composed `*-detail.tsx` screens through
- * `RecordScreen` (`web/components/record-chrome.tsx`), and five recipe-driven
+ * `RecordScreen` (`web/components/records/record-chrome.tsx`), and five recipe-driven
  * ones through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`)
  * — and the class below lived as a private constant inside the FIRST one. So
  * the recipe path fell through to the kit's own `titleSize = "h3"` default and
@@ -182,7 +182,7 @@ export const TITLE_ACTIONS_SPLIT =
  * call site can apply one of and pass.
  *
  * Applied by BOTH detail-rendering call sites, and by nothing else:
- *   · `web/components/record-chrome.tsx` — `RecordScreen`, the thirteen
+ *   · `web/components/records/record-chrome.tsx` — `RecordScreen`, the thirteen
  *     hand-composed `*-detail.tsx` screens.
  *   · `shared/web/screen-engine/screen-renderer.tsx` — `renderDetail`, the five
  *     recipe-driven details, on BOTH front doors.

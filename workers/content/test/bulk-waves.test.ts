@@ -35,6 +35,8 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
+import { sourceFiles } from "@shared/rules/source-scan"
+import { BULK_PATHS } from "@shared/workers/limits"
 import { bulkSetStatus } from "../src/lib/help"
 import { buildSpineDb, IDS } from "../../tenancy/test/spine-harness"
 
@@ -112,3 +114,79 @@ describe("a bulk move runs in bounded waves", () => {
 function readSource(): string {
   return readFileSync(join(__dirname, "..", "src", "lib", "help.ts"), "utf8")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("every bulk path in the product declares its shape, and the declaration is true", () => {
+  // THE CENSUS IS DATA, AND THE SOURCE IS THE ORACLE.
+  //
+  // `BULK_PATHS` in shared/workers/limits.ts answers speed_review's four
+  // questions for every path that moves many rows: the chunk size, the resume
+  // point, what happens to a row that fails, and whether anybody can see how far
+  // it got. It exists because the keyword probe that used to answer them was
+  // wrong in both directions — it counted `loadBatch` and `getBatchView` as bulk
+  // paths for having "batch" in their names, and missed the ingest sweep's row
+  // loop because its cursor sits thirty lines above the `for`.
+  //
+  // A written census rots the moment a function is renamed, and a rotted census
+  // reads exactly like a true one. So this holds every row to the disk.
+
+  const root = join(__dirname, "..", "..", "..")
+  const source = (rel: string) => readFileSync(join(root, rel), "utf8")
+  /** Everything the workers and the shared seams declare, through the one
+   * source-walking seam the laws use. */
+  const WORKER_SOURCE = sourceFiles([join(root, "workers"), join(root, "shared", "workers")], {
+    extensions: [".ts"],
+    skipTests: true,
+    relativeTo: root,
+  })
+
+  it("every declared path still exists, in the file it names", () => {
+    for (const p of BULK_PATHS) {
+      const body = source(p.file)
+      expect(body.includes(`function ${p.fn}`), `${p.file} no longer declares ${p.fn}`).toBe(true)
+    }
+  })
+
+  it("every stated chunk size names a constant that is really declared", () => {
+    const limits = source("shared/workers/limits.ts")
+    for (const p of BULK_PATHS) {
+      // "one statement" is a real answer, not a gap: a set-shaped UPDATE bounded
+      // by a refusal is not improved by being cut into pieces.
+      if (p.chunk === "one statement") continue
+      expect(/^[A-Z][A-Z0-9_]+$/.test(p.chunk), `${p.fn}'s chunk "${p.chunk}" is not a constant name`).toBe(true)
+      const here = source(p.file)
+      // Declared in the shared limits, or in the worker source beside the sweep
+      // that spends it — several per-tick sizes live next to their own loop
+      // rather than in limits.ts, which is a reasonable place for a number only
+      // one module has an opinion about. Read through the one source-walking
+      // seam (`sourceFiles`), never a hand-rolled readdir.
+      expect(
+        limits.includes(`export const ${p.chunk}`) ||
+          WORKER_SOURCE.some((f) => f.source.includes(`const ${p.chunk} =`)),
+        `${p.fn} says it chunks by ${p.chunk}, and nothing declares that`
+      ).toBe(true)
+      expect(here.includes(p.chunk), `${p.file} does not mention ${p.chunk}`).toBe(true)
+    }
+  })
+
+  it("every path answers all four questions in words somebody can act on", () => {
+    // A one-word answer is how a census becomes a formality. Each field has to
+    // say something — the shortest honest answer in the table is nineteen
+    // characters, and that one is "none — it is a synchronous download".
+    for (const p of BULK_PATHS)
+      for (const field of ["iterates", "chunk", "resume", "onFailure", "progress"] as const)
+        expect(p[field].length, `${p.fn}.${field} says nothing`).toBeGreaterThan(8)
+  })
+
+  it("the two paths a probe has misread are in it, and the three it invented are not", () => {
+    // ROT CHECK ON THE REASON THIS EXISTS. If the census ever loses the ingest
+    // sweep or the migration robot it has stopped being a census of bulk paths
+    // and become a list of the easy ones.
+    const named = new Set<string>(BULK_PATHS.map((p) => p.fn))
+    for (const must of ["sweepKind", "migrateTeams", "confirmBatch", "indexSource"])
+      expect(named.has(must), `${must} moves many rows and is not in BULK_PATHS`).toBe(true)
+    for (const isNot of ["loadBatch", "createBatch", "getBatchView"])
+      expect(named.has(isNot), `${isNot} is a single-row read with "batch" in its name`).toBe(false)
+  })
+})

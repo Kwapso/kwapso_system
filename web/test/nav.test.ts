@@ -73,7 +73,7 @@ describe("the phone can actually reach the overflow", () => {
   // is exactly how this shipped: pages.ts even carried a comment promising
   // extras "would fold into a More entry", and nothing folded them anywhere. A
   // comment describing the catch is not the catch, so this reads the shell.
-  const shell = readFileSync(join(ROOT, "web", "components", "app-shell.tsx"), "utf8")
+  const shell = readFileSync(join(ROOT, "web", "components", "shell", "app-shell.tsx"), "utf8")
 
   it("the shell computes the overflow", () => {
     expect(shell).toContain("overflowNavItems(navLinks)")
@@ -204,7 +204,7 @@ describe("the rail's icons", () => {
   // indented `key: Value,` — so an entry commented OUT with a block comment is
   // still counted as an entry. Proved 27 Aug 2026: wrapping `waves: SeaWaves,`
   // in a /* */ left this suite green while the rail had no icon for waves.
-  const src = stripComments(readFileSync(join(ROOT, "web/components/app-shell.tsx"), "utf8"))
+  const src = stripComments(readFileSync(join(ROOT, "web/components/shell/app-shell.tsx"), "utf8"))
   const block = src.match(/const SECTION_ICONS[^{]*\{([^}]*)\}/)?.[1] ?? ""
   const pairs = [...block.matchAll(/^\s*"?([\w-]+)"?:\s*(\w+),/gm)].map(([, key, icon]) => ({ key, icon }))
 

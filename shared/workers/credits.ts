@@ -194,20 +194,68 @@ export async function refundAiUnits(
   }
 }
 
-/** Owner/admin top-up: add credits to a team's balance (idempotent insert/accumulate).
- * Returns the new balance. Real payment integration will call this same path later. */
-export async function grantCredits(env: Env, teamId: string, amount: number): Promise<number> {
+/** WHO ASKED FOR A TOP-UP — as honestly as the door can say it.
+ *
+ * A union of one, deliberately. `adminGuard` proves possession of the owner's
+ * key and nothing about a person, so the only value today names the DOOR and
+ * invents no name. The payment integration that wires into this same seam adds
+ * its own value here as a decision somebody makes, not as a free string a
+ * caller can fill with anything. */
+export type GrantActor = "owner-key"
+
+/** THE RECORD A GRANT LEAVES. Required, because forgetting it is the whole bug:
+ * before this, a top-up wrote a bigger number and nothing else, and a leaked
+ * owner key could add credits untraceably. An argument cannot be forgotten the
+ * way a follow-up call can. */
+export type GrantRecord = {
+  actor: GrantActor
+  /** the click this grant rode in on (`requestId(request)`, shared/workers/trace.ts).
+   * Two grants of the same size to the same team a second apart are told apart
+   * by this, and it joins to `error_logs.request_id`. */
+  requestId: string
+}
+
+/** Owner/admin top-up: add credits to a team's balance (idempotent insert/accumulate),
+ * AND write the row that says who did it. Returns the new balance. Real payment
+ * integration will call this same path later — and will have to name itself.
+ *
+ * THE TWO WRITES GO IN ONE `batch`, so the money and its record commit together
+ * or neither does. Same shape as the email switch and its audit row
+ * (workers/auth/src/lib/email-change.ts), and the reason is the same: an audit
+ * row written best-effort AFTER the change is exactly the untraceable grant this
+ * exists to prevent, only now it looks fixed.
+ *
+ * IT RETURNS `lifetimeGranted` TOO. That column has been incremented on every
+ * grant since the table shipped and read by nothing at all — its schema comment
+ * said "for admin view" and DATA-MODEL.md repeated the promise, and no admin
+ * view exists. It is not decoration: a balance is spent down, so once a team has
+ * used its credits the balance can no longer say how much they were ever given.
+ * The person who needs that number is the one running the grant, so it comes
+ * back in the same answer rather than waiting for a screen nobody is building.
+ * (db/core/0010 and DATA-MODEL.md § agent_credits were corrected to say this.) */
+export async function grantCredits(
+  env: Env,
+  teamId: string,
+  amount: number,
+  by: GrantRecord
+): Promise<{ balance: number; lifetimeGranted: number }> {
   const now = new Date().toISOString()
-  await env.DB.prepare(
-    `INSERT INTO agent_credits (team_id, balance, lifetime_granted, updated_at) VALUES (?, ?, ?, ?)
-     ON CONFLICT(team_id) DO UPDATE SET balance = balance + ?, lifetime_granted = lifetime_granted + ?, updated_at = ?`
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO agent_credits (team_id, balance, lifetime_granted, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(team_id) DO UPDATE SET balance = balance + ?, lifetime_granted = lifetime_granted + ?, updated_at = ?`
+    ).bind(teamId, amount, amount, now, amount, amount, now),
+    env.DB.prepare(
+      `INSERT INTO credit_grants (id, team_id, granted_at, amount, actor, request_id)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(ulid(), teamId, now, amount, by.actor, by.requestId),
+  ])
+  const row = await env.DB.prepare(
+    "SELECT balance, lifetime_granted FROM agent_credits WHERE team_id = ?"
   )
-    .bind(teamId, amount, amount, now, amount, amount, now)
-    .run()
-  const row = await env.DB.prepare("SELECT balance FROM agent_credits WHERE team_id = ?")
     .bind(teamId)
-    .first<{ balance: number }>()
-  return row?.balance ?? 0
+    .first<{ balance: number; lifetime_granted: number }>()
+  return { balance: row?.balance ?? 0, lifetimeGranted: row?.lifetime_granted ?? 0 }
 }
 
 /** Where a turn's AI units came from: all free, all paid credit, or a bit of each. */

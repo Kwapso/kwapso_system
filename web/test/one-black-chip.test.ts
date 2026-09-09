@@ -83,7 +83,7 @@ const REF_JOINED = /\.ref\b[\s\S]*?" · "|" · "[\s\S]*?\.ref\b/
  * reason it is not a record's reference. One line, and it should stay that
  * way. */
 const INVERSE_BADGE_OK: Record<string, string> = {
-  "web/components/process-map.tsx":
+  "web/components/process/process-map.tsx":
     "NOT A REFERENCE. The two badges there are a LEGEND KEY — the short code " +
     "(`A`, `B`) standing in front of each side's label on a comparison bar, " +
     "paired with a `secondary` badge for the other side so the two sides read " +
@@ -102,31 +102,35 @@ const INVERSE_BADGE_OK: Record<string, string> = {
  * pass plain text to, which trades a real inconsistency for a bigger one. In
  * every one of these the reference still LEADS, in the same order the chip
  * uses, so a person reading down a picker sees the number first either way. */
+/* EVERY PIN BELOW MOVED ON 8 Sep 2026, when main and feat/ui-ux were merged:
+ * main's own edits (the reviewer row, the screen-recording row, a page of
+ * stories leaving the words of the work behind) landed ABOVE these lines in
+ * five files. The reasons are unchanged — only the addresses are. */
 const REF_AS_STRING_OK: Record<string, string> = {
   "web/lib/picker-sources.ts:70":
-    "`PickerOption.label` is typed `string` (web/components/record-picker.tsx) " +
+    "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
     "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
     "its name from this one field. A ticket option leads with its number " +
     "because that is what somebody types to find it.",
   "web/lib/picker-sources.ts:89": "same slot, a story option — see the ticket one above.",
-  "web/components/stories-screen.tsx:139":
+  "web/components/work/stories-screen.tsx:154":
     "the ticket picker on the story form, building the same `PickerOption.label` " +
     "the two lines in picker-sources.ts build.",
-  "web/components/help-detail.tsx:909":
+  "web/components/tickets/help-detail.tsx:964":
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
     "a row of its own. (Re-pinned from :931 to :945 on 7 Sep 2026 when the " +
     "activity rail landed above this line, and to :909 later the same day when " +
     "the `awaiting_validation` retirement took the confirm button and the " +
     "`run` helper it was the last caller of out of this file.)",
-  "web/components/help-detail.tsx:1052":
+  "web/components/tickets/help-detail.tsx:1107":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
     "string slot as picker-sources.ts, for the ticket the form is pinned to. " +
     "(Re-pinned from :1074 to :1088 and then to :1052 on 7 Sep 2026, both times " +
     "riding the same edits as :909 above.)",
-  "web/components/story-detail.tsx:420":
+  "web/components/work/story-detail.tsx:445":
     "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:931.",
-  "web/components/sprints-screen.tsx:522":
+  "web/components/work/sprints-screen.tsx:523":
     "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
     "the chip would be wrong even if the slot allowed it: a day cell is a few " +
     "characters wide and a lozenge in it is furniture, not information.",

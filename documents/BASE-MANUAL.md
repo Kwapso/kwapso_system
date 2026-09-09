@@ -31,7 +31,7 @@ service-binding calls (never a public hop).
 |---|---|---|---|
 | **auth** | `kwapso-auth` | Sign-in, a 6-digit email code via Resend or Google (no Clerk), sessions, the email-change flow, profile, `/api/auth/me`, and `/internal/send-email` | Identity is the one thing every other worker trusts. It's the single session authority: everyone else asks it "who is this?" (`whoAmI`) rather than parsing cookies themselves. |
 | **tenancy** | `kwapso-tenancy` | Teams, members, Member roles (`member_roles`) + the permission sheet, invites, per-team dropdown values, the screen-recipe config store, the team-DB migration/sharding admin endpoints, **and the three subsystems that hang off the same spine:** the **customer spine** (accounts, contact links, portal logins + the one account-fence corridor), **process maps** (App → Process → Step and the savings cut from them), and **the money** (the three rate cards + margin — `account_rates`, what a client is charged; `internal_rates`, what our own hour costs; `internal_role_rates`, the per-role cost card — split across two files because R24 forbids the internal two reaching the portal) | This is the multi-tenancy engine, it owns the global "who's in which team, in which role" catalog and the per-team database lifecycle. The permission seam that every module gates against lives here, and so does the *second* fence the product needs: which **accounts** a caller may see. Both are decisions about who may read what, so they belong to one worker. |
-| **realtime** | `kwapso-realtime` | The live switchboard, two Durable Object classes: `TeamChannel` (a team's channel is four shard instances, `team:<id>#0…3`; a person's is one, `user:<id>`) fanning out row-level `{resource,id,op}` change pings over WebSockets, and `TeamInterest`, the per-team registry that narrows which shards each ping reaches (DURABLE-OBJECTS.md §1–2) | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data**, the databases stay the source of truth, so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
+| **realtime** | `kwapso-realtime` | The live switchboard, two Durable Object classes: `TeamChannel` (a team's channel is `REALTIME_SHARDS` shard instances — nine today, derived — `team:<id>#0` … `team:<id>#8`; a person's is one, `user:<id>`) fanning out row-level `{resource,id,op}` change pings over WebSockets, and `TeamInterest`, the per-team registry that narrows which shards each ping reaches (DURABLE-OBJECTS.md §1–2) | Live-sync is a cross-cutting concern with a stateful runtime (open sockets). It holds **no app data**, the databases stay the source of truth, so it can be a thin, hibernatable coordinator instead of a second copy of everything. |
 | **content** | `kwapso-content` | **Tickets** (tickets + threaded replies, one module, no help section; the key, tables and path stay `help`, DATA-MODEL.md says why), **the work engine** (stories, sprints, work logs, to-dos, tasks, triage duty, meetings), **the knowledge base** (sources → chunks → terms → the Vectorize index, plus the 15-minute sweep and the 07:00 digest), **the per-person Google connections**, and **the agency's own housekeeping** (brand assets, meeting purposes, staff profiles) | Everything a team AUTHORS lives here. They're grouped because they share one shape, team-DB CRUD gated on a permission module, deactivate-not-delete, an audit block, R2 media, and none is big enough to deserve its own worker. It is the only domain worker besides tenancy with a cron, and both of its crons record failures to the error store (R12). |
 | **data-ops** | `kwapso-data-ops` | **CSV import** (the 3-stage single-target session + the agentic multi-file batch import, AGENTIC-IMPORT.md) and **the AI agent** | Both are "operations over the other modules' data" rather than modules of their own. Import writes act-as-user through a target's create endpoint; the agent acts-as-user through every gated endpoint. Neither owns a table of user content, they orchestrate. |
 | **mcp** | `kwapso-mcp` | The external machine surface: personal access tokens → a team-pinned session bridge → an opt-in tool catalogue for outside machines | It proves the point of the door design: it slots onto the same gated endpoints the agent already uses, so it added zero new trust surface beyond the token itself. How an outside tool connects + the cost model: **MCP.md**. |
@@ -77,6 +77,7 @@ everything that is about *identity and billing across teams*:
 | `importable_databases` | the owner-maintained import target catalogue | `db/core/0008` |
 | `agent_usage` | per-team free daily AI counter | `db/core/0009` |
 | `agent_credits` | per-team purchasable AI balance | `db/core/0010` |
+| `credit_grants` | who topped that balance up, and when (one row per grant, same batch as the balance) | `db/core/0030` |
 | `agent_usage_log` | per-command usage trail (when · who · credits · why; confirm folds in) | `db/core/0011` |
 
 **One isolated D1 database per team, reached over the D1 REST door.** Each team
@@ -85,7 +86,7 @@ gets its *own* database holding all of that team's content: `member_roles` +
 `help_threads`, `invite_logs`, `activity`, `data_import_sessions`,
 `agent_threads` + `agent_messages`. The master definition of what lives in a team
 DB, and the seed rows a newborn team starts with, is
-`workers/tenancy/src/team-schema.ts` (`TEAM_MIGRATIONS`).
+`workers/tenancy/src/team-schema/migrations.ts` (`TEAM_MIGRATIONS`; `team-schema.ts` is the barrel that re-exports it).
 
 **Why this split.** Two invariants pull in opposite directions:
 
@@ -128,7 +129,7 @@ still belongs in `web/components/`. If a primitive needs changing, change it
 upstream in `Kwapso/kwapso-ui-ux`, tag it, and pull it with `scripts/sync-design.mjs`
 (UI-GAPS.md is the list of what the kit still cannot do); `shared/ui/README.md`
 says why in full. Screens are one client-resolved shell
-(`web/components/deep-link-screen.tsx`) rendering recipes from `web/lib/screens.ts`
+(`web/components/deep-link/deep-link-screen.tsx`) rendering recipes from `web/lib/screens.ts`
 at `/t/<teamId>/<module>/<id>` URLs.
 
 ---
@@ -188,7 +189,7 @@ with an **Admin** (locked, full rights) and a **Viewer** (read-only) role.
 
 ### The AI agent acts AS the signed-in user
 
-**One shell, and the co-pilot rides above it.** The whole post-auth app is ONE client-resolved shell (`web/components/deep-link-screen.tsx`, it resolves `/home`, `/settings`, `/invitations`, `/tickets`, and the `/t/**` tree from the URL), so all in-app navigation is soft History-API (`softNavigate` / `go()`), no reload anywhere (EDGE-CASES §1). The assistant panel is mounted ONCE at the root layout (`web/components/agent-host.tsx`) above that shell, so navigating, including the agent's own screen-trace, moves the page *underneath* it and never closes it. The launcher is gated by `agent:create`, on a reactive session cache so it appears the instant you sign in.
+**One shell, and the co-pilot rides above it.** The whole post-auth app is ONE client-resolved shell (`web/components/deep-link/deep-link-screen.tsx`, it resolves `/home`, `/settings`, `/invitations`, `/tickets`, and the `/t/**` tree from the URL), so all in-app navigation is soft History-API (`softNavigate` / `go()`), no reload anywhere (EDGE-CASES §1). The assistant panel is mounted ONCE at the root layout (`web/components/assistant/agent-host.tsx`) above that shell, so navigating, including the agent's own screen-trace, moves the page *underneath* it and never closes it. The launcher is gated by `agent:create`, on a reactive session cache so it appears the instant you sign in.
 
 **Screen tracing.** While the agent works, its steps DRIVE the real screen to where the change is now VISIBLE, the affected record's detail, or the collection list where row-level live-sync makes the new/changed row appear, then rings it. Because the app is one shell, the engine soft-drives the screen from **anywhere** (Home included) with the History API, no reload. A trace **never opens an input form** (`?panel=add|edit`): the agent writes directly through the gated API, so re-opening the manual form would just leave a blank, stale dialog sitting open after the record already exists (the "created the role but left an empty new-role form open" bug). `TraceTarget` has no query field at all, so that class of bug can't be expressed. The tool→screen map is pure (`web/lib/agent-trace.ts`) and machine-checked: `trace-parity.test.ts` fails the build if a write tool ships without a result screen, or if a trace tries to carry a dialog query.
 
@@ -286,8 +287,9 @@ To add, say, a `products` module, you touch these seams and nothing else:
 4. **The screen engine.** Describe the list + detail as a recipe in
    `web/lib/screens.ts`, map its URL segment to its permission module in
    `MODULE_PERMISSION`, and the deep-link shell renders it at
-   `/t/<teamId>/products/<id>`. The record detail gets **Overview + Activity tabs**
-   from the library for free (Law R2).
+   `/t/<teamId>/products/<id>`. The record detail gets its **Overview tab** and its
+   tab strip from the library for free (Law R2), and its **history** from the ink
+   footer's Latest activity eyebrow — the Activity TAB was retired on 7 Sep 2026.
 5. **The glossary.** Any new product term goes in `shared/glossary.ts`, one clear,
    brief definition, and UI copy uses that exact word (Law R6). The agent's system
    prompt injects the whole glossary, so the assistant speaks the same dictionary.
@@ -531,10 +533,11 @@ bigger.
 
 - **Live updates.** The realtime layer fans a **tiny `{resource, id, op}` ping** (never
   row data), so a busy team costs bandwidth in bytes, not kilobytes. Each team's
-  channel is **its own set of `TeamChannel` Durable Objects — four shard instances,
-  `team:<id>#0…3` (`REALTIME_SHARDS`), plus one `TeamInterest` registry that narrows
+  channel is **its own set of `TeamChannel` Durable Objects — `REALTIME_SHARDS` shard
+  instances, `team:<id>#0` … `team:<id>#8` (nine today, derived from the peak since
+  7 Sep 2026), plus one `TeamInterest` registry that narrows
   which shards each ping reaches** — every one hibernatable (idle instances cost
-  ~nothing), so ten thousand teams don't cost fifty thousand always-on processes.
+  ~nothing), so ten thousand teams don't cost a hundred thousand always-on processes.
   *(Fact updated 26 Aug 2026: this bullet said one `TeamChannel` per team; the
   channel was split across `REALTIME_SHARDS` on 14 Aug 2026 — a publisher still
   names `team:<id>` and the realtime worker's `/publish` door owns the fan-out.)*
@@ -615,14 +618,20 @@ answer and MCP tool for that module would then read the database it had just
 emptied, on both front doors, while the door answered `status: "done"` and resolved
 the size alarm.
 
-Two things have to land before the valve opens, and the second is the larger:
-(1) the read path has to consult `team_module_databases`, and (2) a merged read has
-to be able to PAGE, SORT and COUNT — `d1QueryAcross` deliberately refuses all three
-across more than one database, because a concatenation cannot answer them, and
-every collection in this base does all three (R14, R16). That is a cross-shard
-cursor, a merged sort and a summed count: an architecture decision, not a patch.
-Until it is taken, a full team database is relieved by archiving or by moving the
-TEAM, and stage 2's same-table cutover stays a documented path (Prime Directive 1).
+Two things had to land before the valve opens, and **the second one has (7 Sep
+2026)**: (1) the read path has to consult `team_module_databases`, and (2) a merged
+read has to be able to PAGE, SORT and COUNT. This paragraph used to say
+`d1QueryAcross` "deliberately refuses all three". It does not any more — the merged
+SORT and the CUT are built (each shard answers its own top n under the same
+ordering; the seam sorts the union by the statement's own keys and cuts to the
+limit) and the summed COUNT is `countCollectionAcross` in
+`shared/workers/count.ts`. What it still refuses is an OFFSET, a raw aggregate and
+an ordering it cannot read as bare columns — which is the honest shape of what is
+LEFT: a cross-shard keyset CURSOR that means the same position on every shard, and,
+before that, the routing of (1). Still an architecture decision rather than a patch,
+and now one decision rather than three. Until it is taken, a full team database is
+relieved by archiving or by moving the TEAM, and stage 2's same-table cutover stays
+a documented path (Prime Directive 1).
 
 **Organizing many apps in Cloudflare:** Cloudflare has no folders. The base's
 convention is (a) a name prefix per product, every worker, database and bucket

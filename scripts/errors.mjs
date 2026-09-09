@@ -83,14 +83,23 @@ const headers = { "x-admin-key": ADMIN_KEY, "Content-Type": "application/json" }
  * by the same two columns the server builds a signature from, and hands the line
  * back to the door to decide what it matches. One folder, and it is the one that
  * does the closing. */
+/** Sources the door declares as MEASUREMENTS — rows written on purpose with no
+ * stack (the slow-door line). Announced by the server so this script never has
+ * to know the list; a group from one of them is tagged rather than read as a
+ * crash with its stack missing. */
+let measurementSources = []
+
 async function listErrors(status) {
   const res = await timedFetch(`${base}/api/data-ops/admin/errors?status=${status}&limit=200`, { headers })
   if (!res.ok) {
     console.error(`The errors door answered ${res.status}: ${(await res.text()).slice(0, 300)}`)
     process.exit(1)
   }
-  return (await res.json()).errors ?? []
+  const body = await res.json()
+  measurementSources = body.measurementSources ?? []
+  return body.errors ?? []
 }
+
 
 const resolveSig = flag("--resolve")
 if (resolveSig) {
@@ -126,7 +135,7 @@ if (!rows.length) {
 const groups = new Map()
 for (const r of rows) {
   const key = `${r.source} · ${String(r.message).slice(0, 80)}`
-  const g = groups.get(key) ?? { n: 0, newest: r.at, place: r.place, resolved: 0 }
+  const g = groups.get(key) ?? { n: 0, newest: r.at, place: r.place, resolved: 0, source: r.source }
   g.n++
   if (r.status === "resolved") g.resolved++
   if (r.at > g.newest) g.newest = r.at
@@ -137,7 +146,10 @@ const sorted = [...groups].sort((a, b) => b[1].n - a[1].n)
 console.log(`${environment}: ${rows.length} row(s) in ${sorted.length} signature(s), biggest first\n`)
 for (const [sig, g] of sorted) {
   console.log(`${String(g.n).padStart(5)}  ${g.newest.slice(0, 16).replace("T", " ")}  ${sig}`)
-  console.log(`       ${g.place}${g.resolved ? `  (${g.resolved} already closed)` : ""}`)
+  console.log(
+    `       ${g.place}${g.resolved ? `  (${g.resolved} already closed)` : ""}` +
+      (measurementSources.includes(g.source) ? "  (a measurement, no stack by design)" : "")
+  )
 }
 console.log(
   `\nTo close one whole failure — the signature is the line above, quoted:\n` +

@@ -34,10 +34,10 @@
 
 import { fail, json } from "@shared/workers/http"
 import { healthBody } from "@shared/workers/config-health"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, identityFor } from "@shared/workers/gating"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { requestId } from "@shared/workers/trace"
-import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import type { Env } from "./env"
 import { internalLogError, internalMcpSession, internalSendEmail } from "./routes/internal"
@@ -135,7 +135,13 @@ export default {
       // sibling workers do — auth publishes on the USER channel (a profile edit,
       // an email change, a forced sign-out), and those pings held the response
       // for the same reason every other one did.
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // …and this request's NAME, so a user-channel ping that did not go out
+      // leaves a row that joins the click that caused it (trace.ts).
+      // …and the CORE database counted, so the slow-door line below can see the
+      // trips this worker actually makes. `beginD1Timing` only ever saw the D1
+      // REST door, so a native `env.DB` statement was invisible and a worker that
+      // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       logIfSlow(request, route, def.kind, env.DB)
       return withTiming(request, res, def.kind)
     } catch (e) {
@@ -144,7 +150,15 @@ export default {
       // every intended 400 would have become a 500 — and a 500 on the
       // unauthenticated sign-in door writes a row to the GLOBAL core database
       // per request. The two changes only make sense together.
-      if (e instanceof GuardError) return fail(e.status, e.code, e.message)
+      if (e instanceof GuardError) {
+        // A REFUSAL THAT KNOWS WHY IS NOT AN ORDINARY 4xx (gating.ts `detail`):
+        // the caller's answer is unchanged and the cause stops being console-only.
+        // The same branch every sibling worker carries — auth's was the odd one
+        // out, so a diagnosed refusal on a sign-in door recorded nothing.
+        if (e.detail)
+          await recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
+        return fail(e.status, e.code, e.message)
+      }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
       // `console.*` sites in this codebase and not one of them named a request,
       // which made the live tail and `error_logs` two stores with no join between
@@ -156,8 +170,10 @@ export default {
       // Record the crash in the central error log (core DB) — best-effort, and
       // now literally "never blocks the response": it rides `waitUntil`, so the
       // 500 goes out while the row is written and the row is still guaranteed to
-      // land. Clean GuardError refusals never reach here.
-      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request)))
+      // land. Clean GuardError refusals never reach here. WHOSE crash it was is
+      // read off the request (`noteIdentity` in lib/sessions.ts, the moment the
+      // session row resolves) — the same WeakMap `teamContext` fills elsewhere.
+      afterResponse(request, recordWorkerError(env.DB, "auth", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request)))
       return fail(500, "internal", "Something went wrong on our side. Try again.")
     }
   },

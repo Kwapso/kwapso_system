@@ -18,7 +18,7 @@ import { ROUTES } from "../src/index"
  * its reason. Rot-checked both ways. */
 const SILENT: Record<string, string> = {
   "POST /api/data-ops/admin/grant-credits":
-    "the owner topping up a team's AI allowance through the ADMIN_KEY door. It is not a change to any team RECORD, so it has no related_table to hang on and would appear in the cross-module feed as a sentence about nothing anybody can open. The grant is audited where it belongs — on the allowance row's own audit block, in the global core database, beside the balance it moved.",
+    "the owner topping up a team's AI allowance through the ADMIN_KEY door. It is not a change to any team RECORD, so it has no related_table to hang on and would appear in the cross-module feed as a sentence about nothing anybody can open. The grant is audited where it belongs — one row per top-up in `credit_grants` (db/core/0030), in the global core database, written in the SAME batch as the balance it moved. This sentence used to say 'on the allowance row's own audit block', and there was no such block: `agent_credits` carries a balance, a lifetime total and an `updated_at`, and never said who. The exemption was true about the feed and false about the audit for as long as it stood.",
 }
 
 activitySeam({

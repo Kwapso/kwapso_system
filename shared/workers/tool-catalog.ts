@@ -189,8 +189,25 @@ export type SharedTool = {
   name: string
   /** The MCP's own name for this endpoint, when it differs (external-contract stable). */
   mcpName?: string
-  /** ONE human description — handed to the model AND shown to MCP developers. */
+  /** ONE LINE — handed to the model AND shown to MCP developers, and the ONLY
+   * half either of them is given before they have asked for anything. It says
+   * what the tool does and what the door will refuse; roughly 110 characters,
+   * 160 at the very most (data-ops/test/tool-diet.test.ts holds the ceiling). */
   summary: string
+  /** THE REST OF THE SENTENCE — fetched on request through `describe_tool`, and
+   * never sent in a manifest.
+   *
+   * A MANIFEST IS A BILL. An MCP client loads every description before its user
+   * has typed a word, and on 2026-09-08 that was 85,621 characters of prose —
+   * enough that the owner's own Claude stopped behaving the day he connected it.
+   * So each summary was cut to one line and everything it said moved here,
+   * VERBATIM: the history, the reasoning, the worked examples, the sentences a
+   * caller needs once it is already holding the tool. Nothing was deleted, which
+   * is the whole claim, and tool-diet.test.ts proves the half that can rot — a
+   * trimmed summary must have a detail, and the detail must still name every
+   * identifier its summary does. R27 judges the two halves together, because a
+   * model reads both. */
+  detail?: string
   binding: "TENANCY" | "CONTENT"
   method: "GET" | "POST"
   path: string
@@ -251,9 +268,35 @@ export const SHARED_TOOLS: SharedTool[] = [
    * question. These two are that. The door builds the SQL; the model never
    * writes any.
    */
+  /* ------------------- THE OTHER HALF OF A ONE-LINE SUMMARY ------------------
+   *
+   * Every `summary` below is one line, because a manifest is loaded before
+   * anybody has typed a word and 85,621 characters of it is what stopped the
+   * owner's own Claude from behaving. The rest of each sentence sits on
+   * `detail`, which no manifest carries; this is how a caller asks for it.
+   *
+   * Core on the agent surface (CORE_TOOL_NAMES) for the reason `load_tools` is:
+   * a catalogue you cannot open is a shorter catalogue and nothing else.
+   */
+  {
+    name: "describe_tool",
+    summary:
+      "The full instructions for one tool, by `tool` name — everything its one-line summary leaves out. Ask before a call you are unsure of.",
+    binding: "TENANCY",
+    method: "GET",
+    path: "/api/tenancy/tools/describe",
+    schema: obj({ tool: S }, ["tool"]),
+    buildQuery: (i) => `?tool=${encodeURIComponent(str(i, "tool"))}`,
+    agent: {
+      write: false,
+      summarize: (i) => `Read how ${str(i, "tool")} works`,
+    },
+  },
   {
     name: "describe_module",
     summary:
+      "A module's filterable fields, types, enum values and the client names in use. `module` takes the app's aliases (`help` = tickets); omit it to list modules.",
+    detail:
       "What can I ask about this module? Give it `module` — and if you know that thing by another name here, use it: the modules answer to the names the rest of this catalogue uses, so `help` reaches tickets. It answers with every field you may filter, group or sort by — the field's name, its type (text, number, date, boolean, id or enum), the values an enum accepts, and what an id points at. It also lists the client NAMES actually in use on that module, so you can see the company is spelled 'FluClinic' before searching for 'flu clinic' and finding nothing. Call it BEFORE query_records on a module you have not queried this conversation, and never guess a field name or a client's spelling: a wrong field is refused outright, and a field answers to the word this app uses for it as well as its own name. It marks the fields whose values have a past — a reference these records used to wear still finds them through query_records, so a number quoted in an old email is worth trying as it was given to you. With no `module` at all it lists the modules this caller may read, one line each. Enum values that the team edits themselves (ticket types, sprint types, industries) are read live from their own dropdown list, so they are the words actually in use rather than the words that shipped.",
     binding: "TENANCY",
     method: "GET",
@@ -268,6 +311,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "query_records",
     summary:
+      "Ask a module a question. `module` required; `where` filters, `groupBy`/`countOnly` count, `cursor` pages. Name any `unmatched` values in your answer.",
+    detail:
       "Ask a module a question — the one read tool. `module` names what to ask (describe_module lists them and their fields), and it accepts the other names a thing goes by here, so `help` reaches tickets. Every answer echoes the canonical `module` it used. `where` is a list of filters, each an object of field, op and value, ANDed together; a filter's field may be a LIST of field names, and then any one of them matching satisfies it — which is how a search box works (look in the title, the reference and the description at once); the ops are eq, ne, in, notIn, gt, gte, lt, lte, between, contains, isNull and notNull. Dates work: between takes two values and includes both days, so a whole month is one filter, and a bare date like 2026-07-31 covers that entire day rather than its first instant. in, notIn and between take a list; contains takes one piece of text OR a list, matching any of them. On a field that points at another record (a client, an app), eq and in also accept that record's NAME, and contains matches part of it — so three clients named in a question are ONE filter and need no lookup first. `groupBy` is a list of one or two field names and turns the answer into counts: the reply then carries `groups`, each with its key, a readable label where the field points at a record, and a count — which is how 'how many per client' or 'per month' is one call instead of a page-walk. `countOnly` true answers with the NUMBER and no rows at all — use it for every 'how many' question, because a page of fifty rows you are only going to count is thousands of tokens you have to read to ignore. `fields` narrows what comes back (long text is left out unless you name it). `sort` and `dir` order it, `cursor` walks it. A record is found by its id OR by its human reference, which are two different fields on most modules — a reference handed to the id field finds nothing. A reference can also be one the record no longer wears: these numbers changed shape once, every retired string was kept, and filtering by an old one still finds the record — so a number somebody read off an email from last year works exactly as the current one does, and the answer comes back carrying the number the record wears now. `describe_module` marks the fields this applies to. If any value you filtered by names nothing here — a client that does not exist, a ticket type this team does not use — the reply carries `unmatched` listing exactly those, and you MUST say so in the same sentence as the number — '97 open across FluClinic and Confia; there is no client called HORSt here'. A total that silently drops one of the things the person asked about is a correct number and a false answer. On a module where records get linked to a client BY HAND rather than automatically (meetings, for now), a query filtering an account by an exact match can carry `unlinked: { count }` — that many more rows mention the client by name but nobody has linked them yet. Exactly as with `unmatched`, you MUST say so in the SAME SENTENCE as the row you are about to name, never present that row alone as the latest — 'The most recent meeting linked to this client is from 6 August; 3 more mention them by name but are not linked to the account yet.' Then a second call filtering by the client's name as text instead, rather than the account, often finds the real one. The reply always carries `records`, an exact `total` over the SAME filters (`totalCapped` true means the count stopped at its ceiling), `hasMore` and an opaque `nextCursor` to pass straight back. Some modules keep put-away rows off their everyday list, exactly as their own screens do — a ticket that has been archived is not on the tickets list — so the reply says `view` when that applies; filter on that field yourself to reach them. A module can bound the OTHER end too: meetings that have not happened yet are off the everyday list, because most future rows are recurring calendar shells with nothing in them and sorted newest-first they answer every 'what was the latest…' question with a placeholder. The reply says `when`: happened means the answer stops at today, and filtering on that same date field yourself lifts the bound and gets you exactly what you asked for. `describe_module` marks the field it applies to. You only ever see rows your role may already read, and the door refuses a client login.",
     binding: "TENANCY",
     method: "GET",
@@ -327,16 +372,18 @@ export const SHARED_TOOLS: SharedTool[] = [
     // per-module fence and breached R24 in the same row.
     name: "read_activity",
     summary:
-      "What has CHANGED, and who changed it — edits, deactivations and reactivations across the whole team, newest first. A creation is not here: a record's own audit line says who made it, so this feed is the history AFTER that. `scope` says what you are asking about and is one of team, record, user, role or invite; it defaults to team, the whole feed narrowed to the modules your role may read. For one record's own history use scope record with `table` (the table the record lives in — help, stories, accounts, meetings, and so on) and `id`. For what one colleague changed use scope user with their user id in `id`; scope role takes a role id and scope invite takes an invite id. Any scope but team with no `id` answers with nothing rather than with everybody's. The reply carries `activity` — each row an `id`, a `type`, a plain-English `description` of the change, the `actorName` who made it and `createdAt` — plus an exact `total` over the same question (`totalCapped` true means the count stopped at its ceiling), `hasMore`, and an opaque `nextCursor` to hand straight back as `cursor` for the next page. YOU ONLY EVER SEE WHAT YOUR OWN ROLE MAY READ: the team feed subtracts every module you are denied, so a number here is the number for YOU and not for the team, and the door refuses a client login outright.",
+      "What changed and who changed it. `scope`: team, record, user, role, invite or actor — all but team need `id` (record also needs `table`). `cursor` pages.",
+    detail:
+      "What has CHANGED, and who changed it — edits, deactivations and reactivations across the whole team, newest first. A creation is not here: a record's own audit line says who made it, so this feed is the history AFTER that. `scope` says what you are asking about and is one of team, record, user, role, invite or actor; it defaults to team, the whole feed narrowed to the modules your role may read. For one record's own history use scope record with `table` (the table the record lives in — help, stories, accounts, meetings, and so on) and `id`. THE TWO QUESTIONS ABOUT A PERSON ARE DIFFERENT ONES: scope actor with their user id in `id` is what THEY CHANGED, anywhere in the team; scope user with the same id is what happened TO THEM as a member — they joined, their role changed, they were removed. Scope role takes a role id and scope invite takes an invite id. Any scope but team with no `id` answers with nothing rather than with everybody's. `verb` narrows any scope to one kind of event and is one of created, edited, status, archived, restored, deleted, viewed or other — an equality on the row's own stored word, so it finds every archive whatever sentence was written for it. The reply carries `activity` — each row an `id`, a `type`, a plain-English `description` of the change, the `actorName` who made it, `createdAt`, the same `verb`, and `origin`, which door the change came through — plus an exact `total` over the same question (`totalCapped` true means the count stopped at its ceiling), `hasMore`, and an opaque `nextCursor` to hand straight back as `cursor` for the next page. YOU ONLY EVER SEE WHAT YOUR OWN ROLE MAY READ: the team and actor feeds both subtract every module you are denied, so a number here is the number for YOU and not for the team, and the door refuses a client login outright.",
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/activity",
-    schema: obj({ scope: S, id: S, table: S, cursor: S }),
+    schema: obj({ scope: S, id: S, table: S, cursor: S, verb: S }),
     // R19: every parameter the door parses is exposed above and forwarded here —
-    // scope, id, table and cursor, which is all four of them.
+    // scope, id, table, cursor and verb, which is all five of them.
     buildQuery: (i) => {
       const parts: string[] = []
-      for (const key of ["scope", "id", "table", "cursor"])
+      for (const key of ["scope", "id", "table", "cursor", "verb"])
         if (str(i, key)) parts.push(`${key}=${encodeURIComponent(str(i, key))}`)
       return parts.length ? `?${parts.join("&")}` : ""
     },
@@ -345,9 +392,15 @@ export const SHARED_TOOLS: SharedTool[] = [
       summarize: (i, names) =>
         str(i, "scope") === "record"
           ? `Read what changed on ${names?.[str(i, "id")] ?? (str(i, "id") || "a record")}`
-          : str(i, "id")
+          : // "what X changed" is true of the ACTOR scope and was being said about
+            // every id-scope, including `user` — which answers what happened TO
+            // them. The panel a person approves said the wrong thing about the
+            // one scope somebody would check it for.
+            str(i, "scope") === "actor" && str(i, "id")
             ? `Read what ${names?.[str(i, "id")] ?? str(i, "id")} changed`
-            : "Read what has changed",
+            : str(i, "id")
+              ? `Read the history of ${names?.[str(i, "id")] ?? str(i, "id")}`
+              : "Read what has changed",
     },
   },
   {
@@ -361,6 +414,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_invites",
     summary:
+      "The team's invites with email, role and status (pending / accepted / revoked). Pass `id` for one. Use it to find a pending invite's id before revoking.",
+    detail:
       "List the team's invites, each one's email, role, status (pending / accepted / revoked) and its invite id. Use this to find a PENDING invite's id before revoking it (list_members only shows people who've already joined, so an unaccepted invite won't be there).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/invites",
     schema: obj({ id: S }),
@@ -370,6 +425,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_dropdown_values",
     summary:
+      "The team's dropdown values, active first then deactivated; each carries `active`. Pass `id` for one.",
+    detail:
       "List the team's dropdown values (selectable data), active first then deactivated, each carries `active`. Deactivated values are listed too, so you can find one's id and reactivate it.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/selectable",
     schema: obj({ id: S }),
@@ -379,6 +436,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_tickets",
     summary:
+      "List tickets. `status` is one or more of new, triaged, scheduled, in_progress, ready, resolved. `waiting` 'only' keeps the ones where a client owes us a reply.",
+    detail:
       "List the team's tickets. scope: 'mine', which now means the tickets on the apps you are STAFFED to, not the ones you typed, or 'all' (default all); view: 'live' (default, the everyday list) or 'archived' (tickets that have been put away); `q` searches the reference, the description and the title; `accountId` narrows to one client's tickets; `appId` narrows to one system's; `moduleId` narrows to one SECTION of that system, the modules an app is divided into (list_app_modules gives their ids). `helpType` narrows to one kind, as the team spells it in their own Ticket type list; `status` narrows to one or more stages of the lifecycle — 'new', 'triaged', 'scheduled', 'in_progress', 'ready' or 'resolved' — comma-separated for several at once, so 'triaged,scheduled,in_progress' is every ticket that has been sorted and is not finished. `waiting`: 'only' keeps just the tickets whose LAST reply came from the agency's side, i.e. the ones where a client owes us an answer; it is not a stage and stores nothing, it is worked out from the conversation each time you ask, so combine it with `status` to say which stages you mean. Pass `id` to fetch just one ticket, archived or not. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'created', 'updated', 'status', 'kind' or 'title'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer; `byType` and `byStatus` tally the whole (unfiltered by kind or stage) list a kind or a stage at a time. `byAccount` is the same tally per CLIENT — `accountId`, `accountName`, `open` and `total` — already sorted with the most open first, so 'which client has the most open tickets' is the first entry and needs no counting of your own. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/help",
     schema: obj({
@@ -440,6 +499,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_team",
     summary:
+      "Rename the team and set the agency's own legal details. Send only what you are changing; an empty string clears a field.",
+    detail:
       "Rename the team this caller is standing in, and set the agency's own details. Its people, records and history are untouched. `legalName` is what goes on a contract when it is not the short name in the rail, `legalAddress` is the registered address, `legalNumbers` is one block of text for whatever numbers the country asks for (a company number, a VAT number), and `phone` is the number somebody rings. Send only what you are changing: a field left out keeps its current value, and an empty string clears it.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/teams/update",
     schema: obj({ name: S, legalName: S, legalAddress: S, legalNumbers: S, phone: S }, ["name"]),
@@ -460,6 +521,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_accounts",
     summary:
+      "Companies and people in one list (people need the contacts right). `type` is 'entity' or 'individual'; `archived` 'yes'/'no'; `cursor` pages.",
+    detail:
       "List the team's accounts, companies and people in one list, unless the caller's role lacks the contacts right, in which case it is the companies. Filters: `q` (searches name, reference and email), `type` ('entity' for a company or 'individual' for a person), `archived` ('yes' for only the put-away ones, 'no' for only the live ones; both by default), `parentId` (only the accounts sitting under that one). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'code' or 'updated'. The order is the DOOR's, so it spans the whole collection rather than the page you are holding. The `total` counts the SAME filtered question the rows answer, so it is the answer to 'how many are there?' as well. `entityTotal` and `individualTotal` are a different question, how many companies and how many people there are in the whole collection, whatever this call asked for. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts",
     schema: obj({ q: S, type: S, archived: S, parentId: S, sort: S, dir: S, cursor: S }),
@@ -474,6 +537,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_account",
     summary:
+      "One account in full by `id`. `links`/`companies` need the contacts right; `portalUsers` needs the portal access right.",
+    detail:
       "One account in full (by id). For a company it carries `links`, the people linked to it, and for a person it carries `companies`, the accounts they are a contact of; both are empty without the contacts right. `portalUsers` is who can sign in, and needs the portal access right. Use list_accounts to find the id.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/accounts/detail",
     schema: obj({ id: S }, ["id"]),
@@ -483,6 +548,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_account",
     summary:
+      "Create an account. `accountType` is 'entity' or 'individual'. `code` is minted from the name if you leave it out; `parentAccountId` nests it.",
+    detail:
       "Create an account. `accountType` is 'entity' (a company) or 'individual' (a person), nothing else is accepted. Both are still live here, but the agency's own screens now only ever create companies: a person is made on a company's Contacts tab, which creates the account and then links it the way `link_contact` does. `parentAccountId` puts it under another account; leave it out for a top-level one. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `country` and `industry` are picked from the team's own dropdown values. `code` is the reference, and you almost never send it: leave it out and one is minted from the name (BERG for Bergman S.A., BERG2 when that is taken).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts",
     schema: obj(
@@ -504,6 +571,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_account",
     summary:
+      "Edit an account's own details by `id`, never its parent (that is set_account_parent). Send only what you change; an empty string clears a field.",
+    detail:
       "Edit an account's own details (by id), never its place in the hierarchy; that's set_account_parent. Send ONLY the fields you are changing: anything you leave out keeps its current value. To empty a field, send it as an empty string. The postal address is four fields, `street`, `postalCode`, `city`, `country`, and `about` is the paragraph about them.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/update",
     schema: obj(
@@ -547,6 +616,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "link_contact",
     summary:
+      "Link a person to a company: `accountId` is the company, `personAccountId` the person's own account row. One person can be a contact of several.",
+    detail:
       "Say that a person is a contact of an account: `accountId` is the company, `personAccountId` is the person's own account row (create it first with create_account if it isn't there). The same person can be a contact of more than one account.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/accounts/links",
     schema: obj({ accountId: S, personAccountId: S, relationship: S, isMainStakeholder: B }, ["accountId", "personAccountId"]),
@@ -568,6 +639,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_portal_access",
     summary:
+      "Who can sign in to the client portal, with their email and whether the access is live. `accountId` narrows to one account.",
+    detail:
       "Who can log in to the client portal, every portal access the caller may see, or just one account's with `accountId`. Each row carries the person's email and whether their access is live.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/portal-users",
     schema: obj({ accountId: S }),
@@ -580,6 +653,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "grant_portal_access",
     summary:
+      "A portal login for someone at an account. They must have signed in once; a team member is refused. `roleId` defaults to Client, `notify` emails (`emailSent`).",
+    detail:
       "Give someone at an account a login to the client portal. `accountId` is the account they'll see; `personAccountId` is the person, picked off that account's own records, the door reads their email from there, so it never takes a typed-in address. They must have signed in here at least once, and a member of your own team is refused. `appRestriction` narrows them to named systems INSIDE that account: a comma-separated list of app ids from `list_apps`, each of which must belong to this client or the grant is refused. Leave it out for their whole company's world, which is the usual case. `roleId` is the role they hold on your team — a client login IS an ordinary member, so this is what decides what they can see; leave it out and a role called Client is used, and the call is refused if there is none. `notify` (default off) emails the person to tell them their portal is ready and where to sign in; the answer's `emailSent` says whether it actually went, so never claim it did without reading that.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/portal-users",
     schema: obj({ accountId: S, personAccountId: S, appRestriction: S, roleId: S, notify: B }, ["accountId", "personAccountId"]),
@@ -613,6 +688,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_role",
     summary:
+      "Create a team role. It has no rights unless you pass `permissions` (as set_role_permissions takes) — which also needs member_roles:edit.",
+    detail:
       "Create a new team role. It starts with no access rights unless you pass `permissions`, the same object set_role_permissions takes (keyed by module → { read, create, edit, delete }). Creating WITH a matrix is create + edit in one move, so the door demands member_roles:edit on top of member_roles:create; leave it out for a plain create and grant rights afterwards.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles",
     schema: obj({ title: S, description: S, permissions: { type: "object" } }, ["title"]),
@@ -641,6 +718,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_role_permissions",
     summary:
+      "Set a role's rights by `roleId`. `value` maps each module to { read, create, edit, delete }; a write auto-enables read. The Admin role is locked.",
+    detail:
       "Set a role's access rights (by role id). `value` is an object keyed by module, one of teams, team_members, member_roles, help, selectable_data, screens, agent, each mapping to { read, create, edit, delete } booleans. Turning on create/edit/delete auto-enables read. The Admin role is locked (the server enforces this).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/roles/permissions",
     schema: obj({ roleId: S, value: { type: "object" } }, ["roleId", "value"]),
@@ -678,6 +757,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "invite_member",
     mcpName: "create_invite",
     summary:
+      "Invite someone by email with a role id. Refuses your own address or an existing member. `emailSent` says whether the invite email went.",
+    detail:
       "Invite someone to the team by email, assigning them a role (by role id). Sends the branded invite email. Refuses if the email is the caller's own address or someone already on the team, and returns `emailSent` so you know whether the email actually went out.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/invites",
     schema: obj({ email: S, roleId: S }, ["email", "roleId"]),
@@ -703,6 +784,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_dropdown_value",
     summary:
+      "Add a dropdown value: `type` is the group, `value` the option. A write never invents an option — call this first, the write second, same turn.",
+    detail:
       "Add a dropdown value: `type` = the group name, `value` = the option, and an optional `mark`, one glyph shown beside the word wherever the type appears. A dropdown write NEVER invents an option, for 'create X and move things onto it', call THIS first and the write second, in the SAME turn.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable",
     schema: obj({ type: S, value: S, mark: S }, ["type", "value"]),
@@ -721,6 +804,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "set_dropdown_default",
     mcpName: "set_dropdown_value_default",
     summary:
+      "Mark a dropdown value as a team default, or take the mark off (`isDefault`). A default cannot be switched off until the mark comes off.",
+    detail:
       "Mark a dropdown value (by `id`) as one of the team's defaults, or take that mark off, with `isDefault`. A default value cannot be switched off by `set_dropdown_value_active` until the mark is taken off — that is what the mark is for. Renaming a default is always allowed.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable/default",
     schema: obj({ id: S, isDefault: B }, ["id", "isDefault"]),
@@ -740,14 +825,34 @@ export const SHARED_TOOLS: SharedTool[] = [
     name: "raise_help_ticket",
     mcpName: "create_help_ticket",
     summary:
-      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. Every ticket opens in `new` and goes straight into the queue, whatever its kind.",
+      "Raise a ticket (`description` required). `accountId` is the client it is for, `moduleId` must belong to `appId`. Give it a title. Opens in `new`.",
+    detail:
+      "Raise a new support ticket (description required). `accountId` names the CLIENT it is raised for. Use it whenever the ticket is on a client's behalf, because the client's own people see their company's tickets and a ticket with no client belongs to nobody. Leave it off only for the agency's own internal questions. A client-portal caller cannot set it; theirs is always their own company. `appId` names the system it is about and `moduleId` which SECTION of it, which is how tickets are grouped; a module must belong to the app named in `appId`. `raisedByContactId` is the person at that client who asked, which is not always whoever types it, since most of a client's history is written down on their behalf. Every ticket opens in `new` and goes straight into the queue, whatever its kind. GIVE IT A TITLE: `titleDe` and `titleEn` are the two titles a ticket carries, and neither is derived from the other — write the one you have in the language it was asked in, and the other when you have it. A ticket with neither is what a person sees at the top of their list with no name on it.",
     binding: "CONTENT", method: "POST", path: "/api/content/help",
-    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["description"]),
+    schema: obj({ description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["description"]),
     // accountId is read in lib/help.ts, not in the handler, so R22's source scan
     // cannot derive it (see its own note on fields forwarded wholesale to a lib).
     // Exposed by hand, deliberately: without it a machine can only raise tickets
     // that no client will ever see.
-    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    //
+    // AND THE SAME IS TRUE OF THE TITLES, which is how they were missed. Both are
+    // read in lib/help.ts and written straight into `title_de` / `title_en`, so
+    // R22 never saw them and never asked for them — and every ticket a machine
+    // created was TITLELESS, from the day this door shipped. The detail screen
+    // renders `titleDe` as "Title" and `titleEn` as "Title (English)", so what a
+    // person opened was a ticket with no name on it. Neither is derived from the
+    // other on purpose (lib/help.ts's own note: 788 legacy requests exist only in
+    // German), so both are offered and either may be left out.
+    //
+    // WHAT IS STILL DELIBERATELY ABSENT: `sourceScreen`, `sourceRelatedTable` and
+    // `sourceRelatedRowId`. The door reads all three, and they record WHICH SCREEN
+    // a person was looking at when they raised this. A machine has no screen, so a
+    // value here could only be invented — and an invented provenance is worse than
+    // an empty one, because it is indistinguishable from a real one afterwards.
+    // They are absent rather than exempted because R22 cannot see them either:
+    // a NARROWED_BODY_FIELDS line naming a field the census does not report would
+    // fail that law's own rot check. This comment is where the decision lives.
+    buildBody: (i) => ({ description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn") }),
     // CONFIRM, because `accountId` decides WHO CAN READ THIS TICKET. Naming a
     // client puts the conversation in their portal — the same order of decision
     // as a permission grant, reached by a model that has been reading ticket text
@@ -758,12 +863,19 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_help_ticket",
     summary:
-      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries.",
+      "Edit a ticket by `id`. `accountId` can be set once and never moved. Fields left out keep their value, so `titleEn` never blanks `titleDe`.",
+    detail:
+      "Edit a support ticket's details (by id). `accountId` names the client a ticket has none for, it can be SET once and never moved, because moving a ticket would take the conversation away from the people reading it. `appId` (the system it is about), `moduleId` (which SECTION of it — the module must belong to that app) and `raisedByContactId` (the person at that client who asked) can all be corrected freely; leaving either out keeps whatever the ticket already carries. `titleDe` and `titleEn` are the ticket's two titles and are corrected the same way — this is how a title is added to a ticket that has none, and how a translated one is filled in beside the original. Leaving one out keeps what is already there, so writing `titleEn` never blanks `titleDe`.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/update",
-    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S }, ["id", "description"]),
+    schema: obj({ id: S, description: S, helpType: S, screenRecordingLink: S, accountId: S, appId: S, moduleId: S, raisedByContactId: S, titleDe: S, titleEn: S }, ["id", "description"]),
     // Same note as create_help_ticket: read in lib/help.ts, so R22's scan cannot
-    // derive it. Exposed by hand.
-    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId") }),
+    // derive it. Exposed by hand — the titles included, and they are the reason
+    // this tool now matters twice over. `translate-ticket` is kept off the machine
+    // surface on the stated grounds that a chat turn can translate a title and
+    // then call THIS tool with `titleEn`; that sentence was written before the
+    // field existed here, so the exclusion rested on a call nobody could make.
+    // The three `source*` fields stay out for the reason create_help_ticket gives.
+    buildBody: (i) => ({ id: str(i, "id"), description: str(i, "description"), helpType: opt(i, "helpType"), screenRecordingLink: opt(i, "screenRecordingLink"), accountId: opt(i, "accountId"), appId: opt(i, "appId"), moduleId: opt(i, "moduleId"), raisedByContactId: opt(i, "raisedByContactId"), titleDe: opt(i, "titleDe"), titleEn: opt(i, "titleEn") }),
     // CONFIRM, and this is the one that mattered. The door SETS `account_id` on a
     // ticket that had none, and a ticket carries its whole reply history — so one
     // silent call could hand an internal agency conversation to a client's portal.
@@ -774,6 +886,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_help_status",
     summary:
+      "Move a ticket along: new, triaged, scheduled, in_progress or ready. It will NOT take 'resolved' — that is resolve_help_ticket, which needs the words to send.",
+    detail:
       "Move a ticket along its lifecycle, by id. A STATUS IS A FACT here, not a switch, five of the six stages are reached by something happening, so setting one by hand is a correction rather than the ordinary path. In order: new (raised, nobody has read it), triaged (somebody read it. Set by triage_help_ticket), scheduled (its work is booked into a sprint, happens by itself), in_progress (a timer started on it or on one of its stories, happens by itself), ready (every story closed, happens by itself), resolved (answered and closed). `status` will NOT accept 'resolved': answering a client is resolve_help_ticket, which requires the words to send. Moving a resolved ticket back to triaged is how a ticket is reopened, there is no separate reopened state.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/status",
     schema: obj({ id: S, status: S }, ["id", "status"]),
@@ -794,6 +908,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     // longer has, which is exactly the divergence R9 exists to prevent.
     name: "triage_help_ticket",
     summary:
+      "Record that somebody has READ a ticket (`id`): new becomes triaged. A ticket already further along moves nothing.",
+    detail:
       "Record that somebody has READ a ticket, by `id`, the one judgement in the lifecycle nothing can infer. Moves it from new to triaged; a ticket already triaged, scheduled or being worked on moves nothing, so this never drags a started request backwards.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/triage-read",
     schema: obj({ id: S }, ["id"]),
@@ -803,6 +919,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_help_attachments",
     summary:
+      "The files and links on one ticket (`id`). Each carries `kind` ('file' or 'link'), `label` and `url`; `total` is how many.",
+    detail:
       "The files and links on one ticket, by `id`, what somebody attached to show what they mean. `attachments` carries each one's `kind` ('file' or 'link'), its `label`, and the `url` to open it; `total` is how many there are.",
     binding: "CONTENT", method: "GET", path: "/api/content/help/attachments",
     schema: obj({ id: S }, ["id"]),
@@ -812,6 +930,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_help_link",
     summary:
+      "Attach a LINK to a ticket: `id`, `label`, `url`. Files are attached from the app; this never uploads bytes.",
+    detail:
       "Attach a LINK to a ticket: `id` is the ticket, `label` what a person reads, `url` where it goes. A ticket holds several. Files are attached from the app rather than here, this tool sends `kind` as 'link' and never uploads bytes.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/attachments",
     schema: obj({ id: S, label: S, url: S }, ["id", "label", "url"]),
@@ -825,6 +945,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "remove_help_attachment",
     summary:
+      "Take a file or link off a ticket: `id` is the ticket, `attachmentId` the attachment. Nothing is deleted; it stops being listed.",
+    detail:
       "Take a file or a link off a ticket: `id` is the ticket, `attachmentId` the one to remove (from list_help_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/attachments/remove",
     schema: obj({ id: S, attachmentId: S }, ["id", "attachmentId"]),
@@ -834,6 +956,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_story_attachments",
     summary:
+      "The files and links on one story (`id`): each `kind`, `label` and `url`, plus `total`. A story needs at least one before it can go for review.",
+    detail:
       "The files and links on one story, by `id` — what somebody put up to show what the work did. `attachments` carries each one's `kind` ('file' or 'link'), its `label`, and the `url` to open it; `total` is how many there are. A story needs at least one of these before it can go for review.",
     binding: "CONTENT", method: "GET", path: "/api/content/stories/attachments",
     schema: obj({ id: S }, ["id"]),
@@ -843,6 +967,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_story_link",
     summary:
+      "Attach a LINK to a story: `id`, `label`, `url`. A story needs at least one attachment before set_story_status will move it to in_review.",
+    detail:
       "Attach a LINK to a story: `id` is the story, `label` what a person reads, `url` where it goes. A story holds several, and needs at least one before `set_story_status` will move it to in_review. Files are attached from the app rather than here — this tool sends `kind` as 'link' and never uploads bytes.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments",
     schema: obj({ id: S, label: S, url: S }, ["id", "label", "url"]),
@@ -854,6 +980,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_story_attachment",
     summary:
+      "Fix an attachment on a story: `id` is the story, `attachmentId` the row. `label` renames; `url` re-points a link (the old row is kept, deactivated).",
+    detail:
       "Fix one that is already on a story: `id` is the story, `attachmentId` the one to fix (from `list_story_attachments`). Send `label` to rename it. Send `url` to point a LINK somewhere else — the old row is kept and deactivated, so a replaced link stays in the story's history and stops being listed. A FILE's bytes are swapped from the app rather than here, for the reason `add_story_link` gives; renaming a file works fine from here. Answers with the story's remaining `attachments` and their `total`.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments/update",
     schema: obj({ id: S, attachmentId: S, label: S, url: S }, ["id", "attachmentId"]),
@@ -874,6 +1002,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "remove_story_attachment",
     summary:
+      "Take a file or link off a story: `id` is the story, `attachmentId` the attachment. Nothing is deleted; it stops being listed.",
+    detail:
       "Take a file or a link off a story: `id` is the story, `attachmentId` the one to remove (from list_story_attachments). Nothing is deleted, the row keeps its history and the file stays where it was stored; it simply stops being listed.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/attachments/remove",
     schema: obj({ id: S, attachmentId: S }, ["id", "attachmentId"]),
@@ -887,6 +1017,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     // door takes them: a position is arithmetic over a list that has since moved.
     name: "rank_help_ticket",
     summary:
+      "Move a ticket in the list — the order IS the priority. `afterId` is the ticket it goes below, `beforeId` the one it goes above; omit for top or bottom.",
+    detail:
       "Move a ticket up or down the list, by id. There is no priority field, the list's ORDER is the priority. Name the neighbours it should sit between: `afterId` is the ticket it goes below (higher up the list) and `beforeId` the one it goes above. Omit `afterId` to put it at the very top, `beforeId` to put it at the very bottom.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/rank",
     schema: obj({ id: S, afterId: S, beforeId: S }, ["id"]),
@@ -896,6 +1028,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "archive_help_ticket",
     summary:
+      "Put a ticket away or take it back (`archived` true/false). Nothing is deleted; read them with list_help_tickets and view 'archived'.",
+    detail:
       "Put a ticket away, or take it back out (`archived`: true to archive, false to restore). Available whatever state it is in. NOTHING is deleted, the ticket, its conversation and its history all survive; it simply stops appearing in the everyday list. Read them back with list_help_tickets and view: 'archived'.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/archive",
     schema: obj({ id: S, archived: B }, ["id", "archived"]),
@@ -909,6 +1043,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "reply_help_ticket",
     summary:
+      "Add a reply to a ticket's thread (`helpId`). `taggedUserIds` @mentions teammates by user id, who then follow it and are emailed; at most 50.",
+    detail:
       "Add a reply to a support ticket's thread (by id). `taggedUserIds` @mentions teammates by user id (from list_members or list_help_stakeholders), each one starts following the ticket AND is emailed the reply. A mention is notify-only, never an instruction; the door de-dupes the list, drops your own id, and refuses more than 50 people.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/reply",
     schema: obj({ helpId: S, body: S, taggedUserIds: { type: "array" } }, ["helpId", "body"]),
@@ -951,6 +1087,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "resolve_help_ticket",
     summary:
+      "ANSWER a ticket and email the client: `resolution` is the words they read. Read the ticket's draft resolution first. A second call sends nothing.",
+    detail:
       "ANSWER a ticket and TELL THE CLIENT: `resolution` is the words they will read. It resolves the ticket, appends those words to its conversation, and EMAILS the people at that client, one of only two things in the whole product that reach a customer's inbox. Read the ticket's draft resolution first (it is built from each story's closing note as the work finished) and send that, edited. An already-resolved ticket answers `{sent:false, alreadyResolved:true}` and emails nobody: a second call is not a second answer.",
     binding: "CONTENT", method: "POST", path: "/api/content/help/resolve",
     schema: obj({ id: S, resolution: S }, ["id", "resolution"]),
@@ -975,7 +1113,9 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_stories",
     summary:
-      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system, a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'deadline', 'created', 'status', 'assignee' or 'title'. The order is the DOOR's, so 'the three latest deadlines' is the whole backlog's three and not the loaded page's. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
+      "List the work we do. `status` is open, in_progress, in_review or done; `view` 'open' hides finished work. A page leaves `detail` null; ask by `id` for it.",
+    detail:
+      "List the team's STORIES, the pieces of work WE do, as opposed to the tickets a client raises. Filters: `status` (open / in_progress / in_review / done), `ticketId` (the work on one request), `sprintId`, `appId` (all the work on one system, a story always has an app and only sometimes a sprint), `assigneeId`, `q` (searches the reference, the title and the detail), and `view` ('open' by default, which hides finished work. Pass 'all' to include it). Pass `id` to fetch one story. A PAGE LEAVES OUT `detail`, the words of the work itself — it is 40% of a page and no list shows it, so it comes back null in a page and whole on the one story you ask for by `id`. `q` still searches it either way. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'rank' (the default, the order somebody dragged them into), 'deadline', 'created', 'status', 'assignee' or 'title'. The order is the DOOR's, so 'the three latest deadlines' is the whole backlog's three and not the loaded page's. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/stories",
     schema: obj({
       id: S, status: S, ticketId: S, sprintId: S, appId: S, assigneeId: S, q: S, view: S,
@@ -994,6 +1134,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_story",
     summary:
+      "Write down one piece of work. `title` and `storyType` are required, and so is ONE of `processIds` or `changesNoStep` — the door refuses without one.",
+    detail:
       "Write down one piece of work. `title` and `storyType` are both required, the kind is one of the team's own Story type values (Fix, Feature, Change as seeded). `ticketId` links it to the request it answers, most work has none, so leave it off unless you know the ticket. `processIds` names EVERY process this work touches and `changesNoStep` says it touches none; one of the two is required at the door, because a saving nobody can trace to a map is a saving nobody can check. `stepKey` names the step inside the map, and is required before the story can be marked done, so set it now if you know it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories",
     schema: obj(
@@ -1030,6 +1172,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_story",
     summary:
+      "Edit a story by `id`. Same fields as create_story; `title`, `storyType` and one of `processIds`/`changesNoStep` still required. `processIds` replaces the set.",
+    detail:
       "Edit a story (by id). Same fields as create_story; `title` and `storyType` both stay required, and `processIds` is re-sent WHOLE, the set it names replaces the one the story carries. Re-pointing it at another ticket moves the work onto that client's books, which is why the reference number does NOT follow, a client may already be quoting it.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/update",
     schema: obj(
@@ -1063,6 +1207,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_story_status",
     summary:
+      "Move a story: open, in_progress, in_review, done. in_review needs `reviewNote` and no running timer; done needs the story's `stepKey` (or no step).",
+    detail:
       "Move a story along its four states, by id: open, in_progress (which also happens BY ITSELF the moment a timer starts on the story), in_review (someone is checking it), done. `closingNote` is what we will tell the client, and it is appended to the ticket's DRAFT resolution rather than sent. Two refusals, both deliberate: a story cannot go to in_review while any timer on it is still running, or without `reviewNote` saying what was done (`reviewFileUrl` and `reviewFileName` attach something to show for it, and are optional because plenty of work has nothing); and it cannot be set to done until it names the process step it changed (`stepKey` on the story) or is marked as changing none, the door refuses with 'step_required' rather than guessing, because every savings figure is computed from that answer.",
     binding: "CONTENT", method: "POST", path: "/api/content/stories/status",
     schema: obj({ id: S, status: S, closingNote: S, reviewNote: S, reviewFileUrl: S, reviewFileName: S }, ["id", "status"]),
@@ -1083,6 +1229,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_sprints",
     summary:
+      "Blocks of delivery work sold, newest first, with dates, flat price and stories done. `accountId` or `appId` narrows; `when` 'open' drops finished ones.",
+    detail:
       "List the blocks of delivery work sold, newest first, each with its kind, its dates, the flat price it was sold for (in whole cents) and how many of its stories are done. Pass `accountId` for one client's, or `appId` for one system's (a sprint covers exactly one app). `when` is 'all' by default; pass 'open' for only the blocks still worth putting work into, not completed, not archived, and not already past their end date. Bounded, not paged: a sprint is a contract, so there are few of them.",
     binding: "CONTENT", method: "GET", path: "/api/content/sprints",
     schema: obj({ accountId: S, appId: S, when: S }),
@@ -1096,6 +1244,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_sprint",
     summary:
+      "Start a sprint on one account. `soldPriceCents` is WHOLE CENTS (4,500 euros is 450000). `sprintType` is Planning, Implementation or Iteration.",
+    detail:
       "Start a sprint, a block of delivery work sold to one account, with a start, an end and a flat price. `soldPriceCents` is WHOLE CENTS (4500 euros is 450000), because a fractional price loses money between here and a margin. `sprintType` is Planning, Implementation or Iteration; a 'blueprint' is a PRICED PLANNING sprint, not a fourth kind.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints",
     schema: obj(
@@ -1118,6 +1268,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_sprint",
     summary:
+      "Edit a sprint by `id`. Omitted fields are CLEARED — send the whole sprint. `soldPriceCents` is whole cents. The client and the app cannot be changed.",
+    detail:
       "Edit a sprint by id, its name, kind, goal, dates and the flat price it was sold for. `soldPriceCents` is WHOLE CENTS, like `create_sprint`, and it is the field this door exists for: a sprint's price is the revenue half of every margin, and it was previously settable only at the moment the sprint was started. The CLIENT and the APP are NOT on this door and cannot be changed: the reference a client quotes was minted against the account, and the sprint's figures feed that account's margin, so re-pointing either would rewrite what an already-published number means. (Process-map versions are cut by hand on the map itself, not by completing a sprint — that automatic cut was purged in migration 0051.) Omitted fields are CLEARED, not kept: send the whole sprint as it should end up.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/update",
     schema: obj(
@@ -1139,6 +1291,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "complete_sprint",
     summary:
+      "Mark a sprint finished, or reopen it (`complete` true/false). Re-completing a complete sprint changes nothing.",
+    detail:
       "Mark a sprint finished, or reopen it (`complete`: true / false). Completion is the delivery milestone the wave and the margin read. Process-map versions are cut BY HAND on the map itself — the automatic cut on completion was purged in migration 0051, so completing a sprint changes no map. Re-completing an already-complete sprint changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/sprints/complete",
     schema: obj({ id: S, complete: B }, ["id", "complete"]),
@@ -1159,6 +1313,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_triage",
     summary:
+      "Who is on triage duty and the unread tickets waiting more than three days. `waiting` goes only to the person on duty; `yours` says if that is you.",
+    detail:
       "Whose week it is on triage duty, and every ticket nobody has read yet that has been sitting more than three days, oldest first, with how many days each has waited. `onDuty` is public to the team; the `waiting` list is not, only the person on duty is given it, and `yours` says whether this caller is that person (when nobody holds the week, anyone who could triage it is). An INTERNAL prompt: it is never shown to a client and implies no service-level promise. Pass `week` (any date in it) to ask who was on duty for a different week.",
     binding: "CONTENT", method: "GET", path: "/api/content/triage",
     schema: obj({ week: S }),
@@ -1168,6 +1324,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_triage_duty",
     summary:
+      "Put one person on triage duty for a week (`userId`, and `week` as any date in it). Exactly one person holds a week.",
+    detail:
       "Put one named person on triage duty for a week, `userId` from list_members, and `week` as any date inside it (it snaps to that Monday; leave it off for this week). Exactly one person holds a week: naming a second replaces the first.",
     binding: "CONTENT", method: "POST", path: "/api/content/triage",
     schema: obj({ userId: S, week: S }, ["userId"]),
@@ -1186,6 +1344,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_meetings",
     summary:
+      "Meetings we have had or will have. `view` is 'upcoming' by default — pass 'week' or 'all'. `transcript` 'yes' finds the few with words on file.",
+    detail:
       "List MEETINGS, conversations we have had or are about to have, newest first, with the agenda and the notes on each. `view` is 'upcoming' by default (what has not started yet, by the clock); pass 'week' for the week we are in, past and upcoming both, or 'all' for the whole meetings list including cancelled ones. `accountId` narrows to one client, `appId` to one system, `purposeId` to one reason we meet, `month` narrows to one calendar month as `YYYY-MM` (what a calendar asks for), and `q` searches the title, the agenda, the notes AND the guest list, so \"the call with Aparna\" is a search somebody can actually run. `transcript` is 'yes' for the meetings that have words on file and 'no' for the ones that do not: MOST MEETINGS HAVE NONE, so pass 'yes' before hunting for what was said, and read `transcriptCapturedAt` on a row to see it there too. Pass `id` for one meeting. `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'when' (the default, most recent first), 'title', 'client' or 'added'. The order is the DOOR's, so it spans the whole meetings list rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one). A meeting is NOT a work log: it says what was agreed, never how long it took.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings",
     schema: obj({ id: S, accountId: S, appId: S, purposeId: S, view: S, month: S, transcript: S, q: S, sort: S, dir: S, cursor: S }),
@@ -1203,6 +1363,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_meeting",
     summary:
+      "Put a meeting on the list. `title` and `startsAt` (a date AND time) required. This writes nothing to Google Calendar; " + brand.name + " only reads them.",
+    detail:
       "Put a meeting on the meetings list. `title` and `startsAt` are required; `startsAt` and `endsAt` are moments (a date AND a time, a meeting happens at an hour). `accountId` says which client it is with and is left off for an internal one; `appId` says which of their systems it was about and is left off when it was about the account itself; `purposeId` is why we meet, out of the meeting purposes list. `agenda` is what we mean to cover. This does NOT put anything in anybody's Google Calendar and nothing here can: " + brand.name + " reads calendars and never writes them. To have a meeting in both places, arrange it in Google Calendar and it arrives here on the next sync_calendar_series, with its guests, its join link and its attachments.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings",
     schema: obj(
@@ -1229,6 +1391,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_meeting",
     summary:
+      "Correct a meeting or write up its `notes`, by `id`. EVERY field is replaced by what you send — read it first and pass back what you are not changing.",
+    detail:
       "Correct a meeting, or write its notes up afterwards, by id. EVERY field is replaced by what you send. Read the meeting first and pass back what you are not changing, or you will blank it. `notes` is the one people actually use this for: what was said and decided, written straight after.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/update",
     schema: obj(
@@ -1255,6 +1419,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_meeting_transcript",
     summary:
+      "What was SAID in a meeting (`id`). Read `found` first: false is final for this meeting, and `message` is a fact to relay in your own words, never repeated.",
+    detail:
       "What was SAID in a meeting, by `id` — the transcript's own words, kept on the record rather than fetched from Google, so any colleague who may read meetings can read it. READ `found` FIRST. `found` false means this meeting has no words on file, which is FINAL: the meeting is real, you did not guess the wrong id, and asking again — here or about another meeting — will not produce any. `message` is a FACT to relay in your own words, never a sentence to repeat to the user — it never names a tool, and neither should you (there is a related door that can go and capture one from Google, before you say none exists). Most meetings have no transcript, so check `transcriptCapturedAt` on a meeting's row before hunting through it. When `found` is true, `text` carries the words, `capturedAt` when they were taken, `foundBy` which of the three hunts found them, `url` opens the document where they live, and `note` is present only when the transcript was longer than one record may hold and says so in words.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings/transcript",
     schema: obj({ id: S }, ["id"]),
@@ -1264,6 +1430,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_meeting_people",
     summary:
+      "Which people on a meeting's invitation we know (`id`). `links` rows carry `memberUserId`/`memberName` for our own, `accountId` for a contact.",
+    detail:
       "Which of the people on a meeting's invitation we already know, by `id`. Every address on the entry comes back once in `links`, with `memberUserId` and `memberName` set when it is one of our own team members, and `accountId` and `accountName` set when it is a contact on one of our accounts, resolved to the client the contact sits under rather than the contact's own row. Both halves are null for an address that is neither, which is most of them. Nothing is looked up anywhere outside this team. Who was INVITED, and what each of them answered, is on the meeting record itself.",
     binding: "CONTENT", method: "GET", path: "/api/content/meetings/people",
     schema: obj({ id: S }, ["id"]),
@@ -1273,6 +1441,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_calendar_series",
     summary:
+      "Read the caller's Google Calendar into Meetings, one way only. Safe to repeat. `caughtUp` false means call again to keep walking the history.",
+    detail:
       "Read the caller's Google Calendar into Meetings. ONE WAY, always: nothing in " + brand.name + " writes to a calendar. Every entry in the live window (a fortnight back, four weeks on) with no record yet becomes one, whether it repeats or not and whether it is past or future, and `created` counts them. Every meeting whose entry is in the window has its Google facts brought up to date, the description, the location, the guest list and what each person answered, the organiser, the join link, the attachments and the link back to the entry, and `updated` counts those. An entry called off in Google is cancelled here, counted by `cancelled`. Entries beyond the live horizon come back in `ahead` as read-only. It ALSO walks one slice of the caller's whole calendar, five years back to a year ahead, resuming from where the last call stopped: `swept` is the moment that walk has reached and `caughtUp` is true once it has reached the far end, so call it repeatedly to bring in a whole history. Safe to call twice: an entry that already has a record cannot get a second one, and one Google has not touched since the last call is skipped without a write.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/sync-calendar",
     schema: obj({}),
@@ -1286,6 +1456,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_meeting_transcript",
     summary:
+      "Find and keep a past meeting's transcript (`id`), writing a row of time for each of our own people in the room. `captured` false means nothing new was found.",
+    detail:
       "Find and keep the transcript of a meeting that has already happened, by `id`, and record what its arrival means: a row of time is written for every one of OUR OWN people who was in the room. The client's people are never given one, a client's hour is not our cost. It hunts three ways in order of proof, the file Google attached to the calendar entry itself, then a document in a Drive folder the caller has shared, then a notice from Google in the caller's mail naming the document it made, and `foundBy` says which of the three found it. `captured` false means nothing was found or it had already been read, and `note` says which in a sentence; `logsWritten` counts the rows of time it wrote. Reading it twice does nothing the second time. The words themselves are read back with `get_meeting_transcript`.",
     binding: "CONTENT", method: "POST", path: "/api/content/meetings/transcript",
     schema: obj({ id: S }, ["id"]),
@@ -1304,6 +1476,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_google_knowledge",
     summary:
+      "Bring my own Google material into the knowledge base through my connection only. `onlyIfStale` true skips a sweep run in the last five minutes.",
+    detail:
       "Bring MY OWN Google material into the knowledge base: the Drive folders and Chat spaces I named, mail to or from a known contact, and my calendar. Reads through MY connection only, never a colleague's, and files each item under the client it belongs to, keeping anything on my private shelf answerable to me alone. Safe to repeat: material that has not changed costs nothing, and pass `onlyIfStale` true to skip Google entirely when my material was already brought into step in the last five minutes, and `skipped` comes back true to say so, the answer is then the state as of that last sweep. Answers with a line per service and `caughtUp`, which is false when there is more to bring in on the next call.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync-google",
     schema: obj({ onlyIfStale: B }),
@@ -1317,6 +1491,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_todos",
     summary:
+      "Things we are waiting on a CLIENT for (our own admin is list_tasks). `view` is 'open' or 'done'; a `cursor` belongs to the view it was minted in.",
+    detail:
       "List the things we are WAITING ON A CLIENT FOR, never our own admin, which is list_tasks. Each carries the reference the client quotes, the `dueOn` date, `completedAt` and `completedByName` if it has come back, and `fileName` + `fileUrl` for the document they sent with it. `view` is 'open' by default — the ones still outstanding; pass 'done' for the ones that have come back, which are the only ones that can be carrying a file, because completing a to-do is what attaches it. `accountId` narrows to one client. `q` searches the title and detail. Pass `id` to fetch just that one. Every answer carries `openTotal`, `doneTotal` and `allTotal` whichever view you asked for, so a count never has to be derived from the rows. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one). A cursor belongs to the view it was minted in: the two views are ordered by different columns, so one minted in 'open' is refused by 'done'.",
     binding: "CONTENT", method: "GET", path: "/api/content/todos",
     schema: obj({ accountId: S, view: S, q: S, id: S, cursor: S }),
@@ -1331,6 +1507,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "raise_todo",
     summary:
+      "Ask a client for something: `accountId` and `title`. It sits in their portal and they complete it. Our own admin is create_task; delivery work is create_story.",
+    detail:
       "Ask a client for something, `accountId` says which client and `title` says what we need. A to-do sits in THEIR portal with a due date, and they complete it and attach a file themselves. Use it only for something we genuinely cannot proceed without; our own admin is create_task and a piece of delivery work is create_story.",
     binding: "CONTENT", method: "POST", path: "/api/content/todos",
     schema: obj({ accountId: S, title: S, detail: S, dueOn: S, ticketId: S }, ["accountId", "title"]),
@@ -1356,6 +1534,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "complete_todo",
     summary:
+      "Mark a to-do done by `id` — usually the client does this themselves. Completing a completed to-do changes nothing.",
+    detail:
       "Mark a to-do done, by id. Usually the client does this themselves in their portal; a staff member does it when the thing arrived another way (on the phone, by email). Completing an already-completed to-do changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/todos/complete",
     schema: obj({ id: S }, ["id"]),
@@ -1366,6 +1546,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "cancel_todo",
     summary:
+      "Withdraw a to-do we no longer need, by `id`. Nothing is deleted and the client's side is told nothing.",
+    detail:
       "Withdraw a to-do we no longer need, by id. Nothing is deleted, it leaves the client's list and the decision stays on the record. Their side is simply told nothing, which is the point: an email saying 'ignore the last email' is worse than silence.",
     binding: "CONTENT", method: "POST", path: "/api/content/todos/cancel",
     schema: obj({ id: S }, ["id"]),
@@ -1375,6 +1557,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_tasks",
     summary:
+      "Our own internal admin (a client-facing one is list_todos). `view` is open, overdue, upcoming, completed, calendar or all. Pass `id` for one task.",
+    detail:
       "List KWAPSO'S OWN internal admin, never anything a client sees, which is list_todos. `view` is 'open' by default (everything not finished); the other five are 'overdue' (past its deadline), 'upcoming' (due today or later), 'completed', 'calendar' (everything with a deadline, finished or not) and 'all'. `assigneeId` narrows to one person's. Pass `id` to fetch just that one, which is the only way to reach a task that is not on the page in front of you. Every view's count comes back whichever one you ask for, `openTotal`, `overdueTotal`, `upcomingTotal`, `completedTotal`, `calendarTotal`, `allTotal`, plus `dueTodayTotal` and `dueTodayDone`, which are everything due today or earlier and how many of those are done. Returns ONE page plus `total` (the view you asked for, exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor` — to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/tasks",
     schema: obj({ view: S, assigneeId: S, id: S, cursor: S }),
@@ -1392,6 +1576,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_task",
     summary:
+      "Write down our own admin. `department` is one of five and decides a second field: Production must name `appId`, Sales must name `accountId`.",
+    detail:
       "Write down a piece of OUR OWN admin, the quarterly VAT return, renewing a domain, preparing next week's review. Nobody outside the agency ever sees one. `dueOn` is the deadline. `accountId` is optional and usually left off; naming a client is for admin ABOUT them (chasing an invoice), which is what puts the time in the right margin. `department` is one of the agency's five (Sales, Admin, Production, Marketing, Business) and it decides a second field: a Production task must name `appId`, a Sales task must name `accountId`, and an Admin task may. `important` and `urgent` are the two priority ticks, scored 1 to 4. `fileDataUrl` attaches one file (a base64 data URL, at most 10 MB) with `fileName` beside it. Time can be logged against a task, unlike a to-do.",
     binding: "CONTENT", method: "POST", path: "/api/content/tasks",
     schema: obj(
@@ -1419,6 +1605,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_task",
     summary:
+      "Correct a task by `id`. Every field is REPLACED — send the whole task. A ticked-off task is refused; put it back with set_task_done first.",
+    detail:
       "Correct a task by `id` — its `title`, `detail`, `dueOn` deadline, `assigneeId`, `accountId`, `appId`, `department`, and the two priority ticks `important` and `urgent`. Every field is REPLACED by what you send, so send the whole task, not just the part you are changing: an omitted field is cleared. The two ticks are what the 1-to-4 priority score is derived from, so this is how a task is re-prioritised. A task that is already ticked off is refused — put it back with `set_task_done` first. The same rules the create door applies still hold: a Production task must name `appId` and a Sales task must name `accountId`.",
     binding: "CONTENT", method: "POST", path: "/api/content/tasks/update",
     schema: obj(
@@ -1464,6 +1652,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_work_logs",
     summary:
+      "Rows of time — who worked on what, in whole seconds. `period` is '7d', '30d' or '90d'. `totalSeconds` is exact and never capped. Binned timers are excluded.",
+    detail:
       "List rows of time, who worked on what, and for how long in whole seconds. Filters: `scope` ('mine' for the caller's own, 'all' otherwise), `targetTable` + `targetId` (the time against one story, ticket, task or meeting), `userId`, `meetingTime` ('exclude' drops the time spent in meetings, 'only' keeps nothing else, leaving it off counts all of it), `q` (matches who logged it and what it was against — the same search the Time screen's toolbar asks), and `period` ('7d', '30d' or '90d', a rolling window on when it was logged; leave it off for all time). `sort` ('started', the default, newest first; 'duration', longest first; 'person', alphabetically by who logged it) and `dir` ('asc' or 'desc') choose the order; leave `sort` off to keep the door's own default. Returns ONE page plus `total` (rows, exact up to 1,000,000; `totalCapped` true means there are more than that), `totalSeconds` (the number anybody actually wants, and ALWAYS exact, it is billable time, never capped), `hasMore` and an opaque `nextCursor`. Call again passing that as `cursor` to read further. Binned runaway timers are never in the list.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs",
     schema: obj({
@@ -1487,6 +1677,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     // simply read off one answer. The sentences below say what the tool is FOR,
     // which is the part a model cannot derive.
     summary:
+      "The team's week in numbers, including seconds logged in each of the last eight weeks. A section is empty when your role cannot read that module.",
+    detail:
       "The team's week in numbers, in one call: how many tickets are open and how they are spread across the stages of the lifecycle, how much work is in hand, how much of our own admin is due today or earlier, how many meetings are in this week, and — the part no other tool can give you — how many seconds were logged in each of the last eight weeks, oldest first, each labelled with the Monday that opens it. Ask it for a picture of how a week or a month went; ask list_help_tickets, list_stories or list_work_logs when you need the rows themselves. A section comes back empty when the caller's role cannot read that module, which is not the same as there being none.",
     binding: "CONTENT", method: "GET", path: "/api/content/insights",
     schema: obj({}),
@@ -1496,6 +1688,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_running_timers",
     summary:
+      "The caller's timers running right now, with what each is on and how long. `runaway` is true past eight hours.",
+    detail:
       "What the caller has running RIGHT NOW, one row per timer, with what it is on, when it started and how many whole seconds it has been going. `runaway` is true once one has been running more than eight hours, which is the prompt to ask what they want done about it.",
     binding: "CONTENT", method: "GET", path: "/api/content/work-logs/running",
     schema: obj({}),
@@ -1505,6 +1699,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "start_timer",
     summary:
+      "Start a timer: `targetTable` is 'stories' or 'help' and `targetId` is that row. A second timer on the same thing is refused. The clock is the server's.",
+    detail:
       "Start a timer on a story or a ticket, `targetTable` is 'stories' or 'help' and `targetId` is that row's id. Time is logged against a story, a ticket or a task and NOTHING else: never a to-do (that is the client's time, not ours) and never an account on its own. Parallel timers on different things are fine; starting a second one on the SAME thing is refused. The start moment is the server's clock, never a time you pass.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs/start",
     schema: obj({ targetTable: S, targetId: S, note: S, kind: S }, ["targetTable", "targetId"]),
@@ -1523,6 +1719,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "stop_timer",
     summary:
+      "Stop one of the caller's running timers by its `id`. `endedAt` says it really stopped earlier; leave it off to stop now.",
+    detail:
       "Stop one of the caller's running timers, by the timer's id (from list_running_timers). `endedAt` is optional and is how 'it really stopped at five o'clock on Friday' is said. Leave it off and it stops now. Stopping an already-stopped timer changes nothing.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs/stop",
     schema: obj({ id: S, endedAt: S }, ["id"]),
@@ -1532,6 +1730,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "log_time",
     summary:
+      "Write finished time down by hand. `startedAt` and `endedAt` are ISO moments; the duration comes from them, there is no hours field. `billable` defaults true.",
+    detail:
       "Write time down by hand, for work already finished. `startedAt` and `endedAt` are ISO moments and the duration is computed FROM them, there is no field for a number of hours, because two moments can be checked afterwards and a number cannot. `billable` defaults to true. Same targets as start_timer: a story or a ticket, never a to-do and never an account.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs",
     schema: obj(
@@ -1555,6 +1755,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "resolve_runaway_timer",
     summary:
+      "Answer for a timer left running (`id`). `answer` is 'keep', 'stopAt' (with the moment in `at`) or 'discard'. Nothing is ever stopped automatically.",
+    detail:
       "Answer for a timer left running (from list_running_timers, where `runaway` is true). Three answers and no fourth, `answer`: 'keep' (it really did run that long; stop it now), 'stopAt' (it ran until the moment in `at`), or 'discard' (nothing happened; the row is kept and marked binned, and every total subtracts it). Nothing is ever stopped automatically: a number a person did not choose is a number nobody can defend.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs/runaway",
     schema: obj({ id: S, answer: S, at: S }, ["id", "answer"]),
@@ -1574,6 +1776,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_timer_auto_stop",
     summary:
+      "The caller's own preference: does starting a timer stop their other running ones? Off by default.",
+    detail:
       "The caller's OWN preference: does starting a timer stop the ones they already have running? Off by default, because working on two things in a morning is ordinary and a setting that silently stopped the other one would be discovered by losing an hour.",
     binding: "CONTENT", method: "POST", path: "/api/content/work-logs/auto-stop",
     schema: obj({ on: B }, ["on"]),
@@ -1594,6 +1798,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "ask_knowledge",
     summary:
+      "Ask the knowledge base. Mark claims [[src:…]] by `sourceId`; never write a list of sources. `found` false: say so, not from memory. `compose` costs a credit.",
+    detail:
       "Ask the team's knowledge base a question and get the passages that answer it, each with the source it came from. Pass `accountId` when the question is about one client and you know which, the answer is otherwise compartmented from the question's own words. By default it writes NOTHING for you: answer from the passages, and mark each claim WHERE YOU MAKE IT by writing [[src:...]] around that passage's own `sourceId` straight after the sentence it supports — the app draws the mark and lists the `citations` under your answer itself, so never write a list of sources or titles of your own. If `found` is false say so in the words of `message` rather than answering from memory (it refuses on purpose when nothing in the base is close enough, that is an answer, not a failure). `reason` says which compartment it searched and why, and `records` names what the question looks like it is ABOUT, repeat them when the answer looks wrong for the question. EVERY CITATION CARRIES `liveStatus`: the real row read at the moment of asking, which is what to say when it disagrees with the passage, the passage is what was indexed, `liveStatus` is what is true now. `recordPath` is where the record itself lives in the app (`tickets/<id>`, `processes/<id>`), null for a source with no record screen — offer it when somebody wants to go and read the original. `sources` narrows WHICH DOORS the question reads from, as a list of any of: meetings, mail, drive, chat, records (everything this app holds its own rows for — a ticket, a client, a piece of work, a colleague), articles (what somebody typed or uploaded into the knowledge base). Leave it off and it reads all of them, which is the normal case; name one when a person has said where the answer should come from, or to find out which door an odd answer came through. `compose` true asks the app to write the answer out for you and return it as `answer`, which COSTS one of the team's assistant credits and needs the assistant right; leave it off when you are going to write the reply yourself, which is the normal case, or the same answer is paid for twice.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/ask",
     schema: obj({ q: S, accountId: S, sources: { type: "array" }, limit: N, compose: B }, ["q"]),
@@ -1616,6 +1822,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_knowledge_sources",
     summary:
+      "What the assistant may read. `kind`, `compartment` ('agency' or 'account:<id>'), `q`, `active` narrow it. A list row carries the summary, not the material.",
+    detail:
       "List what the assistant is allowed to read. Filters: `kind` ('note' for something typed here, 'file' for one somebody uploaded, or 'ticket' / 'account' / 'contact' / 'app' / 'process' / 'sprint' / 'story' / 'meeting' / 'todo' / 'task' for material mirrored from the app's own rows, and 'document' / 'email' / 'event' / 'message' for material out of your own Google connection), `compartment` ('agency' or 'account:<id>'), `q` (searches the title and the summary), `active` ('yes' for the sources the assistant may read, 'no' for the ones somebody took away — they are kept, not deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'touched' (the default, most recently changed), 'added', 'title', 'kind' or 'dated' (the date the MATERIAL is from, which is not the date it was filed). Pass `id` for one source, a list row carries the SUMMARY of each source rather than its material, because a source can be a three-hundred-page contract; read one by id for its words. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge",
     schema: obj({ id: S, kind: S, compartment: S, q: S, active: S, sort: S, dir: S, cursor: S }),
@@ -1633,6 +1841,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_knowledge_status",
     summary:
+      "Is the knowledge base in step? One row per kind: how far the sweep read, when it last ran and last SUCCEEDED, and `lastError` if it failed.",
+    detail:
       "Is the knowledge base in step? One row per kind of material the app keeps in step for you — the customer spine (accounts, contacts), the built systems and their process maps, and the work (tickets, sprints, stories, meetings, to-dos, tasks): how far the sweep has read, when it last ran, when it last SUCCEEDED, and what went wrong if it didn't. `lastError` set with an old `lastOkAt` is the shape of 'it has been failing since Tuesday'. Read this before trusting an answer that seems to be missing something recent.",
     binding: "CONTENT", method: "GET", path: "/api/content/knowledge/sync",
     schema: obj({}),
@@ -1641,6 +1851,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_knowledge_source",
     summary:
+      "Write something into the knowledge base (`title`, `body`). `visibility` 'private' or `visibleToAppId` narrow who may read it. Over ~1.5 MB is refused.",
+    detail:
       "Write something into the knowledge base so the assistant can use it from now on: `title` and `body` are the material itself. `accountId` files it under one client (leave it out for the agency's own). WHO MAY READ IT has three answers: `visibility` 'private' keeps it to you alone, `visibleToAppId` limits it to the people staffed to that app, and leaving both out means the whole team. An app you are not on is refused, so you cannot file something you would then be locked out of. It is searchable immediately. A whole document is fine, up to about 1.5 MB of text, roughly six hundred pages; past that it is REFUSED in words and nothing is saved, so split it and add the parts.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge",
     schema: obj({ title: S, body: S, sourceUrl: S, accountId: S, visibility: S, visibleToAppId: S }, ["title"]),
@@ -1657,6 +1869,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_knowledge_source",
     summary:
+      "Correct a source by `id`. A source mirrored from the app's own rows can only have its filing changed. Every field is written as sent, so send what you keep.",
+    detail:
       "Correct a source (by id). A source MIRRORED from the app's own rows (a ticket, an account, an app) owns its own text, for those, only the filing can change here (`accountId`, `visibility`, `visibleToAppId`), because the sweep would overwrite anything else on its next pass. A note typed into the knowledge base is editable in full. Every field is written as you send it, so send the ones you are keeping too: omitting `visibleToAppId` widens a source back to the whole team.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/update",
     schema: obj({ id: S, title: S, body: S, sourceUrl: S, accountId: S, visibility: S, visibleToAppId: S }, ["id", "title"]),
@@ -1674,6 +1888,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "sync_knowledge",
     summary:
+      "Bring the knowledge base into step with the app's own rows, a slice at a time. Keep calling while `caughtUp` is false. Mainly for a first fill.",
+    detail:
       "Bring the knowledge base into step with the app's own rows, tickets, accounts, apps, stories and sprints, one bounded slice at a time. Every result carries `caughtUp`; keep calling while any of them is false. You rarely need it: asking a question catches the base up first, and a 15-minute sweep is the backstop. This is for the FIRST FILL of a base that has never been indexed.",
     binding: "CONTENT", method: "POST", path: "/api/content/knowledge/sync",
     schema: obj({}),
@@ -1706,6 +1922,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_apps",
     summary:
+      "The systems we have built. `accountId` narrows to one client, `q` searches the name. Bounded: no cursor here.",
+    detail:
       "List the systems we have built, an App is the thing with its own address and its own stage (SCOPE ch.02). `accountId` narrows to one client's systems, and `q` searches an app's `name`. Bounded: an agency has tens of apps, so there is no cursor here; the collection that grows underneath is process maps.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/apps",
     schema: obj({ accountId: S, q: S }),
@@ -1720,6 +1938,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app",
     summary:
+      "Record a system we built. `toolCostCentsPerMonth` is internal. `leadUserId` must be in `staffUserIds`, `mainStakeholderContactId` in `stakeholderContactIds`.",
+    detail:
       "Record a system we have built. `accountId` is whose it is (leave it out for the agency's own). `toolCostCentsPerMonth` is what it costs US to keep running, an internal figure, never shown to a client. `stage` is where it has got to, one of the team's App stage values. `logoUrl` is the client's own mark: send a `data:image/png|jpeg|webp;base64,…` URL and the bytes are stored and the row keeps our own path, or send a path we already minted. The four context fields are prose: `about` is what the system is, `clientContext` is the situation it was built into, `solution` is what we did about it, and `keyActors` is who actually uses it. `staffUserIds` is who from OUR team is on it (`leadUserId` names the team lead, who must be one of them) and `stakeholderContactIds` is the client's own people (`mainStakeholderContactId` names the main one, who must be one of them, and is who a resolved ticket on this app is emailed to).",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps",
     schema: obj(
@@ -1747,6 +1967,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_app",
     summary:
+      "Edit an app by `id`, never its account. Send only what you change. `staffUserIds` and `stakeholderContactIds` are each re-sent WHOLE and replace the set.",
+    detail:
       "Edit an app's own details (by id), never which account it belongs to, which is set once when it is created. Send ONLY the fields you are changing; anything you leave out keeps its current value. `logoUrl` follows that rule too: send a `data:` image to replace the mark, send it empty to take the picture away, leave it out to keep the one the app has. The four context fields (`about`, `clientContext`, `solution`, `keyActors`) are prose and are edited here like any other field. `staffUserIds` and `stakeholderContactIds` are each re-sent WHOLE, the set you name replaces the one the app has, and anybody dropped keeps their history rather than being deleted. Leave a list out entirely to change nobody.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/apps/update",
     schema: obj(
@@ -1778,6 +2000,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_deliverables",
     summary:
+      "What we handed over on one system (`appId`), each with `kind`, `title`, `datedOn`, `url` and `imageUrl`. Bounded, no cursor. A client login cannot reach it.",
+    detail:
       "What we handed over on one system: handover docs, API references, recorded walkthroughs, SOPs. `appId` names the app whose shelf you want; `id` narrows to one row. Each carries a `kind` (the team's own word for what sort of thing it is), a `title`, a `datedOn` day, a `url` pointing at the material itself, and an `imageUrl` when there is a picture worth showing. Bounded: a shelf is curated rather than accumulated, so there is no cursor here. Internal: a client login cannot reach this door.",
     binding: "CONTENT", method: "GET", path: "/api/content/deliverables",
     schema: obj({ appId: S, id: S }),
@@ -1791,6 +2015,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_deliverable",
     summary:
+      "File something we handed over. `appId` and `title` required; the app is what it belongs to for good. `kind` is picked-or-created; `datedOn` is YYYY-MM-DD.",
+    detail:
       "File something we handed over on an app. `appId` and `title` are required, and the app is what it belongs to for good, the account it was built for is copied off the app rather than sent. `kind` is picked-or-created as a dropdown value, so a word nobody has used yet becomes one. `datedOn` is a calendar day written YYYY-MM-DD. `url` is the material: a link anywhere (a recording, a document, an API reference) — uploading the bytes themselves is a screen action, not a tool. `imageUrl` is the picture on its card.",
     binding: "CONTENT", method: "POST", path: "/api/content/deliverables",
     schema: obj({ appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["appId", "title"]),
@@ -1804,6 +2030,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_deliverable",
     summary:
+      "Correct a deliverable by `id`. `appId` says whose shelf it is on and cannot be moved — file it again on the right app instead.",
+    detail:
       "Correct a deliverable (by `id`). `appId` is which app's shelf it sits on and cannot be changed by sending a different one — file it again on the right app and archive this one. Same fields as filing one.",
     binding: "CONTENT", method: "POST", path: "/api/content/deliverables/update",
     schema: obj({ id: S, appId: S, title: S, kind: S, datedOn: S, url: S, imageUrl: S }, ["id", "appId", "title"]),
@@ -1825,6 +2053,8 @@ export const SHARED_TOOLS: SharedTool[] = [
     // somebody could plant in a ticket.
     name: "set_deliverable_visibility",
     summary:
+      "Show a deliverable to the client, or take it back (`visible`). `appId` is the shelf it sits on. Off until somebody turns it on.",
+    detail:
       "Show a deliverable to the client (`visible: true`) or take it back (`visible: false`). `id` is the deliverable and `appId` is the app whose shelf it sits on. Off until somebody turns it on: a deliverable is invisible to the client until this is called, and the client then reads it in their own portal alongside the rest of their company's shared material. Withdrawing one is instant and leaves the record untouched. Archiving a deliverable also withdraws it, without changing this switch.",
     binding: "CONTENT", method: "POST", path: "/api/content/deliverables/visibility",
     schema: obj({ id: S, appId: S, visible: B }, ["id", "appId", "visible"]),
@@ -1839,6 +2069,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_app_modules",
     summary:
+      "The sections an app is divided into — what a ticket says it is about, not a process. `appId` narrows; `archived` 'all' includes switched-off ones.",
+    detail:
       "List the MODULES of an app — the sections the software is divided into, like Settings, Documents or Tasks. A module is what a ticket says it is about, so this is how tickets are grouped; it is NOT a process (a process is a way of working, and belongs to the account's world, not the app's structure). `appId` narrows to one system and is what you almost always want; `id` fetches just one module; `archived` accepts 'all' to include the sections that have been switched off. Each row carries `name`, `mark` (the emoji beside it), `nameDe` (the German name), `description`, `benefit` and `ticketCount`, the open tickets filed against it. Bounded, not paged: an app has a handful of sections, never a stream of them.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/app-modules",
     schema: obj({ id: S, appId: S, archived: S }),
@@ -1855,6 +2087,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_app_module",
     summary:
+      "Add a section to an app: `name`, plus `mark`, `nameDe`, `description`, `benefit`. Two live modules of one app cannot share a name.",
+    detail:
       "Add a section to an app. `name` is what it is called on screen; `mark` is an emoji shown beside it, `nameDe` the German name for a client who reads in German, `description` what the section does and `benefit` what it gives them. Two live modules of one app cannot share a name.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules",
     schema: obj({ appId: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["appId", "name"]),
@@ -1871,6 +2105,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_app_module",
     summary:
+      "Rename or re-describe a module by `id`. Send only what you change; an empty string clears a field.",
+    detail:
       "Rename or re-describe a module (by id). Send ONLY what you are changing; to empty a field, send it as an empty string. A rename reaches every ticket filed against it straight away, because a ticket stores the module rather than its spelling.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/app-modules/update",
     schema: obj({ id: S, name: S, mark: S, nameDe: S, description: S, benefit: S }, ["id", "name"]),
@@ -1887,6 +2123,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_processes",
     summary:
+      "Process maps — a way of working inside an app. `q`, `appId` and `archived` narrow it; `sort`/`dir`/`cursor` page it.",
+    detail:
       "List process maps, a Process is a way of working inside an App. Filters: `q` (searches the name and description), `appId` (only that app's maps), `archived` ('no' for the maps still in use, 'yes' for the ones put away — a map is archived, never deleted). `sort` puts the page in an order and `dir` ('asc' or 'desc') flips it: 'created' (the default, newest first), 'name', 'app' or 'steps' (the longest map first). The order is the DOOR's, so it spans every map rather than the page you are holding. Returns ONE page plus `total` (exact up to 1,000,000; `totalCapped` true means there are more than that), `hasMore`, and an opaque `nextCursor`, to read further, call again passing that value as `cursor` (never invent one).",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes",
     schema: obj({ q: S, appId: S, archived: S, sort: S, dir: S, cursor: S }),
@@ -1904,6 +2142,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_process",
     summary:
+      "One process map in full (`id`): versions, one version's steps, comments, connections and the saving. `versionId` or `asOf` reads an older one.",
+    detail:
       "One process map in full (by id): its versions newest-first, the steps of ONE version with their times and the order they happen in, the exact number of comments on it, the other maps it is connected to, and the saving it produces (step by step, with the caption that number must be quoted with). `versionId` reads an OLDER version, its steps exactly as they were agreed when it was cut; leave it off for the current one. `asOf` is a day (YYYY-MM-DD) and reads the map as it was on that day, out of its dated history; the reply also lists every day it changed. `auditDate` is the day every saving on this map is measured FROM, which is Alex's visit rather than a version number.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/detail",
     schema: obj({ id: S, versionId: S, asOf: S }, ["id"]),
@@ -1923,6 +2163,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_client_departments",
     summary:
+      "The departments inside a client's company. `accountId` narrows to one. Each carries `name`, `active` and `roleCount`.",
+    detail:
       "The departments inside a client's own company. `accountId` narrows to one client; leave it off for every client you may see. Each carries `name`, whether it is `active`, and `roleCount` — how many roles sit in it. Answers `departments` and an exact `total`.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/client/departments",
     schema: obj({ accountId: S }),
@@ -1932,6 +2174,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_client_department",
     summary:
+      "Add a department to a client's company (`accountId`, `name`). Two live departments of one client cannot share a name.",
+    detail:
       "Add a department to a client's company. `accountId` is the client it belongs to and `name` is what they call it. Two live departments of one client cannot share a name.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/departments",
     schema: obj({ accountId: S, name: S }, ["accountId", "name"]),
@@ -1949,6 +2193,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_client_roles",
     summary:
+      "The jobs a client's own people do. Each carries `name`, `centsPerHour` (null when unpriced), `active`, its `departmentIds` and the `peopleIds` holding it.",
+    detail:
       "The roles inside a client's own company — the jobs their people do. `accountId` narrows to one client. Each carries `name`, `centsPerHour` (what an hour of that role costs THE CLIENT, null when nobody has said yet — which is not the same as free), whether it is `active`, the `departmentIds` it sits in (a role can be in several) and the `peopleIds` holding it. Answers `roles` and an exact `total`.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/client/roles",
     schema: obj({ accountId: S }),
@@ -1958,6 +2204,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_client_role",
     summary:
+      "Add a role to a client's company (`accountId`, `name`). `centsPerHour` is what an hour costs them; `departmentIds` may name several departments.",
+    detail:
       "Add a role to a client's company. `accountId` is the client, `name` is the job. `centsPerHour` is what an hour of it costs them, in cents — leave it off if nobody knows yet, and a saving computed from it will read as incomplete rather than as zero. `departmentIds` is the list of departments it sits in, and it may be more than one.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles",
     schema: obj(
@@ -1975,6 +2223,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_client_role",
     summary:
+      "Edit a client role: `name`, `centsPerHour`, `departmentIds`. The departments are the WHOLE set — anything left out is removed.",
+    detail:
       "Edit a role: its `name`, what an hour costs (`centsPerHour`, in cents), and the `departmentIds` it sits in. The departments are the WHOLE set, not an addition — send every department the role should be in, because anything left out is removed.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/update",
     schema: obj({ id: S, name: S, centsPerHour: N, departmentIds: { type: "array" } }, ["id", "name"]),
@@ -1989,6 +2239,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_client_role_person",
     summary:
+      "Say somebody holds a role, or no longer does. `id` is the role, `personAccountId` an existing contact, `attached` true to link.",
+    detail:
       "Say that somebody holds a role, or that they no longer do. `id` is the role and `personAccountId` is a CONTACT you already have — there is no separate person record here on purpose. `attached` true links them, false unlinks. One person can hold several roles and one role can be held by several people.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/roles/people",
     schema: obj({ id: S, personAccountId: S, attached: B }, ["id", "personAccountId", "attached"]),
@@ -2005,6 +2257,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_client_tools",
     summary:
+      "The tools a client runs on. `accountId` narrows; `asOf` (a day) reads the price in force then. Each carries `cents`, `billingPeriod`, `effectiveOn`.",
+    detail:
       "The tools a client runs on — anything a step uses, digital or physical. `accountId` narrows to one client. `asOf` (a day, like 2026-03-01) reads the price that was in force ON THAT DAY rather than today's, which is what lets a map set to March cost March correctly; leave it off for today. Each carries `name`, `mark`, whether it is `active`, and `cents` / `billingPeriod` / `effectiveOn` for the price that applied. Answers `tools` and an exact `total`.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools",
     schema: obj({ accountId: S, asOf: S }),
@@ -2019,6 +2273,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_client_tool_prices",
     summary:
+      "What one tool has cost over time, newest first (`id`). Each row carries `cents`, `billingPeriod` and the `effectiveOn` day.",
+    detail:
       "What one tool has cost over time, newest first. `id` is the tool. Each row carries `cents`, `billingPeriod` and the `effectiveOn` day it started being true — the record behind the single number a map shows.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/client/tools/prices",
     schema: obj({ id: S }, ["id"]),
@@ -2028,6 +2284,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_client_tool",
     summary:
+      "Add a tool to a client's estate (`accountId`, `name`, optional `mark`). It has NO price — set one with set_client_tool_price.",
+    detail:
       "Add a tool to a client's estate. `accountId` is the client, `name` is the tool, `mark` is an optional icon. It is created with NO price — set one with set_client_tool_price, which files it under the day it started being true.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools",
     schema: obj({ accountId: S, name: S, mark: S }, ["accountId", "name"]),
@@ -2041,6 +2299,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_client_tool",
     summary:
+      "Rename a tool or change its `mark`. Its price is not here — that is set_client_tool_price, filed under a date.",
+    detail:
       "Rename a tool or change its `mark`. Its price is NOT here — a price belongs to a date, so it is set through set_client_tool_price and never overwritten in place.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/update",
     schema: obj({ id: S, name: S, mark: S }, ["id", "name"]),
@@ -2050,6 +2310,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_client_tool_price",
     summary:
+      "Say what a tool costs from a day: `toolId`, `cents`, `billingPeriod` ('month' or 'year') and `effectiveOn`. A day that already has a price is replaced.",
+    detail:
       "Say what a tool costs, from a given day. `toolId` is the tool, `cents` the amount, `billingPeriod` either 'month' or 'year', and `effectiveOn` the day that price started being true (like 2026-03-01). Setting a price for a day that already has one REPLACES it — that is a correction. Any other day is a new row, which is what keeps the history a history.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/client/tools/price",
     schema: obj(
@@ -2070,6 +2332,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_process",
     summary:
+      "Map a way of working inside an app. It is created WITH version 1, the way it was done before. `roleName` is whose hours it takes and is what prices it.",
+    detail:
       "Map a way of working inside an app. It is created WITH its version 1, the way the work was done before we touched anything, because a process with no baseline can never produce a saving. `baselineLabel` is what the client calls that old way. `roleName` is WHOSE hours this takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_impact) — a map created without one counts its hours and reports no money at all, so name it here rather than leaving it for update_process.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes",
     schema: obj({ appId: S, name: S, description: S, baselineLabel: S, roleName: S }, ["appId", "name"]),
@@ -2085,6 +2349,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_process",
     summary:
+      "Rename or re-describe a process map by `id`, or set `roleName` — whose hours it takes, which is what turns its hours into money. Send only what you change.",
+    detail:
       "Rename or re-describe a process map (by id), or say who does the work. Send ONLY what you are changing; to empty a field, send it as an empty string. `roleName` is WHOSE hours this process takes, the bookkeeper, the dispatcher, whoever actually does it, and it is what turns the hours this map gives back into money (see get_app_impact). It is free text in the team's own words, and naming a role nobody has priced is fine: the hours still count and the money is reported as unpriced rather than invented.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/update",
     schema: obj({ id: S, name: S, description: S, roleName: S }, ["id", "name"]),
@@ -2099,6 +2365,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "add_process_step",
     summary:
+      "Add a step to the map's CURRENT version. `secondsPerRun`/`runsPerPeriod` are agreed estimates — ask, never guess. `roleId` prices it, `toolId` is its tool.",
+    detail:
       "Add a step to a process map's CURRENT version. `secondsPerRun` is how long it takes each time; `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it: 2 a day, or 40 a month, and everything downstream converts to months once. Both are AGREED ESTIMATES, and every savings figure in the app is a subtraction between two of them, so do not guess: ask. `roleId` is WHICH of the client's own roles does this step, from `list_client_roles`, and it is what the step's minutes are priced at; leave it out and the step inherits the map's own role. `toolId` is the ONE thing it is done in, from `list_client_tools`: a step done in two systems has a handoff in the middle of it, and that is two steps. `branchLabel` is the word on a fork, such as: if the claim is rejected. `branchOf` is which ARM a step is on — the step key of the branch head it continues — for a fork whose ways do not meet again; leave it out and a step below a fork is the rejoin. `loopsBackTo` is the step key this one sends the work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps",
     schema: obj(
@@ -2124,6 +2392,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_process_step",
     summary:
+      "Edit ONE step by `id`, only in the map's CURRENT version — an older one is refused. `roleId` changes the money without changing a minute.",
+    detail:
       "Edit ONE step (by id), only in the map's CURRENT version. Editing an older version is refused: a baseline that can be changed after the fact is a saving anybody can dial up, and the whole point of these numbers is that a client can check them. `runsPerPeriod` and `frequencyPeriod` are how often it happens, said the way a person says it. `roleId` is who does the step, from `list_client_roles`, and changing it changes the money the map reports without changing a minute on it; send it empty to say nobody is named, leave it out to keep who is. `toolId` is the ONE thing it is done in. `branchLabel`, `branchOf` and `loopsBackTo` describe the shape — the word on a fork, which arm a step is on (the branch head it continues, for a fork whose ways do not meet again), and the step key this one sends work back to.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/update",
     schema: obj(
@@ -2149,6 +2419,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "remove_process_step",
     summary:
+      "Record that a step NO LONGER HAPPENS (`id`). Not a delete: it keeps its place and drops to zero time, which is the largest saving there is.",
+    detail:
       "Record that a step NO LONGER HAPPENS (by id). Not a delete: the step keeps its place and its frequency and drops to zero time, which is exactly what turns work we removed entirely into the largest saving there is.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/remove",
     schema: obj({ id: S }, ["id"]),
@@ -2158,6 +2430,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "delete_process_step",
     summary:
+      "Delete a step COMPLETELY (`id`), for one added by mistake. Refused for a step in an agreed version or one another step loops back to.",
+    detail:
       "Delete a step COMPLETELY (by `id`) — for a step added by mistake, as if it was never added, history included. This is a different verb from `remove_process_step`: stopping is a fact about the work and becomes a saving; deleting is an admission the row was wrong. The door refuses a step that is part of an agreed version, or one another step sends work back to — those can only be switched off — and says which rule refused.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/steps/delete",
     schema: obj({ id: S }, ["id"]),
@@ -2172,6 +2446,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_waves",
     summary:
+      "The packages clients have bought — several sprints sold together. `accountId` narrows. Dates are derived from the sprints inside.",
+    detail:
       "The packages clients have bought. A Wave is several sprints sold together; `accountId` narrows to one client's. Bounded: a wave is something the agency SELLS, so the list grows at the speed of contracts, not of work. Dates are DERIVED from the sprints inside and stored, so a wave with no sprints yet has none.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves",
     schema: obj({ accountId: S }),
@@ -2181,6 +2457,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_wave",
     summary:
+      "One wave in full (`id`): what it is for, the sprints inside it, and any clash between their dates. A clash is reported, never refused.",
+    detail:
       "One wave in full (by `id`): what it is for, the sprints inside it, and any clash between their dates. A clash is reported and never refused — two sprints really can overlap, and a door that said no would be describing a rule nobody agreed to.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/waves/one",
     schema: obj({ id: S }, ["id"]),
@@ -2190,6 +2468,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_wave",
     summary:
+      "Sell a wave: `accountId`, `name`, `goal`. It carries no price. Sprints go in afterwards with set_sprint_wave, and the wave's dates follow them.",
+    detail:
       "Sell a wave: `accountId` is whose it is, `name` is what it is called, `goal` is what it is for. It carries NO price — what a wave costs is deliberately out of this module's first version. Sprints are put in afterwards with `set_sprint_wave`, and the wave's dates follow them.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves",
     schema: obj({ accountId: S, name: S, goal: S }, ["accountId", "name"]),
@@ -2199,6 +2479,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "update_wave",
     summary:
+      "Rename a wave by `id`, or re-word its `goal`. Never its dates: those are derived from the sprints in it.",
+    detail:
       "Rename a wave (by `id`) or re-word what it is for. Never its dates: those are derived from the sprints in it, and a date somebody typed would disagree with the sprints the moment one moved.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/update",
     schema: obj({ id: S, name: S, goal: S }, ["id", "name"]),
@@ -2208,6 +2490,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_sprint_wave",
     summary:
+      "Put a sprint into a wave, or take it out: `sprintId`, and `waveId` (empty to remove). Both waves' dates are recalculated.",
+    detail:
       "Put a sprint into a wave, or take it out. `sprintId` is the sprint; `waveId` is the wave, or leave it empty to take the sprint out of whichever wave it is in. The wave's start and end dates are recalculated on both ends, so a sprint moving between waves re-dates the one it left as well as the one it joined.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/waves/sprint",
     schema: obj({ sprintId: S, waveId: S }, ["sprintId"]),
@@ -2217,6 +2501,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_audit_date",
     summary:
+      "Move the day a map's savings are measured from (`processId`, `auditDate`), which selects which agreed version is the before. The same day does nothing.",
+    detail:
       "Move the day a process map's savings are measured FROM. `auditDate` is a day (YYYY-MM-DD) and it selects which agreed version counts as the before, so every figure on the map — and on the client's own portal — changes with it, without a single minute of their work changing. Setting it to the day it already holds does nothing and says so.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/audit-date",
     schema: obj({ processId: S, auditDate: S }, ["processId", "auditDate"]),
@@ -2232,6 +2518,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "connect_processes",
     summary:
+      "Say one process map hands work to another. Loose: it changes no duration and no saving. Connecting the same pair twice answers `alreadyLinked`.",
+    detail:
       "Say that one process map hands its work to another. LOOSE: it changes no duration, no frequency and no saving on either side — it is a signpost, and the last step of one process very often is the first step of another. `note` is what the connection is, in the team's own words. Connecting the same pair twice is the same sentence, so the second call answers `alreadyLinked` rather than failing.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/link",
     schema: obj({ fromProcessId: S, toProcessId: S, note: S }, ["fromProcessId", "toProcessId"]),
@@ -2245,6 +2533,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "disconnect_processes",
     summary:
+      "Take a connection between two maps away. `id` is the connection, from get_process. No times or savings change.",
+    detail:
       "Take a connection between two process maps away. `id` is the connection, from `get_process`. Nothing about either map's times or savings changes, because nothing about them changed when it was made.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/unlink",
     schema: obj({ id: S, processId: S }, ["id", "processId"]),
@@ -2254,6 +2544,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "cut_process_version",
     summary:
+      "Cut a new version of a map: today's steps copy forward and the current version freezes. A second call answers `alreadyCut`.",
+    detail:
       "Cut a new version of a process map: today's steps are copied forward and the current version is frozen exactly as it was agreed. A version is only ever cut by hand. Press twice in quick succession and the second call answers `alreadyCut: true` rather than cutting a second one.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/versions",
     schema: obj({ processId: S, label: S }, ["processId"]),
@@ -2266,6 +2558,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_process_comments",
     summary:
+      "The conversation on one map (`processId`), oldest first. A comment with `explainsStepKey` explains a step that now takes longer.",
+    detail:
       "The conversation on one process map (`processId`), the client's questions and the team's answers, oldest first. A comment marked `explainsStepKey` is the team's explanation for a step that now takes LONGER than it used to.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/processes/comments",
     schema: obj({ processId: S }, ["processId"]),
@@ -2275,6 +2569,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "comment_on_process",
     summary:
+      "Say something on a process map. A comment changes no step, time or figure. `explainsStepKey` marks it as why a step got slower; team only.",
+    detail:
       "Say something on a process map. A comment is a CONVERSATION, never an edit, it changes no step, no time and no figure. `explainsStepKey` marks it as the explanation for a step that got slower, which is what the client's own screen shows beside it; only the team may set that.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/processes/comments",
     schema: obj({ processId: S, body: S, explainsStepKey: S }, ["processId", "body"]),
@@ -2288,6 +2584,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_impact",
     summary:
+      "The savings, drilled app → process → step, with the subtraction for each. `accountId`/`appId` narrow it. Quote the caption that comes with it.",
+    detail:
       "THE SAVINGS, drilled App → Process → Step: for each step, what it took before, what it takes now, how often it happens, and the subtraction between them. `accountId` / `appId` narrow it. Every answer carries the caption that makes it honest, the times are agreed estimates, the subtraction is arithmetic, and a `prices` block appears ONLY for an account whose price visibility is switched on. A step that got slower is included and counted, never filtered out.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/impact",
     schema: obj({ accountId: S, appId: S }),
@@ -2317,6 +2615,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_account_rate",
     summary:
+      "Add a line to an account's rate card: a kind of work and `centsPerHour` in whole cents. One live line per kind of work.",
+    detail:
       "Add a line to an account's rate card: a kind of work and what it is charged per hour, in whole CENTS (4,500 = 45.00). One live line per kind of work per account.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/rates",
     schema: obj({ accountId: S, label: S, centsPerHour: N, currency: S }, ["accountId", "label", "centsPerHour"]),
@@ -2344,6 +2644,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_internal_rates",
     summary:
+      "What an hour of OUR OWN work costs us. INTERNAL, never shown to a client. The one marked `isDefault` covers unnamed kinds of work.",
+    detail:
       "What an hour of OUR OWN work costs us, by kind of work. INTERNAL: this is the agency's own cost, it is never shown to a client under any setting, and the one marked `isDefault` is the rate a margin applies to logged time whose kind of work is not yet named.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/internal-rates",
     schema: obj({}),
@@ -2353,6 +2655,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_internal_rate",
     summary:
+      "Add what a kind of our own work costs per hour, in whole cents. `isDefault` true makes it the fallback; only one may be default.",
+    detail:
       "Add what a kind of our own work costs per hour, in whole CENTS. `isDefault: true` makes it the rate a margin applies to time whose kind of work is unknown, there can be only one, and setting a second is refused.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates",
     schema: obj({ label: S, centsPerHour: N, currency: S, isDefault: B }, ["label", "centsPerHour"]),
@@ -2381,6 +2685,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "read_margin",
     summary:
+      "Revenue minus our own logged time minus tool costs, for one `accountId`. INTERNAL — never repeat it to a client in any form.",
+    detail:
       "Revenue minus our own logged time minus tool costs, for one account (`accountId`), with every line it was built from. INTERNAL, never repeat this figure to a client, in any form; it is the one number SCOPE says they must never see. `loggedTimeAvailable: false` means the work engine's time records are not in this database yet, so the time half of the subtraction is missing and the number is not yet a margin.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/margin",
     schema: obj({ accountId: S }, ["accountId"]),
@@ -2390,6 +2696,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_role_rates",
     summary:
+      "What an hour of each ROLE is worth. INTERNAL, never quote one to a client. Each row carries `roleName`, `centsPerHour` and whether it is `active`.",
+    detail:
       "What an hour of each ROLE is worth, the bookkeeper, the dispatcher, whoever actually does a process. INTERNAL: never quote one to a client. This is the third rate card and it answers a different question from the other two: `list_account_rates` is what a client is charged and `list_internal_rates` is what a kind of our own work costs us. Each row carries `roleName`, `centsPerHour` and whether it is still `active`.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/role-rates",
     schema: obj({}),
@@ -2399,6 +2707,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_role_rate",
     summary:
+      "Set what an hour of one role is worth, by `roleName`. `centsPerHour` is whole cents; `active` false switches it off. INTERNAL.",
+    detail:
       "Set what an hour of one role is worth, by name. The ROLE is the key, so this one tool adds, re-prices and deactivates: `roleName` names it, `centsPerHour` is WHOLE CENTS an hour (45 euros is 4500), and `active: false` switches it off without deleting anything. Re-sending a price that has not changed moves nothing and writes no history. INTERNAL, this number feeds what an app is said to have given back, and it is never shown to a client.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/role-rates",
     schema: obj({ roleName: S, centsPerHour: N, active: B }, ["roleName", "centsPerHour", "active"]),
@@ -2429,6 +2739,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "get_app_impact",
     summary:
+      "What one app gives back a month: `savedSecondsPerMonth`, `moneyCentsPerMonth` and a line per process. Quote `caption`. The money half is INTERNAL.",
+    detail:
       "What ONE app has given back every month: `savedSecondsPerMonth` (the hours), `moneyCentsPerMonth` (those hours at the rate of the role that used to spend them) and one line per process in `lines`, each naming its `roleName` and `centsPerHour`. `unpricedProcesses` counts the processes that could not be priced because they name no role or the role has no live rate, their HOURS are still in the total and their money is not, and saying so is the point. Always quote `caption` with the figure. INTERNAL: the money half comes from the role rate card, so never repeat it to a client, the hours half on its own is what the client's own value screen shows.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/app-money",
     schema: obj({ appId: S }, ["appId"]),
@@ -2456,6 +2768,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_brand_asset",
     summary:
+      "Add to the brand library (`name`). `category` is picked-or-created. A colour asset carries `colorHex` instead of a `fileUrl`.",
+    detail:
       "Add something to the brand library (name required). `category` is picked-or-created as a dropdown value. `fileUrl` may be a link anywhere; uploading the bytes themselves is a screen action, not a tool. An asset that IS a colour carries `colorHex` (`#RRGGBB`) instead of a file — a swatch is drawn from the value, never fetched from a website.",
     binding: "CONTENT", method: "POST", path: "/api/content/brand-assets",
     schema: obj({ name: S, category: S, description: S, fileUrl: S, colorHex: S }, ["name"]),
@@ -2500,6 +2814,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_staff_profiles",
     summary:
+      "What our own people are like and how they work best. `userId` narrows to one. INTERNAL: never repeat any of it where a client will read.",
+    detail:
       "What the team's own people are like and how they work best. Pass `userId` for one person's. THE AGENCY'S OWN, and the sharpest case of it in the app: never repeat any of this to a client, or into anything a client will read. A client login cannot reach the door.",
     binding: "CONTENT", method: "GET", path: "/api/content/staff/profiles",
     schema: obj({ userId: S }),
@@ -2509,6 +2825,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "save_staff_profile",
     summary:
+      "Write a colleague's profile (`userId`). One door for both cases: it writes a new profile or replaces the fields of the one they have.",
+    detail:
       "Write a colleague's profile (`userId` required). ONE door for both cases: if they have no profile yet this writes one, and if they do this replaces its fields, a person either has a profile or they don't, and asking the caller which would be a race between two open tabs.",
     binding: "CONTENT", method: "POST", path: "/api/content/staff/profiles",
     schema: obj(
@@ -2530,6 +2848,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "list_staff_certificates",
     summary:
+      "The qualifications the team holds. `userId` narrows to one person. Internal.",
+    detail:
       "The qualifications the team holds. Pass `userId` for one person's. The door narrows, not the caller: filtering a capped list afterwards would disagree with the count beside it. Internal.",
     binding: "CONTENT", method: "GET", path: "/api/content/staff/certificates",
     schema: obj({ userId: S }),
@@ -2539,6 +2859,8 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "create_staff_certificate",
     summary:
+      "Record a qualification (`userId`, `title`). `issuedOn` and `expiresOn` are YYYY-MM-DD days; anything that is not a real day is refused.",
+    detail:
       "Record a qualification somebody holds (`userId` and `title` required). `issuedOn` / `expiresOn` are days, written YYYY-MM-DD, anything that is not a real calendar day is refused rather than stored, because an expiry that half parses is a certificate that silently never lapses.",
     binding: "CONTENT", method: "POST", path: "/api/content/staff/certificates",
     schema: obj({ userId: S, title: S, issuer: S, issuedOn: S, expiresOn: S, fileUrl: S }, ["userId", "title"]),

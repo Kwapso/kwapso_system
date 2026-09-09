@@ -114,15 +114,6 @@ export const TEAM_REF_TABLES: Record<TeamRefKindName, string> = {
   input: "todos",
 }
 
-/** The same map keyed by the LETTER, which is what SQL and a stored row carry.
- * Derived rather than typed twice. */
-export const REF_TABLE_BY_KIND = Object.fromEntries(
-  (Object.keys(TEAM_REF_KINDS) as TeamRefKindName[]).map((name) => [
-    TEAM_REF_KINDS[name],
-    TEAM_REF_TABLES[name],
-  ])
-) as Record<TeamRefKind, string>
-
 /** THE TABLE THAT REMEMBERS WHAT A RECORD USED TO BE CALLED. One row per
  * retired string (migration 0068). Named here rather than spelled into five
  * queries, for the reason every other constant in this file exists. */
@@ -130,7 +121,7 @@ export const REF_ALIAS_TABLE = "ref_aliases"
 
 /** How wide a reference's number prints. Four, since the first counter — see
  * `canonicalRef`, which is the only place it is applied. */
-export const REF_PAD = 4
+const REF_PAD = 4
 
 /** THE FORMULA, and the whole point of it being a function.
  *

@@ -189,12 +189,12 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
   })
 
   it("the renderer draws exactly those kinds — read off disk, not asserted from here", () => {
-    const src = readFileSync(join(ROOT, "web", "components", "agent-blocks.tsx"), "utf8")
+    const src = readFileSync(join(ROOT, "web", "components", "assistant", "agent-blocks.tsx"), "utf8")
     // The renderer map is one object literal keyed by kind (its TYPE is a mapped
     // type over AgentBlockKind, so tsc refuses a missing or extra key too — this
     // reads the same fact off the file so R9's own check states it).
     const map = /const BLOCK_RENDERERS[\s\S]*?=\s*\{([\s\S]*?)\n\}/.exec(src)
-    expect(map, "web/components/agent-blocks.tsx must export one BLOCK_RENDERERS map").not.toBeNull()
+    expect(map, "web/components/assistant/agent-blocks.tsx must export one BLOCK_RENDERERS map").not.toBeNull()
     const drawn = [...map![1].matchAll(/^\s{2}([a-z]+):/gm)].map((m) => m[1])
     expect(new Set(drawn), "the prompt offers a block the renderer cannot draw, or hides one it can").toEqual(
       new Set(BLOCK_KINDS)

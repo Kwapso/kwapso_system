@@ -15,7 +15,7 @@
 import { cleanup, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { SelectableScreen } from "@/components/selectable-screen"
+import { SelectableScreen } from "@/components/choices/selectable-screen"
 import type { SelectableValue } from "@shared/types"
 
 afterEach(cleanup)

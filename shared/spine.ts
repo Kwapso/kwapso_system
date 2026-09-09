@@ -54,7 +54,7 @@
 //
 // THE ARGUMENT THAT WAS MADE, in the words it was made in: paper is the
 // fallback, not the kit's own `screen-shell.tsx` default of mango (override
-// 56); `web/components/app-shell.tsx` has painted a paper rail since before
+// 56); `web/components/shell/app-shell.tsx` has painted a paper rail since before
 // the spine was a choice at all, and a person who has never opened Settings
 // must keep seeing exactly the rail they always had — switching everyone to
 // mango the day this shipped would be a redesign nobody asked for, wearing a

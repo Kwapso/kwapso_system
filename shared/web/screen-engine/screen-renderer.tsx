@@ -146,7 +146,7 @@ export interface ScreenRendererProps {
    *
    * THIS IS NOT `renderActivity` COMING BACK, and the difference is the whole
    * reason the old prop is not the answer here. `renderActivity` let a host
-   * pass `web/components/activity-panel.tsx` INTO this engine as the body of a
+   * pass `web/components/records/activity-panel.tsx` INTO this engine as the body of a
    * recipe's `activity` BLOCK — a tab. The client killed the Activity tab
    * across the app (2026-09-06: "I don't want to have activity as a tab
    * anywhere but on the footer … this would open a slide-in with all the
@@ -582,7 +582,7 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
     // `RecordDetail`, which already wraps the whole panel in ONE `Card` at
     // the DEFAULT variant (`bg-surface-panel`); that OUTER seam is the real
     // fix, and it stands. A second `Card` here, added 2026-08-31 as the
-    // app-side twin of `web/components/overview-list.tsx`'s same-night
+    // app-side twin of `web/components/records/overview-list.tsx`'s same-night
     // change, put a white `variant="raised"` box INSIDE that panel — a
     // container inside a container, which the client's screenshot rejected
     // outright the same night. The fact list's `<dl>` renders straight onto
@@ -629,7 +629,7 @@ function renderBlock(block: RecipeBlock, ctx: BlockCtx): React.ReactNode {
     // `VENDORED_UI` in scripts/lib/i18n-source.mjs). Somebody reading the app in
     // German was told in English that there was nothing to read. The three
     // sentences here are the app's own, word for word the ones
-    // `web/components/activity-panel.tsx` already says, so the two feeds cannot
+    // `web/components/records/activity-panel.tsx` already says, so the two feeds cannot
     // drift apart and the catalogue gains nothing new.
     case "activity": {
       return (
@@ -1051,7 +1051,7 @@ function renderDetail(
   // member's photo on `members.detail`), so the app's own landing screen and
   // every member page kept drawing one for days after the ruling — because the
   // ruling was implemented in the BESPOKE path only, where
-  // `web/components/record-chrome.tsx` marks its `mark`/`leading` props "NO
+  // `web/components/records/record-chrome.tsx` marks its `mark`/`leading` props "NO
   // LONGER READ BY THIS COMPONENT" and hands the kit nothing. Same ruling, same
   // outcome, both paths.
   //
@@ -1084,7 +1084,7 @@ function renderDetail(
 
          THIS PATH HAD NEITHER HALF OF THAT, AND THE GAP WAS INVISIBLE. The
          thirteen bespoke details have drawn the kit's ink footer since
-         2026-08-31 (web/components/record-chrome.tsx §"the footer"); this
+         2026-08-31 (web/components/records/record-chrome.tsx §"the footer"); this
          engine has always rendered `RecordDetail` with no `audit` and no
          `activity`, so a recipe-driven record (the team's own landing screen,
          a member, an invite, the four agency-internal kinds) showed no footer
@@ -1117,7 +1117,7 @@ function renderDetail(
       /* THE SAME TITLE TREATMENT THE BESPOKE DETAILS WEAR — R52, added
          2026-09-06. `RECORD_TITLE_TREATMENT` (shared/web/record-heading.tsx)
          is the h1/44 step and the 80% title/actions split as ONE string, and
-         `web/components/record-chrome.tsx` applies exactly this same constant
+         `web/components/records/record-chrome.tsx` applies exactly this same constant
          to the thirteen hand-composed detail screens.
 
          WITHOUT IT THIS PATH DREW A DIFFERENT SCREEN FROM THE SAME MODEL.

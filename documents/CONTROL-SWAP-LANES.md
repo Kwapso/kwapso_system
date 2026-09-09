@@ -28,6 +28,15 @@ touches it.
 One conversion is not a lane. It is folded into lane C, which is also small and
 also careful, and the two file sets do not overlap. Three lanes, not four.
 
+**THE THREE FILE LISTS BELOW ARE A SNAPSHOT, AND THREE OF THE FILES ARE GONE.**
+They were counted the day the lanes were written and they are left as counted,
+because "these 34 and no others" is the instruction a lane obeyed and rewriting
+it now would falsify the record. Three names in them no longer exist:
+`web/components/knowledge-ask.tsx` (lane A) went when the Ask box became a
+conversation that quotes its passages, and `shared/web/screen-engine/`'s
+`range-facet.tsx` and `searchable-facet.tsx` (lane C) went when the filter row
+became the design kit's. A lane reading this today skips them and says so.
+
 ---
 
 ## THE SHARED RULING — every lane obeys this, and it is why they agree
@@ -106,19 +115,19 @@ READ FIRST: CLAUDE.md, then shared/ui/docs/RULES.md (the kit's own rulebook,
 which is readable in this repo as of today), then RULES.md's R39 row.
 
 YOUR FILES — these 34 and no others:
-  web/components/google-source-dialog.tsx      (4 button, 2 img)
-  web/components/app-shell.tsx                 (5 button)
+  web/components/knowledge/google-source-dialog.tsx      (4 button, 2 img)
+  web/components/shell/app-shell.tsx                 (5 button)
   web/components/knowledge-ask.tsx             (3 button, 1 form)
-  web/components/story-detail.tsx              (3 button)
-  web/components/sprint-detail.tsx             (3 button)
-  web/components/record-calendar.tsx           (3 button)
-  web/components/app-form-dialog.tsx           (2 label, 1 img)
-  web/components/wave-detail.tsx               (2 button)
-  web/components/story-form-dialog.tsx         (2 label)
-  web/components/record-picker.tsx             (1 button, 1 input)
-  web/components/process-detail.tsx            (2 button)
-  web/components/internal-rate-card.tsx        (2 label)
-  web/components/contact-link-dialog.tsx       (2 label)
+  web/components/work/story-detail.tsx              (3 button)
+  web/components/work/sprint-detail.tsx             (3 button)
+  web/components/records/record-calendar.tsx           (3 button)
+  web/components/apps/app-form-dialog.tsx           (2 label, 1 img)
+  web/components/work/wave-detail.tsx               (2 button)
+  web/components/work/story-form-dialog.tsx         (2 label)
+  web/components/records/record-picker.tsx             (1 button, 1 input)
+  web/components/process/process-detail.tsx            (2 button)
+  web/components/money/internal-rate-card.tsx        (2 label)
+  web/components/accounts/contact-link-dialog.tsx       (2 label)
   …and: timer-bar, temp/auth-card, team-switcher, role-picker-dialog,
   record-table, profile-menu, profile-dialog, meeting-detail,
   knowledge-upload-dialog, help-attachments, file-picker, email-change-dialog,
@@ -167,14 +176,14 @@ Same setup, different branch and files:
   git worktree add -b lane/controls-b ~/Desktop/kwapso-ctrl-b lane/ui-swap
 
 YOUR FILES — these 8 and no others:
-  web/components/agent-panel.tsx               (2 button, 1 input)
-  web/components/work-panels.tsx               (2 button)
-  web/components/import-screen.tsx             (1 input, 1 label)
-  web/components/stakeholders-panel.tsx        (1 button)
+  web/components/assistant/agent-panel.tsx               (2 button, 1 input)
+  web/components/work/work-panels.tsx               (2 button)
+  web/components/screens/import-screen.tsx             (1 input, 1 label)
+  web/components/apps/stakeholders-panel.tsx        (1 button)
   web/components/screens/kwapso-screen.tsx     (1 button)
-  web/components/meetings-screen.tsx           (1 button)
-  web/components/contact-panels.tsx            (1 button)
-  web/components/account-detail-panels.tsx     (1 button)
+  web/components/meetings/meetings-screen.tsx           (1 button)
+  web/components/accounts/contact-panels.tsx            (1 button)
+  web/components/accounts/account-detail-panels.tsx     (1 button)
 
 Everything else — the ruling on what not to convert, R31, the gate, the visual
 check, the report — is identical to Lane A. Read that prompt's middle section.

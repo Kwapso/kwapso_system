@@ -9,7 +9,7 @@
 //
 // The fix has two halves and they are checked in two places: the DOOR says which
 // members are client logins (here), and the front door decides what to do about
-// it (web/test/assignable-people.test.ts). This suite is the first half — the
+// it (web/test/assignable-members.test.ts). This suite is the first half — the
 // fact has to be true before anything can act on it.
 //
 // It runs the REAL handler against a real SQLite database with the real

@@ -1,0 +1,905 @@
+"use client"
+
+// APP DETAIL — one system at /apps/<id>, as a tabbed record: Overview /
+// Sprints / Stories / Process maps. Its history is not the last tab any more —
+// it is reached from the ink footer's Latest activity column, on the client's
+// 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the ruling and
+// the argument.
+//
+// THIS SCREEN IS THE CROSS-LINK the owner named as mattering more than any single
+// path: from an app to its account, from an app to its other stories. So the
+// header says whose it is (a link, one tap to the account) and three of the tabs
+// are the work hanging off it — each asked of the SERVER by `appId`, never
+// narrowed in the browser, because the backlog is paged and "this app's work
+// among the newest fifty" is an answer that looks like an answer.
+//
+// Host-composed, because those three tabs are collections with their own actions
+// and no engine block draws them. Every count is an exact server COUNT(*) through
+// the one formatCount seam (R16).
+
+import * as React from "react"
+
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import { TabsView } from "@shared/web/screen-engine/tabs-view"
+import { Headline } from "@shared/ui/components/typography/typography"
+import { useRemembered } from "@shared/web/remembered"
+import { ModulesPanel } from "@/components/apps/modules-panel"
+import { PencilSimple, Power } from "@shared/ui/foundations/icons"
+
+import { AppFormDialog, type AppFormValues } from "@/components/apps/app-form-dialog"
+import { useAssignableMembers } from "@/lib/members"
+import { ProcessFormDialog } from "@/components/process/process-form-dialog"
+import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
+import { MeetingFormDialog, type MeetingFormValues } from "@/components/meetings/meeting-form-dialog"
+import { SprintFormDialog } from "@/components/work/sprint-form-dialog"
+import { StoryFormDialog } from "@/components/work/story-form-dialog"
+import { createSprintFrom } from "@/components/work/sprints-screen"
+import { createStoryFrom, useStoryFormOptions } from "@/components/work/stories-screen"
+import {
+  AppMeetingsPanel,
+  AppTicketsTab,
+  ProcessesPanel,
+  SprintsPanel,
+  StoriesPanel,
+  sliceKey,
+} from "@/components/work/work-panels"
+import { DeliverablesPanel } from "@/components/apps/deliverables-panel"
+import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
+import { AppMoneyPanel } from "@/components/apps/app-money-panel"
+import { OverviewList } from "@/components/records/overview-list"
+import { content as contentApi, tenancy } from "@/lib/api"
+import {
+  RecordActionsMenu,
+  RecordChipLink,
+  RecordScreen,
+  STICKY_TABS,
+  RECORD_TABS_CONFIG,
+  type RecordAction,
+} from "@/components/records/record-chrome"
+import { formatCount } from "@shared/web/format-count"
+import {
+  accountsKey,
+  appMoneyKey,
+  appsKey,
+  helpKey,
+  listFetch,
+  meetingsKey,
+  totalKey,
+  impactKey,
+} from "@/lib/live-resources"
+import { appStageDotTone, appStageMark } from "@shared/app-stages"
+import { AppMark } from "@/components/apps/app-tiles"
+import { CONCEPT_ICON } from "@/lib/pages"
+import { usePermissions } from "@/lib/perms"
+import { useRecordActivity } from "@/lib/use-record-activity"
+import { useRecordCounts } from "@/lib/use-record-counts"
+import { ticketTypeKeptForMigration } from "@shared/types"
+import type { Account, AppRow, MeetingPurpose, SelectableValue } from "@shared/types"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
+import { useT } from "@shared/web/language"
+import { RichText } from "@shared/web/rich-text-view"
+import { MARK_GROUP, markMap } from "@/lib/type-marks"
+import { StakeholdersPanel } from "@/components/apps/stakeholders-panel"
+import { useConfirm } from "@shared/web/use-confirm"
+
+export function AppDetailScreen({
+  teamId,
+  appId,
+  basePath,
+}: {
+  teamId: string
+  appId: string
+  /** the apps list in the URL form we arrived through (/apps or /t/<team>/apps) */
+  basePath: string
+}) {
+  const t = useT()
+  // The apps set is bounded and read whole, so the record comes out of the same
+  // cache the list holds — opening one costs no round-trip.
+  // THE TEAM'S GLYPHS (R35), read once for this screen and handed to every
+  // nested panel on it. The same key the Dropdown values manager writes, so
+  // an emoji changed there reaches these rows with no deploy.
+  const teamVocabulary = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
+    tenancy.selectable().then((r) => r.values)
+  )
+
+  const appsQ = useCached<AppRow[]>(appsKey(teamId), () => listFetch.apps(teamId))
+  const accountsQ = useCached<Account[]>(accountsKey(teamId), () => listFetch.accounts(teamId))
+  // The ONE web-side read of a record's history (R5) — rows, the door's exact
+  // COUNT(*) for the tab badge, and the cursor the feed below spends.
+  const activity = useRecordActivity("apps", appId)
+  // THE BADGES, BEFORE THE CLICK. Five collections hang off a system and all
+  // five used to be blank until you opened the tab — this record is the one the
+  // owner named first. One bounded read of every total, primed into the same
+  // sidecars below; the ROWS behind each tab stay lazy.
+  useRecordCounts("apps", appId)
+  // The exact totals the five collection tabs badge (R16) — from the counts read
+  // above, and re-primed by each panel's own fetch over the same filter its rows
+  // came from. `null` is the third answer: the role may not read that module
+  // (R18), which renders as nothing exactly as a zero does.
+  const sprintsTotal = useCachedValue<number | null>(totalKey("sprints-app", appId))
+  const storiesTotal = useCachedValue<number | null>(totalKey("stories-app", appId))
+  const mapsTotal = useCachedValue<number | null>(totalKey("processes-app", appId))
+  const modulesTotal = useCachedValue<number | null>(totalKey("modules-app", appId))
+  const meetingsTotal = useCachedValue<number | null>(totalKey("meetings-app", appId))
+  const ticketsTotal = useCachedValue<number | null>(totalKey("tickets-app", appId))
+  const deliverablesTotal = useCachedValue<number | null>(totalKey("deliverables-app", appId))
+
+  const { can } = usePermissions(teamId)
+  const canEdit = can("processes", "edit")
+  const canArchive = can("processes", "delete")
+  const canWriteWork = can("work", "create")
+  const canReadKnowledge = can("knowledge", "read")
+  // 8.13 — the money half of "what this app gave back" is an INTERNAL figure, so
+  // the tab is behind the right that decides whether a person may see money at
+  // all. The door refuses a client login besides (R24).
+  const canSeeMoney = can("commercials", "read")
+  const canReadTickets = can("help", "read")
+  // 8.7 — WHAT WE HANDED OVER on this system. Its own module, so a role that may
+  // open an app does not automatically see its handover shelf: without the right
+  // there is no tab at all, rather than a tab that refuses.
+  const canReadDeliverables = can("deliverables", "read")
+  // THE RIGHT ON THE CHILD, NEVER THE PARENT. Raising a request about this
+  // system is `help:create` and putting a meeting on the meetings list is
+  // `meetings:create` — the rights those two doors gate on. `processes:edit`,
+  // which is what lets somebody edit the app record itself, says nothing about
+  // either. The door decides (R10); these only decide whether we draw a button
+  // that would come back a 403.
+  const canRaiseTicket = can("help", "create")
+  const canArrangeMeeting = can("meetings", "create")
+  // Who can be put on this app (8.10) — the team, from the cache the members
+  // screen already fills.
+  const members = useAssignableMembers(teamId)
+  // The client's own people, by name — see the note beside `contactNames` below
+  // for why this is a second read rather than the accounts cache.
+  const clientId = appsQ.data?.find((a) => a.id === appId)?.accountId ?? null
+  const contactsQ = useCached(clientId ? `account-detail:${clientId}` : null, () =>
+    tenancy.accountDetail(clientId as string)
+  )
+
+  // WHAT THE TWO NEW FORMS NEED, and nothing more. Both read the SAME cache keys
+  // their own sections read, and both are conditional on the right that draws
+  // the button: a role that cannot arrange a meeting never fetches the purposes.
+  const purposesQ = useCached<MeetingPurpose[]>(
+    canArrangeMeeting ? `purposes:${teamId}` : null,
+    () => listFetch.purposes(teamId)
+  )
+  // ONE READ OF THE TEAM'S VOCABULARY, not two. This was a second read of
+  // `selectable:<team>` with the same fetcher as `teamVocabulary` above —
+  // and `teamVocabulary` is unconditional, so the conditional key here could
+  // never be the one that warmed the cache. It cost no extra request (the store
+  // dedupes an in-flight key), but it was a second place to change the same
+  // question, and a screen reading one thing twice reads as though it wanted
+  // two. The marks and the ticket types come off one read now.
+  // THE TEAM'S OWN `Ticket type` WORDS — one derivation, read by the create
+  // dialog below AND by the Tickets tab's own Kind facet, so the two can never
+  // offer two different lists of the same vocabulary.
+  //
+  // …MINUS THE KIND THAT IS KEPT BUT NEVER SHOWN. The same subtraction
+  // `use-screen-data.ts` makes on the top-level tickets screen, for the same
+  // reason and out of the same shared test — the client's ruling of 6 Sep 2026
+  // is written up in full beside it (`TICKET_TYPE_KEPT_FOR_MIGRATION`,
+  // shared/types.ts). Both call sites derive the list from the team's own
+  // vocabulary, so both had to subtract, or this tab would offer a kind the
+  // tickets screen does not and the door refuses.
+  const helpTypeOptions = (teamVocabulary.data ?? [])
+    .filter((v) => v.type === "Ticket type" && v.active && !ticketTypeKeptForMigration(v.value))
+    .map((v) => v.value)
+
+  // The open tab is remembered per record for as long as this document
+  // lives (web/lib/nav-memory.ts) — leaving to another section and coming
+  // back lands on the tab she was reading, and a miss lands on "overview".
+  //
+  // …WITH ONE DEEP-LINKABLE TAB, `?tab=modules` (2026-09-06). The exact shape
+  // `account-detail.tsx` already uses for `?tab=organisation`, and added for the
+  // same class of reason: a link that lands one tab away from what it named is a
+  // link that makes the reader hunt.
+  //
+  // WHY A MODULE'S LINK POINTS HERE AT ALL. The client ruled that the four facts
+  // under a triage card — client, app, module and author — are all LINKS she can
+  // navigate from. Three of the four already had an address. A MODULE HAS NONE:
+  // there is no `modules` segment in `TEAM_SECTIONS`, no `modules.detail`
+  // recipe, no branch in `module-content.tsx`, and `relationship-map.tsx`'s own
+  // `RECORD_PATH` deliberately has no `app_modules` entry — a module is a
+  // division OF an app, and the only screen it has ever appeared on is this
+  // record's Modules tab (`ModulesPanel`, below). Inventing a `/modules/<id>`
+  // URL to satisfy one link would have been a whole screen nobody asked for; the
+  // honest destination is the place the module actually is, and that place is a
+  // tab. So the tab got an address rather than the module getting a screen.
+  //
+  // AND A LINK BEATS THE MEMORY, which is `account-detail.tsx`'s own sentence
+  // and the reason this is not simply an initial value: an address that NAMES a
+  // tab is somebody telling us where to go, so the per-record memory does not
+  // get to argue with it — the third argument to `useRemembered` refuses the
+  // remembered value outright whenever the URL asked for one.
+  const askedTab = () =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab")
+  const [tab, setTab] = useRemembered(
+    "tab",
+    () => (askedTab() === "modules" ? "modules" : "overview"),
+    (found) => (askedTab() ? undefined : typeof found === "string" ? found : undefined)
+  )
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [sprintOpen, setSprintOpen] = React.useState(false)
+  const [mapOpen, setMapOpen] = React.useState(false)
+  const [storyOpen, setStoryOpen] = React.useState(false)
+  const [ticketOpen, setTicketOpen] = React.useState(false)
+  const [meetingOpen, setMeetingOpen] = React.useState(false)
+  const options = useStoryFormOptions(teamId)
+
+  // The URL PREFIX we are standing in — "" at the top level, "/t/<teamId>" inside
+  // a team — so every cross-link off this record stays in the shape the person
+  // arrived through. `basePath` ends in the section, which is one segment more.
+    // NEST, DON'T REPLACE. This used to strip the collection segment off the path
+  // before the panels appended to it, so opening a related record from here
+  // threw away the record you opened it FROM — a story reached from a client
+  // landed on /stories/<id> with no way back to the client. The base is now this
+  // record's own address, so a related record lands INSIDE it and the trail is
+  // in the URL for the crumbs, the Back button and anybody you send it to.
+  const host = { base: `${basePath}/${appId}` }
+
+  const refresh = React.useCallback(() => {
+    invalidate(appsKey(teamId))
+    invalidate(impactKey(teamId))
+    invalidate(`activity:record:apps:${appId}`)
+  }, [appId, teamId])
+
+  // The one confirm dialog this record's red action shares
+  // (shared/web/use-confirm.tsx) — `run` refreshes on success and toasts
+  // either way; `ask` opens the dialog with the words for archiving.
+  const { busy, ask, run, dialog: confirmDialog } = useConfirm(refresh)
+
+  async function save(values: AppFormValues) {
+    await tenancy.updateApp({
+      id: appId,
+      name: values.name.trim(),
+      url: values.url || null,
+      stage: values.stage || null,
+      // Always sent, like the two people lists below: the form hands back either
+      // a newly picked data URL, the path the app already had, or "" for a logo
+      // somebody cleared, and all three are answers the door should hear.
+      logoUrl: values.logoUrl,
+      toolCostCentsPerMonth: values.toolCostCentsPerMonth,
+      about: values.about || null,
+      clientContext: values.clientContext || null,
+      solution: values.solution || null,
+      keyActors: values.keyActors || null,
+      // The two sets are re-sent WHOLE — the door replaces what it is given and
+      // touches nothing it is not, so an edit that changed only the stage would
+      // leave both alone and this one says both out loud.
+      staffUserIds: values.staffUserIds,
+      leadUserId: values.leadUserId || null,
+      stakeholderContactIds: values.stakeholderContactIds,
+      mainStakeholderContactId: values.mainStakeholderContactId || null,
+    })
+    refresh()
+    toast.success(t("App updated."))
+  }
+
+  // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
+  // the rollout from help-detail (73414c58).
+  if (appsQ.error)
+    return (
+      <RecordScreen
+        title={<Skeleton className="h-7 w-48" />}
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the app.") }}
+        errorAction={
+          <Button variant="secondary" onClick={() => invalidate(appsKey(teamId))}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (appsQ.data === undefined)
+    return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
+  const app = appsQ.data.find((a) => a.id === appId) ?? null
+  if (!app)
+    return (
+      <RecordScreen
+        title={t("App")}
+        state="empty"
+        copy={{ emptyTitle: t("That app no longer exists."), emptyDescription: "" }}
+      />
+    )
+
+  function archiveApp() {
+    ask({
+      title: t("Archive {name}?", { name: app!.name }),
+      body: t("It stops showing in the everyday lists. Everything on it, its work and its history, stays exactly where it is, and you can bring it back any time."),
+      action: t("Archive"),
+      run: () => run(() => tenancy.setAppActive(appId, false), t("App archived."), t("Couldn't archive that app.")),
+    })
+  }
+
+  async function restoreApp() {
+    await run(() => tenancy.setAppActive(appId, true), t("App restored."), t("Couldn't restore that app."))
+  }
+
+  // THE REAL NAME, NEVER "A CLIENT" WHILE A REAL ACCOUNT IS LINKED — client
+  // bug, 2026-08-31: ETZI's own account chip read "A client" instead of
+  // "Etzi Haus" even though `app.accountId` pointed at a real, active
+  // account. Root cause was the SAME shape the comment below (THE CONTACT
+  // NAMES) already names for a sibling field: `accountsQ.data` is the accounts
+  // list, and accounts are a GROWING collection that PAGES (R14) — page one is
+  // newest-first, so an older or otherwise-unlucky account silently missed the
+  // page and `.find()` came back empty forever, not just on the first paint.
+  // `contactsQ` already reads THIS exact account by id, off the single-record
+  // door (`tenancy.accountDetail`, below), for the stakeholder names two
+  // sections down — its own `.account` is the same record, read the way R38
+  // asks a detail screen to read one: by id, never by scanning a loaded page.
+  const accountName = app.accountId ? (contactsQ.data?.account.name ?? "A client") : null
+
+  // ONLY THE STAFF ON IT AND AN ADMIN OPEN THIS PAGE (CHECKLIST 8.11, Aurora's
+  // ap1 over the narrower reading). The refusal is the DOOR's — the app row
+  // arrived with its context fields, its address and its people withheld — and
+  // this is the sentence that explains what happened rather than the thing that
+  // enforces it. An overview tile is still theirs to see; the record is not.
+  if (!app.canOpen)
+    return (
+      <div className="flex flex-col gap-4">
+        {/* h1 (44/500) — RECHECKED 2026-08-31 as part of the client's main-vs-
+            detail correction. This bare title is NOT a main-screen heading —
+            it is this same App RECORD's own detail title, drawn without
+            RecordChrome only because the reader cannot open the record (see
+            this branch's own comment above). Every other path through this
+            file renders the same record's title through RecordScreen, which
+            now takes the "Record heading" step via record-chrome.tsx's own
+            app-side override; this fallback carries the identical step
+            directly so the one record shows one title size regardless of
+            which branch draws it — the earlier pass had this at h2 (32),
+            grouping it with the MAIN-screen sweep by mistake. */}
+        <Headline as="h1" size="h1">{app.name}</Headline>
+        <p className="text-muted-foreground text-sm">
+          {t(
+            "You're not on this app, so its page is closed. Ask an admin to add you to the team on it."
+          )}
+        </p>
+      </div>
+    )
+
+  // The people on it, as NAMES. The row carries ids — a staff row points at a
+  // login in the core database and a stakeholder at an account row.
+  //
+  // THE STAFF NAMES come out of the members cache, which is bounded and read
+  // whole. THE CONTACT NAMES do not come out of the accounts cache, and that is
+  // the bug this comment exists to stop somebody re-introducing: accounts are a
+  // GROWING collection that PAGES, so a contact who is not in page one resolved
+  // to "Somebody". They come off the account's own detail door instead — the
+  // same read the form uses to offer them, so the name a person picked and the
+  // name they are shown are the one answer.
+  const memberNames = new Map(members.map((m) => [m.id, m.name]))
+  // Their faces, from the same read (R35).
+  const memberPhotos = new Map(members.map((m) => [m.id, m.photo ?? null]))
+  const contactNames = new Map(
+    (contactsQ.data?.links ?? []).map((l) => [l.personAccountId, l.personName])
+  )
+  // THE TWO COMMA-JOINED LINES ARE GONE — see the Stakeholders tab below. They
+  // were two Overview fields reading "Alaap K, Alexander Stadlmair, Aurora
+  // Thalassa" and "Paras Maroo (main), Petya Bletsova": the people who own this
+  // system, flattened into prose you could not click, with the two sides told
+  // apart only by which label they sat under.
+  const peopleCount = app.staff.length + app.stakeholders.length
+
+  // THE CONTEXT AN APP CARRIES, above the housekeeping. The four prose fields
+  // are what somebody joining the account reads first and what the assistant
+  // answers "what is this system for?" out of, so they lead the Overview rather
+  // than trailing the address. A field nobody has filled in is dropped rather
+  // than shown empty (UI-RULEBOOK W2 — `hideEmpty` is the default).
+  const overviewItems = [
+    { label: t("Client"), value: accountName ?? "Ours, no client" },
+    // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
+    // sits where an icon sits and never inside a sentence") — it already draws
+    // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
+    { label: t("Stage"), value: app.stage || "—" },
+    { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
+    {
+      label: t("Client context"),
+      value: app.clientContext ? <RichText html={app.clientContext} /> : "—",
+    },
+    { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
+    { label: t("Key actors"), value: app.keyActors || "—" },
+    { label: t("Address"), value: app.url || "—" },
+    // The audit rows moved to the record footer (D7 / CHECKLIST 11.3).
+  ]
+
+  const tabsConfig = {
+    ...RECORD_TABS_CONFIG,
+    tabs: [
+      { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
+      {
+        value: "sprints",
+        label: t("Sprints"),
+        icon: CONCEPT_ICON.sprints,
+        badge: formatCount(sprintsTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "stories",
+        label: t("Stories"),
+        icon: CONCEPT_ICON.stories,
+        badge: formatCount(storiesTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        // WHO OWNS THIS SYSTEM, on a tab of its own (19 Aug 2026). It was two
+        // comma-joined Overview fields — a list of people you could not click,
+        // sitting between "Key actors" and "Address" like housekeeping. "Who do
+        // I ask about this?" is one of the two questions an app record exists to
+        // answer, and it was the one you had to read prose for.
+        //
+        // THE BADGE IS BOTH SIDES ADDED UP, and it is an exact server total
+        // rather than a page length (R16): `staff` and `stakeholders` arrive as
+        // whole sets on the app row — the door reads them per app, not per page
+        // — so this is one of the few tabs where a local length IS the count.
+        value: "stakeholders",
+        label: t("Stakeholders"),
+        icon: CONCEPT_ICON.contacts,
+        badge: formatCount(peopleCount),
+        badgeVariant: "" as const,
+      },
+      {
+        // THE APP'S OWN DIVISION, and it sits before Processes deliberately: a
+        // module is what this system IS made of, a process is how the client
+        // works inside it. Reading the structure first is the order somebody
+        // learns an app in.
+        value: "modules",
+        label: t("Modules"),
+        icon: CONCEPT_ICON.processes,
+        badge: formatCount(modulesTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "maps",
+        label: t("Processes"),
+        icon: CONCEPT_ICON.processes,
+        badge: formatCount(mapsTotal),
+        badgeVariant: "" as const,
+      },
+      {
+        value: "meetings",
+        label: t("Meetings"),
+        icon: CONCEPT_ICON.meetings,
+        badge: formatCount(meetingsTotal),
+        badgeVariant: "" as const,
+      },
+      // TICKETS ABOUT THIS SYSTEM (8.6). Behind the caller's own help right: a
+      // role without it sees no tab at all rather than a tab that refuses.
+      ...(canReadTickets
+        ? [
+            {
+              value: "tickets",
+              label: t("Tickets"),
+              icon: CONCEPT_ICON.tickets,
+              badge: formatCount(ticketsTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // WHAT WE HANDED OVER (8.7) — the handover docs, API references, recorded
+      // walkthroughs and SOPs filed against this system. Behind the caller's own
+      // deliverables right, exactly like the ticket tab above it.
+      ...(canReadDeliverables
+        ? [
+            {
+              value: "deliverables",
+              label: t("Deliverables"),
+              icon: CONCEPT_ICON.deliverables,
+              badge: formatCount(deliverablesTotal),
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // WHAT IT GIVES BACK (8.13) — hours, and what those hours are worth at the
+      // rate of the role that used to spend them. Not a collection and so not
+      // counted; see RECORD_TAB_COUNT_EXCEPTIONS.
+      ...(canSeeMoney
+        ? [
+            {
+              value: "impact",
+              label: t("Impact"),
+              icon: CONCEPT_ICON["internal-rates"],
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // THE KNOWLEDGE BASE, IN CONTEXT (8.9 + 12.1). Not a collection and so not
+      // counted — see RECORD_TAB_COUNT_EXCEPTIONS. What it is instead is the
+      // ordinary ask box with THIS record's own details already in the question,
+      // which is what Aurora meant by "in context": nobody should have to retype
+      // which system they are asking about while standing on its page.
+      ...(canReadKnowledge
+        ? [
+            {
+              value: "knowledge",
+              label: t("Knowledge"),
+              icon: CONCEPT_ICON.knowledge,
+              badge: "",
+              badgeVariant: "" as const,
+            },
+          ]
+        : []),
+      // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — a system's history is
+      // reached from the ink footer's Latest activity column now, and opens in a
+      // slide-in off it. web/components/records/activity-panel.tsx carries the ruling.
+    ],
+  }
+
+  /* B1 / CHECKLIST 11.2 — an app has no lifecycle button, so its one visible
+   * action is Edit and everything else is in the menu. Archive keeps its red and
+   * its confirm (shared/web/use-confirm.tsx) by moving. */
+  const overflow: RecordAction[] = canArchive
+    ? [
+        app.active
+          ? {
+              key: "archive",
+              label: t("Archive"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              destructive: true,
+              onSelect: archiveApp,
+            }
+          : {
+              key: "restore",
+              label: t("Restore"),
+              icon: <Power className="size-3.5" />,
+              disabled: busy,
+              onSelect: () => void restoreApp(),
+            },
+      ]
+    : []
+
+  return (
+    <RecordScreen
+      // An app's own mark is its STAGE mark, from the same shared list the tiles
+      // read, so a system looks the same wherever it appears (G3) — and where
+      // the client has given us their logo, that goes in the same square
+      // instead, which is exactly what `leading` was put on RecordHeader for.
+      // `AppMark` decides between the two, so the heading and the tile can never
+      // disagree about which picture an app has.
+      mark={appStageMark(app.stage)}
+      leading={<AppMark app={app} size="band" />}
+      // NO EYEBROW — client ruling, 2026-09-03, verbatim: "I want you to remove
+      // the eyebrow on the title on main screens. Remove that eyebrow, kill it."
+      // The prop this line used to pass is deleted from `RecordScreen` itself
+      // (record-chrome.tsx says why it had outlived the 2026-09-01 ruling that
+      // took the eyebrow out of the full header); the breadcrumb above this
+      // header is what names the record type now.
+      // D4: THE NUMBER A PERSON QUOTES, in the black chip below the title. An
+      // app gained one the same day this rule split off the account-code
+      // prefix (shared/workers/refs.ts) — `AppRow.ref` didn't exist before
+      // that, which is why this used to be the record that had none.
+      recordNumber={app.ref || undefined}
+      // THE THREE PILLS, sharpened by a second client ruling the same day,
+      // reading their own screenshot of THIS exact screen back: "1 id, 2
+      // status, 3 the most relevant container parent". They live in `chips`
+      // rather than `collectionLabel`, because `collectionLabel` is always
+      // wrapped in the kit's own plain `Badge` — nesting a coloured
+      // `variant="status"` Badge inside it would double-wrap the pill;
+      // `chips` renders bare, so each one is exactly the Badge it should be,
+      // in the order the client read off the screenshot.
+      chips={
+        <>
+          {app.stage && (
+            <Badge variant="status" dot={appStageDotTone(app.stage)}>
+              {app.stage}
+            </Badge>
+          )}
+          {app.accountId && (
+            <RecordChipLink href={`${host.base}/accounts/${app.accountId}`}>
+              {accountName}
+            </RecordChipLink>
+          )}
+          {app.active ? null : (
+            <Badge variant="status" dot="archived">
+              {t("Archived")}
+            </Badge>
+          )}
+        </>
+      }
+      title={app.name}
+      // NO STATUS LINE, NO "BUILT FOR" SUBTITLE — client feedback, 2026-08-31,
+      // reading the live ETZI screen back, verbatim: "in the title, still
+      // wrong. only components: image (sometimes), eyebrow, title, pills.
+      // remove the rest joder." Both used to duplicate the three chips above,
+      // word for word (stage, account, archived) — `status` as a dot-joined
+      // plain-text line and `headerExtra` as a second "Built for {account}"
+      // line, neither carrying a fact the chips didn't already say. They
+      // predate this file's chip work (override 73 / the 2026-08-31 status-
+      // colour ruling) and were never removed once the chips took over saying
+      // the same thing.
+      actions={
+        <>
+          {/* ICON-ONLY (client ruling, 2026-08-31: "edit, only the pencil icon"). */}
+          {canEdit && (
+            <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
+              <PencilSimple className="size-3.5" />
+            </Button>
+          )}
+          <RecordActionsMenu actions={overflow} />
+        </>
+      }
+      // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
+      // footer's Record column.
+      audit={{
+        createdByName: app.createdByName,
+        createdAt: app.createdAt,
+        editedByName: app.editedByName,
+        updatedAt: app.updatedAt,
+      }}
+      activity={activity}
+      onAddNote={can("processes", "create") ? activity.addNote : undefined}
+      notePlaceholder={t("Add a note")}
+    >
+      <TabsView
+        className={STICKY_TABS}
+        config={tabsConfig}
+        value={tab}
+        onValueChange={setTab}
+        renderPanel={(panel) => {
+          if (panel.value === "sprints")
+            return (
+              <SprintsPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.sprint)}
+                ownerKind="app"
+                ownerId={appId}
+                filter={{ appId }}
+                host={host}
+                onNew={canWriteWork ? () => setSprintOpen(true) : undefined}
+                emptyText={t("No work has been sold against this app yet.")}
+              />
+            )
+          if (panel.value === "stories")
+            return (
+              <StoriesPanel
+                marks={markMap(teamVocabulary.data, MARK_GROUP.story)}
+                ownerKind="app"
+                ownerId={appId}
+                filter={{ appId }}
+                host={host}
+                onNew={canWriteWork ? () => setStoryOpen(true) : undefined}
+                emptyText={t("Nothing has been done on this app yet.")}
+              />
+            )
+          if (panel.value === "modules") return <ModulesPanel teamId={teamId} appId={appId} />
+          if (panel.value === "maps")
+            return (
+              <ProcessesPanel
+                appId={appId}
+                host={host}
+                onNew={canEdit ? () => setMapOpen(true) : undefined}
+              />
+            )
+          if (panel.value === "meetings")
+            return (
+              <AppMeetingsPanel
+                appId={appId}
+                host={host}
+                onNew={canArrangeMeeting ? () => setMeetingOpen(true) : undefined}
+              />
+            )
+          if (panel.value === "tickets")
+            // TWO VIEWS ON ONE TAB (client, 6 Sep 2026) — the list she asked to
+            // be put in, and this system's own dashboard beside it. The switch,
+            // the memory and the choice of which panels survive one app all
+            // live in `AppTicketsTab`; this record hands over only what it
+            // alone knows.
+            return (
+              <AppTicketsTab
+                teamId={teamId}
+                // NO `marks` — client ruling, 2026-09-07, "for type, kill the
+                // emojis. this is legacy. in current system we use colors."
+                // This handed the panel the team's own glyph per TICKET type;
+                // the panel's rows draw the kind as a coloured pill like every
+                // other ticket surface. `MARK_GROUP.ticket` no longer exists,
+                // so there is nothing to pass — web/lib/type-marks.ts carries
+                // the ruling. The sprint and story marks below are untouched:
+                // her sentence is about tickets.
+                // The same vocabulary the create dialog below already fetches
+                // (gated the same way, on `canRaiseTicket`) — a reader who may
+                // only READ tickets here simply gets no Kind facet, rather than
+                // this panel paying for a second fetch nothing else needed.
+                helpTypeOptions={helpTypeOptions}
+                appId={appId}
+                host={host}
+                onNew={canRaiseTicket ? () => setTicketOpen(true) : undefined}
+                // R50's own question, asked of the WHOLE collection: the exact
+                // server COUNT(*) this record's own tab badge is already
+                // showing (R16), read from the same sidecar rather than counted
+                // a second way.
+                ticketTotal={ticketsTotal}
+              />
+            )
+          if (panel.value === "deliverables") return <DeliverablesPanel teamId={teamId} appId={appId} />
+          if (panel.value === "stakeholders")
+            return (
+              <StakeholdersPanel
+                staff={app.staff}
+                stakeholders={app.stakeholders}
+                memberNames={memberNames}
+                memberPhotos={memberPhotos}
+                contactNames={contactNames}
+                host={host}
+              />
+            )
+          if (panel.value === "impact") return <AppMoneyPanel appId={appId} host={host} />
+          if (panel.value === "knowledge")
+            return (
+              <AskTheAssistant
+                context={[
+                  `the app "${app.name}"`,
+                  accountName ? `built for ${accountName}` : "one of our own systems",
+                  app.stage ? `at stage ${app.stage}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
+              />
+            )
+          return <OverviewList items={overviewItems} />
+        }}
+      />
+
+      <AppFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        teamId={teamId}
+        members={members}
+        accounts={(accountsQ.data ?? [])
+          .filter((a) => a.active && a.accountType === "entity")
+          .map((a) => ({ id: a.id, name: a.name }))}
+        initial={{
+          name: app.name,
+          accountId: app.accountId ?? "",
+          url: app.url ?? "",
+          stage: app.stage ?? "",
+          logoUrl: app.logoUrl ?? "",
+          // A cost we have never been told is ZERO on the way into the form, not
+          // absent: the field asks for an amount, and an amount nobody has given
+          // is nothing rather than a blank the door would read as "leave it".
+          toolCostCentsPerMonth: app.toolCostCentsPerMonth ?? 0,
+          about: app.about ?? "",
+          clientContext: app.clientContext ?? "",
+          solution: app.solution ?? "",
+          keyActors: app.keyActors ?? "",
+          staffUserIds: app.staff.map((p) => p.userId),
+          leadUserId: app.staff.find((p) => p.isLead)?.userId ?? "",
+          stakeholderContactIds: app.stakeholders.map((p) => p.contactId),
+          mainStakeholderContactId: app.stakeholders.find((p) => p.isMain)?.contactId ?? "",
+        }}
+        draftKey={`app:edit:${appId}`}
+        onSubmit={save}
+      />
+
+      {/* A REQUEST ABOUT THIS SYSTEM, RAISED FROM ITS OWN RECORD. The app rides in
+          as `fixedApp` — which system it is about is a fact about where you are
+          standing, and it is the field that routes the request and decides who
+          gets told when it is answered (5.8). The CLIENT is left as a question:
+          a ticket about one of our systems may be raised on behalf of a client
+          or be our own housekeeping, and the app cannot answer that.
+
+          It arrives already related, which is the entire point: the tab behind
+          this dialog asks the server for `?appId=`, so the new row and the exact
+          count above it move together on the next read. */}
+      <HelpFormDialog
+        open={ticketOpen}
+        onOpenChange={setTicketOpen}
+        teamId={teamId}
+        helpTypeOptions={helpTypeOptions}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`help:add:app:${appId}`}
+        onSubmit={async (v) => {
+          // The id comes back so a screenshot picked while writing the ticket
+          // has something to hang on (help-form-dialog's own note says why).
+          const { id } = await contentApi.createHelp(v)
+          invalidate(sliceKey("tickets-app", appId))
+          invalidate(helpKey(teamId, "all"))
+          toast.success(t("Ticket raised."))
+          return id
+        }}
+      />
+
+      {/* A MEETING ABOUT THIS SYSTEM, arranged from its own record. Same shape,
+          same reason — and the CLIENT is again left as a question, because a
+          meeting about an app is not always with the client who owns it. */}
+      <MeetingFormDialog
+          teamId={teamId}
+        open={meetingOpen}
+        onOpenChange={setMeetingOpen}
+        accountOptions={(accountsQ.data ?? [])
+          .filter((a) => a.active && a.accountType === "entity")
+          .map((a) => ({ id: a.id, name: a.name }))}
+        appOptions={[{ id: appId, name: app.name }]}
+        purposeOptions={(purposesQ.data ?? [])
+          .filter((x) => x.active)
+          .map((x) => ({ id: x.id, name: x.name }))}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`meeting:add:app:${appId}`}
+        onSubmit={async (v: MeetingFormValues) => {
+          await contentApi.createMeeting({
+            title: v.title,
+            startsAt: v.startsAt,
+            endsAt: v.endsAt || undefined,
+            accountId: v.accountId || undefined,
+            appId,
+            purposeId: v.purposeId || undefined,
+            location: v.location || undefined,
+            agenda: v.agenda || undefined,
+            notes: v.notes || undefined,
+          })
+          invalidate(sliceKey("meetings-app", appId))
+          invalidate(meetingsKey(teamId))
+          toast.success(t("It's in Meetings."))
+        }}
+      />
+
+      {/* A MAP IS DRAWN FROM THE APP IT BELONGS TO (8.12). Process maps stopped
+          being a nav destination on 17 Aug 2026, so this button is the way in —
+          without it the tab could only ever show maps somebody made elsewhere. */}
+      <ProcessFormDialog
+        open={mapOpen}
+        onOpenChange={setMapOpen}
+        apps={[{ id: appId, name: app.name }]}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`process:add:app:${appId}`}
+        onSubmit={async (v) => {
+          await tenancy.createProcess({
+            appId: v.appId,
+            name: v.name,
+            description: v.description || undefined,
+            baselineLabel: v.baselineLabel || undefined,
+            // Who does it — the answer the form collects and this call used to
+            // drop, which is why the money half of the Value tab was 0.00.
+            roleName: v.roleName || undefined,
+          })
+          invalidate(sliceKey("processes-app", appId))
+          invalidate(impactKey(teamId))
+          // The money is computed from this map's role, so the panel that shows
+          // it has to be told a priced map just appeared.
+          invalidate(appMoneyKey(appId))
+          toast.success(t("Process mapped."))
+        }}
+      />
+
+      {/* Both forms open with THIS app already chosen — you are standing on it,
+          so it is a fact rather than a question. */}
+      <SprintFormDialog
+        open={sprintOpen}
+        onOpenChange={setSprintOpen}
+        apps={options.apps}
+        fixedApp={{ id: appId, name: app.name }}
+        draftKey={`sprint:add:${appId}`}
+        onSubmit={async (v) => {
+          await createSprintFrom(teamId, v, t)
+          invalidate(sliceKey("sprints-app", appId))
+        }}
+      />
+      <StoryFormDialog
+        teamId={teamId}
+        open={storyOpen}
+        onOpenChange={setStoryOpen}
+        sprints={options.sprints}
+        apps={options.apps}
+        fixedApp={{ id: appId, name: app.name }}
+        tickets={options.tickets}
+        members={options.members}
+        appStaff={options.appStaff}
+        processes={options.processes}
+        storyTypes={options.storyTypes}
+        draftKey={`story:add:app:${appId}`}
+        onSubmit={async (v) => {
+          // The id goes back so the dialog can hang the picked files on it —
+          // see the note at the sprint's copy of this call. Discarding it drops
+          // the file silently.
+          const madeId = await createStoryFrom(teamId, v, t)
+          invalidate(sliceKey("stories-app", appId))
+          return madeId
+        }}
+      />
+
+      {confirmDialog}
+    </RecordScreen>
+  )
+}

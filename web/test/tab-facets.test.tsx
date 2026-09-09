@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { ticketFacets, triageFacets } from "@/components/tickets-collection"
+import { ticketFacets, triageFacets } from "@/components/tickets/tickets-collection"
 import { COLLECTION_FILTERS } from "@/lib/collection-filters"
 import {
   HELP_TOOLBAR_FACET_FIELDS,
@@ -66,7 +66,7 @@ const ROOT = join(WEB, "..")
  * offered to the dictionary without pretending to be one. */
 const t = (english: string) => english
 
-const src = readFileSync(join(WEB, "components/tickets-collection.tsx"), "utf8")
+const src = readFileSync(join(WEB, "components/tickets/tickets-collection.tsx"), "utf8")
 /** …AND THE SAME FILE WITH ITS PROSE TAKEN OUT. Every assertion about what the
  * screen DOES reads this one: this file's own comments quote the patterns it
  * forbids (the `rows.filter(` note beside `narrowTriage` is a paragraph about

@@ -49,7 +49,7 @@
 // "finishes the rename" and changes what a screen says:
 //
 //   • `t("Kwapso")` — the nav destination, TITLE CASE by design
-//     (web/components/app-shell.tsx says so where the team name is drawn beside
+//     (web/components/shell/app-shell.tsx says so where the team name is drawn beside
 //     it). `brand.name` is lower case, so reading the seam here would quietly
 //     change the label.
 //   • `t("e.g. Kwapso GmbH")` — the legal-name field's placeholder. That is an

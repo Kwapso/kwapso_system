@@ -195,7 +195,7 @@ export interface FacetOption {
    * importing `ticketTypeColour`/`AppMark` itself: this file sits under
    * `shared/web/`, read by BOTH front doors, and neither the ticket type's
    * colour map (`web/lib/type-colours.ts`) nor an app's own mark
-   * (`web/components/app-tiles.tsx`'s `AppMark`) lives somewhere this layer
+   * (`web/components/apps/app-tiles.tsx`'s `AppMark`) lives somewhere this layer
    * may import from (`@/...` resolves to a different folder per door). The
    * CALLER that builds a `FilterFacet`'s options already has both concerns
    * addressed — the ticket screens draw a `<Swatch>` for a type and an

@@ -19,7 +19,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { PagedFind, type FindQuery } from "@/components/paged-find"
+import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 import { translatedFacets } from "@/lib/collection-filters"
 import { forgetEverything, readSlot, writeSlot } from "@/lib/nav-memory"
 import { RememberedScreen } from "@shared/web/remembered"

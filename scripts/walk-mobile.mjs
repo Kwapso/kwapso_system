@@ -82,6 +82,23 @@ const SCREENS = {
   agency: [["home", "/home"], ["accounts", "/accounts"], ["tickets", "/tickets"], ["knowledge", "/knowledge"], ["apps", "/apps"], ["settings", "/settings"], ["profile", "/profile"], ["kwapso", "/kwapso"]],
 }
 
+/** HOW MANY SCREENS ONE DOOR MAY BE WALKED THROUGH IN A RUN.
+ *
+ * With `--live` this script is not a local render check: it signs in against
+ * DEPLOYED staging and loads each screen for real, in two colour schemes, on
+ * both front doors — so every entry in the list above is a page load and every
+ * page load is real requests against real workers and real D1 reads. That is
+ * cheap and it is not free, and the list is DATA: it grows by somebody adding a
+ * line, which is exactly the shape of an unbounded loop that nobody notices
+ * because nothing in the loop looks expensive.
+ *
+ * COSTS.md's rule is that every billed loop carries a number in the code. This
+ * is that number for this script. It is generous — it is above the eight
+ * screens the longer door lists today — so it changes nothing about the walk as
+ * it stands, and a run that reaches it says so rather than quietly costing more
+ * than the last one did. */
+const MAX_SCREENS_PER_DOOR = 12
+
 /* ── the stub fixtures, for --stub ─────────────────────────────────────── */
 const MODULES = ["teams","team_members","member_roles","accounts","contacts","portal_users","help","knowledge","selectable_data","agent","processes","deliverables","commercials","work","all_tasks","todos","meetings","brand_assets","delivery","staff_profiles","google","google_mail"]
 const ALL_RIGHTS = Object.fromEntries(MODULES.map((m) => [m, { read: true, create: true, edit: true, delete: true }]))
@@ -337,7 +354,12 @@ for (const door of doors) {
       await ctx.route("**/realtime/**", (r) => r.abort())
     }
 
-    for (const [name, path] of SCREENS[door]) {
+    const walking = SCREENS[door].slice(0, MAX_SCREENS_PER_DOOR)
+    if (walking.length < SCREENS[door].length)
+      console.log(
+        `  NOTE ${door}: walking ${walking.length} of ${SCREENS[door].length} screens — MAX_SCREENS_PER_DOOR is ${MAX_SCREENS_PER_DOOR}. Raise it deliberately if the walk should cost more.`
+      )
+    for (const [name, path] of walking) {
       const page = await ctx.newPage()
       const errs = []
       page.on("pageerror", (e) => errs.push(String(e).slice(0, 150)))

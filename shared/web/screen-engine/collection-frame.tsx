@@ -435,6 +435,21 @@ function CollectionFrame<T>({
   // this file draws (the kit-panel branch below, and the app-drawn-header
   // branch further down) suppress the same three controls from the same
   // one answer instead of two copies of the same condition.
+  //
+  // THAT LAST SENTENCE WAS NOT TRUE UNTIL 6 SEP 2026, and it is worth saying so
+  // rather than quietly making it true. It was written beside the kit branch,
+  // where it described the code accurately; the app-drawn branch below never
+  // got the guard, and it is the DEFAULT one (`useKitPanel` defaults to false).
+  // So the file's own comment told every later reader — including the two lanes
+  // that went looking for this exact bug — that both paths were done. A comment
+  // that describes the fix as finished is worse than no comment, because it
+  // ends the search. The fourth recurrence of "no toolbar on an empty
+  // collection" was hiding behind a sentence claiming it had been fixed.
+  //
+  // The guard is now on both, and `collection-frame-empty.test.tsx` RENDERS the
+  // fallback path empty and asserts it — off the DOM, not off this file — so
+  // the next recipe that reaches this branch cannot re-open the hole however
+  // the source is arranged.
   const isEmptyState = state === "ready" && filtered.length === 0 && !narrowed
 
   const showFilterBar = config.userFilter && config.filterFacets.length > 0
@@ -696,14 +711,33 @@ function CollectionFrame<T>({
               {config.title && (
                 <h3 className="text-sm font-medium">{config.title}</h3>
               )}
-              {config.showCount && (
+              {/* `!isEmptyState`, for the same reason the three controls below
+                  carry it. The kit branch has no count PROP at all — its count
+                  is folded into the search placeholder, which that branch
+                  already suppresses when empty — so on the kit path an empty
+                  collection shows a heading and nothing else. Without this the
+                  two paths disagree about what "no toolbar" means, and this one
+                  draws "Showing 0 of 0" over an empty state that is already
+                  saying, in a sentence, that there is nothing here. */}
+              {config.showCount && !isEmptyState && (
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {t("Showing {shown} of {total}", { shown: visible.length, total: filtered.length })}
                 </span>
               )}
             </div>
           )
-          const searchBox = config.searchable ? (
+          // `!isEmptyState` ON ALL FOUR — the client's 2 Sep 2026 ruling
+          // ("NEVER TOOLBAR ON EMPTY COLLECTION"), which reached the kit branch
+          // above and never reached this one. The comment on `isEmptyState`
+          // itself has claimed since that day that "both render paths this file
+          // draws … suppress the same three controls from the same one answer
+          // instead of two copies of the same condition". That sentence was
+          // true of the branch it was written next to and false here, which is
+          // the worst shape a comment can have: it told every later reader the
+          // job was finished. And this is the DEFAULT path — `useKitPanel`
+          // defaults to false — so the unguarded one was the one most recipes
+          // take.
+          const searchBox = config.searchable && !isEmptyState ? (
             <SearchInput
               defaultValue={query}
               onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
@@ -722,9 +756,9 @@ function CollectionFrame<T>({
           // (see the `useKitPanel` branch's own note above). `filterBarPill`/
           // `filterBarPanel` are `useFilterBar`'s own values, called once
           // above the branch alongside every other hook here.
-          const filterBar = showFilterBar ? filterBarPill : null
-          const filterPanel = showFilterBar ? filterBarPanel : null
-          const sortControl = showSort ? (
+          const filterBar = showFilterBar && !isEmptyState ? filterBarPill : null
+          const filterPanel = showFilterBar && !isEmptyState ? filterBarPanel : null
+          const sortControl = showSort && !isEmptyState ? (
             <SortControl
               options={config.sortOptions}
               value={sortBy}
@@ -780,7 +814,18 @@ function CollectionFrame<T>({
                   already this block's own and is unchanged. */}
               <div className="flex flex-col gap-2 sm:hidden">
                 <div className="flex items-center gap-2">
-                  {config.searchable ? (
+                  {/* THE PHONE HEADER HAS ITS OWN SEARCH NODE, and that is why
+                      guarding the shared `searchBox` above was not enough. This
+                      block does not reuse it — it inlines a second
+                      `<SearchInput>` with the mobile placeholder — so the empty
+                      guard has to be spelled again here. In jsdom both blocks
+                      render (the `sm:hidden` is CSS), which is what surfaced it;
+                      in a real browser this is the ONLY one a phone shows, so
+                      the unguarded path was the one on the smaller screen.
+                      Falling through to `titleBlock` is the existing branch and
+                      the right answer: the collection keeps its name and loses
+                      its toolbar. */}
+                  {config.searchable && !isEmptyState ? (
                     <SearchInput
                       defaultValue={query}
                       onChange={(e) => debouncedSetQuery(e.currentTarget.value)}
@@ -791,7 +836,11 @@ function CollectionFrame<T>({
                   ) : (
                     <div className="min-w-0 flex-1">{titleBlock}</div>
                   )}
-                  {showSort && (
+                  {/* The funnel is a control too. `sortControl` inside it is
+                      already null when empty, so without this the phone drew an
+                      empty popover trigger over zero rows — a button that opens
+                      onto nothing. */}
+                  {showSort && !isEmptyState && (
                     <Popover modal={modal}>
                       <PopoverTrigger asChild>
                         <Button

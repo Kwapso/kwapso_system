@@ -7,7 +7,7 @@
 // /brand/<id>, so nothing here ever grows a sub-path the gateway would have to
 // be told about.
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export default function KwapsoPage() {
   return <DeepLinkScreen />

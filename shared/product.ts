@@ -58,7 +58,7 @@ export const TEAM_CREATION_CLOSED = true
  *
  * So this hides two things and only two things:
  *   • the TEAM SWITCHER — the dropdown in the sidebar and the mobile top bar
- *     (web/components/team-switcher.tsx, rendered from app-shell.tsx);
+ *     (web/components/shell/team-switcher.tsx, rendered from app-shell.tsx);
  *   • the TEAMS LIST on the Settings screen
  *     (web/components/screens/settings-screen.tsx).
  *

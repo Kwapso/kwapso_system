@@ -132,6 +132,11 @@ function accountForAddresses(
   return null
 }
 
+/** One file or message a read could not open — named, so the person who shared
+ * it can go and fix it, rather than a whole sweep turning up empty with nothing
+ * saying why. */
+export type GoogleSkip = { title: string; reason: string }
+
 /** What a caller asks the seam for. */
 export type GoogleReadRequest = {
   /** which services to read; defaults to all four the person has connected. */
@@ -409,9 +414,15 @@ export async function readGoogleMaterial(
   cfg: D1Rest,
   guard: MemberGuard,
   request: GoogleReadRequest = {}
-): Promise<{ items: GoogleItem[]; contactsUsed: number; contactsCapped: boolean }> {
+): Promise<{
+  items: GoogleItem[]
+  contactsUsed: number
+  contactsCapped: boolean
+  skipped: GoogleSkip[]
+}> {
   const wanted = request.services ?? (["drive", "gmail", "calendar", "chat"] as GoogleService[])
   const items: GoogleItem[] = []
+  const skipped: GoogleSkip[] = []
   let contactsUsed = 0
   let contactsCapped = false
   // Read ONCE for the whole call, not per service: Gmail needs the addresses to
@@ -444,6 +455,28 @@ export async function readGoogleMaterial(
         // The folder it came out of, or — for a file named on its own — the row
         // that names the file itself.
         const source = shelfOf.get(file.folderId) ?? namedFileSource.get(file.id)
+        // ONE FILE'S REFUSAL IS ONE FILE'S — the same reasoning google-api.ts's
+        // folder walk gives for a listing call, one layer down, for the READ of a
+        // file the walk already found. Before this the first file `driveFileText`
+        // could not open — a metadata 403 on that specific item, a timeout, a
+        // socket that dropped mid-download — took every file after it with it:
+        // the loop had no catch, so one awkward document turned a whole sweep
+        // into nothing, silently. `google_access_lost` is different and still
+        // throws: a dead token would otherwise be swallowed once per file and the
+        // whole read would come back EMPTY AND SUCCESSFUL, which is worse than
+        // the failure this exists to fix.
+        let text = ""
+        if (request.withText) {
+          try {
+            text = await driveFileText(env, token, file.id)
+          } catch (e) {
+            if ((e as { code?: string })?.code === "google_access_lost") throw e
+            const reason = e instanceof Error ? e.message : String(e)
+            const name = file.name || file.id
+            console.error(`google drive file "${name}" (${file.id}) skipped: ${reason}`)
+            skipped.push({ title: name, reason })
+          }
+        }
         items.push({
           service: "drive",
           sourceId: source?.id ?? null,
@@ -457,7 +490,7 @@ export async function readGoogleMaterial(
           // inside it.
           title: file.name || "(untitled document)",
           url: file.webViewLink,
-          text: request.withText ? await driveFileText(env, token, file.id) : "",
+          text,
           updatedAt: file.modifiedTime,
           shelf: source?.shelf ?? "private",
           ownerUserId: guard.userId,
@@ -597,7 +630,7 @@ export async function readGoogleMaterial(
     if (fresh.size) await rememberChatPeople(cfg, guard, fresh)
   }
 
-  return { items, contactsUsed, contactsCapped }
+  return { items, contactsUsed, contactsCapped, skipped }
 }
 
 /**
@@ -624,8 +657,9 @@ export async function hydrateText(
   cfg: D1Rest,
   guard: MemberGuard,
   items: GoogleItem[]
-): Promise<GoogleItem[]> {
+): Promise<{ items: GoogleItem[]; skipped: GoogleSkip[] }> {
   const out: GoogleItem[] = []
+  const skipped: GoogleSkip[] = []
   // One token per service, resolved lazily — a slice that turns out to be all
   // Drive must not go and refresh a Gmail token it never uses.
   const tokens = new Map<GoogleService, string | null>()
@@ -643,13 +677,33 @@ export async function hydrateText(
       out.push(item)
       continue
     }
-    const text =
-      item.service === "drive"
-        ? await driveFileText(env, token, item.externalId)
-        : (await gmailMessage(token, item.externalId)).text
+    // ONE ITEM'S REFUSAL IS ONE ITEM'S — see the identical guard in
+    // `readGoogleMaterial` above. This loop hydrates a whole tick's slice one
+    // body at a time; before this, the first item that could not be read (a
+    // Drive file refused mid-download, a Gmail message the connection lost mid-
+    // sweep) took every item after it with it, and the docstring above — "an
+    // item whose text cannot be read comes back with the text it already had" —
+    // described behaviour this loop did not actually have. `google_access_lost`
+    // still throws: a dead token would otherwise be swallowed once per item and
+    // the whole hydration would come back looking like a clean, empty pass.
+    let text = ""
+    try {
+      text =
+        item.service === "drive"
+          ? await driveFileText(env, token, item.externalId)
+          : (await gmailMessage(token, item.externalId)).text
+    } catch (e) {
+      if ((e as { code?: string })?.code === "google_access_lost") throw e
+      const reason = e instanceof Error ? e.message : String(e)
+      const name = item.title || item.externalId
+      console.error(`google ${item.service} item "${name}" (${item.externalId}) skipped: ${reason}`)
+      skipped.push({ title: name, reason })
+      out.push(item)
+      continue
+    }
     out.push({ ...item, text: text || item.text })
   }
-  return out
+  return { items: out, skipped }
 }
 
 /** A token, or null when this person simply has not connected that service.

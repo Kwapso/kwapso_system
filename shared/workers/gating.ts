@@ -82,21 +82,12 @@ export class GuardError extends Error {
   }
 }
 
-/** WHAT TO RECORD ABOUT A THROWN THING — the diagnosis where there is one, the
- * message where there is not.
- *
- * The recording seam wants the sentence a developer can act on; the caller wants
- * the sentence a person can read. For everything except a diagnosed refusal
- * those are the same string, which is why this reads as a no-op most of the time
- * and is worth its own name anyway: `String(e)` at a recording site is exactly
- * how 327 cron rows came to say "Google couldn't answer that just now. Try
- * again." — our own words, quoted back at us, about a token Google had revoked.
- *
- * Use it at every site that turns a caught error into a row. */
-export function causeOf(e: unknown): string {
-  if (e instanceof GuardError) return e.detail ?? e.message
-  return e instanceof Error ? e.message : String(e)
-}
+/** WHAT TO RECORD ABOUT A THROWN THING — defined beside the recorder it feeds
+ * (error-log.ts, which documents it) and re-exported here so the sites that
+ * turn a caught error into a row keep the import they always had. One
+ * definition: the recorder and the sites that pre-compose a message for it
+ * must agree on what "the cause" is, or the same failure records two sentences. */
+export { causeOf } from "./error-log"
 
 /** WHICH TEAM DATABASES THIS DEPLOYMENT CAN REACH DIRECTLY.
  *
@@ -195,8 +186,20 @@ export const AUTH_UNAVAILABLE_MS = 5_000
  *     GuardError first, the caller keeps their session, and the error store gets
  *     a row that says `auth_unavailable` rather than a generic 500.
  *
- * There is deliberately NO fallback answer here — no cached identity, no
- * "assume signed in". Guessing on the identity read is guessing on the gate. */
+ * THERE IS A FALLBACK, AND IT IS NOT A GUESS. This sentence used to read "there
+ * is deliberately NO fallback answer here — no cached identity, no 'assume signed
+ * in'", and it stopped being true on 2026-09-05, twenty lines above the catch
+ * that makes it untrue: `sessionFromCore` answers from the core database when
+ * auth cannot. RESILIENCE.md §1 was corrected for exactly this on 6 Sep and this
+ * comment was not, which left the seam's own doc comment contradicting the seam.
+ *
+ * The half that was always the point STANDS, and it is what makes the fallback
+ * safe: no CACHED identity and no "assume signed in". `sessionFromCore` reads the
+ * same live session row auth reads, so an expired session, a sign-out and a
+ * deactivated member are all still refused, and it is READ-ONLY — auth remains
+ * the only thing that mints, slides or destroys a session. Guessing on the
+ * identity read would be guessing on the gate; reading the same row from one hop
+ * closer is not guessing. The catch below argues it in full. */
 export async function whoAmI(request: Request, env: GatingEnv): Promise<SessionUser | null> {
   // The init is assembled apart and cast once. `shared/` is compiled by the two
   // WEB workspaces as well as the workers, and there the ambient `AbortSignal`
@@ -331,13 +334,29 @@ export async function teamContext(request: Request, env: GatingEnv): Promise<Tea
   return { user, actor: toActor(user), cfg, guard }
 }
 
-const errorIdentity = new WeakMap<Request, { teamId: string; userId: string }>()
+const errorIdentity = new WeakMap<Request, { teamId?: string; userId?: string }>()
 
 /** The identity the central catch may attach to an error row — the resolved
  * caller when the request got that far, and honestly nothing when it did not
  * (a 401, a pre-team door, a cron). */
 export function identityFor(request: Request): { teamId?: string; userId?: string } {
   return errorIdentity.get(request) ?? {}
+}
+
+/** THE OTHER PLACES A CALLER BECOMES KNOWN. `teamContext` above notes the
+ * identity for every team-scoped door on tenancy, content and data-ops — and
+ * the three workers that resolve a caller some other way (auth from its own
+ * session row, mcp from a token, realtime from a socket's query) recorded rows
+ * with neither column, 0 of 2,026 on staging by 7 Sep 2026. Same WeakMap, same
+ * request-scoped lifetime, so the central catch reads it the same way in all
+ * six. A later note may ADD the team a door resolved after the user was known;
+ * it never blanks a field it has no answer for. */
+export function noteIdentity(request: Request, who: { teamId?: string; userId?: string }): void {
+  const known = errorIdentity.get(request) ?? {}
+  errorIdentity.set(request, {
+    userId: who.userId ?? known.userId,
+    teamId: who.teamId ?? known.teamId,
+  })
 }
 
 type RightsRow = {

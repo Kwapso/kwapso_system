@@ -20,22 +20,25 @@ export async function requireUser(request: Request, env: Env) {
   return user
 }
 
+/** ONE SHAPE FOR A TOKEN ON A LIST, so the three doors that answer with the list
+ * cannot drift into three shapes of it. */
+function summaries(rows: Awaited<ReturnType<typeof listTokens>>) {
+  return rows.map((t) => ({
+    id: t.id,
+    label: t.label,
+    teamId: t.team_id,
+    createdAt: t.created_at,
+    // A token expires (0016). The screen shows the deadline, so "active" on
+    // this list means usable — not merely un-revoked.
+    expiresAt: t.expires_at,
+    lastUsedAt: t.last_used_at,
+    revokedAt: t.revoked_at,
+  }))
+}
+
 export async function getTokens(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env)
-  const rows = await listTokens(env, user.id)
-  return json({
-    tokens: rows.map((t) => ({
-      id: t.id,
-      label: t.label,
-      teamId: t.team_id,
-      createdAt: t.created_at,
-      // A token expires (0016). The screen shows the deadline, so "active" on
-      // this list means usable — not merely un-revoked.
-      expiresAt: t.expires_at,
-      lastUsedAt: t.last_used_at,
-      revokedAt: t.revoked_at,
-    })),
-  })
+  return json({ tokens: summaries(await listTokens(env, user.id)) })
 }
 
 export async function postToken(request: Request, env: Env): Promise<Response> {
@@ -59,6 +62,11 @@ export async function postToken(request: Request, env: Env): Promise<Response> {
       expiresAt: row.expires_at,
     },
     secret,
+    // …AND THE LIST IT NOW BELONGS TO. The screen used to create a token and
+    // then ask for the whole list back — two sequential round trips to learn
+    // something this door already knew, which is the same shape
+    // `saveRolePermissions` had until 6 Sep 2026. The rows are already in hand.
+    tokens: summaries(await listTokens(env, user.id)),
   })
 }
 
@@ -75,5 +83,7 @@ export async function postRevoke(request: Request, env: Env): Promise<Response> 
   const id = requireText(body.id, "Token", TEXT_LIMITS.short)
   await revokeToken(env, user.id, id)
   dropCachedSession(id)
-  return json({ ok: true })
+  // The list AFTER the revocation, for the same reason the create door answers
+  // with it: the screen's next act was always to ask for exactly this.
+  return json({ ok: true, tokens: summaries(await listTokens(env, user.id)) })
 }

@@ -15,7 +15,7 @@
 // ModuleContentCtx, so the split re-threaded nothing.
 
 import * as React from "react"
-import { WaveDetailScreen } from "@/components/wave-detail"
+import { WaveDetailScreen } from "@/components/work/wave-detail"
 
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import {
@@ -25,21 +25,21 @@ import {
 } from "@shared/web/screen-engine/screen-renderer"
 import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
 
-import { AccountDetailScreen } from "@/components/account-detail"
-import { RoleDetailScreen } from "@/components/role-detail"
-import { KnowledgeDetailScreen } from "@/components/knowledge-detail"
-import { HelpDetailScreen } from "@/components/help-detail"
-import { ProcessDetailScreen } from "@/components/process-detail"
-import { AppDetailScreen } from "@/components/app-detail"
-import { SprintDetailScreen } from "@/components/sprint-detail"
-import { StoryDetailScreen } from "@/components/story-detail"
-import { TaskDetailScreen } from "@/components/task-detail"
-import { MeetingDetailScreen } from "@/components/meeting-detail"
-import { ImportScreen } from "@/components/import-screen"
-import { InternalRateCardScreen } from "@/components/internal-rate-card"
-import { StaffPanel } from "@/components/staff-panel"
-import { SelectableScreen } from "@/components/selectable-screen"
-import { SelectableDetailScreen } from "@/components/selectable-detail"
+import { AccountDetailScreen } from "@/components/accounts/account-detail"
+import { RoleDetailScreen } from "@/components/team/role-detail"
+import { KnowledgeDetailScreen } from "@/components/knowledge/knowledge-detail"
+import { HelpDetailScreen } from "@/components/tickets/help-detail"
+import { ProcessDetailScreen } from "@/components/process/process-detail"
+import { AppDetailScreen } from "@/components/apps/app-detail"
+import { SprintDetailScreen } from "@/components/work/sprint-detail"
+import { StoryDetailScreen } from "@/components/work/story-detail"
+import { TaskDetailScreen } from "@/components/work/task-detail"
+import { MeetingDetailScreen } from "@/components/meetings/meeting-detail"
+import { ImportScreen } from "@/components/screens/import-screen"
+import { InternalRateCardScreen } from "@/components/money/internal-rate-card"
+import { StaffPanel } from "@/components/team/staff-panel"
+import { SelectableScreen } from "@/components/choices/selectable-screen"
+import { SelectableDetailScreen } from "@/components/choices/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -53,7 +53,7 @@ import {
   shapePurposeDetail,
   shapeTeamDetail,
 } from "@/components/deep-link/shape"
-import { ActivityRail } from "@/components/activity-rail"
+import { ActivityRail } from "@/components/records/activity-rail"
 import type { ActivityItem } from "@shared/types"
 import type { Language } from "@shared/i18n"
 import type { useScreenData } from "@/lib/use-screen-data"
@@ -76,7 +76,7 @@ type ScreenData = ReturnType<typeof useScreenData>
  * The host owns all of it; this bundle is how it hands the render half a snapshot. */
 export type ModuleContentCtx = Pick<
   ScreenData,
-  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
+  | "overridesQ" | "metaQ" | "membersQ" | "rolesQ" | "invitesQ" | "helpQ" | "accountsQ" | "knowledgeQ" | "knowledgeShapeQ" | "companiesQ" | "totals" | "activityQ" | "activityTotal" | "activityKey" | "activityScope" | "activityFetchPage" | "inviteAuditQ"
   | "brandQ" | "purposesQ" | "internalActivity"
   | "storiesQ" | "sprintsQ" | "appsQ" | "tasksOpenQ" | "tasksAllQ" | "workLogsQ" | "meetingsQ"
   // The team's live `Ticket type` values. The tickets screen's sub-tab strip is
@@ -110,6 +110,10 @@ export type ModuleContentCtx = Pick<
   myUserId: string | null
   query: ScreenQuery
   taskView: TaskView
+  /** Which body the knowledge collection is showing — its list, or the picture
+   * of the whole base. The `view` slot on that screen's toolbar (R53). */
+  knowledgeView: string
+  setKnowledgeView: (v: string) => void
   setTaskView: (v: TaskView) => void
   /** The reader's language, as `t`. It rides the ctx rather than a hook because
    * these two render halves are plain functions, not components — the host
@@ -345,7 +349,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // — the team feed's exact server COUNT(*) — and it is what the slide-in
       // off the footer's Latest activity column will show. It badges no tab
       // today: the Activity TAB went on the client's 2026-09-06 ruling (see
-      // web/components/activity-panel.tsx), so this recipe is one description
+      // web/components/records/activity-panel.tsx), so this recipe is one description
       // block and the seam is a no-op over it.
       const recipe = withTabCounts(base, { activity: activityTotal })
       const data = shapeTeamDetail({
@@ -386,7 +390,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // inside that tab, is gone with the tabs it served
     // (shared/web/screen-engine/screen-renderer.tsx). `activityQ` is still read
     // and still shaped into each detail's `sets.activity` below: the tab was a
-    // PLACE, not the data. web/components/activity-panel.tsx carries the ruling.
+    // PLACE, not the data. web/components/records/activity-panel.tsx carries the ruling.
     if (module === "members") {
       if (membersQ.error) return <LoadError what="members" />
       if (membersQ.data === undefined) return <Skeleton variant="list" lines={4} />

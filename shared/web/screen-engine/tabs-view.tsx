@@ -377,7 +377,7 @@ export function renderFolderTabs(strip: FolderTabStrip | undefined): React.React
 
 /** CLIENT RULING, 1 Sep 2026 — three fixes to the LINE strip, app-side
  * overrides on the kit's `Tabs` (vendored, pinned, CLAUDE.md R39 — reached
- * through `[&_[data-slot=…]]:` the same pattern `web/components/auth-card.tsx`
+ * through `[&_[data-slot=…]]:` the same pattern `web/components/shell/auth-card.tsx`
  * documents, never a kit hand-edit). Unconditional now that line is the only
  * strip this file ever draws (it applied only to the line strip already, so
  * v1.2.28's retirement of folder changes nothing about the rule itself).

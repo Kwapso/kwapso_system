@@ -60,10 +60,12 @@
 //   GET  /api/content/record-counts       -> one record's child totals, before a tab is clicked
 //   GET  /api/content/knowledge           -> the sources the assistant may read (?id → one)
 //   GET  /api/content/knowledge/ask       -> answer a question from them, with citations
+//   GET  /api/content/knowledge/shape     -> the whole base as one clustered picture
 //   GET  /api/content/knowledge/sync      -> how far the sweep has got with each kind
 //   POST /api/content/knowledge           -> add a source
 //   POST /api/content/knowledge/upload    -> …or hand it a FILE, and read it
 //   POST /api/content/knowledge/upload-stream -> the same, file as the raw body
+//   POST /api/content/knowledge/upload-confirm -> the same, file already PUT straight to R2
 //   POST /api/content/knowledge/update    -> correct a source
 //   POST /api/content/knowledge/active    -> take a source away from the assistant / give it back
 //   POST /api/content/knowledge/sync      -> bring the base into step, one bounded slice
@@ -86,14 +88,15 @@
 //   GET  /api/content/health
 
 import { brand } from "@shared/brand"
-import { healthBody } from "@shared/workers/config-health"
+import { configReport, healthBody } from "@shared/workers/config-health"
 import { fail, json } from "@shared/workers/http"
-import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
-import { recordWorkerError } from "@shared/workers/error-log"
+import { recordWorkerError, tickId } from "@shared/workers/error-log"
+import { beatCron, reportStaleCrons } from "@shared/workers/cron-heartbeat"
 import { requestId } from "@shared/workers/trace"
-import { postPresignUpload } from "./routes/uploads"
+import { postConfirmUpload, postPresignUpload } from "./routes/uploads"
 import type { Env } from "./env"
 import {
   getHelp,
@@ -161,6 +164,7 @@ import {
   getKnowledge,
   getKnowledgeAsk,
   getKnowledgeMap,
+  getKnowledgeShape,
   getKnowledgeSync,
   postCreateKnowledge,
   postKnowledgeSync,
@@ -168,6 +172,7 @@ import {
   postSetKnowledgeActive,
   postUpdateKnowledge,
   postStreamKnowledgeFile,
+  postConfirmKnowledgeFile,
   postUploadKnowledgeFile,
 } from "./routes/knowledge"
 import {
@@ -263,6 +268,11 @@ import { publishChange } from "@shared/workers/realtime"
  * drift into a cron that fires and does nothing. */
 const DIGEST_CRON = "0 7 * * *"
 
+/** What this worker cannot work without — the health door's list, and the
+ * morning tick's own self-check (config-health.ts). One list, so the two
+ * cannot disagree about what "configured" means. */
+const CONTENT_REQUIRED = ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"] as const
+
 /** How often each tick fires, in milliseconds — the rotation's step size (see
  * teamSlice). Beside the expressions above rather than derived from them, because
  * parsing a cron string to get a period is a lot of machinery to answer a
@@ -336,7 +346,8 @@ export async function teamSlice(
         env.DB,
         "content",
         `cron/${job} (lap length)`,
-        new Error(lap)
+        new Error(lap),
+        tickId(job, scheduledTime)
       )
   }
   const rows = await env.DB.prepare(
@@ -467,6 +478,7 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "GET /api/content/knowledge": { handler: getKnowledge, kind: "read" },
   "GET /api/content/knowledge/ask": { handler: getKnowledgeAsk, kind: "read" },
   "GET /api/content/knowledge/map": { handler: getKnowledgeMap, kind: "read" },
+  "GET /api/content/knowledge/shape": { handler: getKnowledgeShape, kind: "read" },
   "GET /api/content/knowledge/sync": { handler: getKnowledgeSync, kind: "read" },
   "POST /api/content/knowledge": { handler: postCreateKnowledge, kind: "mutation" },
   // A file becomes a source: stored whole, read where we can, and honest about
@@ -478,8 +490,13 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // publish and the activity line belong. Answers `{ direct: false }` in any
   // environment with no R2 credential, so it is inert until somebody turns it on.
   "POST /api/content/uploads/presign": { handler: postPresignUpload, kind: "housekeeping" },
+  // "THE BYTES ARE UP" — the third step of the direct upload. Housekeeping for
+  // the same reason as the streaming doors it stands in for: it proves an object
+  // and answers a reference; the row is the module's own door's to write.
+  "POST /api/content/uploads/confirm": { handler: postConfirmUpload, kind: "housekeeping" },
   "POST /api/content/knowledge/upload": { handler: postUploadKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/upload-stream": { handler: postStreamKnowledgeFile, kind: "mutation" },
+  "POST /api/content/knowledge/upload-confirm": { handler: postConfirmKnowledgeFile, kind: "mutation" },
   "POST /api/content/knowledge/update": { handler: postUpdateKnowledge, kind: "mutation" },
   "POST /api/content/knowledge/active": { handler: postSetKnowledgeActive, kind: "mutation" },
   // A slice of the sweep, by hand — it writes source rows, so it publishes (a
@@ -670,7 +687,7 @@ export default {
     try {
       // What this worker cannot work without, answered by NAME (config-health.ts).
       if (route === "GET /api/content/health")
-        return json(healthBody("content", env, ["DB", "AUTH", "AI", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY"]))
+        return json(healthBody("content", env, CONTENT_REQUIRED))
       const def = ROUTES[route]
       if (!def) return fail(404, "not_found", "No such content action.")
       // Measured on the way out — see timing.ts.
@@ -680,8 +697,16 @@ export default {
       // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
-      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // is new. `publishChange` reads the deferrer off `env.DEFER`.
+      // …AND THIS REQUEST'S NAME rides the same copy (`TRACE`), for the same
+      // reason and by the same route: `publishChange` and `sendBrandedEmail`
+      // take no `Request`, so the id the door minted reaches their failure rows
+      // through `env` rather than through 190 call sites (trace.ts).
+      // …and the CORE database counted, so the slow-door line below can see the
+      // trips this worker actually makes. `beginD1Timing` only ever saw the D1
+      // REST door, so a native `env.DB` statement was invisible and a worker that
+      // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)
@@ -694,7 +719,7 @@ export default {
       // unchanged; the cause stops being console-only.
       if (e instanceof GuardError) {
         if (e.detail)
-          await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+          await recordWorkerError(env.DB, "content", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
         return fail(e.status, e.code, e.message)
       }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
@@ -745,6 +770,15 @@ export default {
     // about 7am?" is a question with a different answer in every timezone and a
     // wrong one whenever a tick is late.
     if (controller.cron === DIGEST_CRON) return morningDigest(env, controller.scheduledTime)
+    // ONE TICK, ONE NAME — every row this tick writes joins on it (`tickId`).
+    const tick = tickId("knowledge-sweep", controller.scheduledTime)
+    // …AND THE PINGS THIS TICK SENDS CARRY IT TOO. A cron has no request, so
+    // the per-request copy the dispatcher builds does not exist here — this is
+    // the unattended equivalent, and it is the same shallow copy with the same
+    // one field on it. Without it a live-layer failure during the sweep was the
+    // one row of the tick that joined nothing (`error_logs.request_id`).
+    const traced = { ...env, TRACE: tick }
+    let failed = false
     let teams: { id: string; database_id: string }[] = []
     try {
       // Bounded like every other read (R14), and ROTATING — see teamSlice. A cron
@@ -753,8 +787,8 @@ export default {
       // each one resumes from its own kind's cursor when its window comes round.
       teams = await teamSlice(env, controller.scheduledTime, SWEEP_EVERY_MS, "knowledge sweep")
     } catch (e) {
-      console.error("knowledge sweep: could not list teams:", e)
-      await recordWorkerError(env.DB, "content", "cron/knowledge-sweep", e)
+      console.error("knowledge sweep: could not list teams:", tick, e)
+      await recordWorkerError(env.DB, "content", "cron/knowledge-sweep", e, tick)
       return
     }
 
@@ -770,7 +804,7 @@ export default {
         // under a system actor, so every activity row it writes says so.
         const results = await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
-        if (indexed > 0) await publishChange(env, team.id, "knowledge")
+        if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 
         // AND GOOGLE BRINGS ITSELF IN (owner, 19 Aug 2026). This cannot run under
         // the guard above: `userId` there is `system:knowledge-sweep`, a value no
@@ -788,19 +822,20 @@ export default {
         // A captured transcript changes a meeting AND puts words in the knowledge
         // base on the next pass, so both listeners are told.
         if (auto.captured > 0) {
-          await publishChange(env, team.id, "meetings")
-          await publishChange(env, team.id, "knowledge")
+          await publishChange(traced, team.id, "meetings")
+          await publishChange(traced, team.id, "knowledge")
         }
         // R12: every failure recorded, per person, so one expired token is
         // visible without being fatal. `googleAutopilot` throws nothing — it
         // returns what went wrong so this loop keeps going.
+        if (auto.errors.length) failed = true
         for (const err of auto.errors)
           await recordWorkerError(
             env.DB,
             "content",
             `cron/google-autopilot (${team.id}/${err.userId}/${err.where})`,
             new Error(err.message),
-            undefined,
+            tick,
             // A cron has no request, but THIS loop knows exactly whose token and
             // whose team each failure belongs to — the columns exist to be queried.
             { teamId: team.id, userId: err.userId }
@@ -810,18 +845,28 @@ export default {
         // already suspects something, and the 90-day error log is where anyone
         // looks when they don't.
         for (const r of results)
-          if (r.error)
+          if (r.error) {
+            failed = true
             await recordWorkerError(
               env.DB,
               "content",
               `cron/knowledge-sweep (${team.id}/${r.kind})`,
-              new Error(r.error)
+              new Error(r.error),
+              tick,
+              // WHICH TEAM — the place already said it, in a form nothing can
+              // query. 2,020 cron rows on staging carried a team in `place` and
+              // none in `team_id`.
+              { teamId: team.id }
             )
+          }
       } catch (e) {
-        console.error(`knowledge sweep failed for team ${team.id}:`, e)
-        await recordWorkerError(env.DB, "content", `cron/knowledge-sweep (${team.id})`, e)
+        failed = true
+        console.error(`knowledge sweep failed for team ${team.id}:`, tick, e)
+        await recordWorkerError(env.DB, "content", `cron/knowledge-sweep (${team.id})`, e, tick, { teamId: team.id })
       }
     }
+    // LAST, so a tick that died partway leaves no beat (cron-heartbeat.ts).
+    await beatCron(env.DB, "knowledge-sweep", new Date(controller.scheduledTime), !failed)
   },
 } satisfies ExportedHandler<Env>
 
@@ -845,6 +890,28 @@ export default {
  * R12: every failure is recorded, per team, and the loop goes on to the next one.
  * Unattended work has nobody watching. */
 async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
+  // ONE TICK, ONE NAME — every row this tick writes joins on it (`tickId`).
+  const tick = tickId("morning-digest", scheduledTime)
+  let failed = false
+  // BEFORE ANY OF IT: IS THIS WORKER EVEN CONFIGURED? Tenancy asks this of
+  // itself nightly and of auth and realtime; content asks it of itself here,
+  // once a day, by NAME (config-health.ts) — a cleared CF_D1_TOKEN would
+  // otherwise surface only as every sweep failing, ninety-six rows a day
+  // that name the symptom and never the cause.
+  const config = configReport(env, CONTENT_REQUIRED)
+  if (!config.ok)
+    await recordWorkerError(
+      env.DB,
+      "content",
+      "cron/config",
+      new Error(
+        `this worker is missing required configuration and its unattended work is degraded or dead: ${config.missing.join(", ")}. Set it with a wrangler secret (a secret) or in wrangler.jsonc (a var), then redeploy.`
+      ),
+      tick
+    )
+  // AND IS TENANCY'S NIGHTLY STILL FIRING? (cron-heartbeat.ts — the two workers
+  // watch each other's schedules once a day each.)
+  await reportStaleCrons(env.DB, "content", new Date(scheduledTime), tick)
   let teams: { id: string; database_id: string }[] = []
   try {
     // Bounded like every other read (R14), and ROTATING — see teamSlice. It used
@@ -853,8 +920,8 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
     // digest at all.
     teams = await teamSlice(env, scheduledTime, DIGEST_EVERY_MS, "morning digest")
   } catch (e) {
-    console.error("morning digest: could not list teams:", e)
-    await recordWorkerError(env.DB, "content", "cron/morning-digest", e)
+    console.error("morning digest: could not list teams:", tick, e)
+    await recordWorkerError(env.DB, "content", "cron/morning-digest", e, tick)
     return
   }
 
@@ -901,8 +968,11 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
         missingTime,
       })
     } catch (e) {
-      console.error(`morning digest failed for team ${team.id}:`, e)
-      await recordWorkerError(env.DB, "content", `cron/morning-digest (${team.id})`, e)
+      failed = true
+      console.error(`morning digest failed for team ${team.id}:`, tick, e)
+      await recordWorkerError(env.DB, "content", `cron/morning-digest (${team.id})`, e, tick, { teamId: team.id })
     }
   }
+  // LAST, so a tick that died partway leaves no beat (cron-heartbeat.ts).
+  await beatCron(env.DB, "morning-digest", new Date(scheduledTime), !failed)
 }

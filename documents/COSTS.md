@@ -1,6 +1,15 @@
 # COSTS.md — what this app costs to run
 
-**Written 2026-09-05.** Every price below was read off the vendor's own public page on
+**Written 2026-09-05. Per-action figures revised 2026-09-06**, when the two-stage tool
+catalogue cut what a model step sends by 69.8% and left this file's headline 3.4× too
+high — see §2. The PRICES are unchanged and still as read on 2026-09-05; what moved is
+the number of tokens they are multiplied by.
+**§2's preamble block, §3's two cron rows and §4's lifecycle bullet re-checked
+against the tree and the live account on 2026-09-07** — the lifecycle bullet was
+claiming a control that had never been applied to a single bucket, which is the
+one kind of staleness that is worse than none.
+
+Every price below was read off the vendor's own public page on
 that date and is repeated as data in [`shared/workers/pricing.ts`](../shared/workers/pricing.ts),
 which is what the code and the scripts compute from. **Nothing here was measured by
 spending**: no billed model call, no benchmark run, no assistant turn was made to produce
@@ -65,20 +74,42 @@ down is the one that surprises somebody.
 
 ### The measurement everything rests on
 
-The assistant re-sends its whole preamble — the system prompt plus the tool catalogue —
+The assistant re-sends its preamble — the system prompt plus the tools it is offered —
 on every model call in a turn. Reproduce it in one command, which makes no model call:
 
 ```
 $ node scripts/measure-preamble.mjs
-tools in catalogue  165
-tool JSON           107,064 chars  (~28,011 tokens)
+tools in catalogue  166
+tool JSON           109,680 chars  (~28,695 tokens)
 system prompt       25,464 chars  (~6,662 tokens)
-PREAMBLE            132,528 chars  (~34,672 tokens)
-ungated tools       52 of 165 carry no declared gate, so every caller gets them
-trim FLOOR          63,659 chars  (~16,655 tokens)
+PREAMBLE            135,144 chars  (~35,357 tokens)
+ungated tools       53 of 166 carry no declared gate, so every caller gets them
+trim FLOOR          65,578 chars  (~17,157 tokens)
+
+STAGE ONE            40,864 chars  (~10,691 tokens) — what a step ACTUALLY sends
+  7 core tools in full, plus 3,023 chars of names for the other 159
+  a cut of 69.8% against the whole catalogue above
 ```
 
-Two independent checks agree with the 34,672:
+Read on the working tree on **2026-09-07**. `PREAMBLE` drifts by a few hundred
+characters every time a tool description is edited — it was 134,447 / 35,175 on
+6 September — and **`STAGE ONE` has not moved**, which is the number every figure
+below is computed from. So a drift in the top line changes nothing here and is
+still worth re-pasting: the day it moves the bill, the two lines will disagree
+and somebody will be able to see it.
+
+**TWO NUMBERS, AND THE SECOND ONE IS THE BILL.** Since the two-stage catalogue
+(2026-09-06) a step carries the CORE tools in full plus a flat index of every other
+tool's NAME, and fetches the rest on demand with `load_tools`. `PREAMBLE` is what the
+model could reach — still the right thing to measure, because it is what the bill would
+be without the split. `STAGE ONE` is what a step costs today. Every figure below is
+computed from **10,691**, and the older figures this file carried (132,528 chars,
+34,672 tokens, $0.1149 a reply) described the catalogue before the split — they were
+correct when written and are kept nowhere, because a superseded number in a rate card is
+worse than none.
+
+Two independent checks agree with the WHOLE-CATALOGUE figure (they predate the split and
+measure the un-split shape, which is exactly what they are being used to confirm):
 
 - the **provider's own tokenizer**, recorded in `agent-routing-bench.mjs`'s header on
   29 Aug 2026: 775,265 input tokens over 22 one-call questions = **35,239 per step** (1.6% apart);
@@ -104,22 +135,46 @@ per AI unit         $0.0290
 NOTE  56 of 183 commands carry no token counts (pre-0027 rows)
 ```
 
-`$14.59 ÷ 127 commands that DO carry tokens = $0.1149 per reply.` The published-rate
-estimate for a typical three-step turn is `$0.1093`, so the meter and the rate card agree
-to within 5%.
+`$14.59 ÷ 127 commands that DO carry tokens = $0.1149 per reply.`
+
+**READ THE WINDOW BEFORE YOU READ THE FIGURE.** Those 183 commands ran between 28 August
+and 1 September — **before the two-stage catalogue existed**, and the split is in `main`
+but **not deployed**. So $0.1149 is a true measurement of the OLD shape and is not what a
+reply costs on this tree. It is kept because it validates the METHOD: the pre-split
+published-rate estimate for the same shape was `$0.1093`, and the meter and the rate card
+agreed to within 5%. That agreement is why the post-split estimate below can be trusted
+before anyone has metered it.
+
+### One agent reply — **after the split**, at published rates
+
+Not yet measured, and it cannot be until the split deploys and somebody uses it. Same
+arithmetic, same rate card, the one input that changed:
+
+```
+one step             10,691 × $0.950/M = $0.010156   +  400 × $4.000/M = $0.001600  = $0.011756
+
+typical 3-step turn  in  (3 × 10,691) + 523×(1+2)     =  33,642 tok × $0.950/M = $0.031960
+                     out  3 × 400                     =   1,200 tok × $4.000/M = $0.004800
+                                                                          TURN  = $0.0368
+```
 
 **Worst case, from the code's own ceiling.** `MAX_STEPS = 12` (`agent.ts`), each step
-re-sending 34,672 tokens, with tool results accumulating at `RESULT_CHARS = 2000`
+re-sending stage one, with tool results accumulating at `RESULT_CHARS = 2000`
 characters (≈523 tokens) apiece:
 
 ```
-input   12 × 34,672 = 416,064  + 523 × (1+…+11) = 34,518  → 450,582 tok × $0.950/M = $0.4280
-output  12 ×    400 =   4,800                                        tok × $4.000/M = $0.0192
-                                                          WORST TURN  =  $0.447
+input   12 × 10,691 = 128,292  + 523 × (1+…+11) = 34,518  → 162,810 tok × $0.950/M = $0.1547
+output  12 ×    400 =   4,800                                         tok × $4.000/M = $0.0192
+                                                           WORST TURN  =  $0.174
 ```
 
-**The assistant is the most expensive action in the system by two orders of magnitude,**
-and roughly 90% of a short turn's cost is preamble the question never needed.
+A turn that needs a deferred tool spends one extra step fetching it, which is included in
+the step count above rather than added to it.
+
+**The assistant is still the most expensive action in the system by two orders of
+magnitude.** What changed is the share that is preamble: it was roughly 90% of a short
+turn and is now roughly 70%, because the floor is the system prompt (6,662 tokens) plus
+the core tools, and neither of those is per-question waste.
 
 ### One signup
 
@@ -164,17 +219,24 @@ measurement): 1,000 signups, 500 imports, 20,000 assistant replies per month.
 
 | line | arithmetic | per month |
 |---|---|---|
-| assistant replies | 20,000 × $0.1093 | **$2,186** |
-| …if every reply hit `MAX_STEPS` | 20,000 × $0.4470 | $8,940 |
+| assistant replies | 20,000 × $0.0368 | **$736** |
+| …if every reply hit `MAX_STEPS` | 20,000 × $0.1740 | $3,480 |
 | imports | 500 × $0.0116 | $5.80 |
 | signup emails | 1,000 × $0.0004 | $0.40 |
 | knowledge questions (say 20,000) | 20,000 × $0.0019 | $38 |
 | plan base | — | $5 |
 | everything else (requests, D1, R2, DO) | inside the included allowances at today's volume — see §4 | $0 |
-| | | **≈ $2,235/month** |
+| | | **≈ $785/month** |
 
-**One line is 98% of the bill.** Any cost work that is not about the assistant's preamble
-is rounding.
+**One line is 94% of the bill** — it was 98% and $2,235/month on the pre-split preamble.
+Any cost work that is not about the assistant is still rounding, but the preamble is no
+longer the obvious next thing to cut: at 10,691 tokens a step, 6,662 of them are the
+system prompt, which is the capability brief the assistant needs to know what the app can
+do. The next real lever is FEWER STEPS, not a smaller preamble.
+
+**None of this is metered yet.** The split is not deployed, so the $736 is a rate-card
+projection standing where a measured $2,186 used to be. It becomes a measurement the
+first time `scripts/ai-spend.mjs` is run over a window after the deploy.
 
 ---
 
@@ -187,8 +249,8 @@ there is nothing to do.
 |---|---|---|---|
 | **knowledge sweep** (`workers/content`) | every 15 min | `CRON_TEAM_CAP` = 200 teams × `INGEST_SOURCES_PER_TICK` = 25 sources | **$0 on a quiet tick.** Unchanged text is skipped on a content hash *before* any embedding call, so a tick with no new material makes no model call at all. A tick that re-embeds a full 25-source slice of ~5,000-char sources is `25 × 5,000 / 3.82 = 32,700 tok × $0.012/M ≈ $0.0004`. |
 | **Google autopilot** (same tick) | every 15 min | `GOOGLE_SWEEP_PEOPLE_PER_TICK` people × `TRANSCRIPT_SWEEP_PER_PERSON`, `TRANSCRIPT_ATTEMPT_CAP` | Google's APIs are free at this volume; the cost is the embeddings a captured transcript then produces, priced in the row above. |
-| **morning digest** (same worker) | daily | one email per staff member on a team with nobody on triage duty, capped at `SEND_FAN_CAP` = 100 recipients | `n × $0.0004`, so at most `100 × $0.0004 = $0.04/day` = **$1.20/month per team**. A 20-person agency is $0.24/month. This is the one job whose work grows with TEAM SIZE rather than with what changed — but it grows to a stated ceiling, past which the extra recipients are dropped and named in the log rather than silently sent to. |
-| **nightly retention + size check + ops digest** (`workers/tenancy`) | daily, 03:10 UTC | `RETENTION_DELETE_CAP` × `RETENTION_PASSES_PER_TICK` deletes, `CRON_GROWTH_CAP` = 200 upserts, `CRON_ALERT_CAP` = 50 alarms, plus ≤ 4 bounded SELECTs and at most one digest email | D1 writes: ~250 rows = `250 / 1M × $1.00 = $0.00025`. Email: at most `1 + recipients × $0.0004`. **Under a cent a day.** |
+| **morning digest** (same worker) | daily | one email per staff member on a team with nobody on triage duty, capped at `SEND_FAN_CAP` = 100 recipients; **plus the cron watch** — one `SELECT job, last_run_at FROM cron_heartbeats LIMIT 50` | `n × $0.0004`, so at most `100 × $0.0004 = $0.04/day` = **$1.20/month per team**. A 20-person agency is $0.24/month. This is the one job whose work grows with TEAM SIZE rather than with what changed — but it grows to a stated ceiling, past which the extra recipients are dropped and named in the log rather than silently sent to. The watch is one bounded read of a three-row table: fractions of a penny a year, and it is listed because unpriced is unpriced. |
+| **nightly retention + size check + ops digest** (`workers/tenancy`) | daily, 03:10 UTC | `RETENTION_DELETE_CAP` × `RETENTION_PASSES_PER_TICK` deletes, `CRON_GROWTH_CAP` = 200 upserts, `CRON_ALERT_CAP` = 50 alarms, plus ≤ 4 bounded SELECTs and at most one digest email — **and, since 2026-09-07, two service-binding health fetches** (`probeWorkerHealth` of auth and realtime, `HEALTH_PROBE_MS` each) **and the cron watch's own `SELECT … LIMIT 50`** | D1 writes: ~250 rows = `250 / 1M × $1.00 = $0.00025`. Email: at most `1 + recipients × $0.0004`. The two health fetches are worker-to-worker subrequests, 2/day = 730/year against the 10M-request included tier, i.e. **$0.0000005/day** at `$0.30/M`. **Still under a cent a day.** |
 
 **Nothing here scales with the dataset.** Every one is a rotating, bounded window with a
 cursor; `teamSlice` warns in the log when the estate outgrows one tick.
@@ -262,10 +324,47 @@ distinction that replaced them is the useful one:
   that is deactivated can be restored, and deleting its bytes would hand back an
   asset whose file 404s. `setBrandAssetActive` states this in the source and it is
   the rule for every module.
-- **LIFECYCLE — set, and never by age.** `scripts/r2-lifecycle.mjs` applies rules
-  to every bucket (OPERATIONS.md). It aborts incomplete multipart uploads and can
-  transition old objects to Infrequent Access; it does not and will not expire an
-  object by age, because age says nothing about whether a row points at it.
+- **LIFECYCLE — set on STAGING, not yet on production, and never by age.**
+  `scripts/r2-lifecycle.mjs` (OPERATIONS.md) aborts incomplete multipart uploads
+  after `ABORT_INCOMPLETE_DAYS = 7` and can transition old objects to Infrequent
+  Access; it does not and will not expire an object by age, because age says
+  nothing about whether a row points at it.
+
+  **Where it is applied, and how to check** — because this bullet used to claim a
+  control that was not there. Until 7 Sep 2026 it read "applies rules to every
+  bucket", and against the live account every one of the nine carried exactly one
+  rule and it was **Cloudflare's own** `Default Multipart Abort Rule`, applied
+  when a bucket is created. The script existed, was correct, was tested, and had
+  never been run. A written claim that a control is set where it is not is worse
+  than saying nothing, because it stops anybody checking.
+
+  Run on 7 Sep 2026 against the five STAGING buckets, which now carry our own
+  `abort-incomplete-multipart` rule:
+
+  ```
+  cf-exec node scripts/r2-lifecycle.mjs staging          # done, 2026-09-07
+  cf-exec npx wrangler r2 bucket lifecycle list kwapso-media-staging
+    name: abort-incomplete-multipart · enabled: Yes · (all prefixes)
+    action: Abort incomplete multipart uploads after 7 days
+  ```
+
+  **PRODUCTION IS STILL UNSET, and it is the owner's to set** (the script's own
+  header says so: applying rules to live buckets is an infrastructure change). It
+  also has one thing to fix first — `bucketsFor("production")` names
+  `kwapso-glide-archive`, which does not exist on the account (only the `-staging`
+  one was ever created), and it sorts first, so a production run fails on its
+  first bucket and sets nothing at all. Create the bucket or drop it from the
+  derivation, then:
+
+  ```
+  cf-exec node scripts/r2-lifecycle.mjs production --dry-run
+  cf-exec node scripts/r2-lifecycle.mjs production
+  ```
+
+  What the gap costs today is small and worth stating rather than assuming:
+  Cloudflare's default rule does the same job as ours, so incomplete multiparts
+  ARE being aborted on production. What is missing there is the guarantee that
+  the rule stays if the default ever changes.
 
 What remains, and it is still an owner's decision: a RETIRED record's bytes are
 kept for ever, and there is no tenant-delete path at all. Combined with
@@ -291,8 +390,14 @@ measurement, and the numbers above are the first reading.
 ### Retention that DOES exist
 
 D1 has real, enforced retention, swept nightly and bounded, reporting its own ceiling as
-an error row when it cannot catch up: `ERROR_LOG_RETENTION_DAYS = 90`,
-`AUTH_RETENTION_HOURS = 24`. R2 has none.
+an error row when it cannot catch up — and, since 7 Sep 2026, naming the TABLE it failed
+on rather than reporting a count of zero that reads exactly like a quiet night:
+`ERROR_LOG_RETENTION_DAYS = 90`, `AUTH_RETENTION_HOURS = 24`.
+
+R2 has no retention by age and will not have one, for the reason in the lifecycle bullet
+above. What it now has on staging is the multipart-abort rule, which is a lifecycle
+control and is not retention: it removes parts nothing can reference, never an object
+anybody could reach.
 
 ---
 
@@ -339,13 +444,27 @@ an error row when it cannot catch up: `ERROR_LOG_RETENTION_DAYS = 90`,
 
 ## 7 · The one number that does not reconcile
 
+> **THE BENCH MEASURES THE UN-SPLIT SHAPE, and that matters beyond this section.**
+> `scripts/agent-routing-bench.mjs:177` calls `toolSpecs()` with no arguments, which
+> returns the WHOLE 166-tool catalogue — not stage one, no index, and no `load_tools`.
+> That is the right shape for the reconciliation below, which is about the old meter
+> reading. It is the WRONG shape for the question the bench is currently being asked to
+> answer before the split deploys: run as it stands, it would measure the routing accuracy
+> of the catalogue the assistant no longer sends, and pass or fail for reasons that have
+> nothing to do with the change. Making it exercise stage one is a small edit —
+> `toolSpecs(undefined, new Set())`, the index appended to the system prompt, and a
+> `load_tools` reply handled in the loop — and until it is made, "the bench is green" is
+> not evidence about the split.
+
+
 `model.ts` records, off the account meter, *"16,593 neurons for both runs, about $0.18"*
 for two 22-question bench runs — 44 model calls, i.e. **$0.0041 per call**. The published
-rate for the same shape is **$0.0345 per call**, 8.4× higher.
+rate for the same shape is **$0.0350 per call**, 8.5× higher.
 
 Three of this repo's own measurements say the meter reading is the odd one out:
 
-- `measure-preamble.mjs` — 34,672 tokens of preamble per call;
+- `measure-preamble.mjs` — 35,175 tokens of WHOLE-CATALOGUE preamble per call, which is
+  the shape the bench sends (see the note below);
 - the bench's own header, from the provider's tokenizer — 35,239 input tokens per step;
 - the bench's own note, from the meter six days earlier — ~880 neurons per question on
   gpt-oss-120b **with this catalogue**.
@@ -402,4 +521,16 @@ own analytics.)*
   was last true.
 
 **Review this file whenever the assistant's engine changes, whenever a new billing surface
-is added, and otherwise every quarter.** Last full review: **2026-09-05**.
+is added, WHENEVER A CODE CHANGE MOVES HOW MUCH IS SENT PER CALL, and otherwise every
+quarter.**
+
+That third trigger was missing and it is the one that bit. On 2026-09-06 the two-stage
+catalogue cut a step from ~35,175 tokens to ~10,691 — no vendor changed a price, no
+billing surface was added, `PRICES_READ_ON` was still correct, and every guard listed
+above stayed green. The rate card was right and the bill was wrong by 3.4×, in the
+direction that makes the assistant look expensive, for as long as it took somebody to
+re-measure. **A rate is only half of a cost; the other half is a number that lives in the
+code and can move without anybody touching this file.**
+
+Last full review: **2026-09-05**. Per-action figures re-measured: **2026-09-06**
+(`node scripts/measure-preamble.mjs`, no model call).

@@ -221,7 +221,7 @@ every table and OPERATIONS.md says what breaks without each of the recent ones.
 
 > **Per-team databases are NOT created here.** Each team's database is created at
 > runtime when the team is created, `applyTeamSchema` runs the `TEAM_MIGRATIONS`
-> array in `workers/tenancy/src/team-schema.ts`, which starts at `0001_team_base`
+> array in `workers/tenancy/src/team-schema/migrations.ts`, which starts at `0001_team_base`
 > and today runs to `0023_activity_feed_index`. **That file is the live list; any count
 > written here is a copy that will go stale, so open it.** You only apply
 > *team-schema* migrations to *existing* teams later, via the migrate-teams robot

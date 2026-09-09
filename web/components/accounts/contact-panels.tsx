@@ -1,0 +1,515 @@
+"use client"
+
+// THE THREE COLLECTION TABS of a CONTACT's record — the companies they belong
+// to, the tickets raised for them, and the meetings they were in.
+//
+// They sit beside contact-detail.tsx for the same reason account-detail-panels
+// sits beside account-detail: each is one list answering one question, and the
+// record's own screen stays the only place that knows how to read or write the
+// person. Every count here is the DOOR's exact total (R16), primed into the same
+// sidecar the tab badge reads, so a badge can never advertise rows the list is
+// unwilling to show.
+
+import * as React from "react"
+
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui/components/select/select"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { CaretRight } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+
+import type { AccountLink, HelpTicket, Meeting } from "@shared/types"
+import { content as contentApi } from "@/lib/api"
+import { ToolbarRow } from "@/components/deep-link/screen-bits"
+import { formatDate } from "@shared/web/format"
+import { softNavigate } from "@/lib/nav"
+import { cursorKey, totalKey } from "@/lib/live-resources"
+import { LoadMore } from "@/components/records/load-more"
+import { sliceKey, type PanelHost } from "@/components/work/work-panels"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+import { primeCache, useCached } from "@shared/web/store"
+import { useLanguage, useT } from "@shared/web/language"
+import { richTextPlain } from "@shared/web/rich-text"
+import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
+
+/** Every list on this file narrows an already-loaded array in the browser, the
+ * same shape `selectable-screen.tsx`'s own toolbar uses — Companies is truly
+ * bounded (a person is a contact of a handful of accounts), while Tickets and
+ * Meetings are R14 GROWING collections whose first page is what loads here and
+ * whose own `<LoadMore>` (below each list) is what makes the rest of it
+ * reachable. Search and sort still run over the loaded prefix rather than
+ * asking the door (R14's honest-search clause is for the collection's OWN
+ * screen, which pages via a search box; this is a record's summary of it). */
+type ActiveFilter = "all" | "active" | "inactive"
+function matchesActive(filter: ActiveFilter, active: boolean): boolean {
+  return filter === "all" || (filter === "active" ? active : !active)
+}
+
+/** The two slice kinds these panels cache under. Named constants because the
+ * live registry has to invalidate them by PREFIX when any ticket or meeting
+ * moves — a slice nobody drops is a tab that goes stale the moment somebody else
+ * writes (R15's other half). */
+const TICKETS_OF_ACCOUNT = "tickets-account"
+const MEETINGS_OF_ACCOUNT = "meetings-account"
+
+/** A tappable row. Inactive rows are faded rather than hidden — nothing here is
+ * deleted, so "not a contact there any more" is a state, not an absence. */
+function Row({
+  active = true,
+  onClick,
+  children,
+}: {
+  active?: boolean
+  onClick?: () => void
+  children: React.ReactNode
+}) {
+  const className = `flex flex-wrap items-center gap-2 px-3 py-2 ${
+    active ? "" : "opacity-60"
+  } ${onClick ? "hover:bg-muted/40 cursor-pointer text-left" : ""}`
+  return (
+    <li>
+      {onClick ? (
+        <button type="button" onClick={onClick} className={`${className} w-full`}>
+          {children}
+        </button>
+      ) : (
+        <div className={className}>{children}</div>
+      )}
+    </li>
+  )
+}
+
+/** WHICH COMPANIES THIS PERSON IS A CONTACT OF — the link table read from the
+ * person's side. This is the list that made one table the right answer: Marta is
+ * a contact of Bergman and of Delaval, and a parent pointer has room for one of
+ * them.
+ *
+ * NOT THE SAME QUESTION AS WHO THEY WORK FOR, which is the parent account and has
+ * its own control on the Overview (contact-detail's `moveToCompany`). The two
+ * agree for most people and they are different facts: leaving Bergman for Delaval
+ * moves the parent, and may well leave the Bergman link exactly where it is,
+ * because we still talk to her about Bergman. The line under this list says so
+ * once, so a reader who came here looking for the employer knows where it is —
+ * rather than this tab growing a second control that writes the same column from
+ * a different screen.
+ *
+ * Read-only on purpose. A link is made and unmade on the COMPANY's Contacts tab,
+ * where the question is "who is inside this company?" — the write belongs beside
+ * the list it changes, not in two places. */
+export function CompaniesPanel({
+  companies,
+  onOpen,
+}: {
+  companies: AccountLink[]
+  onOpen: (accountId: string) => void
+}) {
+  const t = useT()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState<ActiveFilter>("all")
+  // R53 — THE SORT SLOT IS A DEFAULT, AND THIS PANEL HAD NO REASON TO SKIP IT.
+  // The mirror-image list on the other side of the same relationship —
+  // `ContactsPanel` (account-detail-panels.tsx), the people inside ONE company
+  // — has ordered by exactly these two columns since it was written; this one,
+  // the companies ONE person is a contact of, drew the same rows off the same
+  // `AccountLink` shape and offered no order at all. Nobody decided that: the
+  // slot was optional, so it was simply never passed. Two columns, both on the
+  // row itself (the company's name, then the relationship), and the whole list
+  // is in hand — bounded, prop-fed, no `<LoadMore>` — so ordering it here
+  // orders ALL of it rather than page one of it (R14).
+  const [sort, setSort] = React.useState<{ by: "name" | "relationship"; dir: "asc" | "desc" }>({
+    by: "name",
+    dir: "asc",
+  })
+
+  if (companies.length === 0)
+    // No `onCreate` on purpose — this whole panel is read-only (see the file
+    // header): a link is made on the COMPANY's own Contacts tab, never here.
+    return (
+      <CollectionEmptyState
+        title={t("Not linked to a company.")}
+        description={t("Add them as a contact from the company's own page.")}
+      />
+    )
+
+  const q = query.trim().toLowerCase()
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const shown = companies
+    .filter(
+      (c) =>
+        matchesActive(status, c.active) &&
+        (q === "" ||
+          c.personName.toLowerCase().includes(q) ||
+          (c.relationship ?? "").toLowerCase().includes(q))
+    )
+    // A COPY BEFORE `.sort()` — `companies` is a prop, and `Array.prototype.sort`
+    // mutates in place; `.filter()` above already returns a fresh array, so this
+    // is sorting our own copy and never the host's row list.
+    .sort((a, b) =>
+      sort.by === "name"
+        ? a.personName.localeCompare(b.personName) * dirMul
+        : (a.relationship ?? "").localeCompare(b.relationship ?? "") * dirMul
+    )
+
+  return (
+    <div className="flex flex-col">
+      {companies.length > 1 && (
+        <ToolbarRow
+          // Reached only past the `companies.length === 0` early return above.
+          empty={false}
+          search={
+            <>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search companies…")}
+                className="flex-1"
+                aria-label={t("Search companies")}
+              />
+              <Select value={status} onValueChange={(v) => setStatus(v as ActiveFilter)}>
+                <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("All")}</SelectItem>
+                  <SelectItem value="active">{t("Contacts now")}</SelectItem>
+                  <SelectItem value="inactive">{t("No longer")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </>
+          }
+          // R53 — the same two columns `ContactsPanel` orders by on the other
+          // side of this relationship. See the `sort` state above for why this
+          // panel had none until now.
+          sort={{
+            options: [
+              { value: "name", label: t("Name") },
+              { value: "relationship", label: t("Relationship") },
+            ],
+            value: sort.by,
+            onValueChange: (by: string) => setSort({ by: by as typeof sort.by, dir: "asc" }),
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort((s) => ({ ...s, dir })),
+          }}
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((c) => (
+          <Row key={c.id} active={c.active} onClick={() => onOpen(c.accountId)}>
+            <span className="min-w-0 flex-1 truncate text-sm">{c.personName}</span>
+            {c.relationship && (
+              <span className="text-muted-foreground text-xs">{c.relationship}</span>
+            )}
+            {c.isMainStakeholder && (
+              <Badge variant="secondary" className="text-badge">
+                {t("Main contact")}
+              </Badge>
+            )}
+            {!c.active && (
+              <Badge variant="secondary" className="text-muted-foreground text-badge">
+                {t("No longer")}
+              </Badge>
+            )}
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+      <p className="text-muted-foreground text-sm">
+        {t("The companies they're a contact of. Who they work for is on the Overview.")}
+      </p>
+    </div>
+  )
+}
+
+/** THE TICKETS RAISED FOR THIS PERSON. The door narrows by `accountId` and counts
+ * the same narrowed question, so the badge above and the rows here are one
+ * answer. A contact's ticket list is a summary on somebody's record — the
+ * whole collection has its own screen with its own search and filters — but
+ * it is still R14 GROWING, so page one is never the whole answer on its own;
+ * `<LoadMore>` below the list is what makes a contact with more tickets than
+ * one page reach the rest of them, exactly as the sibling app panel
+ * (work-panels.tsx's `AppTicketsPanel`) already does for the same
+ * collection. */
+export function ContactTicketsPanel({
+  accountId,
+  host,
+}: {
+  accountId: string
+  /** THIS PERSON'S OWN ADDRESS (`${sectionPath}/${accountId}`) — never the flat
+   * `/tickets` base. A ticket raised for them opens NESTED under their own
+   * record, exactly like an app's own Tickets tab (work-panels.tsx's
+   * `AppTicketsPanel`): the trail is built from `route.levels`
+   * (deep-link/route.ts's `trailPath`), which can only reflect what the URL
+   * actually encodes, so a flat address here would mean "who this ticket was
+   * raised for" is silently dropped the moment somebody opens it — the same
+   * bug the owner reported on 24 Aug 2026 for Accounts → Apps → Sprints,
+   * still uncorrected on this sibling panel until now. */
+  host: PanelHost
+}) {
+  const { t, lang } = useLanguage()
+  const [query, setQuery] = React.useState("")
+  const [status, setStatus] = React.useState("all")
+  const listKey = sliceKey(TICKETS_OF_ACCOUNT, accountId)
+  const q = useCached<HelpTicket[]>(listKey, () =>
+    contentApi.help({ accountId }).then((r) => {
+      primeCache(totalKey("tickets-account", accountId), r.total)
+      // R14: the cursor sidecar `<LoadMore>` reads below — without it, page
+      // one was the whole answer and every ticket past it was unreachable
+      // from this record.
+      primeCache(cursorKey(listKey), r.nextCursor)
+      return r.tickets
+    })
+  )
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the tickets.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
+  if (q.data.length === 0)
+    return (
+      <CollectionEmptyState
+        title={t("No tickets raised for them yet.")}
+        description={t("Every ticket about them will show here once one is raised.")}
+      />
+    )
+  // NEST, DON'T REPLACE (deep-link/route.ts) — a ticket opened from here stays
+  // inside the person it was raised for, exactly like `AppTicketsPanel`'s own
+  // tickets. This used to rebuild a flat `/tickets` base off the SECTION path
+  // (`basePath.replace(/\/accounts$/, "/tickets")`), which is the section
+  // swap the 24 Aug fix retired everywhere else: it never carried the
+  // contact's own id in the first place, so the base it swapped from was
+  // already the wrong shape to nest under.
+  const ticketsBase = `${host.base}/tickets`
+  // THE STATUS OPTIONS ARE DERIVED FROM WHAT'S ON SCREEN, never a hard-coded
+  // enum — the same rule `FilterFacet.options` follows when a caller leaves
+  // them off (config.ts: "the distinct values are derived from the data").
+  // This tab is a page-one SUMMARY (the file header), so that data is exactly
+  // what a filter here can honestly promise to narrow.
+  const statuses = Array.from(new Set(q.data.map((tk) => tk.status))).sort()
+  const needle = query.trim().toLowerCase()
+  const shown = q.data.filter(
+    (tk) =>
+      (status === "all" || tk.status === status) &&
+      (needle === "" ||
+        richTextPlain(tk.description).toLowerCase().includes(needle) ||
+        (tk.helpType ?? "").toLowerCase().includes(needle))
+  )
+  return (
+    <div className="flex flex-col">
+      {(q.data.length > 1 || statuses.length > 1) && (
+        <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
+          search={
+            <>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search tickets…")}
+                className="flex-1"
+                aria-label={t("Search tickets")}
+              />
+              {statuses.length > 1 && (
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger className="h-9 w-full sm:w-40" aria-label={t("Filter by status")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("All")}</SelectItem>
+                    {statuses.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
+          }
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((ticket) => (
+          <Row key={ticket.id} onClick={() => softNavigate(`${ticketsBase}/${ticket.id}`)}>
+            <div className="min-w-0 flex-1">
+              {/* THE TICKET'S NUMBER, in front of what was asked. This row is a
+                  ticket's face on somebody else's screen (R35) and it carried
+                  no reference at all — so a person reading a contact's tickets
+                  could not quote one back without opening it. Same chip, same
+                  position as the ticket collection's own table. */}
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={ticket.ref} />
+                <span className="min-w-0 truncate">{richTextPlain(ticket.description)}</span>
+              </p>
+              <p className="text-muted-foreground truncate text-xs">
+                {[ticket.helpType, ticket.status, formatDate(ticket.createdAt, lang)].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+      {/* R14: this is a GROWING collection and page one is only ever a
+          summary — the sibling app panel (work-panels.tsx's
+          AppTicketsPanel) pages the identical collection, and a contact
+          with more tickets than one page could reach none of the rest. */}
+      <LoadMore
+        listKey={listKey}
+        label={t("Load more tickets")}
+        fetchPage={(cursor) =>
+          contentApi.help({ accountId, cursor }).then((r) => ({ rows: r.tickets, nextCursor: r.nextCursor }))
+        }
+      />
+    </div>
+  )
+}
+
+/** THE MEETINGS THIS PERSON WAS IN — the meetings list, narrowed to their record. Same
+ * shape as the tickets above, and the same reason `<LoadMore>` sits under it too. */
+export function ContactMeetingsPanel({
+  accountId,
+  host,
+}: {
+  accountId: string
+  /** See `ContactTicketsPanel`'s own note — the same nested-address fix, on
+   * the sibling panel that had the identical bug. */
+  host: PanelHost
+}) {
+  const { t, lang } = useLanguage()
+  const [query, setQuery] = React.useState("")
+  const [sort, setSort] = React.useState<{ dir: "asc" | "desc" }>({ dir: "desc" })
+  const listKey = sliceKey(MEETINGS_OF_ACCOUNT, accountId)
+  const q = useCached<Meeting[]>(listKey, () =>
+    contentApi.meetings({ accountId }).then((r) => {
+      primeCache(totalKey("meetings-account", accountId), r.total)
+      // R14: the cursor sidecar `<LoadMore>` reads below — without it, page
+      // one was the whole answer and every meeting past it was unreachable
+      // from this record.
+      primeCache(cursorKey(listKey), r.nextCursor)
+      return r.meetings
+    })
+  )
+  if (q.error)
+    return (
+      <ShapeStateBody
+        shape="recordChrome"
+        state="error"
+        copy={{ errorTitle: t("Couldn't load the meetings.") }}
+        action={
+          <Button variant="secondary" onClick={() => q.refresh()}>
+            {t("Try again")}
+          </Button>
+        }
+      />
+    )
+  if (q.data === undefined) return <Skeleton variant="list" lines={3} />
+  if (q.data.length === 0)
+    return (
+      <CollectionEmptyState
+        title={t("No meetings with them yet.")}
+        description={t("Every meeting they're in will show here once one is arranged.")}
+      />
+    )
+  // NEST, DON'T REPLACE — see `ContactTicketsPanel`'s own note above, the same
+  // fix on the sibling panel.
+  const meetingsBase = `${host.base}/meetings`
+  const needle = query.trim().toLowerCase()
+  const dirMul = sort.dir === "desc" ? -1 : 1
+  const shown = q.data
+    .filter(
+      (m) =>
+        needle === "" ||
+        m.title.toLowerCase().includes(needle) ||
+        (m.location ?? "").toLowerCase().includes(needle)
+    )
+    .sort((a, b) => (a.startsAt < b.startsAt ? -1 : 1) * dirMul)
+  return (
+    <div className="flex flex-col">
+      {q.data.length > 1 && (
+        <ToolbarRow
+          // Reached only past the `q.data.length === 0` early return above.
+          empty={false}
+          search={
+            <>
+              <SearchInput
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("Search meetings…")}
+                className="flex-1"
+                aria-label={t("Search meetings")}
+              />
+            </>
+          }
+          // OUT OF `search` AND INTO ITS OWN SLOT (R53, 2026-09-06) — see
+          // screen-bits.tsx's `ToolbarSortSlot` for the ruling. One option is
+          // the whole control: a meetings list has one order worth offering
+          // (when it happened), so the field is fixed and the direction is the
+          // live question.
+          sort={{
+            options: [{ value: "startsAt", label: t("When") }],
+            value: "startsAt",
+            onValueChange: () => undefined,
+            direction: sort.dir,
+            onDirectionChange: (dir: "asc" | "desc") => setSort({ dir }),
+          }}
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+      )}
+      <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
+        {shown.map((m) => (
+          <Row key={m.id} onClick={() => softNavigate(`${meetingsBase}/${m.id}`)}>
+            <div className="min-w-0 flex-1">
+              {/* The meeting's number, in front of its title — see the tickets
+                  panel above. */}
+              <p className={`${REF_LEADS_NAME} text-sm`}>
+                <RecordRef value={m.ref} />
+                <span className="min-w-0 truncate">{m.title}</span>
+              </p>
+              <p className="text-muted-foreground truncate text-xs">
+                {/* The date is the first thing here and it is also the answer to
+                    "has it happened?", which is why the status word that used to
+                    sit third is gone rather than replaced. */}
+                {[formatDate(m.startsAt, lang), m.location].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <CaretRight className="text-muted-foreground size-4 shrink-0" />
+          </Row>
+        ))}
+      </ul>
+      {/* R14: same gap as the tickets panel above, on the same collection
+          shape — a contact with more meetings than one page could reach
+          none of the rest. */}
+      <LoadMore
+        listKey={listKey}
+        label={t("Load more meetings")}
+        fetchPage={(cursor) =>
+          contentApi.meetings({ accountId, cursor }).then((r) => ({ rows: r.meetings, nextCursor: r.nextCursor }))
+        }
+      />
+    </div>
+  )
+}

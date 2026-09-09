@@ -16,7 +16,7 @@ recipes in `web/lib/screens.ts`), because it is the smallest module that still
 exercises every layer: a per-team table, a permission row, gated CRUD, boundary
 validation, an audit block, deactivate-not-delete, a pick-or-create vocabulary
 field, an upload door, an activity write, `publishChange`, a screen recipe, a
-record detail with Overview + Activity tabs, and a count badge.
+record detail with an Overview tab and a reachable history, and a count badge.
 
 Where your module needs something the brand library doesn't have, this document
 names the module that does: **Tickets** (`help`) for a collection that GROWS and
@@ -36,11 +36,11 @@ shared notes). Substitute your real name everywhere you see `notes` / `note`.
 
 | Layer | File(s) | What you add |
 |---|---|---|
-| 1. Table + migration | `workers/tenancy/src/team-schema.ts` | a `CREATE TABLE`, appended as a new `TEAM_MIGRATIONS` entry |
+| 1. Table + migration | `workers/tenancy/src/team-schema/migrations.ts` | a `CREATE TABLE`, appended as a new `TEAM_MIGRATIONS` entry |
 | 2. Register + permissions | `shared/team-modules.ts`. `TEAM_MODULES` + `MODULE_LABELS` (**not** `team-schema.ts`, which only re-exports them; the list moved to `shared/` the moment data-ops needed it too), then `buildTeamSeed` back in `team-schema.ts` | one module key, one label, seed rows for the two default roles |
 | 3. Worker handler | `workers/content/src/{routes,lib}/notes.ts` + `index.ts` `ROUTES` | gated CRUD → validate → audit → activity → `publishChange` |
 | 4. Web client + screen | `web/lib/api/content.ts`, `web/lib/screens.ts`, `web/lib/pages.ts`, `web/lib/live-resources.ts`, `web/components/deep-link/shape.tsx`, `web/lib/use-screen-data.ts`, `web/components/deep-link/module-content.tsx` | api wrapper, a list recipe, a nav section, a cache key + fetcher, a shaper, the read, the render |
-| 5. Record detail | a `<module>.detail` recipe, or `web/components/note-detail.tsx` | Overview + Activity tabs (Law R2). Nothing to register: name the file `<module>-detail.tsx` and the R2/R8 census picks it up off disk from that day (it also catches any component that renders an `<ActivityPanel>`, whatever it is called) |
+| 5. Record detail | a `<module>.detail` recipe, or `web/components/<module>/<module>-detail.tsx` | The tab strip through the library `TabsView`, and the record's history REACHABLE from the ink footer's Latest activity eyebrow (Law R2 — the Activity TAB was retired on 7 Sep 2026). Nothing to register: name the file `<module>-detail.tsx`, in the module's OWN folder (`web/components/` has no top-level files — UI-CONVENTIONS.md), and the R2/R8 census picks it up off disk from that day |
 | 6. Tests | the existing seam/rule tests + `shared/rules/registry.ts` | nothing to register for the detail — the laws already walk it; pin any tab that shows no collection, with its reason |
 
 The workers involved: **content** (`workers/content`) is the right home for a
@@ -55,13 +55,16 @@ add a worker for a new module, you add routes to an existing one.
 
 Every team has its **own** D1 database (locked, ARCHITECTURE.md). The one master
 definition of what lives inside it is `TEAM_MIGRATIONS` in
-`workers/tenancy/src/team-schema.ts`. A new table is a **new entry appended to that
-array**. Never an edit to an existing migration (existing databases have already
+`workers/tenancy/src/team-schema/migrations.ts`. A new table is a **new entry
+appended to that array**. *(It lived in `team-schema.ts` until 6 Sep 2026, when
+that file became a 37-line barrel that re-exports the ledger and the seed. Every
+IMPORT still says `../src/team-schema` and still resolves — only the place you
+APPEND moved.)* Never an edit to an existing migration (existing databases have already
 run them). The runner stamps each applied version into the per-team `_migrations`
 table and only applies what's missing.
 
 Look at how the brand library did it (migration `0018_agency_internal`,
-team-schema.ts):
+`team-schema/migrations.ts`):
 
 ```sql
 CREATE TABLE brand_assets (
@@ -94,7 +97,7 @@ The **shape rules**, every one visible above and non-negotiable:
 Append your migration. The version prefix is monotonic:
 
 ```ts
-// workers/tenancy/src/team-schema.ts — appended to TEAM_MIGRATIONS
+// workers/tenancy/src/team-schema/migrations.ts — appended to TEAM_MIGRATIONS
 {
   version: "0006_notes",
   sql: `
@@ -127,7 +130,7 @@ the whole story, no per-table binding, no wrangler migration file.
 **Permissions are the spine.** A module the matrix doesn't know about can't be
 gated, so the server would refuse every request. Registering is three edits across
 **two** files: the module key and its label live in `shared/team-modules.ts`, the
-seed loop in `workers/tenancy/src/team-schema.ts`.
+seed loop in `workers/tenancy/src/team-schema/seed.ts`.
 
 > **Why two files, and why it is worth knowing.** The list used to sit in
 > `team-schema.ts` and moved to `shared/` the moment data-ops needed the same list
@@ -169,7 +172,7 @@ both the worker gate and the Roles UI.
 
 ### 2c. Seed the two default roles
 
-`buildTeamSeed` (team-schema.ts) writes the starter permission sheet every new
+`buildTeamSeed` (`team-schema/seed.ts`) writes the starter permission sheet every new
 team gets: **Admin** (full) and **Viewer** (read-only). The loop already iterates
 `TEAM_MODULES`, so your module is seeded automatically. Admin gets
 `read/create/edit/delete = 1,1,1,1`, Viewer gets `1,0,0,0`. You only touch this if
@@ -520,18 +523,22 @@ changed row. Never refetch the whole collection on a change. (CACHING.md.)
 
 ---
 
-## Layer 5, the record detail: Overview + Activity tabs (Law R2)
+## Layer 5, the record detail: the tab strip, and a reachable history (Law R2)
 
-**Every record-detail screen exposes Overview + Activity tabs**, via the library
-`TabsView` + `ActivityFeed`.
+**Every record-detail screen draws its tab strip through the library `TabsView`, and
+every record's history is REACHABLE** — from the ink footer's Latest activity eyebrow
+(`All activity · N ›`), which opens the slide-in `ActivityRail`. The Activity TAB was
+retired on 7 Sep 2026 at the client's ruling, "kill all old activity tabs", so no detail
+renders an `<ActivityPanel>` any more.
 
-**Try the recipe first.** If your record is facts and history, its `tabs` are recipe
-*data* and you get R2 for free, `brandDetailRecipe` (screens.ts) is six
-description-list rows and an activity block, and that is the whole detail screen.
+**Try the recipe first.** If your record is facts, its `tabs` are recipe *data* and you
+get R2 for free, `brandDetailRecipe` (screens.ts) is six description-list rows through
+`internalDetailTabs` and that is the whole detail screen — the history comes from
+`RecordScreen`'s own footer, so a recipe declares no activity block at all.
 
 For a **bespoke** detail this is on you to render, and `knowledge-detail.tsx` is the
-shortest template: three tabs, of which one is the record's own words and two are the
-standard pair.
+shortest template: three tabs — Overview, the relationship map, and the record's own
+words — with its history handed to `RecordScreen`'s `activity` prop for the footer.
 
 Its reads, all cache-first:
 
@@ -617,13 +624,13 @@ it red.
 ## The copy-paste checklist
 
 ```
-LAYER 1 — table + migration  (workers/tenancy/src/team-schema.ts)
+LAYER 1 — table + migration  (workers/tenancy/src/team-schema/migrations.ts)
 [ ] Append a NEW entry to TEAM_MIGRATIONS (version "NNNN_<module>"); never edit an old one
 [ ] Table has: id TEXT PRIMARY KEY (ULID); the 3 audit blocks (created_/editor_/deactivator_)
 [ ] Deactivate-not-delete: a deactivated_at column, NO DELETE anywhere
 [ ] Indexes for the columns you filter/join on
 
-LAYER 2 — register + permissions  (shared/team-modules.ts, then team-schema.ts)
+LAYER 2 — register + permissions  (shared/team-modules.ts, then team-schema/seed.ts)
 [ ] Add the module key to TEAM_MODULES          (shared/team-modules.ts)
 [ ] Add its label to MODULE_LABELS (TS forces this) (same file)
 [ ] buildTeamSeed already seeds it (Admin 1111 / Viewer 1000) — only touch for a special Viewer default
@@ -643,13 +650,13 @@ LAYER 4 — web client + screen
 [ ] web/lib/api/content.ts: add the content.<module> wrappers (each list carries `total`)
 [ ] web/lib/pages.ts: add the TeamSection (+ countCacheKey if a collection tab, R8) + CONCEPT_ICON
 [ ] web/lib/screens.ts: add <module>ListRecipe, BASE_RECIPES["<module>.list"], MODULE_PERMISSION
-[ ] web/components/deep-link/shape.ts: add shape<Module>List (name/detail + facet columns)
+[ ] web/components/deep-link/shape.tsx: add shape<Module>List (name/detail + facet columns)
 [ ] web/lib/live-resources.ts: a <module>Key(teamId) builder + a listFetch entry that primes total:
 [ ] web/lib/use-screen-data.ts: the useCached read; use-screen-actions.ts: the write callbacks
 [ ] deep-link/module-content.tsx: the list branch + the detail branch
 [ ] (top-level URL?) add to TOP_LEVEL_MODULES + the gateway shell loop + web/app/<segment>/
 
-LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>-detail.tsx)
+LAYER 5 — record detail  (a <module>.detail recipe, or web/components/<module>/<module>-detail.tsx)
 [ ] Facts + history only? A detail RECIPE gets R2 for free — try that before a component
 [ ] Bespoke detail renders TabsView + Overview (auditItems) + Activity (ActivityFeed) — R2
 [ ] Activity via useRecordActivity("<module>", id) — the ONE generic path (R5); no new history SQL
@@ -685,7 +692,7 @@ AFTER SHIP
 - **A mutation with no `publishChange`.** Fails `publish-seam.test.ts` (R1).
 - **`body.field.trim()` without `requireText`/`optionalText`.** A non-string 500s;
   bad input must be a 400 (locked by validate.test.ts).
-- **A detail without Overview + Activity tabs.** Fails `record-detail-tabs` (R2).
+- **A detail whose history a person cannot reach.** Fails `record-detail-tabs` (R2).
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
 - **A record tab with no count.** Every tab that reveals a collection carries it,
@@ -825,8 +832,22 @@ again, which is the only property that matters here.
   animates it. **R52 `record-title-treatment`** — a record detail wears the
   one shared title treatment whichever path draws it, imported from
   `shared/web/record-heading` and never re-declared at the call site.
+- **R56 `one-door-per-unit`** — a component asks a door once. Two reads of ONE
+  key is a defect with no exemption (the store dedupes it, so the second buys
+  nothing); two different keys on one door is a real second request and needs a
+  reasoned `TWO_READS_ONE_DOOR` line. A read gated on a permission is the same
+  question as an ungated one, so gating it is not a way out.
 - **R25 `savings-caption`** — a screen that shows a saving renders
   `SAVINGS_CAPTION` word for word.
+- **R57 `component-folders`** — your module's components go in ONE folder named
+  for it, `web/components/<module>/`, and that folder gets a line in
+  `web/components/README.md` saying what belongs there. The top level holds no
+  files at all, and the folder set is derived from the README rather than from a
+  list in a test, so the paragraph a person reads is the one the build enforces.
+- **R58 `named-paths`** — every path your module's documents and comments name
+  must open. Write a real file's path or none: an illustrative one goes in
+  `<angle brackets>` so it reads as a template, and a path named precisely
+  BECAUSE the file is gone gets a reasoned `GONE_ON_PURPOSE` line.
 
 **The words** (the ones that catch every new module, every time)
 

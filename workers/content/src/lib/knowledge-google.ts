@@ -51,7 +51,7 @@ import { mendMojibake } from "@shared/workers/mojibake"
 import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
-import { googlePresence, type ProbableService } from "./google-api"
+import { calendarEventIdInText, googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
 import { indexSource } from "./knowledge"
 import { withSyncLease } from "./sync-lease"
@@ -300,10 +300,16 @@ type FoldTargets = { transcripts: Set<string>; events: Set<string> }
 async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTargets> {
   const [meetings, events] = await Promise.all([
     // R14 hard cap: one team's meetings, stated at the statement.
-    d1Query<{ title: string; transcript_file_id: string | null; words: number }>(
+    d1Query<{
+      title: string
+      transcript_file_id: string | null
+      superseded_transcript_ids: string | null
+      words: number
+    }>(
       cfg,
       guard.databaseId,
-      `SELECT title, transcript_file_id, LENGTH(COALESCE(transcript_text, '')) AS words
+      `SELECT title, transcript_file_id, superseded_transcript_ids,
+              LENGTH(COALESCE(transcript_text, '')) AS words
          FROM meetings WHERE deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
     ),
     // R14 hard cap: the calendar entries this base already mirrors.
@@ -314,13 +320,25 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
         WHERE kind = 'event' AND deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
     ),
   ])
+  // A TRANSCRIPT ONLY COUNTS WHEN THE MEETING REALLY HOLDS THE WORDS. Folding
+  // the Drive copy while the app's own row is empty would leave the base with
+  // neither, which is the one outcome worse than the duplication — and it is
+  // the SAME clause for a runner-up as for the winner, on purpose: a runner-up
+  // is only known-inferior relative to a winner that is genuinely still there.
+  const held = meetings.filter((m) => m.transcript_file_id && m.words > 0)
   return {
-    // A TRANSCRIPT ONLY COUNTS WHEN THE MEETING REALLY HOLDS THE WORDS. Folding
-    // the Drive copy while the app's own row is empty would leave the base with
-    // neither, which is the one outcome worse than the duplication.
-    transcripts: new Set(
-      meetings.filter((m) => m.transcript_file_id && m.words > 0).map((m) => m.transcript_file_id as string)
-    ),
+    transcripts: new Set([
+      ...held.map((m) => m.transcript_file_id as string),
+      // EVERY DOCUMENT A HUNT FOR THIS MEETING HAS EVER READ AND REJECTED — an
+      // ID join exactly like the winner's above, and unconditional beyond the
+      // same "the meeting really holds words" gate: a file lands in this column
+      // only because `fromAttachments`/`refreshTranscript` already proved a
+      // STRICTLY fuller candidate for the same event beat it (google-transcript.ts,
+      // meetings.ts), so there is no "does it hold words" test left to apply a
+      // second time — it held fewer of them than the one that won, and that is
+      // the whole of the decision. See migration 0070.
+      ...held.flatMap((m) => (m.superseded_transcript_ids ?? "").split(",").filter(Boolean)),
+    ]),
     events: new Set([...meetings.map((m) => m.title), ...events.map((e) => e.title)]),
   }
 }
@@ -421,6 +439,32 @@ export function googleIngestKinds(
     return r
   }
 
+  /** WHICH CALL A GOOGLE ARTEFACT IS FROM, where Google itself says so.
+   *
+   * MAIL ONLY, AND NARROW ON PURPOSE. Google's calendar robot writes the event
+   * into an invitation, an update, an acceptance and a decline as an `eid` link,
+   * and that is a fact to be read (`calendarEventIdInText`). Nothing else here
+   * is given the same treatment: a Drive document that quotes a calendar link is
+   * quoting somebody's prose, and measured on staging on 8 Sep 2026 not one of
+   * the 80 live Drive sources carries such a link anyway. A Chat message has no
+   * such statement at all.
+   *
+   * It runs AFTER hydration, which is why it lives here and not in the gmail
+   * lane's own mapper: a listing hands back a hundred-character snippet and the
+   * link is far below it. It rides `slice` for the same reason the fold and the
+   * mojibake mend do — a lane added tomorrow is covered because it goes through
+   * this function, not because somebody remembered.
+   *
+   * THE NOTES MAIL IS THE ONE THIS CANNOT REACH, and it is the one that matters
+   * most: 121 "Notes:" messages on staging, not one carrying an eid, a Meet link
+   * or anything else naming the call — only the event's title in quotes, which
+   * is exactly the inference this app does not make. They keep a NULL. */
+  const statedEvent = (service: GoogleService, r: IngestRow): IngestRow => {
+    if (service !== "gmail" || r.eventId) return r
+    const eventId = calendarEventIdInText(r.body)
+    return eventId ? { ...r, eventId, eventIdFrom: "mail" } : r
+  }
+
   /** List cheaply, walk to the cursor, and only THEN pay for the bodies. A Drive
    * listing is one call for fifty files and their text is fifty more, so
    * hydrating before the slice would pay for forty-nine files this tick is not
@@ -443,12 +487,15 @@ export function googleIngestKinds(
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
-    const fold = (r: IngestRow) => folded(service, mended(r), targets)
+    const fold = (r: IngestRow) => statedEvent(service, folded(service, mended(r), targets))
     if (!hydrate || wanted.length === 0) return wanted.map(fold)
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
-    const full = await hydrateText(
+    // A skipped item is already named in the log `hydrateText` writes (one
+    // unreadable file must not cost the tick the rest of its slice); the sweep
+    // itself just carries on with what each item already had.
+    const { items: full } = await hydrateText(
       env,
       cfg,
       guard,
@@ -579,6 +626,12 @@ export function googleIngestKinds(
               sortAt: at,
               // WHEN THIS IS FROM — the entry's own moment. See the drive lane.
               recordDate: at || null,
+              // THE ENTRY IS THE EVENT. `externalId` is Google's own event id —
+              // the same string the meetings table stores as `google_event_id`
+              // and the same one a calendar notice carries in its `eid` — so this
+              // is a fact read off the item, not a match made against it.
+              eventId: item.externalId || null,
+              eventIdFrom: item.externalId ? "origin" : null,
               title: item.title,
               body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
                 .filter(Boolean)

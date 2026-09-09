@@ -1,0 +1,364 @@
+"use client"
+
+// Personal access tokens (Settings) — the human side of the MCP front desk.
+// Create a token (pinned to your CURRENT team; the secret is shown ONCE — copy
+// it then), see when each was last used, and revoke any. Machines send the
+// token as `Authorization: Bearer …` to the /mcp endpoint and act AS you, in
+// that team only, capped by your live role.
+
+import * as React from "react"
+
+import { Badge } from "@shared/ui/components/badge/badge"
+import { Button } from "@shared/ui/components/button/button"
+import { Input } from "@shared/ui/components/input/input"
+import { Field } from "@shared/web/field"
+import { defaultFieldConfig } from "@shared/web/screen-engine/config"
+import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
+import { Spinner } from "@shared/ui/components/spinner/spinner"
+import { toast } from "@shared/ui/components/sonner/sonner"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@shared/ui/components/dialog/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@shared/ui/components/alert-dialog/alert-dialog"
+import { Prohibit, Copy } from "@shared/ui/foundations/icons"
+import { ShapeStateBody } from "@shared/ui/compositions/states/states"
+
+import type { McpTokenSummary } from "@shared/types"
+import { MCP_TOKEN_TTL_DAYS } from "@shared/workers/limits"
+import { FormShell, fieldSpacing } from "@shared/web/form-shell"
+import { ApiFailure, mcp } from "@/lib/api"
+import { formatActivityWhen, formatDate } from "@shared/web/format"
+import { useCached, primeCache } from "@shared/web/store"
+import { useLanguage } from "@shared/web/language"
+import { AddButton } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
+
+/** Past its deadline (or missing one — the server treats that as expired too).
+ * A token that has run out is not "active": it stops working the same way a
+ * revoked one does, so the screen must not keep calling it live. */
+function hasExpired(t: McpTokenSummary): boolean {
+  return !t.expiresAt || t.expiresAt <= new Date().toISOString()
+}
+
+// A ready-to-paste connect prompt for ANY AI (Claude, Gemini, GPT, …) — endpoint,
+// the Bearer header, and a Claude-Desktop-style stdio config. Built from the LIVE
+// app host so it's correct for staging or production without a hardcoded URL. When
+// we hold the real secret (right after create) we embed it; otherwise we leave the
+// `kwapso_mcp_YOUR_TOKEN` placeholder for the developer to swap in.
+function connectPrompt(token: string): string {
+  const origin = typeof window === "undefined" ? "https://kwapso.<workers-subdomain>.workers.dev" : window.location.origin
+  const endpoint = `${origin}/mcp`
+  return `Connect to my kwapso workspace over MCP (Model Context Protocol).
+
+Endpoint: ${endpoint}
+Auth header: Authorization: Bearer ${token}
+Protocol: MCP over HTTP. JSON-RPC 2.0 (initialize, tools/list, tools/call)
+
+If your tool runs MCP servers locally over stdio (e.g. Claude Desktop), add this to its config:
+{
+  "mcpServers": {
+    "kwapso": {
+      "command": "npx",
+      "args": ["mcp-remote", "${endpoint}", "--header", "Authorization: Bearer ${token}"]
+    }
+  }
+}
+
+Then call tools/list to see what I can do. You act as me, in one team, capped by my role —
+reads, exports and imports are free; only the assistant tools (agent_chat, agent_confirm,
+plan_import — and ask_knowledge when it composes an answer) use the team's assistant credits.`
+}
+
+function copyInstructions(token: string, t: (english: string) => string) {
+  void navigator.clipboard?.writeText(connectPrompt(token)).then(
+    () => toast.success(t("Setup instructions copied. Paste into any AI.")),
+    () => toast.error(t("Couldn't copy. Try again."))
+  )
+}
+
+export function AccessTokensSection({ teamName }: { teamName: string | null }) {
+  const { t, lang } = useLanguage()
+  const tokensQ = useCached<McpTokenSummary[]>("mcp-tokens", () =>
+    mcp.tokens().then((r) => r.tokens)
+  )
+  const tokens = tokensQ.data ?? []
+
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [label, setLabel] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+  // The show-once secret, displayed right after a create (until dismissed).
+  const [secret, setSecret] = React.useState<string | null>(null)
+  const [revoking, setRevoking] = React.useState<McpTokenSummary | null>(null)
+
+  async function create() {
+    if (!label.trim() || busy) return
+    setBusy(true)
+    try {
+      // ONE round trip. The door answers with the list the new token is now on,
+      // so this used to be a create followed by a read of what the create knew.
+      const r = await mcp.createToken(label.trim())
+      setSecret(r.secret)
+      setLabel("")
+      primeCache("mcp-tokens", r.tokens)
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't create the token."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function revoke() {
+    if (!revoking || busy) return
+    setBusy(true)
+    try {
+      const { tokens } = await mcp.revokeToken(revoking.id)
+      primeCache("mcp-tokens", tokens)
+      toast.success(t("Token revoked."))
+      setRevoking(null)
+    } catch (err) {
+      toast.error(err instanceof ApiFailure ? err.message : t("Couldn't revoke the token."))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="motion-panel-in flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-muted-foreground text-micro uppercase">
+          {t("Access tokens")}
+        </h2>
+        <AddButton label={t("New token")} onClick={() => setCreateOpen(true)} />
+      </div>
+      <p className="text-muted-foreground text-sm">
+        {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you, capped by your role, in the team the token was made for.")}
+      </p>
+
+      {tokensQ.error ? (
+        <ShapeStateBody
+          shape="recordChrome"
+          state="error"
+          copy={{ errorTitle: t("Couldn't load your tokens.") }}
+          action={
+            <Button variant="secondary" onClick={() => tokensQ.refresh()}>
+              {t("Try again")}
+            </Button>
+          }
+        />
+      ) : tokensQ.data === undefined ? (
+        <Skeleton variant="list" lines={2} />
+      ) : tokens.length === 0 ? (
+        // The kit's register (27.21) with the one act, rather than a bare
+        // line under a button in the header — owner ruling, 2026-09-07.
+        <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
+      ) : (
+        <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+          {tokens.map((token) => (
+            <div
+              key={token.id}
+              // A row rule inside one panel, as an inset hairline rather than a
+              // border (kit §2.7 — web/test/kit-conformance.test.ts). One list,
+              // one kind of row, so a paper step would be saying they differ.
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 p-3 text-sm shadow-[var(--hairline-under)] last:shadow-none"
+            >
+              <span className="font-medium">{token.label}</span>
+              {token.revokedAt ? (
+                <Badge variant="secondary" className="text-muted-foreground text-badge">
+                  {t("Revoked")}
+                </Badge>
+              ) : hasExpired(token) ? (
+                <Badge variant="secondary" className="text-muted-foreground text-badge">
+                  {t("Expired")}
+                </Badge>
+              ) : (
+                <Badge variant="secondary" className="text-badge">
+                  {t("Active")}
+                </Badge>
+              )}
+              <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+                {/* THREE WHOLE CLAUSES, joined by the middot — not one sentence
+                    stitched out of translated pieces. Each says one fact about the
+                    token and carries its own hole, so a translator can move the
+                    date inside its own clause, which is exactly what German and
+                    Japanese need to do. They used to be a JSX text run plus three
+                    templates: only the word "Created" was ever in the catalogue,
+                    and it was in it as a bare fragment. */}
+                {t("Created {when}", { when: formatActivityWhen(token.createdAt) })}
+                {token.lastUsedAt
+                  ? ` · ${t("last used {when}", { when: formatActivityWhen(token.lastUsedAt) })}`
+                  : ` · ${t("never used")}`}
+                {token.revokedAt
+                  ? ""
+                  : hasExpired(token)
+                    ? ` · ${t("expired {date}", { date: formatDate(token.expiresAt, lang) })}`
+                    : ` · ${t("works until {date}", { date: formatDate(token.expiresAt, lang) })}`}
+              </span>
+              {!token.revokedAt && (
+                <div className="flex items-center gap-2">
+                  {/* Copy the connect prompt for any AI. The secret can't be re-read,
+                   * so this carries the `kwapso_mcp_YOUR_TOKEN` placeholder to swap.
+                   * Label collapses to icon-only below sm (narrow-screen rule).
+                   * Nothing to set up with an expired token — make a new one. */}
+                  {!hasExpired(token) && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => copyInstructions("kwapso_mcp_YOUR_TOKEN", t)}
+                      className="gap-1"
+                      title={t("Copy setup instructions for any AI")}
+                    >
+                      <Copy className="size-3.5" aria-hidden />
+                      <span className="hidden sm:inline">{t("Instructions")}</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setRevoking(token)}
+                    className="text-destructive hover:text-destructive gap-1"
+                  >
+                    <Prohibit className="size-3.5" aria-hidden />
+                    <span className="hidden sm:inline">{t("Revoke")}</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create — FormShell (Law R4). After creating, the same dialog shows the
+       * secret ONCE with a copy button; it is never retrievable again. */}
+      <Dialog
+        open={createOpen}
+        onOpenChange={(o) => {
+          if (busy) return
+          setCreateOpen(o)
+          if (!o) setSecret(null)
+        }}
+      >
+        {/* p-0: this dialog has two faces and one of them is a FormShell, which
+            owns its own edges (see shared/web/form-shell.tsx). The other face
+            re-states the padding for itself, one line down. */}
+        <DialogContent className="gap-0 overflow-hidden p-0">
+          {secret ? (
+            <div className="flex flex-col gap-4 p-6">
+              <DialogTitle>{t("Copy your token now")}</DialogTitle>
+              <DialogDescription>
+                {t("This is the only time it's shown. Anyone holding it can act as you in")}{" "}
+                {teamName ?? t("this team")}. Treat it like a password. It works for{" "}
+                {MCP_TOKEN_TTL_DAYS} {t("days, then you make a new one.")}
+              </DialogDescription>
+              <div className="bg-muted/60 flex items-center gap-2 rounded-[var(--radius)] p-3">
+                <code className="min-w-0 flex-1 break-all text-xs">{secret}</code>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0 gap-1"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(secret).then(
+                      () => toast.success(t("Copied.")),
+                      () => toast.error(t("Couldn't copy. Select it by hand."))
+                    )
+                  }}
+                >
+                  <Copy className="size-3.5" aria-hidden /> {t("Copy")}
+                </Button>
+              </div>
+              {/* One-tap: the whole connect prompt WITH this token embedded, ready to
+               * paste into Claude, Gemini, GPT — the fastest way to hand it off. */}
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-1 self-start"
+                onClick={() => copyInstructions(secret, t)}
+              >
+                <Copy className="size-3.5" aria-hidden /> {t("Copy setup instructions for any AI")}
+              </Button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  onClick={() => {
+                    setSecret(null)
+                    setCreateOpen(false)
+                  }}
+                >
+                  {t("Done")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <FormShell
+              onSubmit={(e) => {
+                e.preventDefault()
+                void create()
+              }}
+              title={<DialogTitle>{t("New access token")}</DialogTitle>}
+              subtitle={
+                <DialogDescription>
+                  {t("Pinned to")} {teamName ?? t("your current team")}. It can do exactly what you can do
+                  there, nothing more, and it stops working after {MCP_TOKEN_TTL_DAYS} {t("days.")}
+                </DialogDescription>
+              }
+              submit={{
+                busy: busy,
+                disabled: !label.trim(),
+              }}
+            >
+              <Field
+                config={{ ...defaultFieldConfig, label: t("Name"), required: true }}
+                htmlFor="token-label"
+                className={fieldSpacing}
+              >
+                <Input
+                  id="token-label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  placeholder={t("CI importer")}
+                  disabled={busy}
+                  autoFocus
+                />
+              </Field>
+            </FormShell>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke — destructive, so confirm. */}
+      <AlertDialog open={!!revoking} onOpenChange={(o) => !busy && !o && setRevoking(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("Revoke")} {revoking?.label}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("Anything using this token stops working immediately. This can't be undone, you can always create a new token.")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{t("Cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                void revoke()
+              }}
+              disabled={busy}
+            >
+              {busy ? <Spinner /> : null}
+              {busy ? t("Revoking…") : t("Revoke")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </section>
+  )
+}

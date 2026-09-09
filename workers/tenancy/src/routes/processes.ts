@@ -33,7 +33,7 @@ import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
 import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
-import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
+import { ownedMediaKey, reclaimMedia, storeImageDataUrl, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
@@ -166,7 +166,7 @@ export async function postCreateApp(request: Request, env: Env): Promise<Respons
     // encoded text before anything decodes — it just has to be reachable.
     logoUrl: await storeImageDataUrl(
       env.MEDIA,
-      mediaKey(guard.teamId, "apps"),
+      teamMediaKey(guard.teamId, "apps"),
       optionalText(body.logoUrl, "Logo", imageFieldLimit(body.logoUrl)),
       REFUSE_IMAGE
     ),
@@ -266,7 +266,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
       "logoUrl" in body
         ? ((await storeImageDataUrl(
             env.MEDIA,
-            mediaKey(guard.teamId, "apps"),
+            teamMediaKey(guard.teamId, "apps"),
             optionalText(body.logoUrl, "Logo", imageFieldLimit(body.logoUrl)),
             REFUSE_IMAGE
           )) ?? null)
@@ -288,7 +288,7 @@ export async function postUpdateApp(request: Request, env: Env): Promise<Respons
   await publishChange(env, guard.teamId, "apps", id)
   // The logo this edit replaced or took away. AFTER the row moved and fail-soft:
   // an orphan costs storage, a lost save costs trust (shared/workers/image.ts).
-  // The owners list is the one `mediaKey(guard.teamId, "apps")` mints with,
+  // The owners list is the one `teamMediaKey(guard.teamId, "apps")` mints with,
   // twenty lines up — a `.startsWith` on the wrong prefix returns null and
   // deletes nothing, which is a reclaim that LOOKS like it ran.
   await reclaimMedia(

@@ -18,7 +18,7 @@ import { imageFieldLimit, optionalText, queryText, requireText, TEXT_LIMITS } fr
 import { publishChange } from "@shared/workers/realtime"
 import { gated, gatedBody, openTeam } from "@shared/workers/route"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
-import { mediaKey, ownedMediaKey, reclaimMedia, storeImageDataUrl } from "@shared/workers/image"
+import { ownedMediaKey, reclaimMedia, storeImageDataUrl, teamMediaKey } from "@shared/workers/image"
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
@@ -103,8 +103,8 @@ async function accountImages(
   fields: { logoUrl?: string; coverUrl?: string }
 ): Promise<{ logoUrl?: string; coverUrl?: string }> {
   const [logoUrl, coverUrl] = await Promise.all([
-    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.logoUrl, REFUSE_IMAGE),
-    storeImageDataUrl(env.MEDIA, mediaKey(guard.teamId, "accounts"), fields.coverUrl, REFUSE_IMAGE),
+    storeImageDataUrl(env.MEDIA, teamMediaKey(guard.teamId, "accounts"), fields.logoUrl, REFUSE_IMAGE),
+    storeImageDataUrl(env.MEDIA, teamMediaKey(guard.teamId, "accounts"), fields.coverUrl, REFUSE_IMAGE),
   ])
   return { logoUrl, coverUrl }
 }
@@ -260,7 +260,7 @@ export async function getAccountDetail(request: Request, env: Env): Promise<Resp
   //
   // This one shipped the same rows anyway, with the global users.email joined on,
   // to anyone holding `accounts:read`. The Portal-access tab is already hidden
-  // client-side by exactly this check (web/components/account-detail.tsx) — which
+  // client-side by exactly this check (web/components/accounts/account-detail.tsx) — which
   // is the shape the gating seam's own header forbids: "security is never just
   // hiding UI". The server now decides it too.
   const maySeeLogins = await hasRight(cfg, guard, "portal_users", "read")
@@ -384,7 +384,7 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
  * a null parent). The loop refusal comes back as a plain 409 sentence.
  *
  * The human caller is the contact screen's "Which company do they work for?"
- * control (web/components/contact-detail.tsx); the machine ones are the
+ * control (web/components/accounts/contact-detail.tsx); the machine ones are the
  * assistant's `set_account_parent` and an import column. */
 export async function postAccountParent(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(

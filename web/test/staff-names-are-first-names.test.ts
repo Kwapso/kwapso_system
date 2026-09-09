@@ -268,14 +268,14 @@ const NON_NAME_PAYLOAD: Record<string, string> = {
     "THE IMPORT BATCH'S SUMMARY LINE. `by: b.creator_name ?? \"Someone\"` " +
     "(workers/data-ops/src/lib/import-batch.ts) is a staff name under a name too " +
     "generic to match on: `.by` is how every sort state in the app spells its own " +
-    "column. Its ONE render is web/components/import-screen.tsx, which resolves it " +
+    "column. Its ONE render is web/components/screens/import-screen.tsx, which resolves it " +
     "through the seam — checked below by name, since the census cannot reach it.",
 }
 
 /** The file that renders each `NON_NAME_PAYLOAD` field, so the exclusion costs
  * nothing. Keyed by the same field name, so the two cannot drift apart. */
 const NON_NAME_RENDERED_IN: Record<string, string> = {
-  by: "web/components/import-screen.tsx",
+  by: "web/components/screens/import-screen.tsx",
 }
 
 /* ------------------------------------------------------------------------- */

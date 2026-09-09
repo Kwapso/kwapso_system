@@ -113,7 +113,7 @@ describe("the tab-to-content gap", () => {
     ).toContain("pb-[var(--tab-content-gap)]")
 
     expect(
-      read("web/components/record-chrome.tsx"),
+      read("web/components/records/record-chrome.tsx"),
       "a detail screen's --record-tab-gap must resolve to the same --tab-content-gap, or the two halves of the app can drift apart again"
     ).toContain("[--record-tab-gap:var(--tab-content-gap)]")
 
@@ -129,12 +129,12 @@ describe("the tab-to-content gap", () => {
     // paints at the padding box, so padding would drag the rule off the tabs;
     // a border extends the border box instead. See STICKY_TABS's own comment.
     expect(
-      read("web/components/record-chrome.tsx"),
+      read("web/components/records/record-chrome.tsx"),
       "STICKY_TABS must spend --record-tab-gap on the pinned tablist's OWN border box, not as a flex gap between it and its TabsContent sibling — a gap between two siblings is never painted and stops meaning anything once the strip pins on scroll"
     ).toContain("[border-bottom:var(--record-tab-gap)_solid_var(--surface-raised)]")
 
     expect(
-      read("web/components/record-chrome.tsx"),
+      read("web/components/records/record-chrome.tsx"),
       "STICKY_TABS's flex gap must not spend --record-tab-gap a second time — the border above already reserves it, and paying twice pushes the panel down by a gap nobody asked for"
     ).not.toContain("gap-[calc(var(--space-6)_+_var(--record-tab-gap))]")
   })

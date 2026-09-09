@@ -33,16 +33,19 @@ an instance and points here for what an instance IS.
 |---|---|---|---|
 | **Worker** | Deployed code (auth, tenancy, realtime, content, data-ops, mcp, gateway, portal-gateway) | 8 built | No |
 | **DO class** | A class *inside* a worker (`TeamChannel` + `TeamInterest`, both in realtime) | 2 today (26 Aug 2026) | No |
-| **DO instance** | A *runtime* entity addressed by name (`team:<id>#0…3`, `team:<id>!interest`, `user:<id>`) | Unlimited | Yes — five per team (four `TeamChannel` shards + one `TeamInterest`) **and** one `TeamChannel` per signed-in user |
+| **DO instance** | A *runtime* entity addressed by name (`team:<id>#<shard>`, `team:<id>!interest`, `user:<id>`) | Unlimited | Yes — `REALTIME_SHARDS` + 1 per team (nine `TeamChannel` shards today + one `TeamInterest`) **and** one `TeamChannel` per signed-in user |
 
 An instance is **not** a worker. Addressing one by name conjures it; idle ones
 hibernate and cost ~nothing. Exactly like OOP: one `class` (code), millions of
 objects (runtime). 10,000 teams + their members is still 8 workers + two DO
-classes, but ~50,000 team-side instances (four channel shards and one interest
-registry per team) plus one per signed-in user, almost all asleep. *(Fact
-updated 26 Aug 2026: this paragraph used to count one class and one instance
-per team. The class count moved when `TeamInterest` shipped; the instance
-arithmetic moved with the shard split §2 describes.)*
+classes, but ~100,000 team-side instances (`REALTIME_SHARDS` channel shards —
+nine today — and one interest registry per team) plus one per signed-in user,
+almost all asleep. *(Fact updated 26 Aug 2026: this paragraph used to count one
+class and one instance per team. The class count moved when `TeamInterest`
+shipped; the instance arithmetic moved with the shard split §2 describes. Fact
+updated 7 Sep 2026: the shard count became derived and went 4 → 9, so the
+team-side arithmetic went 5 → 10 per team. Read the count from
+`REALTIME_SHARDS`, never from a number written here.)*
 
 This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the class.
 
@@ -53,12 +56,16 @@ This doc uses "the DO" for the runtime instance and "`TeamChannel`" for the clas
 `TeamChannel` lives in `workers/realtime/src/index.ts`. It is a **pub/sub relay
 and nothing else**:
 
-- **One channel per team or per person — and a TEAM channel is four instances.**
+- **One channel per team or per person — and a TEAM channel is nine instances.**
   A person's identity channel is one instance, addressed `user:<id>`. A team's
   data channel is addressed `team:<id>` by every PUBLISHER, but since the split
   of 14 Aug 2026 (ARCHITECTURE §7 records the decision; this section is its
-  mechanism) it is **spread across `REALTIME_SHARDS` (4) instances**, named by
-  `teamShardName` as `team:<id>#0` … `team:<id>#3`. All three names —
+  mechanism) it is **spread across `REALTIME_SHARDS` instances**, named by
+  `teamShardName` as `team:<id>#0` … `team:<id>#8`. Since 7 Sep 2026 that count
+  is DERIVED — `ceil(REALTIME_PEAK_LISTENERS_PER_TEAM ÷
+  REALTIME_SHARD_WATCH_SOCKETS)` = 9 — so it cannot silently fall behind the
+  peak it is meant to carry; `workers/realtime/test/shard-count.test.ts` locks
+  the property rather than the number. All three names —
   `REALTIME_SHARDS`, `shardFor` (a stable hash of the user id) and
   `teamShardName` — live in `shared/workers/realtime.ts`, the seam the client
   and the worker both import, so the two can never disagree about the count.
@@ -75,10 +82,12 @@ and nothing else**:
   through the door, or address a shard. *(Fact updated 26 Aug 2026: this bullet
   said "one instance per channel" from the day the doc was locked until the
   split, and for twelve days after it.)*
-- **And the shard count now has an instrument under it (5 Sep 2026).** The
-  ceiling `REALTIME_SHARDS` implies — "~12–20k concurrent listeners per team,
-  which clears the yardstick's 25,000 only once combined with subscription
-  scoping" — was a comment, and nothing measured either half. A Durable Object
+- **And the shard count now has an instrument under it (5 Sep 2026), and is
+  derived from it (7 Sep 2026).** The ceiling four shards implied — "~12–20k
+  concurrent listeners per team, which clears the yardstick's 25,000 only once
+  combined with subscription scoping" — was a comment, and nothing measured
+  either half. The count is now the division that comment was doing by eye, so
+  the watch line below is not merely an alarm: it is the input. A Durable Object
   is single-threaded and a broadcast is a serial loop, so past a few thousand
   sockets every publish on that team queues behind the last, and the first
   symptom is "the app feels slow" pointing at nothing.
@@ -472,7 +481,7 @@ runtime drops it on close).
 ### Step 4, the client patches ONE row (browser)
 
 `shared/web/realtime.ts` receives the frame and calls the host's `onEvent`; the
-registry-driven handler in `web/components/app-shell.tsx` decides what to do. It
+registry-driven handler in `web/components/shell/app-shell.tsx` decides what to do. It
 is **not** a per-resource `switch`, every module is one entry in
 `TEAM_RESOURCES`:
 

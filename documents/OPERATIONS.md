@@ -222,6 +222,19 @@ New migrations must be applied to BOTH databases before deploying workers that n
 
 **Core migration 0027 (`agent_usage_log` token columns), apply BEFORE deploying data-ops or content (2026-08-18).** The assistant's stable prefix — the tool catalogue plus the system prompt, about nine tenths of every turn's input — is now sent with an Anthropic prompt-cache breakpoint (`AGENT_PROMPT_CACHE`, `off` | `5m` | `1h`, unset means `5m`). Whether that saves anything depends entirely on the HIT RATE, and a hit rate cannot be reconstructed afterwards, so each usage row records what the turn actually cost: `input_tokens`, `output_tokens`, `cache_write_tokens`, `cache_read_tokens`. **WITHOUT it the INSERT in `logUsage` names columns that do not exist, and because recording usage is contractually best-effort it fails SILENTLY — the usage log simply stops filling while the assistant looks perfectly healthy** (the same failure shape as 0014 and 0020). The columns are nullable on purpose: rows written before it were never measured, and a back-filled zero would read as "measured, and it was free".
 
+**Core migration 0029 (`cron_heartbeats`), apply BEFORE deploying tenancy or content (2026-09-07).** Each cron tick now beats into it and the two cron workers watch each other's beats for a schedule that stopped firing (`shared/workers/cron-heartbeat.ts`, DATA-MODEL.md). **WITHOUT it nothing breaks and nothing is watched:** the beat is best-effort and prints one console line per tick, and the watcher records ONE `cron/watch` row per day saying it could not read the table — which is the row telling you to apply this. The migration seeds one row per job stamped at apply time, so apply it, then deploy; a job that has not beaten within two of its periods after that is reported.
+
+**Core migration 0030 (`credit_grants`), apply BEFORE deploying data-ops (2026-09-07).**
+Every top-up through `POST /api/data-ops/admin/grant-credits` now writes one row
+saying who granted, how much, to which team and when — in the SAME `env.DB.batch`
+as the balance it moves (`shared/workers/credits.ts`, DATA-MODEL.md). Before it,
+the owner's key could add credits and leave nothing behind but a bigger number.
+**WITHOUT it the grant door fails LOUDLY and grants nothing:** the batch cannot
+insert into a table that is not there, so the balance is rolled back with it and
+the call errors. That is deliberate — the alternative, a best-effort audit row
+after the money, is the untraceable grant this exists to prevent, only looking
+fixed. Apply it to `kwapso-core` + `kwapso-core-staging` first, then deploy.
+
 **Team migration `0037_app_logo`, apply BEFORE deploying tenancy (2026-08-18).**
 `apps.logo_url`, the client's own mark on the app tile. **WITHOUT it every write
 through the apps door 500s on a missing column**, which is the loud failure; the
@@ -416,13 +429,41 @@ every answer says what it searched).
 
 - `POST /api/data-ops/admin/seed-targets`, refresh the GLOBAL `importable_databases` catalog's LABELS (display names / descriptions / schemas). **No longer a step anyone must remember**: the catalogue reconciles itself against the code on read (R13, a fresh env's picker heals on first open; a target the owner switched off stays off, and this door no longer re-activates it either).
 - `GET /api/data-ops/admin/errors?status=open|resolved|all&limit=N`. Read the central error log (newest first). `POST /api/data-ops/admin/errors/resolve` `{ id, note }`, mark one resolved with the what-went-wrong note. See ERROR-HANDLING.md.
-- `POST /api/data-ops/admin/grant-credits`, top up a team's AI credit balance (the purchasable half of the agent quota; the free half is **the app's own daily allowance**, `AGENT_FREE_DAILY`, code default 25, but both environments ship **50**). This is the seam real payments wire into later.
+- `POST /api/data-ops/admin/grant-credits`, top up a team's AI credit balance (the purchasable half of the agent quota; the free half is **the app's own daily allowance**, `AGENT_FREE_DAILY`, code default 25, but both environments ship **50**). This is the seam real payments wire into later. **Every call writes a `credit_grants` row** — who (`owner-key`, because the key proves possession and not a person), how much, which team, when, and this request's own trace id — in the same batch as the balance, so a top-up cannot happen without leaving a record (DATA-MODEL.md § credit_grants).
 
 ### Public surface (LOCKED): only the two gateways are public
 
 auth, tenancy, realtime, content, data-ops and mcp, the six domain workers, all set `"workers_dev": false` **and `"preview_urls": false`** (BOTH, top-level AND env.staging, envs don't inherit, and a per-version preview URL would be another public door), so they have NO public `*.workers.dev` URL and are reachable ONLY via service bindings. The two public addresses are the **agency gateway** (`kwapso` / `kwapso-staging`) and the **portal gateway** (`kwapso-portal` / `kwapso-portal-staging`), one per front door, and no more. That is what makes `/internal/send-email` (and the agent/import act-as-user surface) safe: no public route can reach `/internal/*`, the agent, or the act-as-user surface. Never add a public route/`workers_dev` to a worker that isn't one of the two gateways.
 
 The two gateways set `"preview_urls": false` too, the reasoning above ("a per-version preview URL would be another public door") always applied to them and was simply never written down, so until 11 Aug 2026 every uploaded-but-undeployed version of BOTH front doors had a public address. They also set `"workers_dev": false` in production and `true` only under `env.staging`, so production is custom-domain-only. The whole posture is asserted per worker, per environment, in `workers/gateway/test/public-surface.test.ts`, a claim in this file is no longer the thing standing between a door and the internet.
+
+**A FOURTH FLOW LEAVES THE TWO GATEWAYS, AND IT IS NOT A WORKER (7 Sep 2026).** The
+sentence above stays literally true — only the two gateway WORKERS have a public
+address — but since the presigned upload landed a browser can PUT bytes to
+`<account>.r2.cloudflarestorage.com` directly, with no worker on that path at all, so
+this section would otherwise describe three flows out of four. What holds the promise
+there is not a route setting; it is the **key-minting fence** in
+`workers/content/src/routes/uploads.ts`. The presign door gates on the same right as the
+upload door it stands in for (resolved from `UPLOAD_TARGETS`, so the two cannot diverge
+into a presign that is easier to get than the upload), refuses a portal caller, and then
+**mints the key itself** — `teamMediaKey(guard.teamId, target.module)`, a ULID under the
+team's own prefix; not one byte of it comes off the request. `shared/workers/presign.ts`
+calls that the first of "the three things that make it safe", because "a caller who chose
+their own key could presign a PUT over another team's object — which is the integrity hole
+`unreferencedKeys` closes, reopened one layer down where the database check cannot see
+it". The grant
+is PUT-only, to that one key, for `PRESIGN_TTL_SECONDS` (300), with the content type and
+the byte length signed INTO it, so R2 refuses anything else; the confirm door re-proves
+the key is ours (`ownedMediaKey`) before it hands back a reference. The read path is
+unchanged: bytes still come back through `/media/<key>`.
+
+**And it is off.** `presignConfigured` is false without an `R2_ACCESS_KEY_ID` secret and
+no deployed environment has one, so every upload today still goes through the streaming
+door and the client falls back silently. Switching it on is not a deploy step — it waits
+on a **write-only credential scoped to the two buckets**, which is the condition
+`shared/workers/presign.ts` records; the account-wide key measured on 7 Sep 2026 answered
+200 to LIST and GET and 204 to DELETE across an account shared with two other companies,
+and does not qualify. Check any candidate the same way before setting the secret.
 - **Both environments are on the same commit as of 2026-08-06**, production was
   brought up from the pre-hardening build in one rollout: core migration `0014`
   applied to `kwapso-core` first, then every worker then on disk, realtime-first
@@ -543,8 +584,12 @@ production callers, so it cannot be left set the wrong way.
 retention sweeps, or an owner's decision about old rows), or give that TEAM a new
 database and repoint `teams.database_id` — the restore path in RESILIENCE.md is
 the same procedure. Wiring the mover properly needs the read path to consult the
-routing table AND a merged read that can page, sort and count; `d1QueryAcross`
-refuses all three across more than one database on purpose.
+routing table AND a merged read that can page, sort and count. *(Fact updated
+7 Sep 2026: this line used to end "`d1QueryAcross` refuses all three across more
+than one database on purpose". It sorts and cuts now, and `countCollectionAcross`
+counts; what it still refuses is an OFFSET, a raw aggregate and an ordering it
+cannot parse. So of the two things wiring needs, the merged read is DONE and the
+routing is not — ARCHITECTURE.md §1 has the whole picture.)*
 
 ### The account's D1 storage, and why the mover is the wrong answer to it
 
@@ -566,6 +611,19 @@ the reassuring branch is the one nobody re-reads.
 cf-exec node scripts/r2-lifecycle.mjs staging --dry-run    # what it would set
 cf-exec node scripts/r2-lifecycle.mjs production           # apply
 cf-exec node scripts/r2-lifecycle.mjs production --infrequent
+```
+
+**WHERE IT HAS ACTUALLY BEEN RUN.** Applied to the five STAGING buckets on
+2026-09-07 — before that day the script had never been run against anything, and
+every bucket carried only Cloudflare's own `Default Multipart Abort Rule`.
+**Production is still unset and is the owner's to set**, and it has one blocker:
+`bucketsFor("production")` names `kwapso-glide-archive`, which does not exist on
+the account (only the `-staging` one was ever created) and sorts first, so a
+production run fails on its first bucket and sets nothing. Create the bucket or
+drop it from the derivation first. Check either environment with:
+
+```bash
+cf-exec npx wrangler r2 bucket lifecycle list kwapso-media-staging
 ```
 
 Idempotent (`lifecycle set` replaces the rule set), reads and writes no object,
@@ -677,8 +735,10 @@ both environments, 600 requests per caller per worker per minute
   the per-door `@source` list. Only the paragraph you are reading matches the
   files on disk — check `head -20 web/app/globals.css` before trusting it
   again.)
-- Missing UI components are still placeholdered in `web/components/temp/` and tracked in
-  UI-GAPS.md. Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
+- Missing UI components are placeholdered in `web/components/temp/` and tracked in
+  UI-GAPS.md — a folder that exists only while something is in it, and is absent today
+  (its last file went on 2026-08-29, and UI-GAPS.md says where the one remaining
+  placeholder lives instead). Closing one is a kit change: built upstream in `Kwapso/kwapso-ui-ux`, tagged,
   pulled with `scripts/sync-design.mjs`, then the import is swapped and the placeholder
   deleted here — never built by hand under `shared/ui/`, which turns the build red.
 

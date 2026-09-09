@@ -4,7 +4,7 @@
 Its commit `d7a700cc` touches **35 files**, removing `tracking-tight` (32 sites) and
 converting hand-rolled eyebrows to `text-micro` (16 sites).
 
-**Exactly one file overlaps with this lane: `web/components/record-chrome.tsx`.**
+**Exactly one file overlaps with this lane: `web/components/records/record-chrome.tsx`.**
 
 That overlap is benign and the resolution is decided in advance: this lane replaces
 the app's `record-chrome.tsx` with the kit's `RecordChrome`, so design-audit's

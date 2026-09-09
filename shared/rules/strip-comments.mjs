@@ -264,7 +264,7 @@ function opensJsxElement(src, at) {
  *     handler whose `publishChange` had not moved. Ordering papered over it.
  *
  *  2. Then `accept="image/*"`. A JSX attribute, in
- *     `web/components/app-form-dialog.tsx`. No `//` in sight, so the ordering
+ *     `web/components/apps/app-form-dialog.tsx`. No `//` in sight, so the ordering
  *     fix did nothing: the block regex opened a comment inside the STRING and
  *     closed it at the next `*​/` — the end of a JSDoc SIXTY LINES BELOW. Three
  *     `<Notes>` call sites, a `<Field>` and a `<FileUpload>` were deleted before

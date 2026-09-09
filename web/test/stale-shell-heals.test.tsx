@@ -27,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 const reported = vi.fn()
 vi.mock("@shared/web/log", () => ({ reportError: (...a: unknown[]) => reported(...a) }))
 
-import { ErrorBoundary } from "@/components/error-boundary"
+import { ErrorBoundary } from "@/components/shell/error-boundary"
 
 const reload = vi.fn()
 

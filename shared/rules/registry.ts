@@ -56,6 +56,23 @@ export interface Rule {
  * the NEXT collision impossible, which is the only harm still in front of us.
  *
  * `LAW_ID_ORIGIN` below is that record, and the check on it is the guard. */
+/** AND ONE RENUMBERING THAT DID HAPPEN, 8 Sep 2026, so nobody hunts for it.
+ *
+ * `main` and `feat/ui-ux` were apart for 92 and 57 commits, and BOTH minted an
+ * R52, an R53 and an R54 — six different laws under three numbers. One set had
+ * to move, and the paragraph above is the precedent for how that is decided: the
+ * harm is a reader who cannot tell which law a number means, so MINIMISE THE
+ * REFERENCE REWRITE. feat/ui-ux's four laws (R52 record-title-treatment, R53
+ * toolbar-slot-set, R54 staff-names-are-first-names, R55 refs-match-the-formula)
+ * were named at 148 sites across 39 files, most of them code comments where a
+ * wrong number is invisible; main's three were named at 14. So the branch's
+ * numbers stand and MAIN'S THREE MOVED UP: one-door-per-unit R52 → R56,
+ * component-folders R53 → R57, named-paths R54 → R58.
+ *
+ * What went stale is commit MESSAGES on both sides — "test(rules): R52 — a
+ * component asks a door once" now describes R56 — and a commit message is a
+ * record of a moment, which is the one thing here that could not be rewritten
+ * and the one thing that was never meant to be current. */
 export const BASE_REPOSITORY = "alaap-swift-struck/brimba"
 
 /** The highest law id the canonical base had minted when this was last read
@@ -95,7 +112,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R2",
     dimension: "ui",
-    law: "Every record-detail screen exposes Overview + Activity tabs.",
+    law: "Every record-detail screen draws its tab strip through the library TabsView, and every record's history is REACHABLE — from the ink footer's Latest activity eyebrow, which opens the slide-in rail. The Activity TAB was retired on 7 Sep 2026 (\"kill all old activity tabs\"), so no detail renders <ActivityPanel> any more and the check follows the history to the rail its two hosts mount.",
     checkId: "record-detail-tabs",
     status: "enforced",
   },
@@ -289,7 +306,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R29",
     dimension: "ui",
-    law: "THE PAGE HAS ONE WIDTH, AND A SCREEN DOES NOT GET ITS OWN. Each front door owns exactly one page container — `web/components/app-shell.tsx` at `max-w-none`, `web-portal/components/portal-shell.tsx` at `max-w-3xl` — and no other component may set a page-level width. A page container is identified positionally, the way R20 identifies a checked field: one line carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the exact signature of a centred content column and of nothing else. Anything else that needs a cap (a dialog, a sheet, a door card, a chat bubble, a line of prose) is not centred-and-full-width and is not caught. Exceptions are DATA in `SCREEN_WIDTH_EXEMPT`, each with its reason, and every one is rot-checked: an entry whose file no longer sets a width turns the build red, so the list can only shrink.",
+    law: "THE PAGE HAS ONE WIDTH, AND A SCREEN DOES NOT GET ITS OWN. Each front door owns exactly one page container — `web/components/shell/app-shell.tsx` at `max-w-none`, `web-portal/components/portal-shell.tsx` at `max-w-3xl` — and no other component may set a page-level width. A page container is identified positionally, the way R20 identifies a checked field: one line carrying `mx-auto`, `w-full` and a `max-w-*` together, which is the exact signature of a centred content column and of nothing else. Anything else that needs a cap (a dialog, a sheet, a door card, a chat bubble, a line of prose) is not centred-and-full-width and is not caught. Exceptions are DATA in `SCREEN_WIDTH_EXEMPT`, each with its reason, and every one is rot-checked: an entry whose file no longer sets a width turns the build red, so the list can only shrink.",
     why: "The owner named this one himself, and named it as an inconsistency rather than a bug: work logs, tasks and meetings use the full width, and he could not see why other pages did not. The answer was that those three render through the one shell and six screens cap themselves narrower. One of the six is the shell's OWN loading skeleton (`app-shell.tsx:489`, `max-w-2xl`), so every cold load of the agency app visibly snapped sideways as 672px of skeleton became 1120px of content. That is the shape of failure this law exists for: not a rule anybody disagreed with — UI-RULEBOOK L1 already said 'one container, one cap', and round one of the feedback implemented it in `deep-link-screen.tsx` — but a rule that was implemented in the one place somebody happened to be looking and stayed unimplemented in six others, silently, under a green build. A width is invisible to every other check in this repo: TypeScript sees a string, the lint sees a string, and no test reads layout. It ships a screen that works, on which two thirds of a wide display is empty.",
     checkId: "one-page-width",
     status: "enforced",
@@ -456,7 +473,7 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R50",
     dimension: "ui",
-    law: "NEVER TOOLBAR ON AN EMPTY COLLECTION — NOT EVEN THE CREATE BUTTON. R48 made the search box a default; this makes the WHOLE row answer one question together. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) takes a required `empty` prop — true when the collection holds zero rows before any search or filter narrows it — and returns `null` unconditionally when it is true, before any other slot (search, filters, sort, view, or `actions`, the create button) is even considered. `<PagedFind>` (`web/components/paged-find.tsx`) takes the equivalent required `restingEmpty` prop for the same reason on the door-searched half of the app, suppressing its own search/filters/sort/match-count/actions row the identical way while a genuinely empty collection is not being searched. `<SectionWithCreate>`'s own header-drawn create button (`showCreateInHeader`) carries the same gate through an optional `empty` prop, for the one shape neither `folderTabs` nor `useKitPanel` already covers. Two censuses, off the disk: every `<ToolbarRow>` call site across `web/` and `web-portal/` must pass an `empty` prop DERIVED FROM THE COLLECTION'S OWN ROW COUNT, and every `<PagedFind>` call site must pass a `restingEmpty` prop the same way — a prop that is MISSING, or hardcoded to a bare `{true}`/`{false}` literal (the row answering the question with a constant rather than real data), must be named in `EMPTY_TOOLBAR_EXEMPT` with the real reason. Rot-checked both ways, so the list can only shrink.",
+    law: "NEVER TOOLBAR ON AN EMPTY COLLECTION — NOT EVEN THE CREATE BUTTON. R48 made the search box a default; this makes the WHOLE row answer one question together. `<ToolbarRow>` (`web/components/deep-link/screen-bits.tsx`) takes a required `empty` prop — true when the collection holds zero rows before any search or filter narrows it — and returns `null` unconditionally when it is true, before any other slot (search, filters, sort, view, or `actions`, the create button) is even considered. `<PagedFind>` (`web/components/records/paged-find.tsx`) takes the equivalent required `restingEmpty` prop for the same reason on the door-searched half of the app, suppressing its own search/filters/sort/match-count/actions row the identical way while a genuinely empty collection is not being searched. `<SectionWithCreate>`'s own header-drawn create button (`showCreateInHeader`) carries the same gate through an optional `empty` prop, for the one shape neither `folderTabs` nor `useKitPanel` already covers. Two censuses, off the disk: every `<ToolbarRow>` call site across `web/` and `web-portal/` must pass an `empty` prop DERIVED FROM THE COLLECTION'S OWN ROW COUNT, and every `<PagedFind>` call site must pass a `restingEmpty` prop the same way — a prop that is MISSING, or hardcoded to a bare `{true}`/`{false}` literal (the row answering the question with a constant rather than real data), must be named in `EMPTY_TOOLBAR_EXEMPT` with the real reason. Rot-checked both ways, so the list can only shrink.",
     why: "The client's own words, verbatim, about a Time tab on a brand-new record: \"once again, when empty collection no toolbar at all - fix everywhere and set as a rule.\" \"Once again\" is the load-bearing word: R48 (2 Sep 2026) had already ruled 'NEVER TOOLBAR ON EMPTY COLLECTION' once, and `CollectionFrame`'s own `isEmptyState` branch (the recipe engine's kit-panel path) had correctly carried it since — but that law's own two censuses only ever asked whether a `search` prop was PRESENT, never whether the REST of the row agreed with it. A `<ToolbarRow search={data.length > 0 && …} actions={canCreate && <AddButton/>} />` passes R48 outright (it has a `search` prop) while still drawing a lone, floating create button the moment the collection is empty — precisely her screenshot: a Time tab with zero rows, no search box, no sort, no filter, just a circular orange \"+\" sitting above \"No time logged against this yet.\" The audit this law's own census forced turned up the identical shape SEVEN more times, each reasoned as if it were the intended design rather than the bug it was: Sprints' Overview/Calendar toolbar fell back to a bare `<ToolbarRow actions={…}>` \"the same gate waves-screen.tsx puts on its own finder\" (a comment describing the bug as a precedent); Waves' own finder did the identical fallback, precedent and all; a wave's own Sprints tab kept a `<ToolbarRow>` alive through `canCreate` alone, picker included, regardless of `sprints.length`; Deliverables, Modules, and every one of Client-org's three lists (departments/roles/tools) gated `search` on the collection's own length and left `actions` gated on nothing but a permission check; Dropdown values fell back to the exact same shape with an Import CSV button riding along; and Tickets' own Triage queue drew its toolbar from a PARENT component that could never see whether the CHILD's queue — fetched two components away — held a single row. The fix could not be a fourteenth per-call-site patch, so it is not one: `empty`/`restingEmpty` are REQUIRED props precisely because an OPTIONAL one is what let every one of these seven happen — a caller who remembers to gate `search` and forgets to gate `actions` the identical way is not a caller who forgot a rule, it is a rule that was never asked of that slot.",
     checkId: "empty-toolbar",
     status: "enforced",
@@ -473,7 +490,7 @@ export const RULES_REGISTRY: Rule[] = [
     id: "R52",
     dimension: "ui",
     law: "EVERY PATH THAT DRAWS A RECORD DETAIL WEARS THE SAME TITLE TREATMENT — ONE CONSTANT, NEVER A PER-CALL-SITE CLASS. `RECORD_TITLE_TREATMENT` (`shared/web/record-heading.tsx`) is the record heading's own step (h1/44, reached as `[&_[data-slot=title-heading]]:text-4xl` because the kit's `Title` has no h1 rung) and the 80% title/actions split, as ONE string. One census, off the disk, over `web/`, `web-portal/` and `shared/web/`: every call site that renders the kit's `<RecordDetail>` or its `<RecordChrome>` template — the app's only two ways to draw a detail screen — must apply that exact constant in its `className` AND import it from `shared/web/record-heading`, and none of them may pass a competing `titleSize` prop of its own. The constant's own definition is pinned too: `RECORD_TITLE_SIZE` must still be the h1 step against the kit's own `data-slot=title-heading` hook, and `RECORD_TITLE_TREATMENT` must still be built from it, so the law cannot be satisfied by an identifier that has been quietly emptied. A tripwire asserts the census found more than one path at all — a scan that goes blind reports agreement.",
-    why: "The client's own words, 2026-09-06, verbatim: \"i want that unless other oomponents are above the tabs, the tabs are at exact same heigh in main screen and detail screen / also titels at same high / need to lok more uniform\" — and, standing behind it, the ruling she has now given three times: \"i dont want you to hardcode fixes for single pages, but to state rules about components.\" THE DEFECT WAS EXACTLY A PER-CALL-SITE PATCH OUTLIVING ITS ONE CALL SITE. This app draws a record detail TWO ways — thirteen hand-composed `*-detail.tsx` screens through `RecordScreen` (`web/components/record-chrome.tsx`), and five recipe-driven ones through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`) — and the 44px title, a fix for a real client correction on 2026-08-31 (\"title on main screens still way too small! it's currently smaller than in detail screens\"), was written as a PRIVATE constant inside the first one. The second path never saw it and fell through to the kit's own `titleSize = \"h3\"` default, so `team.detail`, `members.detail`, `invites.detail`, `brand.detail` and `purposes.detail` set a record's own name at 24px while thirteen sibling screens set it at 44px — a 20px step, and every pixel of it lands on the tab strip below, which is the height the client was actually pointing at. `team.detail` is the app's own landing screen, so this was the FIRST detail screen most people saw. The 2026-09-01 ruling on the title row (\"we always reserve a % on the left for the buttons\") had gone the identical way, private to the same file, invisible to the same five screens. NOTHING WAS RED, and nothing could have been: a default on one path and a class on the other is not a contradiction any type or any test could see, and neither file names the other. The tab-strip GAP, by contrast, was already uniform on both paths and on main screens — because it had been made a TOKEN (`--tab-content-gap`, R49's neighbour) rather than a class in one file. That is the whole difference between the half of this that drifted and the half that did not, and it is why the fix is one exported constant with a census over the paths, not a second copy of the class.",
+    why: "The client's own words, 2026-09-06, verbatim: \"i want that unless other oomponents are above the tabs, the tabs are at exact same heigh in main screen and detail screen / also titels at same high / need to lok more uniform\" — and, standing behind it, the ruling she has now given three times: \"i dont want you to hardcode fixes for single pages, but to state rules about components.\" THE DEFECT WAS EXACTLY A PER-CALL-SITE PATCH OUTLIVING ITS ONE CALL SITE. This app draws a record detail TWO ways — thirteen hand-composed `*-detail.tsx` screens through `RecordScreen` (`web/components/records/record-chrome.tsx`), and five recipe-driven ones through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`) — and the 44px title, a fix for a real client correction on 2026-08-31 (\"title on main screens still way too small! it's currently smaller than in detail screens\"), was written as a PRIVATE constant inside the first one. The second path never saw it and fell through to the kit's own `titleSize = \"h3\"` default, so `team.detail`, `members.detail`, `invites.detail`, `brand.detail` and `purposes.detail` set a record's own name at 24px while thirteen sibling screens set it at 44px — a 20px step, and every pixel of it lands on the tab strip below, which is the height the client was actually pointing at. `team.detail` is the app's own landing screen, so this was the FIRST detail screen most people saw. The 2026-09-01 ruling on the title row (\"we always reserve a % on the left for the buttons\") had gone the identical way, private to the same file, invisible to the same five screens. NOTHING WAS RED, and nothing could have been: a default on one path and a class on the other is not a contradiction any type or any test could see, and neither file names the other. The tab-strip GAP, by contrast, was already uniform on both paths and on main screens — because it had been made a TOKEN (`--tab-content-gap`, R49's neighbour) rather than a class in one file. That is the whole difference between the half of this that drifted and the half that did not, and it is why the fix is one exported constant with a census over the paths, not a second copy of the class.",
     checkId: "record-title-treatment",
     status: "enforced",
   },
@@ -501,6 +518,30 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "refs-match-the-formula",
     status: "enforced",
   },
+  {
+    id: "R56",
+    dimension: "arch",
+    law: "A COMPONENT ASKS A DOOR ONCE. Every `useCached(key, fetcher)` read across `web/` and `web-portal/` is censused off the disk, grouped by the COMPONENT it sits in (not the file, which can hold seven panels each with its own local `key`) and by the DOOR its fetcher calls (`tenancy.selectable`, `listFetch.apps` — the receiver and method, since the arguments say which rows and not which question). A component holding two reads of one door is a finding, and the two shapes are graded differently because they cost differently. SAME KEY TWICE is an outright defect with no exemption available: the store dedupes by key (`inFlight` in shared/web/store.ts), so the second read buys nothing and exists only as a second place to change one question. TWO DIFFERENT KEYS on one door is a REAL second request the store cannot dedupe, and is sometimes right — those are named in `TWO_READS_ONE_DOOR` with the reason, rot-checked, so the list can only shrink. Identifiers are resolved to what they were assigned and a `cond ? KEY : null` gate normalises to KEY, because a read gated on a permission is the same question as an ungated one — which is exactly the shape that shipped.",
+    why: "round_trip_review's criterion 2 is called \"no question is asked twice\". On 5 Sep 2026 it scored 100 out of 100 at weight 13, and on 6 Sep the same lane found `app-detail.tsx` reading `selectable:<team>` twice — once unconditionally and once gated on `canRaiseTicket`, so the gated one could never be the read that warmed the cache. The criterion was scored by a human reading a probe's hits, and the probe HAD reported it; it was dismissed as a false positive on the correct but incomplete grounds that the store dedupes the request. That is true and it is not the whole property: the reviewer was right about the network and wrong about the score, and a criterion whose 100 depends on a judgement call made in a hurry is a criterion that says nothing. The owner asked, a month apart, whether the duplicate reads those reviews found were sorted and whether any review still watches for them — the honest answer was that a review watched and nothing checked. This is the check. It found the property is otherwise held: 183 fetching read sites across both front doors, zero same-key duplicates, and four components asking one door under two keys, every one of them a genuinely different question (a week of meetings versus all of them; four versions of one process map; a record's time versus a person's; and the open task list beside the all list, which use-screen-data.ts keeps apart on purpose because ticking a task off the OPEN list would make a detail screen sourced from it answer \"that record no longer exists\").",
+    checkId: "one-door-per-unit",
+    status: "enforced",
+  },
+  {
+    id: "R57",
+    dimension: "ui",
+    law: "web/components IS ONE FOLDER PER MODULE OR KIND, AND EVERY FOLDER SAYS WHAT BELONGS IN IT. The 7 Sep 2026 fold turned 148 flat files into fifteen folders on TWO AXES: `tickets-screen.tsx` sits in `tickets/` because it draws a module and `home-screen.tsx` in `screens/` because there is no home module; `collection-heading.tsx` in `records/` because every collection reuses it and `collection-content.tsx` in `deep-link/` because only the routing shell renders it. The rule is written once, in `web/components/README.md`, one line per folder, and the check DERIVES the permitted set from that file's own table rows rather than holding a second copy of the list — so the doc and the law cannot disagree, because there is only one of them. Three failures: a component left loose at the top level, a folder nobody described, and a described folder nobody has.",
+    why: "Both pairs above are right and neither is guessable, which is the whole reason the words exist and not just the check: a newcomer has to READ the rule, and before this there was nothing to read. The arrangement was recorded in a commit message and enforced by nobody, in a repo whose other fifty-two invariants are all machine-checked — so the next component dropped at the top level would have been green, and the one after it would have made \"the top level is empty\" untrue for good. Deriving the folder set from the README rather than from a constant is what stops the usual second failure, a list in a test that drifts from the paragraph a person actually reads.",
+    checkId: "component-folders",
+    status: "enforced",
+  },
+  {
+    id: "R58",
+    dimension: "arch",
+    law: "A PATH THIS REPO NAMES MUST RESOLVE ON DISK. Two censuses, both derived off the disk and both read through the one walker: every repo path with a real extension in `documents/**.md` and the root canon, and every path spelled out with a `.ts`/`.tsx` extension anywhere in our own source. An import specifier in this codebase never carries an extension, so the source census reads PROSE and string literals and never the module graph. The way out is a reasoned `GONE_ON_PURPOSE` line — a path a document names precisely BECAUSE it is gone (\"the clause and web/lib/use-live-refetch.ts were retired\") — rot-checked both ways, so a path that comes back and a pin nothing mentions any more both turn the build red and the list can only shrink.",
+    why: "Every law here is a source scan, and every scan reads a path it was HANDED; nothing read the paths the repo WRITES. Earned by eight dangling paths in the canon and twelve in our own source, and it is worse than untidy: FIVE of the twelve named a GUARD that does not exist. workers/auth/src/lib/sessions.ts promised the build fails if a fourth copy of the session cookie name appears and named a test file that is not there; workers/content/src/routes/triage.ts said a whole-repo census watched the triage rota and named another. Both properties are genuinely enforced, by suites under different names — so a reader who checks is reassured by a file that is not there, and a reader who does not check is reassured by nothing at all. The 7 Sep fold of web/components left one more behind, in a comment two folders away, and a human found it weeks after a green build.",
+    checkId: "named-paths",
+    status: "enforced",
+  },
 ]
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
@@ -519,7 +560,7 @@ export const RULES_REGISTRY: Rule[] = [
  * and the list can only ever shrink.
  *
  * Empty is the goal, and empty is where it stands. The one line it ever held was
- * the two triage banners in `web/components/tickets-collection.tsx`, deferred on
+ * the two triage banners in `web/components/tickets/tickets-collection.tsx`, deferred on
  * the day this law landed only because a concurrent lane owned that file; both
  * call sites now resolve through `staffNameFromSnapshot`, exactly as
  * `triage-strip.tsx` — the third copy of the same sentence — always did. */
@@ -733,7 +774,7 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // from each other.
 // Bumped by +2/language on 2026-09-03: the record-activity audit (R33/R28)
 // wired the kit's `ActivityFeed` `loading`/`error` registers into
-// `ActivityPanel` (web/components/activity-panel.tsx) so a still-loading or
+// `ActivityPanel` (web/components/records/activity-panel.tsx) so a still-loading or
 // failed feed stops rendering "No activity yet." Two new `t(...)` sentences
 // — "Couldn't load activity" and "We couldn't load this record's activity.
 // Try again in a moment." — extract with no seed entry yet in any of the
@@ -763,7 +804,7 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // (154 → 168); this pin covers exactly this change's own rise on top of
 // that one and does not answer for any other in-flight change to the true
 // count.
-// 2026-09-03, 183 → 186 (loading-toolbar pass, web/components/paged-find.tsx,
+// 2026-09-03, 183 → 186 (loading-toolbar pass, web/components/records/paged-find.tsx,
 // load-more.tsx, tickets-collection.tsx, meetings-screen.tsx). This pass's
 // OWN new sentences: `t("That's the first {n}. Search or filter to find what
 // you're after.")` (load-more.tsx, replacing a translated-fragment-plus-raw-
@@ -791,7 +832,7 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // icons on recipe tabs, the Activity block's own registers, the confirm's red
 // button and busy state) added ZERO new catalogue strings — every sentence it
 // says was already in the catalogue, reused word for word from
-// web/components/activity-panel.tsx and shared/web/use-confirm.tsx so the two
+// web/components/records/activity-panel.tsx and shared/web/use-confirm.tsx so the two
 // implementations of each cannot drift. What raised the count is the
 // `node scripts/i18n-extract.mjs` run that change is required to make: the
 // working tree's catalogue was stale against several other in-flight changes,
@@ -806,6 +847,70 @@ export const CORPUS_EXEMPT: Record<string, string> = {
 // to be reconciled against the other concurrent bumps rather than trusted as
 // the final number.
 export const TRANSLATION_CEILING: Record<string, number> = {
+  // RAISED 216 -> 217 in all three on 8 Sep 2026. ONE sentence, and it is the
+  // first of a class worth naming here because the next 48 arrive the same way:
+  //
+  //  · "The system this work is on. Everything below is narrowed by it." — the
+  //    New story dialog's explanation of its App row. It was WRITTEN when the
+  //    field was built and has never rendered, because the config set `hint:`
+  //    and `FieldConfig` has no such key; it has `helpText`. Nothing in the app
+  //    or the kit accepts a `hint` prop, and TypeScript never objected because
+  //    the config is a named constant rather than an inline literal, so the
+  //    excess-property check does not fire.
+  //
+  // FORTY-EIGHT MORE LIKE IT sit across both front doors — tickets, sprints,
+  // rates, reviews, legal details, time — every one an explanation somebody
+  // wrote for a person and no person has ever read. They are outside R28, R33
+  // and R34 as well, because those walk `label:` and `helpText:` and a dead key
+  // says nothing to anybody. This one was converted alone, deliberately, to
+  // MEASURE what the class costs: one ceiling point per language each, so the
+  // whole set is +48 more unless it is translated in the same change.
+  //
+  // The owner asked why the row shows "Required" over a value he cannot touch
+  // (8 Sep 2026). This sentence is the answer the dialog always meant to give.
+  //
+  // RAISED 213 -> 216 in all three on 7 Sep 2026, dead-end lane. THREE new
+  // English sentences, all three of them the words a dead end needed in order
+  // to stop being one — a field the machine surface could already write, put in
+  // front of the person who owns the record:
+  //
+  //  · "Screen recording" and "Open the recording" — one row and its link on
+  //    the ticket's Overview. `help.screen_recording_link` has been settable on
+  //    `create_help_ticket`/`update_help_ticket` since the door shipped, stored,
+  //    selected and typed, and rendered by no screen on either front door: a
+  //    person could hand the assistant a Loom link, read "Screen recording: …"
+  //    on the confirm panel, press yes, and never see it again.
+  //  · "Who reviews it" — the story's own reviewer, resolved at the door
+  //    through `memberOrThrow` and shown by nothing. The row appears only when
+  //    a story HAS one (zero of 329 on staging do), so it is a sentence a
+  //    German reader meets the first time the capability is used rather than on
+  //    every story.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, for the same reason as every entry below:
+  // `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before. The next reviewed run takes all
+  // three back down together.
+  //
+  // RAISED 211 -> 213 in all three on 7 Sep 2026, first-run lane, under the
+  // owner's ruling that there should be empty states for everything. TWO new
+  // English sentences, both the kit's own empty register (27.21) reaching a
+  // host-composed tab the engine never drew for:
+  //
+  //  · "No tasks with a deadline yet." — Tasks' Calendar tab on a team with
+  //    nothing dated. Its own sentence because that tab's collection is the
+  //    dated tasks, and a team with undated tasks lands there too, so "no
+  //    tasks yet" would be false for them.
+  //  · "Nothing in Meetings yet." — Meetings' Calendar tab. The SAME words the
+  //    meetings recipe has always carried as its `emptyText`, said at a `t(…)`
+  //    call site for the first time; a recipe's `emptyText` is translated
+  //    where it is read (screens.ts, `t(c.emptyText)`), which the extractor
+  //    does not see, so the sentence was never in the catalogue although a
+  //    screen has drawn it since 5 Sep. The calendar tab saying it through
+  //    `t()` is what put it here — a genuine debt made visible, not a new one.
+  //
+  // NOT TRANSLATED HERE, ON PURPOSE, for the same reason as every entry below:
+  // `scripts/i18n-translate.mjs` spends the OWNER'S own API key and has
+  // rate-limited his personal account before. The next reviewed run takes all
   // LOWERED 244 -> 240 in all three on 6 Sep 2026, the tickets-dashboard lane,
   // and this is the direction the pin is supposed to move. Twenty-five new
   // English sentences landed with the Monday screen and NOT ONE of them is in
@@ -978,9 +1083,49 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // ("no header"). Every verb it draws — Accept, Assign, Plan, Store — and the
   // picker's own strings were already catalogued by the card, which is what
   // sharing `triageAct` and `RecordPicker` between the two views buys.
-  de: 240,
-  es: 240,
-  ca: 240,
+  // MERGED 8 Sep 2026, main × feat/ui-ux, and RAISED 240 -> 246 in all three.
+  //
+  // THE ARITHMETIC. The two branches carried different debts over different
+  // sentences: main's pin read 217 and feat/ui-ux's read 240, and neither is
+  // the merged number, because untranslated-ness is a UNION — a sentence main
+  // never translated is still untranslated after the merge, and so is one of
+  // hers. So the count was RE-MEASURED against the merged catalogue rather than
+  // reasoned to, and it comes back 246 in de, es and ca alike (2,039 extracted
+  // strings; `npm run lang` run immediately before). +6 over the higher of the
+  // two pins is the part of main's residue that feat/ui-ux had not already
+  // paid, and nothing here is new copy this merge wrote.
+  //
+  // RAISING IS THE EXCEPTION AND THIS IS THE REASON. A merge is the wrong
+  // commit to clear 246 × 3 translations in: 738 new entries would bury the
+  // 290-file merge they rode in on, and every one of them is a sentence
+  // somebody should be able to read in the diff that introduces it. The debt
+  // is older than this commit and it is unchanged in kind by it. The next
+  // reviewed translation pass takes all three down together — and it can only
+  // ever take them DOWN.
+  //
+  // LOWERED 246 -> 244 in all three, the field-hints lane. 44 `FieldConfig`s
+  // across both front doors set `hint:` instead of `helpText:` — a key the
+  // type has never had, silently dropped by the excess-property check's own
+  // blind spot for named constants — so every explanation written for a
+  // person was read by nobody. Renamed and extracted (43 distinct new English
+  // sentences; one is shared verbatim by two fields), and translated by hand
+  // into de/es/ca per the owner's 8 Sep 2026 ruling that translation is the
+  // builder's own job and never spends his key. That is +0 net against this
+  // ceiling — the 43 are BRAND NEW extractions, not previously counted, and
+  // all 43 are translated the same commit they are catalogued in.
+  //
+  // The -2 is two SEPARATE, already-catalogued sentences translated in the
+  // same pass: "The system this work is on. Everything below is narrowed by
+  // it." (the New story dialog's App field, converted alone on 8 Sep 2026 to
+  // measure this exact class, and part of the 246 as an untranslated string
+  // until now), and "Choices" (the Settings tab renamed from "Dropdown
+  // values" on 2026-09-01, extracted since but never translated — caught
+  // because this lane's own `typeField` hint named the OLD screen name and
+  // had to be corrected to "the Choices screen" first, R34, which put the
+  // tab's own word in front of the same translator).
+  de: 244,
+  es: 244,
+  ca: 244,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -995,36 +1140,36 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
   "components/visibility":
     "unreached as of 2026-09-03, and by a deletion rather than a gap: its `useIsVisible` had exactly one caller in the app, `web/components/condensed-title.tsx`, which watched a screen's real title and swapped in a smaller sticky stand-in once it scrolled away. The client removed that bar outright (\"when I scroll down, the whole compressed title is useless, so remove that\"), so nothing in either front door now asks \"is this element on screen right now\" — every other scroll-dependent surface in the app is plain `position: sticky` (the record and collection tab strips, the shell's breadcrumb bar), which needs no observer at all. The day a screen genuinely needs to know what is in view again, this is the part to reach for rather than a second IntersectionObserver.",
   "components/heatmap":
-    "no screen aggregates \"which record did how much work each period\" as a grid — work-log views are single-series (one record's weeks, or one week's people, web/components/work-logs-panel.tsx), never a record×period matrix.",
+    "no screen aggregates \"which record did how much work each period\" as a grid — work-log views are single-series (one record's weeks, or one week's people, web/components/work/work-logs-panel.tsx), never a record×period matrix.",
   "components/pulse-band":
-    "a confirmed name collision, not a gap: web/components/pulse.tsx exports its own PulseBand, a StatGrid-plus-two-bar-charts dashboard band with no day-of-week axis at all — unrelated in shape to the kit's day-by-week density strip. Nothing in the app tracks per-day-of-week workload.",
+    "a confirmed name collision, not a gap: web/components/screens/pulse.tsx exports its own PulseBand, a StatGrid-plus-two-bar-charts dashboard band with no day-of-week axis at all — unrelated in shape to the kit's day-by-week density strip. Nothing in the app tracks per-day-of-week workload.",
   "components/donut":
-    "explicitly rejected in the app's own comment: web/components/pulse-charts.tsx documents that every comparison chart (hours by person, by app, by stage) stays a bar \"deliberately not a pie: … a bar is the only chart anybody reads a comparison off reliably.\"",
+    "explicitly rejected in the app's own comment: web/components/screens/pulse-charts.tsx documents that every comparison chart (hours by person, by app, by stage) stays a bar \"deliberately not a pie: … a bar is the only chart anybody reads a comparison off reliably.\"",
   "components/rings":
-    "no single-KPI-against-a-target or part-of-a-whole metric exists anywhere that isn't already a bar comparison — the app's eleven charts are all multi-category bars or time-series areas (web/components/pulse-charts.tsx).",
+    "no single-KPI-against-a-target or part-of-a-whole metric exists anywhere that isn't already a bar comparison — the app's eleven charts are all multi-category bars or time-series areas (web/components/screens/pulse-charts.tsx).",
   "components/radar":
     "no feature compares one record across several independent dimensions at once — every metric the app tracks (hours, margin, savings, stage counts) is a single measure over time or over a group, which the existing bar/area charts already cover.",
   "components/progress-toggle":
-    "both progress readouts in the app are plain text (web/components/sprints-screen.tsx's \"3 of 11 done\") or a continuous bar (KpiProgress, web/components/tasks-screen.tsx) — never discrete done/undone segments for this pill row to draw.",  "components/container":
-    "adopting it would break R29: web/components/app-shell.tsx's own `max-w-none` line is the sole machine-checked page-width owner for the agency front door, and Container's own presets (app 1240 / marketing 1200 / document 960) don't even offer that width.",
+    "both progress readouts in the app are plain text (web/components/work/sprints-screen.tsx's \"3 of 11 done\") or a continuous bar (KpiProgress, web/components/work/tasks-screen.tsx) — never discrete done/undone segments for this pill row to draw.",  "components/container":
+    "adopting it would break R29: web/components/shell/app-shell.tsx's own `max-w-none` line is the sole machine-checked page-width owner for the agency front door, and Container's own presets (app 1240 / marketing 1200 / document 960) don't even offer that width.",
   "components/signature":
     "the app's one approval flow, PortalApprovalBand (web-portal/components/ticket-screen.tsx), is a click-to-approve button with a caption — not a drawn, canvas signature capture. No sign-off flow in the app asks for one.",
   "components/rating":
     "no star icon and no rating concept exists anywhere in either front door's UI code.",
   "components/aspect-ratio":
-    "the one ratio-boxed image (web/components/deliverables-panel.tsx) applies the plain `aspect-video` Tailwind utility directly to a single thumbnail — one site, not a reusable wrapper's job.",
+    "the one ratio-boxed image (web/components/apps/deliverables-panel.tsx) applies the plain `aspect-video` Tailwind utility directly to a single thumbnail — one site, not a reusable wrapper's job.",
   "components/video":
     "no `<video>` element exists anywhere in web/, web-portal/, or shared/web/.",
   "components/web-embed":
     "the only `<iframe>` in the codebase is a sanitizer test fixture (web/test/stored-html.test.tsx) proving embeds get stripped — not a real embedded-content surface.",
   "components/progress-dashboard":
-    "multi-metric displays are already assembled from StatGrid + KpiProgress + Chart (web/components/pulse.tsx, work-logs-panel.tsx, agent-blocks.tsx) — nothing needs this component's specific stacked-bars shape.",
+    "multi-metric displays are already assembled from StatGrid + KpiProgress + Chart (web/components/screens/pulse.tsx, work-logs-panel.tsx, agent-blocks.tsx) — nothing needs this component's specific stacked-bars shape.",
   "components/tree":
-    "no nested/hierarchical disclosure exists in the app — process branching (web/components/step-form-dialog.tsx) renders as a flowchart DAG through the kit's own Flowchart, not a tree, and the kit's own Comments is explicitly one level deep.",
+    "no nested/hierarchical disclosure exists in the app — process branching (web/components/process/step-form-dialog.tsx) renders as a flowchart DAG through the kit's own Flowchart, not a tree, and the kit's own Comments is explicitly one level deep.",
   "components/notifications":
     "the app relies on the kit's own `sonner` toasts for the moment and `activity-feed` for the history — no bell icon or notification-center composition exists anywhere for this to replace.",
   "components/spreadsheet":
-    "rate cards and time logs (web/components/internal-rate-card.tsx, time-panel.tsx) are list-based with edits through a separate dialog, exactly the \"hours, invoices\" content the kit's own header names — but adopting it means re-architecting a working dialog-based edit flow into inline cell-editing, not a swap.",
+    "rate cards and time logs (web/components/money/internal-rate-card.tsx, time-panel.tsx) are list-based with edits through a separate dialog, exactly the \"hours, invoices\" content the kit's own header names — but adopting it means re-architecting a working dialog-based edit flow into inline cell-editing, not a swap.",
   "components/matrix":
     "work-logs-panel.tsx deliberately renders hours by week/person/kind as three independent 1D bar charts, each failing on its own when it has nothing to say — no two-dimensional record×period cross-tab exists for this to replace.",
   "components/swimlane":
@@ -1040,9 +1185,9 @@ export const KIT_COMPONENT_EXEMPT: Record<string, string> = {
   "components/compare":
     "no 2-4 record side-by-side comparison screen exists anywhere in the app.",
   "components/flowdetail":
-    "a fundamental mismatch: process steps are editable in this app (web/components/process/steps-panel.tsx has onEditStep/canEdit), and flowdetail's click-a-step panel is read-only by design — the app already adopted plain Flowchart directly instead (web/components/process-flowchart.tsx).",
+    "a fundamental mismatch: process steps are editable in this app (web/components/process/steps-panel.tsx has onEditStep/canEdit), and flowdetail's click-a-step panel is read-only by design — the app already adopted plain Flowchart directly instead (web/components/process/process-flowchart.tsx).",
   "components/copilot-overlay":
-    "documented and deliberate: web/components/agent-host.tsx names copilot-overlay in its own comment, explaining that only the launcher's PLACEMENT was reused (it has to clear the phone's bottom nav bar, which the kit's own corner-pinned launcher does not account for) — the panel was rebuilt because agent-panel.tsx needs RunSteps and citation pills the kit's overlay does not model.",
+    "documented and deliberate: web/components/assistant/agent-host.tsx names copilot-overlay in its own comment, explaining that only the launcher's PLACEMENT was reused (it has to clear the phone's bottom nav bar, which the kit's own corner-pinned launcher does not account for) — the panel was rebuilt because agent-panel.tsx needs RunSteps and citation pills the kit's overlay does not model.",
   "components/detail-view":
     "a documented architecture choice, not an oversight: UI-CONVENTIONS.md §2b rules that bespoke `*-detail.tsx` screens are host-composed from TabsView + ActivityFeed + DescriptionList + Card precisely because each carries a control the screen engine (and this generic template) has no block for.",
 }
@@ -1107,52 +1252,52 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["translatedFacets"],
     why: "the same, for filter facets: each label sits beside the `field` and `value` the door parses, which are names of data and are never translated. `translatedFacets(key, t, rows)` is the one read.",
   },
-  "web/components/apps-screen.tsx": {
+  "web/components/apps/apps-screen.tsx": {
     kinds: ["property"],
     via: ["t(o.label)"],
     why: "APP_SORTS is the same shape as COLLECTION_SORTS one file over — a BOUNDED collection's own sort vocabulary, module-level so it sits beside the `value` each label belongs to, translated on the way to `<SortControl>` (`APP_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at declaration, where `t` is not a hook this constant could call.",
   },
-  "web/components/tickets-collection.tsx": {
+  "web/components/tickets/tickets-collection.tsx": {
     kinds: ["property"],
     via: ["t(o.label)"],
     why: "TRIAGE_SORTS, the same reasoning as APP_SORTS above — the triage queue's own one-option sort vocabulary (`Raised`, added 2026-09-06 when the client asked the queue for the full toolbar), module-level so the label sits beside the `value` the sort slot is keyed on, and translated where `<ToolbarRow>` reads it (`TRIAGE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the constant, where `t` is not a hook a module-level table could call.",
   },
-  "web/components/deliverables-panel.tsx": {
+  "web/components/apps/deliverables-panel.tsx": {
     kinds: ["property"],
     via: ["t(o.label)"],
     why: "DELIVERABLE_SORTS, the same reasoning as APP_SORTS above — the deliverables shelf's own two-option sort vocabulary, translated where it is read (`DELIVERABLE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
   },
-  "web/components/selectable-screen.tsx": {
+  "web/components/choices/selectable-screen.tsx": {
     kinds: ["property"],
     via: ["t(o.label)"],
     why: "VALUE_SORTS, the same reasoning again — Choices' own Value/Group sort vocabulary, translated where `<SortControl>` reads it (`VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
   },
-  "web/components/tasks-screen.tsx": {
+  "web/components/work/tasks-screen.tsx": {
     kinds: ["field-label", "property"],
     via: ["translateFields(columns, t)", "t(tab.label)"],
     why: "a screen that composes its OWN table columns and its own six-tab strip. The columns are spread onto the recipe after `resolveRecipe` has run, so `translateRecipe` never sees them — `translateFields` is that same rule called at the place they are spread in; the tab labels are read through `t` where the strip is built.",
   },
-  "web/components/meetings-screen.tsx": {
+  "web/components/meetings/meetings-screen.tsx": {
     kinds: ["field-label"],
     via: ["translateFields(ALL_COLUMNS, t)"],
     why: "the meetings All view, host-composed for the same reason and translated through the same one call.",
   },
-  "web/components/google-connections.tsx": {
+  "web/components/knowledge/google-connections.tsx": {
     kinds: ["property"],
     via: ["t(SERVICE_COPY[service].label)", "t(SERVICE_COPY[service].scope, BRAND)"],
     why: "`SERVICE_COPY` — each Google service's name and the sentence saying WHAT CONNECTING IT LETS US SEE. It is keyed by the service the caller is drawing, so the words are looked up rather than written at the point of use, and all three reads go through `t` — carrying `BRAND` since 5 Sep 2026, because the calendar sentence names the app and now says `{brand}` rather than spelling it out (shared/brand.ts is the one place that word is decided). The privacy sentence in particular is the one a person most needs in their own language.",
   },
-  "web/components/google-scope-dialog.tsx": {
+  "web/components/knowledge/google-scope-dialog.tsx": {
     kinds: ["property"],
     via: ["t(m.title)", "t(m.description, BRAND)", "t(EVENT_KINDS[kind].title)"],
     why: "`MODES` and `EVENT_KINDS` — two closed vocabularies. MODES is keyed by SERVICE on purpose: the same two answers mean opposite things on the two connections (Gmail's 'only' takes mail away; Calendar's can hand more over, because kwapso reads only the primary calendar today), so the sentences cannot be shared and the table is what keeps them apart. EVENT_KINDS' `value` is Google's own event-type word, passed straight to events.list, so the table is a translation of an API constant and never a mapping. Every half is read through `t` in the same file — `m.description` carrying `BRAND`, because the calendar mode names the app through a `{brand}` hole rather than spelling it out.",
   },
-  "web/components/google-source-dialog.tsx": {
+  "web/components/knowledge/google-source-dialog.tsx": {
     kinds: ["property"],
     via: ["t(k.title)", "t(s.description)"],
     why: "`SHELVES` and `KINDS` — two closed vocabularies whose `value` is a database column value and whose `title`/`description` are the words offered beside it. Both halves are read through `t` in the same file. (The FIELD configs in this file are not pinned: they are positional, through `shared/web/field.tsx`.)",
   },
-  "web/components/internal-record-dialog.tsx": {
+  "web/components/team/internal-record-dialog.tsx": {
     kinds: ["property"],
     via: ["label: f.label", "t(f.placeholder)"],
     why: "one form for three record kinds, each supplying its FIELDS as data (`brandAssetFields`, `deliverableFields`, `purposeFields`). The label reaches the screen through this file's `<Field config={{ ...defaultFieldConfig, label: f.label }}>`, which is the translating seam; the placeholder is put through `t` beside it.",
@@ -1257,7 +1402,7 @@ export const RADIUS_EXCEPTION: Record<string, string> = {
   "rounded-select":
     "6px, on the mark of a selection control — the checkbox. It is the one place a third number is unavoidable rather than convenient: at `rounded-xl` a 16px checkbox is a lozenge, and at `rounded-full` it is a radio button, so the two-radius vocabulary cannot express 'a square box with softened corners' at this size. Fixed at 0.375rem rather than derived from `--radius`, because it is not a smaller box — it is a different shape doing a different job.",
   "rounded-ss-none":
-    "Not a third number — zero, on the single corner where the assistant's own folder tab attaches. `web/components/agent-panel.tsx`'s docked panel (`PANEL_COLUMN`) keeps `--radius` on all four corners and then REMOVES one of them, exactly the argument the kit's own `screen-shell.tsx` already makes for its content card's leading corner (`CARD_JOINED`, out of this file's scope because that surface is vendored): the tab's silhouette is a fixed SVG path that may not be edited, so the object it joins gives its corner up instead, and a plain CSS radius is the app's own to remove. Start-start rather than top-left so it mirrors with the tab in RTL for free. Applied ONLY when the panel is docked (the tab is only drawn there — the floating popover keeps all four corners); squaring a second corner, or this one on a surface with no tab above it, would be a different change and is not this one.",
+    "Not a third number — zero, on the single corner where the assistant's own folder tab attaches. `web/components/assistant/agent-panel.tsx`'s docked panel (`PANEL_COLUMN`) keeps `--radius` on all four corners and then REMOVES one of them, exactly the argument the kit's own `screen-shell.tsx` already makes for its content card's leading corner (`CARD_JOINED`, out of this file's scope because that surface is vendored): the tab's silhouette is a fixed SVG path that may not be edited, so the object it joins gives its corner up instead, and a plain CSS radius is the app's own to remove. Start-start rather than top-left so it mirrors with the tab in RTL for free. Applied ONLY when the panel is docked (the tab is only drawn there — the floating popover keeps all four corners); squaring a second corner, or this one on a surface with no tab above it, would be a different change and is not this one.",
 }
 
 /** THE VENDORED COMPONENT LIBRARY — the one directory in `shared/` that is not
@@ -1344,7 +1489,7 @@ export const PAGE_WIDTH_OWNER: Record<string, string> = {
   // the content column; `max-w-none` is what makes this div's own right edge
   // land on that same edge, on every rail state and every viewport, rather
   // than a second guessed number. See the fuller note in app-shell.tsx.
-  "web/components/app-shell.tsx": "max-w-none",
+  "web/components/shell/app-shell.tsx": "max-w-none",
   // The portal's cap is NARROWER on purpose and it is a locked decision
   // (UI-RULEBOOK L5, "Do not do" #15): a client reads a handful of screens on a
   // phone, and 768px with larger type is the right measure for that. Three lines
@@ -1392,7 +1537,7 @@ export const TOOLBAR_EXEMPT: Record<string, string> = {
   // only filter the page it is holding). `listCollection(..., {paged:true})`
   // is what turns `searchable` off for exactly this reason, and every one of
   // these six DOES show a real toolbar with a real search box — `PagedFind`
-  // (components/paged-find.tsx) draws an unconditional `<SearchInput>`, no
+  // (components/records/paged-find.tsx) draws an unconditional `<SearchInput>`, no
   // per-caller way to switch it off — so this is a recorded "search lives
   // elsewhere", not a screen with none.
   "tickets.list":
@@ -1459,12 +1604,32 @@ export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
  * Rot-checked in both directions, the same shape `TOOLBAR_EXEMPT` above
  * uses: an entry whose call site now derives the prop from real data fails
  * the build, so a screen that gets fixed cannot leave its pin behind. */
+/** R52 — the components that ask ONE door under TWO keys on purpose.
+ *
+ * Only this shape is exemptible. Reading one KEY twice has no entry here and
+ * never will: the store dedupes it, so the second read buys nothing at all.
+ *
+ * Keyed `file::Component::door`, because the unit is the component and one file
+ * can hold several. */
+export const TWO_READS_ONE_DOOR: Record<string, string> = {
+  "web/components/meetings/meetings-screen.tsx::MeetingsScreen::listFetch.meetings":
+    "the month and the WEEK are two questions, not one asked twice — `meetingsKey(teamId)` is the collection and `meetingsKey(teamId, weekView)` is the strip above it, which narrows to a week the door itself resolves. Deriving the week client-side would mean the strip could only ever show what page one happened to contain.",
+  "web/components/process/process-detail.tsx::ProcessDetailScreen::tenancy.processDetail":
+    "four reads of one door because a process map can be COMPARED with itself: the current version, a named older version, the map as it stood on a date, and the one being diffed against. Three of the four are null-keyed unless a comparison is open, so an ordinary open costs one. They are four different records that happen to share a door.",
+  "web/components/work/work-logs-panel.tsx::WorkLogsPanel::contentApi.workLogs":
+    "one record's own time and one PERSON's time are different fences, not the same list filtered — `recordTimeKey(targetTable, targetId)` is what this record cost, and the person-filtered read is a different question the door answers with a different total. Filtering the first client-side would give a number that disagrees with the badge.",
+  "web/components/tickets/tickets-collection.tsx::TicketsCollection::listFetch.helpFacet":
+    "the sub-tab that is OPEN and the WAITING column on the Open board are two questions, and only one of them is ever live at a time. `facetQ` reads whichever stage tab a person has picked; `waitingQ` is null-keyed unless `facet === OPEN && openView === \"board\"`, and its `help-facet:all:waiting` key is the same one the Waiting TAB rests on, so the board column and that tab are one read between them rather than two. Collapsing them would mean the board's Waiting column counted page one of the open list instead of the door's own total (R14/R16), which is the arithmetic the column exists to show. Named on 8 Sep 2026, when main's R56 met feat/ui-ux's ticket board — neither branch could see this, because the law and the screen landed on opposite sides of the merge.",
+  "web/lib/use-screen-data.ts::useScreenData::listFetch.tasks":
+    "the OPEN list and the ALL list are kept apart deliberately, and the file says why: ticking a task off the open list REMOVES it from the open list, so a detail screen sourced from that collection would answer \"that record no longer exists\" the moment somebody used the button on it. This is R38's failure prevented by construction; collapsing the two reads would reintroduce it.",
+}
+
 export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
-  "web/components/account-detail-panels.tsx":
+  "web/components/accounts/account-detail-panels.tsx":
     "ContactsPanel's <ToolbarRow> carries `empty={false}` — the one collection in the app with TWO first-adds rather than one (\"Add contact\", linking a person already on the books, and \"New contact\", making one), and `CollectionEmptyState` only ever carries a single labelled `onCreate` — it cannot offer both, so the row's own two icon buttons have to stay reachable on an empty contacts list exactly as they do on a populated one.",
-  "web/components/contact-panels.tsx":
+  "web/components/accounts/contact-panels.tsx":
     "all three <ToolbarRow> call sites (Companies/Tickets/Meetings, one person's read-only summary panels) carry `empty={false}` — each is reached only PAST that panel's own early `X.length === 0` return, so the row can never actually be empty by the time it renders; the literal records that guarantee rather than hides it.",
-  "web/components/tickets-collection.tsx":
+  "web/components/tickets/tickets-collection.tsx":
     "TriageQueue's <ToolbarRow> carries `empty={false}` — reached only past two earlier returns (`!view.yours`, `view.waiting.length === 0`), so the queue is guaranteed non-empty by the time this row renders; the literal records that guarantee rather than hides it.",
 }
 
@@ -1488,11 +1653,11 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
 export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
   "web/components/deep-link/screen-bits.tsx":
     "THE ROW THIS LAW IS ABOUT. `<ToolbarRow>` builds both controls from `ToolbarSortSlot`/`ToolbarViewSlot`, which is clause (i) of R53 — it is the owner, not an exception to the rule.",
-  "web/components/paged-find.tsx":
+  "web/components/records/paged-find.tsx":
     "THE DOOR-SEARCHED HALF OF THE APP. `<PagedFind>` draws its own toolbar because its search, its facets and its ORDER all have to reach the door rather than the fifty rows in the browser (R14 — \"the sort actually doesn't work\" was a frame ordering page one and calling it sorted). Its `sorts`/`defaultSort` props are already the same default-with-a-reason shape R53 clause (iii) puts on `<ToolbarRow>`, and all nine of its call sites pass both.",
   "shared/web/screen-engine/collection-frame.tsx":
     "THE RECIPE ENGINE'S OWN FRAME, and the one path that already got this right: its sort control is DERIVED (`frameSortOptions`, web/lib/screens.ts) from the recipe's own columns rather than passed in, and it stands itself down for a paged collection, for a table whose headers already order it, and for a list with fewer than two orderable columns. A screen drawn this way cannot forget a sort control, because it never had to ask for one — which is the shape R53 is copying onto the bespoke row.",
-  "web/components/wave-finder.tsx":
+  "web/components/work/wave-finder.tsx":
     "A SECOND HAND-WRITTEN COPY OF `<ToolbarRow>`, and the honest name for it. It repeats the row's own `data-slot=\"toolbar-row-column\"`/`\"toolbar-row-track\"`, its fill, its two-radius rule and its `--toolbar-content-gap` margin, and then adds a sixth slot `<ToolbarRow>` has no name for (`period`, the waves timeline's own date-range control) and puts `view` AFTER it rather than before `actions`. FOLDING IT IN IS OPEN WORK, not a decision this law makes: it needs a `period` slot on the shared row and a ruling on which fill a toolbar wears inside a `<CollectionCard>` (this one paints `bg-surface-panel`, `<ToolbarRow>` paints `--surface-raised`, and Dropdown values draws a `<ToolbarRow>` inside a `CollectionCard` today — so the two disagree and neither is obviously wrong). Pinned here so the divergence is a line somebody can read rather than a file the toolbar censuses cannot see.",
 }
 
@@ -1515,17 +1680,17 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
  * list is worse than dead — it is wrong. Rot-checked in both directions: an
  * entry whose component now passes `sort` fails the build. */
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
-  "web/components/tasks-screen.tsx#TasksScreen":
+  "web/components/work/tasks-screen.tsx#TasksScreen":
     "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
-  "web/components/stakeholders-panel.tsx#StakeholdersPanel":
+  "web/components/apps/stakeholders-panel.tsx#StakeholdersPanel":
     "NOT ONE LIST. It draws two named groups — Ours and Theirs — each with the lead/main contact pinned at the top, so the grouping and that pin ARE the order; one search box narrows both (\"who is on this, on either side\" is one question). There is no single sequence for a sort control to act on, and applying one per group would order two lists from one chip.",
-  "web/components/work-logs-panel.tsx#WorkLogsPanel":
+  "web/components/work/work-logs-panel.tsx#WorkLogsPanel":
     "TIME IS READ IN TIME ORDER, and this list PAGES (`<LoadMore>`, R14). A browser-side reorder would put the fifty entries currently in hand into a new sequence and present it as the order of the whole log, which is exactly the defect `frameSortOptions` refuses for every paged collection in the engine. If this ever earns a sort it belongs on the door, as a `<PagedFind>` `sorts` option, not here.",
-  "web/components/contact-panels.tsx#ContactTicketsPanel":
+  "web/components/accounts/contact-panels.tsx#ContactTicketsPanel":
     "A PAGE-ONE SUMMARY OF A PAGED LIST (`<LoadMore>`, R14) on somebody's record — the whole ticket collection has its own screen, with its own door-backed search, filters and sort. Same reason as WorkLogsPanel above: ordering the loaded page and calling it the order of the list is the lie R14 exists to stop.",
-  "web/components/tickets-dashboard.tsx#TicketsDashboard":
+  "web/components/tickets/tickets-dashboard.tsx#TicketsDashboard":
     "A DASHBOARD IS NOT A LIST, AND HAS NO ROW ORDER TO OFFER. The client asked for this toolbar in the same breath as the exemption — \"dashboard should also have toolbar / filter by client and type / no sort\", 6 Sep 2026 — and the reason is structural rather than a preference. There are no rows on this tab at ALL: every number on it is a COUNT(*) or a quantile the database took over the whole backlog, and the six panels under this row are a pipeline grid, a stacked bar per system, two ranked lists the DOOR ordered (busiest first), a 4×4 matrix, a duration distribution and the monthly trend beside it. Not one of them is a sequence a reader could ask to see differently — the pipeline's order is the ticket lifecycle, the matrix's is the ticket vocabulary, and the rankings are already the answer to \"who has the most\", which is the question. A `<SortControl>` here would offer to reorder a picture. The three NARROWINGS it does carry — the two filters and, since 7 Sep 2026, the search box (\"still missing full toolbar!\", which is why this row now has a search box and this entry still has no sort) — are not the browser narrowing loaded rows either (there are none to narrow): they are parameters of `GET /api/content/help/dashboard`, spent in the WHERE clause of all nine of its grouped reads and carried in the cache key, which is the only shape that can work when the screen holds no data of its own. SEARCHING A BACKLOG AND REORDERING A PICTURE ARE DIFFERENT ACTS, which is why this entry survived the change that deleted this component's `TOOLBAR_EXEMPT` line: a term is a WHERE clause the door can answer, and an order is a sequence that does not exist here. The app record's own Dashboard view is this same component with an `appId` and four panels instead of six, and it changes nothing here: a pipeline, a matrix and a duration distribution are no more orderable for one system than for all of them.",
-  "web/components/sprints-screen.tsx#SprintsScreen":
+  "web/components/work/sprints-screen.tsx#SprintsScreen":
     "THE BESPOKE ROW SERVES TWO BODIES THAT ARE NOT FLAT LISTS — Overview, which groups sprints under their own state headings, and Calendar, a month grid. A sort chip would either fight the grouping or reorder squares by something other than the date they sit on. The third tab, \"All sprints\", is a flat list drawn by the recipe engine, and it gets its picker from `frameSortOptions` off its own columns — which is why this screen looks sorted where it is a list and unsorted where it is not.",
 }
 
@@ -1541,7 +1706,7 @@ export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
  * own container. What survives is one entry that is not a page at all, which is
  * what this list was always meant to hold. */
 export const SCREEN_WIDTH_EXEMPT: Record<string, string> = {
-  "web/components/install-prompt.tsx":
+  "web/components/shell/install-prompt.tsx":
     "not a page. It is the install nudge's Sheet content, which is centred and full-width INSIDE the sheet, and a sheet is an overlay with its own measure.",
 }
 
@@ -2135,7 +2300,7 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "tickets",
     listRecipe: "tickets.list",
     webKey: "helpKey(",
-    pagerFile: "components/tickets-collection.tsx",
+    pagerFile: "components/tickets/tickets-collection.tsx",
     pagerKey: "helpKey(",
     why: "tickets accumulate forever — a team that has raised 3,000 must still reach the oldest",
   },
@@ -2191,7 +2356,7 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/tenancy/src/routes/team.ts",
     rowsKey: "activity",
     webKey: "useRecordActivity(",
-    pagerFile: "components/activity-panel.tsx",
+    pagerFile: "components/records/activity-panel.tsx",
     pagerKey: "activity.listKey",
     why: "one record's slice of the same ever-growing feed — a long-running ticket outgrows a page on its own",
   },
@@ -2202,7 +2367,7 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "processes",
     listRecipe: "processes.list",
     webKey: "processesKey(",
-    pagerFile: "components/processes-screen.tsx",
+    pagerFile: "components/process/processes-screen.tsx",
     pagerKey: "processesKey(",
     why: "every app of every client grows maps, and every map is kept rather than replaced — a process is archived, never deleted, because the savings computed from its baseline have to stay checkable years later. An agency two years in has more of these than it has clients, and the oldest is the one a client is most likely to ask about",
   },
@@ -2212,7 +2377,7 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/content/src/routes/work-logs.ts",
     rowsKey: "logs",
     webKey: "workLogsKey(",
-    pagerFile: "components/time-panel.tsx",
+    pagerFile: "components/work/time-panel.tsx",
     pagerKey: "workLogsKey(",
     why: "the fastest-growing row in the work engine — 2,940 arrived from two years of the previous system and the rate only goes up, because every piece of work produces several. A ceiling here would eventually be a refusal to show somebody their own week",
   },
@@ -2223,7 +2388,7 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "meetings",
     listRecipe: "meetings.list",
     webKey: "meetingsKey(",
-    pagerFile: "components/meetings-screen.tsx",
+    pagerFile: "components/meetings/meetings-screen.tsx",
     pagerKey: "meetingsKey(",
     why: "an EVENT, which is the shape this law names first: a meeting happens, is written up and is never curated away, because a cancelled call in March is still the answer to 'didn't we speak in March?'. Glide's own two years are 350 rows before this app has held a single conversation of its own, and the oldest is the one somebody digs for",
   },
@@ -2233,7 +2398,7 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/content/src/routes/todos.ts",
     rowsKey: "tasks",
     webKey: "tasksKey(",
-    pagerFile: "components/tasks-screen.tsx",
+    pagerFile: "components/work/tasks-screen.tsx",
     pagerKey: "tasksKey(",
     why: "the SAME mistake the to-do below made, in the file next door, and it survived the round that caught that one. `listTasks` carried a hard cap on the reasoning that admin 'shrinks as fast as it grows because the done ones fall out of the default view' — true of the default view, and false of three of the six this door offers: `completed` asks for exactly the rows that fall out, `all` asks for every row there has ever been, and `calendar` asks for every dated one. On those three a thousand rows was a list with an invisible end, under a badge (R16) reporting the true number, so the screen said 'at least a million' above a list of a thousand and offered no way to reach the rest. Not caught by anything, because GROWING_COLLECTIONS is DATA: a growing collection nobody adds is never asked to page, which is the one shape this law cannot detect for itself. The four-key priority sort is folded into one lexicographic string (TASK_SORTS) because a cursor names a position and a position in a four-key order needs all four keys in it",
   },
@@ -2243,7 +2408,7 @@ export const GROWING_COLLECTIONS: Record<
     routes: "workers/content/src/routes/todos.ts",
     rowsKey: "todos",
     webKey: "todosKey(",
-    pagerFile: "components/work-panels.tsx",
+    pagerFile: "components/work/work-panels.tsx",
     pagerKey: "todosListKey(",
     why: "a to-do SHRINKS as fast as it grows while it is open, which is why this collection was capped for a year — and the moment the DONE pile is visible it stops being true, because a completed to-do is kept for ever. It has to be visible: `completeTodo` writes `file_url` and `completed_at` in the SAME UPDATE, so a to-do carries the document a client sent us if and ONLY if it is completed, and the open-only default meant the only rows that could hold a client's file were exactly the rows nobody could see, on either front door. NOT one list with both piles in it: the two views sort by different columns (due date ascending; completed descending), so each is its own ordering with its own cursor signature, and a cursor minted under one is refused by the other rather than silently skipping rows at the page boundary",
   },
@@ -2254,7 +2419,7 @@ export const GROWING_COLLECTIONS: Record<
     rowsKey: "stories",
     listRecipe: "stories.list",
     webKey: "storiesKey(",
-    pagerFile: "components/stories-screen.tsx",
+    pagerFile: "components/work/stories-screen.tsx",
     pagerKey: "storiesKey(",
     why: "one piece of work per thing we do, kept forever — the two years arriving from Glide are 3,677 rows on day one, and a done story is never deleted because the savings and the margin computed from it have to stay checkable. SPRINTS are deliberately NOT here beside it: a sprint is a block of SOLD work, so that collection grows at the speed of contracts rather than of clicks and a hard ceiling is an honest answer",
   },
@@ -2267,7 +2432,7 @@ export const GROWING_COLLECTIONS: Record<
  * WHY THIS LIST EXISTS AT ALL, AND WHAT IT REPLACED. The census used to match
  * the LITERAL `rows.filter(`, so it was defeated by a newline: a chain broken
  * after `rows` walked straight past it. That is not a hypothetical. On
- * 2026-09-07 `web/components/tickets-collection.tsx` carried a paragraph saying
+ * 2026-09-07 `web/components/tickets/tickets-collection.tsx` carried a paragraph saying
  * the chain must STAY broken across lines *because the matcher demanded it* —
  * a law bending the code it polices, and a passing suite resting on
  * whitespace. The matcher is whitespace-insensitive now, which caught that call
@@ -2282,7 +2447,7 @@ export const GROWING_COLLECTIONS: Record<
  * A RATCHET, like RAW_BODY_EXEMPT: an entry matching nothing in its file turns
  * the build red, so the list can only shrink. */
 export const FIND_NARROWING_OK: Record<string, string> = {
-  "web/components/tickets-collection.tsx::rows.filter((r) => r.status === stage)":
+  "web/components/tickets/tickets-collection.tsx::rows.filter((r) => r.status === stage)":
     "the Open tab's BOARD, and a partition rather than a narrowing: the columns are mapped off OPEN_TAB_STATUSES (`web/test/tab-facets.test.tsx` holds that), a loaded ticket has exactly one status, and every one of those statuses is drawn — so no card the page loaded is dropped from the board. The number beside each column stands down the moment anything is being asked (`count: narrowed ? undefined : counts?.[stage]`, with `narrowed={found.active}`), so the exact server count never sits over a bucketed page. The fifth column (Waiting) is a SECOND door read, not a slice of these rows, for the same reason.",
 }
 
@@ -2717,73 +2882,73 @@ export const STORED_FILES: {
   {
     writtenIn: "workers/auth/src/lib/profile.ts",
     field: "SessionUser.imageUrl",
-    shownIn: "web/components/profile-menu.tsx",
+    shownIn: "web/components/shell/profile-menu.tsx",
     why: "a member's own photo, on the avatar in the rail they see on every screen",
   },
   {
     writtenIn: "workers/tenancy/src/lib/teams.ts",
     field: "TeamSummary.logoUrl",
-    shownIn: "web/components/team-switcher.tsx",
+    shownIn: "web/components/shell/team-switcher.tsx",
     why: "the team's own logo, on the switcher at the top of the rail",
   },
   {
     writtenIn: "workers/tenancy/src/routes/accounts.ts",
     field: "Account.logoUrl",
-    shownIn: "web/components/account-detail.tsx",
+    shownIn: "web/components/accounts/account-detail.tsx",
     why: "a client's mark, leading their record",
   },
   {
     writtenIn: "workers/tenancy/src/routes/accounts.ts",
     field: "Account.coverUrl",
-    shownIn: "web/components/account-detail.tsx",
+    shownIn: "web/components/accounts/account-detail.tsx",
     why: "the wide image their record leads with — a second field on the same door",
   },
   {
     writtenIn: "workers/tenancy/src/routes/processes.ts",
     field: "AppRow.logoUrl",
-    shownIn: "web/components/app-tiles.tsx",
+    shownIn: "web/components/apps/app-tiles.tsx",
     why: "a system's mark, on every tile and every row that names it. The door is called `processes` because that is the permission module; the record it writes is an APP",
   },
   {
     writtenIn: "workers/content/src/routes/help.ts",
     field: "HelpAttachment.url",
-    shownIn: "web/components/help-attachments.tsx",
-    why: "what somebody attached to a ticket, on the ticket's Files and links tab",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what somebody attached to a ticket, on the ticket's Files and links tab. One panel serves both records since the fold; `tickets/help-attachments.tsx` is the ticket's door and copy, and passes no `fix`",
   },
   {
     writtenIn: "workers/content/src/routes/stories.ts",
     field: "StoryAttachment.url",
-    shownIn: "web/components/story-attachments.tsx",
-    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for",
+    shownIn: "web/components/records/record-attachments.tsx",
+    why: "what a story shows for itself. Unrendered anywhere until 96ea8fe1 — the second of the three breaches this law exists for. Same panel as the ticket's; `work/story-attachments.tsx` is the story's door and copy",
   },
   {
     writtenIn: "workers/content/src/routes/todos.ts",
     field: "Todo.fileUrl",
-    shownIn: "web/components/work-panels.tsx",
+    shownIn: "web/components/work/work-panels.tsx",
     why: "the document a client sent back through the portal. Shown as an unclickable filename until this law landed — the worst of the three, because a person outside the company was on one end of it",
   },
   {
     writtenIn: "workers/content/src/routes/todos.ts",
     field: "Task.fileUrl",
-    shownIn: "web/components/task-detail.tsx",
+    shownIn: "web/components/work/task-detail.tsx",
     why: "the photo of the letter on a piece of our own admin. Write-only from the day the door shipped — the third breach. Same file as the to-do above because one route module owns both doors",
   },
   {
     writtenIn: "workers/content/src/routes/knowledge.ts",
     field: "KnowledgeItem.fileUrl",
-    shownIn: "web/components/knowledge-detail.tsx",
+    shownIn: "web/components/knowledge/knowledge-detail.tsx",
     why: "the material behind a source, on the source's own screen",
   },
   {
     writtenIn: "workers/content/src/routes/staff.ts",
     field: "StaffProfile.photoUrl",
-    shownIn: "web/components/staff-panel.tsx",
+    shownIn: "web/components/team/staff-panel.tsx",
     why: "a colleague's face on their profile. The door is a generic upload endpoint and this is one of the two fields its answer lands on",
   },
   {
     writtenIn: "workers/content/src/routes/staff.ts",
     field: "StaffCertificate.fileUrl",
-    shownIn: "web/components/staff-panel.tsx",
+    shownIn: "web/components/team/staff-panel.tsx",
     why: "the certificate itself, behind its title. The second destination of the same upload endpoint",
   },
   {
@@ -2795,7 +2960,7 @@ export const STORED_FILES: {
   {
     writtenIn: "workers/content/src/routes/deliverables.ts",
     field: "Deliverable.url",
-    shownIn: "web/components/deliverables-panel.tsx",
+    shownIn: "web/components/apps/deliverables-panel.tsx",
     why: "what we handed over on an app, opened from the app's own shelf",
   },
 ]
@@ -2832,7 +2997,7 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "overlays/access-denied.tsx":
     "MISMATCH. The optional `grantor` prop is real (a peer's render probe upstream confirmed `grantor={null}` draws no self-service well), but the composition's non-optional premise — a Dialog laid over the actual requested screen, blurred and scrimmed behind it — has no real call site: the agency's denial (`web/components/deep-link/screen-bits.tsx`'s `NoAccess`) is an inline sentence inside the persistent `AppShell`/`ScreenShell`, with no page-behind to blur and no dialog anywhere in the pattern; the portal's (`web-portal/components/no-access.tsx`) is a total, whole-session denial with literally no screen behind it to render. Neither door has the 'one blocked module inside an otherwise-working app, with a real page still open behind it' scenario this file is built for.",
   "overlays/assistant.tsx":
-    "MISMATCH, reasoning corrected 2026-08-31 (2026-08-29's pass had it backwards): this app's `AgentPanel` (web/components/agent-panel.tsx) is itself non-modal — now a `Popover`-anchored bubble, and already `modal={false}` on the prior `Sheet` primitive before that — because the 'screen trace' mechanism (agent-host.tsx's go()/runAction()) needs the underlying screen to stay interactive while the assistant is open. The kit's own overlays/assistant.tsx / CopilotOverlay still doesn't fit, for two reasons unrelated to modality: its own file header names it 'CONTRADICTION 1' (chapter 19 calls for a corner-anchored floating card, but what got built is a right-hand Sheet, copilot-overlay.tsx lines ~43-68), and its flat CopilotMessage model has no concept of this app's streamed text deltas, live tool-step rows, R23 citations, or staged file attachments (web/lib/use-agent-chat.tsx).",
+    "MISMATCH, reasoning corrected 2026-08-31 (2026-08-29's pass had it backwards): this app's `AgentPanel` (web/components/assistant/agent-panel.tsx) is itself non-modal — now a `Popover`-anchored bubble, and already `modal={false}` on the prior `Sheet` primitive before that — because the 'screen trace' mechanism (agent-host.tsx's go()/runAction()) needs the underlying screen to stay interactive while the assistant is open. The kit's own overlays/assistant.tsx / CopilotOverlay still doesn't fit, for two reasons unrelated to modality: its own file header names it 'CONTRADICTION 1' (chapter 19 calls for a corner-anchored floating card, but what got built is a right-hand Sheet, copilot-overlay.tsx lines ~43-68), and its flat CopilotMessage model has no concept of this app's streamed text deltas, live tool-step rows, R23 citations, or staged file attachments (web/lib/use-agent-chat.tsx).",
   "overlays/bulk-edit.tsx":
     "OWNER'S CALL. `BulkEditScreen` IS the selection primitive (7 marks + select-all rendered on an open composition, confirmed by render probe) — it is not blocked on anything unbuilt, the way the first read wrongly assumed. What is unresolved is a product question: does any collection in this app want bulk mutation at all. RECOMMENDATION: not yet — no collection today performs a bulk write (every mutation is per-record, gated per-record), and standing up selection UI across 20+ collections for a capability nobody has asked for is the kind of unearned surface area the base's 'stay lean' rule warns against. Revisit if one specific collection (bulk-deactivating stale roles, bulk-tagging tickets) becomes a real, named ask.",
   "overlays/delete-confirmation.tsx":
@@ -2850,11 +3015,11 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "screens/brand.tsx":
     "GAP, a real finding. Nobody has built a staff-facing page listing the app's own design tokens (colours, type, marks) for reference — the Brand library (`web/app/brand/`) is a client-asset collection of logos and swatches, a different concept entirely, already correctly adopted via the kit's `gallery`. Worth building only if staff actually ask 'what's our poppy hex' more than never; not urgent enough to justify scope on its own.",
   "screens/company-hub.tsx":
-    "MISMATCH. `web/components/account-detail.tsx` already covers this job with a genuinely different anatomy: tabs (Overview/Contacts/work/Rates/Knowledge/Activity), the companies-vs-people split, portal-access rules, `MarginPanel` — none of which the composition's single-page header-figures-lists shape has a slot for.",
+    "MISMATCH. `web/components/accounts/account-detail.tsx` already covers this job with a genuinely different anatomy: tabs (Overview/Contacts/work/Rates/Knowledge/Activity), the companies-vs-people split, portal-access rules, `MarginPanel` — none of which the composition's single-page header-figures-lists shape has a slot for.",
   "screens/home.tsx":
     "MISMATCH. The kit's home embeds one live ticket queue inline (`CollectionScreen`, per its own doc, \"a dashboard that cannot be opened into its records is a poster\"); this app's real `/home` (`web/components/screens/home-screen.tsx`) deliberately shows summary figures plus permission-gated link-out cards to six different collections — a different product decision about what a dashboard is for, not a missing prop.",
   "screens/invite-acceptance.tsx":
-    "MISMATCH. The composition assumes an unauthenticated person clicking one emailed link, shown one invite, handed to onboarding with no account yet. This app's real flow (`web/components/invitations.tsx`) is the opposite on purpose: sign in first however you like, then see an INBOX of every pending invite for that address — a stated fix for 'I was invited but have no way to see it', not a rendering of the same screen.",
+    "MISMATCH. The composition assumes an unauthenticated person clicking one emailed link, shown one invite, handed to onboarding with no account yet. This app's real flow (`web/components/team/invitations.tsx`) is the opposite on purpose: sign in first however you like, then see an INBOX of every pending invite for that address — a stated fix for 'I was invited but have no way to see it', not a rendering of the same screen.",
   "screens/link-sent.tsx":
     "MISMATCH. Built entirely around a magic link opened on a possibly different device, with a resend countdown and no code. This app's sign-in (`shared/web/use-email-sign-in.ts`) sends a 6-digit code typed on the same device in the same form — there is no separate device, no link, and no waiting-room screen at all.",
   "screens/not-found.tsx":

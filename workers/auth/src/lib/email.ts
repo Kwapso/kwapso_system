@@ -53,20 +53,40 @@ export async function sendEmail(
     ? env.EMAIL_FROM
     : `${brand.name} <${env.EMAIL_FROM}>`
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: [msg.to], subject: msg.subject, html: msg.html, text: msg.text }),
-    signal: AbortSignal.timeout(15_000), // LAW R11: a hung email send must not stall the worker
-  })
+  let res: Response
+  try {
+    res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [msg.to], subject: msg.subject, html: msg.html, text: msg.text }),
+      signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS), // LAW R11: a hung email send must not stall the worker
+    })
+  } catch (e) {
+    // A REFUSAL SAYS "Resend"; A HUNG SOCKET USED TO SAY NOTHING. Every caller
+    // here hands what is thrown to `note()` in shared/workers/notify.ts, which
+    // writes it into the error store as the whole explanation of why a person
+    // never got their link — and for a timeout that explanation was the raw
+    // abort, which names no service and no deadline. The refusal a line below
+    // has always named both. Same sentence shape as the D1 REST door's.
+    const said = e instanceof Error ? e.message : String(e)
+    throw new Error(
+      /^(TimeoutError|AbortError)$/.test((e as { name?: string } | null)?.name ?? "")
+        ? `Resend did not answer within ${EMAIL_TIMEOUT_MS}ms (R11 deadline): ${said}`
+        : `Resend could not be reached: ${said}`
+    )
+  }
   if (!res.ok) {
     throw new Error(`Resend refused the email (${res.status}): ${await res.text()}`)
   }
   return true
 }
+
+/** LAW R11's deadline on the send, named because the sentence reporting a
+ * breach quotes it. */
+const EMAIL_TIMEOUT_MS = 15_000
 
 /**
  * Send the 6-digit login code (branded). Returns false when no RESEND_API_KEY

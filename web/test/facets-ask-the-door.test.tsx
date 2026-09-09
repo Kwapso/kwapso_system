@@ -36,7 +36,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import { PagedFind, type FindQuery } from "@/components/paged-find"
+import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 import { COLLECTION_FILTERS, translatedFacets } from "@/lib/collection-filters"
 import { cursorKey } from "@/lib/live-resources"
 import { readCache } from "@shared/web/store"

@@ -35,14 +35,43 @@ one question, *who is this?*, and there is exactly one master that can answer
 
 ### The worst case, stated
 
-> **If `kwapso-auth` is down, seven of the eight workers stop serving anything
-> gated.** Both front doors still answer, the screens load from static assets,
-> and cached screens still paint, but every API call behind them returns
-> `503 auth_unavailable`, and the user sees an app that renders and cannot do
-> anything. Sign-in is also unavailable, so nobody can get in behind them.
+> **If `kwapso-auth` is down, somebody already signed in keeps working, and
+> nobody new can get in.** Every gated request still begins by asking who the
+> caller is — and since 6 Sep 2026 the gating seam answers that itself when auth
+> cannot, by reading the session row out of the core database (§ "The
+> recommendation, now taken" below). So the app keeps serving: the screens load,
+> the reads answer, the writes land, and every permission decision is made from
+> the same rows it always was. What is lost is everything auth alone can do —
+> **signing in, signing out, changing an email, editing a profile, and minting a
+> session for the machine surface** — every one of those is a door on auth itself
+> (`workers/auth/src/index.ts`'s ROUTES table is the list). So nobody new gets
+> in, and a session that expires mid-outage is not renewed: the fallback is
+> READ-ONLY, so it never slides an expiry forward, which is exactly the property
+> that keeps auth the only master.
+>
+> **If the CORE DATABASE is down, that is the outage this section used to
+> describe.** Nothing can say who is asking, every gated call returns
+> `503 auth_unavailable`, and the user sees an app that renders and can do
+> nothing. Core is the real single point of failure; auth was only ever the
+> visible one.
 
-This is a deliberate consequence of "one session system, one master", not an
-oversight. It is written here so it is a known cost rather than a discovery.
+**WHAT THIS SECTION SAID UNTIL 6 SEP 2026, and why the correction is recorded
+rather than quietly made.** It read: *"If `kwapso-auth` is down, seven of the
+eight workers stop serving anything gated … every API call behind them returns
+`503 auth_unavailable`, and the user sees an app that renders and cannot do
+anything."* Beside it, a row in the table below promised **"No fallback identity,
+on purpose."**
+
+Both were true when written. The fallback landed three paragraphs further down
+this same file and NEITHER was corrected in that commit, so for a day this
+document told a reader that an auth outage takes the app down while the code it
+describes did the opposite. A stated consequence that has gone false is worse
+than none, because it is read as current — which is the argument this whole
+law-book rests on, and it was broken inside the file that makes it.
+
+It is written here rather than deleted because the failure is the useful part:
+nothing in the repository could have caught it. The fan-in is unchanged and still
+worth knowing; what changed is what the fan-in COSTS.
 
 ### What softens it, and what does not
 
@@ -50,7 +79,7 @@ oversight. It is written here so it is a known cost rather than a discovery.
 |---|---|
 | **A ceiling on the wait** | `AUTH_UNAVAILABLE_MS` (5s) in `shared/workers/gating.ts`. A slow auth degrades the request that hit it, not the worker behind it. Without a ceiling one unwell worker fills five others' queues, and the outage spreads by waiting. |
 | **An honest code** | An auth outage throws `503 auth_unavailable`, never `null`. `null` means "not signed in", and callers turn that into a 401 that signs somebody out, so an outage that returned `null` would log every signed-in person out of a healthy app and send them all back to the door that is already struggling. |
-| **No fallback identity, on purpose** | There is no cached session, no "assume signed in". Guessing on the identity read is guessing on the gate, and the permission spine is the product. Availability is not bought with a weaker fence. |
+| **A fallback identity, and it is not a cache** | `whoAmI` resolves the caller from the session row itself when auth is unreachable (`sessionFromCore`, called at `shared/workers/gating.ts`'s one catch). There is still no CACHED session and no "assume signed in" — the original sentence here was right about that and it is why the fallback reads live rows instead. An expired session, a deactivated member and a sign-out are all still refused, because the fallback asks the same database the same questions. Availability is still not bought with a weaker fence; it is bought by asking the fence directly. |
 | **Realtime degrades, it does not fail** | `kwapso-realtime` has fan-in 6 and is the one dependency that is genuinely optional. `publishChange` is wrapped, capped at 2s, and swallows its own failure: a live-layer outage costs a screen its instant refresh and nothing else, because the write already committed and the client is cache-first ([CACHING.md](CACHING.md)). Same for member-notification email (`sendBrandedEmail`, 15s cap). ARCHITECTURE §5 already locks the state change as the authority. |
 
 ### The recommendation, now taken — and it is NOT a cache
@@ -124,7 +153,7 @@ a clean split that nothing had written down until now.
 
 Everything else the probes flag is a false positive worth knowing about: the
 `help` and `knowledge_*` writes attributed to tenancy are
-`TEAM_MIGRATIONS` SQL in `workers/tenancy/src/team-schema.ts`. Tenancy owns
+`TEAM_MIGRATIONS` SQL in `workers/tenancy/src/team-schema/migrations.ts`. Tenancy owns
 rolling team schema forward; that IS its job, and a migration is not a runtime
 writer. (`sprints` used to be on that false-positive list too; the waves module
 made it a REAL second writer on 24 Aug 2026, which is what the row above records.)
@@ -374,10 +403,12 @@ resolves.
 > at the $0.001-per-million overage rate, i.e. zero. No resource was created and
 > nothing was written to any database.
 >
-> **STILL NOT DONE, and deliberately not claimed: Time Travel.** Nothing has been
-> restored to a bookmark. That is the path RUNBOOK § 2 sends you down for a live
-> database inside 30 days, so it is the most likely of all of these to be used
-> and the only one never tried.
+> **STILL NOT DONE HERE, and deliberately not claimed: Time Travel.** Nobody
+> writing in this file has restored to a bookmark. That is the path RUNBOOK § 2
+> sends you down for a live database inside 30 days, so it is the most likely of
+> all of these to be used and the only one never tried first-hand. (A relayed,
+> unwitnessed 2026-09-07 rehearsal is recorded at the end of this document — as
+> a relay, and it does not change this sentence.)
 
 **An untested restore is not a restore**, and until 2026-09-05 that rule was
 enforced by nobody — which is how the recorded rehearsal came to be eight
@@ -391,12 +422,27 @@ The REMOTE half is still a manual rehearsal, and it is still the half that runs
 on the bad day. **Export-and-reload was rehearsed on 2026-09-06, on both tiers,
 and passed** — core and a real team database, figures in the block above.
 
-**One piece remains untested, and it is now the most likely to be used:
-Time Travel.** Nothing has been restored to a bookmark. RUNBOOK § 2 sends you
-there for any live database inside 30 days, which is most bad days; the dump
-path rehearsed above is the one for a database that is *gone*. Do it in the next
-staging window and extend the block above.
+**One piece is still not rehearsed FIRST-HAND, and it is the most likely to be
+used: Time Travel.** RUNBOOK § 2 sends you there for any live database inside 30
+days, which is most bad days; the dump path rehearsed above is the one for a
+database that is *gone*.
+
+> **RELAYED, NOT WITNESSED — 2026-09-07.** A `wrangler d1 time-travel restore
+> --bookmark=…` against a throwaway staging database, reported as restoring
+> 67 tables, was relayed to this lane by the planner coordinating that day's run.
+> It is written down here rather than lost, and it is written down as a RELAY
+> rather than as a result, because nobody who has edited this file has seen it:
+> no command output, no database name, no bookmark. Every other figure in this
+> section was produced by the person who wrote it down, and that difference is
+> the whole value of the section.
+>
+> **So it does not yet count.** Treat Time Travel as unrehearsed until somebody
+> runs it and replaces this block with the real numbers — the database, the
+> bookmark, the tables and rows back, and the time it took. Delete this
+> paragraph on that day; it exists only to stop the next person redoing work
+> that may already be done, and to stop anyone reading it as done.
 
 Until then the honest statement is: *we know the export mechanism works on both
 tiers and produces a dump that reloads faithfully, we know one team database
-takes about seven minutes to come back, and we have never used Time Travel.*
+takes about seven minutes to come back, and nobody who has written in this file
+has used Time Travel.*

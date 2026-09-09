@@ -37,14 +37,28 @@ describe("the one walker every law reads source through", () => {
   it("RECURSES by default — the whole reason it exists", () => {
     const all = sourceFiles(COMPONENTS, { extensions: [".tsx"] })
     const nested = all.filter((f) => f.rel.includes("/"))
-    // web/components has subdirectories (deep-link, screens, temp). A walk that
-    // stopped at the top level would enforce the UI laws on part of the app and
-    // report success for all of it.
+    // web/components is ENTIRELY subdirectories since the 7 Sep 2026 fold (one
+    // folder per module or kind). A walk that stopped at the top level would
+    // enforce the UI laws on nothing and report success for all of it.
     expect(
       nested.length,
       "web/components has subdirectories — a default walk must reach into them"
-    ).toBeGreaterThan(0)
-    expect(all.length).toBeGreaterThan(nested.length)
+    ).toBeGreaterThan(100)
+    // ENTIRELY, which is the half this asserted for nothing. ">100 nested" stays
+    // true the moment somebody drops one file back at the top level, and
+    // UI-CONVENTIONS.md's "web/components has no top-level files" would then be a
+    // sentence nothing held. The fold is only worth keeping if it cannot leak
+    // back one file at a time.
+    const top = all.filter((f) => !f.rel.includes("/")).map((f) => f.rel)
+    expect(
+      top,
+      "web/components has no top-level files (UI-CONVENTIONS.md) — put it in its module's folder"
+    ).toEqual([])
+    // …and the top level is still read where there is one: web/lib keeps its
+    // files flat beside one `api/` folder, so both halves of the walk show here.
+    const lib = sourceFiles(join(WEB, "lib"), { extensions: [".ts", ".tsx"] })
+    expect(lib.some((f) => !f.rel.includes("/")), "web/lib's own top-level files").toBe(true)
+    expect(lib.some((f) => f.rel.includes("/")), "web/lib/api/, one level down").toBe(true)
   })
 
   it("`recursive: false` means flat, and the difference is real", () => {
@@ -465,7 +479,7 @@ describe("the two strippers are two jobs, and neither can do the other's", () =>
 //
 // TOO MUCH is the silent one. Every law here asks "does this source contain X?",
 // so source that was deleted before the law read it answers no, and no is what
-// compliance looks like. `accept="image/*"` in web/components/app-form-dialog.tsx
+// compliance looks like. `accept="image/*"` in web/components/apps/app-form-dialog.tsx
 // opened a comment the old regex closed at a JSDoc sixty lines below; three
 // `<Notes>` call sites, a `<Field>` and a `<FileUpload>` were gone before any law
 // looked, and an agent's census of that file counted 15 sites where 18 exist and

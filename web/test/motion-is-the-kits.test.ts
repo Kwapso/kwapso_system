@@ -52,7 +52,7 @@ const HAND_ROLLED =
  * collapse went with it, so the pin described nothing and this check said so
  * before anybody read the diff. The list can only shrink. */
 const HAND_ROLLED_OK: Record<string, string> = {
-  "web/components/agent-markdown.tsx":
+  "web/components/assistant/agent-markdown.tsx":
     "the assistant's rendered links transition `text-decoration-color` (rest " +
     "`decoration-hair-strong`, hover `decoration-current`) — the one ink-swap " +
     "case `motion-hover` does not cover (motion.css §13 lists background-color/" +
@@ -115,7 +115,7 @@ describe("motion is the kit's, everywhere", () => {
   it("the route transition is on the content and not on the chrome", () => {
     // The agency shell. `AppShell` is the chrome; the wrapper must sit INSIDE
     // it, around what the route renders.
-    const shell = readFileSync(join(ROOT, "web/components/deep-link-screen.tsx"), "utf8")
+    const shell = readFileSync(join(ROOT, "web/components/deep-link/deep-link-screen.tsx"), "utf8")
     expect(shell).toContain("motion-page-in")
     const chromeAt = shell.indexOf("<AppShell")
     const motionAt = shell.indexOf("motion-page-in")

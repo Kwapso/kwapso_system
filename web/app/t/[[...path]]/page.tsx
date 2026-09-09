@@ -4,7 +4,7 @@
 // gateway serves this shell for any /t/* depth (workers/gateway). The actual
 // resolver is the client component below.
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export const dynamic = "force-static"
 

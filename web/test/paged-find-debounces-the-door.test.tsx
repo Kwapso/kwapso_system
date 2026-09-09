@@ -39,7 +39,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 
-import { PagedFind, type FindQuery } from "@/components/paged-find"
+import { PagedFind, type FindQuery } from "@/components/records/paged-find"
 
 // The facet panel's popover measures itself; jsdom has no ResizeObserver. The
 // same stub `facets-ask-the-door.test.tsx` installs, for the same reason.

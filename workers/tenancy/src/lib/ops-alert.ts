@@ -51,6 +51,7 @@ import {
   OPS_SIGNATURE_CAP,
 } from "@shared/workers/limits"
 import { foldSignature, SIGNATURE_SQL } from "@shared/workers/error-signature"
+import { MEASUREMENT_SOURCES } from "@shared/workers/error-log"
 import { sendBrandedEmail } from "@shared/workers/notify"
 import { aiCostUsd, usd } from "@shared/workers/pricing"
 import { brand } from "@shared/brand"
@@ -125,6 +126,26 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   // 90-day retention, and the reasoning is in limits.ts.
   const historyFrom = since(now, 24 * 30)
 
+  // WHAT AN EMAIL TO A PERSON MAY BE ABOUT. This digest goes to `ALERT_TO`, a
+  // human address, and the only reason to wake somebody is something they can
+  // act on. A MEASUREMENT is not that: `slow-door` rows are this codebase's own
+  // latency instrument (timing.ts), and on 8 Sep 2026 one morning's mail led
+  // with eighteen of them — the top three being `GET /api/auth/me`,
+  // `my-permissions` and `active`, each over the read budget having made ZERO
+  // database trips and read ZERO rows. A door that touches no database and is
+  // still "too slow" is not reporting a defect in that door; it is reporting
+  // that the budget sits under the platform's own floor (this file's header
+  // measured routing alone at ~90ms against a 100ms read budget). Eighteen such
+  // lines do not tell the reader a door regressed — they bury the one line that
+  // would have.
+  //
+  // The rows are NOT suppressed: they are still written, still swept on the same
+  // 90-day clock, and still the first thing the errors door returns (it already
+  // announces `measurementSources` so a reader can tell the two apart). What
+  // changes is only that a measurement no longer composes a sentence addressed
+  // to a person. An exception — something that THREW, with a stack — still does.
+  const measurementFilter = MEASUREMENT_SOURCES.map(() => "?").join(", ")
+
   // Last night's signatures, biggest first. R14: the read is capped at five
   // times the line budget rather than at the budget itself, because the FOLD
   // below merges rows — asking for exactly twenty raw groups could hand back
@@ -132,12 +153,12 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   const todayRows = await env.DB.prepare(
     `SELECT ${SIGNATURE_SQL} AS sig, COUNT(*) AS n
        FROM error_logs
-      WHERE at > ?
+      WHERE at > ? AND source NOT IN (${measurementFilter})
       GROUP BY sig
       ORDER BY n DESC
       LIMIT ${OPS_SIGNATURE_CAP * 5 + 1}`
   )
-    .bind(day)
+    .bind(day, ...MEASUREMENT_SOURCES)
     .all<{ sig: string; n: number }>()
   const today = fold(todayRows.results ?? [])
   const notShown = Math.max(0, today.length - OPS_SIGNATURE_CAP)
@@ -151,11 +172,11 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
     `SELECT sig, SUM(n) AS n FROM (
         SELECT ${SIGNATURE_SQL} AS sig, 1 AS n
           FROM error_logs
-         WHERE at > ? AND at <= ?
+         WHERE at > ? AND at <= ? AND source NOT IN (${measurementFilter})
          LIMIT ${OPS_HISTORY_CAP}
       ) GROUP BY sig`
   )
-    .bind(historyFrom, day)
+    .bind(historyFrom, day, ...MEASUREMENT_SOURCES)
     .all<{ sig: string; n: number }>()
   // Folded the SAME way, or "have we seen this before" would answer no every
   // time an id changed — which is the whole failure the fold exists to end.
@@ -233,6 +254,11 @@ export async function readOpsDigest(env: Env, now: Date, model: string): Promise
   }
 }
 
+/** THE ONE WORD THAT MEANS "DELIBERATELY NOBODY". Set as `ALERT_TO` when the
+ * digest should be computed and recorded but never posted. It is a value rather
+ * than an absence on purpose — see `sendOpsDigest`. */
+export const OPS_DIGEST_OFF = "off"
+
 /** Is there anything worth an envelope? Spend alone is not: a bill that is
  * simply continuing is not news, and a nightly cost email is the one people
  * filter first. It rides along WITH a reason to write, never as one. */
@@ -249,6 +275,28 @@ export async function sendOpsDigest(
   d: OpsDigest
 ): Promise<{ mailed: number; recipients: number }> {
   if (!digestHasNews(d)) return { mailed: 0, recipients: 0 }
+
+  // NOBODY WANTS THIS MAIL, AND THAT IS A DECISION SOMEBODY MADE. The owner,
+  // 8 Sep 2026: "I would just rather not have the error report... I don't
+  // really give a fuck about the emails; they do nothing but fill up my inbox."
+  // The rows are read on purpose instead, through the error_log_review and
+  // error_analyze skills, on a cadence he chooses.
+  //
+  // WHY A WORD AND NOT AN EMPTY STRING. Unset already means something here, and
+  // it means the opposite: R12 says a cron that told nobody must say so, so an
+  // absent ALERT_TO THROWS a few lines down and lands in the store as "somebody
+  // forgot to wire the alarm". Silencing the mail by deleting the address would
+  // therefore trade a nightly email for a nightly error row — the same noise in
+  // the place he has asked to keep clean, and it would also destroy the check
+  // that catches a genuinely forgotten address. So OFF is a value, absence stays
+  // a fault, and the two can never be confused for one another.
+  //
+  // NOTHING ELSE CHANGES. The digest is still computed every night, the near-
+  // allowance and spiking-signature findings are still derived, and every row is
+  // still written and still swept at 90 days. Only the envelope stops.
+  if ((env.ALERT_TO ?? "").trim().toLowerCase() === OPS_DIGEST_OFF)
+    return { mailed: 0, recipients: 0 }
+
   const to = (env.ALERT_TO ?? "")
     .split(",")
     .map((a) => a.trim())

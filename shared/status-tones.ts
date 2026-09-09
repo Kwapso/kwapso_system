@@ -65,7 +65,7 @@ import type { HelpStatus, StoryStatus } from "./types"
  * THE RETIRED STAGE IS NOT LISTED, AND MUST NOT BE. This map is keyed by the
  * LIVE vocabulary, so it answers for what a ticket can be in now. A ticket's
  * HISTORY is drawn from words, not dots (`stageLabel`,
- * web/components/ticket-stages.tsx), so a retired stage needs no row here and
+ * web/components/tickets/ticket-stages.tsx), so a retired stage needs no row here and
  * adding one back would re-open the `Record` to a word no chip can be handed. */
 const HELP_STATUS_DOT_TONE: Record<HelpStatus, DotTone> = {
   // Raised, nobody has read it yet — the "Not started" tier.

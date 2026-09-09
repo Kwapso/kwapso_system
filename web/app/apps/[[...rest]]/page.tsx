@@ -3,7 +3,7 @@
 // (one client-resolved shell); the gateway serves this shell for any /apps/*
 // depth (workers/gateway run_worker_first + the /apps/ rewrite).
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export const dynamic = "force-static"
 

@@ -1,6 +1,7 @@
 import type { Env } from "../env"
 import { randomToken, sha256Hex } from "./crypto"
 import { ulid } from "@shared/workers/id"
+import { noteIdentity } from "@shared/workers/gating"
 import { readCookie, sessionCookieName, LEGACY_SESSION_COOKIE, SESSION_COOKIE, readSessionToken } from "@shared/workers/session-cookie"
 import type { UserRow } from "./users"
 
@@ -19,7 +20,7 @@ import type { UserRow } from "./users"
  * RE-EXPORTED so every call site in this worker keeps its habitual import, and
  * so auth still reads as the place the session is decided. Auth remains the only
  * thing that MINTS, SLIDES or DESTROYS one — what moved is a name and two pure
- * functions. `shared/workers/test/session-cookie.test.ts` fails the build if a
+ * functions. `web/test/one-cookie-name.test.ts` fails the build if a
  * fourth copy of the literal appears anywhere. */
 export {
   LEGACY_SESSION_COOKIE,
@@ -140,6 +141,12 @@ export async function getSessionUser(
   // human's current app team — the whole gating chain downstream just works.
   if (row.team_pin) row.current_team_id = row.team_pin
 
+  // WHOSE REQUEST THIS IS, for the central catch. auth never passes through
+  // `teamContext`, so its error rows carried neither column; this is the one
+  // place every signed-in auth door resolves the person, and it is where the
+  // sibling workers' equivalent (`teamContext`) does the same thing.
+  noteIdentity(req, { userId: row.id, teamId: row.current_team_id ?? undefined })
+
   // Slide the expiry forward while the session is actively used. A pinned
   // (MCP) session is deliberately short-lived — never slid.
   const slide =
@@ -151,7 +158,7 @@ export async function getSessionUser(
   const seenStale =
     now.getTime() - new Date(row.last_seen_at).getTime() > LAST_SEEN_THROTTLE_MS
   if (slide || seenStale) {
-    await env.DB.prepare(
+    const bookkeeping = env.DB.prepare(
       slide
         ? "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?"
         : "UPDATE sessions SET last_seen_at = ? WHERE id = ?"
@@ -166,6 +173,23 @@ export async function getSessionUser(
           : [now.toISOString(), row.session_id])
       )
       .run()
+    // NOBODY IS WAITING FOR THIS, AND EVERYBODY WAS.
+    //
+    // This is the hottest authenticated path in the product: every request that
+    // carries a cookie passes through here, at both front doors. The answer —
+    // who is asking — is already in hand on the line above; this statement only
+    // moves a presence stamp forward, and past the five-minute throttle it fires
+    // on the FIRST request of every visit, which is exactly the cold open a
+    // person feels. Measured 7 Sep 2026, `/api/auth/me` was ~280ms against a
+    // 100ms read budget, and a second sequential round trip to the core database
+    // was a third of it for a value no caller reads.
+    //
+    // So it rides the request's own lifetime instead (shared/workers/parallel.ts).
+    // `env.DEFER` is undefined where there is no request to hang work on — a cron
+    // tick, the test suites — and then it is AWAITED exactly as before, which is
+    // that seam's stated contract rather than a silent drop.
+    if (env.DEFER) env.DEFER(bookkeeping)
+    else await bookkeeping
   }
 
   return row

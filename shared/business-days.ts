@@ -65,7 +65,7 @@ function startOfDay(d: Date): number {
  * weeks, so the loop is short; it is bounded below so a clock skew that puts
  * `to` before `from` returns 0 rather than a negative age.
  */
-export function workingMsBetween(from: Date | string, to: Date | string): number {
+function workingMsBetween(from: Date | string, to: Date | string): number {
   const a = typeof from === "string" ? Date.parse(from) : from.getTime()
   const b = typeof to === "string" ? Date.parse(to) : to.getTime()
   if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return 0

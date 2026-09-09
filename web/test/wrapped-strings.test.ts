@@ -168,8 +168,41 @@ describe("R33 · every extracted position asks for its translation", () => {
       `the seam no longer imports "${KIT_FIELD}" — the kit moved it, and this ban is now reading for a string that exists nowhere. Update KIT_FIELD.`
     ).toContain(KIT_FIELD)
 
+    /* AN IMPORT, NOT A SENTENCE ABOUT ONE. `offenders` used to grep raw file
+       text for the tail, which is exactly the mistake this file's own header
+       warns every OTHER law against: a substring scan cannot tell an actual
+       `import … from "…components/field/field"` from this law's own paragraph
+       ABOUT that ban, which quotes the tail in backticks. That paragraph lives
+       in shared/rules/registry.ts, and until 2026-09-08 registry.ts was never
+       walked here at all — R33's `appFiles()` is the front doors' own import
+       closure, and nothing in `web/` or `web-portal/` imported it. The day a
+       screen first reached into `ACTIVITY_GATE_MAP` (the knowledge source's
+       Connections tab, deriving which origin tables the record-map door will
+       draw, instead of hand-listing them) registry.ts joined the walk for the
+       first time, and this test failed on its OWN law text — a real file,
+       innocent of the ban, reported as an offender because the check could not
+       tell code from commentary. So it reads the AST every other position in
+       this file already reads: an import/export-from whose STRING LITERAL
+       module specifier carries the tail, never a raw byte anywhere in the
+       file. */
+    const importsKitField = (tree: ts.SourceFile): boolean => {
+      let found = false
+      const visit = (node: ts.Node) => {
+        if (
+          (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+          node.moduleSpecifier &&
+          ts.isStringLiteral(node.moduleSpecifier) &&
+          node.moduleSpecifier.text.includes(KIT_FIELD)
+        )
+          found = true
+        ts.forEachChild(node, visit)
+      }
+      visit(tree)
+      return found
+    }
+
     const offenders = appFiles()
-      .filter(({ path }: { path: string }) => readFileSync(path, "utf8").includes(KIT_FIELD))
+      .filter(({ tree }: { tree: ts.SourceFile }) => importsKitField(tree))
       .map(({ path }: { path: string }) => relative(ROOT, path))
       .filter((rel: string) => rel !== SEAM)
 

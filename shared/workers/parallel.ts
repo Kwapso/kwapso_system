@@ -87,11 +87,15 @@ export async function inOrder<T extends readonly unknown[]>(
 // overturns; this is the other half of it.
 //
 // PROVENANCE, because a decision is only as good as its trail: that answer
-// reached this lane RELAYED through the planner session, not typed here. It is
-// recorded as the owner's because that is what it is, and the branch it lands on
-// is not merged and not deployed — so the owner sees it once more, in review,
-// before it is true of the running app. If the relay was wrong, this comment is
-// the first thing to correct.
+// reached this lane RELAYED rather than typed into it, and was written down that
+// way before it could be checked — deliberately, because a code change is
+// reversible and a false attribution in a comment is not.
+//
+// SINCE CONFIRMED, FIRST-HAND: the decision went to the owner as a numbered
+// list, and against the item "Say 'saved' straight away, and finish the history
+// entry a moment later?" his reply was the single word "yes", in his own
+// message. The chain is recorded rather than collapsed because the next reader
+// deserves to know which parts were seen and which were relayed.
 //
 // NEITHER IS OBSERVABLE BY THE CALLER, which is the rule above and the reason
 // they qualify. `logActivity` already swallows and self-reports its own failures

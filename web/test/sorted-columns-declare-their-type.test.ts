@@ -194,8 +194,8 @@ describe("a sortable column showing a formatted value declares what it is", () =
     // → something else, `field(` → a new helper, `<RecordTable` → a wrapper)
     // empties the census silently. An empty census passes every assertion above.
     expect(tableFiles.map((f) => f.rel).sort(), "no file renders a RecordTable any more").toEqual([
-      "web/components/meetings-screen.tsx",
-      "web/components/tasks-screen.tsx",
+      "web/components/meetings/meetings-screen.tsx",
+      "web/components/work/tasks-screen.tsx",
     ])
     expect(columnKeys.size, "no column keys were found in the table files").toBeGreaterThan(5)
     expect(cells.size, "no formatted cells were found in any shaper").toBeGreaterThan(3)

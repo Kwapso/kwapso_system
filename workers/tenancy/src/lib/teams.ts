@@ -1,7 +1,7 @@
 // Team lifecycle: the factory that gives every new team its OWN database
 // (locked architecture), seeded with default roles + dropdown values.
 
-import type { ActiveContext, ReceivedInvite, TeamMeta, TeamSummary } from "@shared/types"
+import type { ActiveContext, ReceivedInvite, SessionUser, TeamMeta, TeamSummary } from "@shared/types"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { logActivity } from "@shared/workers/activity"
 import {
@@ -13,14 +13,7 @@ import {
   type D1Rest,
 } from "@shared/workers/d1-rest"
 import { ulid } from "@shared/workers/id"
-import {
-  dataUrlBytes,
-  MAX_IMAGE_BYTES,
-  mediaKey,
-  ownedMediaKey,
-  parseDataUrl,
-  reclaimMedia,
-} from "@shared/workers/image"
+import { dataUrlBytes, MAX_IMAGE_BYTES, ownedMediaKey, parseDataUrl, reclaimMedia, teamMediaKey } from "@shared/workers/image"
 import { publishChange, publishUserChange } from "@shared/workers/realtime"
 import { d1ConfigFrom } from "@shared/workers/gating"
 import type { ActivityOrigin } from "@shared/workers/origin"
@@ -224,7 +217,7 @@ export async function createTeam(
 }
 
 /** Edit a team's name + optional logo (the global teams row). A new logo (data
- * URL) lands in R2 and is served by the gateway at /media/teams/<id>/<random> —
+ * URL) lands in R2 and is served by the gateway at /media/<team>/logo/<random> —
  * a capability URL (no session on that door), so the key carries a random tail.
  * Caller checks teams:edit. */
 export async function updateTeamDetails(
@@ -271,10 +264,16 @@ export async function updateTeamDetails(
     const current = await env.DB.prepare("SELECT logo_url FROM teams WHERE id = ?")
       .bind(teamId)
       .first<{ logo_url: string | null }>()
-    supersededKey = ownedMediaKey(current?.logo_url, "/media/", "teams", teamId)
+    // THE ONE TEAM SHAPE, `<team>/logo/…`, since 7 Sep 2026 (teamMediaKey says
+    // why one shape). A logo stored under the older `teams/<team>/…` shape is
+    // not this owners list and is left where it is on its first replacement —
+    // one small object, once, per team — rather than the reclaim carrying a
+    // second owners list nothing mints any more, which media-keys.test.ts
+    // rightly refuses.
+    supersededKey = ownedMediaKey(current?.logo_url, "/media/", teamId, "logo")
     // Unguessable by construction — the logo is served with no session, so the
     // key is the credential (mediaKey; see the gateway's /media/* door).
-    const key = mediaKey("teams", teamId)
+    const key = teamMediaKey(teamId, "logo")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: parsed.contentType } })
     logoUrl = `/media/${key}?v=${Date.now()}`
   }
@@ -522,11 +521,15 @@ export async function acceptInvite(
 export async function getActiveContext(
   env: Env,
   cfg: D1Rest,
-  userId: string
+  /** WHO IS ASKING, passed in rather than read again. The door above resolved
+   * this through auth to know there was anybody to answer, and the answer now
+   * carries it — see `ActiveContext.user` in shared/types.ts for why. */
+  user: SessionUser
 ): Promise<ActiveContext> {
+  const userId = user.id
   const teams = await listMyTeams(env, userId)
   if (teams.length === 0)
-    return { team: null, role: null, memberCount: 0, teams: [] }
+    return { team: null, role: null, memberCount: 0, teams: [], user, permissions: null }
 
   const stored = await env.DB.prepare(
     "SELECT current_team_id FROM users WHERE id = ?"
@@ -569,7 +572,10 @@ export async function getActiveContext(
     if (roleRows[0]) role = { id: roleRows[0].id, title: roleRows[0].title }
   }
 
-  return { team: current, role, memberCount: countRow?.n ?? 0, teams }
+  // `permissions` is filled by the DOOR, which holds the fence guard the rights
+  // sheet is read with; null here means only "not answered yet", exactly as it
+  // does for a person with no team.
+  return { team: current, role, memberCount: countRow?.n ?? 0, teams, user, permissions: null }
 }
 
 /** Switch the active team (locked: one team session at a time). Validates the

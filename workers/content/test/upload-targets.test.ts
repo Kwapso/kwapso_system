@@ -40,20 +40,20 @@ describe("every upload target mirrors a real door", () => {
 
   it("THE KEY PREFIX IS ONE A STREAMING DOOR ALREADY MINTS", () => {
     // THE LOAD-BEARING ONE. `media-keys.test.ts` cannot see through the presign
-    // door's `mediaKey(guard.teamId, ...target.owners)` — a spread is opaque to
-    // a text scan — so it admits that mint on the promise made here: every
-    // entry's owners spell a prefix some door already writes literally, and
+    // door's `teamMediaKey(guard.teamId, target.module)` — a variable is opaque
+    // to a text scan — so it admits that mint on the promise made here: every
+    // entry's module spells a prefix some door already writes literally, and
     // therefore one that table already describes. A new entry inventing a
     // prefix fails HERE, which is the only reason the admission over there is
     // not a hole.
     for (const [name, target] of Object.entries(UPLOAD_TARGETS)) {
-      const literal = `mediaKey(guard.teamId, "${target.owners.join('", "')}")`
+      const literal = `teamMediaKey(guard.teamId, "${target.module}")`
       expect(
         doorSrc(MIRRORS[name]).includes(literal),
-        `${name}'s owners (${target.owners.join(", ")}) are not a prefix ` +
+        `${name}'s module (${target.module}) is not a prefix ` +
           `${MIRRORS[name]}.ts mints literally. Either the door changed its key shape, or this ` +
           "entry invented a prefix nothing describes — and media-keys.test.ts is admitting the " +
-          "presign door's spread mint on the promise that this cannot happen."
+          "presign door's mint on the promise that this cannot happen."
       ).toBe(true)
     }
   })

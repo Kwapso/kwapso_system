@@ -292,8 +292,12 @@ export function gatingSeam(worker: Worker & {
  *
  * So this indexes both, and slices between top-level declarations rather than
  * between exports. Same file walk, same stripComments contract; a different
- * question, and one where a private helper is exactly what is being looked for. */
-export function indexAllFunctions(dir: string): Map<string, string> {
+ * question, and one where a private helper is exactly what is being looked for.
+ *
+ * NOT EXPORTED. It was, and nothing outside this file ever imported it — the
+ * activity seam below is its only caller. An export nothing imports is a
+ * contract nobody agreed to. */
+function indexAllFunctions(dir: string): Map<string, string> {
   const out = new Map<string, string>()
   for (const file of sourceFiles(dir, { extensions: [".ts"] })) {
     const starts = [...file.source.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+(\w+)/gm)]
@@ -354,7 +358,16 @@ export function activitySeam(worker: Worker & { silent: Record<string, string> }
       ...indexAllFunctions(join(__dirname, "..", "workers")),
     ])
 
-    /** Does this function, or anything it calls within MAX_HOPS, write a row? */
+    /** Does this function, or anything it calls within MAX_HOPS, write a row?
+     *
+     * The walk follows a call into a lib AND into another function in the same
+     * routes folder. The second half was added on 7 Sep 2026: it used to follow
+     * libs only, so a handler that shared its write with a sibling door through
+     * a helper extracted BESIDE it — the ordinary shape when one door grows a
+     * second way in — stopped one hop short and was reported as writing no
+     * history at all. The failure direction is the dangerous one: a false
+     * "silent", answered by adding a reasoned exemption for a door that does in
+     * fact log. */
     const writesActivity = (fn: string, seen = new Set<string>(), depth = 0): boolean => {
       if (depth > MAX_HOPS || seen.has(fn)) return false
       seen.add(fn)
@@ -363,7 +376,8 @@ export function activitySeam(worker: Worker & { silent: Record<string, string> }
       const code = stripComments(body)
       if (ACTIVITY_RE.test(code)) return true
       for (const call of code.matchAll(/(?<![A-Za-z0-9_$.])(\w{4,})\s*\(/g))
-        if (libFns.has(call[1]) && writesActivity(call[1], seen, depth + 1)) return true
+        if ((libFns.has(call[1]) || routeFns.has(call[1])) && writesActivity(call[1], seen, depth + 1))
+          return true
       return false
     }
 

@@ -102,6 +102,11 @@ glide/r2-manifest.json
 
 # Parallel agent worktrees — working copies, never content
 .claude/worktrees/
+# The same thing under the owner's own rule of 8 Sep 2026: every folder this repo
+# creates lives INSIDE the project, so lane worktrees moved here from
+# ~/kwapso-lanes/. They are checkouts of branches that are already on GitHub —
+# tracking them would commit the repo into itself.
+.worktrees/
 
 # The retrieval benchmark's corpus and its cached vectors — hundreds of MB,
 # rebuildable by scripts/knowledge-retrieval-bench.mjs.

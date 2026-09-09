@@ -36,8 +36,9 @@
 //                        PERSON connecting something outside the app to their
 //                        own account, which is what the word means here.
 //   4. Choices        — formerly "Dropdown values", formerly its own tab on
-//                        the team area's strip (web/components/selectable-
-//                        screen.tsx explains the rename and the move). This
+//                        the team area's strip
+//                        (web/components/choices/selectable-screen.tsx
+//                        explains the rename and the move). This
 //                        is the one door to it now; ManageDropdownsLink and
 //                        every other in-app shortcut open straight to it via
 //                        `?tab=choices`.
@@ -72,9 +73,9 @@ import { List } from "@shared/web/list-compat"
 import { CaretRight } from "@shared/ui/foundations/icons"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { AccessTokensSection } from "@/components/access-tokens"
-import { GoogleConnectionsSection } from "@/components/google-connections"
-import { InvitationsPanel, useReceivedInvites } from "@/components/invitations"
+import { AccessTokensSection } from "@/components/team/access-tokens"
+import { GoogleConnectionsSection } from "@/components/knowledge/google-connections"
+import { InvitationsPanel, useReceivedInvites } from "@/components/team/invitations"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
 import { TEAM_SECTIONS } from "@/lib/pages"
@@ -88,7 +89,7 @@ import { SpineSection } from "@shared/web/spine-section"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
 
-import { RECORD_TABS_CONFIG } from "@/components/record-chrome"
+import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
 import { ScreenRenderer, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
 import type { ScreenRights } from "@shared/web/screen-engine/recipe"
@@ -96,7 +97,7 @@ import { NoAccess, SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { shapeMembersList, shapeRolesList } from "@/components/deep-link/shape"
 import { resolveRecipe, withDataDrivenCollection } from "@/lib/screens"
 import { useScreenData } from "@/lib/use-screen-data"
-import { SelectableScreen } from "@/components/selectable-screen"
+import { SelectableScreen } from "@/components/choices/selectable-screen"
 
 export function SettingsScreen({
   active,

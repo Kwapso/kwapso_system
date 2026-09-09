@@ -47,7 +47,7 @@ import { fileToCsv, UserFileError } from "@/lib/file-to-csv"
 import { clearPendingQuestion, usePendingQuestion } from "@/lib/agent-open"
 import { traceFor } from "@/lib/agent-trace"
 import { emitTrace } from "@/lib/screen-trace"
-import { AgentMarkdown } from "@/components/agent-markdown"
+import { AgentMarkdown } from "@/components/assistant/agent-markdown"
 import { reportError } from "@shared/web/log"
 
 let nextId = 0
@@ -56,7 +56,7 @@ const newId = () => `m${++nextId}`
 /* ────────────────────────────────────────────────────────────────────────
    THE LIVE CHAT STATE, HOISTED TO MODULE LEVEL.
 
-   THE BUG: AgentHost (web/components/agent-host.tsx) renders EITHER the
+   THE BUG: AgentHost (web/components/assistant/agent-host.tsx) renders EITHER the
    docked column OR a floating `Popover`, chosen by `useShellColumns()` (a
    48rem media query) — two structurally different subtrees at the same
    return, so React UNMOUNTS AgentPanel (and this hook with it) the instant a

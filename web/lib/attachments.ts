@@ -1,14 +1,21 @@
-// THE THREE THINGS BOTH ATTACHMENT PANELS NEED — and one of them is a security
+// THE THREE THINGS THE ATTACHMENT PANEL NEEDS — and one of them is a security
 // check, which is the reason this file exists rather than a preference.
 //
-// A ticket's attachments and a story's attachments are two panels that
-// legitimately differ: different records, different doors, different cache keys,
-// different words. What they were NOT allowed to differ about is which URLs may
-// be put in an `href`, and until 6 Sep 2026 that decision was written out twice,
-// character for character, in help-attachments.tsx and story-attachments.tsx.
-// Two copies of a security check is one check and one thing that looks like it —
-// the same argument shared/rules/seam-scan.ts makes about its own scanner, and
-// the reason R40 cares about `href` at all.
+// A ticket's attachments and a story's attachments were two panels that agreed
+// on almost everything and legitimately differed on three things: their door,
+// their cache key, and their words. What they were NOT allowed to differ about
+// is which URLs may be put in an `href`, and until 6 Sep 2026 that decision was
+// written out twice, character for character, in help-attachments.tsx and
+// story-attachments.tsx. Two copies of a security check is one check and one
+// thing that looks like it — the same argument shared/rules/seam-scan.ts makes
+// about its own scanner, and the reason R40 cares about `href` at all.
+//
+// The rest of the two panels followed the same way on 7 Sep 2026: the list is
+// `web/components/records/record-attachments.tsx` and the two module files hand
+// it their door, their key and their two sentences. This file kept its own
+// place, because a security check that lives inside the component it protects
+// is one a second component cannot borrow — which is how it came to be written
+// twice in the first place.
 //
 // THE CLIENT PORTAL KEEPS ITS OWN, DELIBERATELY, and this file must not swallow
 // it. `web-portal/components/ticket-attachments.tsx` applies a STRICTER policy —

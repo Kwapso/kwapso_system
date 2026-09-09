@@ -21,3 +21,25 @@ const cssNs = (globalThis as { CSS: { escape?: (v: string) => string } }).CSS
 if (typeof cssNs.escape !== "function") {
   cssNs.escape = (value: string) => String(value).replace(/[^a-zA-Z0-9_ -￿-]/g, (ch) => `\\${ch}`)
 }
+
+// Two more jsdom gaps, met the first time a suite rendered the WHOLE shell
+// (cold-screen-hops): the kit's cursor glow asks `matchMedia` for the
+// reduced-motion preference on mount, and the folder-tab breadcrumb scrolls its
+// live tab into view. Neither exists in jsdom, and both are answered here the
+// way ResizeObserver is above — a no-op, because no test asserts a scroll
+// position or a media query, only what is on screen.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener() {},
+    removeEventListener() {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia
+}
+if (typeof Element !== "undefined" && typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {}
+}

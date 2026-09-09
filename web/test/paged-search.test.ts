@@ -238,6 +238,6 @@ describe("paged-search (R14, the search half): a paged list searches the whole c
     expect(
       users.map((f) => f.replace(`${ROOT}/`, "")),
       "formatSearchTotal is the filtered-total seam — the find bar renders it, and nothing else should hand-roll a second one beside it"
-    ).toEqual([join(WEB, "components", "paged-find.tsx").replace(`${ROOT}/`, "")])
+    ).toEqual([join(WEB, "components", "records", "paged-find.tsx").replace(`${ROOT}/`, "")])
   })
 })

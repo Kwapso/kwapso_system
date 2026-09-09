@@ -19,7 +19,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { AppMark } from "@/components/app-tiles"
+import { AppMark } from "@/components/apps/app-tiles"
 import type { AppRow } from "@shared/types"
 
 afterEach(cleanup)

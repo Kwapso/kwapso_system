@@ -8,6 +8,21 @@ export type Env = {
    * Optional because a cron tick and the test suites have no request to hang
    * work on; absent means the ping is awaited exactly as it was before. */
   DEFER?: (work: Promise<unknown>) => void
+  /** THIS REQUEST'S NAME, set on the same per-request shallow copy — the id the
+   * public door minted, re-read off the `x-request-id` header and never minted
+   * again (shared/workers/trace.ts). `publishChange` and `sendBrandedEmail` read
+   * it off `env` and put it on the failure rows they write, so a live-layer ping
+   * or an email that did not go out joins the click that ordered it. Nothing
+   * else reads it, and nothing gates on it.
+   *
+   * On the env rather than in the signature for the same reason `DEFER` is:
+   * neither seam takes a `Request`, and 190 call sites already pass `env` (186
+   * publish + 4 mail, counted 7 Sep 2026).
+   *
+   * Optional because a cron tick has no request — it puts the TICK's id here
+   * instead (`tickId`) — and the suites hand a bare `env`; absent means the row
+   * lands exactly as it did before, with nothing to join on. */
+  TRACE?: string
 
   /** The global core database (users, teams, team_members, invite_index). */
   DB: D1Database
@@ -15,7 +30,8 @@ export type Env = {
   AUTH: Fetcher
   /** The realtime worker — pinged after a write so open screens refresh live. */
   REALTIME: Fetcher
-  /** Team logos (uploaded), served by the gateway at /media/teams/<id>. */
+  /** Team logos (uploaded), served by the gateway at /media/<team>/logo/<ulid>
+   * (`/media/teams/<id>/…` for one written before 7 Sep 2026). */
   MEDIA: R2Bucket
 
   /** Cloudflare account id (plain var) — for creating/querying team DBs. */

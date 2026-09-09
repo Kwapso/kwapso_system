@@ -1653,6 +1653,7 @@ export const SEED: Catalogue = {
   "This is your work with us.": { de: "Das ist Ihre Arbeit mit uns.", es: "Este es tu trabajo con nosotros.", ca: "Aquesta és la teva feina amb nosaltres."},
   "This one is kept in step with the record it came from, so its words are edited there. You can still change where it is filed and who can use it.": { de: "Diese wird mit dem Datensatz, aus dem sie stammt, in Einklang gehalten, ihre Worte werden also dort bearbeitet. Wo sie abgelegt ist und wer sie nutzen darf, können Sie weiterhin ändern.", es: "Esta se mantiene al día con el registro del que procede, así que su texto se edita allí. Aún puedes cambiar dónde está archivada y quién puede usarla.", ca: "Aquesta es manté al dia amb el registre del qual prové, així que el seu text s'edita allà. Encara pots canviar on està arxivada i qui la pot fer servir."},
   "This picture appears once a second person logs time against it.": { de: "Dieses Bild erscheint, sobald eine zweite Person Zeit darauf erfasst.", es: "Este reparto aparece en cuanto una segunda persona registra tiempo aquí.", ca: "Aquesta imatge apareix quan una segona persona hi registra temps."},
+  "This source doesn't have a map to draw.": { de: "Für diese Quelle gibt es keine Karte zum Zeichnen.", es: "Esta fuente no tiene un mapa que dibujar.", ca: "Aquesta font no té cap mapa per dibuixar."},
   "This version has no steps recorded.": { de: "Für diese Version sind keine Schritte erfasst.", es: "Esta versión no tiene pasos registrados.", ca: "Aquesta versió no té passos registrats."},
   "Ticked off. It's under All tasks.": { de: "Abgehakt. Es steht unter Alle Aufgaben.", es: "Marcado. Está en Todas las tareas.", ca: "Marcat. És a Totes les tasques."},
   "Today": { de: "Heute", es: "Hoy", ca: "Avui"},
@@ -3455,11 +3456,81 @@ export const SEED: Catalogue = {
     es: "Ver el mapa entero",
     ca: "Veure el mapa sencer",
   },
+  /* ── THE WHOLE KNOWLEDGE BASE AS ONE PICTURE (8 Sep 2026) ────────────────
+   * The Shape view beside the knowledge list. Same register as the
+   * neighbourhood map above it: plain, short, sentence case, and the same word
+   * for the same thing — "Karte"/"mapa" for the picture, "Quellen"/"fuentes"/
+   * "fonts" for what the assistant may read, which is the word the knowledge
+   * list already uses ("{count} sources match"). */
+  Shape: { de: "Form", es: "Forma", ca: "Forma" },
+  "{count} sources": { de: "{count} Quellen", es: "{count} fuentes", ca: "{count} fonts" },
+  "A map of the whole knowledge base, grouped by account": {
+    de: "Eine Karte der ganzen Wissensbasis, nach Konto gruppiert",
+    es: "Un mapa de toda la base de conocimiento, agrupada por cuenta",
+    ca: "Un mapa de tota la base de coneixement, agrupada per compte",
+  },
+  /* The cap, said out loud — and the second sentence is the load-bearing one:
+   * the dots are a sample and the sizes are not. */
+  "Drawing the {drawn} most recently touched. Every group is sized by its full count.": {
+    de: "Es werden die {drawn} zuletzt bearbeiteten gezeigt. Jede Gruppe ist nach ihrer vollen Anzahl bemessen.",
+    es: "Se dibujan las {drawn} más recientes. Cada grupo se dimensiona por su total completo.",
+    ca: "Es dibuixen les {drawn} més recents. Cada grup es dimensiona pel seu total complet.",
+  },
+  /* The aggregation fence, said out loud. "Konto"/"cuenta"/"compte" is the
+   * glossary's Account, and the second half says whose limit it is. */
+  "Grouping by account is off, because you cannot open accounts.": {
+    de: "Die Gruppierung nach Konto ist aus, weil Sie Konten nicht öffnen können.",
+    es: "La agrupación por cuenta está desactivada, porque no puedes abrir cuentas.",
+    ca: "L'agrupació per compte està desactivada, perquè no pots obrir comptes.",
+  },
+  "Nothing in the knowledge base yet.": {
+    de: "Noch nichts in der Wissensbasis.",
+    es: "Todavía no hay nada en la base de conocimiento.",
+    ca: "Encara no hi ha res a la base de coneixement.",
+  },
+  /* ── A CALL'S OWN CONNECTIONS TAB (9 Sep 2026) ───────────────────────────
+   * The meeting screen's map. Same register as the knowledge base's beside it:
+   * plain, short, sentence case. "Call" rather than "meeting" in the empty
+   * sentence because the reader is standing ON the meeting and the word for
+   * what came out of it is the conversation, not the record. */
+  "Nothing is filed against this call yet.": {
+    de: "Zu diesem Gespräch ist noch nichts abgelegt.",
+    es: "Todavía no hay nada archivado sobre esta llamada.",
+    ca: "Encara no hi ha res arxivat sobre aquesta trucada.",
+  },
+  /* The long one says what WOULD fill it, in two clauses: what Google has to
+   * say for an artefact to arrive, and the three fields that show here anyway. */
+  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The client, the system and the reason we met show here too, once they are set.":
+    {
+      de: "E-Mails, Chatverläufe und Mitschriften gehören zu einem Gespräch, wenn Google sagt, zu welchem Termin sie gehören. Kunde, System und der Grund des Treffens erscheinen hier ebenfalls, sobald sie gesetzt sind.",
+      es: "Los correos, los chats y las transcripciones se unen a una llamada cuando Google dice a qué evento pertenecen. El cliente, el sistema y el motivo de la reunión también aparecen aquí, una vez definidos.",
+      ca: "Els correus, els xats i les transcripcions s'uneixen a una trucada quan Google diu a quin esdeveniment pertanyen. El client, el sistema i el motiu de la reunió també apareixen aquí, un cop definits.",
+    },
+  "This meeting doesn't have a map to draw.": {
+    de: "Für dieses Meeting gibt es keine Karte.",
+    es: "Esta reunión no tiene un mapa que dibujar.",
+    ca: "Aquesta reunió no té cap mapa per dibuixar.",
+  },
+  "Nothing is filed under an account yet.": {
+    de: "Noch nichts unter einem Konto abgelegt.",
+    es: "Todavía no hay nada archivado bajo una cuenta.",
+    ca: "Encara no hi ha res arxivat sota un compte.",
+  },
   /* Read aloud, never drawn — the picture's own name. */
   "A map of what this record is connected to": {
     de: "Eine Karte davon, womit dieser Eintrag verbunden ist",
     es: "Un mapa de con qué está conectado este registro",
     ca: "Un mapa d'amb què està connectat aquest registre",
+  },
+  /* THE TAB'S OWN FAILURE (8 Sep 2026) — the map's read can fail like any
+   * other, and this is the sentence that says so instead of leaving the
+   * loading skeleton on screen forever. Written here, beside the rest of the
+   * map's words, for the same "{count} connected" / "Nothing is linked to
+   * this yet." register. */
+  "Couldn't load this record's connections.": {
+    de: "Verbindungen dieses Eintrags konnten nicht geladen werden.",
+    es: "No se pudieron cargar las conexiones de este registro.",
+    ca: "No s'han pogut carregar les connexions d'aquest registre.",
   },
   /* The group's accessible name — read aloud, never drawn. */
   "Which sources the assistant reads": {
@@ -3488,6 +3559,28 @@ export const SEED: Catalogue = {
     de: "{done} von {count} Zeile(n) geschrieben. Jede wird genau so geprüft, als hätten Sie sie selbst eingegeben.",
     es: "{done} de {count} fila(s) escritas. Cada una se comprueba exactamente como si la hubiera escrito usted.",
     ca: "{done} de {count} fila/es escrites. Cadascuna es comprova exactament com si l'haguéssiu escrita vós.",
+  },
+
+  /* THE LIVE-CONNECTION STRIP (shared/web/live-status.tsx). Hand-written here
+   * rather than left for the generator, because the generator spends the
+   * owner's own key and R44 will not let an untranslated string ship: two new
+   * sentences would have pushed all three ceilings up by two, which is the
+   * "accepted debt" exit rather than the right one for copy this short.
+   *
+   * "Live" is the hard word. It is not `Live` in German here — a person is
+   * being told their screen has stopped keeping itself up to date, and
+   * "aktualisiert sich gerade nicht" says that in the plain register the rest
+   * of this file uses. Same choice in Spanish and Catalan: describe what has
+   * stopped happening, rather than borrow an English adjective for it. */
+  "Not updating live right now — you may not be seeing the latest changes.": {
+    de: "Aktualisiert sich gerade nicht — du siehst möglicherweise nicht die neuesten Änderungen.",
+    es: "Ahora mismo no se actualiza solo — puede que no estés viendo los últimos cambios.",
+    ca: "Ara mateix no s'actualitza sol — potser no estàs veient els darrers canvis.",
+  },
+  "Refresh": {
+    de: "Aktualisieren",
+    es: "Actualizar",
+    ca: "Actualitza",
   },
   /* ── THE TICKETS DASHBOARD (6 Sep 2026) ──────────────────────────────────
      Written here rather than left to accumulate as ceiling debt (R44), and for
@@ -3764,4 +3857,60 @@ export const SEED: Catalogue = {
   "Anything you'd like to add? (optional)": { de: "Möchten Sie noch etwas ergänzen? (optional)", es: "¿Quieres añadir algo? (opcional)", ca: "Vols afegir-hi alguna cosa? (opcional)"},
   "Send": { de: "Senden", es: "Enviar", ca: "Enviar"},
   "Thanks for telling us.": { de: "Danke für Ihre Rückmeldung.", es: "Gracias por decírnoslo.", ca: "Gràcies per dir-nos-ho."},
+
+  /* ── THE FIELD HINTS THAT NEVER RENDERED ────────────────────────────────
+   * 44 `FieldConfig`s across both front doors set `hint:`, a key the type
+   * has never had (it has `helpText`) — written for a person and read by
+   * nobody, silently dropped by the excess-property check's own blind spot
+   * for named constants. Renamed to `helpText:` and translated here, by
+   * hand, on the owner's ruling of 8 Sep 2026 (never `i18n-translate.mjs` —
+   * that spends his own key). One of the 44, the New story dialog's App
+   * field, was converted and catalogued alone on 8 Sep 2026 to measure the
+   * class; its own translation lives in this same block, keyed by its
+   * English exactly as `shared/i18n-strings.json` has it. */
+  "The system this work is on. Everything below is narrowed by it.": { de: "Das System, auf das sich diese Arbeit bezieht. Alles darunter wird dadurch eingegrenzt.", es: "El sistema en el que está este trabajo. Todo lo de abajo se filtra por él.", ca: "El sistema en què és aquesta feina. Tot el que hi ha a sota es filtra per aquest."},
+  "A line or two. It is what the reviewer reads before they look.": { de: "Ein bis zwei Zeilen. Das liest der Prüfer, bevor er sich alles ansieht.", es: "Una o dos líneas. Es lo que el revisor lee antes de mirar.", ca: "Una o dues línies. És el que llegeix qui revisa abans de mirar."},
+  "A recording, a page, a document somebody can open.": { de: "Eine Aufnahme, eine Seite, ein Dokument, das sich öffnen lässt.", es: "Una grabación, una página, un documento que alguien pueda abrir.", ca: "Un enregistrament, una pàgina, un document que algú pugui obrir."},
+  "A screenshot, a recording, a document somebody can open.": { de: "Ein Screenshot, eine Aufnahme, ein Dokument, das sich öffnen lässt.", es: "Una captura de pantalla, una grabación, un documento que alguien pueda abrir.", ca: "Una captura de pantalla, un enregistrament, un document que algú pugui obrir."},
+  "A split is two things that can happen next, and which one happens depends on something. A step added after a split joins the two sides back up — unless you say it carries on from one of them.": { de: "Eine Verzweigung sind zwei mögliche nächste Schritte, und welcher eintritt, hängt von etwas ab. Ein Schritt nach einer Verzweigung führt die beiden Seiten wieder zusammen — es sei denn, Sie sagen, dass er an einer der beiden weitergeht.", es: "Una bifurcación son dos cosas que pueden pasar después, y cuál ocurre depende de algo. Un paso añadido tras una bifurcación reúne otra vez los dos lados, a menos que digas que continúa desde uno de ellos.", ca: "Una bifurcació són dues coses que poden passar després, i quina passa depèn d'alguna cosa. Un pas afegit després d'una bifurcació torna a unir els dos costats, llevat que diguis que continua des d'un d'ells."},
+  "At least one. A screenshot, a recording, a link to the page it changed.": { de: "Mindestens eines. Ein Screenshot, eine Aufnahme, ein Link zur geänderten Seite.", es: "Al menos uno. Una captura de pantalla, una grabación, un enlace a la página que cambió.", ca: "Almenys un. Una captura de pantalla, un enregistrament, un enllaç a la pàgina que ha canviat."},
+  "Blocks on this app that are still running or still to come.": { de: "Blöcke auf dieser App, die noch laufen oder noch bevorstehen.", es: "Bloques de esta app que siguen en marcha o que aún están por venir.", ca: "Blocs d'aquesta app que encara estan en marxa o encara han d'arribar."},
+  "Company number, VAT number, whatever your country asks for.": { de: "Handelsregisternummer, USt-IdNr., was auch immer Ihr Land verlangt.", es: "Número de empresa, NIF/CIF, lo que pida tu país.", ca: "Número d'empresa, NIF, el que demani el teu país."},
+  "Editable on the Choices screen.": { de: "Bearbeitbar auf der Seite „Optionen“.", es: "Editable en la pantalla de Opciones.", ca: "Editable a la pantalla d'Opcions."},
+  "Every way of working this changes, or tick that it changes none.": { de: "Jede Arbeitsweise, die sich dadurch ändert, oder anhaken, dass sich keine ändert.", es: "Cada forma de trabajar que esto cambia, o marca que no cambia ninguna.", ca: "Cada manera de treballar que això canvia, o marca que no en canvia cap."},
+  "On unless you say otherwise.": { de: "Aktiv, sofern Sie nichts anderes sagen.", es: "Activado, a menos que digas lo contrario.", ca: "Activat, llevat que diguis el contrari."},
+  "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.": { de: "Ein Emoji, das neben diesem Wort erscheint, überall wo der Typ auftaucht. Leer lassen für eine einfache Bezeichnung.", es: "Un emoji que aparece junto a esta palabra, allí donde aparezca el tipo. Déjalo vacío para una etiqueta sencilla.", ca: "Un emoji que apareix al costat d'aquesta paraula, allà on aparegui el tipus. Deixa-ho buit per a una etiqueta senzilla."},
+  "One rate per kind of work.": { de: "Ein Satz pro Art der Arbeit.", es: "Una tarifa por tipo de trabajo.", ca: "Una tarifa per tipus de treball."},
+  "One. A step done in two systems has a handoff in the middle of it, and that is two steps.": { de: "Eines. Ein Schritt, der in zwei Systemen ausgeführt wird, hat mittendrin eine Übergabe, und das sind zwei Schritte.", es: "Uno. Un paso realizado en dos sistemas tiene un traspaso en medio, y eso son dos pasos.", ca: "Un. Un pas fet en dos sistemes té un traspàs enmig, i això són dos passos."},
+  "Only one rate can be the fallback.": { de: "Nur ein Satz kann der Standardsatz sein.", es: "Solo una tarifa puede ser la predeterminada.", ca: "Només una tarifa pot ser la predeterminada."},
+  "Open requests on this app. Most work stands on its own.": { de: "Offene Anfragen zu dieser App. Die meiste Arbeit steht für sich.", es: "Solicitudes abiertas de esta app. La mayoría del trabajo se sostiene por sí solo.", ca: "Sol·licituds obertes d'aquesta app. La majoria del treball es manté per si sol."},
+  "Our team. Only they and an admin open this app's page.": { de: "Unser Team. Nur sie und ein Administrator öffnen die Seite dieser App.", es: "Nuestro equipo. Solo ellos y un administrador abren la página de esta app.", ca: "El nostre equip. Només ells i un administrador obren la pàgina d'aquesta app."},
+  "Set once. Leave it blank for one of our own.": { de: "Einmal festgelegt. Leer lassen für eine unserer eigenen.", es: "Se define una vez. Déjalo en blanco para una de las nuestras.", ca: "Es defineix una vegada. Deixa-ho en blanc per a una de les nostres."},
+  "The client's own contacts for this system.": { de: "Die eigenen Kontakte des Kunden für dieses System.", es: "Los propios contactos del cliente para este sistema.", ca: "Els propis contactes del client per a aquest sistema."},
+  "The client's own mark. Without one the tile shows the stage.": { de: "Das eigene Zeichen des Kunden. Ohne eines zeigt die Kachel die Phase.", es: "La marca propia del cliente. Sin ella, la ficha muestra la etapa.", ca: "La marca pròpia del client. Sense cap, la fitxa mostra l'etapa."},
+  "The company this is for. Their contacts see it in their portal; leave it off for our own questions.": { de: "Das Unternehmen, für das dies ist. Deren Kontakte sehen es in ihrem Portal; für eigene Fragen leer lassen.", es: "La empresa para la que es esto. Sus contactos lo ven en su portal; déjalo vacío para nuestras propias preguntas.", ca: "L'empresa per a la qual és això. Els seus contactes ho veuen al seu portal; deixa-ho buit per a les nostres pròpies preguntes."},
+  "The flat price for this block of work. Leave it at zero if it isn't sold separately.": { de: "Der Festpreis für diesen Arbeitsblock. Bei null lassen, wenn er nicht separat verkauft wird.", es: "El precio fijo de este bloque de trabajo. Déjalo en cero si no se vende por separado.", ca: "El preu fix d'aquest bloc de treball. Deixa'l a zero si no es ven per separat."},
+  "The one who marks work on this app done.": { de: "Wer die Arbeit an dieser App als erledigt markiert.", es: "Quien marca como terminado el trabajo en esta app.", ca: "Qui marca com a acabada la feina d'aquesta app."},
+  "The part of your system this is about. It helps us route it to the right person.": { de: "Der Teil Ihres Systems, um den es geht. Das hilft uns, es an die richtige Person weiterzuleiten.", es: "La parte de tu sistema de la que se trata. Nos ayuda a dirigirlo a la persona adecuada.", ca: "La part del teu sistema de què es tracta. Ens ajuda a adreçar-ho a la persona adequada."},
+  "The person at that client who asked. Not always whoever types it in.": { de: "Die Person bei diesem Kunden, die gefragt hat. Nicht immer, wer es eintippt.", es: "La persona de ese cliente que lo pidió. No siempre quien lo escribe.", ca: "La persona d'aquell client que ho ha demanat. No sempre qui ho escriu."},
+  "The role whose hours this takes. It is what prices the saving.": { de: "Die Rolle, deren Stunden das kostet. Das bestimmt den Preis der Ersparnis.", es: "El rol cuyas horas se dedican a esto. Es lo que pone precio al ahorro.", ca: "El rol les hores del qual dedica això. És el que posa preu a l'estalvi."},
+  "The side of the split this step continues. It hangs under that one instead of joining the two back together.": { de: "Die Seite der Verzweigung, die dieser Schritt fortsetzt. Er hängt an dieser Seite, statt die beiden wieder zusammenzuführen.", es: "El lado de la bifurcación que continúa este paso. Queda bajo ese lado en vez de reunir los dos de nuevo.", ca: "El costat de la bifurcació que continua aquest pas. Queda sota aquest costat en lloc de tornar a unir els dos."},
+  "The situation it was built into.": { de: "Die Situation, in die hinein es gebaut wurde.", es: "La situación en la que se construyó.", ca: "La situació en què es va construir."},
+  "The step this one happens INSTEAD of. The two sit side by side in the picture.": { de: "Der Schritt, ANSTELLE dessen dieser hier passiert. Die beiden stehen im Bild nebeneinander.", es: "El paso en cuyo lugar ocurre este. Los dos aparecen uno junto al otro en la imagen.", ca: "El pas en lloc del qual passa aquest. Els dos apareixen l'un al costat de l'altre a la imatge."},
+  "The system this block of work covers.": { de: "Das System, das dieser Arbeitsblock abdeckt.", es: "El sistema que cubre este bloque de trabajo.", ca: "El sistema que cobreix aquest bloc de treball."},
+  "The time you agreed with them, not a measurement.": { de: "Die Zeit, die Sie mit ihnen vereinbart haben, keine Messung.", es: "El tiempo que acordaste con ellos, no una medición.", ca: "El temps que vas acordar amb ells, no una mesura."},
+  "The words that decide it — written the way somebody would say it out loud.": { de: "Die Worte, die darüber entscheiden — geschrieben, wie jemand es laut sagen würde.", es: "Las palabras que lo deciden, escritas tal como alguien las diría en voz alta.", ca: "Les paraules que ho decideixen, escrites tal com algú les diria en veu alta."},
+  "This is emailed to the client and added to the conversation.": { de: "Das wird dem Kunden per E-Mail zugesendet und dem Gespräch hinzugefügt.", es: "Esto se envía al cliente por correo electrónico y se añade a la conversación.", ca: "Això s'envia al client per correu i s'afegeix a la conversa."},
+  "Version 1 is the way they worked before us. Every saving is measured from it.": { de: "Version 1 ist die Art, wie sie vor uns gearbeitet haben. Jede Ersparnis wird daran gemessen.", es: "La versión 1 es cómo trabajaban antes de nosotros. Cada ahorro se mide a partir de ella.", ca: "La versió 1 és com treballaven abans de nosaltres. Cada estalvi es mesura a partir d'ella."},
+  "We read its transcript. Leave it empty and paste the notes instead.": { de: "Wir lesen dessen Abschrift. Leer lassen und stattdessen die Notizen einfügen.", es: "Leemos su transcripción. Déjalo vacío y pega las notas en su lugar.", ca: "En llegim la transcripció. Deixa-ho buit i enganxa les notes en el seu lloc."},
+  "What goes on a contract, if it is not the short name.": { de: "Was auf einem Vertrag steht, falls es nicht der Kurzname ist.", es: "Lo que va en un contrato, si no es el nombre corto.", ca: "El que va en un contracte, si no és el nom curt."},
+  "What this system is, in a sentence or two.": { de: "Was dieses System ist, in ein bis zwei Sätzen.", es: "Qué es este sistema, en una o dos frases.", ca: "Què és aquest sistema, en una o dues frases."},
+  "What we did about it.": { de: "Was wir dagegen unternommen haben.", es: "Qué hicimos al respecto.", ca: "Què vam fer-hi."},
+  "Where it has got to.": { de: "Wo es gerade steht.", es: "En qué punto está.", ca: "En quin punt està."},
+  "Which part of the app it is about, like Settings or Documents. Choose the app first.": { de: "Welcher Teil der App gemeint ist, etwa Einstellungen oder Dokumente. Zuerst die App wählen.", es: "Qué parte de la app es, como Ajustes o Documentos. Elige primero la app.", ca: "Quina part de l'app és, com Configuració o Documents. Tria primer l'app."},
+  "Which system this is about. It is what routes the request and who gets told when it is answered.": { de: "Um welches System es geht. Das bestimmt, wohin die Anfrage geleitet wird und wer benachrichtigt wird, wenn sie beantwortet ist.", es: "De qué sistema se trata. Determina a dónde se dirige la solicitud y a quién se avisa cuando se responde.", ca: "De quin sistema es tracta. Determina on s'adreça la sol·licitud i a qui s'avisa quan es respon."},
+  "Who actually uses it, in their words.": { de: "Wer es tatsächlich nutzt, in deren eigenen Worten.", es: "Quién lo usa de verdad, con sus propias palabras.", ca: "Qui l'utilitza de debò, amb les seves pròpies paraules."},
+  "Who does it. The role's hourly cost is what turns these minutes into money.": { de: "Wer es macht. Der Stundensatz der Rolle verwandelt diese Minuten in Geld.", es: "Quién lo hace. El coste por hora del rol es lo que convierte estos minutos en dinero.", ca: "Qui ho fa. El cost per hora del rol és el que converteix aquests minuts en diners."},
+  "Who hears back when a ticket on this app is answered.": { de: "Wer benachrichtigt wird, wenn ein Ticket zu dieser App beantwortet wird.", es: "Quién recibe la respuesta cuando se contesta un ticket de esta app.", ca: "Qui rep la resposta quan es respon un tiquet d'aquesta app."},
+  "Choices": { de: "Optionen", es: "Opciones", ca: "Opcions"},
 }

@@ -132,14 +132,23 @@ export function sideFor(authorId: string | null, meId: string): "mine" | "theirs
 
 export function TicketScreen({ ready, ticketId }: { ready: PortalReady; ticketId: string }) {
   const { t, lang } = useLanguage()
-  // The list is usually already warm (they tapped a row to get here), so read the
-  // ticket out of it; fall back to the by-id door on a cold deep link from email.
+  // READ BY ID, ALWAYS — and paint from the list while that lands.
+  //
+  // This used to read the ticket OUT OF THE LIST and only fall back to the by-id
+  // door when the list did not hold it, which is the shape R38 exists to forbid:
+  // tickets is a paged collection, so a ticket past page one reports itself as
+  // missing, and the row a list carries is not the record — a list row is
+  // whatever the LIST door chose to send. Concretely it is why the ticket list
+  // payload cannot be trimmed: `description` is 34.9% of it, measured, and
+  // dropping it would silently show a client half their own ticket.
+  //
+  // Cache-first, so nothing on screen got slower: the list row paints instantly
+  // and the by-id answer replaces it the moment it lands (CACHING.md), which is
+  // the same trade every record screen in the agency app already makes.
   const { tickets } = useTickets()
   const fromList = (tickets ?? []).find((t) => t.id === ticketId)
-  const oneQ = useCached(fromList ? null : cacheKeys.ticket(ticketId), () =>
-    support.ticket(ticketId)
-  )
-  const ticket = fromList ?? oneQ.data ?? null
+  const oneQ = useCached(cacheKeys.ticket(ticketId), () => support.ticket(ticketId))
+  const ticket = oneQ.data ?? fromList ?? null
 
   const threadQ = useCached<HelpMessage[]>(cacheKeys.thread(ticketId), () =>
     support.thread(ticketId).then((r) => {

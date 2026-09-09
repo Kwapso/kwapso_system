@@ -117,7 +117,7 @@ describe("a fresh team's dropdown values, after migrations AND seed", () => {
 // the module, the readers off disk.
 describe("the ticket vocabulary is one name, everywhere it is written down", () => {
   /** The `type` values the ticket screens filter selectable_data by. */
-  const filtered = ["web/lib/use-screen-data.ts", "web/components/help-detail.tsx"].map((f) => {
+  const filtered = ["web/lib/use-screen-data.ts", "web/components/tickets/help-detail.tsx"].map((f) => {
     const src = readFileSync(join(ROOT, f), "utf8")
     // THE PARAMETER'S NAME IS THE CALLER'S, not the law's. This read
     // `/v\.type === "…"/`, hardcoding the lambda parameter both screens happen

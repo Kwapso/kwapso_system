@@ -62,7 +62,7 @@ import { getTicket } from "./help"
  * the schema's own CHECK constraint holds the same three (0067) — this is the
  * door's copy of that floor, so a 4 is a clean 400 with a sentence rather than a
  * constraint violation surfacing as a 500. */
-export const RATING_SCORES = [1, 2, 3] as const
+const RATING_SCORES = [1, 2, 3] as const
 
 type RatingRow = {
   id: string

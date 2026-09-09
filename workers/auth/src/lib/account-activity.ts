@@ -6,6 +6,7 @@
 // describes. The actor is always the user themselves, so there's no Actor arg.
 
 import type { ActivityItem } from "@shared/types"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { ulid } from "@shared/workers/id"
 import { ACCOUNT_ACTIVITY_PER_HOUR } from "@shared/workers/limits"
 import { publishUserChange } from "@shared/workers/realtime"
@@ -62,6 +63,15 @@ export async function logAccountActivity(
       .run()
   } catch (e) {
     console.error("account activity log failed:", e)
+    // AND IT IS WRITTEN DOWN, because this table is the person's own security
+    // history — "you changed your sign-in email", "somebody signed in from a new
+    // device". Best-effort was always the right shape (a failed history note
+    // must not undo the change it describes) and console-only was not: a run of
+    // these means the account feed people are told to check has a hole in it,
+    // and nobody would ever know. Filed against the PERSON, so "whose history
+    // stopped being written" is the query, and `recordWorkerError` can neither
+    // throw nor change this function's answer.
+    await recordWorkerError(env.DB, "auth", "account-activity", e, undefined, { userId })
     return
   }
   if ((written.meta.changes ?? 0) === 0) {
@@ -95,5 +105,18 @@ export async function listAccountActivity(
     // is none.
     actorIsClient: false,
     createdAt: r.created_at,
+    // NEITHER COLUMN EXISTS ON THIS TABLE, and that is the two-table split doing
+    // what it is for rather than a gap to fill. `account_activity` lives in the
+    // GLOBAL core database and records identity acts — a name, a photo, an email
+    // address — which belong to the person across every team they are in. The
+    // per-team `activity` table records what happened to a team's RECORDS, and
+    // it is the one that carries `verb` (which of the eight) and `origin` (which
+    // door). Deriving a verb here from the sentence would be free and would be a
+    // lie of a different kind: it would put a value in a column this trail does
+    // not keep, and the next reader would reasonably filter on it and get an
+    // answer assembled at read time from one table and stored at write time from
+    // the other. Null is what "this trail does not record that" looks like.
+    verb: null,
+    origin: null,
   }))
 }

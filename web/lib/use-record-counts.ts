@@ -93,6 +93,17 @@ function fetchRecordCounts(table: string, id: string): Promise<Record<string, nu
  * the feed. A task and a meeting were on that list until 2026-08-18 — both carry
  * a Time tab, and both badged a sidecar nothing filled until it was opened. */
 export function useRecordCounts(table: string | null, id: string | null): void {
+  // "IT DOES NOT BLOCK FIRST PAINT" (above) was true of what the screen AWAITS
+  // and not of what the browser is doing while somebody waits, and the budget
+  // beside it counts the second thing: `MAX_REQUESTS_BEFORE_FIRST_PAINT` is
+  // requests issued before the record is on screen, awaited or not. Censused
+  // 7 Sep 2026 this was one of them on a ticket and a meeting, and two on an
+  // account, which straddles two workers.
+  //
+  // The fix is the CALLER's, not this hook's: a screen passes null until it has
+  // the record, which is the deterministic gate after-paint.ts asks for. The
+  // owner's sentence is untouched either way — he asked for the badge before the
+  // CLICK, not before the record.
   const on = Boolean(table && id && RECORD_CHILDREN[table as string]?.length)
   useCached<Record<string, number | null>>(
     on ? recordCountsKey(table as string, id as string) : null,

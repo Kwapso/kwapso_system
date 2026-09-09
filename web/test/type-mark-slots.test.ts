@@ -181,7 +181,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
       /story:\s*"Story type"/.test(marksSeam),
       "MARK_GROUP no longer names the story vocabulary — this check has no subject left"
     ).toBe(true)
-    const stories = readFileSync(join(ROOT, "web", "components", "stories-screen.tsx"), "utf8")
+    const stories = readFileSync(join(ROOT, "web", "components", "work", "stories-screen.tsx"), "utf8")
     // `.` DOES NOT MATCH A NEWLINE. `markMap\(.*MARK_GROUP\.story\)` needed the
     // whole call typed on one physical line, so the ordinary wrap Prettier
     // applies the moment that argument list grows would have reddened a law
@@ -213,7 +213,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
         '("for type, kill the emojis … we use colors") and the colour is the mark now ' +
         "(Swatch + ticketTypeColour). Restoring the group needs a ruling, not a commit."
     ).toBe(false)
-    const strip = readFileSync(join(ROOT, "web", "components", "tickets-collection.tsx"), "utf8")
+    const strip = readFileSync(join(ROOT, "web", "components", "tickets", "tickets-collection.tsx"), "utf8")
     expect(
       /markMap\(/.test(strip),
       "the tickets screen reads type marks again — see the ruling above"
@@ -275,7 +275,7 @@ describe("the type mark's four missing slots (UI-GAPS 16, 18, 19, 20)", () => {
     // the second. Either carries a mark, so the slot exists.
     expect(/support\?:|chart\?:/.test(item), "StatItem no longer has a glyph slot (support/chart)").toBe(true)
 
-    const panel = readFileSync(join(ROOT, "web", "components", "work-logs-panel.tsx"), "utf8")
+    const panel = readFileSync(join(ROOT, "web", "components", "work", "work-logs-panel.tsx"), "utf8")
     expect(
       (panel.match(/icon:\s*<Icon name=\{CONCEPT_ICON\./g) ?? []).length,
       "the numbers band's cards no longer carry their concept icons"

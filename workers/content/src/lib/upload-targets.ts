@@ -23,29 +23,34 @@
 //
 // ── THE PART THAT IS A SECURITY BOUNDARY, NOT A CONVENIENCE ─────────────────
 //
-// `owners` is what makes the key OURS — spread into the key minter with a fresh
-// ULID, so the caller never contributes a byte of the object's name. A
-// caller who chose their own key could presign a PUT over another team's object,
-// which is the integrity hole `unreferencedKeys` closes, reopened one layer down
-// where the database check cannot see it. The module segment is the same one the
-// streaming doors mint and the same one `ownedMediaKey` proves against, so an
-// object uploaded directly is reclaimable exactly as one uploaded through the
-// worker. `upload-targets.test.ts` holds each entry to the door it mirrors.
+// `module` is what makes the key OURS — handed to `teamMediaKey` with the
+// caller's own team id and a fresh ULID, so the caller never contributes a byte
+// of the object's name. A caller who chose their own key could presign a PUT
+// over another team's object, which is the integrity hole `unreferencedKeys`
+// closes, reopened one layer down where the database check cannot see it. The
+// module segment is the same one the streaming doors mint and the same one
+// `ownedMediaKey` proves against, so an object uploaded directly is reclaimable
+// exactly as one uploaded through the worker — and it is the same proof the
+// CONFIRM door runs over the key a browser quotes back (`presignedKey`).
+// `upload-targets.test.ts` holds each entry to the door it mirrors.
 
 import {
   ANY_FILE_TYPE,
   INLINE_SAFE_UPLOAD,
   NEUTRALISED_CONTENT_TYPE,
+  ownedMediaKey,
   storedContentType,
 } from "@shared/workers/image"
+import type { MemberGuard } from "@shared/workers/gating"
 import { STREAM_UPLOAD_MAX_BYTES } from "@shared/workers/limits"
 import type { Right } from "@shared/workers/gating"
 
 export type UploadTarget = {
   /** The permission the door this mirrors opens with — same module, same verb. */
   right: [string, Right]
-  /** The key's owner segments, before the ULID. Never caller input. */
-  owners: string[]
+  /** The key's module segment (`<team>/<module>/<ulid>`, teamMediaKey). Never
+   * caller input. */
+  module: string
   /** The R2 binding the door writes to, by name — resolved on the env so this
    * table stays free of a worker's `Env` type. */
   binding: "INTERNAL_MEDIA" | "MEDIA"
@@ -67,7 +72,7 @@ export type UploadTarget = {
 export const UPLOAD_TARGETS: Record<string, UploadTarget> = {
   knowledge: {
     right: ["knowledge", "create"],
-    owners: ["knowledge"],
+    module: "knowledge",
     binding: "INTERNAL_MEDIA",
     bucketVar: "INTERNAL_MEDIA_BUCKET",
     accepts: ANY_FILE_TYPE,
@@ -81,7 +86,7 @@ export const UPLOAD_TARGETS: Record<string, UploadTarget> = {
   },
   deliverables: {
     right: ["deliverables", "create"],
-    owners: ["deliverables"],
+    module: "deliverables",
     binding: "INTERNAL_MEDIA",
     bucketVar: "INTERNAL_MEDIA_BUCKET",
     accepts: ANY_FILE_TYPE,
@@ -90,7 +95,7 @@ export const UPLOAD_TARGETS: Record<string, UploadTarget> = {
   },
   staff: {
     right: ["staff_profiles", "edit"],
-    owners: ["staff"],
+    module: "staff",
     binding: "INTERNAL_MEDIA",
     bucketVar: "INTERNAL_MEDIA_BUCKET",
     // Only the inline-safe list, which is why storing the DECLARED type is safe
@@ -101,7 +106,7 @@ export const UPLOAD_TARGETS: Record<string, UploadTarget> = {
   },
   brand: {
     right: ["brand_assets", "create"],
-    owners: ["brand"],
+    module: "brand",
     binding: "INTERNAL_MEDIA",
     bucketVar: "INTERNAL_MEDIA_BUCKET",
     accepts: INLINE_SAFE_UPLOAD,
@@ -121,4 +126,27 @@ export function uploadTarget(module: string | null | undefined): UploadTarget | 
   return Object.prototype.hasOwnProperty.call(UPLOAD_TARGETS, module)
     ? UPLOAD_TARGETS[module]
     : null
+}
+
+/** WHERE A TARGET'S OBJECTS ARE SERVED FROM, by the bucket it writes to. The
+ * agency-only shelf is `/media/internal/` on the agency gateway alone; the
+ * shared bucket is `/media/` on both. Derived from the binding rather than
+ * written per entry, so an entry cannot name a shelf its bucket is not on —
+ * which is the drift `media-keys.test.ts` checks the reclaims for. */
+export function servedAt(target: UploadTarget): "/media/internal/" | "/media/" {
+  return target.binding === "INTERNAL_MEDIA" ? "/media/internal/" : "/media/"
+}
+
+/** THE KEY A BROWSER QUOTES BACK, OR NOTHING.
+ *
+ * After a direct PUT the client hands the confirm door the key it was given.
+ * That string is caller input now, whatever it was when we minted it, and it
+ * reaches `bucket.head` — so it is re-proved from the caller's OWN guard through
+ * the same seam a reclaim uses: under this team, under this module, one ULID
+ * tail, nothing deeper. A key from another team, another module, or a made-up
+ * path answers null, and the door says "not one we gave you" rather than
+ * looking anything up. */
+export function presignedKey(guard: MemberGuard, target: UploadTarget, quoted: string): string | null {
+  const base = servedAt(target)
+  return ownedMediaKey(`${base}${quoted}`, base, guard.teamId, target.module)
 }

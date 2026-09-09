@@ -10,7 +10,9 @@
 // Lifted out of index.ts on 6 Sep 2026 with nothing changed but the file and the
 // `export` keyword.
 
+import { recordWorkerError } from "@shared/workers/error-log"
 import { fail } from "@shared/workers/http"
+import { requestId } from "@shared/workers/trace"
 import { queryText, TEXT_LIMITS } from "@shared/workers/validate"
 
 import type { Env } from "../env"
@@ -118,7 +120,32 @@ export async function googleCallback(request: Request, env: Env): Promise<Respon
   } catch (e) {
     // One sentence to the person, the detail to the log. Which claim failed is
     // useful to us and is an oracle to anyone probing the door.
-    console.error("google callback failed:", e)
+    console.error("google callback failed:", requestId(request), e)
+    // …AND THE DETAIL TO THE STORE, which is the half this door did not have.
+    // Every other failure in this worker reaches the central catch in index.ts
+    // and is recorded there; this one cannot, because it RETURNS a redirect
+    // rather than throwing — a 302 to the sign-in screen is not a crash, so the
+    // catch never sees it and `error_logs` never heard of it. The person is told
+    // sign-in failed and nothing anywhere says why.
+    //
+    // The three things that break this door are all invisible without this line:
+    // an expired GOOGLE_CLIENT_SECRET (the code exchange 401s), a Google outage,
+    // and clock skew on the id-token's `iat`/`exp`. Each of them fails EVERY
+    // Google sign-in, and each is a sentence in the store instead of a support
+    // ticket that says "the button doesn't work".
+    //
+    // Awaited, not deferred: this path is already redirecting a person who could
+    // not sign in, one core insert costs less than the round trip they are about
+    // to make, and `afterResponse` on a door that returns rather than throws
+    // would silently drop the row wherever no waitUntil context is registered.
+    // No identity: the whole point is that the handshake never resolved one.
+    await recordWorkerError(
+      env.DB,
+      "auth",
+      "GET /api/auth/google/callback",
+      e,
+      requestId(request)
+    )
     return back("google_failed")
   }
 }

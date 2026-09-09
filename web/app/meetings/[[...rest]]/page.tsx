@@ -4,7 +4,7 @@
 // shell for any /meetings/* depth (workers/gateway run_worker_first + the
 // /meetings/ rewrite).
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export const dynamic = "force-static"
 

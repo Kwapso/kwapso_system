@@ -169,7 +169,7 @@ export function shapeInvitesList(invites: Invite[]): ScreenData {
  * until the client retired `awaiting_validation` on 7 Sep 2026 (shared/types.ts,
  * `HELP_STATUSES`); its label, "Waiting on you", is deliberately not gone from
  * the app — a ticket that really passed through that stage still draws those
- * words on its stage history (`stageLabel`, web/components/ticket-stages.tsx).
+ * words on its stage history (`stageLabel`, web/components/tickets/ticket-stages.tsx).
  * It is gone from HERE because this map is keyed by the LIVE vocabulary and a
  * list row can only show a stage a ticket is currently in. */
 export const HELP_STATUS: Record<HelpTicket["status"], string> = {

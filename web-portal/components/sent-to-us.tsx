@@ -149,7 +149,7 @@ export function SentToUs() {
                 </p>
                 <p className="text-muted-foreground text-sm">
                   {/* A whole sentence with a hole, never a word joined to a
-                      date — see the same note in web/components/work-panels.tsx.
+                      date — see the same note in web/components/work/work-panels.tsx.
                       `completedAt` is set on every row this view can return: it
                       is what puts the row in this view. */}
                   {todo.completedAt ? t("Sent {date}", { date: formatDate(todo.completedAt, lang) }) : null}

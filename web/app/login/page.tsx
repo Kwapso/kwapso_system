@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 
 import { ModeToggle } from "@shared/ui/components/mode-toggle/mode-toggle"
 
-import { AuthCard } from "@/components/auth-card"
+import { AuthCard } from "@/components/shell/auth-card"
 
 export default function LoginPage() {
   const router = useRouter()

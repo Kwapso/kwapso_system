@@ -415,7 +415,7 @@ function ProcessConversation({ processId, open }: { processId: string; open: boo
         items={(data?.comments ?? []).map((c) => ({
           id: c.id,
           // THE SAME THREE SENTENCES AND THE SAME RAW DATE the agency app's
-          // own copy of this map carried (web/components/process-detail.tsx) —
+          // own copy of this map carried (web/components/process/process-detail.tsx) —
           // the two are a three-line clone, and both shipped these in English
           // to every reader regardless of the language they chose. The date
           // read `toLocaleDateString()` with no locale, so it rendered in the

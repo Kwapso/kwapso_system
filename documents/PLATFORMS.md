@@ -23,7 +23,7 @@ code. A port = back these five with the target platform's primitives.
 
 | # | Pillar | What the Kwapso System uses (Cloudflare) | The one seam file to swap |
 |---|--------|-------------------------------|----------------------------|
-| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) for TEAM data — plus 151 raw `env.DB.prepare(…)` sites in 27 files for the CORE database, which has no adapter (see below) |
+| 1 | **Per-team data isolation** | one **D1** (SQLite) database *per team* + one core D1 for global identity/billing | `shared/workers/d1-rest.ts` (`d1Query` / `d1ExecScript` / `d1QueryAcross` / `sqlString`) for TEAM data — plus 157 raw `env.DB.prepare(…)` sites in 29 files for the CORE database, which has no adapter (see below) |
 | 2 | **The live layer** | the `TeamChannel` **Durable Object** fans out change pings | `shared/workers/realtime.ts` (`publishChange`), the ONLY broadcast seam |
 | 3 | **Compute** | **8 Workers** behind two public gateways (one per front end) | each `workers/*` + the gateway router (the shape ports; the runtime swaps) |
 | 4 | **File storage** | **R2**, keyed per team | the R2 `.put/.get` calls in `content` + `gateway` (`/media/*`) |
@@ -48,7 +48,7 @@ that one seam and the 8 workers keep working unchanged.
 exactly right for the per-team databases: every statement against them goes
 through `d1Query` / `d1ExecScript`, and `web/test/rules.test.ts` holds it there.
 The GLOBAL core database is reached a different way — `env.DB.prepare(…).bind(…)`,
-Cloudflare's raw D1 binding API — at **151 call sites across 27 production files** —
+Cloudflare's raw D1 binding API — at **157 call sites across 29 production files** —
 auth, tenancy, content, data-ops and mcp — with no adapter of any kind between
 them and the platform.
 
@@ -58,11 +58,30 @@ quoted. A port that rewrote `d1-rest.ts` and expected the workers to keep workin
 would find identity, sessions, teams, memberships, invites, the error log, the
 usage ledgers, the token desk and the sharding tables all still speaking D1
 directly. Every effort band in §2 understates pillar 1 by that work — it is
-mechanical rather than clever (one adapter, then a codemod over 151 sites), but
+mechanical rather than clever (one adapter, then a codemod over 157 sites), but
 it is days, and it is days nobody had counted.
 
-The count is derivable, so it can be re-checked rather than trusted:
-`grep -rn "env\.DB\.prepare(" --include='*.ts' workers/ shared/ | grep -v test | wc -l`.
+The count is derivable, so it is DERIVED rather than remembered: the three
+numbers above are recomputed off the source on every build by
+`web/test/doc-claims.test.ts`, and a stale one turns the build red. Run the same
+census by hand with
+
+```
+grep -rn "env\.DB\.prepare(" --include='*.ts' workers/ shared/ | grep -v test | wc -l
+grep -rln "env\.DB\.prepare(" --include='*.ts' workers/ shared/ | grep -v test | wc -l
+```
+
+Why it is checked and not just written down: this file is the ONE document that
+prices a move off Cloudflare, and its count is the size of the one gap in that
+price. It read **151 sites in 27 files** from the day it was written. Two
+independent architecture measurements have since caught it out — 154 in 28, then
+156 in 29 — and neither drift was visible to anybody reading the sentence. The
+third catch was the check's own, on the 7 Sep 2026 merge: the credit-grant audit
+row added a core call site and the figure moved to 157 the moment it landed,
+which is the difference between a number that is derived and one that is typed. It was
+right when it was typed, it grows one direction only, and a stale figure here
+understates a port by exactly the work nobody counted. So the number is derived
+now, and the only way it can be wrong is if the census itself is.
 
 ---
 

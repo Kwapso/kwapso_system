@@ -141,10 +141,13 @@ build itself checks against):
 | `templates/search-results.tsx` | `[ ]` | A real finding — no global search exists anywhere; worth the owner's separate consideration. |
 | `templates/sign-in.tsx` | `[x]` | Adopted — confirmed by direct import: the portal shell's `AuthPhotograph`. |
 | `templates/stat-strip.tsx` | `[=]` | `pulse.tsx` already draws its numbers through the kit's own `StatGrid`, the primitive this file wraps; its one addition is forbidden here by house law. |
-| `templates/stepper-hero.tsx` | `[x]` | Adopted — the ticket status track, verified live at all four widths, both themes. |
+| `templates/stepper-hero.tsx` | `[?]` | Adopted as the ticket status track, then **REVERSED 31 Aug 2026** by the client's "nothing may render after the chips" ruling. It is a `COMPOSITION_EXEMPT` OWNER'S CALL in `shared/rules/registry.ts` now; the paragraph below records what was built and why it went. |
 
-**Tally: 9 adopted, 6 realized differently, 24 mismatch, 3 owner's-call, 5 real
+**Tally: 9 adopted, 7 realized differently, 23 mismatch, 3 owner's-call, 5 real
 gaps = 47.** Every one decided; none left for the next lane to re-discover.
+*(Recounted off the marks above on 7 Sep 2026 — the previous line said 6 / 24
+and had been one out in two columns since it was written. Count the rows, never
+carry the sentence.)*
 
 ---
 
@@ -248,7 +251,7 @@ record of why something was rejected is only useful while it is true."
 here from `[?] Needs a human call` — see that section (now 2, not 3) for the
 full account of what changed and the two findings it surfaced (the
 `onSelect`-only wiring Rail's own missing `preventDefault` requires, and the
-member chip's missing photo slot). `web/components/app-shell.tsx` now builds
+member chip's missing photo slot). `web/components/shell/app-shell.tsx` now builds
 `RailGroup[]`/`RailMember` from `lib/pages.ts` and the signed-in user and
 renders `Rail` directly, `spine="paper"` to match `ScreenShell` below it. The
 `COMPOSITION_EXEMPT["templates/rail.tsx"]` line in `shared/rules/registry.ts`
@@ -256,7 +259,17 @@ is deleted with this change (R45's own ratchet: an exemption for a
 composition now directly reached is stale).
 
 **`shared/ui/compositions/templates/stepper-hero.tsx`, read-only, for the
-ticket status track** (`web/components/help-status-stepper.tsx`).
+ticket status track** — REVERSED, and the account below is what WAS built rather
+than what is on disk. *(Fact updated 7 Sep 2026: the client's absolute ruling of
+31 Aug 2026 — "chips is the last component of headers, nothing may render after
+them, ever, no exceptions" — put a status track below the chips row out of bounds
+on every record screen. Both wrappers, `web/components/help-status-stepper.tsx`
+and `story-status-stepper.tsx`, were REMOVED rather than relocated, on 1 Sep 2026;
+neither file exists, and status now reads from the record's own coloured chip
+(`shared/status-tones.ts`). The composition is a `COMPOSITION_EXEMPT` OWNER'S CALL
+in `shared/rules/registry.ts`, which carries the standing reason and the one
+condition that would reopen it. Kept, not deleted: the finding is still the best
+account of what the composition does.)*
 `RecordChrome`'s own `headerExtra` slot forwards to the kit's `hero` prop —
 named for exactly this composition. `door="system"` (7 stages) matches
 `HELP_STATUSES` exactly; no `onStageSelect` is passed, which register 10 of
@@ -269,7 +282,8 @@ Verified live at 390/768/1280/1920, both themes
 at every width including the narrowest phone wrap. No new i18n strings (no
 `copy`/label props passed). Committed `811cc5ef`.
 
-**Not** applied to `story-status-stepper.tsx`: stories have 4 stages, and
+**Not** applied to `story-status-stepper.tsx` (which no longer exists either, for
+the same 31 Aug reason): stories have 4 stages, and
 the kit's only 4-stage progression (`door="delivery"`) is a **vertical
 wizard rail**, not the horizontal record hero — the composition's own header
 says so in words: "the kit draws no four-stage record vocabulary." Forcing
@@ -288,7 +302,7 @@ unchanged from the first pass; see git history rather than repeat it here.
 `main-screen.tsx`, `screen-shell.tsx` and `portal-home.tsx` were first
 rejected because all six compose `ScreenShell`, which draws a rail, and
 this app already has one persistent, app-wide sidebar
-(`web/components/app-shell.tsx`). That check never read whether the rail's
+(`web/components/shell/app-shell.tsx`). That check never read whether the rail's
 CONTENTS were forced — they are not: `rail={null}` is a real, documented
 opt-out, confirmed both by reading the prop doc and by a peer's render
 probe (zero `nav`/`aside` elements, no 13rem column in the markup, for all
@@ -299,7 +313,7 @@ its own `<ScreenShell rail={…}>` per screen) would remount the rail's DOM
 on every navigation even though the outer app-wide shell never unmounts.
 
 Resolved by composing bare `screen-shell.tsx` ONCE, at the layout level —
-`web/components/app-shell.tsx` now renders `<ScreenShell spine="paper"
+`web/components/shell/app-shell.tsx` now renders `<ScreenShell spine="paper"
 rail={…}>{children}</ScreenShell>` instead of its own hand-rolled
 `<aside>`/`<div>` structure, with the rail's actual content (TeamSwitcher,
 both nav groups, ProfileMenu, the collapse toggle) re-homed as the `rail`
@@ -373,9 +387,12 @@ highlighted" (ruling 26: never two mangos). This app already assembles
 exactly that shape, out of the same two-to-three parts, already adopted
 individually: `AppShell` is now `ScreenShell` (this file), every record
 screen composes `RecordChrome` through the `RecordScreen` host seam
-(`web/components/record-chrome.tsx`), and `StepperHero` is in the hero
-slot wherever a record has stages worth showing (`help-status-stepper.tsx`,
-this session). There is no additional composition to import — the shape
+(`web/components/records/record-chrome.tsx`), and `StepperHero` was in the hero
+slot wherever a record had stages worth showing (`help-status-stepper.tsx`, this
+session) — *reversed on 31 Aug 2026 by the "nothing after the chips" ruling; see
+the `templates/stepper-hero.tsx` entry above, and note that `RecordChrome`'s
+`hero` prop is now passed by no record screen*. There is no additional composition
+to import — the shape
 these two templates document is already built, from parts, under different
 file names. The one real difference is a decision already made rather than
 a gap: `AppShell`'s `ScreenShell` header carries a persistent
@@ -549,7 +566,7 @@ step — flagged, not attempted this pass.
 **Reasoning corrected again, verdict unchanged.** The previous entry claimed
 this app's `AgentPanel` was "deliberately modal … because it live-drives the
 screen underneath" — stale, and backwards. `AgentPanel`
-(`web/components/agent-panel.tsx`) moved off `Sheet` entirely to a
+(`web/components/assistant/agent-panel.tsx`) moved off `Sheet` entirely to a
 `Popover`-anchored bubble (item 2, 31 Aug 2026: "more like a bubble coming
 out of its button, instead of a slide-in"), and its own header comment
 records that it was **already** `modal={false}` on the prior `Sheet`
@@ -602,7 +619,9 @@ way, just empty. There is no escape hatch. Confirmed unchanged.
 
 `ArchiveConfirmationDialog` (the mandatory-reason sibling of
 `DeleteConfirmationDialog`) and `StepperHero` for `story-status-stepper.tsx`
-(the 4-stage door mismatch) are also still real, unresolved mismatches, but
+(the 4-stage door mismatch — that file was deleted on 1 Sep 2026 and the mismatch
+is now moot for a second, larger reason, above) are also still real, unresolved
+mismatches, but
 each is recorded once already — under the `[~]`/`[x]` entry for its sibling
 composition — rather than duplicated here.
 
@@ -630,7 +649,7 @@ engine, not adding a missing piece.
 
 **`templates/sign-in.tsx`** — landed. The other lane shipped
 `sign-in-system` (the agency login now renders the kit's `LoginRoute`
-through `web/components/auth-card.tsx`) after this file's first pass flagged
+through `web/components/shell/auth-card.tsx`) after this file's first pass flagged
 the asset-import blocker as stale. See UI-GAPS.md rows 2 and 23.
 
 **`templates/rail.tsx`** — LANDED 2026-08-31, moved out of this section (see
@@ -639,7 +658,7 @@ kit's own reviewed `Rail` and said, verbatim, "the navbar is completely
 different" — `AppShell`'s rail COLUMN was the kit's `ScreenShell` since the
 earlier pass, but the nav CONTENTS were still this app's own `navButton`
 function reading the same `--spine-*` tokens by hand, which is exactly what
-read as a paraphrase rather than the real thing on a side-by-side. `web/components/app-shell.tsx`
+read as a paraphrase rather than the real thing on a side-by-side. `web/components/shell/app-shell.tsx`
 now builds `railGroups`/`railMember` from the nav registry (`lib/pages.ts`)
 and the signed-in user and renders the kit's `Rail` directly. The render probe
 recorded here — `mark`/`wordmark`/`tagline` all take an arbitrary node — turned
@@ -692,7 +711,7 @@ exactly one other file, `web/components/deep-link/collection-content.tsx`
 (6 call sites there, one direct and five through `SectionWithCreate`, which
 always wraps in `CollectionCard`). The kit's own `CollectionFrame` component
 is not adopted anywhere today — only its `CollectionRegister` sub-export is
-(`web/components/agent-panel.tsx`), which is the empty/error/busy notice,
+(`web/components/assistant/agent-panel.tsx`), which is the empty/error/busy notice,
 not the frame.
 
 The owner has ruled the double-box question directly: "make the kit
@@ -993,7 +1012,7 @@ name and email already filled from the invite" — no account exists yet at
 the point this screen is shown.
 
 This app's real invite flow is a deliberately different shape, stated in
-`web/components/invitations.tsx`'s own comment: "The fix for 'I was invited
+`web/components/team/invitations.tsx`'s own comment: "The fix for 'I was invited
 but have no way to see/accept it': this works for ANY signed-in user, not
 just a teamless one at onboarding." A person signs in first, however they
 like (Google or email+code, at whatever address), lands in the app, and
@@ -1011,7 +1030,7 @@ possibly a different device, "works once and expires in 15 minutes," with
 a live resend countdown and no code to type anywhere.
 
 This app's sign-in (`shared/web/use-email-sign-in.ts`, driving both
-`web/components/auth-card.tsx` and `web-portal/components/sign-in.tsx`)
+`web/components/shell/auth-card.tsx` and `web-portal/components/sign-in.tsx`)
 sends a 6-digit CODE, typed into a field on the same device, in the same
 form the email step was submitted from — there is no separate device, no
 link to click, and no "waiting room" screen at all: the UI swaps straight
@@ -1033,7 +1052,7 @@ found:
    `web/lib/use-active-team.ts`'s 401 branch clears the session cache and
    redirects to `/login` — by the time a screen could read it, it is gone.
 2. No `returnTo`/`redirectTo` mechanism exists anywhere in the login flow —
-   checked `web/app/login/page.tsx`, `web/components/auth-card.tsx`, and
+   checked `web/app/login/page.tsx`, `web/components/shell/auth-card.tsx`, and
    `shared/web/use-email-sign-in.ts`. The composition's destination chip and
    "back to where you were" promise has nothing to restore TO.
 3. The destination chip wants a friendly record title
@@ -1217,14 +1236,14 @@ the `variant="folder"` tab strip already in use
 
 **No current need**, not a mismatch: `breadcrumb` (the composable 7-part
 version) — this app has exactly one `Breadcrumbs` call site
-(`web/components/app-shell.tsx`), a plain URL-derived array with no
+(`web/components/shell/app-shell.tsx`), a plain URL-derived array with no
 per-crumb customization, and the already-adopted `breadcrumbs` one-prop
 wrapper handles it completely. The lower-level parts exist for a Next
 `<Link>` via `asChild`, a mark, or a non-route step — none apply here.
 
 **Confirmed mismatch, same family already documented:** `data-preview-table`
 — `DataTable` plus per-row confidence/error marks for a single-table
-import review. `web/components/import-screen.tsx` has no table at all in
+import review. `web/components/screens/import-screen.tsx` has no table at all in
 its review step (Badge-only, card-based), consistent with
 AGENTIC-IMPORT.md's real shape (multi-table, agent-proposed, FK-resolved) —
 one more layer down on the same root mismatch as the import trio.
@@ -1240,7 +1259,7 @@ pause.
 
 **`use-virtual-rows` — SHIPPED** (commit `9ec3efcf`). The candidate above
 was verified against real data rather than wired in blind:
-`web/components/selectable-screen.tsx` now windows a dropdown-values group
+`web/components/choices/selectable-screen.tsx` now windows a dropdown-values group
 once it crosses 100 rows — per GROUP, not per screen, since the hook
 assumes one uniform row height across whatever list it's handed, and this
 screen's groups (one per vocabulary type) are the uniform grain, the whole

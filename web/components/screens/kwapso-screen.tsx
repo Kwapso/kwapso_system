@@ -30,9 +30,9 @@ import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
-import { LegalDetailsDialog } from "@/components/legal-details-dialog"
-import { OverviewList } from "@/components/overview-list"
-import { EmptyLine } from "@/components/deep-link/screen-bits"
+import { LegalDetailsDialog } from "@/components/team/legal-details-dialog"
+import { OverviewList } from "@/components/records/overview-list"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { brandAssetsKey, listFetch } from "@/lib/live-resources"
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -234,7 +234,11 @@ function BrandPanel({ teamId, canRead }: { teamId: string; canRead: boolean }) {
         </Button>
       </div>
       {newest.length === 0 ? (
-        <EmptyLine concept="brand">{t("Nothing in the brand library yet.")}</EmptyLine>
+        // The kit's own register (27.21), not a bare line — every empty
+        // collection on both front doors draws it (owner ruling, 2026-09-07).
+        // No act here: the way in is the "Open the brand library" button this
+        // panel's own header already carries, a line above.
+        <CollectionEmptyState title={t("Nothing in the brand library yet.")} />
       ) : (
         <ul className="divide-border flex flex-col divide-y">
           {newest.map((a) => (

@@ -110,7 +110,7 @@ describe("tabCountKey / withTabCounts", () => {
   // tab, because every detail recipe in the app shipped one. None does any more:
   // the client killed the Activity tab across the app on 2026-09-06 (a record's
   // history is read from the footer's Latest activity column and opens in a
-  // slide-in off it — web/components/activity-panel.tsx carries the ruling), so
+  // slide-in off it — web/components/records/activity-panel.tsx carries the ruling), so
   // the five detail recipes are a single `description` block each.
   //
   // The SEAM did not go with them. `withTabCounts` is what badges whatever

@@ -91,7 +91,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
   }
 })
 
-import { TicketsDashboard } from "@/components/tickets-dashboard"
+import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
 
 const TYPES = ["Issue", "Question", "Request", "Extra"]
 

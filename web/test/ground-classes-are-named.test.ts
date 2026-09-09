@@ -50,7 +50,7 @@ const ESCAPE = new RegExp(String.raw`bg-\[var\(--(${GROUND_TOKENS.join("|")})\)\
  * An entry here is a claim that the same argument holds. Adding one without
  * that argument written beside the code is how this check stops being worth
  * running. */
-const DELIBERATE = new Set(["web/components/agent-panel.tsx"])
+const DELIBERATE = new Set(["web/components/assistant/agent-panel.tsx"])
 
 describe("ground classes", () => {
   it("are the named utility, so the kit's ground-aware tokens still rebind", () => {

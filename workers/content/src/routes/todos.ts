@@ -18,7 +18,7 @@ import { publishChange } from "@shared/workers/realtime"
 import { hasRight } from "@shared/workers/gating"
 import { accountScope, refusePortalCaller, type AccountScope } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
-import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
+import { ANY_FILE_TYPE, dataUrlBytes, parseUploadDataUrl, storedContentType, teamMediaKey } from "@shared/workers/image"
 import { cancelTodo, clientSprints, completeTodo, countTodos, createTodo, getTodo, listTodos, todoOrThrow } from "../lib/todos"
 import { countTasks, createTask, getTask, listTasks, setTaskDone, updateTask, type TaskFilter } from "../lib/tasks"
 import { notifyTodoRaised, teamMemberNames } from "../lib/notify"
@@ -219,7 +219,7 @@ export async function postCompleteTodo(request: Request, env: Env): Promise<Resp
           ? "That file is over 10MB. Try a smaller one."
           : "That file didn't come through. Try attaching it again."
       )
-    const key = mediaKey("todo", guard.teamId)
+    const key = teamMediaKey(guard.teamId, "todo")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     file = {
       url: `/media/${key}`,
@@ -447,7 +447,7 @@ export async function postCreateTask(request: Request, env: Env): Promise<Respon
           ? "That file is over 10MB. Try a smaller one."
           : "That file didn't come through. Try attaching it again."
       )
-    const key = mediaKey(guard.teamId, "tasks")
+    const key = teamMediaKey(guard.teamId, "tasks")
     await env.INTERNAL_MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     file = {
       url: `/media/internal/${key}`,

@@ -174,7 +174,7 @@ describe("what the memory must never do", () => {
     // `rememberPath` records and returns nothing, and `readSlot` answers about
     // the address it was given. There is no function here that maps a
     // destination to a different destination except `sectionClick`, and that one
-    // is only ever wired to the rail (web/components/app-shell.tsx).
+    // is only ever wired to the rail (web/components/shell/app-shell.tsx).
     rememberPath(TEAM, "/accounts/CONFIA")
     expect(rememberPath(TEAM, "/accounts/OTHER")).toBeUndefined()
     expect(readSlot(TEAM, "/accounts/OTHER", "tab")).toBeUndefined()

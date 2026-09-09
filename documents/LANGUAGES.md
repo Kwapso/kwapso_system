@@ -96,9 +96,22 @@ key-free alternative.
 ## 4 · The three shapes that go wrong
 
 **`t("of")` — a fragment.** A call site may not disagree with the definition:
-`t("of")` declares a string to be copy that `isUserVisible` refuses (under two
-characters of prose, no sentence to translate), so it is translated **nowhere**,
-catalogued nowhere, and flagged by nothing. Write the whole sentence with a
+`t("of")` declares a string to be copy that `isUserVisible` refuses, so it is
+translated **nowhere**, catalogued nowhere, and flagged by nothing.
+
+**What `isUserVisible` actually is**, since three laws stand on it and it is
+named in five documents. One function, `scripts/lib/i18n-source.mjs`, and it
+answers ONE question — is this string a sentence a person reads? It says no to
+seven shapes, in this order: shorter than two characters; no letter in it at all;
+anything starting `/` or containing `://` (a path or a URL); anything opening on
+`. , ; : % ) ] } & — – … ' ’` (a fragment that begins mid-sentence); a bare email
+address; a kebab, snake or dotted identifier (`help-thread`, `team_id`,
+`a.b`); and a lowercase run of three characters or fewer — which is what
+actually refuses `"of"`, and `"en"`, `"de"` and `"px"` with it. Everything else
+is copy. The consequence is the point: a string it refuses is invisible to R28,
+R33 and R44 together, so it ships in English with nothing red anywhere. That is
+why the fix is always to widen the STRING into a whole sentence, never to argue
+with the predicate. Write the whole sentence with a
 `{hole}` in it — `t("Page {page} of {total}")` — which is also the only shape a
 translator can reorder, because word order is not the same in four languages.
 

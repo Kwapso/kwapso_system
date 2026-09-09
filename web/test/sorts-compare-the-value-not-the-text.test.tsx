@@ -49,7 +49,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { RecordTable, type TableColumn } from "@/components/record-table"
+import { RecordTable, type TableColumn } from "@/components/records/record-table"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
 import { formatDate } from "@shared/web/format"
 import type { Language } from "@shared/i18n"

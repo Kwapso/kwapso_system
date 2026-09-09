@@ -28,7 +28,7 @@ ROOTS.push(join(PORTAL, "components"), join(PORTAL, "app"), join(PORTAL, "lib"),
  * it. Rot-checked below: a line whose file has gained an importer (or lost its
  * file) turns the build red, so the list records real decisions only. */
 const PARKED: Record<string, string> = {
-  "mail-reply-dialog":
+  "tickets/mail-reply-dialog":
     "the only place either front end ever holds a Gmail draft id. Parked, not dead: " +
     "the reachable-screens exemption for POST /google/gmail/trash names this file as " +
     "where a person's own 'bin it' belongs the day a screen opens it — delete this " +

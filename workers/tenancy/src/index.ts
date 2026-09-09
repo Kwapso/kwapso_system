@@ -87,6 +87,7 @@
 //   POST /api/tenancy/activity/note        -> add a note to one record's history ({table, id, note})
 //   GET  /api/tenancy/query                -> ask a module a question (?module=&where=&groupBy=&countOnly=&cursor=)
 //   GET  /api/tenancy/query/describe       -> what a module has: its fields, types and allowed values
+//   GET  /api/tenancy/tools/describe       -> one shared tool's full instructions (?tool=), the half no manifest carries
 //   GET  /api/tenancy/team-meta            -> the active team's Overview metadata
 //   GET  /api/tenancy/invites              -> the team's invites (all statuses)
 //   GET  /api/tenancy/invites/audit        -> one invite's invite_logs audit (?id)
@@ -108,7 +109,7 @@
 //                                             database's retention sweep
 
 import { brand } from "@shared/brand"
-import { configReport, healthBody } from "@shared/workers/config-health"
+import { configReport, healthBody, probeWorkerHealth } from "@shared/workers/config-health"
 
 /** WHAT TENANCY CANNOT WORK WITHOUT, named once so the health answer and the
  * nightly self-check ask the identical question. `CF_D1_TOKEN` is on it for a
@@ -117,9 +118,10 @@ import { configReport, healthBody } from "@shared/workers/config-health"
  * be inconvenienced to run. */
 const TENANCY_REQUIRED = ["DB", "AUTH", "CF_ACCOUNT_ID", "CF_D1_TOKEN", "INTERNAL_KEY", "ALERT_TO"] as const
 import { fail, json } from "@shared/workers/http"
-import { beginRequest, logIfSlow, withTiming } from "@shared/workers/timing"
+import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/timing"
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
-import { recordWorkerError } from "@shared/workers/error-log"
+import { recordWorkerError, tickId } from "@shared/workers/error-log"
+import { beatCron, reportStaleCrons } from "@shared/workers/cron-heartbeat"
 import { readOpsDigest, sendOpsDigest } from "./lib/ops-alert"
 import { identityFor } from "@shared/workers/gating"
 import { requestId } from "@shared/workers/trace"
@@ -155,6 +157,7 @@ import {
   switchActiveTeam,
 } from "./routes/team"
 import { getQueryDescribe, getQueryRecords } from "./routes/query"
+import { getToolDescribe } from "./routes/tools"
 import { getMembers, postMemberRemove, postMemberRole } from "./routes/members"
 import {
   getMyPerms,
@@ -330,6 +333,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // login at the door (R21).
   "GET /api/tenancy/query": { handler: getQueryRecords, kind: "read" },
   "GET /api/tenancy/query/describe": { handler: getQueryDescribe, kind: "read" },
+  // The manual behind a one-line summary — routes/tools.ts says why it sits
+  // here beside describe_module and why it demands no module right.
+  "GET /api/tenancy/tools/describe": { handler: getToolDescribe, kind: "read" },
   "GET /api/tenancy/team-meta": { handler: getTeamMetaFeed, kind: "read" },
   "GET /api/tenancy/invites": { handler: getInvites, kind: "read" },
   "GET /api/tenancy/invites/audit": { handler: getInviteAudit, kind: "read" },
@@ -470,8 +476,16 @@ export default {
       // per-ISOLATE and shared between concurrent requests, so hanging a lifetime
       // on it would attach one caller's work to another caller's request. The
       // copy is shallow: every binding travels by reference, and only this field
-      // is new. `publishChange` reads it off `env.DEFER`; nothing else does.
-      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request) })
+      // is new. `publishChange` reads the deferrer off `env.DEFER`.
+      // …AND THIS REQUEST'S NAME rides the same copy (`TRACE`), for the same
+      // reason and by the same route: `publishChange` and `sendBrandedEmail`
+      // take no `Request`, so the id the door minted reaches their failure rows
+      // through `env` rather than through 190 call sites (trace.ts).
+      // …and the CORE database counted, so the slow-door line below can see the
+      // trips this worker actually makes. `beginD1Timing` only ever saw the D1
+      // REST door, so a native `env.DB` statement was invisible and a worker that
+      // makes nothing but those printed "0 D1 trips" (timing.ts, `countedDb`).
+      const res = await def.handler(request, { ...env, DEFER: deferrerFor(request), TRACE: requestId(request), DB: countedDb(request, env.DB) })
       // The route's OWN tag decides which budget it answers to (limits.ts) —
       // one place a route's class is declared, and the measurement follows it.
       logIfSlow(request, route, def.kind, env.DB)
@@ -484,7 +498,7 @@ export default {
       // unchanged; the cause stops being console-only.
       if (e instanceof GuardError) {
         if (e.detail)
-          await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, new Error(e.detail), requestId(request), identityFor(request))
+          await recordWorkerError(env.DB, "tenancy", `${request.method} ${new URL(request.url).pathname}`, e, requestId(request), identityFor(request))
         return fail(e.status, e.code, e.message)
       }
       // THE CONSOLE LINE CARRIES THE SAME NAME AS THE ROW. Sixty-eight
@@ -523,6 +537,17 @@ export default {
    * second unattended schedule, a second deploy surface and a second thing to
    * forget — for no more safety than this line. */
   async scheduled(controller, env): Promise<void> {
+    // ONE TICK, ONE NAME. Every row this tick writes carries it in `request_id`
+    // (error-log.ts `tickId`), so "what went wrong last night" is one query and
+    // not a date-range guess across five places.
+    const tick = tickId("nightly", controller.scheduledTime)
+    // …AND THE MAIL THIS TICK SENDS CARRIES IT TOO. `sendBrandedEmail` reads the
+    // name off `env` (notify.ts), and a cron has no request to read one from —
+    // so the tick's own id goes on the same shallow copy the dispatcher builds
+    // for a click. Without it the one row saying an 80% alarm never reached
+    // anybody joined nothing else the tick wrote.
+    const traced = { ...env, TRACE: tick }
+    let failed = false
     // Two independent jobs, two try blocks. A failing size check must not cost
     // the estate its sweep, and a failing sweep must not hide an 80% alarm.
     try {
@@ -538,11 +563,34 @@ export default {
           "cron/retention",
           new Error(
             `retention sweep hit its per-table ceiling on ${swept.capped.join(", ")}, those tables still hold rows past their retention window and were NOT fully swept tonight. Tomorrow's run continues.`
-          )
+          ),
+          tick
         )
+      // THE SAME SENTENCE FOR THE TABLE THAT THREW. `sweepCoreRetention` never
+      // throws by design — one broken predicate must not cost the other three
+      // tables their sweep — so the catch below never sees a single-table
+      // failure, and until this line it was a console message and a count of
+      // zero that looked exactly like a quiet night. A table that has silently
+      // stopped being swept is the unbounded growth this job exists to prevent.
+      for (const f of swept.failed) {
+        // …and the tick is NOT clean, so `last_ok_at` must not move: the cron
+        // watch's whole question is "did this schedule last run to a good end",
+        // and a night that left one table unswept did not.
+        failed = true
+        await recordWorkerError(
+          env.DB,
+          "tenancy",
+          "cron/retention",
+          new Error(
+            `the retention sweep FAILED on ${f.table} and that table was not swept tonight — it keeps every row past its retention window until this is fixed, and the other tables were swept normally: ${f.message}`
+          ),
+          tick
+        )
+      }
     } catch (e) {
-      console.error("nightly retention sweep failed:", e)
-      await recordWorkerError(env.DB, "tenancy", "cron/retention", e)
+      failed = true
+      console.error("nightly retention sweep failed:", tick, e)
+      await recordWorkerError(env.DB, "tenancy", "cron/retention", e, tick)
     }
     try {
       const result = await checkDatabaseSizes(env, d1Config(env, "automation"))
@@ -561,7 +609,8 @@ export default {
           "cron/size-check",
           new Error(
             `size check stopped at its ${result.alerted.length}-alarm ceiling, more team databases are over the threshold and were NOT alarmed tonight. Tomorrow's run continues from where this one stopped.`
-          )
+          ),
+          tick
         )
       // TELL A HUMAN. Its OWN try, inside this one, for the reason the two outer
       // blocks exist: the alarm row is the record and it is already written, so a
@@ -569,18 +618,20 @@ export default {
       // it is RECORDED, because a database crossing 80% that nobody was told about
       // is precisely the silence R12 and ARCHITECTURE §7 both exist to prevent.
       try {
-        const sent = await alertNewAlarms(env, result.alerted)
+        const sent = await alertNewAlarms(traced, result.alerted)
         if (sent.mailed)
           console.log(`size alarm emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
       } catch (e) {
-        console.error("size alarm could not be delivered:", e)
-        await recordWorkerError(env.DB, "tenancy", "cron/size-alert", e)
+        failed = true
+        console.error("size alarm could not be delivered:", tick, e)
+        await recordWorkerError(env.DB, "tenancy", "cron/size-alert", e, tick)
       }
     } catch (e) {
+      failed = true
       // LAW R12: unattended work has no user watching, so a swallowed failure would be
       // invisible — record it to the error store, not just the console.
-      console.error("nightly size check failed:", e)
-      await recordWorkerError(env.DB, "tenancy", "cron/size-check", e)
+      console.error("nightly size check failed:", tick, e)
+      await recordWorkerError(env.DB, "tenancy", "cron/size-check", e, tick)
     }
     // BEFORE ANY OF IT: IS THIS WORKER EVEN CONFIGURED? A missing secret has
     // never been detected until somebody's request failed on it, which on
@@ -597,8 +648,22 @@ export default {
         "cron/config",
         new Error(
           `this worker is missing required configuration and its unattended work is degraded or dead: ${config.missing.join(", ")}. Set it with a wrangler secret (a secret) or in wrangler.jsonc (a var), then redeploy.`
-        )
+        ),
+        tick
       )
+    // AND THE WORKERS THIS ONE CAN REACH. The same question, asked of auth and
+    // realtime over the bindings tenancy already holds (config-health.ts says
+    // why a person no longer has to ask it). content asks it of itself on its
+    // morning tick; data-ops and mcp answer only on their own health door, which
+    // no cron worker binds — a probe there would be a new binding, and that is
+    // an architecture edge for the owner to add, not this tick.
+    await probeWorkerHealth(env.DB, "tenancy", tick, [
+      { name: "auth", door: env.AUTH, path: "/api/auth/health" },
+      { name: "realtime", door: env.REALTIME, path: "/api/realtime/health" },
+    ])
+    // AND THE SCHEDULES THEMSELVES (cron-heartbeat.ts): content's two crons are
+    // watched from here, tenancy's own from content's morning tick.
+    await reportStaleCrons(env.DB, "tenancy", new Date(controller.scheduledTime), tick)
 
     // THE THIRD JOB, AND THE ONE THAT READS WHAT THE OTHER TWO WROTE. Its own
     // try, like the two above and for the same reason: a digest that cannot be
@@ -615,11 +680,15 @@ export default {
       console.log(
         `ops digest: ${digest.fresh.length} new, ${digest.spiking.length} spiking, ${digest.nearQuota.length} near quota, ${digest.spend.turns} assistant turn(s)`
       )
-      const sent = await sendOpsDigest(env, digest)
+      const sent = await sendOpsDigest(traced, digest)
       if (sent.mailed) console.log(`ops digest emailed to ${sent.mailed}/${sent.recipients} recipient(s)`)
     } catch (e) {
-      console.error("nightly ops digest failed:", e)
-      await recordWorkerError(env.DB, "tenancy", "cron/ops-digest", e)
+      failed = true
+      console.error("nightly ops digest failed:", tick, e)
+      await recordWorkerError(env.DB, "tenancy", "cron/ops-digest", e, tick)
     }
+    // LAST, so that a tick which died partway leaves no beat: `last_run_at`
+    // means "this tick ran to its end", and a clean one moves `last_ok_at`.
+    await beatCron(env.DB, "nightly", new Date(controller.scheduledTime), !failed)
   },
 } satisfies ExportedHandler<Env>

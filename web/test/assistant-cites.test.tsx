@@ -27,8 +27,8 @@ import { AgentChat } from "@shared/ui/components/agent-chat/agent-chat"
 import { splitCites } from "@shared/agent-cites"
 import type { KnowledgeCitation, KnowledgePassage } from "@shared/types"
 
-import { AgentMarkdown } from "@/components/agent-markdown"
-import { citationPills } from "@/components/agent-sources"
+import { AgentMarkdown } from "@/components/assistant/agent-markdown"
+import { citationPills } from "@/components/assistant/agent-sources"
 
 const citation = (sourceId: string, title: string, kind: string): KnowledgeCitation => ({
   sourceId,

@@ -19,7 +19,7 @@ import { act, render, renderHook, waitFor } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
 import type { ModelFailure } from "@shared/types"
-import { AssistantLimitNotice } from "@/components/assistant-limit-notice"
+import { AssistantLimitNotice } from "@/components/assistant/assistant-limit-notice"
 
 const ALL: ModelFailure[] = [
   "unconfigured",

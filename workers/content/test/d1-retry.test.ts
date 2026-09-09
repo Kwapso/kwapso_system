@@ -86,3 +86,48 @@ describe("the D1 REST door's failure classification", () => {
     expect(s.calls()).toBe(2)
   })
 })
+
+// A TIMEOUT AND AN UNREACHABLE DOOR ARE TWO FACTS, AND THE ROW HAS TO SAY WHICH.
+//
+// When the attempts are spent, `lastError` IS the diagnosis: it is what the
+// central catch records and all anyone reading the error store gets. For a
+// network failure it used to be the raw abort — "The operation was aborted due
+// to timeout" — which names no door, no call and no deadline, and reads the same
+// whether the far side was slow or gone. The 500 branch beside it has always
+// said `Cloudflare D1 API 500 on /d1/database/…`.
+describe("a network failure on the D1 REST door names itself", () => {
+  /** Every attempt rejects the way `AbortSignal.timeout` does — a DOMException
+   * whose `name` is TimeoutError, which is the only thing separating the two
+   * cases at the catch. */
+  function fetchRejects(err: Error): { calls: () => number } {
+    let i = 0
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        i++
+        throw err
+      })
+    )
+    return { calls: () => i }
+  }
+
+  it("a hung socket says it timed out, names the call and quotes the deadline", async () => {
+    const timeout = Object.assign(new Error("The operation was aborted due to timeout"), {
+      name: "TimeoutError",
+    })
+    const s = fetchRejects(timeout)
+    await expect(d1Query(CFG, "db1", "SELECT 1")).rejects.toThrow(
+      /Cloudflare D1 API did not answer within \d+ms on \/d1\/database\/db1\/query \(R11 deadline, attempt 3 of 3\)/
+    )
+    expect(s.calls(), "a hung socket is a blip: every attempt is spent on it").toBe(3)
+  })
+
+  it("an unreachable door says THAT instead, in different words, and still names the call", async () => {
+    const s = fetchRejects(new TypeError("Network connection lost."))
+    const thrown = (await d1Query(CFG, "db1", "SELECT 1").catch((e: Error) => e)) as Error
+    expect(thrown.message).toMatch(/^Cloudflare D1 API could not be reached on \/d1\/database\/db1\/query \(attempt 3 of 3\)/)
+    expect(thrown.message, "the far side's own words are kept").toMatch(/Network connection lost\./)
+    expect(thrown.message, "and it must not claim a deadline it never hit").not.toMatch(/did not answer within/)
+    expect(s.calls()).toBe(3)
+  })
+})

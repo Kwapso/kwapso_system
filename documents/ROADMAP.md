@@ -132,7 +132,7 @@ Then the Foundation phase (below) resumes.
 - `POST /api/auth/email/change/start`   . Send a 6-digit code to the NEW email
 - `POST /api/auth/email/change/verify`  , verify + switch email + log
 
-**Web seams:** `web/lib/pages.ts` (registry) · `web/components/app-shell.tsx`
+**Web seams:** `web/lib/pages.ts` (registry) · `web/components/shell/app-shell.tsx`
 (sidebar + bottom tabs) · a `<PageGuard>` wrapper used by guarded screens.
 
 > **`<PageGuard>` was never built** (noted 2026-08-10). It was a planned seam in
@@ -184,7 +184,7 @@ Then the Foundation phase (below) resumes.
   row). New global-core migration `db/core/0005_email_change.sql` adds
   `email_change_codes` (pending, hashed, separate from `login_codes` so it can't
   be replayed as a login) + `email_change_logs` (audit). Reuses `brandedEmail`.
-  `web/components/email-change-dialog.tsx` (two-step, reuses the `CodeInput`
+  `web/components/team/email-change-dialog.tsx` (two-step, reuses the `CodeInput`
   temp) lives in Settings → Account. **Two security sub-decisions locked this
   round (do not relitigate):** on a successful change we (a) **sign out the
   user's other devices** (`signOutOtherSessions`, keeps the current one) and
@@ -197,7 +197,7 @@ Then the Foundation phase (below) resumes.
     `GET /api/tenancy/invitations` + `POST /api/tenancy/invitations/accept`
     (`acceptInvite` in `teams.ts`, race-safe, join + switch) surfaced in the team
     switcher, top of Settings, and the `/invitations` route the email deep-links
-    to. `web/components/invitations.tsx`. No schema change (reuses `invite_index`).
+    to. `web/components/team/invitations.tsx`. No schema change (reuses `invite_index`).
 - **4 · Team header + edit**. SHIPPED (2026-06-15): team header + access-gated
   `TeamEditDialog` (name + logo → R2 `/media/teams/<id>`), `teams:edit` guarded.
 

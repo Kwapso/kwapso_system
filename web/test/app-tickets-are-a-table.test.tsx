@@ -68,7 +68,7 @@ vi.mock("@shared/web/store", async (importOriginal) => {
   }
 })
 
-import { AppTicketsTab } from "@/components/work-panels"
+import { AppTicketsTab } from "@/components/work/work-panels"
 
 afterEach(cleanup)
 

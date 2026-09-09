@@ -154,7 +154,7 @@
 // items-baseline gap-2` row) — hand-editing it fails
 // `web/test/vendored-kit.test.ts` by design, and it exposes no prop for this.
 // So this is THE OWNER'S OVERRIDE, APP-SIDE ONLY, same technique as
-// `web/components/auth-card.tsx`'s: a descendant selector reaching the kit's
+// `web/components/shell/auth-card.tsx`'s: a descendant selector reaching the kit's
 // own stable `data-slot`, applied from a wrapper the kit never sees. It lands
 // on the ONE scrolling body div every form's fields already flow through
 // (below), which is why one selector reaches every field of every one of

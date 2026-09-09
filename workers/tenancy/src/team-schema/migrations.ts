@@ -252,6 +252,28 @@ CREATE TABLE agent_threads (
 );
 CREATE INDEX idx_agent_threads_creator ON agent_threads (creator_id);
 
+-- WHAT WAS ASKED AND WHAT WAS ANSWERED, AND content IS NEVER REWRITTEN.
+--
+-- (No backticks anywhere in this comment: it lives inside a TEMPLATE LITERAL,
+-- so a backtick here ends the SQL string and the file stops parsing. The lint
+-- caught it in 15ms; it is worth the sentence because the next person to
+-- document a column in this file will reach for them exactly as I did.)
+--
+-- Nothing in any worker issues an UPDATE against this column. The ONE update
+-- this table takes is on tool_calls_json (data-ops lib/threads.ts), and it is a
+-- compare-and-swap -- AND tool_calls_json = the value we just read -- so even
+-- that cannot silently overwrite a concurrent decision.
+--
+-- Said out loud because the property is LOAD-BEARING and was carried by nothing
+-- but the absence of code. This is the assistant's own trail: it is what the
+-- team is shown when they ask what the assistant did on their behalf, and the
+-- one place a machine's account of its own actions is kept. A trail whose text
+-- can be edited after the fact answers a different question from the one people
+-- think they are asking it, and the edit would leave no mark. The activity
+-- table states the same guarantee for the same reason; this one had it and
+-- never claimed it.
+--
+-- If a message ever needs to CHANGE, append a new row and leave this one alone.
 CREATE TABLE agent_messages (
   id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL REFERENCES agent_threads (id),
@@ -1416,6 +1438,12 @@ SELECT lower(hex(randomblob(16))), '${v.type}', '${v.value}', 1, datetime('now')
 CREATE TABLE google_connections (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  -- SET ONCE AND NEVER CHANGED, deliberately: \`service\` is not a property of a
+  -- connection, it is WHICH connection this is. It rides the live unique index
+  -- below (one per person per service) and the consent it was granted under, so
+  -- turning a Drive grant into a Gmail one by writing a word would leave a row
+  -- claiming a scope Google never gave it. Reconnect instead; disconnect and
+  -- connect again is already the ordinary way to fix a grant.
   service TEXT NOT NULL,
   google_email TEXT NOT NULL,
   scopes TEXT NOT NULL DEFAULT '',
@@ -1469,6 +1497,10 @@ CREATE TABLE google_sources (
   id TEXT PRIMARY KEY,
   connection_id TEXT NOT NULL REFERENCES google_connections(id),
   user_id TEXT NOT NULL,
+  -- SET ONCE, like the connection's own: a source IS a folder, or a mailbox, or
+  -- a calendar, and \`service\` says which of those \`external_id\` is an id in. An
+  -- edit here would point the same id at a different Google API and read
+  -- somebody else's material, or nothing at all. Share the thing again to move it.
   service TEXT NOT NULL,
   external_id TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -3326,6 +3358,11 @@ CREATE UNIQUE INDEX idx_client_tools_name
 CREATE TABLE client_tool_prices (
   id TEXT PRIMARY KEY,
   tool_id TEXT NOT NULL REFERENCES client_tools (id),
+  -- SET ONCE, AND THAT IS THE WHOLE POINT OF THE TABLE (see client_tools above).
+  -- A price is DATED: a tool that cost EUR 240 in March and EUR 300 now must not
+  -- rewrite March's arithmetic, so a new price is a NEW ROW with a later
+  -- \`effective_on\`, never an edit to this one. Editing \`cents\` in place would
+  -- silently restate every map already drawn against it.
   cents INTEGER NOT NULL CHECK (cents >= 0),
   billing_period TEXT NOT NULL CHECK (billing_period IN ('month', 'year')),
   -- The day this price started being true. A map set to a date reads the newest
@@ -4492,7 +4529,7 @@ CREATE INDEX idx_help_ratings_ticket ON help_ratings (help_id, created_at DESC, 
     // record of what happened is not editable by a later opinion about the
     // vocabulary. The reader keeps drawing those rungs in the words we used at
     // the time — "Waiting on you" (`stageLabel`,
-    // web/components/ticket-stages.tsx, typed on `HelpStatusEver` for exactly
+    // web/components/tickets/ticket-stages.tsx, typed on `HelpStatusEver` for exactly
     // this reason).
     //
     // `validated_at` IS NOT CLEARED. It records a real act by a real person on a
@@ -4556,6 +4593,152 @@ SELECT lower(hex(randomblob(16))), h.id, 'awaiting_validation', 'new',
    );
 
 UPDATE help SET status = 'new' WHERE status IN ('awaiting_validation');
+`,
+  },
+  {
+    // A SOURCE SAYS WHICH CALL IT CAME FROM — and says nothing where Google did
+    // not say it.
+    //
+    // ── THE FAULT, IN THE OWNER'S OWN WORDS (8 Sep 2026) ────────────────────
+    //
+    // One Padelbase call produced a calendar invite, two "the call was moved"
+    // notices, three acceptance notices, a one-minute transcript from somebody
+    // who joined by accident, and the real transcript. Every one of those is its
+    // own knowledge source, separately embedded, and all of them compete as
+    // STRANGERS in the same search. That day the assistant answered a question
+    // about the week-planning call from a 1,179-character stub while the
+    // 73,141-character notes sat beside it, unrelated as far as anything here
+    // could tell.
+    //
+    // Measured on staging before this migration was written (7 sources for one
+    // 30-minute call, and 3,967 live sources in the base): nothing in the schema
+    // could say that two of them were about the same half-hour.
+    //
+    // ── ONE COLUMN, AND WHAT IS ALLOWED TO FILL IT ─────────────────────────
+    //
+    // `event_id` is GOOGLE'S OWN calendar event id and nothing else.
+    // lib/record-map.ts already states the principle this obeys: "Nothing here
+    // infers a relationship. Every edge is a foreign key this app has always
+    // stored." So there is no title matching here, no timestamp proximity, no
+    // fuzzy grouping and no embedding. Where Google does not say which event an
+    // artefact belongs to, the column stays NULL — and that is a CORRECT answer,
+    // not a gap to be filled by a guess. A wrong grouping is worse than none,
+    // because it makes the base answer confidently from the wrong artefact,
+    // which is the very failure above.
+    //
+    // AN EVENT IS OPTIONAL, DELIBERATELY. The owner's own correction the same
+    // day: "an email thread that is probably nothing to do with a call or just a
+    // conversation with the client will still fall into the larger umbrella of
+    // accounts and apps." A stray thread has an account and no event, and
+    // inventing an event for it would reproduce the duplicate problem one layer
+    // up. `account_id` and `app_id` are the universal parents and they have been
+    // on this table since 0012 and 0020 — this migration deliberately adds no
+    // second spelling of either. Measured the same day: of every mirrored source
+    // whose own row names a client or a system, ZERO disagreed with that row, so
+    // there is nothing here to repair and a new column would only be a second
+    // place for the answer to drift.
+    //
+    // ── WHY A SECOND COLUMN SAYING HOW WE KNOW ─────────────────────────────
+    //
+    // `event_id_from` records WHICH statement of Google's was read, exactly as
+    // `meetings.transcript_found_by` does for the transcript hunt beside it. The
+    // three do not prove the same thing and a reader deserves to be able to tell:
+    //
+    //   'origin'  the source IS the calendar entry — Google's event id is the
+    //             tail of its own `origin_row_id`. Nothing can be wrong here.
+    //   'meeting' the source mirrors a `meetings` row that already carries
+    //             `google_event_id`, a column this app has stored since 0012.
+    //   'mail'    Google's robot wrote the event into the notice as
+    //             `…/calendar/event?eid=<base64url of "<eventId> <calendarId>">`.
+    //             Read by the backfill script, which cannot be done in SQL —
+    //             SQLite has no base64 — see scripts/backfill-source-events.mjs.
+    //
+    // ── WHAT THIS MIGRATION CANNOT PLACE, SAID OUT LOUD ────────────────────
+    //
+    // The Gemini notes DOCUMENT — the artefact that actually holds the answer —
+    // carries no event id at all. Measured over every Google-sourced row on
+    // staging: 0 of 80 live Drive sources mention a calendar link, an `eid` or
+    // even a Meet link in their text, and 0 of them is named by any calendar
+    // entry this app has read. The only place Google states that link is the
+    // event's own `attachments[]`, which is a live Calendar call rather than a
+    // column, and today it names a THIRD document for the week-planning call —
+    // neither of the two the Drive sweep filed. The 121 "Notes:" emails carry
+    // nothing either: no eid, no Meet link, only the event's title in quotes.
+    // Those rows keep a NULL, honestly, until a lane exists that can ask the
+    // event what is hanging off it.
+    //
+    // NOTHING ABOUT THE SEARCH CHANGES HERE. The vector carries nine metadata
+    // keys (lib/knowledge-vectors.ts) and this is not a tenth: the index is not
+    // rewritten, the namespace is still the team's, and every passage is still
+    // read back out of this database under the caller's own fence (R26). What
+    // is searched is a later decision, made with this column in front of it.
+    version: "0070_a_source_says_which_call_it_is_from",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN event_id TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN event_id_from TEXT;
+
+-- Partial, because the column is NULL on most rows by design and an index over
+-- those nulls would be a write cost with no reader — the ruling of 0061.
+CREATE INDEX idx_knowledge_sources_event ON knowledge_sources (event_id) WHERE event_id IS NOT NULL;
+
+-- ROUTE 'origin' — the source IS the calendar entry. \`origin_row_id\` is built as
+-- \`<readerUserId>:<googleEventId>\` (lib/knowledge-google.ts's \`rowId\`), so the
+-- tail after the FIRST colon is Google's own id, read rather than matched. A row
+-- with no colon is not a Google calendar row and is left alone.
+UPDATE knowledge_sources
+   SET event_id = substr(origin_row_id, instr(origin_row_id, ':') + 1),
+       event_id_from = 'origin'
+ WHERE origin_table = 'google_calendar'
+   AND event_id IS NULL
+   AND origin_row_id IS NOT NULL
+   AND instr(origin_row_id, ':') > 0
+   AND length(substr(origin_row_id, instr(origin_row_id, ':') + 1)) > 0;
+
+-- ROUTE 'meeting' — the source mirrors a meeting, and a meeting has carried
+-- \`google_event_id\` since 0012. An ID join, never a title one.
+UPDATE knowledge_sources
+   SET event_id = (SELECT m.google_event_id FROM meetings m WHERE m.id = knowledge_sources.origin_row_id),
+       event_id_from = 'meeting'
+ WHERE origin_table = 'meetings'
+   AND event_id IS NULL
+   AND EXISTS (SELECT 1 FROM meetings m
+                WHERE m.id = knowledge_sources.origin_row_id
+                  AND m.google_event_id IS NOT NULL AND m.google_event_id <> '');
+`,
+  },
+
+  {
+    // A LOSING CANDIDATE IS STILL A CANDIDATE, AND THE HUNT NOW SAYS SO.
+    //
+    // 0055/8153a8e5 taught route 1 to read EVERY attachment a calendar entry
+    // carries and keep the fullest — a false start and a real transcript are the
+    // same shape, so length is what decides. That fixed which ONE file id a
+    // meeting quotes. It did not touch the OTHER file ids: the Drive lane mirrors
+    // every shared file into `knowledge_sources` on its own, so the document that
+    // lost the hunt — Gemini's abandoned three-second stub, sitting beside the
+    // hour it actually recorded — goes on existing as its own `document` source,
+    // unrelated in the fold's eyes to the meeting whose hunt already read and
+    // discarded it.
+    //
+    // `superseded_transcript_ids` is the file ids of every OTHER candidate a
+    // hunt for THIS meeting has ever read words out of and not chosen — the
+    // losers of `fromAttachments`'s own contest, plus (on a refresh) whichever
+    // file id `transcript_file_id` is about to stop being. Comma-joined text, not
+    // JSON: a Drive file id never carries a comma, and every reader of this
+    // column only ever asks "is X in here", never "give me the list back
+    // ordered". NULL means "none", exactly like every other optional mirror
+    // column on this table.
+    //
+    // It is written ONLY where the winner already is — `meetings.ts`'s two
+    // transcript-writing statements — so it costs no new door and no new write
+    // path, and it is read in exactly one place: `readFoldTargets`
+    // (knowledge-google.ts) widens the SAME set `transcript_file_id` already
+    // feeds, so the existing ID-join fold retires a runner-up exactly as it
+    // retires the winner's own duplicate — no new fold logic, a wider set for
+    // the one that already exists.
+    version: "0071_a_losing_candidate_is_still_a_candidate",
+    sql: `
+ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
 `,
   },
 ]

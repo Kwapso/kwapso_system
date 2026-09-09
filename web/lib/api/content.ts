@@ -50,20 +50,81 @@ import type {
 } from "@shared/types"
 import type { RecordCounts } from "@shared/record-counts"
 import { api, enc, listQuery, post } from "@shared/web/api"
+import { reportError } from "@shared/web/log"
 
-/** SEND A FILE AS THE BODY — the client half of the four streaming upload doors.
+/** WHAT THE PRESIGN DOOR ANSWERS: a place to PUT one file, or "use the door you
+ * have". Mirrors `postPresignUpload` in workers/content/src/routes/uploads.ts. */
+type PresignAnswer =
+  | { direct: false }
+  | { direct: true; uploadUrl: string; key: string; headers: Record<string, string>; expiresInSeconds: number }
+
+/** REMEMBERED FOR THE TAB: an environment that answered `{ direct: false }` once
+ * answers it every time (the credential is a deploy-time fact), so the second
+ * upload does not pay a round trip to be told again. */
+let directUploadsOff = false
+
+/** ONE FILE, STRAIGHT TO STORAGE — the browser's half of the presigned upload.
+ *
+ * Asks the presign door for a signed PUT, sends the bytes to R2 itself, and hands
+ * back the KEY the door minted, which the caller quotes to the confirm door to
+ * get its reference. Null means "take the streaming door", and it is returned in
+ * every case where that is the right answer rather than a failure: no credential
+ * in this environment, a bucket with no CORS rule (the PUT never leaves the
+ * browser), an expired grant, an R2 refusal. A failed accelerator is never a
+ * failed upload — but it is REPORTED, because "the fast path is silently never
+ * taken" is exactly the kind of fact nobody would otherwise learn.
+ *
+ * Only `Content-Type` is set by hand: `Content-Length` is a browser-owned header
+ * that fetch refuses to let a page set, and the browser fills it from the blob —
+ * the same number the door signed, or R2 refuses the PUT. */
+async function putDirect(module: string, blob: Blob): Promise<string | null> {
+  if (directUploadsOff) return null
+  const type = blob.type || "application/octet-stream"
+  const grant = await api<PresignAnswer>(
+    "/api/content/uploads/presign",
+    post({ module, contentType: type, sizeBytes: blob.size })
+  )
+  if (!grant.direct) {
+    directUploadsOff = true
+    return null
+  }
+  try {
+    const res = await fetch(grant.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": grant.headers["Content-Type"] ?? type },
+      body: blob,
+    })
+    if (!res.ok) {
+      reportError("upload/direct-put-refused", new Error(`${res.status} PUT to storage for ${module}`))
+      return null
+    }
+  } catch (e) {
+    reportError("upload/direct-put-failed", e instanceof Error ? e : new Error(String(e)), { module })
+    return null
+  }
+  return grant.key
+}
+
+/** SEND A FILE — the client half of the four upload doors.
  *
  * The form fields in this app produce a base64 data URL (that is what a file input
  * plus a downsize step hands back), and the browser was never the constrained end:
  * the 25 MB ceiling was the WORKER's, three copies of the file in a 128 MB isolate.
  * So the data URL stays on this side and turns back into bytes here, at the edge of
- * the network call, so the request carries the file itself and the worker streams it
- * to storage without ever holding it.
+ * the network call.
+ *
+ * WHERE THE BYTES GO, in order of preference: straight to R2 on a signed PUT
+ * (`putDirect`), with the reference then fetched from the confirm door; or, where
+ * that is off or refused, as the body of the streaming door, which hands them to
+ * storage as they arrive. Both answer the same `{ url, contentType }`, so the form
+ * field holding the reply cannot tell which path ran.
  *
  * One helper for all four doors. The old base64 doors are still live for tabs that
  * were open before the deploy — they simply are not called from this build. */
-async function sendFile<T>(path: string, dataUrl: string): Promise<T> {
+async function sendFile<T>(path: string, module: string, dataUrl: string): Promise<T> {
   const blob = await (await fetch(dataUrl)).blob()
+  const key = await putDirect(module, blob)
+  if (key) return api<T>("/api/content/uploads/confirm", post({ module, key }))
   return api<T>(path, {
     method: "POST",
     // The file's own type — a LABEL the door holds to its allow-list before it
@@ -868,6 +929,34 @@ export const content = {
       total: number
       capped: boolean
     }>(`/api/content/knowledge/map?table=${enc(table)}&id=${enc(id)}`),
+  /** THE WHOLE KNOWLEDGE BASE AS ONE PICTURE — every source this reader may see,
+   * clustered by the client it is filed under, with the apps and sprints it
+   * hangs off as the hubs inside each cluster.
+   *
+   * `total` is the EXACT size of the corpus and `drawn` is how many dots came
+   * back; `capped` says the two differ, and every cluster carries its own true
+   * `total` beside the `drawn` sample so the picture is sized by the corpus
+   * rather than by what fitted. `clustered` is false when the caller may not
+   * read accounts — the picture then has no clusters at all, because a dense
+   * named blob is the fact that right was withholding. See
+   * workers/content/src/lib/knowledge-shape.ts. */
+  knowledgeShape: (compartment?: string) =>
+    api<{
+      clusters: { id: string; label: string; total: number; drawn: number }[]
+      nodes: {
+        id: string
+        kind: string
+        label: string
+        cluster: string
+        table: string
+        recordId: string
+      }[]
+      links: { from: string; to: string }[]
+      total: number
+      drawn: number
+      capped: boolean
+      clustered: boolean
+    }>(`/api/content/knowledge/shape${compartment ? `?compartment=${enc(compartment)}` : ""}`),
   knowledgeOne: (id: string) =>
     api<{ sources: KnowledgeSource[] }>(`/api/content/knowledge?id=${enc(id)}`).then(
       (r) => r.sources[0] ?? null
@@ -932,6 +1021,23 @@ export const content = {
     visibleToAppId?: string | null
   }) => {
     const blob = await (await fetch(input.fileDataUrl)).blob()
+    // STRAIGHT TO R2 WHERE IT IS ON (putDirect): the bytes never pass through a
+    // worker, and the confirm door reads them back out of the bucket once, for
+    // the assistant. The metadata rides the body there, the query string here.
+    const key = await putDirect("knowledge", blob)
+    if (key)
+      return api<{ source: KnowledgeSource | null; total: number }>(
+        "/api/content/knowledge/upload-confirm",
+        post({
+          key,
+          fileName: input.fileName,
+          contentType: blob.type || "application/octet-stream",
+          title: input.title,
+          accountId: input.accountId ?? undefined,
+          visibility: input.visibility,
+          visibleToAppId: input.visibleToAppId ?? undefined,
+        })
+      )
     const q = new URLSearchParams({ fileName: input.fileName })
     if (input.title) q.set("title", input.title)
     if (input.accountId) q.set("accountId", input.accountId)
@@ -1136,7 +1242,7 @@ export const content = {
   /** The bytes behind a deliverable (gated deliverables:create), streamed as the
    * request body. Answers with the /media/internal URL the record then stores. */
   uploadDeliverableFile: (dataUrl: string) =>
-    sendFile<{ url: string; contentType: string }>("/api/content/deliverables/upload-stream", dataUrl),
+    sendFile<{ url: string; contentType: string }>("/api/content/deliverables/upload-stream", "deliverables", dataUrl),
 
   /* ------------------- the agency's own housekeeping ------------------------
    * Two modules, both CAPPED rather than paged (R14) — an authored library and a
@@ -1154,7 +1260,7 @@ export const content = {
   /** Upload the bytes behind an asset (gated brand_assets:create). Streams the
    * bytes as the request body; get back the served /media/internal URL. */
   uploadBrandAssetFile: (dataUrl: string) =>
-    sendFile<{ url: string; contentType: string }>("/api/content/brand-assets/upload-stream", dataUrl),
+    sendFile<{ url: string; contentType: string }>("/api/content/brand-assets/upload-stream", "brand", dataUrl),
 
   meetingPurposes: () => api<{ purposes: MeetingPurpose[]; total: number }>("/api/content/delivery/purposes"),
   meetingPurposeOne: (id: string) =>
@@ -1177,7 +1283,7 @@ export const content = {
     api<{ profiles: StaffProfile[]; total: number }>("/api/content/staff/profiles/active", post({ id, active })),
   /** A profile photo or a certificate, streamed as the request body. */
   uploadStaffFile: (dataUrl: string) =>
-    sendFile<{ url: string; contentType: string }>("/api/content/staff/upload-stream", dataUrl),
+    sendFile<{ url: string; contentType: string }>("/api/content/staff/upload-stream", "staff", dataUrl),
 
   /** `userId` narrows at the DOOR, not in the client: a member's page shows one
    * person's certificates, and filtering a capped list afterwards would disagree

@@ -28,7 +28,7 @@
 // wrong, and a machine with no framework around it is one a test can drive with
 // fake timers and assert about directly (`web/test/five-seconds-before-it-sends
 // .test.ts` covers all four). The component that draws the toast and the
-// pending bubble is `web/components/reply-composer.tsx`.
+// pending bubble is `web/components/tickets/reply-composer.tsx`.
 
 /** HOW LONG THE HOLD IS, IN SECONDS. The client said five and this is the one
  * place it is written down — the toast counts it, the pending bubble counts it,

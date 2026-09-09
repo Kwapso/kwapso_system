@@ -41,7 +41,7 @@ vi.mock("@/lib/use-active-team", () => ({
   useActiveTeam: () => ({ user: null, ctx: { team: { id: "t1" } }, loading: false }),
 }))
 
-import { TodoFormDialog } from "@/components/todo-form-dialog"
+import { TodoFormDialog } from "@/components/work/todo-form-dialog"
 
 const ROOT = join(import.meta.dirname, "..", "..")
 

@@ -56,7 +56,7 @@ import { readTicketStages } from "../lib/help-stages"
 import { rateTicket, readTicketRatings } from "../lib/help-ratings"
 import { notifyReplyAndMentions, notifyTicketResolved } from "../lib/notify"
 import { addStakeholder, listStakeholders } from "../lib/stakeholders"
-import { ANY_FILE_TYPE, dataUrlBytes, mediaKey, parseUploadDataUrl, storedContentType } from "@shared/workers/image"
+import { ANY_FILE_TYPE, dataUrlBytes, parseUploadDataUrl, storedContentType, teamMediaKey } from "@shared/workers/image"
 import { safeExternalLink } from "../lib/internal-fields"
 import { TICKET_FILE_MAX_BYTES } from "@shared/workers/limits"
 import type { Env } from "../env"
@@ -856,7 +856,7 @@ export async function postHelpAttachment(request: Request, env: Env): Promise<Re
       )
     // The key carries a ULID, which is what makes the capability URL unguessable;
     // the team id keeps one team's objects out of another's prefix.
-    const key = mediaKey("ticket", guard.teamId)
+    const key = teamMediaKey(guard.teamId, "ticket")
     await env.MEDIA.put(key, parsed.bytes, { httpMetadata: { contentType: storedContentType(parsed.contentType) } })
     url = `/media/${key}`
     contentType = parsed.contentType

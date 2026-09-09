@@ -13,6 +13,18 @@
 // dismiss (Esc / backdrop / the close button) — dismissing a form discards it. It is
 // PRESERVED when the form simply unmounts from navigation — that's the case we're
 // protecting. Also cleared for everyone on sign-out (clearAllFormDrafts).
+//
+// A LIVE PATCH WHILE THE FORM IS OPEN NEVER TOUCHES THE DRAFT. `initial` is read
+// on the inactive→active edge and at no other time (see `initialRef` below), so
+// when a colleague saves the same record two seconds before you and the row-level
+// patch (`patchRow`, the R1/R15 seam) hands the host a new `initial`, your values
+// stay yours, nothing prompts, and your save is what lands — whole-record, last
+// save wins, in the order the saves happened. The owner's ruling, 2026-09-07: "I
+// would just assume everything happens sequentially … I propagate the latest
+// change, and that is what should be reflected." web/test/last-save-wins.test.tsx
+// holds it through a real dialog over a real cached read, because an innocent
+// `useEffect(() => setValues(initial), [initial])` in any one form would undo it
+// silently and stay green.
 
 import * as React from "react"
 

@@ -13,7 +13,7 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * instead of in the row, and says so with `omitDate`; the row is still these
  * four facts and no fifth.)
  *
- * MOVED HERE FROM `web/components/tickets-collection.tsx` (where it was
+ * MOVED HERE FROM `web/components/tickets/tickets-collection.tsx` (where it was
  * `TriageChips`), 2026-09-06, BECAUSE THE CLIENT ASKED FOR IT TWICE IN ONE
  * SENTENCE. Her own words, reading the ticket DETAIL screen next to the
  * triage card: "replicate the pills that we have on the view outside. These
@@ -140,7 +140,7 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * established shape is a render prop, exactly the reason
  * `shared/web/screen-engine/screen-renderer.tsx` used to take a
  * `renderActivity` prop instead of importing
- * `web/components/activity-panel.tsx` directly: `@/` resolves to two different
+ * `web/components/records/activity-panel.tsx` directly: `@/` resolves to two different
  * folders depending on which door is compiling. (That particular prop is gone —
  * it existed for the Activity tabs the client killed on 2026-09-06 — but the
  * REASON it had that shape is the reason these three are props, and it is the
@@ -158,7 +158,7 @@ import { richTextPlain, safeHref } from "@shared/web/rich-text"
  * ── THE SPLIT THIS CLOSES ──────────────────────────────────────────────────
  *
  * There were two answers in the app, on two tables of the same collection.
- * `ticketTitle` (web/components/tickets-collection.tsx) read `titleEn ||
+ * `ticketTitle` (web/components/tickets/tickets-collection.tsx) read `titleEn ||
  * titleDe || the first line of the description`, and it was right; the ticket
  * COLLECTION'S own rows, shaped by `shapeHelpList`
  * (web/components/deep-link/shape.tsx), named every row by the DESCRIPTION

@@ -29,7 +29,7 @@ import {
   getTool,
   googleServicesOf,
   requiresConfirm,
-  toolIndex,
+  stageOneSystem,
   toolSpecs,
   type AgentTool,
   type ToolResult,
@@ -888,7 +888,7 @@ function injectSources(
 
 /** THE CHIP'S OWN WORD, for the sentence the assistant repeats.
  *
- * A DELIBERATE SECOND COPY of the four labels in `web/components/agent-panel.tsx`,
+ * A DELIBERATE SECOND COPY of the four labels in `web/components/assistant/agent-panel.tsx`,
  * and not a shared one: a sentence a person reads is the front door's to say and
  * to translate (R28/R33), and an English string in `shared/knowledge-chips.ts`
  * would be extracted into the catalogue from a file with no translator in it.
@@ -1397,15 +1397,8 @@ async function runPlanLoop(
   // role-shaped, which is the trade `toolSpecs(held)` already made a lane ago and
   // for the same reason: a handful of roles per team, each warming its own prefix
   // within the first question of the day.
-  if (model.canActWithTools && convo[0]?.role === "system") {
-    const index = toolIndex(held)
-    if (index)
-      convo[0] = {
-        ...convo[0],
-        content:
-          `${convo[0].content}\n\nMORE TOOLS, BY NAME. Beyond the ones you have been given in full, these exist and you can use any of them — call load_tools with the names you need (several at once) and their full instructions arrive for the rest of this conversation. The names say what they do; if none of them fits, answer with what you have rather than guessing at one.\n${index}`,
-      }
-  }
+  if (model.canActWithTools && convo[0]?.role === "system")
+    convo[0] = { ...convo[0], content: stageOneSystem(convo[0].content, held) }
   // Stream text deltas only when the caller wants live progress AND the model supports
   // it; otherwise take the one-shot path (Workers AI, or any non-streamed request).
   const streaming = !!emit && model.canStream && !!model.stream

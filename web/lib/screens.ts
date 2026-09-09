@@ -93,7 +93,7 @@ function listCollection(
     // notice because a search that finds nothing looks like an answer. The frame
     // searches the array it holds — page one — so on a paged collection the box
     // is answered by the DOOR instead, from the host's own find bar
-    // (components/paged-find.tsx · SEARCH.md layer 2). One box per screen, and
+    // (components/records/paged-find.tsx · SEARCH.md layer 2). One box per screen, and
     // it is the one that can see past the cursor.
     searchable: !opts.paged,
   }
@@ -180,7 +180,7 @@ export const MODULE_PERMISSION: Record<string, string> = {
  * ITS ACTIVITY FEED WAS A SECOND TAB HERE UNTIL 2026-09-06, when the client
  * killed the Activity tab across the app: a record's history is read from the
  * footer's Latest activity column and opens in a slide-in off it
- * (web/components/activity-panel.tsx carries the ruling). The feed itself is
+ * (web/components/records/activity-panel.tsx carries the ruling). The feed itself is
  * unchanged and still read — `use-screen-data.ts` fetches it and the host still
  * shapes it into this screen's `sets.activity` for whatever draws it next.
  *
@@ -226,7 +226,7 @@ const teamDetailRecipe: ScreenRecipe = {
     },
     // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
     // is reached from the record footer's Latest activity column and opens in a
-    // slide-in off it, not from a tab. web/components/activity-panel.tsx carries
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
     // the ruling and the argument.
   ],
 }
@@ -302,7 +302,7 @@ const memberDetailRecipe: ScreenRecipe = {
     },
     // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
     // is reached from the record footer's Latest activity column and opens in a
-    // slide-in off it, not from a tab. web/components/activity-panel.tsx carries
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
     // the ruling and the argument.
   ],
 }
@@ -391,7 +391,7 @@ const inviteDetailRecipe: ScreenRecipe = {
     },
     // NO ACTIVITY TAB (client, 2026-09-06 · 2026-09-07) — this record's history
     // is reached from the record footer's Latest activity column and opens in a
-    // slide-in off it, not from a tab. web/components/activity-panel.tsx carries
+    // slide-in off it, not from a tab. web/components/records/activity-panel.tsx carries
     // the ruling and the argument.
   ],
 }
@@ -458,7 +458,7 @@ const accountsListRecipe: ScreenRecipe = {
   actions: [],
   // NO FACETS HERE, and that is the fix rather than a loss: type / status /
   // archived are the door's OWN filters now, asked from the host's find bar
-  // (components/paged-find.tsx). In the frame they narrowed the loaded page —
+  // (components/records/paged-find.tsx). In the frame they narrowed the loaded page —
   // "companies among the newest fifty" — while the exact count above them never
   // moved, which is what a manager reported as "filter by type, the count
   // doesn't change". A filter a person can pick has to be one the server applies.
@@ -483,7 +483,7 @@ const accountsListRecipe: ScreenRecipe = {
  * so there is one door and one detail screen for both, never a second
  * `/contacts/<id>` address for a record that already has one.
  *
- * Grouped by company on screen (`components/contacts-by-company.tsx`,
+ * Grouped by company on screen (`components/accounts/contacts-by-company.tsx`,
  * UI-GAPS #24), promoted from the tab it used to live on rather than rebuilt —
  * the same component, drawing the same row, at the same right. */
 const contactsListRecipe: ScreenRecipe = {
@@ -756,7 +756,7 @@ const tasksListRecipe: ScreenRecipe = {
  * badged with the exact server total through the withTabCounts seam; the client
  * killed the Activity tab across the app on 2026-09-06 (a record's history is
  * read from the footer's Latest activity column and opens in a slide-in off it —
- * web/components/activity-panel.tsx carries the ruling), so each of these
+ * web/components/records/activity-panel.tsx carries the ruling), so each of these
  * details is a single description block now. The seam stays: it is what badges
  * whatever collection tab one of these recipes grows next, and it is derived
  * from the tab's own block rather than from a list of tab keys.
@@ -1141,7 +1141,7 @@ export function withDataDrivenCollection(
  * rows it is holding and call the result sorted, which is what the owner was
  * looking at when he said "the sort actually doesn't work". So a paged
  * collection gets NO frame sort at all — its control lives in `<PagedFind>` and
- * asks the door (components/paged-find.tsx). One control per screen, and it is
+ * asks the door (components/records/paged-find.tsx). One control per screen, and it is
  * the one that can see past the cursor.
  *
  * `searchable` is what says which is which, because `listCollection(…, { paged:

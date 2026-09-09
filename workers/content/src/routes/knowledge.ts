@@ -21,13 +21,14 @@ import { fail, json, pagedJson } from "@shared/workers/http"
 import { resolveOrdering } from "@shared/workers/sorting"
 import { ACTIVITY_GATE_MAP } from "@shared/rules/registry"
 import { neighbourhood, readableTables } from "../lib/record-map"
+import { buildShape } from "../lib/knowledge-shape"
 import { kindsForChips, SOURCE_CHIP_KEYS } from "@shared/knowledge-chips"
 import { optionalText, queryText, requireText, TEXT_LIMITS } from "@shared/workers/validate"
 import { hasRight, requireRight } from "@shared/workers/gating"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
-import { ANY_FILE_TYPE, mediaKey, NEUTRALISED_CONTENT_TYPE, parseUploadDataUrl } from "@shared/workers/image"
+import { ANY_FILE_TYPE, NEUTRALISED_CONTENT_TYPE, parseUploadDataUrl, teamMediaKey } from "@shared/workers/image"
 import {
   KNOWLEDGE_EXTRACT_MAX_BYTES,
   KNOWLEDGE_FILE_MAX_BYTES,
@@ -49,6 +50,8 @@ import {
 } from "../lib/knowledge"
 import { writeAnswer } from "../lib/knowledge-compose"
 import { extractFile, unreadableNote } from "../lib/knowledge-files"
+import { presignedKey, UPLOAD_TARGETS } from "../lib/upload-targets"
+import { confirmStored } from "./uploads"
 import { catchUp, listIngestState, sweepAll } from "../lib/knowledge-ingest"
 import { googleStateKeys, sweepGoogle } from "../lib/knowledge-google"
 import type { Env } from "../env"
@@ -215,6 +218,46 @@ export async function getKnowledgeMap(request: Request, env: Env): Promise<Respo
   return json(await neighbourhood(cfg, guard, { table, id, readable }))
 }
 
+/** GET /api/content/knowledge/shape — THE WHOLE KNOWLEDGE BASE AS ONE PICTURE:
+ * every source we may show this reader, clustered by the client it is filed
+ * under, with the apps and sprints it hangs off as the hubs inside each cluster.
+ *
+ * THE SIBLING OF THE DOOR ABOVE, AND THE OPPOSITE QUESTION. `map` answers "what
+ * is this connected to" about one record. This answers "where is the knowledge,
+ * and where is there none" about all of them — which is not a question any
+ * neighbourhood can be asked, and not one a list answers either, because a list
+ * of clients sorted by a count is the same facts with the shape taken out.
+ *
+ * R14, AND THE HONEST HALF OF IT. A picture cannot page: a cursor hands somebody
+ * the second half of a drawing whose first half has scrolled away. So the cap
+ * (KNOWLEDGE_SHAPE_SOURCES) falls on the DOTS and never on the arithmetic —
+ * every cluster is sized by an exact count over the whole corpus — and past the
+ * cap the reader NARROWS with `compartment`, the same filter the list beside
+ * this picture already offers. That is the paging story: one client's material
+ * is far under the ceiling.
+ *
+ * THE FENCE IS APPLIED TWICE, and the second time is the one only a picture
+ * needs. The nodes carry knowledge.ts's own `readerClause`. The CLUSTERS carry
+ * the module fence: a picture leaks by AGGREGATION, so a reader who may not open
+ * accounts is not shown a dense named blob either — the blob IS the withheld
+ * fact. `readableTables` is that clause, the same one the neighbourhood door
+ * subtracts through, and lib/knowledge-shape.ts carries the whole argument.
+ *
+ * AGENCY ONLY, for the reason `getKnowledgeMap` gives above.
+ *
+ * Gated on `knowledge:read` because this is the knowledge section's own screen;
+ * what it can SHOW is then decided by the per-module subtraction. */
+export async function getKnowledgeShape(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "knowledge", "read")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  // Checked where it sits (R20): the value is capped text, and it is then only
+  // ever compared against the compartment column as a bound parameter.
+  const compartment = queryText(url.searchParams.get("compartment"), "Compartment", TEXT_LIMITS.short)
+  const readable = await readableTables(cfg, guard)
+  return json(await buildShape(cfg, guard, { compartment: compartment ?? null, readable }))
+}
+
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
@@ -319,7 +362,7 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   //
   // A server-side loop was added here on 20 Aug 2026 and taken out the same
   // morning, because the screen has looped since the day it was written
-  // (`MAX_SYNC_PASSES` in web/components/google-sync.tsx). Two loops around the
+  // (`MAX_SYNC_PASSES` in web/components/knowledge/google-sync.tsx). Two loops around the
   // same work meant one press did twelve passes of up-to-forty passes, and each
   // HTTP call ran for over five minutes before answering — long enough that the
   // owner watched a spinner and reasonably concluded the button was broken.
@@ -465,7 +508,7 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
-  const key = mediaKey(guard.teamId, "knowledge")
+  const key = teamMediaKey(guard.teamId, "knowledge")
   await env.INTERNAL_MEDIA.put(key, parsed.bytes as unknown as ArrayBuffer, {
     // NEVER the declared type. The object is served back on the app's own origin,
     // so a stored `text/html` would be stored XSS — and the structural answer is
@@ -589,11 +632,103 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   // exactly where they are: a key cannot be renamed, they simply match no
   // module's prefix and are never reclaimed, which is the behaviour they already
   // had.
-  const key = mediaKey(guard.teamId, "knowledge")
+  const key = teamMediaKey(guard.teamId, "knowledge")
   await env.INTERNAL_MEDIA.put(key, request.body, {
     httpMetadata: { contentType: NEUTRALISED_CONTENT_TYPE },
   })
 
+  const id = await indexStoredFile(env, cfg, guard, actor, {
+    key,
+    bytes: declared,
+    fileName,
+    contentType,
+    title,
+    accountId,
+    privateToMe,
+    visibleToAppId,
+  })
+  await publishChange(env, guard.teamId, "knowledge", id, "add")
+  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+}
+
+/** POST /api/content/knowledge/upload-confirm — the file is already in R2; make
+ * it a source.
+ *
+ * The third step of a DIRECT upload (routes/uploads.ts says how the three
+ * steps go): the browser PUT the bytes to R2 on a signature this worker minted,
+ * and now quotes the key back with the same metadata the streaming door takes
+ * on its query string. From here on the two doors are ONE function
+ * (`indexStoredFile`): prove the key is ours, prove the object arrived, read it
+ * back for the assistant, write the row, publish. A file that reached the
+ * bucket and never reached this door is an object no row points at — which is
+ * what the 7-day multipart rule and `unreferencedKeys` are for, and what R41
+ * asks of the CLIENT: it sends this or it says it failed, it never drops the
+ * result.
+ *
+ * Every field goes through the seam (R20), and the two the streaming door reads
+ * off HEADERS come off the body here and are held to the same rules: the key
+ * to `presignedKey`, the declared type to `ANY_FILE_TYPE`. The stored label is
+ * whatever R2 is holding — the signature pinned it — never the declared one.
+ *
+ * MUTATION: it writes the source row and publishes it, exactly as the streaming
+ * door does. */
+/** The confirm door's body, read field by field through the seam below — a
+ * shape hint, never a promise (route.ts on `gatedBody`). */
+type ConfirmBody = Record<string, unknown>
+
+export async function postConfirmKnowledgeFile(request: Request, env: Env): Promise<Response> {
+  const { actor, cfg, guard, body } = await gatedBody<ConfirmBody>(request, env, "knowledge", "create")
+  await refusePortalCaller(cfg, guard)
+
+  const key = presignedKey(guard, UPLOAD_TARGETS.knowledge, requireText(body.key, "File", TEXT_LIMITS.short))
+  if (!key) return fail(400, "invalid_input", "That file isn't one we gave you a place for. Nothing was saved.")
+  const fileName = requireText(body.fileName, "File name", TEXT_LIMITS.short)
+  const contentType = requireText(body.contentType, "File type", TEXT_LIMITS.short)
+  if (!ANY_FILE_TYPE.test(contentType))
+    return fail(400, "invalid_input", "That upload did not say what kind of file it is. Nothing was saved.")
+  const title = optionalText(body.title, "Title", TEXT_LIMITS.short) ?? fileName
+  const accountId = optionalText(body.accountId, "Account", TEXT_LIMITS.short) ?? null
+  const visibleToAppId = optionalText(body.visibleToAppId, "App", TEXT_LIMITS.short) ?? null
+  const privateToMe = optionalText(body.visibility, "Visibility", TEXT_LIMITS.short) === "private"
+
+  const found = await confirmStored(env.INTERNAL_MEDIA, UPLOAD_TARGETS.knowledge, key)
+  if (!found) return fail(404, "not_found", "That file never arrived. Nothing was saved.")
+
+  const id = await indexStoredFile(env, cfg, guard, actor, {
+    key,
+    bytes: found.size,
+    fileName,
+    contentType,
+    title,
+    accountId,
+    privateToMe,
+    visibleToAppId,
+  })
+  await publishChange(env, guard.teamId, "knowledge", id, "add")
+  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+}
+
+/** AN OBJECT ALREADY IN THE BUCKET BECOMES A SOURCE — the half of a file upload
+ * that is the same whichever way the bytes arrived. Answers the new source's
+ * id; the DOOR publishes it, so the live-sync seam can see the publish where it
+ * looks, in the handler (R1). */
+async function indexStoredFile(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  file: {
+    key: string
+    bytes: number
+    fileName: string
+    contentType: string
+    title: string
+    accountId: string | null
+    privateToMe: boolean
+    visibleToAppId: string | null
+  }
+): Promise<string> {
+  const { key, bytes, fileName, contentType } = file
   // READING IT IS A SEPARATE QUESTION FROM STORING IT, and now they have separate
   // ceilings. Conversion needs the bytes in memory — that is what conversion is —
   // so a file past the extract ceiling is stored and listed and SAYS it was not
@@ -601,11 +736,12 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   // cannot convert. Storing a 60 MB archive nobody can search beats refusing it:
   // the alternative is that the material is not in the product at all.
   let extract: { text: string | null; note: string | null }
-  if (declared > KNOWLEDGE_EXTRACT_MAX_BYTES) {
+  if (bytes > KNOWLEDGE_EXTRACT_MAX_BYTES) {
     extract = { text: null, note: unreadableNote(fileName) }
   } else {
-    // Read back ONCE, from the object we just wrote. One copy in memory, against
-    // the buffered door's three.
+    // Read back ONCE, from the object in the bucket. One copy in memory, against
+    // the buffered door's three — and on a direct upload the ONLY time these
+    // bytes are ever in a worker at all.
     const stored = await env.INTERNAL_MEDIA.get(key)
     extract = stored
       ? await extractFile(env, {
@@ -616,16 +752,14 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
       : { text: null, note: unreadableNote(fileName) }
   }
 
-  const id = await createFileSource(env, cfg, guard, actor, {
-    title,
-    accountId,
-    privateToMe,
-    visibleToAppId,
-    file: { url: `/media/internal/${key}`, name: fileName, type: contentType, bytes: declared },
+  return createFileSource(env, cfg, guard, actor, {
+    title: file.title,
+    accountId: file.accountId,
+    privateToMe: file.privateToMe,
+    visibleToAppId: file.visibleToAppId,
+    file: { url: `/media/internal/${key}`, name: fileName, type: contentType, bytes },
     extract,
   })
-  await publishChange(env, guard.teamId, "knowledge", id, "add")
-  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
 }
 
 const mb = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`

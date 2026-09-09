@@ -7,7 +7,7 @@
   },
   {
     "law": "borders",
-    "where": "web/components/knowledge-upload-dialog.tsx",
+    "where": "web/components/knowledge/knowledge-upload-dialog.tsx",
     "what": "border",
     "why": "A drop target, which is the case RULES.md §2.7 blesses in its own sentence — form fields and selection controls are the two places a hairline is allowed at all — and the kit makes the identical call for the identical shape in its own components/file-upload/file-upload.tsx. The dashed edge is also doing work no fill and no inset ring can do: dashed is the one stroke style that reads as PROVISIONAL, which is exactly what an empty drop zone is saying, and the same element restates it in the primary tone while a file is being dragged over it. THE HONEST FOOTNOTE: this app already imports the kit's own FileUpload in eight other places, so this hand-rolled zone is a duplicate of a kit part and adopting it would delete this entry outright. That was weighed and not done tonight — the swap changes what a person sees in a dialog, and CONTROL-SWAP-LANES.md's standing ruling on this very file is that an unsure conversion is left alone and reported."
   }

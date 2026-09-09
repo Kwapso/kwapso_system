@@ -116,15 +116,18 @@ async function googleFetch(
   token: string,
   init?: { method?: string; body?: string; contentType?: string; missingIsNull?: boolean }
 ): Promise<unknown> {
-  // A TIMEOUT IS A DIFFERENT FAILURE FROM A REFUSAL, and until this it reached
-  // the error store as a bare `TimeoutError: The operation was aborted due to
-  // timeout` naming no endpoint at all — a row you cannot act on, in a table
-  // whose whole purpose is rows you can. The RESPONSE is deliberately unchanged:
-  // this rethrows a plain Error, so the central catch answers it exactly as it
-  // did (500, "Something went wrong on our side"), and only the row improves.
-  // Naming Google here rather than turning it into a clean refusal is the
-  // conservative half — "Google was slow" is not the same promise as "Google
-  // said no", and that is a product decision, not a logging one.
+  // A TIMEOUT IS A DIFFERENT FAILURE FROM A REFUSAL — and now the person is
+  // told so too. It used to reach the error store as a bare `TimeoutError: The
+  // operation was aborted due to timeout` naming no endpoint, and the person as
+  // the generic 500 ("Something went wrong on our side"), the same sentence a
+  // refusal below earns: "Google was slow" and "Google said no" read identically
+  // and want different next moves (wait, versus reconnect or check sharing).
+  // So both are clean refusals with their own sentence — 504 when Google did
+  // not answer in time, 502 when it could not be reached at all — and each
+  // carries the diagnosis (which call, how long, what the socket said) as the
+  // `detail` the central catch records. The row and the sentence both improve;
+  // the STATUS moves from 500 to a gateway code, which is the honest one: the
+  // fault is on the far side of a socket, not in this worker.
   let res: Response
   try {
     res = await fetch(url, {
@@ -140,10 +143,18 @@ async function googleFetch(
   } catch (e) {
     const where = `${init?.method ?? "GET"} ${new URL(url).origin}${new URL(url).pathname}`
     const said = e instanceof Error ? e.message : String(e)
-    throw new Error(
-      /^(TimeoutError|AbortError)$/.test((e as { name?: string })?.name ?? "")
-        ? `google ${where} did not answer within ${GOOGLE_TIMEOUT_MS}ms (R11 deadline): ${said}`
-        : `google ${where} could not be reached: ${said}`
+    if (/^(TimeoutError|AbortError)$/.test((e as { name?: string })?.name ?? ""))
+      throw new GuardError(
+        504,
+        "google_timeout",
+        "Google didn't answer in time. Try again in a moment.",
+        `google ${where} did not answer within ${GOOGLE_TIMEOUT_MS}ms (R11 deadline): ${said}`
+      )
+    throw new GuardError(
+      502,
+      "google_unreachable",
+      "Google couldn't be reached. Try again in a moment.",
+      `google ${where} could not be reached: ${said}`
     )
   }
   // WHAT GOOGLE ACTUALLY SAID, in the log and nowhere else.
@@ -1086,6 +1097,50 @@ const GOOGLE_NOTICE_SENDERS = [
 export function documentIdInText(text: string): string | null {
   const hit = /docs\.google\.com\/document\/d\/([A-Za-z0-9_-]{16,})/.exec(text)
   return hit?.[1] ?? null
+}
+
+/** THE CALENDAR EVENT A NOTICE IS ABOUT — Google's own id, read out of the link
+ * Google's own robot wrote.
+ *
+ * Every invitation, update, acceptance and decline carries one line: `Reply for
+ * … and view more details` over a
+ * `calendar.google.com/calendar/event?action=VIEW&eid=<eid>` link, where `eid`
+ * is base64url of `"<eventId> <calendarId>"`. So this is READING an identifier,
+ * not matching on one — the same class of fact as `documentIdInText` above, and
+ * the opposite of the title comparison `eventNamedBy` does in
+ * lib/knowledge-google.ts.
+ *
+ * MEASURED ON STAGING, 8 Sep 2026, over every mail the base holds: 240 messages
+ * carry an `eid`, 240 of 240 decoded cleanly, and 225 of those (93.8%) name an
+ * event this base already holds as a calendar source or a meeting. The 15 that
+ * do not are real events outside the window we ever read — the honest shape of
+ * "Google says which, and we have not met it".
+ *
+ * Returns null rather than guessing. A message with no such link — a "Notes:"
+ * mail, a cancellation, an ordinary thread — is one Google did not tell us
+ * about, and half-matching one would file somebody's newsletter against a call.
+ *
+ * The calendar id is deliberately dropped: two guests receive the same event
+ * under their own calendar ids, and it is the EVENT the two artefacts share. */
+export function calendarEventIdInText(text: string): string | null {
+  const hit = /calendar\.google\.com\/calendar\/event\?[^\s"'<>]*[?&]eid=([A-Za-z0-9_-]+)/.exec(text)
+  if (!hit) return null
+  let decoded: string
+  try {
+    // base64url → base64, and back to the padding `atob` insists on. `atob` is on
+    // the Workers runtime and in Node, so this needs nothing imported.
+    const b64 = hit[1].replace(/-/g, "+").replace(/_/g, "/")
+    decoded = atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4))
+  } catch {
+    // A truncated link in a forwarded mail is not an error worth a log line: it
+    // is one message we cannot place, which is the same answer as no link at all.
+    return null
+  }
+  const space = decoded.indexOf(" ")
+  const eventId = (space === -1 ? decoded : decoded.slice(0, space)).trim()
+  // Google's event ids are base32hex-ish; anything else means we decoded noise
+  // that happened to be valid base64, and noise must never become a parent.
+  return /^[A-Za-z0-9_-]{5,}$/.test(eventId) ? eventId : null
 }
 
 /**

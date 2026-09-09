@@ -157,9 +157,22 @@ describe("every record a URL can name, the breadcrumb can name", () => {
     // section, it stops being present on a nested address and the exemption above
     // starts hiding a real gap — so the guard is read rather than trusted.
     const body = read("web/lib/use-screen-data.ts")
+    // THE GATE MAY WAIT; IT MAY NOT ASK WHICH MODULE IS OPEN. These three back
+    // count badges as well as their own lists, so from 7 Sep 2026 they are read
+    // on the browser's next idle moment rather than in the same commit as the
+    // record a person opened (`useAfterPaint`, and the hop budget in
+    // shared/workers/limits.ts). That is still "across the whole team area" —
+    // what this check exists to protect is that the condition never mentions a
+    // module, because a list narrowed to its own section leaves every nested
+    // address paying for a read it already had the answer to.
+    expect(
+      body,
+      "the team-wide gate must be `enabled` plus a wait, and nothing about which module is open"
+    ).toContain("const teamWide = enabled && painted")
     for (const [seg, cacheKey] of TEAM_WIDE)
       expect(
-        body.includes(`enabled ? \`${cacheKey}:\${teamId}\``),
+        body.includes(`teamWide ? \`${cacheKey}:\${teamId}\``) ||
+          body.includes(`enabled ? \`${cacheKey}:\${teamId}\``),
         `TEAM_WIDE says "${seg}" is loaded across the whole team area under the key ` +
           `"${cacheKey}", but use-screen-data.ts no longer loads it on \`enabled\` alone. ` +
           `Either give it onScreen("${seg}") or update this entry.`
@@ -266,7 +279,7 @@ describe("the shell actually asks for those names", () => {
   // THE WIRING, NOT THE FUNCTION. On 24 Aug 2026 a nesting test passed with the
   // bug still in it, because it proved trailPath while the defect sat in the
   // caller. So this reads the caller.
-  const shell = read("web/components/deep-link-screen.tsx")
+  const shell = read("web/components/deep-link/deep-link-screen.tsx")
 
   it("calls useTrailNames over the whole trail", () => {
     expect(

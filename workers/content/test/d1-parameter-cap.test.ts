@@ -97,6 +97,15 @@ describe("no statement can bind more parameters than D1 accepts", () => {
         "one page of idBatches(ids, 2) — bounded by the helper itself at D1_MAX_BOUND_PARAMS − 2 (98)",
       "content/src/lib/knowledge.ts: terms":
         "a question's search terms, capped at MAX_QUESTION_TERMS (24)",
+      // A CONSTANT ARRAY, not a runtime list: MEASUREMENT_SOURCES is declared
+      // literally in shared/workers/error-log.ts and holds one entry today. It
+      // names the recording seams whose rows are measurements rather than
+      // exceptions, so it grows only when somebody adds such a seam by hand —
+      // it can never take a length from a request, a team's data or a page of
+      // ids, which is the shape this suite exists to catch. Two queries bind it,
+      // each alongside one or two dates, so the ceiling is its length plus 2.
+      "tenancy/src/lib/ops-alert.ts: MEASUREMENT_SOURCES":
+        "the literal list of measurement recording seams in shared/workers/error-log.ts (1 today); grows only by hand-editing that constant",
       // The digit-bearing SUBSET of that same list, bound a second time so the
       // exact-term bypass can name it. A subset of a list capped at 24 is capped
       // at 24, so the lexical statement's worst case is 24 + 24 + 1 owner + the

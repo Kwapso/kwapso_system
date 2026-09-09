@@ -131,10 +131,18 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 65 of the 190 tools (counted from the live catalogue, 26 Aug 2026),
+- **Read** — 69 of the 195 tools answer on a GET (counted from the live catalogue,
+  8 Sep 2026), and 194 of the doors in the census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
   the write families proper are under **Write**:
+  - **reading a tool's own manual** — `describe_tool`. Every description on this
+    surface is ONE LINE: a `tools/list` used to carry 85,621 characters of prose,
+    loaded before the caller had asked for anything, and it is what stopped the
+    owner's own Claude behaving when he connected to it. The rest of each
+    sentence — the history, the reasoning, the worked examples — is on the tool's
+    `detail` and comes back from here, by name, when a caller actually needs it.
+    Nothing was deleted; ask for it before a call you are unsure of.
   - **asking, rather than listing** — `describe_module` and `query_records`. One
     read tool over every module a caller may read: `describe_module` answers with
     the fields, their types and an enum's values (including the ones the team
@@ -237,12 +245,14 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **277 doors, 217 with a tool, 60 with a written reason**, the
+  red build. Today: **281 doors, 218 with a tool, 63 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
-  the presign door (permission to PUT a file, which hands back a URL its caller
-  must then make an HTTP request to — what it needs is a browser rather than
-  argument room, and a model emitting a tool call is not that client),
+  the THREE doors of the direct upload (permission to PUT a file, which hands
+  back a URL its caller must then make an HTTP request to, and the two that
+  acknowledge the PUT afterwards — what all three need is a browser rather than
+  argument room, and a model emitting a tool call is not that client; a machine
+  that never made the PUT could only ever be told the file did not arrive),
   the THREE upload pairs, two media doors and the knowledge base, each a
   buffered door plus a streamed twin: the buffered half cannot be called because a
   base64 document will not fit in a tool argument, and the streamed half cannot be
@@ -261,7 +271,14 @@ Today it covers:
   every one of which `query_records` already answers better with `groupBy` (type
   × status, client × type, by app, and the raised-as × current-type matrix over
   the `raisedAsType` field), so a tool here would be a rigid duplicate of a
-  general one — and the two
+  general one — the knowledge base's TWO PICTURE doors (one record's
+  neighbourhood, and the whole corpus grouped by account), which assemble nodes
+  and links for a canvas to draw rather than answering a question: every
+  relationship in the first is a foreign key the grammar already exposes one at a
+  time, and the second is capped at the number of dots an SVG can draw, so the
+  payload that makes the screen legible is the one a tool can least use —
+  `list_knowledge` answers the arithmetic behind it exactly, per account, over
+  the same fence — and the two
   record-counts doors, one per worker, which bundle a record's child totals so a
   SCREEN can badge its tabs in one round trip: every number in that bundle is
   already machine-readable, exactly and with narrowing those doors do not take,
@@ -953,7 +970,7 @@ and it is the owner's call which" ended with the owner deleting the category.
 `workers/mcp/`. `POST /mcp` (JSON-RPC) + session-gated token management under
 `/api/mcp/tokens*`; the staff-only rule is `workers/mcp/src/lib/staff.ts` (called from
 `postToken` and from the session bridge, held by `test/staff-only.test.ts`); the
-human-facing card is `web/components/access-tokens.tsx`
+human-facing card is `web/components/team/access-tokens.tsx`
 (Settings → Access tokens). Tokens live in the core DB (`mcp_tokens`, migrations
 `0013` + `0016`, `expires_at`, backfilled so applying it gives every existing token a
 full term rather than killing it); the TTL and the per-person cap are

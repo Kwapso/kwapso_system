@@ -172,7 +172,7 @@ concrete + checkable:
 
 - **The global habits every Kwapso build follows**, [SWIFT-STRUCK-WAY.md](documents/SWIFT-STRUCK-WAY.md): the cross-app rules (lean, machine-checked laws, act-as-user, every route gates, deactivate-not-delete, the ship pipeline). Travels with every fork; the `new-app` skill reads it first.
 - **The two prime directives** (stay lean; obey the Laws), [CLAUDE.md](CLAUDE.md), the entry point.
-- **The Laws of the Base** (R1–R55), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: every component under `components/` plus the 3 foundations (icons, tokens, motion) — the count is derived by `kitInventory()` in `scripts/kit-coverage.mjs` and deliberately not written down here — is either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
+- **The Laws of the Base** (R1–R58), [RULES.md](RULES.md), *machine-checked*: pinned to `shared/rules/registry.ts` and enforced by tests that read the source off disk (`web/test/rules.test.ts`, the per-worker `publish-seam.test.ts` for live-sync R1, the `gating-seam` suites, incl. the external mcp surface, for R10, `fetch-timeout` R11, `cron-records` R12, plus the scale/safety round: R13 self-healing catalog, R14 bounded lists, R15 live listeners, R16 exact counts, R17 idempotent transitions, R18 cross-module activity gating, R19 agent/MCP filter parity, R20 scanned boundary validation, R21 no agency door for a client login, R22 agent/MCP body-field parity, R26 the vector index narrows and the team's database decides, R27 described contracts, every backticked identifier in a tool description names something real, R28 the translation catalogue is exactly the set of strings the app says: a sentence missing from it ships untranslated, and an entry nothing says any more is an orphan, R29 the page has one width per front door and a screen never sets its own, R38 a record detail reads its record BY ID and never finds it in a page of a growing collection, R40 a stored file must reach a person: every door that puts bytes in a bucket is walked through to the screen that renders the reference, and a field that only ever reaches a form is not a read, R41 a file somebody picked is either sent or refused and never dropped: every create call site of a dialog that defers an upload must hand back the id its files hang on, R42 every accepted source type resolves to a declared reader on EVERY door or to an honest refusal, and no door chooses its own: one table both the upload door and the Drive lane ask, so the same PDF cannot read properly through one and come out as gibberish through the other, R43 agent/MCP tool-SET parity: a tool that exists on the agent's own catalog exists on MCP's too, or the gap is a named, reasoned line, and the reverse — R19/R22 prove a door has a tool on some surface, this proves the two surfaces agree with each other, R45 every kit composition is decided: all 47 files under `shared/ui/compositions/` are either a direct import this app actually reaches or a reasoned, rot-checked exemption naming why not — a composition nobody looked at, or hand-rolled screen UI that duplicates one, is the only unacceptable result, R46 every kit component and foundation is decided too: every component under `components/` plus the 3 foundations (icons, tokens, motion) — the count is derived by `kitInventory()` in `scripts/kit-coverage.mjs` and deliberately not written down here — is either REACHED — a direct import, or through another adopted part, or through a CSS `@import` a JS-only census cannot see — or a reasoned, rot-checked exemption). Break one → the build goes red. Adding a Law requires the rule, the registry entry, and a check, all three.  **And the check must be able to fail:** every source-scan strips comments before matching (this repo's comments discuss the very seams being scanned), matches a CALL not a word, boundaries each identifier, knows both export shapes, and carries a tripwire asserting it matched something. See CONVENTIONS.md § *Reading config, and writing a check that can fail*, each of those rules was earned by a check that passed its own sabotage.
 - **Code house style**, [CONVENTIONS.md](documents/CONVENTIONS.md): the handler shape, the two data doors, gating, boundary validation, deactivate-not-delete, the comment style.
 - **UI conventions**, [UI-CONVENTIONS.md](documents/UI-CONVENTIONS.md): library-is-lego, recipe vs bespoke, the enforced UI Laws, the action-icon mapping, the *action-button rows never clip* responsive rule, the voice.
 - **How a screen is arranged**, [UI-RULEBOOK.md](documents/UI-RULEBOOK.md): the layer above UI-CONVENTIONS. A *rearrangement* rule book, expressible with the components `shared/ui/` already ships and the tokens the theme already defines, so every rule in it can be applied from `web/`, `web-portal/` and `shared/` without changing a component.
@@ -333,7 +333,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     (`TeamChannel`), the code-vs-runtime model, and when a DO is the lock vs. plain
     atomic D1.
 17. **[EDGE-CASES.md](documents/EDGE-CASES.md)**, the non-obvious traps a maintainer must
-    know (the static-export reload, the list-cache-as-detail-source, the REST-door
+    know (the static-export reload, the fat list SELECT a detail screen still needs, the REST-door
     round-trips, the confirm model, streaming, and more).
 18. **[AGENTIC-IMPORT.md](documents/AGENTIC-IMPORT.md)**, the agent-driven, multi-table data
     import: dump old-system CSV exports, the agent normalizes + maps + orders
@@ -374,7 +374,16 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     files are the evidence for "we decided this, and here is who said so". They are a
     RECORD, never a spec — where a form answer and SCOPE.html disagree, SCOPE wins,
     and where SCOPE is silent, base law applies. They hold no customer data.
-27. **`scaling-review.md`** — **NOT IN THIS REPOSITORY. Do not go looking for it.**
+27. **[docs-audit/RULING.md](docs-audit/RULING.md)** and
+    **[docs-audit/RECONCILIATION.md](docs-audit/RECONCILIATION.md)**, the owner's ruling of
+    2026-08-27 — *"Kwapso's UI/UX rules have the final authority"* — and the line-by-line
+    reconciliation of this repo's UI rules against the kit's own 3,378-line law-book in
+    `shared/ui/docs/`. Read RULING.md before arguing with the kit about a UI question: it
+    says which of our own rules are a second opinion on somebody else's subject, and which
+    are not overturned. *(Added to this map on 7 Sep 2026. Both files have been tracked
+    since 29 Aug and this map indexed neither — a directory that is not `documents/` is
+    invisible to every tool that walks the docs, this map included.)*
+28. **`scaling-review.md`** — **NOT IN THIS REPOSITORY. Do not go looking for it.**
     It was the scaling audit of 14 Aug 2026 (the twelve-dimension score, the platform
     limits looked up live, what breaks first and at what size, the twelve repairs that
     landed and the eleven items judged too risky to change), and it was deleted on
@@ -384,11 +393,13 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
     **The DECISION it produced is [ARCHITECTURE.md §7](documents/ARCHITECTURE.md) — 78 accepted,
     LOCKED — and that section is self-sufficient**: the live layer as the first
     ceiling, at roughly 3,000–5,000 concurrent sockets in one team, is written there,
-    not only here. Cite §7. Two notes for anyone tidying this up: `.gitignore` still
-    carries a comment claiming this file is deliberately tracked (it is not tracked and
-    it is not present — both halves are stale), and `DATA-MODEL.md` cites it once for
-    R16's price. Either restore the report or re-point both at §7; leaving it as a name
-    with nothing behind it is the state this entry exists to warn about.
+    not only here. Cite §7. One note for anyone tidying this up: `.gitignore` (line 44)
+    still carries a comment saying this file is deliberately NOT ignored "so it is a
+    DOCUMENT that two other documents depend on", and cites this entry by its item
+    NUMBER, which has moved once already. Neither half holds: the file is not tracked and
+    not present, and `DATA-MODEL.md` has since re-pointed its one citation at §7. Either
+    restore the report or delete that comment; leaving a name with nothing behind it is
+    the state this entry exists to warn about.
 
 ### Where the code lives
 
@@ -399,7 +410,7 @@ If a rule isn't machine-checked (e.g. a responsive-CSS convention), the doc says
 | `web-portal/` | the CLIENT PORTAL screens (static export → `web-portal/out`, served by `workers/portal-gateway`). Its own workspace, its own tests, including the account-fence suite |
 | `workers/` | the eight workers. Six private brains + the two public gateways |
 | `shared/` | what every side agrees on. `shared/workers/`, the worker seams (gating, the data door, validation, publish); `shared/web/`, the front-end seams BOTH apps import (the cache `store.ts`, the live client `realtime.ts`, `log.ts`, `form-shell.tsx`, `format-count.ts`, `use-form-draft.ts`); plus the types, the glossary and the rules registry. A file lands in `shared/web/` the moment the second front end needs it, that is why several seams the docs used to place under `web/lib/` now live here |
-| `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema.ts`) |
+| `db/core/` | the global core database's migrations (per-team schema lives in `workers/tenancy/src/team-schema/migrations.ts`) |
 | `scripts/` | the operational scripts, reset, seed, the smokes, the Glide pull |
 | `tools/` | developer tools that are never deployed and sit outside both front doors' import closure. `tools/screen-builder/` is a Glide-like sandbox that assembles kit parts with the options the kit's own source declares and nothing else (its README has the rule and the one command that rebuilds it) |
 | `skills/` | the build skills that travel with the base (`new-app`) |
@@ -425,26 +436,31 @@ ends and all eight workers, then runs every test, including the law checks that 
 source off disk, a plain `npx tsc --noEmit` proves far less.
 
 **What green looks like:** **exit code 0**, ten workspaces, every suite passing.
-For scale, that is roughly 315 test files and 4,000-odd tests; don't compare
-against those figures, compare against exit 0, because the suite grows every week.
+**Compare against exit 0 and nothing else** — no count is written down here on
+purpose, because the suite grows most weeks and a number in this file would be
+wrong before you read it. Get today's from the command below.
 **Read the run by its exit code, never by grepping the log** — a suite that fails
 to LOAD prints nothing that looks like a failure.
 
 **Two things skip on a fresh clone, and both are correct.** Anything else that
-skips is not, investigate it.
+skips is not, investigate it. Neither is counted here either; what matters is
+that these two are the only ones.
 
-1. **`workers/content/test/knowledge-backfill.test.ts`** (one file, three tests)
-   measures the knowledge base over the agency's real Glide history, and that
-   data is git-ignored customer material (INVENTORY.md § 6). It is absent from
-   every clone, so the content worker ends `Test Files 70 passed | 1 skipped`,
-   `Tests 933 passed | 3 skipped`. It is the only whole FILE that skips.
-2. **`web/test/splash.test.ts`** holds eight `it.skipIf(!REQUIRED)` rows that
-   compare the two front doors against their built static export. `npm run check`
-   does not build, so they skip and the web workspace ends `Tests 849 passed |
-   8 skipped`. `npm run check:built` builds first, sets `REQUIRE_EXPORT=1`, and
-   runs them for real.
+1. **`workers/content/test/knowledge-backfill.test.ts`** measures the knowledge
+   base over the agency's real Glide history, and that data is git-ignored
+   customer material (INVENTORY.md § 6). It is absent from every clone, so the
+   content worker reports one skipped FILE — and it is the only whole file that
+   skips.
+2. **`web/test/splash.test.ts`** compares the two front doors against their built
+   static export, through `it.skipIf` rows keyed on that export existing.
+   `npm run check` does not build, so they stand down and the web workspace
+   reports skipped TESTS. `npm run check:built` builds first, sets
+   `REQUIRE_EXPORT=1`, and runs them for real. **A `git worktree` skips them the
+   same way a fresh clone does** — `web/out` is git-ignored, so a lane's gate is
+   a few tests thinner than the primary checkout's; `shared/rules/loud-skip.ts`
+   is what makes that say so out loud instead of passing quietly.
 
-The exact count for the commit you are standing on:
+The exact counts for the commit you are standing on:
 
 ```bash
 npm run check 2>&1 | grep -E "Test Files|Tests "

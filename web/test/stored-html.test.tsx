@@ -50,7 +50,7 @@ afterEach(cleanup)
 const MAY_INJECT: Record<string, string> = {
   "shared/web/rich-text-view.tsx":
     "THE seam. Both branches produce known-safe HTML: sanitizeRichHtml (parse detached → allow-list) for a body with tags, toHtml (escape-first markdown) for one without.",
-  "web/components/agent-markdown.tsx":
+  "web/components/assistant/agent-markdown.tsx":
     "the assistant's own reply, through the same escape-first toHtml — the text is escaped before any markup is added, so its output is safe by construction",
   "shared/web/theme-provider.tsx":
     "the pre-paint theme boot script — a module constant written in this repo (apply localStorage's stored data-theme before first paint, the design kit's own prescribed snippet). No value from a request or a row reaches it.",

@@ -206,6 +206,8 @@ export function cachedKeys(prefix: string): string[] {
  * Subscribers are notified so anything mounted refetches through the
  * permission-checked door and finds out honestly what it may still have. */
 export function clearCache(): void {
+  // The stamps are about the values, so they go with them.
+  answeredAt.clear()
   const keys = [...cache.keys()]
   cache.clear()
   for (const key of keys) notify(key)
@@ -213,9 +215,37 @@ export function clearCache(): void {
 
 /** Seed/replace a cached entry — e.g. after a mutation returns fresh data, so
  * the screen updates instantly without a round-trip. */
-export function primeCache(key: string, value: unknown): void {
+export function primeCache(key: string, value: unknown, justAnswered = false): void {
   store(key, value)
+  // AN ANSWER THE DOOR GAVE THIS TAB A MOMENT AGO IS NOT WORTH ASKING FOR AGAIN.
+  //
+  // `useCached` revalidates on mount unless the socket has been watching the key
+  // continuously (`liveHasWatchedSince`) — cache-first with a stale-while-
+  // revalidate top-up, which is right for a value that has been sitting in
+  // memory. It is not right for one that arrived microseconds ago as part of
+  // another door's answer: the caller's rights ride the boot payload
+  // (`ActiveContext.permissions`), and revalidating them on mount put the whole
+  // round trip back that carrying them was meant to remove.
+  //
+  // `justAnswered` is the caller SAYING SO — passed only where the value came
+  // straight off a server response in this tab. It buys a short window, not a
+  // licence: past `JUST_ANSWERED_MS` the ordinary revalidate resumes, and a live
+  // ping still invalidates the key exactly as before.
+  if (justAnswered) answeredAt.set(key, Date.now())
+  else answeredAt.delete(key)
   notify(key)
+}
+
+/** How long an answer counts as one the door has only just given. Seconds, not
+ * minutes: this is "the request that would revalidate it has barely finished",
+ * not a second freshness policy beside `MAX_CACHE_AGE_MS`. */
+const JUST_ANSWERED_MS = 10_000
+const answeredAt = new Map<string, number>()
+
+/** Was this value handed to us by a door within the last breath? */
+function justAnswered(key: string): boolean {
+  const at = answeredAt.get(key)
+  return at !== undefined && Date.now() - at < JUST_ANSWERED_MS
 }
 
 /** Peek at a cached value without subscribing (e.g. the live handler bumping a
@@ -254,15 +284,24 @@ export function useCachedValue<T>(key: string | null): T | undefined {
  * or row-level live-sync behaviour changes, it just fills a cold key earlier. */
 export function primeCacheIfCold<T>(key: string, fetcher: () => Promise<T>): void {
   if (fresh(key)) return
-  void fetcher()
-    .then((value) => {
-      // Re-check: a real fetch (useCached) or live patch may have landed while we
-      // were in flight — don't clobber it with our (now possibly stale) result.
-      if (!fresh(key)) primeCache(key, value)
-    })
-    .catch(() => {
-      /* a prewarm miss is silent — the screen fetches on mount as usual */
-    })
+  // THROUGH `loadShared`, WHICH IS THE WHOLE POINT — and for a year it was not.
+  //
+  // This called `fetcher()` directly, so it never entered `inFlight` and a
+  // prewarm could not be JOINED. A screen's own `useCached` on the same key,
+  // mounting in the same commit, therefore started a SECOND request for the
+  // identical answer: measured 7 Sep 2026 on a cold deep link, the team prewarm
+  // and the screen's own reads were eight requests where they are one set of
+  // four — roles, invites and the dropdown values each asked for twice, in
+  // parallel, by the same tab.
+  //
+  // `force: false`, so this joins a real read already in flight rather than
+  // racing it; and `loadShared` stores the answer once, by the one request,
+  // which is strictly safer than the two-writers re-check this used to do.
+  // Silent on failure exactly as before: a prewarm miss is not a screen's
+  // problem, and the screen's own `useCached` asks again on mount.
+  void loadShared(key, fetcher, false).catch(() => {
+    /* a prewarm miss is silent — the screen fetches on mount as usual */
+  })
 }
 
 /** ROW-LEVEL live patch: a "row X in this collection changed" ping lands → fetch
@@ -555,7 +594,7 @@ export function useCached<T>(
     // registry moves, the socket is up, and it has been up continuously since
     // this value was written (shared/web/realtime.ts explains why a reconnect
     // resets that window). Anything less and we fetch, exactly as before.
-    if (!entry || !liveHasWatchedSince(key, entry.at)) void load()
+    if (!entry || (!liveHasWatchedSince(key, entry.at) && !justAnswered(key))) void load()
 
     const subs = subscribers.get(key) ?? new Set<() => void>()
     subs.add(sync)

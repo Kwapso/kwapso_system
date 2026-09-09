@@ -6,7 +6,7 @@
 // see the note on `contactsListRecipe` in web/lib/screens.ts for why there is no
 // second detail route here.
 
-import { DeepLinkScreen } from "@/components/deep-link-screen"
+import { DeepLinkScreen } from "@/components/deep-link/deep-link-screen"
 
 export const dynamic = "force-static"
 

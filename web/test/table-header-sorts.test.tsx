@@ -46,13 +46,13 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { primeCache } from "@shared/web/store"
-import { PagedFind } from "@/components/paged-find"
-import { RecordTable } from "@/components/record-table"
+import { PagedFind } from "@/components/records/paged-find"
+import { RecordTable } from "@/components/records/record-table"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
 import { formatDate } from "@shared/web/format"
 import { appsKey, tasksKey } from "@/lib/live-resources"
 import { BASE_RECIPES, withDataDrivenCollection } from "@/lib/screens"
-import { TasksScreen } from "@/components/tasks-screen"
+import { TasksScreen } from "@/components/work/tasks-screen"
 import type { Task } from "@shared/types"
 
 // The screen mounts its "new task"/"ask a client" dialogs, which reach the

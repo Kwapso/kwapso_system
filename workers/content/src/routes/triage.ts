@@ -76,7 +76,7 @@ export async function postSetTriageDuty(request: Request, env: Env): Promise<Res
   // somebody, called from a door that always names somebody, and there is no
   // clear, no sweep, no cron and no expiry anywhere that touches this table. The
   // rota is only ever changed by a person naming their replacement, which is what
-  // the rule asks for. `workers/content/test/triage-duty.test.ts` reads the whole
+  // the rule asks for. `workers/content/test/status-is-a-fact.test.ts` reads the whole
   // repo and fails if a second writer ever appears.
   await setDuty(cfg, guard, actor, week, { userId: person.userId, userName: person.name })
   // Whose week it is shows on every staff screen that carries the triage strip,

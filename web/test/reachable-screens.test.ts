@@ -50,41 +50,61 @@
 //      law that has never been pointed at a module is not a law that module
 //      passes.
 //
-//      auth, mcp and realtime are still outside it, and not by choice: they
-//      answer from a `switch` rather than an `export const ROUTES` table, and
-//      every seam scan in this repo finds its subject by parsing that table.
+//      auth, mcp and realtime are still outside THE WRITES half, and the
+//      reason this file gave until 7 Sep 2026 — "they answer from a `switch`
+//      rather than an `export const ROUTES` table" — was true of realtime and
+//      the two gateways and FALSE of auth and mcp, both of which export a
+//      ROUTES table at workers/<w>/src/index.ts. Corrected, and the real
+//      reason measured rather than guessed: pointing the WRITES census at
+//      those two reports six doors, and two of them are
+//      `POST /api/auth/email/start` and `/email/verify` — the sign-in doors
+//      every single person in the product presses, on both front ends. The
+//      matcher misses them because `web/lib/api/auth.ts` puts the verb in an
+//      options object rather than in `post(`, which is the FOURTH helper to
+//      hide a method from this check. Widening it today would buy a row of
+//      excuses in front of doors that are not gaps; the fix is the matcher.
+//      THE READS HALF DOES walk auth and mcp (invariant 4, below) — nothing
+//      there needs a verb.
 //
-// WHAT THE THIRD INVARIANT DOES NOT REACH, said plainly, because a law that
-// overstates its cover is worse than one that admits a gap. It skips GET —
-// "a read is pressed by opening the screen" — and that is right for the reads a
-// screen makes, and wrong for a read that no screen makes. FOUR SUCH DOORS ARE
-// KNOWN, all on the content worker's Google lane and all found by a dead-end
-// review on 5 Sep 2026: `GET /api/content/google/drive/file`,
-// `/gmail/message`, `/calendar/event/transcript` and `/chat/spaces`. Each is
-// gated, tested and documented; none is called by either front door and none is
-// exposed as an MCP tool. Their PLURAL siblings (`/drive/files`,
-// `/gmail/messages`) are wired to web/lib/api/content.ts, which is exactly why
-// the gap is invisible — the lane looks finished. The only caller is
-// `scripts/google-sweep.mjs`, a hand-run probe, and scripts/README.md now says
-// so beside it.
+// THE FOURTH INVARIANT IS THE READS. The third skips GET — "a read is pressed
+// by opening the screen" — which is right for the reads a screen makes and
+// wrong for a read that no screen makes. A dead-end review on 5 Sep 2026
+// found four such doors on the content worker's Google lane (`/drive/file`,
+// `/gmail/message`, `/calendar/event/transcript`, `/chat/spaces`), and this
+// header then said "none is exposed as an MCP tool". THAT SENTENCE WAS FALSE
+// THE DAY IT WAS WRITTEN: all four were already tools on the assistant's own
+// catalogue (`google_drive_file`, `google_mail_message`,
+// `google_meeting_transcript`, `google_chat_spaces` —
+// workers/data-ops/src/lib/tools.ts), reached by a person through agent_chat
+// under that person's own rights. A second review on 7 Sep 2026 read the
+// sentence, believed it, and charged three of them as the product's one real
+// dead end.
 //
-// They are NOT listed in NO_CONTROL: that register is consulted only for
-// non-GET doors, so a line there would be reported stale by the ratchet below
-// on the very next run. Closing this properly means either widening the census
-// to reads — which needs a matcher that can tell a read caller from a write
-// one, since the present `WRITES` test is write-shaped on purpose, and an
-// adjudication of roughly thirty more GET doors on content and tenancy that no
-// api method appears to name — or giving the four doors MCP tools, which is
-// where R43 would put them. Both are a piece of work rather than a line, and
-// naming them here is what stops the next reader concluding the census already
-// covers them.
-
+// AND THE CORRECTION MUST NOT OVERSHOOT THE OTHER WAY, which the first draft
+// of this paragraph did by saying "R43 mirrors them onto MCP". It does not:
+// R43 permits an asymmetry that is a named, reasoned line, and all 21 Google
+// tools are exactly that — `GOOGLE_MCP_EXCLUSION` in
+// workers/mcp/test/agent-mcp-tool-parity.test.ts, MCP.md §3, "a leaked
+// personal access token's blast radius must not include a mailbox". Agent
+// surface yes, MCP surface deliberately no. Writing a second confident,
+// unchecked sentence to replace the first one would have been the same
+// mistake wearing the opposite claim.
+//
+// A claim in a comment is read by people and checked by nothing, which is the
+// whole reason the fourth invariant exists: every GET door on the three ROUTES workers is opened by a
+// front door, is the `path` of a tool on the machine surfaces (DERIVED from
+// the catalogue, never listed here), or is a reasoned `NO_SCREEN_READ` line;
+// and the owner-key doors, GET and POST alike, each name the script or
+// runbook that reaches them, with that file re-read so the claim cannot rot
+// the way this header's did.
+//
 import { existsSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, relative } from "node:path"
 import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import { sourceFiles } from "@shared/rules/source-scan"
+import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 
 import { NAV, NAV_GROUP_ORDER, TEAM_SECTIONS } from "../lib/pages"
 import { BASE_RECIPES, MODULE_PERMISSION } from "../lib/screens"
@@ -141,7 +161,7 @@ describe("the screens are reachable", () => {
     // …and the SHELL must partition by that field rather than naming pages. A
     // hand-listed group in the component would leave the registry describing a
     // rail it no longer controls.
-    const shell = read(join(WEB, "components", "app-shell.tsx"))
+    const shell = read(join(WEB, "components", "shell", "app-shell.tsx"))
     expect(shell, "app-shell must build the rail groups from each destination's own group field").toContain(
       'i.group === g'
     )
@@ -376,7 +396,385 @@ describe("the screens are reachable", () => {
       `NO_CONTROL names doors that are called from a front end now — delete these lines: ${stale.join(", ")}`
     ).toEqual([])
   })
+
+  // 4 — A DOOR THAT ANSWERS SOMETHING HAS SOMETHING THAT ASKS IT.
+  //
+  // The reads. A read is a way in only if something asks it: a screen (an api
+  // method, or an <a href> straight at the door — the accounts export is one),
+  // or a tool on the machine surfaces, which is a way in for the assistant and,
+  // through R43's parity, for an MCP client. What a machine can ask for is
+  // DERIVED: the shared catalogue is imported so a path is the one the tool
+  // actually forwards to, and each surface's own file is read for its
+  // surface-only tools. Nothing here is a list of doors somebody typed.
+  //
+  // Owner-key doors are the third kind. No session reaches them, so no screen
+  // could have a button for one — they are run from a script or a runbook
+  // command with the owner's key. Each is a line in OWNER_KEY_DOORS naming the
+  // file that reaches it, and that file is re-read for the path: a runbook that
+  // stops naming a door turns this red, which is the difference between "it is
+  // documented in four places" and a check.
+  it("reads-have-a-way-in: every read door is opened by a screen, is a tool on the machine surfaces, or says who it is for", () => {
+    const frontDoors = sourceFiles(
+      [
+        join(WEB, "lib"),
+        join(WEB, "components"),
+        join(WEB, "app"),
+        join(ROOT, "web-portal", "lib"),
+        join(ROOT, "web-portal", "components"),
+        join(ROOT, "web-portal", "app"),
+      ],
+      { extensions: [".ts", ".tsx"], skipTests: true }
+    )
+      .map((f) => f.source)
+      .join("\n")
+    expect(frontDoors.length, "the front-door scan read nothing — it has gone blind").toBeGreaterThan(10000)
+
+    const toolPaths = new Set<string>(SHARED_TOOLS.map((t) => t.path))
+    for (const f of [
+      join(ROOT, "workers", "data-ops", "src", "lib", "tools.ts"),
+      join(ROOT, "workers", "mcp", "src", "lib", "tools.ts"),
+    ])
+      for (const m of read(f).matchAll(/path:\s*"(\/api\/[^"]+)"/g)) toolPaths.add(m[1])
+    expect(toolPaths.size, "the tool-path derivation found almost nothing — it has gone blind").toBeGreaterThan(30)
+
+    // A whole path, as the third invariant matches one: it ends at a quote, a
+    // backtick, the `?` of a query string, or the `${` of a builder.
+    const opens = (path: string) =>
+      new RegExp(`${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=["\`?]|\\$\\{)`).test(frontDoors)
+
+    const unopened: string[] = []
+    const ownerKey: string[] = []
+    let doors = 0
+    // FIVE WORKERS, not the third invariant's three. auth and mcp export a
+    // ROUTES table like the other three, so their READS cost nothing extra to
+    // walk — and walking them found one undeclared owner-key door on the first
+    // run (`POST /api/auth/admin/test-login`). The writes half stays at three
+    // for a measured reason, said in this file's header: its matcher cannot see
+    // a verb that lives in an options object, which is how web/lib/api/auth.ts
+    // calls the two sign-in doors every person in the product presses.
+    for (const worker of ["content", "tenancy", "data-ops", "auth", "mcp"]) {
+      const index = read(join(ROOT, "workers", worker, "src", "index.ts"))
+      const table = /export const ROUTES[^=]*=\s*\{([\s\S]*?)\n\}/.exec(index)
+      expect(table, `workers/${worker} has no ROUTES table — did it move?`).toBeTruthy()
+      for (const [, method, path] of (table as RegExpExecArray)[1].matchAll(
+        /"([A-Z]+) (\/[^"]+)":\s*\{\s*handler:/g
+      )) {
+        if (/^\/api\/[a-z-]+\/admin\//.test(path)) {
+          ownerKey.push(`${method} ${path}`)
+          continue
+        }
+        if (method !== "GET") continue
+        doors++
+        if (opens(path) || toolPaths.has(path)) continue
+        unopened.push(`GET ${path}`)
+      }
+    }
+    expect(doors, "the read-door census found almost nothing — it has gone blind").toBeGreaterThan(60)
+
+    const unlisted = unopened.filter((d) => !(d in NO_SCREEN_READ))
+    expect(
+      unlisted,
+      `these doors answer a question nothing asks — no screen opens them and no tool forwards to them. Give each a caller, or write down here who it is for: ${unlisted.join(", ")}`
+    ).toEqual([])
+    // The same ratchet as NO_CONTROL: a reason in front of a door that now has
+    // a caller is a line nobody reread.
+    const stale = Object.keys(NO_SCREEN_READ).filter((d) => !unopened.includes(d))
+    expect(
+      stale,
+      `NO_SCREEN_READ names doors a screen or a tool reaches now — delete these lines: ${stale.join(", ")}`
+    ).toEqual([])
+
+    // The owner-key doors, both ways: every one has a line, every line is a door,
+    // and the file each line names still names the path.
+    expect(ownerKey.length, "the owner-key census found nothing — it has gone blind").toBeGreaterThan(5)
+    const unclaimed = ownerKey.filter((d) => !(d in OWNER_KEY_DOORS))
+    expect(
+      unclaimed,
+      `these owner-key doors say nothing about who runs them — add a line to OWNER_KEY_DOORS naming the script or runbook that does: ${unclaimed.join(", ")}`
+    ).toEqual([])
+    for (const [door, { reached }] of Object.entries(OWNER_KEY_DOORS)) {
+      expect(ownerKey, `OWNER_KEY_DOORS names "${door}", which is not an owner-key door any more — delete the line`).toContain(door)
+      const path = door.split(" ")[1]
+      expect(
+        read(join(ROOT, reached)).includes(path),
+        `OWNER_KEY_DOORS says ${reached} reaches "${door}", and that file no longer names the path — the way in has rotted`
+      ).toBe(true)
+    }
+  })
+
+  // 5 — A SCREEN THAT FILLS THE WINDOW HAS A WAY OFF IT.
+  //
+  // The other half of a dead end, and the half a route census cannot see: not a
+  // door nobody can press, but a SCREEN nobody can leave. A full-height surface
+  // (`min-h-[100svh]`) has drawn over the rail, so whatever is on it is the only
+  // thing a person can press. Walked against staging on 7 Sep 2026 with a real
+  // teamless session, "You're not in a team" — where the app puts anybody whose
+  // invite expired, and anybody who was removed from a team — had exactly three
+  // controls on it and all three changed the colour scheme. The portal's own
+  // equivalent screen has had a "Sign out" since the day it was written.
+  //
+  // So every `.tsx` under the two front doors that draws one is classified,
+  // and the token that proves the classification is re-read from the file:
+  //
+  //   shell      it draws the app around `children`; the rail IS the way out
+  //   retry      a failure that can be retried, and offers it
+  //   form       a step a person completes; the submit is the way on
+  //   terminal   nothing to complete and nothing to retry — it MUST offer a
+  //              sign-out, because a person standing here with the wrong
+  //              address has no other exit but clearing a cookie
+  //
+  // Discovery is DERIVED (the census reads the disk), the classification is
+  // data, and both directions are checked: a new full-height screen with no
+  // line fails, and a line whose file no longer draws one fails too.
+  it("full-screen-escapes: a screen that draws over the rail says how to get off it", () => {
+    const roots = [join(WEB, "app"), join(WEB, "components"), join(ROOT, "web-portal", "app"), join(ROOT, "web-portal", "components")]
+    const drawn = sourceFiles(roots, { extensions: [".tsx"], skipTests: true })
+      .filter((f) => f.source.includes("min-h-[100svh]"))
+      .map((f) => relative(ROOT, f.path))
+    expect(drawn.length, "the full-height census found nothing — it has gone blind").toBeGreaterThan(3)
+
+    const unclassified = drawn.filter((f) => !(f in FULL_SCREEN_SURFACES))
+    expect(
+      unclassified,
+      `these screens fill the window, so the rail is not under them — say which kind each is in FULL_SCREEN_SURFACES, and if it is "terminal" give it a way out: ${unclassified.join(", ")}`
+    ).toEqual([])
+
+    const PROOF: Record<string, RegExp> = {
+      shell: /children/,
+      retry: /Try again/,
+      form: /onSubmit|type="submit"/,
+      terminal: /auth\.logout\(\)/,
+    }
+    for (const [file, { kind }] of Object.entries(FULL_SCREEN_SURFACES)) {
+      expect(drawn, `FULL_SCREEN_SURFACES names ${file}, which no longer draws a full-height screen — delete the line`).toContain(file)
+      expect(
+        PROOF[kind].test(read(join(ROOT, file))),
+        `${file} is classified "${kind}" and no longer carries what that promises. A "terminal" screen with no auth.logout() is a screen a person cannot leave.`
+      ).toBe(true)
+    }
+  })
+
+  // 5 — A FIELD THE MACHINE CAN WRITE IS A FIELD A PERSON CAN SEE.
+  //
+  // THE HOLE THE FIRST FOUR LEFT. Every reachability census in this repo walks
+  // DOORS. Invariant 3 asks whether a write door has a button, invariant 4
+  // whether a read door has an asker — and a door can pass both while a FIELD
+  // it stores reaches nobody, because the door itself is pressed all day for
+  // its other fields. A dead-end review on 7 Sep 2026 hand-censused the 114
+  // write-only columns and found three of exactly that shape, each one green
+  // under all four invariants above:
+  //
+  //   · `help.screen_recording_link` — settable on `create_help_ticket` and
+  //     `update_help_ticket`, validated, stored, SELECTed in TICKET_COLS,
+  //     mapped, typed, and rendered by NO screen on either front door. Somebody
+  //     could hand the assistant a Loom link, read "Screen recording: …" on the
+  //     confirm panel, press yes, and never see it again. Its sibling
+  //     `sourceScreen` is written by the same door one line away and has been on
+  //     the ticket's Overview since it shipped.
+  //   · `stories.reviewer_id` — resolved through `memberOrThrow`, stored,
+  //     selected, typed, filterable, and shown by nothing.
+  //   · `accounts.commercials_visible` — the owner's own ruling ("value for
+  //     everyone, prices only for the accounts he switches on") reads this
+  //     column to decide whether a client sees prices at all, and NOTHING in
+  //     either front door switches it on. See NO_SCREEN_FIELD, where it is
+  //     written down as the gap it is rather than left to be found a third time.
+  //
+  // THE PROBE THAT WAS MEANT TO CATCH THIS CANNOT. `dead_end_review`'s own
+  // `columns.writeOnlyUserFacing` counter reads 0 in every codebase there is:
+  // its `writeOnly` list is only appended when a column is NOT in client code,
+  // and its `userFacing` flag is `inClient && !structural`, so the intersection
+  // is empty by construction. A number that can only ever be zero is worse than
+  // no number, because it reads as an all-clear.
+  //
+  // WHAT IS CENSUSED, and both ends are derived. The fields come from the ONE
+  // tool catalogue, by RUNNING each write tool's `buildBody` over a probe input
+  // (the same technique R22 stands on, and for the same reason: what a tool
+  // FORWARDS is a fact about the function, not about the text of it). The
+  // screens are every `.tsx` under either front door's `components/` and
+  // `app/`. Deliberately `.tsx` ONLY: `web/lib/api/content.ts` has carried
+  // `reviewerId?: string` in its payload type the whole time nothing filled it,
+  // so counting the api layer as a reader is precisely the widening that hid
+  // one of the three.
+  //
+  // TWO WAYS A FIELD IS REACHED. Its own name in a screen, or — for a `<x>Id` —
+  // its `<x>Name` sibling, because this app stores a reference as an id/name
+  // PAIR and a screen shows the name (`assigneeId` is written, `assigneeName`
+  // is read). Anything else is a line in NO_SCREEN_FIELD, rot-checked both
+  // ways, so the list can only shrink.
+  //
+  // AND A DOOR'S OWN DECISION IS NOT REPEATED HERE: a field whose every write
+  // tool sits on a door already named in NO_CONTROL is skipped, because that
+  // door's want of a control is already written down one census up.
+  it("written-fields-are-shown: every field a write tool sends is named by a screen, or says why not", () => {
+    const screens = sourceFiles(
+      [
+        join(WEB, "components"),
+        join(WEB, "app"),
+        join(ROOT, "web-portal", "components"),
+        join(ROOT, "web-portal", "app"),
+      ],
+      { extensions: [".tsx"], skipTests: true }
+    )
+      .map((f) => f.source)
+      .join("\n")
+    expect(screens.length, "the screen scan read nothing — it has gone blind").toBeGreaterThan(10000)
+
+    /** What the door RECEIVES when a caller fills in everything the tool
+     * declares. Built from the tool's own schema, so a field added to the
+     * schema and dropped by `buildBody` is R22's failure, not this one's. */
+    const sends = (tool: (typeof SHARED_TOOLS)[number]): string[] => {
+      const props = ((tool.schema as { properties?: Record<string, { type?: string }> }).properties ??
+        {}) as Record<string, { type?: string }>
+      const probe: Record<string, unknown> = {}
+      for (const [key, spec] of Object.entries(props))
+        probe[key] =
+          spec?.type === "boolean" ? true
+          : spec?.type === "number" ? 1
+          : spec?.type === "array" ? ["probe"]
+          : spec?.type === "object" ? { probe: true }
+          : "probe"
+      return Object.keys(tool.buildBody!(probe))
+    }
+
+    /** field -> the tools that send it, and the doors they send it to. */
+    const written = new Map<string, { tools: string[]; doors: Set<string> }>()
+    for (const tool of SHARED_TOOLS) {
+      if (tool.method !== "POST" || !tool.buildBody) continue
+      for (const field of sends(tool)) {
+        const entry = written.get(field) ?? { tools: [], doors: new Set<string>() }
+        entry.tools.push(tool.name)
+        entry.doors.add(`${tool.method} ${tool.path}`)
+        written.set(field, entry)
+      }
+    }
+    expect(
+      written.size,
+      "the written-field census found almost nothing — it has gone blind"
+    ).toBeGreaterThan(100)
+
+    const shown = (field: string) =>
+      new RegExp(`\\b${field}\\b`).test(screens) ||
+      (field.endsWith("Id") && new RegExp(`\\b${field.slice(0, -2)}Name\\b`).test(screens))
+
+    const unseen = [...written]
+      // A door with no control at all is invariant 3's finding and carries its
+      // own reasoned line there; repeating it here would be one gap counted twice.
+      .filter(([, { doors }]) => ![...doors].every((d) => d in NO_CONTROL))
+      .filter(([field]) => !shown(field))
+      .map(([field]) => field)
+      .sort()
+
+    const unlisted = unseen.filter((f) => !(f in NO_SCREEN_FIELD))
+    expect(
+      unlisted,
+      `a machine can write these fields and no screen on either front door names them, so whatever is stored reaches nobody: ${unlisted.join(", ")}. Show the value on the screen that owns the record, or write down here why not.`
+    ).toEqual([])
+
+    // THE RATCHET, both ways. A line in front of a field a screen now shows is
+    // a line nobody reread; a line for a field no write tool sends any more is
+    // a record of what the app used to accept.
+    const stale = Object.keys(NO_SCREEN_FIELD).filter((f) => !unseen.includes(f))
+    expect(
+      stale,
+      `NO_SCREEN_FIELD names fields that are shown now, or that no write tool sends any more — delete these lines: ${stale.join(", ")}`
+    ).toEqual([])
+    for (const [field, why] of Object.entries(NO_SCREEN_FIELD))
+      expect(
+        why.length,
+        `NO_SCREEN_FIELD's line for ${field} needs a reason somebody can disagree with`
+      ).toBeGreaterThan(60)
+  })
 })
+
+/** FIELDS A MACHINE CAN WRITE AND NO SCREEN SHOWS. Two kinds of line, labelled,
+ * because pretending a gap is a decision is how a gap survives a review — the
+ * same two kinds NO_CONTROL uses one census down, for the same reason. */
+const NO_SCREEN_FIELD: Record<string, string> = {
+  /* ── a gap: the capability shipped and the people the app is for cannot use it ── */
+  commercialsVisible:
+    "A GAP, and the most expensive one on this list. `accounts.commercials_visible` decides whether a client sees what they were charged — the owner's own ruling, quoted in getImpact (workers/tenancy/src/routes/processes.ts): value for everyone, prices only for the accounts he switches on. `pricesVisibleFor` reads it inside the account fence and drops the whole `prices` key when it is off. The column defaults to 0 and NO screen on either front door offers the switch, so the answer is no for every account ever created unless somebody asks the assistant to flip it through `update_account`. Fixing it is a checkbox on the account form and a decision about WHICH right may tick it (accounts:edit is the door's gate today; commercials:read is the money gate) — a permission question, which is the owner's and not a review lane's. Delete this line the day the switch exists.",
+  appRestriction:
+    "A GAP. A portal login can be narrowed to named apps inside a client's world — `grant_portal_access` forwards it, the door validates every id against that account, and `accountScope` reads `app_restriction` back on every portal request — and the agency's own grant panel (contact-detail.tsx, through `tenancy.grantPortalAccess(accountId, personAccountId, notify)`) has no field for it. So the narrowing exists, is enforced, and can only be set by asking the assistant. Delete this line when the grant panel offers the list.",
+  timezone:
+    "A GAP, and a small one that is already half written down. An account carries a time zone; the account form deliberately does not send it, and says so in its own comment (account-detail.tsx `save`: \"the three fields this form doesn't carry — currency, language, time zone — survive a save\"). Nothing on either front door SHOWS it either, so a value set through `create_account` or `update_account` is stored and invisible. It is minor because nothing in the product reads it to decide anything yet; it goes red the day something does.",
+}
+
+/** EVERY SCREEN THAT DRAWS OVER THE RAIL, AND WHAT GETS A PERSON OFF IT.
+ * `kind` is proved against the file by the check above, so a classification
+ * cannot outlive the thing it claims. "terminal" is the one with teeth: it
+ * means there is nothing to submit and nothing to retry, so the only honest
+ * exit is signing out and trying another address. */
+const FULL_SCREEN_SURFACES: Record<string, { kind: "shell" | "retry" | "form" | "terminal"; why: string }> = {
+  "web/app/layout.tsx": { kind: "shell", why: "the document frame; it draws whatever page is under it and never a state of its own." },
+  "web/components/shell/app-shell.tsx": { kind: "shell", why: "the signed-in app: the rail is on the screen, so every destination is a click away." },
+  "web/components/shell/error-boundary.tsx": { kind: "retry", why: "the root boundary. Something broke and nothing is lost — the offer is to try again." },
+  "web/app/onboarding/page.tsx": {
+    kind: "terminal",
+    why: "THREE screens in one file and two of them end: \"You're not in a team\" (invite expired, or removed) and \"You're in the right place\" (a client login at the agency's door). Neither has anything to submit — team creation is closed, and this build cannot know the portal's address — so `SignOutEscape` is the way off both. The third face is the profile form, which submits.",
+  },
+  "web-portal/app/layout.tsx": { kind: "shell", why: "the portal's document frame, same as the agency's." },
+  "web-portal/components/portal-shell.tsx": { kind: "shell", why: "the portal's frame: it draws the nav, and hands the two states that are not the app to NoAccess and to the kit's failure screen." },
+  "web-portal/components/no-access.tsx": { kind: "terminal", why: "signed in, and the world is empty. Deliberately offers no way IN (access is a decision somebody makes), so the only control is the way OUT — the precedent the agency's onboarding screens were measured against." },
+  "web-portal/components/needs-name.tsx": { kind: "form", why: "one question with an answer only this person has; the submit finishes it." },
+}
+
+/** READ DOORS NO SCREEN OPENS AND NO TOOL FORWARDS TO. One kind of line: a
+ * caller the census cannot see, with the reason it cannot. The list is a
+ * RATCHET like NO_CONTROL below — give a door a screen or a tool and its line
+ * must go. */
+const NO_SCREEN_READ: Record<string, string> = {
+  "GET /api/content/google/callback":
+    "GOOGLE'S OWN REDIRECT TARGET. A person reaches it by finishing the consent screen: /google/start sends the browser to Google, and Google sends it back here with the code. No screen names the path because no screen ever calls it — the address is built once, in lib/google-oauth.ts (`redirectUri`), and handed to Google, which is the only caller there will ever be. A human path, then, and one the census cannot see because the literal lives in the worker that answers it.",
+}
+
+/** OWNER-KEY DOORS, AND WHO RUNS EACH ONE. `adminGuard` doors take no session
+ * — a person with the owner's key runs them from a script or a runbook
+ * command, so a screen is the wrong shape and its absence is not a gap. Every
+ * `/admin/` route on the three ROUTES workers has a line here; `reached` is the
+ * file that names the path, re-read by the check above so a runbook that drops
+ * a door turns the build red rather than leaving a door nobody can find. */
+const OWNER_KEY_DOORS: Record<string, { reached: string; why: string }> = {
+  "POST /api/tenancy/admin/migrate-teams": {
+    reached: "scripts/check-team-migrations.mjs",
+    why: "the second step of every staging deploy (OPERATIONS.md): new team tables do not appear because the code shipped, somebody has to apply them.",
+  },
+  "POST /api/tenancy/admin/create-team": {
+    reached: "scripts/seed-staging.mjs",
+    why: "team creation is closed product-wide (TEAM_CREATION_CLOSED), so the one team a product has is made by the seed with the owner's key, never from a screen.",
+  },
+  "GET /api/tenancy/admin/db-sizes": {
+    reached: "documents/OPERATIONS.md",
+    why: "how big every team database is, for the retention runbook. An operator's number, not a member's.",
+  },
+  "POST /api/tenancy/admin/move-module": {
+    reached: "documents/OPERATIONS.md",
+    why: "moves one module's rows between databases during a resharding, which is an operation on the estate rather than on a team.",
+  },
+  "POST /api/data-ops/admin/seed-targets": {
+    reached: "documents/BOOTSTRAP.md",
+    why: "refreshes the global import catalogue's labels on a fresh account (BOOTSTRAP.md step). The catalogue self-heals on read since R13, so this is a bootstrap convenience rather than a step anyone must remember.",
+  },
+  "GET /api/data-ops/admin/errors": {
+    reached: "scripts/errors.mjs",
+    why: "the central error log, read newest-first by the errors script. RUNBOOK.md is the reading order.",
+  },
+  "POST /api/data-ops/admin/errors/resolve": {
+    reached: "documents/RUNBOOK.md",
+    why: "marks ONE error row dealt with, by id, from the runbook's curl. The script resolves by signature (the line below) because a signature is what a person reads; one id is the exception.",
+  },
+  "POST /api/data-ops/admin/errors/resolve-signature": {
+    reached: "scripts/errors.mjs",
+    why: "marks every row sharing one signature dealt with — `node scripts/errors.mjs <env> --resolve <signature> --note <why>`.",
+  },
+  "POST /api/auth/admin/test-login": {
+    reached: "scripts/smoke-staging.mjs",
+    why: "mints a sign-in code for a staging address without an inbox, so a smoke run and a browser walk can get past the front door. STAGING ONLY — the handler refuses unless `TEST_LOGIN_KEY` is set, which production never sets, so there is no screen for it because on the only environment that answers it there is no person to show one to.",
+  },
+  "POST /api/data-ops/admin/grant-credits": {
+    reached: "documents/OPERATIONS.md",
+    why: "tops up a team's AI credit balance. An owner action until real payments wire into the same seam (DATA-MODEL.md § agent_credits).",
+  },
+}
 
 /** WRITE DOORS NOTHING A PERSON CAN PRESS REACHES YET. Two kinds of line, and
  * they are labelled, because pretending a gap is a decision is how a gap
@@ -400,10 +798,6 @@ const NO_CONTROL: Record<string, string> = {
     "FOR AN OLDER BUILD OF THIS APP — the buffered half of the staff-file upload pair, kept for tabs opened before the 17 Aug 2026 deploy for the reason written on the brand-asset line above.",
   "POST /api/content/knowledge/upload":
     "FOR AN OLDER BUILD OF THIS APP. The buffered upload door — a base64 data URL in a JSON body — replaced on 17 Aug 2026 by /upload-stream, which takes the file as the request body and never materialises it. No screen in THIS build calls it, and that is the point rather than a gap: a browser holds its own copy of the app for as long as the tab is open, so a person who loaded the app before the deploy is still running the old JavaScript and still posting here. The door stays until no build in the wild uses it; deleting it then is a separate, boring change. An upload contract is the one kind of change where the server must be ready before the client is, and outlast it afterwards.",
-
-  /* ── the door is ahead of its client, on purpose ───────────────────────── */
-  "POST /api/content/uploads/presign":
-    "THE SERVER HALF OF A TWO-HALF CHANGE, and the mirror image of the three lines above it. Those are doors kept alive for a client that has already shipped; this is a door that has to exist before its client can. It mints a time-limited signature the browser uses to PUT a file straight to R2 — so the client half is not a button, it is a rewrite of how every upload screen sends bytes, and it cannot be written against a door that is not there. Two things make landing it early honest rather than speculative. It is INERT: with no R2_ACCESS_KEY_ID it answers `{ direct: false }` in every environment that exists today, and every upload screen keeps the byte-through-the-worker path it has now. And it is PROVED: upload-targets.test.ts holds each entry to the streaming door it mirrors, and presign.test.ts reproduces AWS's own published signature, so the thing being landed early is checked rather than assumed. DELETE THIS LINE the day an upload screen calls it — the ratchet below will ask for that, and it will be right.",
 
   /* ── the control left the screen, the door did not ──────────────────────── */
   // THE PARENT DOOR IS NOT HERE ANY MORE (19 Aug 2026). Its line said, in the
@@ -476,7 +870,7 @@ const NO_CONTROL: Record<string, string> = {
   "POST /api/content/google/gmail/label":
     "FOR A MACHINE. Filing a message under a label is the assistant tidying a mailbox on request. A person clicks the label button in Gmail, where the message already is.",
   "POST /api/content/google/gmail/trash":
-    "FOR A MACHINE, and specifically to undo a machine — the mail counterpart of the Drive bin two lines up, and the owner asked for it in those words ('why is there no method for you to delete drafts?'). The assistant can write a draft into somebody's mailbox, so it must be able to take one back; a person bins their own mail in Gmail, which is one click from where the message already is. It is also why this app lists no mail and no drafts on any screen: there is no inbox here to hang a bin button on, deliberately, because Gmail is better at being Gmail than a card we could build beside it. THE ONE THING WORTH RE-READING IF THAT CHANGES: web/components/mail-reply-dialog.tsx is the only place in either front end that ever holds a draft id, and today no screen opens it — the day something does, that dialog is where a person's own 'bin it' belongs and this line goes.",
+    "FOR A MACHINE, and specifically to undo a machine — the mail counterpart of the Drive bin two lines up, and the owner asked for it in those words ('why is there no method for you to delete drafts?'). The assistant can write a draft into somebody's mailbox, so it must be able to take one back; a person bins their own mail in Gmail, which is one click from where the message already is. It is also why this app lists no mail and no drafts on any screen: there is no inbox here to hang a bin button on, deliberately, because Gmail is better at being Gmail than a card we could build beside it. THE ONE THING WORTH RE-READING IF THAT CHANGES: web/components/tickets/mail-reply-dialog.tsx is the only place in either front end that ever holds a draft id, and today no screen opens it — the day something does, that dialog is where a person's own 'bin it' belongs and this line goes.",
   "POST /api/content/google/chat/delete":
     "FOR A MACHINE, and specifically to undo a machine — the counterpart of the post door above. It takes back a message kwapso itself sent; a person deletes their own message in Chat.",
 

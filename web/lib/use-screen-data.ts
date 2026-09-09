@@ -11,7 +11,7 @@
 // whole team area (they back list + breadcrumb + a tab-count badge); members /
 // tickets / accounts / team-meta load only on their own module.
 
-import { tenancy } from "@/lib/api"
+import { content, tenancy } from "@/lib/api"
 import type { TaskView } from "@/lib/live-resources"
 import {
   accountsKey,
@@ -21,6 +21,7 @@ import {
   cursorKey,
   helpKey,
   knowledgeKey,
+  knowledgeShapeKey,
   listFetch,
   meetingsKey,
   purposesKey,
@@ -34,6 +35,7 @@ import { SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { ticketTypeKeptForMigration } from "@shared/types"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { useAfterPaint } from "@shared/web/after-paint"
 
 /** What the host needs to drive the reads: the resolved team, whether reads are
  * enabled (on-team + signed-in), the active module and the record id in view. */
@@ -56,6 +58,11 @@ export type ScreenDataInput = {
   /** which pile of our own admin the Tasks screen is showing — a SERVER view,
    * for the same reason (R14/R16). */
   taskView?: TaskView
+  /** WHICH BODY THE KNOWLEDGE COLLECTION IS SHOWING — its list, or the picture
+   * of the whole base. Declared up here for `taskView`'s own reason: the shape
+   * is a DOOR, not a sieve over rows already loaded, so which body is on screen
+   * decides which read happens. */
+  knowledgeView?: string
 }
 
 /** Which TABLE a record under each agency-internal URL segment lives in — the
@@ -78,6 +85,7 @@ export function useScreenData({
   module,
   recordId,
   taskView = "open",
+  knowledgeView = "list",
   ancestorModules = [],
 }: ScreenDataInput) {
   /** Is this module ON SCREEN — as the level being rendered, or as one of the
@@ -92,15 +100,32 @@ export function useScreenData({
     enabled && onScreen("members") ? `members:${teamId}` : null,
     () => tenancy.members().then((r) => r.members)
   )
-  // Roles back the roles list, the breadcrumb label, the change-role picker and
-  // the invite form's role options — load them for the whole team area. The
-  // listFetch fetchers ALSO prime each collection's exact `total:` sidecar (R16).
-  const rolesQ = useCached(enabled ? `member_roles:${teamId}` : null, () =>
+  // ── THE THREE TEAM-WIDE READS, AND WHY THEY NOW WAIT ────────────────────────
+  //
+  // Roles, invites and the dropdown values are read across the WHOLE team area
+  // rather than on their own screens, because they back count badges on the
+  // section tabs as well as their own lists. That is right, and it had one
+  // cost: they left in the same commit as the read of whatever record a person
+  // had actually opened, so a cold deep link from an email (R30) waited on three
+  // requests about the team before it could show one row. A count badge is
+  // secondary content by definition — it is a number beside a word, on a tab
+  // nobody has pressed.
+  //
+  // `teamWide` is false on the commit that paints and true from the browser's
+  // next idle moment (shared/web/after-paint.ts), so the badges arrive a beat
+  // after the record instead of in front of it. Their own SCREENS are unaffected
+  // in any way a person can see: those read the same cache keys and the same
+  // beat is spent inside a skeleton they were already drawing.
+  //
+  // The listFetch fetchers ALSO prime each collection's exact `total:` sidecar (R16).
+  // Called unconditionally — `enabled` flips from false to true on this very
+  // path, and a hook behind a short-circuit is a hook that changes order.
+  const painted = useAfterPaint()
+  const teamWide = enabled && painted
+  const rolesQ = useCached(teamWide ? `member_roles:${teamId}` : null, () =>
     listFetch.roles(teamId as string)
   )
-  // Invites back the invites list AND the section-tab count badge, so load them
-  // across the team area (cache-first + live, so the count stays honest).
-  const invitesQ = useCached(enabled ? `invites:${teamId}` : null, () =>
+  const invitesQ = useCached(teamWide ? `invites:${teamId}` : null, () =>
     listFetch.invites(teamId as string)
   )
   const metaQ = useCached(enabled && module === "team" ? `team-meta:${teamId}` : null, () =>
@@ -133,6 +158,26 @@ export function useScreenData({
     enabled && onScreen("knowledge") ? knowledgeKey(teamId as string) : null,
     () => listFetch.knowledge(teamId as string)
   )
+  // THE SAME COLLECTION AS A PICTURE — the Shape view of the knowledge base.
+  //
+  // ASKED ONLY WHEN SOMEBODY IS LOOKING AT IT, which is what the null key means
+  // here: the List view is the default, so a reader who never touches the switch
+  // never pays for this door. It is a whole-corpus read (bounded, but the widest
+  // one the knowledge section has), so making it lazy is the difference between
+  // one extra request per person who wants the picture and one per visit to the
+  // section.
+  //
+  // NOT NARROWED FROM HERE. The door takes a `compartment`, but the toolbar's
+  // facets live inside `PagedFind` and this hook runs above it; the whole-base
+  // picture is the one this screen asks for, and narrowing is what the reader
+  // does by opening an account. Said out loud so the missing argument reads as a
+  // decision rather than an omission.
+  const knowledgeShapeQ = useCached(
+    enabled && onScreen("knowledge") && knowledgeView === "shape"
+      ? knowledgeShapeKey(teamId as string, null)
+      : null,
+    () => content.knowledgeShape()
+  )
   // EVERY COMPANY, as a safety net for the list's "filed under" names —
   // 2026-08-31: `accountsQ` above is gated to the accounts/contacts screens, so
   // it was `undefined` while browsing Knowledge and every source's account
@@ -150,7 +195,7 @@ export function useScreenData({
   // through these same keys — an app's detail comes out of the bounded set the
   // list already holds — which is why they are keyed by team here rather than by
   // record, and why a slice narrowed to one record gets a key of its own instead
-  // (see sliceKey in components/work-panels.tsx).
+  // (see sliceKey in components/work/work-panels.tsx).
   const storiesQ = useCached(enabled && onScreen("stories") ? storiesKey(teamId as string) : null, () =>
     listFetch.stories(teamId as string)
   )
@@ -219,7 +264,7 @@ export function useScreenData({
   // AND the Dropdown-values tab's count badge, so load them across the team area
   // (cache-first + live, like roles/invites, so the count stays honest).
   const formSelectableQ = useCached(
-    enabled ? `selectable:${teamId}` : null,
+    teamWide ? `selectable:${teamId}` : null,
     () => listFetch.selectable(teamId as string)
   )
   // R16: the exact server totals the badges show (primed by the fetchers above;
@@ -380,6 +425,7 @@ export function useScreenData({
     overridesQ,
     accountsQ,
     knowledgeQ,
+    knowledgeShapeQ,
     companiesQ,
     storiesQ,
     sprintsQ,

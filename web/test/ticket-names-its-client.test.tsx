@@ -76,7 +76,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 vi.mock("@/lib/perms", () => ({ usePermissions: () => ({ can: () => false }) }))
 
-import { HelpFormDialog } from "@/components/help-form-dialog"
+import { HelpFormDialog } from "@/components/tickets/help-form-dialog"
 import { searchAccounts } from "@/lib/picker-sources"
 
 afterEach(cleanup)

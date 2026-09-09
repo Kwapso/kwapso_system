@@ -9,7 +9,7 @@
 // here changed but the file it sits in and the `export` keyword.
 
 import { fail, json } from "@shared/workers/http"
-import { GuardError } from "@shared/workers/gating"
+import { GuardError, noteIdentity } from "@shared/workers/gating"
 import { callerHasBudget, TOO_FAST } from "@shared/workers/rate-limit"
 import { requestId } from "@shared/workers/trace"
 import { brand } from "@shared/brand"
@@ -38,6 +38,10 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!bearer)
     return fail(401, "no_token", "Send a personal access token: Authorization: Bearer <token>.")
   const token = await verifyToken(env, bearer)
+  // WHOSE REQUEST THIS IS, for the central catch: the token's owner, in the
+  // token's pinned team. This surface never passes through `teamContext`, so
+  // until this line its error rows named nobody.
+  noteIdentity(request, { userId: token.user_id, teamId: token.team_id })
 
   // THE MACHINE SURFACE'S OWN CEILING, spent per TOKEN OWNER and separately from
   // their budget inside the app (rate-limit.ts). It sits here because this is where
@@ -59,8 +63,11 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
         protocolVersion: PROTOCOL_VERSION,
         capabilities: { tools: {} },
         serverInfo: { name: `${brand.name}-mcp`, version: "1.0.0" }, // brand-derived; kwapso's value unchanged
+        // The last sentence is load-bearing since 2026-09-08: every tool
+        // description here is ONE LINE, so a client that never calls
+        // describe_tool is reading a quarter of what the catalogue says.
         instructions:
-          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota.",
+          "kwapso's machine surface. Every tool acts AS the token's owner, capped by their live role, inside the token's pinned team only. AI-costed tools (plan_import, agent_chat) draw from the team's assistant quota. Every tool description is one line; call describe_tool with a tool's name for its full instructions.",
       })
     case "notifications/initialized":
       return new Response(null, { status: 202 })

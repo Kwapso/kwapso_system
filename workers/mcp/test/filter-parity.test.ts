@@ -105,6 +105,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the client portal's own standing-move, for the same reason as its context read: only a client login has anywhere to move to, and this surface refuses client logins outright.",
   "GET /api/content/knowledge/map":
     "assembles a PICTURE rather than answering a question: one record's bounded neighbourhood, with the caller's per-module fence applied to BOTH ends of every edge, shaped as nodes and links for a canvas to draw. Every relation in it is a foreign key the grammar already exposes one at a time — a ticket's `accountId`, a story's `ticketId`, a process's `appId` — so a machine caller can compose exactly the edges it wants through `query_records`, which is a better answer than the six this screen happens to draw. A tool here would be a second, narrower way to ask something the grammar answers better, and it would publish a node/link shape that exists to be rendered. DELETE THIS LINE if the map's own relation table ever becomes something a machine should read as a whole (a 'what is connected to this' tool), which is a real feature and a different one from this door.",
+  "GET /api/content/knowledge/shape":
+    "the map door's sibling, and toolless for the same reason plus one of its own. It assembles a PICTURE: the whole corpus as nodes, links and account clusters, capped at `KNOWLEDGE_SHAPE_SOURCES` dots because that is how many an SVG can draw, which is a rendering decision and not an answer. THE CAP IS THE SECOND REASON. A machine caller handed fifteen hundred nodes reads about ONE of them — `trimResult` shows a tool's answer a row at a time — so the payload that makes this screen legible is the payload a tool can least use, and a tool that returned it would look like it had answered. What a machine actually wants from this screen is the ARITHMETIC, not the drawing: `list_knowledge` already answers with the same exact `total` over the same fence, narrowed per account through `compartment`, so 'how much do we hold on Bergman' is one call and the right one. DELETE THIS LINE if somebody asks for 'which clients are we thinnest on' as a capability — that is a COUNTING tool over the account grouping, a real feature and a different one from this door, and it must expose and forward `compartment` (R19).",
   "GET /api/tenancy/invites/audit":
     "the forensic trail behind ONE invite (who sent it, when it was opened, when it was revoked). The invite's own state — email, role, status, id — is already machine-readable through list_invites; this is the strip a person reads on the invite's detail when something looks wrong.",
   "POST /api/tenancy/activity/note":
@@ -173,6 +175,12 @@ const TOOLLESS_DOORS: Record<string, string> = {
 
   "POST /api/content/uploads/presign":
     "PERMISSION TO PUT A FILE, and the reason it is toolless is one step further along than the upload doors below it. Those are exempt because a file cannot be an argument on a JSON-RPC surface; this one carries no file at all — it hands back a URL the CALLER then PUTs to. What it needs is not argument room but a browser: a signed PUT is issued to a client that will make an HTTP request to R2 with the exact Content-Type and Content-Length the signature pins, and a model emitting a tool call is not that client. A machine caller that genuinely holds bytes already has a door — the buffered and streamed uploads below — and the one thing it cannot do is hold a PDF, which it never could. Giving this a tool would offer the model a URL it has no way to use and a contract R22 would then hold it to.",
+  "POST /api/content/uploads/confirm":
+    "THE OTHER END OF THE PRESIGN ABOVE, and toolless for the same reason plus one of its own. It answers \"the bytes are up, give me the reference\", and the only caller who can honestly say that is the one who made the PUT — a browser holding a signed URL, which a model emitting a tool call is not. A machine that reached this door without having uploaded anything gets a 404 (the door proves the object with `head` before it answers), so the tool would be one that fails by construction. The capability a machine wants here is \"file this material\", and it already has it: `add_knowledge_source` takes 1.5 MB of words, and `create_deliverable` and `update_deliverable` both take a `url`. What it cannot do is hold a PDF, and it never could.",
+
+  "POST /api/content/knowledge/upload-confirm":
+    "the knowledge base's own half of the confirm above — the same key, the same proof, plus the source row. It inherits both reasons: a model cannot have made the PUT that this door exists to acknowledge, and the door proves the object arrived before it writes anything, so a tool call from a caller that uploaded nothing could only ever 404. `add_knowledge_source` is the machine's way into this module and takes 1.5 MB of text; this door is for the browser that just sent a file to R2 without our worker touching a byte of it.",
+
   "POST /api/content/knowledge/upload-stream":
     "the SAME door as the buffered upload above, with the file as the request BODY rather than a base64 field inside it — which changes the memory arithmetic and changes nothing at all about whether a machine can call it. This surface is JSON-RPC: a tool call IS a JSON object, so there is no request body for a tool to stream into and no way to express `the bytes are the body` as an argument. The buffered door is unreachable because 34 million characters will not fit in an argument; this one is unreachable because it does not take arguments for the part that matters. Same conclusion, different reason, and the reason is worth writing down so the next person does not try to \"finish\" the pair by adding a tool to one of them.",
 
@@ -201,7 +209,7 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "CORRECTING somebody's hours, which is a different act from logging your own and is gated a step higher (work:edit rather than work:create). The machine surface can start a timer, stop one, write time down and answer for a runaway — everything a person does about their OWN time — but a timesheet correction is the one write in this module that changes a number after the fact, and time is the record here that turns into money. It leaves a trail either way (lib/work-logs editWorkLog writes one); the reason it has no tool is that nobody should be able to say 'make last Tuesday four hours' to an assistant and have it happen. A person opens the row.",
 
   "POST /api/data-ops/agent/translate-ticket":
-    "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`, which is one of the fields R22 makes it expose.",
+    "the ONE button in the app that spends the team's AI allowance without going through a chat turn, and that is exactly why it is not on this surface. MCP.md §6 is a promise about cost: a machine token's reads, writes, exports and imports are free endpoint hits, and only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance — a role without the agent right spends zero AI. A tool here would put a fourth spender on that list, silently, from a headless client that cannot see the balance it is drawing down. Changing the cost model is the owner's decision, not a parity default. And the capability is already reachable in the shape this surface is built for: a chat turn translates the title (metered, visible in the usage log) and calls `update_help_ticket` with `titleEn`. THAT SENTENCE WAS FALSE FOR AS LONG AS IT STOOD HERE, and it is worth saying so rather than quietly making it true: `update_help_ticket` did not expose `titleDe` or `titleEn` at all until 6 Sep 2026, because both are read in lib/help.ts rather than in the handler and R22's census reads the handler. So this exclusion rested on a call nobody could make, and it was the REASON that made it invisible — a reviewer reads the reason, believes the capability is reachable another way, and moves on. It was also claimed on R22's authority — 'one of the fields R22 makes it expose' — which is the part that should have looked wrong: R22 cannot make a tool expose a field it cannot see.",
   "POST /api/data-ops/agent/translate":
     "the SECOND button in the app that spends the team's AI allowance without going through a chat turn, and it is off this surface for the same reason as the ticket translation above it: MCP.md §6 promises a machine token that only `agent_chat` / `agent_confirm` / `plan_import` draw the allowance, and a fourth silent spender from a headless client that cannot see the balance is a change to the cost model rather than a parity default. It is also a door about READING — it writes nothing, it stores nothing, and what it hands back is one person's own view of one screen for as long as they are looking at it. A machine has no screen and no reader: it already receives every one of these fields, verbatim, in the language they were typed in, from the tools that answer with the record itself — which is the form a machine can actually work with, since a translated value matches no record.",
   "POST /api/content/brand-assets/upload":
@@ -534,5 +542,74 @@ describe("the published catalogue (MCP.md) says what the code does", () => {
         DOC.includes(String(n)),
         `MCP.md should state ${n} ${what} and doesn't — the census sentence in §3 has gone stale. It last read 87 / 66 / 21 while the real numbers were ${DOORS.length} / ${withTool} / ${reasoned}.`
       ).toBe(true)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE FIELDS R22 CANNOT SEE — pinned by hand, because the census above is
+// structurally unable to pin them.
+//
+// R22 derives a door's contract from its own `body.<field>` reads. A handler
+// that validates a few fields positionally and then passes `body` WHOLESALE to a
+// lib declares the rest of its contract in that lib's input TYPE, which is not
+// source this scan follows — `door-census.ts` says so in its own words. So for
+// those fields R22 asks a tool for nothing, and a tool offering a narrower
+// contract than its door passes every check in this file.
+//
+// That is not hypothetical. `POST /api/content/help` reads `titleDe` and
+// `titleEn` inside `lib/help.ts` and writes them straight into `title_de` /
+// `title_en`. Neither tool exposed either one, so EVERY TICKET A MACHINE CREATED
+// WAS TITLELESS — the detail screen renders `titleDe` as "Title" and `titleEn` as
+// "Title (English)", so what a person opened had no name on it. It shipped the
+// day the door did and survived every green build, including four runs of the
+// census above.
+//
+// The forwarding half is proved by RUNNING `buildBody`, never by reading it —
+// the same rule R22 applies to the fields it CAN see, and for the same reason: a
+// builder that delegates forwards perfectly while mentioning no field by name.
+describe("R22's blind spot: fields a door reads through a lib, pinned by hand", () => {
+  /** Both surfaces, both acts. The agent and MCP names differ on create. */
+  const TICKET_TOOLS = ["create_help_ticket", "update_help_ticket", "raise_help_ticket"]
+
+  it("both ticket tools EXPOSE and FORWARD the two titles", () => {
+    const checked: string[] = []
+    for (const name of TICKET_TOOLS) {
+      const tool = ALL_TOOLS.find((t) => t.name === name)
+      if (!tool) continue // `create_help_ticket` is MCP's name, `raise_` the agent's
+      checked.push(name)
+      const props = propsOf(tool)
+      for (const field of ["titleDe", "titleEn"]) {
+        expect(
+          field in props,
+          `${name} does not expose "${field}" — a machine cannot give the ticket a title, and R22 cannot see this because the door reads it in lib/help.ts`
+        ).toBe(true)
+        const sent = tool.buildBody!({ ...probeInput(tool), [field]: "probe-title" })
+        expect(
+          sent[field],
+          `${name} exposes "${field}" but its buildBody drops it — the door would never see the title the caller wrote`
+        ).toBe("probe-title")
+      }
+    }
+    // The tripwire: a rename that made both lookups miss would satisfy every
+    // assertion above by checking nothing at all.
+    expect(checked.length, "no ticket tool was found — this test has gone blind").toBeGreaterThanOrEqual(2)
+  })
+
+  it("…and still withhold the three source* fields, which a machine can only invent", () => {
+    // The door reads `sourceScreen`, `sourceRelatedTable` and `sourceRelatedRowId`
+    // — WHICH SCREEN a person was looking at when they raised this. A machine has
+    // no screen, so a value could only be made up, and an invented provenance is
+    // worse than an empty one because afterwards it is indistinguishable from a
+    // real one. Absent rather than exempted: a NARROWED_BODY_FIELDS line naming a
+    // field the census does not report would fail that list's own rot check.
+    for (const name of TICKET_TOOLS) {
+      const tool = ALL_TOOLS.find((t) => t.name === name)
+      if (!tool) continue
+      for (const field of Object.keys(propsOf(tool)))
+        expect(
+          field.startsWith("source"),
+          `${name} exposes "${field}" — provenance is not a machine's to write; see the note in tool-catalog.ts`
+        ).toBe(false)
+    }
   })
 })
