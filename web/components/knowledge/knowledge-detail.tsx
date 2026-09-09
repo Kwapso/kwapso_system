@@ -99,11 +99,38 @@ export function KnowledgeDetailScreen({
   const mapDrawable = item?.originTable
     ? Object.prototype.hasOwnProperty.call(ACTIVITY_GATE_MAP, item.originTable)
     : false
-  const mapKey = item?.originTable && item?.originRowId && mapDrawable
-    ? recordMapKey(item.originTable, item.originRowId)
+  // …AND WHERE THE MAP STANDS WHEN THERE IS NO ORIGIN ROW TO STAND ON.
+  //
+  // The paragraph above is still true and is still the FIRST choice: a source
+  // that mirrors a ticket shows the TICKET's neighbourhood, which is richer than
+  // its own and is the record somebody actually came looking for.
+  //
+  // What changed is the else. `RECORD_EDGES` now carries the source's own four
+  // relationships — the call it came out of, and the account, app and sprint it
+  // is filed under — so `knowledge_sources` is a table the map can draw, and it
+  // has been a key of ACTIVITY_GATE_MAP all along (`knowledge`, the very right
+  // this screen is already gated on). So the fallback needs no new permission
+  // and widens nothing: it stands on the row the reader already has open.
+  //
+  // THAT IS WHAT GIVES THE FOUR EXTERNAL KINDS A NEIGHBOURHOOD. An email, a
+  // Drive file, a calendar entry and a chat message name a system rather than a
+  // row here — 1,313 of 4,838 sources on staging — so there has never been
+  // anything for this tab to open. There is now: the same half-hour's email,
+  // chat log and transcript all point at one Google event (migration 0070), so
+  // the call is one step away and its siblings are one more. A typed note with
+  // an account gets the same treatment, for the same reason.
+  //
+  // It is still possible for the answer to be empty — a note with no account and
+  // no event — and that is honest rather than broken: the map's own register
+  // says "Nothing is linked to this yet."
+  const mapTarget = item
+    ? mapDrawable && item.originTable && item.originRowId
+      ? { table: item.originTable, id: item.originRowId }
+      : { table: "knowledge_sources", id: item.id }
     : null
+  const mapKey = mapTarget ? recordMapKey(mapTarget.table, mapTarget.id) : null
   const mapQ = useCached(mapKey, () =>
-    content.recordMap(item?.originTable as string, item?.originRowId as string)
+    content.recordMap(mapTarget?.table as string, mapTarget?.id as string)
   )
   // The accounts a source MAY BE filed under, for the edit dialog's picker
   // suggestions only — page one is plenty there, since the field itself
@@ -287,12 +314,17 @@ export function KnowledgeDetailScreen({
       { value: "source", label: t("Source"), icon: "file-text", badge: "", badgeVariant: "" as const },
       { value: "overview", label: t("Overview"), icon: "info", badge: "", badgeVariant: "" as const },
       // THE MAP TAB EXISTS ONLY WHERE THERE IS A RECORD TO MAP. A note somebody
-      // typed into the knowledge base has no row behind it, so it has no
-      // neighbourhood — and neither does a source mirrored from outside this
-      // database (an email, a Drive file, a calendar entry, a chat message):
-      // `mapDrawable` above is what tells the two apart. A tab that always fails
-      // for a whole kind of source is a tab that teaches people it is never
-      // worth pressing.
+      // typed into the knowledge base had no row behind it, and neither did a
+      // source mirrored from outside this database (an email, a Drive file, a
+      // calendar entry, a chat message).
+      //
+      // BOTH OF THOSE NOW HAVE ONE, and the tab is offered to every source: the
+      // map falls back to the SOURCE itself (`mapTarget` above), which carries
+      // its own four relationships. What is still true is the sentence that
+      // paragraph was defending — a tab that always fails for a whole kind of
+      // source teaches people it is never worth pressing — and it is now kept by
+      // the answer being real rather than by hiding the tab. A source with
+      // nothing attached gets the map's own honest register, not a failure.
       ...(mapKey
         ? [
             {
@@ -388,7 +420,7 @@ export function KnowledgeDetailScreen({
               //
               // BUT NOT EVERY REFUSAL IS THE SAME REFUSAL. `getKnowledgeMap`'s
               // 400 ("that is not a kind of record this map draws") is
-              // PERMANENT — `mapDrawable` above should already keep this tab
+              // PERMANENT — `mapTarget` above should already keep this tab
               // from being reached for that table, so seeing it here means the
               // fence moved between the read that built the tab strip and this
               // one, not that the door is having a bad moment. A "Try again"
