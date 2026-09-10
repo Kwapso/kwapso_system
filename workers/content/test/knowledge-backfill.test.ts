@@ -304,7 +304,23 @@ describe.skipIf(!present)("the backfill, over the agency's own history", () => {
     // Every source that has text got chunks. (A handful genuinely have none —
     // an account row with no address, phone or reference still has a name, so in
     // practice this is all of them.)
-    const unchunked = one("SELECT COUNT(*) AS n FROM knowledge_sources WHERE chunk_count = 0").n
+    //
+    // EXCEPT A CARD, which writes no chunks BY DESIGN (0074 `generated_only`):
+    // findable, never quotable. Excluding cards without also asserting they
+    // EXIST would turn this into a test that passes when cards silently stop
+    // being made — so both halves are asserted, and the exclusion can never go
+    // vacuous.
+    const cards = one("SELECT COUNT(*) AS n FROM knowledge_sources WHERE generated_only = 1").n
+    expect(cards, "no cards at all — the exclusion below would be vacuous").toBeGreaterThan(0)
+    expect(
+      one(
+        "SELECT COUNT(*) AS n FROM knowledge_sources WHERE generated_only = 1 AND chunk_count > 0"
+      ).n,
+      "a card writes no chunks — chunks are exactly what makes a source quotable"
+    ).toBe(0)
+    const unchunked = one(
+      "SELECT COUNT(*) AS n FROM knowledge_sources WHERE chunk_count = 0 AND generated_only = 0"
+    ).n
     expect(unchunked).toBe(0)
   })
 
