@@ -151,8 +151,15 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   language the count of extracted strings with NO non-empty entry is pinned in
   `TRANSLATION_CEILING`, and the check recomputes it fresh and requires exact
   equality: a string shipped past the ceiling fails the build, and a ceiling left
-  ABOVE the true count after a translation lands fails it too. **The pin can fall
-  and can never rise.** Not a hard zero on purpose — a hard zero turns the next
+  ABOVE the true count after a translation lands fails it too. **The pin can fall,
+  and can never rise without the count behind it rising first** — raising it is
+  the sanctioned move for accepted debt, in the same change, where a reviewer
+  sees it move. (This line read "and can never rise" until 2026-09-10, four
+  words short of the sentence `shared/rules/registry.ts`, RULES.md, LANGUAGES.md
+  and the check's own failure message all carry. Dropping the clause inverts the
+  law into the hard zero its very next sentence says it is not — and this file
+  is the one a new agent reads first, so the wrong version had the widest
+  readership of the four.) Not a hard zero on purpose — a hard zero turns the next
   ordinary feature PR red the moment it adds a label, and a build that fires on
   unrelated work is a build people route around. (`translation-ceiling`)
 - **Every colour resolves through a token (R32).** No Tailwind colour ramp and no
