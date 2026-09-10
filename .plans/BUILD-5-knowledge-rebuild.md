@@ -1,6 +1,6 @@
 # BUILD-5 — the knowledge base, rebuilt
 
-Decided by the owner on 10 Sep 2026 from the audit (`KB-AUDIT.md`) and the briefing
+Decided by the owner on 10 Sep 2026 from the audit (`.plans/KB-AUDIT.md`) and the briefing
 round (`planning-answers/kwapso-kb-final-round-alaap-k-2026-09-10.json`). This is the
 handover document. Hub-and-spoke: ONE Opus planner (the hub) owns this file, writes lane
 briefs, merges, and runs the gate. Sonnet lanes build. No lane spawns an agent. Ever.
@@ -178,7 +178,7 @@ merge; any lane that will exceed its line stops and reports.
 
 ## 6. How to hand this over — paste to the planner
 
-> You are the hub. Read `.plans/BUILD-5-knowledge-rebuild.md`, `KB-AUDIT.md`, CLAUDE.md
+> You are the hub. Read `.plans/BUILD-5-knowledge-rebuild.md`, `.plans/KB-AUDIT.md`, CLAUDE.md
 > and RULES.md. Write ONE design note (schema, seams, contracts) and get it approved by the
 > owner before any lane starts. Then write one self-contained brief per lane (A–G): it
 > must carry its own worktree setup, its exact files, its test to write first, its cost
