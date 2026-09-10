@@ -125,6 +125,24 @@ export type IngestRow = {
    * carries both: a folder somebody filed as team material and one they kept to
    * themselves come back from the same read, and the shelf is on each item. */
   ownerUserId: string | null
+  /** TRUE WHEN EVERY WORD OF THE BODY IS ONE THE APP WROTE for this row.
+   *
+   * The reader is the only thing that can answer this. Its body is a sentence
+   * built from columns with the record's own free text folded in where there is
+   * any — a ticket's description, a task's detail, a contact's `about` — and by
+   * the time those parts are joined into one string they are indistinguishable.
+   * So the answer is recorded here, while it is still known.
+   *
+   * PER ROW, NEVER PER KIND. Every mirror kind KB-AUDIT.md §4.3 named as a
+   * stub offender can also carry a person's words; the stubs it measured were
+   * the rows where those fields happened to be empty. A kind-level answer would
+   * silence 1,309 of 2,051 tickets or reach 22 sources — measured both ways,
+   * both wrong.
+   *
+   * A source with this set writes NO pieces and keeps its record vector, so it
+   * can be found and never quoted. Absent reads as false, which is the safe
+   * direction: a row nobody has taught keeps its words. */
+  generatedOnly?: boolean
 }
 
 /** One kind of in-app material: where it lives, and how a row of it reads.
@@ -403,6 +421,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const title = r.title_en || r.title_de || firstLine(r.description)
         return {
           originRowId: r.id,
+          generatedOnly: !(r.description || r.thread || r.work_notes),
           sortAt: r.sort_at,
           title,
           summary: buildSummary({
@@ -583,6 +602,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const where = [r.street ?? r.address, r.postal_code, r.city, r.country].filter(Boolean).join(", ")
         return {
           originRowId: r.id,
+          generatedOnly: !(r.about),
           sortAt: r.sort_at,
           title: r.name,
           summary: buildSummary({
@@ -674,6 +694,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const role = r.relationship ?? "a contact"
         return {
           originRowId: r.id,
+          generatedOnly: !(r.about),
           sortAt: r.sort_at,
           title: `${r.person_name} at ${r.company_name}`,
           summary: buildSummary({
@@ -761,6 +782,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
+        generatedOnly: !(r.about || r.client_context || r.solution || r.key_actors),
         sortAt: r.sort_at,
         title: r.name,
         summary: buildSummary({
@@ -866,6 +888,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
+        generatedOnly: !(r.description || r.steps || r.comments),
         sortAt: r.sort_at,
         title: r.name,
         summary: buildSummary({
@@ -956,6 +979,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const when = [r.starts_on, r.ends_on].filter(Boolean).join(" to ")
         return {
           originRowId: r.id,
+          generatedOnly: !(r.goal),
           sortAt: r.sort_at,
           title: r.name,
           summary: buildSummary({
@@ -1049,6 +1073,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
+        generatedOnly: !(r.detail || r.closing_note || r.review_note || r.work_notes),
         sortAt: r.sort_at,
         title: r.title,
         summary: buildSummary({
@@ -1187,6 +1212,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
+        generatedOnly: !(r.agenda || r.notes || r.transcript_text || r.transcript_note),
         sortAt: r.sort_at,
         title: r.title,
         summary: buildSummary({
@@ -1337,6 +1363,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const state = r.cancelled_at ? "called off" : r.completed_at ? "sent to us" : "still waiting"
         return {
           originRowId: r.id,
+          generatedOnly: !(r.detail),
           sortAt: r.sort_at,
           title: r.title,
           summary: buildSummary({
@@ -1423,6 +1450,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.id,
+        generatedOnly: !(r.detail || r.work_notes),
         sortAt: r.sort_at,
         title: r.title,
         summary: buildSummary({
@@ -1638,6 +1666,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const noun = isClient ? "client contact" : "colleague of ours"
         return {
           originRowId: m.id,
+          generatedOnly: !(p?.headline || p?.about || p?.strengths || p?.weaknesses || p?.role_models || p?.personality_type),
           sortAt: m.sort_at,
           title: name,
           summary: buildSummary({
@@ -1739,6 +1768,7 @@ export const INGEST_KINDS: IngestKind[] = [
       )
       return rows.map((r) => ({
         originRowId: r.type,
+        generatedOnly: !(r.value_list),
         sortAt: r.sort_at,
         title: r.type,
         summary: buildSummary({
@@ -1818,6 +1848,7 @@ export const INGEST_KINDS: IngestKind[] = [
         const who = r.account_name ?? "a client"
         return {
           originRowId: r.id,
+          generatedOnly: true,
           sortAt: r.sort_at,
           title: `Portal login at ${who}`,
           summary: buildSummary({
@@ -2013,9 +2044,9 @@ async function sweepKind(
       `INSERT INTO knowledge_sources
          (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
           app_id, ticket_id, sprint_id, record_date, event_id, event_id_from,
-          title, summary, body, body_bytes,
+          title, summary, body, body_bytes, generated_only,
           source_url, created_at, creator_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
@@ -2032,6 +2063,11 @@ async function sweepKind(
                      -- not either.
                      event_id = COALESCE(excluded.event_id, knowledge_sources.event_id),
                      event_id_from = COALESCE(excluded.event_id_from, knowledge_sources.event_id_from),
+                     -- RE-DECIDED ON EVERY SWEEP, because it is a fact about the
+                     -- row as it is NOW: somebody typing a detail into a bare
+                     -- task turns a card back into material, and somebody
+                     -- clearing it turns it back into a card.
+                     generated_only = excluded.generated_only,
                      owner_user_id = excluded.owner_user_id,
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
@@ -2077,6 +2113,7 @@ async function sweepKind(
         row.summary ?? row.title,
         row.body,
         new TextEncoder().encode(row.body).length,
+        row.generatedOnly ? 1 : 0,
         row.sourceUrl,
         now,
         now,
@@ -2160,7 +2197,16 @@ async function sweepKind(
     // costs no embedding call and no writes. Both halves are needed — a source
     // whose hash matches but whose indexing did not FINISH (a big document, a
     // tick that died) has to be picked up and carried on.
-    if (source.content_hash === hash && source.indexed_chunks >= source.chunk_count) continue
+    // A ROW THAT HAS JUST BECOME A CARD still has its old pieces, and its TEXT
+    // has not changed — so the hash-skip would leave it flagged unquotable and
+    // quoted anyway, for ever. One forced re-index each, once, and then the flag
+    // and the index agree; self-healing without a repair door anybody has to
+    // remember, the same shape as the blanked hash above.
+    //
+    // ONLY THIS DIRECTION NEEDS SAYING. A card that GAINS a person's words has
+    // changed its body, so its hash moves and the skip does not bite.
+    const nowACard = (row.generatedOnly ?? false) && source.chunk_count > 0
+    if (!nowACard && source.content_hash === hash && source.indexed_chunks >= source.chunk_count) continue
     // …AND THE SKIP THAT STOPS THE SWEEP PAYING FOR THE SAME FAILURE FOR EVER.
     // The blanked hash above is what makes a failed embedding retry, which is
     // right for a Workers AI wobble and wrong for text the model will never
