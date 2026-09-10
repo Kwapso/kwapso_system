@@ -388,9 +388,9 @@ Start with **[README.md](README.md)** (the doc map), then:
   in exactly ONE file in the whole repository — `.session-notes/lanes/LANE-COMMON.md`,
   a lane brief that no check reads, that no doc map indexes, and which until
   2026-09-09 told every lane to do the OPPOSITE (`~/kwapso-lanes/<LANE>`, and
-  "NEVER create a folder on the owner's Desktop"). `story_checks_out_review`
-  found that on 2026-09-10 and rated it its single best finding: a rule whose
-  only home is a chat log is a rule the next agent breaks. 407 MB had already
+  "NEVER create a folder on the owner's Desktop"). The planner session surfaced
+  it on 2026-09-10 and `story_checks_out_review` verified it and filed it high —
+  a rule whose only home is a chat log is a rule the next agent breaks. 407 MB had already
   accumulated outside the project by the time it was noticed.
 - **`npm run check` must stay green** (the lint, then TypeScript across every workspace, then the full test suite including the rule + seam tests). Run it before you commit. It is the gate. The lint (`npm run lint`, oxlint, ~15ms over the whole repo) runs FIRST because it is the cheapest of the three: dead imports, unused dependencies in a hook's array, a React hook rule broken. Its first clean run found an `ErrorBoundary` imported into the root layout and rendered nowhere.
 - **Ship gate** (before `/ship-staging`): `npm run check`, then the quality skills, `lean_mean` (≥ 92), `story_checks_out`, and `security_sentry` (no critical/high), then deploy. Adversarially verify your own findings.

@@ -238,8 +238,10 @@ permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
 The bespoke details are **not a list anybody keeps**. They are DERIVED off disk
 by `recordDetailComponents()` in `web/test/rules.test.ts`, from two independent
 signals: a component under `web/components/` named `*-detail.tsx`, or one that
-renders an `<ActivityPanel>` (a record's own history feed, which nothing but a
-record detail has any business drawing). `RECORD_DETAIL_NOT` in the registry is
+renders a `<RecordScreen>`. The second signal USED to be `<ActivityPanel>`, and
+had to move on 7 Sep 2026: retiring the Activity tab meant no detail rendered
+that panel any more, and a census whose signal matches nothing reports the same
+all-clear as one that matched everything and found no fault. `RECORD_DETAIL_NOT` in the registry is
 the reasoned residue, rot-checked so it can only shrink. **Do not add a screen to
 a list to make it obeyed — name the file `*-detail.tsx` and it is.**
 
@@ -365,9 +367,10 @@ and the check verifies exactly that, reading the source for the two library name
 
 ```ts
 // web/test/rules.test.ts — the SUBJECT is read off disk, never hand-listed
-for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <ActivityPanel>
+for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <RecordScreen
+  // A detail with ONE panel draws no strip and is named in RECORD_TABS_SINGLE_PANEL.
+  if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
   expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
-  expect(c.source, `${c.name} must render an ActivityPanel (the Activity tab)`).toContain("ActivityPanel")
 }
 ```
 

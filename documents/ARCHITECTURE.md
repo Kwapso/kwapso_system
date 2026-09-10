@@ -450,9 +450,10 @@ on top follows [CACHING.md](CACHING.md).
   RULES.md, CLAUDE.md and the check were all amended on 7 Sep and this file was
   committed to three times that day without anyone opening this section —
   `story_checks_out_review` found it on 2026-09-10 and correctly refused to
-  touch a LOCKED item, so it is recorded here on the owner's instruction. Both tabs render from LIBRARY
-  collections (`RecordDetail` / `DescriptionList` / `ActivityFeed`, now in
-  `shared/ui/`) through the screen engine. Never a hand-built app
+  touch a LOCKED item, so it is recorded here on the owner's instruction.
+  The Overview tab and the rail both render from LIBRARY collections
+  (`RecordDetail` / `DescriptionList` / `ActivityFeed`, now in `shared/ui/`)
+  through the screen engine. Never a hand-built app
   component (UI comes from the library, §6). See the activity read path in
   `workers/tenancy/src/lib/activity-read.ts`.
 - Race-safety for invariant writes follows [CONCURRENCY.md](CONCURRENCY.md);

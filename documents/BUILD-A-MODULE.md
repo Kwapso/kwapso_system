@@ -392,7 +392,9 @@ hand-listed count. Sidebar sections don't need one.
 
 R8 covers the **other** tab strip too, the tabs on one record's own screen (step
 6). Don't stop at this one; a module whose team tab is counted and whose record
-Activity tab isn't is only half in-rule.
+history rail isn't is only half in-rule. (The record's ACTIVITY TAB was retired
+7 Sep 2026 — "kill all old activity tabs" — so what carries the count now is the
+ink footer's Latest activity eyebrow, which opens the slide-in `ActivityRail`.)
 
 ```ts
 { key: "notes", title: "Notes", module: "notes", segment: "notes",
@@ -513,7 +515,7 @@ mirroring the brand library.
 - **Create handler**, a small callback that calls the api, then
   **`primeCache(notesKey(teamId), next)`** so the new row appears instantly for
   the actor (everyone else gets the realtime ping), and `invalidate` on the record's
-  activity key after an edit so its Activity tab reflects the new row. See
+  activity key after an edit so its history rail reflects the new row. See
   `saveInternalRecord` (`web/lib/use-screen-actions.ts`), which does both for the
   brand library.
 
@@ -570,7 +572,7 @@ const tabsConfig = { ...defaultTabsConfig, variant: "line", tabs: [
     badge: formatCount(activity.total), badgeVariant: "" },   // ← R8/R16: the exact total
 ]}
 // renderPanel: overview → <OverviewList items={overviewItems}/>,
-//              activity → <ActivityPanel activity={activity}/>
+//              (no activity tab: the history is the ink footer's rail, 7 Sep 2026)
 ```
 
 Note which tabs carry a badge: the ones that reveal a collection do, and the one
@@ -578,7 +580,7 @@ that shows the record itself does not, that difference is Law R8, and an uncount
 tab needs a reasoned `RECORD_TAB_COUNT_EXCEPTIONS` line.
 
 After an edit or (de)activate, prime the list cache with the returned rows and
-`invalidate(\`activity:record:<table>:<id>\`)` so the Activity tab reflects the new
+`invalidate(\`activity:record:<table>:<id>\`)` so the history rail reflects the new
 row (`saveInternalRecord` / `setInternalActive` in
 `web/lib/use-screen-actions.ts` do exactly this). Action buttons carry their kit
 icon (CLAUDE.md): edit = `Pencil`, deactivate = `Power`, destructive actions get the
@@ -696,7 +698,9 @@ AFTER SHIP
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
 - **A record tab with no count.** Every tab that reveals a collection carries it,
-  a record's Activity tab included (R8); an uncounted tab needs a reasoned
+  a record's history included (R8) — reached from the ink footer's Latest
+  activity eyebrow since the Activity TAB was retired 7 Sep 2026, not from a tab;
+  an uncounted tab needs a reasoned
   `RECORD_TAB_COUNT_EXCEPTIONS` line.
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)
 - **A new worker for a new module, or a second copy of a library component.**
