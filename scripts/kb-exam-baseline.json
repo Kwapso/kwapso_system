@@ -1,0 +1,43 @@
+{
+  "examFile": ".plans/KB-EXAM.md",
+  "total": 88,
+  "byDisposition": {
+    "keyed": 67,
+    "struck": 13,
+    "refusal": 8
+  },
+  "byLevel": {
+    "O": 8,
+    "E": 14,
+    "M": 20,
+    "H": 15,
+    "X": 21,
+    "DE": 10
+  },
+  "byTag": {
+    "para": 45,
+    "de-name": 2,
+    "latest": 12,
+    "synth": 9,
+    "exact": 5,
+    "count": 7,
+    "route": 7,
+    "person": 8,
+    "multi": 8,
+    "hijack": 4,
+    "absent": 7,
+    "fence": 3,
+    "de": 10
+  },
+  "mustScore100": [
+    "X4",
+    "X5",
+    "X6",
+    "X7",
+    "X9",
+    "D9",
+    "D10",
+    "X8-notowner"
+  ],
+  "retrieval": null
+}
