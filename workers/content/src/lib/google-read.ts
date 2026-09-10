@@ -150,6 +150,12 @@ export type GoogleReadRequest = {
   /** calendar only — the window to read. */
   from?: string
   to?: string
+  /** GMAIL ONLY — ids this lane has already filed, so their header is worth
+   * skipping. Built by the caller (only the automatic sweep does), never by
+   * this function: it has no database to read one from, and building it here
+   * for every caller would cost a query nobody but the sweep can use. See
+   * `gmailSearch`'s own doc for what skipping one actually means. */
+  gmailKnownIds?: Set<string>
 }
 
 /**
@@ -322,17 +328,22 @@ export async function scopedGmailSearch(
   guard: MemberGuard,
   token: string,
   contactQuery: string,
-  search?: string
+  search?: string,
+  /** See `gmailSearch`'s own doc — passed straight through. Only the
+   * automatic sweep ever builds one; an interactive read (the manual button,
+   * `routes/google.ts`'s mail search) never passes this and reads in full,
+   * exactly as before. */
+  knownIds?: Set<string>
 ): Promise<MailMessage[]> {
   const scope = await googleScope(cfg, guard, "gmail")
-  if (scope.mode !== "only") return gmailSearch(token, contactQuery, search)
+  if (scope.mode !== "only") return gmailSearch(token, contactQuery, search, [], knownIds)
   if (scope.containers.length === 0) return []
   const labels = scope.containers.slice(0, SCOPE_CONTAINER_CAP).map((c) => c.externalId)
   if (scope.containers.length > labels.length)
     console.error(
       `[google] mail scope walked ${labels.length} of ${scope.containers.length} labels for ${guard.userId}`
     )
-  return gmailSearch(token, contactQuery, search, labels)
+  return gmailSearch(token, contactQuery, search, labels, knownIds)
 }
 
 /** THIS PERSON'S CALENDAR, narrowed to the calendars and the kinds of event they
@@ -531,7 +542,7 @@ export async function readGoogleMaterial(
       // THROUGH THE SCOPED READ, never `gmailSearch` directly — the sweep is the
       // largest consumer of a person's mailbox and would be the worst place for
       // the fence to be missing.
-      for (const mail of await scopedGmailSearch(cfg, guard, token, "", request.search))
+      for (const mail of await scopedGmailSearch(cfg, guard, token, "", request.search, request.gmailKnownIds))
         items.push({
           service: "gmail",
           sourceId: null,
