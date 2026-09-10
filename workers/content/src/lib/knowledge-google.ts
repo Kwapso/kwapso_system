@@ -52,14 +52,18 @@
 // it just answers a question sightings now answer differently. "Sharing one
 // row would make the last sweep to run decide who else can read somebody's
 // document" is still true of `owner_user_id` taken alone, which is exactly why
-// nothing here trusts it alone any more: `owner_user_id` on the SOURCE is
-// DERIVED, not assigned — NULL the moment two distinct sighters exist (nobody
-// left to overwrite, because no reader's upsert writes it directly once a
-// sighting exists), and recomputed from the WHOLE sightings set by
-// `teamVisibleRecomputeSql` every time one changes. The old reasoning did not
-// become wrong; it became the reason sightings exist rather than a second
-// owner column. `writeSightings` and `retireSighting`, below, are where that
-// happens — and `knowledge-identity.ts`'s own header has the full account of
+// nothing here trusts it alone any more. THE GENERIC ENGINE'S UPSERT STILL
+// WRITES IT, unconditionally, every tick, whoever's sweep runs — that clobber
+// was never stopped. What changed is that it no longer MATTERS: the moment a
+// second sighting exists, `writeSightings` (below) recomputes `owner_user_id`
+// from the WHOLE sightings set and writes over whatever the engine's own
+// upsert just said, and the read path (`ownerClause`, knowledge.ts) stops
+// trusting the raw column the instant any sighting exists at all. The old
+// reasoning did not become wrong; it became the reason sightings exist rather
+// than a second owner column, and `writeSightings`'s own header has the exact
+// mechanism — the clobber survives, and is made not to matter, which is a
+// different claim than "the clobber was prevented" and worth keeping
+// straight. `knowledge-identity.ts`'s own header has the full account of
 // what the old interpolation cost and why the fence moved with it.
 
 import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
@@ -1378,6 +1382,20 @@ async function scopedCalendarIds(cfg: D1Rest, guard: MemberGuard): Promise<strin
  * decides who it belongs to" — the exact bug per-person rows existed to avoid,
  * reintroduced one column over. Identity and sighting-writing land together
  * or not at all; that was true from the first report on this gate.
+ *
+ * CORRECTED, kb_review's own finding: sightings do not STOP the clobber —
+ * they make it NOT MATTER, which is a different and more precise claim. The
+ * generic engine's upsert (`sweepKinds`, running before this) still writes
+ * `owner_user_id = excluded.owner_user_id` unconditionally, per reader, every
+ * tick — a second reader's sweep really does overwrite the first's value with
+ * their own, momentarily. What saves the read is `ownerClause`'s branch 2
+ * (knowledge.ts), which trusts `owner_user_id` alone ONLY when
+ * `NOT EXISTS (any sighting for this source)`. The instant this function
+ * writes the SECOND sighting for a source, that gate closes — the
+ * momentarily-wrong column becomes invisible to the one read that decides
+ * anything, whatever it currently says. Reorder these two calls believing the
+ * overwrite itself was prevented, and the gap this comment describes is
+ * exactly where a fence would widen.
  *
  * `seen` carries EVERY item this tick's read returned — not just the ones
  * whose text changed (`wanted`, inside `slice`), because a sighting means "I

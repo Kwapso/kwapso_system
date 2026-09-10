@@ -936,6 +936,53 @@ describe("Google material that has GONE stops being quoted", () => {
     expect(live(SPACE), "unshared here means unquotable here").toBe(false)
   })
 
+  it("one colleague switching off a shared space retires ONLY their own sighting — the source, and hers, stay live", async () => {
+    // THE EXACT CASE retireSighting was written for, and the one the rest of
+    // this suite never exercised: under the old per-person-row shape, "he
+    // switched it off" and "the source is gone" were the SAME UPDATE, because
+    // a source was one person's own row. They are not the same fact any more —
+    // Aurora losing her own share of a space must not silently take the
+    // material away from a colleague who still has it, and this proves that
+    // through the real door with two real people, not through a seeded
+    // sightings row on one already-built source.
+    connect(OTHER_STAFF)
+    const THREAD = `spaces/AAA/threads/T1`
+    // BOTH FOLD ONTO ONE SOURCE — the identity gate's own point. Two sweeps,
+    // two people, the same space's mocked messages.
+    await sweep()
+    await call(OTHER_STAFF, "POST /api/content/knowledge/sync-google", {})
+    expect(live(THREAD), "both readers see it before either loses it").toBe(true)
+
+    const source = db()
+      .prepare("SELECT id, deactivated_at FROM knowledge_sources WHERE origin_row_id = ?")
+      .get(THREAD) as { id: string; deactivated_at: string | null }
+    const sightingsBefore = db()
+      .prepare("SELECT seen_by_user_id, gone_at FROM knowledge_sightings WHERE source_id = ?")
+      .all(source.id) as { seen_by_user_id: string; gone_at: string | null }[]
+    expect(
+      sightingsBefore.map((s) => s.seen_by_user_id).sort(),
+      "one sighting per person, before either one changes"
+    ).toEqual([IDS.staffUser, OTHER_STAFF].sort())
+    expect(sightingsBefore.every((s) => s.gone_at === null), "both live before the switch-off").toBe(true)
+
+    // ONLY THE STAFF USER switches off their OWN share of the space — Aurora's
+    // (OTHER_STAFF's) named source is untouched.
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-08-18' WHERE id = 'S_SPACE_${IDS.staffUser}';`)
+    await sweep()
+
+    const sightingsAfter = db()
+      .prepare("SELECT seen_by_user_id, gone_at FROM knowledge_sightings WHERE source_id = ?")
+      .all(source.id) as { seen_by_user_id: string; gone_at: string | null }[]
+    const mine = sightingsAfter.find((s) => s.seen_by_user_id === IDS.staffUser)
+    const hers = sightingsAfter.find((s) => s.seen_by_user_id === OTHER_STAFF)
+    expect(mine?.gone_at, "his own sighting is retired").not.toBeNull()
+    expect(hers?.gone_at, "her sighting is UNTOUCHED — she never switched anything off").toBeNull()
+    expect(
+      live(THREAD),
+      "one live sighting remains, so the source stays live — this is the whole point of the function"
+    ).toBe(true)
+  })
+
   it("the chunks go with it, because the chunks are what an answer is built from", async () => {
     await sweep()
     holder.unlisted.add("FOLDER_CLIENT")
