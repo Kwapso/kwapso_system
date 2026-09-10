@@ -301,6 +301,21 @@ for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
 done
 ```
 
+**The tenth slot has a plan, not yet code.** BUILD-5-knowledge-rebuild.md §3
+calls for the tenth and last free label to be `knowledge_sources.shared_with`
+(0073) — 'private' / 'agency' / 'agency_client', so a compartment search can
+narrow by who a source is shared with the same way it already narrows by
+`compartment` and `owner`, and says the label budget is then SPENT (no
+eleventh slot, ever, on this index). As of 10 Sep 2026 that is still a plan:
+`VectorLabels` and `METADATA_INDEXES` (`workers/content/src/lib/knowledge-vectors.ts`)
+carry nine keys, not ten, `shared_with` is on no vector, and
+`vector-indexes-mirror.test.ts` mirrors whatever the code says today — it
+does not assert ten, and it does not know the tenth is meant to be
+`shared_with` specifically, because nothing has told it to yet. Wiring it in
+is Lane C's, at the same time as `shared_with`'s own read/write path; this
+paragraph exists so the next environment stood up before that lands is built
+against nine on purpose, not by an oversight nobody wrote down.
+
 The binding is `KNOWLEDGE_INDEX` on the content worker and it is OPTIONAL: without
 it the knowledge base answers from its word index alone rather than refusing every
 question. That is a real degradation and a visible one (`reason` on every answer
