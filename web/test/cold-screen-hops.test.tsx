@@ -339,6 +339,13 @@ let painted: () => boolean = () => false
  * difference) — a prefix would slow both. */
 let slowDoor: { match: (p: string) => boolean; ms: number } | null = null
 
+/** A door that DROPS THE CONNECTION — the stand-in throws, so the fetcher's
+ * promise REJECTS. Not a 500 and not an empty answer on purpose: a 200 with
+ * `{ticket: null}` is a real answer meaning "gone", and that is the case these
+ * screens already got right. What they got wrong was the case where the read
+ * never answered at all. */
+let deadDoor: ((p: string) => boolean) | null = null
+
 function paintedOn(name: string): boolean {
   return document.body.textContent?.includes(name) ?? false
 }
@@ -348,6 +355,7 @@ function arriveAt(at: string, name: string) {
   painted = () => paintedOn(name)
   seen = []
   slowDoor = null
+  deadDoor = null
   window.history.replaceState({}, "", at)
 }
 
@@ -361,6 +369,7 @@ beforeEach(() => {
       // when this request left is the only fact the budget is about.
       seen.push({ path: p, afterPaint: painted() })
       if (slowDoor?.match(p)) await new Promise((resolve) => setTimeout(resolve, slowDoor?.ms))
+      if (deadDoor?.(p)) throw new TypeError("Failed to fetch")
       return new Response(JSON.stringify(answer(p)), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -602,4 +611,62 @@ describe("a cold deep link to a record", () => {
       { timeout: 15_000 }
     )
   })
+})
+
+/** WHAT THE SCREEN SAYS WHEN THE READ NEVER ANSWERS.
+ *
+ * The census in `detail-error-states.test.ts` proves each screen's error branch
+ * MENTIONS the by-id read. That is a claim about the source, and a source claim
+ * cannot tell you what a person sees — `RecordScreen` could swallow the state,
+ * the branch could sit below an earlier return, the copy could be missing. So
+ * this renders the two screens for real with the by-id door dropping the
+ * connection, and reads the screen.
+ *
+ * The two wrong answers are named explicitly rather than left to a green tick,
+ * because both of them shipped:
+ *
+ *   "That ticket no longer exists."  a CLAIM, made because the read that could
+ *                                    have disproved it failed. A dropped
+ *                                    connection is not a deletion.
+ *   a skeleton that never resolves   the meetings half, and the worse one: a
+ *                                    person cannot retry it, report it
+ *                                    precisely, or tell it from a slow network.
+ *
+ * `round_trip_review` asked for exactly this shape — a rejected promise rather
+ * than a timing race, since nothing here is about sequencing. */
+const DEAD_READ = [
+  {
+    what: "a ticket",
+    at: `/t/${TEAM}/tickets/${TICKET}`,
+    door: (p: string) => p.startsWith("/api/content/help") && p.includes(`id=${TICKET}`),
+    says: /couldn't load the ticket/i,
+    neverSays: /no longer exists/i,
+  },
+  {
+    what: "a meeting",
+    at: `/t/${TEAM}/meetings/${MEETING}`,
+    door: (p: string) => p.startsWith("/api/content/meetings") && p.includes(`id=${MEETING}`),
+    says: /couldn't load the meeting/i,
+    neverSays: /doesn't exist/i,
+  },
+] as const
+
+describe.each(DEAD_READ)("$what past the cursor, when the by-id read never answers", ({ at, door, says, neverSays }) => {
+  it("says it couldn't load — not that the record is gone, and not for ever", async () => {
+    listHoldsTheRecord = false
+    arriveAt(at, "never painted")
+    deadDoor = door
+    const DeepLinkScreen = await coldShell()
+    render(<DeepLinkScreen />)
+
+    // The error card, with its Try again — a state the person can act on.
+    await screen.findAllByText(says, {}, { timeout: 15_000 })
+    await screen.findAllByText(/try again/i, {}, { timeout: 15_000 })
+
+    // …and NOT the confident sentence about a record nothing has looked at.
+    expect(
+      screen.queryAllByText(neverSays),
+      "the screen claimed the record is gone, on a read that failed"
+    ).toEqual([])
+  }, 30_000)
 })
