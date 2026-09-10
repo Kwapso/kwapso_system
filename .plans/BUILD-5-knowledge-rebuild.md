@@ -33,6 +33,23 @@ what we build. (Ahead / level / behind = against Glean, Dropbox Dash, NotebookLM
 - **Found:** no Google material was ever filed to a client; two of three connected people
   contributed nothing; the `app` label already exists in the index (filing never used it).
 - **Broken:** filing; multi-person duplicates (one Google item = one source per person).
+- **MEASURED 10 Sep, and it corrects the audit's own headline.** KB-AUDIT §4.1 says
+  "dedupe on content hash at ingest — removes ~10% of the index". The finding
+  reproduces (925 of 9,921 live chunks are exact copies, 9.3%); the FIX does not
+  reach it. A source-level content hash reaches **114 of 3,933 sources, 2.9%** —
+  about a third — because most repetition sits INSIDE sources whose whole texts
+  differ. An identity is a source-level key BY CONSTRUCTION, so lane B1 cannot
+  deliver the 10% and nobody should carry that number to the gate. The remainder
+  needs a CHUNK-level key (lane C). Two blocks, each needing a different key:
+  email+email 668 chunk pairs (182 of 436 live mails), document+meeting 582 chunk
+  pairs (20 documents, 15 meetings). Of the mail block, a source content hash folds
+  the larger part and the RFC-822 header is required for the rest — the exact split
+  is being re-derived (B1's report 2 gave 125/84 against a population of 182, which
+  does not add up and is not yet settled). Title+date is the WEAKER key (reaches
+  112 where the hash reaches 125): if only one is built, build the hash. And
+  `event_id` does NOT express the meeting fold though it looks as though it should
+  — coverage is event 66/66, meeting 47/122, email 30/436, **document 0** — because
+  a Gemini notes MAIL is not a calendar notice and Drive files carry none.
 - **Build:** one gate, one identity per thing (Google id / message id / event id / content
   hash); sightings table; sources carry `accounts[]`, `apps[]`, `owner`, `shared_with`
   (private · agency · agency+client); named folder/space → account confirmed once by a

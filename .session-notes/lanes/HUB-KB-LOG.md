@@ -69,3 +69,262 @@ iterations and three expensive ones beats ten expensive ones. `FREE_NEURONS_PER_
 is 10,000, so heavy one-off work spread across days rides the free allowance —
 which also means a naive neuron total OVERSTATES the bill, and the meter must
 subtract the free tier per day rather than multiply the total.
+
+## Tick 2 — 10 Sep 2026, ~19:25
+
+The hub's chat was cleared by accident between ticks. Nothing was lost, and that
+is the whole argument for this file: every decision below was recoverable from
+disk, the worktrees and the commit bodies. A hub whose state lives in a
+transcript is a hub that dies with the transcript.
+
+**kb_B2 reported (report 1).** `fix/kb-grain` pushed, check green, $0 spent.
+Delivered `LINK_TYPES` + `contextLineFor` in `source-readers.ts` and
+`chunkChat`/`chunkMail`/`chunkSheetTab` in `knowledge-text.ts`, test-first.
+
+**MY FAILURE, recorded rather than smoothed over.** kb_B2 asked before starting
+whether `knowledge-shape.ts` was really its file. I answered that question in
+Tick 1 above — it is the knowledge MAP feature, not a grain file — and never
+relayed the answer to the lane. It sat blocked on a question I had already
+resolved, and said so in its report. Writing a correction in my own log is not
+the same act as sending it. Relay, then log.
+
+**Three findings from checking the report rather than accepting it:**
+
+1. kb_B2 reported `.plans/KB-AUDIT.md` "doesn't exist anywhere in the repo", and
+   kb_B1 reported the same gap earlier. It is FALSE as of now, verified four ways:
+   `ls-tree fix/kb-grain` returns blob c1f0ed34 (identical to main's),
+   `merge-base --is-ancestor 50584950 fix/kb-grain` is YES, the lane's own diff
+   shows `.plans/KB-AUDIT.md | 337 ++++`, and the file is in its worktree. Both
+   lanes looked before the canon-move commits arrived and neither re-checked
+   after rebasing. Two lanes built without the audit. Any lane reporting a
+   missing canon file gets re-verified from the hub before I believe it.
+
+2. **§2 has five Build items and only four are built.** Context line, chat runs,
+   mail-message pieces and sheet-tab headers all landed. "Relevancy date =
+   happened-at for frozen things, last-change for living things" is on NEITHER
+   branch — grepped `relevancyDate|relevancy_date|happenedAt|happened_at` across
+   `fix/kb-grain` and `fix/kb-gate`, zero hits on both. Unclaimed, not
+   misfiled. **Assigned to kb_B2** under the B1/B2 seam: it is a property of what
+   the material IS. Not cosmetic — KB-AUDIT §4.5 says the recency trigger the
+   code itself names has already been met, so a missing relevancy date is a live
+   retrieval fault.
+
+3. The real grain seam is confirmed by reading it: `google-read.ts:282` joins a
+   whole thread into `sender: text` lines in one blob. KB-AUDIT §4.9 describes
+   the same line independently ("one thread is one ~348-char blob, speakers
+   inline"). Two oracles, one seam. `chunkChat` replaces it.
+
+**Added to the ship list (not a lane's to close):** the YouTube `timedtext` and
+Loom/Tella oEmbed response shapes are unverified against a live account — no
+network egress in the lane sandboxes. A real-link smoke test on staging is a
+gate item before any of this ships. This is the same shape as the real PDF that
+found the subsetted-font gap in the reader these readers extend.
+
+**Not merged.** B1 (`edf1fdb6`) and B2 (`1b64985a`) are committed and green but
+both lanes are still live in their worktrees; merging under a working lane is
+how a rebase fight starts. kb_E is merged (525b10ea) and still working.
+
+## Tick 3 — 10 Sep 2026, ~19:35
+
+**THE NEAR-MISS. The grounded exam was in no git object anywhere.**
+
+`.plans/kb-exam-draft.md` was untracked — not on main, not on a branch, not in
+any commit's history. `git ls-files --error-unmatch` returned "did not match any
+file(s) known to git". Committed as `.plans/KB-EXAM-TRANSCRIPTS.md` (83 rows) on
+`docs/the-grounded-exam-was-never-committed`, 81743ce7.
+
+THE TWO EXAM FILES ARE NAMED BACKWARDS FROM THEIR CONTENTS:
+
+  KB-EXAM.md (87 rows, tracked, canon, what kb-exam.mjs loads) — its own header:
+  "Drafted by reading 84 CALENDAR EVENTS (titles, dates, attendees)."
+
+  kb-exam-draft.md (83 rows, untracked until now) — its own header: "Only meetings
+  whose transcript or Gemini notes exist on staging with 15 or more pieces were
+  used (71 sources)". Every row names its source AND that source's piece count.
+
+The file called "draft" is the grounded rewrite. The one called canon is the earlier
+calendar pass. The owner settled it today unprompted: the new questions "only come
+from scripts, whereas for the old exam prompt, some came from transcripts and some
+did not" — exactly what the two headers say about themselves.
+
+ee29a9c7's commit body instructed the next reader to DELETE the stray file, and
+`kb-exam.mjs:69` wires it as a fallback BEHIND the weaker file. Both were sound
+given the names and wrong given the contents. I relayed nothing to contradict
+either. A filename was trusted over a header, which is the same class of error as
+Tick 1's `knowledge-shape.ts` — inferring content from a name.
+
+**Not resolved, assigned to kb_E: MEASURE THE OVERLAP FIRST.** The owner wants the
+new rows used "along with the old ones" — a union. O1-O8 are verbatim in both files
+and an unknown number of E/M/H rows are the same question differently sourced. A
+naive concatenation gives 170 rows with duplicate ids and double-counts the
+mandatory eight. Number first, union second, baseline re-pinned once.
+
+**kb_E's struck/tool split verified against the file, not accepted:** 7 count-tagged
+rows in KB-EXAM.md, 7 `tool` rows; 7 + 6 = the 13 the old `struck` held; 87 + 1
+derived = 88. Nothing lost or invented.
+
+**Budget discrepancy resolved (kb_E was right to flag, not act).** Both my
+statements were true of different things: EXECUTION of the full-loop runs is kb_E's,
+THE BUDGET IS THE HUB'S. Each run authorised singly, spend quoted from
+`ai-spend.mjs` after each. A lane holding a standing $3 balance against the owner's
+cap is how a cap gets discovered breached rather than enforced.
+
+**kb_A reported done (542c89f7, migration 0073). Both its findings verified:**
+
+1. CREATE TRIGGER is incompatible with this repo's migration executor. Read
+   `d1-rest.ts:593`: `splitStatements` handles string literals and `--` comments
+   and has NO BEGIN/END awareness, so a trigger body shatters at its inner `;`.
+   The asymmetry is what makes it dangerous — a `node:sqlite` `exec()` test passes
+   while the real path fails. `SEARCH.md:99-107` is the ONLY `CREATE TRIGGER` in
+   the repo and line 127 states a rule ("never write the FTS table from app code")
+   for a pattern never once built. Lane G's to fix, not kb_A's.
+2. `DELETE FROM <fts>` is a silent no-op on an already-empty external-content
+   table; `'delete-all'` + `'integrity-check'` is right.
+
+**Settled kb_A's index question from B1's source instead of relaying it.**
+`identityKey()` returns `${originTable} ${originRowId}` with origins google_drive /
+google_gmail / google_calendar / google_chat / upload / record-table. Namespaced,
+so the GLOBAL unique index is safe. No amend. Told kb_A to stand down.
+
+**Two gaps I found in kb_A's migration and sent back:** `knowledge_sightings`
+(source_id, seen_where, seen_by_user_id, seen_at) has no column for B1's
+`goneAt` — and a sighting that cannot record that it ENDED cannot express B1's
+`liveSightings`/`stillLive` at all. And `relevancy_date` is a column nobody
+populates; the write side is kb_B2's §2 item.
+
+**Known limit, now tracked:** the unique index will not dedupe MAIL across
+colleagues. Gmail's message id is mailbox-scoped and the cross-mailbox identity is
+the RFC-822 header, which the app does not read. B1 wrote this down honestly. It
+lands on the owner's tracker item "one meeting arriving three ways becomes one
+source": transcript and calendar arms merge, the mail arm does not yet.
+
+**The loop is running again** (self-paced; the owner re-supplied the prompt after
+the hub's chat was cleared). Its three exit conditions: BUILD-5 complete, the
+46-item tracker complete, spend under $5. The tracker artifact still says $10 in
+two places and is STALE against the owner's $5 ruling.
+
+## Tick 4 — 10 Sep 2026, ~19:45
+
+**kb_B1 report 2 — the round's best measurement, and it corrects the audit.**
+KB-AUDIT §4.1's fix does not reach its own finding. Reproduces at 925/9,921
+chunks (9.3%); a SOURCE-level hash — which is what an identity is, by
+construction — reaches 114/3,933 sources (2.9%). Written into BUILD-5 §1 so the
+gate cannot inherit a number no lane can satisfy. Remainder is chunk-level, lane
+C's. Also: title+date is the weaker key (112 vs 125), build the hash; `event_id`
+does not express the meeting fold (event 66/66, meeting 47/122, email 30/436,
+**document 0**) because a Gemini notes MAIL is not a calendar notice.
+
+**Sent back for re-derivation: 125 + 84 = 209 against a stated population of
+182.** Load-bearing, because it decides whether the RFC-822 header is a required
+second build or a rounding error. Recorded in BUILD-5 as unsettled, in those
+words, rather than picked.
+
+**MERGE ORDER DECIDED: kb_A FIRST.** B1 is blocked on it and says identity and
+sightings must land in one merge. But 0073 is not mergeable yet — I read its DDL
+against B1's types and CONFIRMED the gap I had only inferred last tick:
+`knowledge_sightings` has NO `gone_at`, while B1's `liveSightings`/`stillLive`/
+`readableBy` all filter on `goneAt`. The table cannot store the field the code
+filters on, so the owner's tracker item "removing a sighting removes it from
+answers within one sweep" is dead on arrival. Two more: `seen_where` (a PLACE)
+cannot also carry `shelf` (a VISIBILITY); and the unique index is nullable in its
+third column, so SQLite's distinct-NULLs rule means it does not dedupe. kb_A
+amends 0073 rather than chasing it with a second migration.
+
+**Told B1 and A to settle the column shape DIRECTLY, copying me.** B1 owns the
+type, A owns the DDL; routing it through the hub adds a translation step and no
+value. The hub decides ORDER and BOUNDARIES, not column names.
+
+**Granted kb_B1 `knowledge.ts` for the cards piece only** (`level:"chunk"`,
+findable-never-quotable), overriding my earlier assignment of that file to Lane
+D. Two reasons: the owner's tracker files "app records are cards, never quoted"
+under B · Ingest, and Lane D does not exist, so the alternative is waiting on a
+lane nobody has started. Boundary stated: indexing only; retrieval or answer
+assembly means stop and tell me.
+
+**B1's discriminator kept as derived, not hand-listed:** a card kind is one where
+every live source produces exactly one short chunk — task 256/256, contact 89/89,
+event 66/66, app 28/28, person 10/10, dropdown 17/17, portal_login 5/5, todo 1/1,
+against ticket 2051/2621, document 78/2911, meeting 122/1958. Separates cleanly,
+nobody maintains it. Rejected the `body <= summary+40` fallback: B1 showed it is
+fuzzier, and which client's material a question routes into is the wrong place to
+approximate.
+
+## Tick 5 — 10 Sep 2026, ~19:55
+
+**kb_E measured the overlap. The headline: ID IS NOT A KEY BETWEEN THE FILES.**
+83 ids collide, only 29 are the same question. A union deduping on id would have
+silently destroyed 54 distinct questions — A.E6 is "HOGO cost-saving" and B.E6 is
+"Padelbase WFC porting", same label, unrelated topics. Real duplicates only show
+up by READING the text, which is what kb_E did. Union is 100 distinct questions,
+not 175 (naive concat) and not 88 (id-collapse).
+
+**MY SECOND PUBLISHED NUMBER WAS WRONG.** I said B was 83 rows in the rescue
+commit AND in BUILD-5's note. It is 88. My grep matched `O|E|M|H|X|D` and no `G`,
+so it dropped the five `gap` rows — the rows that file exists to contribute. An
+instrument that cannot see a category returns a confident number for the
+categories it can see. Corrected in the file's header, not by amending history,
+because the wrong figure reached two documents. Second census error of the day
+after the exam-filename one: both times I trusted a pattern I wrote over the
+thing it was pointing at.
+
+**RULINGS:** (1) union keys on TEXT; ids namespaced `A-E6`/`B-E6`, never
+renumbered, so no collision can drop a question and prior reports still resolve.
+(2) Union = 100. (3) B wins every A/B disposition conflict — verified from B's own
+footer, which names nine meetings with no transcript ≥15 pieces on staging as of
+10 Sep, against A's calendar-only reading. (4) kb_E's two fuzzy rejections stand.
+
+**kb_E UNDER-SCOPED ITS OWN CONFLICT AND I SENT IT BACK DERIVED.** It flagged
+A.E6/A.E12 against B.G1/B.G2. But B's left-out list has NINE entries, and at least
+three more A rows resolve to them: A.M6 ← HORST matching test run 25 Aug (B.G3
+already covers it), A.M19 ← FluClinic task 3144 meeting 25 Aug, A.H13 ← HOGO ×
+Claude math pt 1. Told it to DERIVE the set from B's list rather than hand-list
+the five I found, and to report the count the derivation produces — if it is more
+than five, that is the finding, not my guess at it.
+
+**`gap` is a FIFTH disposition, not a refusal.** A gap row passes by NAMING the
+meeting and saying nothing was recorded; a refusal row passes by refusing. Folding
+them would score an invented answer and a correct one identically.
+
+Union goes in a NEW file; neither source is overwritten, because both are now
+evidence of how their questions were derived and the derivation is what is under
+dispute. Baseline re-pinned ONCE, at the end. Still $0.
+
+## Tick 6 — 10 Sep 2026, ~20:05
+
+**kb_B2 report 2 — fixed the bug §4.9 measured.** `chatThreads` in `google-read.ts`
+no longer flattens a conversation into one blob; it is built from `chunkChat`, runs
+joined on a blank line so the downstream paragraph-cutter lands between runs rather
+than through somebody's turn. It checked `google-ingest.test.ts`'s existing exact-
+string assertions BEFORE changing the format instead of discovering them red.
+
+**The `TokenUsage` change is the meter requirement, delivered early.**
+`contextLineFor` now returns `{ line, usage }` in `shared/workers/credits.ts`'s own
+shape, imported not reinvented. Tick 1 put "ingestion spend recorded into the same
+log `ai-spend.mjs` reads" on lanes C and D, because the account-wide neuron API
+cannot separate our spend from rest-o's agent on the same kimi model. B2 delivered
+the shape at the one moment it was free — before anything is wired. Told it to say
+so in the commit body; it currently reads as a refactor.
+
+**MAIL REGROUP: APPROVED, AND IT GOES FIRST.** BUILD-5 §2 says "mail thread =
+source, message = piece" in as many words, so it is in scope; §4.9 not naming mail
+is the audit being narrower than the plan. B2 was right to ask rather than guess.
+
+The order is the non-obvious part, and it is the OPPOSITE of "wait for B1".
+Confirmed `google-read.ts:549` files `externalId: mail.id` — one source per
+MESSAGE — and B1's dedup key is a source-level hash "computed over the text the
+file reads as". So regrouping changes what a mail source IS, changes the hashed
+text, and **invalidates B1's whole mail measurement** (668 chunk pairs, 182 of 436
+mails, 125 sharing a hash — every figure is over message-shaped sources). Measuring
+a fold against a unit about to change means measuring twice and shipping whichever
+number was current. Regroup first; B1 re-measures after; if the number moves, that
+is a finding. A thread's full text may be a stronger fingerprint than a message's —
+plausibly, and to be measured rather than argued.
+
+**Guarded against an overclaim:** thread-grouping does NOT fix mail identity.
+Gmail thread ids are per-mailbox exactly as message ids are. It fixes GRAIN and may
+incidentally improve hash folding. The owner's tracker item "one meeting arriving
+three ways becomes one source" still has mail as the arm that does not merge.
+
+**Seam: B2 owns the grain, B1 owns what `externalId` becomes.** Told them to settle
+it directly and copy me, as A and B1 are already doing on the sightings columns. A
+disagreement about where the line falls comes to me; the line itself does not.
