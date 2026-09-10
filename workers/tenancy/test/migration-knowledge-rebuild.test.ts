@@ -104,11 +104,11 @@ describe("0073 — the knowledge base gets the shape the rebuild needs", () => {
     })
   })
 
-  describe("knowledge_sightings — who saw a source, where, and when", () => {
+  describe("knowledge_sightings — shaped to match knowledge-identity.ts's Sighting exactly", () => {
     it("creates the table with a source_id foreign key and an index to read by source", () => {
       const db = migrated()
       const cols = columns(db, "knowledge_sightings")
-      for (const c of ["id", "source_id", "seen_where", "seen_by_user_id", "seen_at", "created_at"])
+      for (const c of ["id", "source_id", "seen_by_user_id", "shelf", "seen_at", "gone_at", "created_at"])
         expect(cols.has(c), `knowledge_sightings.${c} is missing`).toBe(true)
       const idx = db
         .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = 'knowledge_sightings'")
@@ -121,29 +121,62 @@ describe("0073 — the knowledge base gets the shape the rebuild needs", () => {
       db.exec(
         `INSERT INTO knowledge_sources (id, kind, title, identity_key, created_at)
            VALUES ('S1','document','Week planning','drive:file-1','2026-09-07');
-         INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, seen_at, created_at)
-           VALUES ('G1','S1','drive:folder-a','U_ALEX','2026-09-07','2026-09-07');
-         INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, seen_at, created_at)
-           VALUES ('G2','S1','drive:folder-a','U_AURORA','2026-09-07','2026-09-07');`
+         INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+           VALUES ('G1','S1','U_ALEX','team','2026-09-07','2026-09-07');
+         INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+           VALUES ('G2','S1','U_AURORA','private','2026-09-07','2026-09-07');`
       )
       expect(
         db.prepare("SELECT COUNT(*) AS n FROM knowledge_sightings WHERE source_id = 'S1'").get()
       ).toMatchObject({ n: 2 })
     })
 
-    it("the same reader seeing the same source at the same place twice does not duplicate", () => {
+    it("the same reader cannot get a second sighting row of the same source", () => {
+      // One row per (source, person) — B1's `readableBy`/`stillLive` read the
+      // SHELF and GONE_AT of that one row rather than picking among several,
+      // so a second row for a person who already has one is a duplicate to
+      // refuse, not a second fact to record.
       const db = migrated()
       db.exec(
         `INSERT INTO knowledge_sources (id, kind, title, created_at) VALUES ('S1','document','X','2026-09-07');
-         INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, seen_at, created_at)
-           VALUES ('G1','S1','drive:folder-a','U_ALEX','2026-09-07','2026-09-07');`
+         INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+           VALUES ('G1','S1','U_ALEX','private','2026-09-07','2026-09-07');`
       )
       expect(() =>
         db.exec(
-          `INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, seen_at, created_at)
-             VALUES ('G2','S1','drive:folder-a','U_ALEX','2026-09-08','2026-09-08');`
+          `INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+             VALUES ('G2','S1','U_ALEX','team','2026-09-08','2026-09-08');`
         )
       ).toThrow(/UNIQUE/)
+    })
+
+    it("shelf only holds the two values Sighting's own type allows", () => {
+      const db = migrated()
+      db.exec(`INSERT INTO knowledge_sources (id, kind, title, created_at) VALUES ('S1','document','X','2026-09-07');`)
+      expect(() =>
+        db.exec(
+          `INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+             VALUES ('G1','S1','U_ALEX','public','2026-09-07','2026-09-07');`
+        )
+      ).toThrow(/CHECK/)
+    })
+
+    it("gone_at retires a sighting without deleting it — 'never saw it' and 'saw it until Tuesday' stay different", () => {
+      const db = migrated()
+      db.exec(
+        `INSERT INTO knowledge_sources (id, kind, title, created_at) VALUES ('S1','document','X','2026-09-01');
+         INSERT INTO knowledge_sightings (id, source_id, seen_by_user_id, shelf, seen_at, created_at)
+           VALUES ('G1','S1','U_ALEX','private','2026-09-01','2026-09-01');`
+      )
+      // liveSightings() filters on `!goneAt` — the column has to exist and hold
+      // a real value for that predicate to be expressible at all.
+      db.exec(`UPDATE knowledge_sightings SET gone_at = '2026-09-08' WHERE id = 'G1';`)
+      expect(
+        db.prepare("SELECT gone_at FROM knowledge_sightings WHERE id = 'G1'").get()
+      ).toMatchObject({ gone_at: "2026-09-08" })
+      expect(
+        db.prepare("SELECT COUNT(*) AS n FROM knowledge_sightings WHERE id = 'G1' AND gone_at IS NULL").get()
+      ).toMatchObject({ n: 0 })
     })
   })
 

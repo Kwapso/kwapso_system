@@ -5036,28 +5036,48 @@ ALTER TABLE knowledge_sources ADD COLUMN relevancy_date TEXT;
 
 CREATE UNIQUE INDEX idx_knowledge_sources_identity ON knowledge_sources (identity_key) WHERE identity_key IS NOT NULL;
 
--- WHO SAW A SOURCE, WHERE, AND WHEN. The row a second (or third) reader of one
+-- ONE PERSON'S SIGHT OF ONE THING. The row a second (or third) reader of one
 -- Google item gets, now that \`identity_key\` above means they no longer get a
--- second \`knowledge_sources\` row of their own. \`seen_where\` is the container
--- the sweep found it in (a folder id, a space, a mailbox) — a source can be
--- filed once and sighted from several places, exactly like the person who
--- filed it can differ from the several people who can see it.
+-- second \`knowledge_sources\` row of their own — shaped to match Lane B's own
+-- \`Sighting\` type exactly ({ userId, shelf: 'private'|'team', goneAt },
+-- \`knowledge-identity.ts\`, not yet merged as this migration lands — R58 is why
+-- this note names it without the full path, which would be a comment pointing
+-- at a file that is not here yet), the type Lane B actually reads and writes,
+-- not a shape guessed at from the plan's prose.
 --
--- The unique index is a courtesy, not the ingest's only defence: a NULL
--- \`seen_by_user_id\` (a team-wide sighting, nobody personal) is never caught by
--- it — SQLite treats every NULL as its own value — so a sweep that runs twice
--- over team-wide material still needs its own idempotency. For a NAMED reader
--- it holds exactly.
+-- \`shelf\` is THEIRS alone, not a location: 'private' or 'team', the same
+-- readable-by decision \`readableBy\`/\`stillLive\` make from a whole SET of
+-- these rows — a colleague who filed the same folder as team material gets a
+-- row of her own saying so, and neither overwrites the other. (An earlier
+-- draft of this column, \`seen_where\`, stored a folder/space id instead — a
+-- concept B1's Sighting type never carries. Caught in review before merge,
+-- not shipped: there is no data anywhere holding the old shape.)
+--
+-- \`gone_at\` is when this person stopped being able to see it (un-shared,
+-- left the space, removed from the team) — stamped, never deleted, so "she
+-- never saw it" and "she saw it until Tuesday" stay different answers, and so
+-- \`liveSightings\`/\`stillLive\` have a column to filter on at all. Without it
+-- a sighting can be recorded but never retired, which is the gap the hub
+-- caught: a set that can only grow cannot express "the last person who could
+-- see this just lost access."
+--
+-- \`seen_by_user_id\` is NOT NULL — B1's \`userId\` is required, never a
+-- team-wide anonymous sighting — so the unique index below is a real
+-- guarantee (SQLite's NULL-is-distinct rule that would have made a nullable
+-- version a courtesy rather than a constraint never comes into play). One row
+-- per (source, person): the shelf they see it on and whether they still can
+-- are both attributes OF that one sighting, not a reason for a second row.
 CREATE TABLE knowledge_sightings (
   id TEXT PRIMARY KEY,
   source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
-  seen_where TEXT NOT NULL,
-  seen_by_user_id TEXT,
+  seen_by_user_id TEXT NOT NULL,
+  shelf TEXT NOT NULL DEFAULT 'private' CHECK (shelf IN ('private', 'team')),
   seen_at TEXT NOT NULL,
+  gone_at TEXT,
   created_at TEXT NOT NULL
 );
 CREATE INDEX idx_knowledge_sightings_source ON knowledge_sightings (source_id);
-CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_where, seen_by_user_id);
+CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_by_user_id);
 
 -- CHAT/MEETING GRAIN (KB-AUDIT.md §4.9's "chunk 47 has no idea which meeting
 -- it is from", and the plan's "chat = who said what when"). \`context_line\` is
