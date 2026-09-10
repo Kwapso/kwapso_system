@@ -1265,13 +1265,18 @@ export async function gmailSearch(
   token: string,
   contactQuery: string,
   search?: string,
-  labelIds: string[] = []
+  labelIds: string[] = [],
+  /** IDS THIS PERSON'S LANE HAS ALREADY FILED — see `knownPlaceholder` below for
+   * what skipping one actually costs (nothing) and why it is safe (a Gmail
+   * message cannot change after it is received). The caller decides when this
+   * is even worth building; an empty or absent set costs nothing extra here. */
+  knownIds?: Set<string>
 ): Promise<MailMessage[]> {
   if (labelIds.length > 1) {
     const seen = new Set<string>()
     const out: MailMessage[] = []
     for (const label of labelIds)
-      for (const m of await gmailSearch(token, contactQuery, search, [label]))
+      for (const m of await gmailSearch(token, contactQuery, search, [label], knownIds))
         if (!seen.has(m.id)) { seen.add(m.id); out.push(m) }
     return out
   }
@@ -1336,9 +1341,25 @@ export async function gmailSearch(
   // other three make, made here too, by name.
   const out: MailMessage[] = []
   const BATCH = 10
+  // A KNOWN ID'S HEADER IS A CALL THAT TEACHES NOTHING. `slice()` in
+  // knowledge-google.ts pays for this read only to compare the message's date
+  // against the cursor and, on every steady-state tick, discard it — the same
+  // discard the cursor would make either way, just paid for first. Gmail
+  // messages are immutable once received (unlike a Drive file or a Calendar
+  // event, which is why this trick is gmail-only), so a known id can be
+  // answered from a PLACEHOLDER instead of a real fetch: its `date` is null,
+  // which `moment()` reads as the empty string — sorts before every real
+  // cursor, so `afterCursor` excludes it exactly as it would once the real
+  // date came back. The id itself is still returned, which is the part that
+  // must not be skipped: `slice()` records every returned id in `seen`
+  // regardless of what `wanted` keeps, and `retireVanished` reads `seen` as
+  // "Google still has this" — an id silently dropped here would read as a
+  // message that vanished and could retire mail that is still in the account.
   for (let i = 0; i < ids.length; i += BATCH) {
     const settled = await Promise.allSettled(
-      ids.slice(i, i + BATCH).map((id) => gmailMessage(token, id, false))
+      ids.slice(i, i + BATCH).map((id) =>
+        knownIds?.has(id) ? Promise.resolve(knownPlaceholder(id)) : gmailMessage(token, id, false)
+      )
     )
     for (const [n, r] of settled.entries()) {
       if (r.status === "fulfilled") {
@@ -1356,6 +1377,25 @@ export async function gmailSearch(
     }
   }
   return out
+}
+
+/** THE ANSWER FOR A KNOWN ID, with no call to Google at all. `date: null` is
+ * the load-bearing field — see the note above the batch loop that builds this.
+ * Everything else is empty because nothing downstream may ever read it: a
+ * placeholder's `sortAt` sorts before any real cursor, so it is excluded from
+ * `wanted` before its `subject` or `snippet` could matter to anyone. */
+function knownPlaceholder(id: string): MailMessage {
+  return {
+    id,
+    threadId: "",
+    from: "",
+    to: "",
+    subject: "",
+    snippet: "",
+    date: null,
+    url: `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(id)}`,
+    text: "",
+  }
 }
 
 /** One message. `withBody` decides whether the text is read too — a list wants

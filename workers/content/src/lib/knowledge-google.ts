@@ -448,6 +448,51 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
  * outgrows it wants a decision rather than a silent truncation. */
 const FOLD_ORACLE_CAP = 20000
 
+/** HOW MANY OF THIS PERSON'S ALREADY-FILED GMAIL IDS ONE TICK WILL SAMPLE. R14
+ * hard cap. `gmailSearch` can only ever list GMAIL_SWEEP_PAGES × GOOGLE_PAGE_SIZE
+ * = 200 ids in one tick, so a known id outside this sample just costs one
+ * redundant, harmless header read on that one message — not a correctness
+ * question, an efficiency one, and a generous one at that. */
+const KNOWN_GMAIL_SAMPLE = 500
+
+/** IDS THIS PERSON'S GMAIL LANE HAS ALREADY FILED — active or retired, because
+ * a retired row still means "already processed", and that is the only signal
+ * `gmailSearch`'s header skip needs (see its own doc). Never applied unless the
+ * caller already holds a cursor for this lane (see `slice` below): a null
+ * cursor means either a first connection or a deliberate `rewindGoogleLane`,
+ * and both mean "read it all again" — which is exactly what NOT calling this
+ * preserves, untouched.
+ *
+ * THIS IS WHY THE SWEEP HAS BEEN COSTING ~204 GMAIL CALLS A TICK PER MAILBOX
+ * EVEN WHEN NOTHING IS NEW (documents/COSTS.md §3, 2026-09-10): every one of
+ * the newest 200 messages got a header read solely to learn a date the cursor
+ * was about to discard it by. This is the same discard, made from a fact the
+ * database already holds instead of a fact Google has to be asked for again. */
+export async function knownGmailIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+  const prefix = `${guard.userId}:`
+  try {
+    const rows = await d1Query<{ origin_row_id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap: KNOWN_GMAIL_SAMPLE.
+      `SELECT origin_row_id FROM knowledge_sources
+        WHERE origin_table = 'google_gmail' AND origin_row_id LIKE ? ESCAPE '\\'
+        ORDER BY updated_at DESC LIMIT ${KNOWN_GMAIL_SAMPLE}`,
+      [`${likeLiteral(guard.userId)}:%`]
+    )
+    return new Set(
+      rows.filter((r) => r.origin_row_id.startsWith(prefix)).map((r) => r.origin_row_id.slice(prefix.length))
+    )
+  } catch {
+    // FAIL SAFE, NEVER FAIL SILENT ABOUT COST: an empty set here does not mean
+    // "nothing is known", it means "the read that would have told us failed" —
+    // and the caller cannot tell the two apart. That is fine, because the only
+    // consequence of an empty set is paying for the expensive, always-correct
+    // path this function exists to make less FREQUENT, never the cheap one.
+    return new Set()
+  }
+}
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -577,7 +622,12 @@ export function googleIngestKinds(
     toRows: (items: GoogleItem[]) => IngestRow[],
     hydrate = false
   ): Promise<IngestRow[]> => {
-    const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service] })
+    // GATED ON A REAL CURSOR, ON PURPOSE. A null cursor means "read it all" —
+    // a first connection, or a lane `rewindGoogleLane` deliberately forgot —
+    // and skipping a known id's header there would defeat the one mechanism
+    // this app has for saying "bring that back". See `knownGmailIds`'s own doc.
+    const gmailKnownIds = service === "gmail" && cursor ? await knownGmailIds(cfg, guard) : undefined
+    const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service], gmailKnownIds })
     // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
     // will FILE; this is everything the service currently holds, which is a
     // different and much larger sentence — and it is the only one that can tell

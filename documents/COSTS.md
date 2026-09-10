@@ -8,6 +8,11 @@ the number of tokens they are multiplied by.
 against the tree and the live account on 2026-09-07** — the lifecycle bullet was
 claiming a control that had never been applied to a single bucket, which is the
 one kind of staleness that is worse than none.
+**§3's "Google autopilot" row priced only half of what that cron does, until
+2026-09-10** — it counted the transcript capture and said nothing about the
+ingestion sweep that runs first in the same function, which is where a real,
+currently-live Gmail rate-limit incident was actually coming from. See the row
+and the paragraph beneath it.
 
 Every price below was read off the vendor's own public page on
 that date and is repeated as data in [`shared/workers/pricing.ts`](../shared/workers/pricing.ts),
@@ -248,12 +253,59 @@ there is nothing to do.
 | cron | frequency | worst-case work per tick | cost per tick |
 |---|---|---|---|
 | **knowledge sweep** (`workers/content`) | every 15 min | `CRON_TEAM_CAP` = 200 teams × `INGEST_SOURCES_PER_TICK` = 25 sources | **$0 on a quiet tick.** Unchanged text is skipped on a content hash *before* any embedding call, so a tick with no new material makes no model call at all. A tick that re-embeds a full 25-source slice of ~5,000-char sources is `25 × 5,000 / 3.82 = 32,700 tok × $0.012/M ≈ $0.0004`. |
-| **Google autopilot** (same tick) | every 15 min | `GOOGLE_SWEEP_PEOPLE_PER_TICK` people × `TRANSCRIPT_SWEEP_PER_PERSON`, `TRANSCRIPT_ATTEMPT_CAP` | Google's APIs are free at this volume; the cost is the embeddings a captured transcript then produces, priced in the row above. |
+| **Google autopilot — the ingestion sweep** (same tick, same function, priced separately below because until 2026-09-10 it was not priced at all) | every 15 min | `GOOGLE_SWEEP_PEOPLE_PER_TICK` = 5 people (today's real count: 3) × 4 kinds (drive, gmail, calendar, chat) | **$0 in Google's own billing, and up to ~204 Gmail API calls per connected mailbox on a tick where nothing changed.** See the paragraph below the table — this is the row that had gone missing. |
+| **Google autopilot — transcripts** (same tick, after the sweep above) | every 15 min | `GOOGLE_SWEEP_PEOPLE_PER_TICK` people × `TRANSCRIPT_SWEEP_PER_PERSON`, `TRANSCRIPT_ATTEMPT_CAP` | Google's APIs are free at this volume; the cost is the embeddings a captured transcript then produces, priced in the row above. |
 | **morning digest** (same worker) | daily | one email per staff member on a team with nobody on triage duty, capped at `SEND_FAN_CAP` = 100 recipients; **plus the cron watch** — one `SELECT job, last_run_at FROM cron_heartbeats LIMIT 50` | `n × $0.0004`, so at most `100 × $0.0004 = $0.04/day` = **$1.20/month per team**. A 20-person agency is $0.24/month. This is the one job whose work grows with TEAM SIZE rather than with what changed — but it grows to a stated ceiling, past which the extra recipients are dropped and named in the log rather than silently sent to. The watch is one bounded read of a three-row table: fractions of a penny a year, and it is listed because unpriced is unpriced. |
 | **nightly retention + size check + ops digest** (`workers/tenancy`) | daily, 03:10 UTC | `RETENTION_DELETE_CAP` × `RETENTION_PASSES_PER_TICK` deletes, `CRON_GROWTH_CAP` = 200 upserts, `CRON_ALERT_CAP` = 50 alarms, plus ≤ 4 bounded SELECTs and at most one digest email — **and, since 2026-09-07, two service-binding health fetches** (`probeWorkerHealth` of auth and realtime, `HEALTH_PROBE_MS` each) **and the cron watch's own `SELECT … LIMIT 50`** | D1 writes: ~250 rows = `250 / 1M × $1.00 = $0.00025`. Email: at most `1 + recipients × $0.0004`. The two health fetches are worker-to-worker subrequests, 2/day = 730/year against the 10M-request included tier, i.e. **$0.0000005/day** at `$0.30/M`. **Still under a cent a day.** |
 
-**Nothing here scales with the dataset.** Every one is a rotating, bounded window with a
-cursor; `teamSlice` warns in the log when the estate outgrows one tick.
+**Nothing here scales with the dataset — except the ingestion sweep above, and the
+exception is why it gets its own paragraph.** Every other row is a rotating, bounded
+window with a cursor; `teamSlice` warns in the log when the estate outgrows one tick.
+
+### The ingestion sweep's real shape, priced for the first time on 2026-09-10
+
+`googleAutopilot()` (`workers/content/src/lib/google-autopilot.ts:139`) does two things
+per connected person, every tick, and only the second one was ever in the table above:
+first `sweepGoogle()` (line 168) brings in drive, gmail, calendar and chat material;
+only then does the transcript-capture loop the row above prices actually run. The first
+half was never counted, in dollars or in calls — and dollars is the wrong unit for it,
+because Google does not bill this app per call. Calls are the unit that matters here,
+and they explain a real, live symptom: the `google_busy` refusal
+(`workers/content/src/lib/google-api.ts:240`, a 403 whose body carries `rateLimitExceeded`
+/ `quotaExceeded` / `userRateLimit` / `dailyLimit`) that the sweep has been hitting.
+
+Three of the four kinds stay cheap because each is scoped to a short, named list a
+person actually shared — a handful of Drive folders, Chat spaces or calendars. **Gmail
+is the one kind that is unscoped by default** (`google-read.ts`: *"I'd read all my
+emails,"* the owner, 20 Aug 2026 — the contact fence that used to narrow it was removed
+on purpose), so its read is the whole mailbox unless a person has set a label scope.
+Per person, per tick, `gmailSearch()` (`google-api.ts:1264`):
+
+```
+list     up to GMAIL_SWEEP_PAGES (4) × GOOGLE_PAGE_SIZE (50)  = 200 message ids   (4 calls)
+headers  one messages.get(format=metadata) per id, 10 at a time via allSettled    (≤200 calls)
+                                    — the cursor is applied AFTER this, in knowledge-google.ts's
+                                      slice(), never as a filter Gmail is asked to honour —
+hydrate  one messages.get(format=full) per id the cursor kept, ≤ INGEST_SOURCES_PER_TICK (25)
+                                                                                   (≤25 calls)
+```
+
+Worst case (a mailbox with 200+ brand-new messages): ~229 calls. **Steady state, a
+perfectly quiet mailbox with nothing new: ~204 calls** — only the hydrate step is
+skipped, because the cursor cannot narrow anything until the list and the headers have
+already been paid for. At today's real connection count (3 mailboxes,
+`GOOGLE_SWEEP_PEOPLE_PER_TICK` caps at 5) × 96 ticks/day:
+
+```
+3 × 204 × 96 ≈ 58,752 Gmail API calls/day, on a day when nothing new arrives at all
+```
+
+Read on the working tree, 2026-09-10, against `GMAIL_SWEEP_PAGES`, `GOOGLE_PAGE_SIZE`
+(`workers/content/src/lib/google-api.ts`) and `INGEST_SOURCES_PER_TICK`
+(`workers/content/src/lib/knowledge-ingest.ts`). This is $0 on Google's own bill and it
+is the proximate cause of the rate-limit hits — the two facts are not in tension, they
+are the same fact stated in two different units, and only the dollar one was written
+down before today.
 
 ---
 
@@ -533,4 +585,7 @@ re-measure. **A rate is only half of a cost; the other half is a number that liv
 code and can move without anybody touching this file.**
 
 Last full review: **2026-09-05**. Per-action figures re-measured: **2026-09-06**
-(`node scripts/measure-preamble.mjs`, no model call).
+(`node scripts/measure-preamble.mjs`, no model call). §3's Google-autopilot row
+completed: **2026-09-10**, by `spend_review` — the ingestion-sweep half priced for
+the first time, against the working tree, no model call and no Google API call
+made to produce it.
