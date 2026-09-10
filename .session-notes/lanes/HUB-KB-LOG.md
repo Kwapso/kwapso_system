@@ -458,3 +458,70 @@ blast radius. This is the live mechanism behind KB-AUDIT §4.5's measured sympto
 first, B2 owns grain and B1 owns `externalId`, and neither may claim it fixes the
 cross-mailbox fold — both have now independently confirmed a Gmail THREAD id is
 per-mailbox exactly as a message id is.
+
+## Tick 9 — 10 Sep 2026, ~21:10
+
+**THE CARDS DESIGN FAILED A THIRD TIME AND kb_B1 CAUGHT IT AGAIN — FROM THE CODE
+THIS TIME, NOT THE DATA.** Built as approved, test red first, seven cases red for
+the right reason. Then, before choosing WHICH kinds to declare, it read the
+readers one at a time:
+
+  person  folds headline / strengths / weaknesses / role_models
+  account folds about, plus its apps, sprints, tickets by name
+  contact folds about · task folds detail + time-log notes
+  app     folds about / client_context / solution / key_actors · todo folds detail
+
+**Every kind §4.3 named as an offender has a reader that can fold in words a
+person wrote.** The stubs the audit measured were rows where those fields happened
+to be EMPTY. Only `dropdown` and `portal_login` fold no free text: **22 of 3,933
+live sources.** Declaring those two would read as "§4.3 addressed" in the plan and
+leave the complaint exactly where it is — the same trap as the first two, one
+layer further in. kb_B1 refused to ship it and asked. Correct.
+
+**THE SENTENCE THAT ENDS IT: card-ness is a property of the ROW, the reader is the
+only thing that knows, and once the body is one string the two halves are
+indistinguishable.** The fact is destroyed by the act of building the body, so it
+must be recorded while it is still known. Ordered from kb_A:
+`knowledge_sources.generated_only INTEGER NOT NULL DEFAULT 0`, set by each reader
+at ingest, with the reasoning in the migration comment so nobody simplifies it
+away. Default 0 is the safe direction: a wrong 0 costs a slot, a wrong 1 silently
+stops a person's words being quotable.
+
+**My score on cards: three designs, three wrong, all three caught by the lane.**
+Census-as-rule, then kind-level declaration, then kind-level at all. Every time the
+lane measured or read something I had not.
+
+**kb_B1 DELETED its red test rather than skipping it** — a skipped test is a
+silent absence that counts as success, and a green test asserting the wrong intent
+is the failure the planning ritual names. The finding lives in
+`knowledge-summary.ts`'s header with both disproved readings and the numbers that
+disproved them.
+
+**Three traps held for whoever wires the column:** no chunks; still write the
+`level:"record"` vector or unquotable becomes UNFINDABLE; and do not let the
+no-embedded-chunks self-heal blank a card's hash — that is a COST bug, re-reading
+and re-embedding every card every fifteen minutes against the €50 ceiling, forever,
+looking exactly like normal sweep activity.
+
+**kb_E's union verified from the branch: 100 rows, ids namespaced, `--check`
+regenerates and diffs so a hand-edit of a generated artefact is a red build.**
+Totals reconcile (72+8+8+7+6 = 101 = 100 + the derived X8-notowner); mustScore100
+8 → 16; ten canaries intact.
+
+**MY GAP RULE WAS WRONG AND kb_E's FLAG CAUGHT IT.** I said "any A row whose
+source resolves to B's left-out list is a gap". A-H13 asks about the recruiter's
+maths over TWO sessions — pt 1 (25 Aug) is left out, pt 2 (26 Aug, 23 pieces) is
+on staging and cited by B's own O3 and M7. Under kb_E's own grading, `gap`
+requires `found === false`, so **a system that correctly answers from pt 2 would
+FAIL the row.** The disposition would have penalised the right behaviour.
+
+Corrected rule: **a row is a gap only if ALL its sources are on the left-out
+list.** A row citing one absent and one present source is a THIN-EVIDENCE row —
+and A-H13 is the only row in the exam testing partial knowledge, mapping exactly
+onto the owner's tracker item "answer and say what is missing". Filed `keyed` to
+pt 2, with the gap sentence recorded in its detail for the full loop to grade
+later. Derived gaps: 4, not 5. kb_E filed it per the letter of my rule and flagged
+the ambiguity instead of resolving it silently — which is the only reason this was
+catchable before an exam run.
+
+**Standing: no model call authorised anywhere. Every lane at $0.**
