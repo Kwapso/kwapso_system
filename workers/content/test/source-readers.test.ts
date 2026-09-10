@@ -19,6 +19,7 @@ import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
+import { NO_TOKENS } from "@shared/workers/credits"
 
 import {
   LINK_TYPES,
@@ -262,7 +263,7 @@ describe("contextLineFor", () => {
 
   it("asks the declared model and returns its one sentence, trimmed", async () => {
     env.AI.run.mockResolvedValue({ choices: [{ message: { content: "  This covers the Q3 renewal terms.  " } }] })
-    const line = await contextLineFor(env as never, {
+    const { line } = await contextLineFor(env as never, {
       sourceTitle: "Renewal email thread",
       piece: "We agreed to renew at the same rate through March.",
     })
@@ -270,14 +271,39 @@ describe("contextLineFor", () => {
     expect(env.AI.run.mock.calls[0][0]).toBe("@cf/meta/llama-4-scout-17b-16e-instruct")
   })
 
-  it("a model failure is an honest empty line, never a thrown error", async () => {
+  it("a model failure is an honest empty line and NO_TOKENS, never a thrown error", async () => {
     env.AI.run.mockRejectedValue(new Error("model unavailable"))
-    const line = await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })
-    expect(line).toBe("")
+    const result = await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })
+    expect(result).toEqual({ line: "", usage: NO_TOKENS })
   })
 
   it("a non-string reply is the same honest empty", async () => {
     env.AI.run.mockResolvedValue({ choices: [{ message: {} }] })
-    expect(await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })).toBe("")
+    expect((await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })).line).toBe("")
+  })
+
+  // BUDGET, per the hub's 10 Sep 2026 ruling: the cost line is now 34% of the
+  // whole build's cap, and "ingestion is recorded nowhere" — so the call
+  // reports what it actually spent, in the SAME shape agent turns already log
+  // (`TokenUsage`, `shared/workers/credits.ts`), rather than a fourth shape
+  // nearly like the other three. This function does not WRITE the usage row
+  // itself — it has no team or actor, only `{AI}` — the caller does, once it
+  // has both.
+  it("reports the tokens the model actually spent, in the shared TokenUsage shape", async () => {
+    env.AI.run.mockResolvedValue({
+      choices: [{ message: { content: "About the renewal." } }],
+      usage: { prompt_tokens: 140, completion_tokens: 12, prompt_tokens_details: { cached_tokens: 40 } },
+    })
+    const { usage } = await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })
+    // Cached tokens are billed at a fraction of the rest, so they are split out
+    // rather than folded into `input` — same reasoning as `readUsage` in
+    // workers/data-ops (the one other place this app reads a Workers AI usage
+    // block), the split just kept local rather than imported across workers.
+    expect(usage).toEqual({ input: 100, output: 12, cacheWrite: 0, cacheRead: 40 })
+  })
+
+  it("a reply with no usage block at all reports NO_TOKENS, not zeroes that look measured", async () => {
+    env.AI.run.mockResolvedValue({ choices: [{ message: { content: "About the renewal." } }] })
+    expect((await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })).usage).toEqual(NO_TOKENS)
   })
 })

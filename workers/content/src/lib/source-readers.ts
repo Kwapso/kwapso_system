@@ -45,6 +45,7 @@
 
 import type { Ai } from "@cloudflare/workers-types"
 
+import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
 import { queryText } from "@shared/workers/validate"
 
 import { looksLikeProse, officeText, readsLikeWords } from "./file-text"
@@ -594,15 +595,49 @@ const CONTEXT_LINE_TIMEOUT_MS = 10_000
  * summarise. */
 const CONTEXT_LINE_MAX_CHARS = 240
 
+/** WHAT ONE CALL SPENT, reported back to the caller — not written down here.
+ * This function has no team and no actor, only `{AI}`, so it cannot be the
+ * one that calls `logUsage` (`shared/workers/credits.ts`); that seam is the
+ * caller's, once ingestion has both. Returning the SAME `TokenUsage` shape
+ * that seam already logs agent turns in is the point: the hub's 10 Sep 2026
+ * ruling ("ingestion is recorded nowhere") asked for one shape across every
+ * lane that spends AI during this rebuild, not three that nearly match. */
+type ContextLineResult = { line: string; usage: TokenUsage }
+
+/** The tiny half of `readUsage` (workers/data-ops/src/lib/model.ts) this file
+ * needs, kept local rather than imported: a worker's own `src/lib` is not
+ * shared, so the choice is duplicate three lines of arithmetic or promote them
+ * to `shared/`, and three lines is not a shared module yet. Same reasoning:
+ * cached prompt tokens are billed at a fraction of the rest, so they are
+ * split out rather than folded into `input`. */
+function tokenUsage(raw: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } | undefined): TokenUsage {
+  if (!raw) return NO_TOKENS
+  const cached = raw.prompt_tokens_details?.cached_tokens ?? 0
+  return {
+    input: Math.max(0, (raw.prompt_tokens ?? 0) - cached),
+    output: raw.completion_tokens ?? 0,
+    cacheWrite: 0,
+    cacheRead: cached,
+  }
+}
+
 /** ONE SENTENCE OF CONTEXT for one piece. A model failure — a timeout, a
  * malformed reply, the binding erroring — is an honest empty line rather than
  * a thrown error: the piece still indexes and searches on its own words, it
  * just carries no context sentence, which is a true and recoverable state
- * (the next sweep can try again) rather than a lost source. */
+ * (the next sweep can try again) rather than a lost source.
+ *
+ * IDEMPOTENCY IS THE CALLER'S JOB, and it has to be: this function has no
+ * store of its own to check against. Key the call on the piece's own
+ * `contentHash` (knowledge-text.ts) and skip it entirely when the piece's
+ * hash has not changed since the last context line was generated for it —
+ * the same discipline this base already applies to re-embedding
+ * (`a-textversion-bump-does-not-re-embed`), and the difference between
+ * spending BUILD-5's $1.70 once and spending it on every rebuild. */
 export async function contextLineFor(
   env: ContextLineEnv,
   input: { sourceTitle: string; piece: string }
-): Promise<string> {
+): Promise<ContextLineResult> {
   try {
     const out = (await withTimeout(
       env.AI.run(
@@ -610,10 +645,13 @@ export async function contextLineFor(
         { messages: [{ role: "user", content: contextLinePrompt(input) }] } as never
       ),
       CONTEXT_LINE_TIMEOUT_MS
-    )) as { choices?: { message?: { content?: unknown } }[] }
+    )) as { choices?: { message?: { content?: unknown } }[]; usage?: Parameters<typeof tokenUsage>[0] }
     const said = out?.choices?.[0]?.message?.content
-    return typeof said === "string" ? said.trim().slice(0, CONTEXT_LINE_MAX_CHARS) : ""
+    return {
+      line: typeof said === "string" ? said.trim().slice(0, CONTEXT_LINE_MAX_CHARS) : "",
+      usage: tokenUsage(out?.usage),
+    }
   } catch {
-    return ""
+    return { line: "", usage: NO_TOKENS }
   }
 }

@@ -159,7 +159,16 @@ const MAX_MESSAGES_PER_CHAT_PIECE = 6
 
 /** ONE PIECE PER RUN. A message with no words (an empty edit, a reaction with
  * no text this reader can see) is dropped rather than filed as a blank
- * turn — its neighbours still carry the run. */
+ * turn — its neighbours still carry the run.
+ *
+ * THE TEXT CARRIES "WHO", NEVER "WHEN" — `${speaker}: ${text}`, the same line
+ * shape this app has always attributed a chat message with. The time is real
+ * metadata (`startAt`/`endAt`), kept OFF the indexed prose on purpose: a raw
+ * ISO instant on every line is the PDF-metadata mistake again (source-readers.ts's
+ * `runReader` comment) — every message would share the same dozen timestamp
+ * characters and resemble every other message more than it resembles a
+ * question, for a fact a citation can already show from the piece's own
+ * columns once they exist. */
 export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
   const pieces: ChatPiece[] = []
   let run: { speaker: string; at: string; text: string }[] = []
@@ -168,7 +177,7 @@ export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
   const flush = () => {
     if (!run.length) return
     pieces.push({
-      text: run.map((m) => `${m.speaker} (${m.at}): ${m.text}`).join("\n"),
+      text: run.map((m) => `${m.speaker}: ${m.text}`).join("\n"),
       speakers: [...new Set(run.map((m) => m.speaker))],
       startAt: run[0].at,
       endAt: run[run.length - 1].at,

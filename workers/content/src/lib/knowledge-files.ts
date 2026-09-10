@@ -45,7 +45,7 @@
 
 import { causeOf, recordWorkerError } from "@shared/workers/error-log"
 import { GuardError } from "@shared/workers/gating"
-import { readersFor, runReader, type ReaderName } from "./source-readers"
+import { classifyLink, readLink, readersFor, runReader, type ReaderName } from "./source-readers"
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import type { Env } from "../env"
 
@@ -246,4 +246,33 @@ export async function extractFile(
 /* `CONVERT_TIMEOUT_MS` and `withTimeout` moved to source-readers.ts with the
  * conversion itself: the ceiling belongs to the reader, so the sweep gets it too
  * rather than only the door that happened to be written first. */
+
+/**
+ * READ A LINK — the third way words come into this door, and the newest
+ * (BUILD-5 §1: YouTube captions first-class, Loom/Tella best-effort, no
+ * Whisper). There are no bytes to keep here; the source is the link itself,
+ * and the two promises this file makes are unchanged: it is kept whatever
+ * happens, and the words are only ever claimed when `readLink`
+ * (source-readers.ts, R42's table applied to a URL instead of a mime/
+ * extension) actually found some.
+ *
+ * NEVER THROWS. Unlike `extractFile`'s empty-bytes case, there is no "you
+ * gave me nothing" version of a link — a link nothing here can read, or one
+ * whose video has no caption track, is a true and useful answer, the same way
+ * an unreadable file is. */
+export async function extractLink(url: string): Promise<ExtractedFile> {
+  const kind = classifyLink(url)
+  if (!kind)
+    return {
+      text: null,
+      note: "We can't read this link, so it is kept here but the assistant can't answer from it. Anything you type into the note below IS searchable.",
+    }
+  const text = await readLink(url)
+  return text
+    ? capToRow(text)
+    : {
+        text: null,
+        note: `We couldn't find any words at this ${kind.label} — it may have no caption track, or we couldn't reach it just now. It is kept here, but the assistant can't answer from it.`,
+      }
+}
 
