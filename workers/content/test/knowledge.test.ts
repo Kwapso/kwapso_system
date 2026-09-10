@@ -610,6 +610,34 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
     expect(total).toBe(sources.length)
   })
 
+  /** THE SENTENCE ABOUT THE CONTENT IS PART OF THE ANSWER (R23), so the fence
+   * has to reach it too. Found by an adversarial review, 11 Sep 2026:
+   * `sourceTitles` fenced with the owner half alone while every other read used
+   * both, so an app-restricted source's TITLE and EXISTENCE reached a colleague
+   * outside that app through `reason` and `records` — with `found` correctly
+   * false and no passage leaking. The test above asserts `.found` and the list
+   * and would have stayed green through all of it, which is why this one asserts
+   * the two fields it never looked at. */
+  it("does not name an app's material to a colleague outside it, not even in the reason", async () => {
+    staffOnApp(IDS.staffUser)
+    await addSource(IDS.staffUser, {
+      title: "Dispatch rollout postmortem — internal only",
+      body: "The dispatch rollout was paused because the invoice run kept timing out.",
+      visibleToAppId: IDS.victimApp,
+    })
+
+    const theirs = await ask(OTHER_STAFF, "why was the dispatch rollout paused?")
+    expect(theirs.found).toBe(false)
+    // The title must appear in NEITHER field a person can read.
+    expect(theirs.reason ?? "").not.toContain("Dispatch rollout postmortem")
+    expect(JSON.stringify(theirs.records ?? [])).not.toContain("Dispatch rollout postmortem")
+
+    // And the same question from the app's OWN staff still names it — otherwise
+    // this passes by breaking the feature rather than by fencing it.
+    const mine = await ask(IDS.staffUser, "why was the dispatch rollout paused?")
+    expect(JSON.stringify(mine.records ?? [])).toContain("Dispatch rollout postmortem")
+  })
+
   it("lets them in the moment they are put on the app, with no re-index", async () => {
     staffOnApp(IDS.staffUser)
     await addSource(IDS.staffUser, {

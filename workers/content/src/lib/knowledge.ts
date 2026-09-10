@@ -1868,14 +1868,33 @@ async function accountById(
 }
 
 /** The titles of a handful of sources, for the sentence the router says out
- * loud. Fenced like every other read here. */
+ * loud.
+ *
+ * FENCED WITH `readerClause`, BOTH HALVES, AND THE REASON IS THE WHOLE POINT.
+ * This used to say "fenced like every other read here" while using
+ * `ownerClause` alone — a comment asserting a property the code did not have.
+ * Every OTHER read here is `readerClause` (owner AND app); this one was the
+ * exception and its own comment hid that.
+ *
+ * What it cost: an app-restricted source's TITLE and its EXISTENCE reached a
+ * colleague who is not on that app, through the router's `reason` sentence and
+ * its `records` — while `found` was correctly false and no passage or citation
+ * leaked. The content fence held; the sentence ABOUT the content did not. R23
+ * makes the reasoning part of the answer, so a fence the reasoning does not
+ * honour is not a fence.
+ *
+ * WHY THIS ONE AND NOT `nameArm`, which also narrows with the owner half alone:
+ * `nameArm` produces CANDIDATES that must still cross the full-fence read-back
+ * before they can become an answer, which is R26's bargain — the index narrows,
+ * the team's database decides. These titles cross nothing. They go straight into
+ * a sentence a person reads. */
 async function sourceTitles(
   cfg: D1Rest,
   guard: MemberGuard,
   ids: string[]
 ): Promise<Map<string, string>> {
   if (!ids.length) return new Map()
-  const owner = ownerClause(guard)
+  const owner = readerClause(guard)
   const rows = await d1Query<{ id: string; title: string }>(
     cfg,
     guard.databaseId,
