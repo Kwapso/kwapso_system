@@ -36,6 +36,19 @@
 // quietly widened a fence would be the most expensive possible way to remove a
 // duplicate.
 //
+// AND THE PROOF'S SCOPE IS NARROWER THAN IT READS, which is worth saying before
+// somebody rests on it. It pins these two functions to each other, in this
+// model. It does NOT pin either of them to the fence running today, and there is
+// no backfill that would let it: migration 0073 creates `knowledge_sightings`
+// and writes not one row into it — grep it for an insert. Nothing derives a
+// sighting from the `owner_user_id` already on 4,000 sources.
+//
+// That is correct rather than missing, and only because of BUILD-5 §0's ruling:
+// every derived row is PURGED and re-pulled, so sightings are written fresh by
+// the readers and there is no old shape to migrate from. It stops being correct
+// the moment somebody folds without purging — then the migration direction has
+// to be proved, not assumed, and this comment is the warning that it never was.
+//
 // AND THE MAIL, WHICH IS THE ONE THAT DOES NOT MERGE YET.
 //
 // Gmail's message id is scoped to ONE MAILBOX: the same message sitting in two
@@ -187,7 +200,29 @@ export function stillLive(sightings: Sighting[]): boolean {
  * whatever writes a sighting's shelf or retires one must recompute this in the
  * same statement, and something must re-derive it across the corpus and refuse
  * to agree with a stored value that has drifted. A stale copy of this is a
- * silent fence widening with no code change and no deploy behind it. */
+ * silent fence widening with no code change and no deploy behind it.
+ *
+ * IT NARROWS. IT NEVER DECIDES. THE FENCE IS TWO CLAUSES AND THIS MODELS ONE.
+ *
+ * `readerClause` is `ownerClause AND appClause`: a source can also be limited to
+ * the people on one app (`visible_to_app_id`), which is a third setting between
+ * private and the team's and has no shelf of its own. So `teamVisible` true
+ * means NO OWNER BLOCKS IT — never "the team may read this". Material restricted
+ * to one app's staff satisfies this function and must still be refused to
+ * everybody else.
+ *
+ * That is not a gap to close here; it is the architecture R26 already states, and
+ * `knowledge_terms` is the proof — it carries an owner and DELIBERATELY carries
+ * no app, because the index narrows and the team's database decides. A restricted
+ * chunk may reach the candidate pool and cost a relevant passage its place; it
+ * cannot reach an answer, because the read-back joins `knowledge_sources` with
+ * the whole of `readerClause` on it.
+ *
+ * SO THE READ-BACK JOIN IS NOT REDUNDANT, however much it looks it once a chunk
+ * carries its own answer. Delete it because "the flag already decided" and the
+ * app fence is bypassed in silence — the fastest possible route to material
+ * escaping the room it was limited to, written by somebody removing what reads
+ * as a duplicate check. */
 export function teamVisible(sightings: Sighting[]): boolean {
   return liveSightings(sightings).some((s) => s.shelf === "team")
 }
