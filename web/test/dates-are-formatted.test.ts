@@ -140,7 +140,7 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
     "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
     "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
-  "web/components/deep-link/shape.tsx:96":
+  "web/components/deep-link/shape.tsx:94":
     "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
@@ -148,7 +148,11 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "`ActivityFeedRow` — and the import and its note landed above this line; " +
     "and to :96 the same day, when the contacts TABLE landed and `REF_LEADS_NAME` " +
     "joined the import block above it with the note saying why the class is " +
-    "shared rather than respelled.)",
+    "shared rather than respelled; and to :94 on 10 Sep 2026, when kb_F deleted " +
+    "the knowledge section's two dead exports (`knowledgeFiledUnder`, " +
+    "`shapeKnowledgeList` — superseded by `KnowledgeSourceCard`) and their " +
+    "now-unused `Icon`/`IconName`/`KnowledgeSource` imports two lines above " +
+    "this one.)",
   "web/components/work/work-panels.tsx:1500":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +

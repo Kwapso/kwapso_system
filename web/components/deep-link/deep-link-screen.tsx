@@ -578,6 +578,7 @@ export function DeepLinkScreen() {
     createHelp,
     createAccount,
     createKnowledge,
+    editKnowledge,
     uploadKnowledgeFile,
     saveInternalRecord,
     setInternalActive,
@@ -924,6 +925,8 @@ export function DeepLinkScreen() {
         createHelp={createHelp}
         createAccount={createAccount}
         createKnowledge={createKnowledge}
+        editKnowledge={editKnowledge}
+        knowledgeQ={knowledgeQ}
         uploadKnowledgeFile={uploadKnowledgeFile}
         saveInternalRecord={saveInternalRecord}
         setInternalActive={setInternalActive}
