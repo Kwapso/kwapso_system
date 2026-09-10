@@ -202,3 +202,49 @@ source": transcript and calendar arms merge, the mail arm does not yet.
 the hub's chat was cleared). Its three exit conditions: BUILD-5 complete, the
 46-item tracker complete, spend under $5. The tracker artifact still says $10 in
 two places and is STALE against the owner's $5 ruling.
+
+## Tick 4 — 10 Sep 2026, ~19:45
+
+**kb_B1 report 2 — the round's best measurement, and it corrects the audit.**
+KB-AUDIT §4.1's fix does not reach its own finding. Reproduces at 925/9,921
+chunks (9.3%); a SOURCE-level hash — which is what an identity is, by
+construction — reaches 114/3,933 sources (2.9%). Written into BUILD-5 §1 so the
+gate cannot inherit a number no lane can satisfy. Remainder is chunk-level, lane
+C's. Also: title+date is the weaker key (112 vs 125), build the hash; `event_id`
+does not express the meeting fold (event 66/66, meeting 47/122, email 30/436,
+**document 0**) because a Gemini notes MAIL is not a calendar notice.
+
+**Sent back for re-derivation: 125 + 84 = 209 against a stated population of
+182.** Load-bearing, because it decides whether the RFC-822 header is a required
+second build or a rounding error. Recorded in BUILD-5 as unsettled, in those
+words, rather than picked.
+
+**MERGE ORDER DECIDED: kb_A FIRST.** B1 is blocked on it and says identity and
+sightings must land in one merge. But 0073 is not mergeable yet — I read its DDL
+against B1's types and CONFIRMED the gap I had only inferred last tick:
+`knowledge_sightings` has NO `gone_at`, while B1's `liveSightings`/`stillLive`/
+`readableBy` all filter on `goneAt`. The table cannot store the field the code
+filters on, so the owner's tracker item "removing a sighting removes it from
+answers within one sweep" is dead on arrival. Two more: `seen_where` (a PLACE)
+cannot also carry `shelf` (a VISIBILITY); and the unique index is nullable in its
+third column, so SQLite's distinct-NULLs rule means it does not dedupe. kb_A
+amends 0073 rather than chasing it with a second migration.
+
+**Told B1 and A to settle the column shape DIRECTLY, copying me.** B1 owns the
+type, A owns the DDL; routing it through the hub adds a translation step and no
+value. The hub decides ORDER and BOUNDARIES, not column names.
+
+**Granted kb_B1 `knowledge.ts` for the cards piece only** (`level:"chunk"`,
+findable-never-quotable), overriding my earlier assignment of that file to Lane
+D. Two reasons: the owner's tracker files "app records are cards, never quoted"
+under B · Ingest, and Lane D does not exist, so the alternative is waiting on a
+lane nobody has started. Boundary stated: indexing only; retrieval or answer
+assembly means stop and tell me.
+
+**B1's discriminator kept as derived, not hand-listed:** a card kind is one where
+every live source produces exactly one short chunk — task 256/256, contact 89/89,
+event 66/66, app 28/28, person 10/10, dropdown 17/17, portal_login 5/5, todo 1/1,
+against ticket 2051/2621, document 78/2911, meeting 122/1958. Separates cleanly,
+nobody maintains it. Rejected the `body <= summary+40` fallback: B1 showed it is
+fuzzier, and which client's material a question routes into is the wrong place to
+approximate.
