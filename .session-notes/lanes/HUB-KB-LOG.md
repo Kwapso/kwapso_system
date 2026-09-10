@@ -328,3 +328,59 @@ three ways becomes one source" still has mail as the arm that does not merge.
 **Seam: B2 owns the grain, B1 owns what `externalId` becomes.** Told them to settle
 it directly and copy me, as A and B1 are already doing on the sightings columns. A
 disagreement about where the line falls comes to me; the line itself does not.
+
+## Tick 7 — 10 Sep 2026, ~20:20
+
+**FIRST MERGE. `main` at a32060ce, `npm run check` EXIT 0** — read the exit code,
+not the output, per the standing rule that a grep has hidden a red build here
+twice. 10 workspaces, 5,236 tests, zero failures. Merged: the docs branch (exam
+rescue + the two corrections) and `fix/kb-model` (migration 0073).
+
+Verified A's amended DDL against B1's `Sighting` type BEFORE merging rather than
+taking the report: `seen_by_user_id NOT NULL`, `shelf CHECK IN ('private','team')`,
+`gone_at TEXT`, unique `(source_id, seen_by_user_id)`. kb_B1 unblocked.
+
+A improved on my instruction: I said decide between one column and two, my read is
+two. It read the TYPE, found `seen_where` held a folder id `Sighting` never
+carries, and deleted it as its own invention from the plan's prose. Deleting an
+invented column beats keeping it company. It also tripped R58 by naming a
+cross-branch file by full path in a comment — the rule firing on a case nobody had
+exercised.
+
+**THE CARDS DISCRIMINATOR: I ENDORSED IT AND IT IS WRONG. kb_B1 CAUGHT IT.**
+Tick 4 I blessed "every live source produces exactly one short chunk" and told B1
+to keep it as derived. B1 measured the TRANSLATION before building — which is what
+I should have done before endorsing — and `chunk_count = 1 AND length(body) <= 480`
+catches 2,589 of 3,933 sources, including **1,309 of 2,051 tickets and 269 of 339
+stories**. The ticket it quoted settles it: a person's own words, short, and
+quoting them is the entire reason we hold it. **A short ticket is not a stub; it is
+a ticket.** It would have shipped green and silently stopped 1,309 tickets being
+quotable.
+
+The flaw, named so I stop making it: **an aggregate census and a per-source
+predicate are different sentences.** "Every source of this kind is short" is a
+property of a KIND; an indexer decides one source at a time and cannot ask about a
+population. I approved a census as though it were a rule. Third census error of the
+day, same shape each time — trusting a pattern over the thing it points at.
+
+**APPROVED B1's replacement**, seam verified first: `knowledge-ingest.ts:4` opens
+"ONE ENGINE, KINDS AS DATA", `INGEST_KINDS` is a plain array at :346,
+`SUMMARY_MAX_CHARS = 480` is `knowledge-summary.ts:45` (a ceiling, not a threshold
+fitted to data). The true separation is **a card kind is one whose every word the
+app generated from columns; a non-card kind folds in something a person wrote** —
+knowable in the CODE, not merely in the data. Declaration is the rule, census is
+the rot-check, fails both ways, list can only shrink. B1's R13 argument for why the
+production census cannot BE the rule is kept verbatim: a fresh environment holds no
+rows, so no kind would qualify and NOTHING would be a card.
+
+**MAIL SETTLED, THEN DELIBERATELY UNSETTLED.** B1 re-derived: 436 live email
+sources, 182 share exact chunk text, hash catches 125 (69%), misses 57 (31%). The
+125/84 error was two `COUNT(DISTINCT source_id)`s over OVERLAPPING sets — one mail
+can share text with an equal-hash twin and a different-hash twin at once — so 209
+was the overlap itself. **The prize is 66 rows removed across 59 hash groups, not
+125**: a fold keeps one per group, and counting members rather than removals
+overstates the win by nearly double. B1 volunteered that. In BUILD-5 now.
+
+All five figures go stale when B2's mail regroup lands, BY DESIGN — Tick 6
+sequenced the regroup first so B1 measures once against the final shape. Told B1 to
+expect it and to treat a moved number as a finding, not an error.
