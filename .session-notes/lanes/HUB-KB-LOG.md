@@ -929,3 +929,54 @@ says WHY — `b-cards` "code done and tested, 0 of 2,052 tickets quotable, needs
 staging", `c-label` carrying kb_A's finding that the mirror test is a CEILING that
 derives its expectation from the code it checks and is therefore green at nine for
 ever.
+
+## Tick 17 — 11 Sep 2026, ~01:15
+
+**kb_CD's STAGE 1 MERGED (`48218c18`, exit 0). The lexical arm is a real BM25.**
+`lexicalArm` reads `knowledge_chunks_fts` through `bm25()` instead of the raw
+SUM(weight) scorer — which IS the strawman KB-AUDIT §4.4 named: "hybrid does not
+help" was measured against a keyword arm with no IDF and then muted to 0.1.
+`termFloor` and the exact-token bypass unchanged; `fuse` only ever read array
+position, not `.lex`'s value.
+
+**§4.2 fixed: the router no longer narrows on an ordinary word.** "what solutions
+have we proposed for data import?" returns compartments [] and "named no client";
+"Paddlebase" still resolves. `accountNamedIn` narrows on a single token only when
+it is RARE (reusing `EXACT_TERM_MAX_CHUNKS` — no new number invented) or matches
+the account's own code.
+
+**THE BEST THING IN THE REPORT IS THE BUG kb_CD FOUND IN ITS OWN FIX.** Its first
+draft populated `knowledge_names` through the swept `knowledge_sources` mirror and
+broke on a brand-new never-indexed account — no candidate row, so it routed as
+"named no client", **MOVING the audit's bug rather than fixing it**. Caught by
+testing the fix's POSITIVE case, not only the negative one. Three card designs died
+in this rebuild for exactly that want.
+
+**And it refused to invent a weight.** Its $0 SQLite-only measurement showed 5.00x
+flat under SUM(weight) versus 1.83x–1.90x under `bm25()`, which would have looked
+like grounds for a new `LEXICAL_WEIGHT`. It said plainly that a corpus-shape
+argument is not a retrieval measurement and left the weights alone.
+
+**RULED: re-measurement NOT YET, and not for cost.** The spend is cents and I would
+clear it. The problem is what it would measure — **the corpus is about to be purged
+and re-pulled**, and tonight's merges change what a chunk IS (thread-grained mail,
+chat runs, context lines, cards writing no chunks at all). Same ruling I gave
+kb_B1 on the mail hash: **measure once, against the final shape.**
+
+**RULED: Stage 2 authorised — build the loop, at $0.** Mocked model calls expected;
+a real call needs per-run clearance. Carried in three lessons: assert on the
+REQUEST not the answer; ask of every seam whether a test RUNS it or only mocks it
+(`googlePresence` had none until last night); R23's one seam for found/passages/
+citations.
+
+**A COST INPUT NOBODY HAD: `catchUp()` INDEXES AND EMBEDS MID-QUESTION.**
+`getKnowledgeAsk` runs it before every `retrieve()`, so a record can be indexed and
+embedded ON THE FLY inside a question. An exam run is therefore NOT purely
+retrieval — a hundred questions against a freshly purged corpus could trigger real
+embedding work inside the run. That is the shape of spend that surprises, because
+it is nobody's line item. **Strong argument for running the rebuild to COMPLETION
+before the exam, rather than letting the exam do the indexing.**
+
+**Lane state: A idle (drop-column ruling pending its D1 verification), B1 on the
+fence wiring, B2 done and holding, E done and holding, CD starting Stage 2.**
+Everything green. Still $0 across every lane.
