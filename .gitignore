@@ -52,6 +52,11 @@ out/
 /story-review.md
 /ocean-review.html
 /ocean-review.md
+/error-log-review.html
+/error-log-review.md
+/error-capture.json
+/spend-review.html
+/spend-review.md
 # NOT scaling-review.md/.html. README's doc map lists it as item 27 and
 # DATA-MODEL.md cites it for a claim, so it is a DOCUMENT that two other
 # documents depend on — ignoring it left the map pointing at a file a fresh
