@@ -236,7 +236,7 @@ const docFiles = () =>
       { extensions: [".md"], relativeTo: ROOT }
     ),
     ...sourceFiles(ROOT, { extensions: [".md"], recursive: false, relativeTo: ROOT }),
-  ].filter((f) => !notOurs(f.rel))
+  ].filter((f) => !notOurs(f.rel) && !isOutput(f.rel))
 
 /** THE CODE HALF. Two passes on purpose: the first asks each root whether it
  * holds code OF OURS at all, reading only code extensions, and the second reads
@@ -249,8 +249,28 @@ const CONFIG = [".css", ".json", ".jsonc", ".html"]
 const codeFiles = () =>
   ROOTS.filter((d) => sourceFiles(join(ROOT, d), { extensions: CODE }).length > 0)
     .flatMap((d) => sourceFiles(join(ROOT, d), { extensions: [...CODE, ...CONFIG], relativeTo: ROOT }))
-    .filter((f) => !notOurs(f.rel))
+    .filter((f) => !notOurs(f.rel) && !isOutput(f.rel))
 
+/** …AND `isOutput` ON BOTH WALKS ABOVE, WHICH IT WAS NOT UNTIL 2026-09-10.
+ *
+ * The predicate answered only "is the path being NAMED something we generate",
+ * never "is the file doing the naming". So this census read generated files as
+ * if they were this repo's own prose — and a generated file names whatever it
+ * named on the day it was built. `tools/screen-builder/index.html` is 2.8 MB of
+ * regenerable HTML, built on 6 Sep, and it still pointed at a verification page
+ * that has since gone — named here in prose rather than spelled out, because
+ * this check reads its own file and a dead path in a COMMENT is exactly what it
+ * forbids. The suite went red
+ * on this laptop and stayed green on CI, because CI clones and never builds it
+ * — two gates wearing one name, which this repo has already been bitten by
+ * once (a4d87f64).
+ *
+ * The root `.md` half is the same bug with a worse blast radius: every review
+ * skill writes its report to the repo root, so running ANY review put a
+ * document-shaped artefact where `docFiles()` would read it as canon.
+ *
+ * One answer, three readers now. If git is told never to track a file, this
+ * repo did not write it as prose and does not stand behind what it says. */
 const dangling = (refs: Ref[]) =>
   refs.filter((r) => !GONE_ON_PURPOSE[r.path] && !isOutput(r.path) && !existsSync(join(ROOT, r.path)))
 

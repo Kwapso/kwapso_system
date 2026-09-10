@@ -1,5 +1,18 @@
 # Machine output — never committed (unanchored: applies in every folder)
-node_modules/
+#
+# NO TRAILING SLASH, for the reason spelled out at `glide/data` below: a
+# trailing slash means "a DIRECTORY", and a SYMLINK to one is not a directory.
+# `node_modules/` therefore ignored the folder and not a link named the same
+# thing — so on 2026-09-10 `feat/ui-ux` merged a tracked symlink called
+# `node_modules` pointing at `/Users/aurora/Developer/Claude/kwapso/
+# kwapso_system/node_modules`, an absolute path on one person's laptop. On
+# every other machine a fresh checkout of `main` got a dead link where the
+# dependencies go, and every npm command, build and test resolved into
+# nothing. It is the same trap the glide rule already carried a paragraph
+# about, one directory up, which is why the paragraph is repeated here rather
+# than cross-referenced: the person who adds the next ignore line reads the
+# top of this file, not the middle.
+node_modules
 .next/
 out/
 # …AND THE SIBLING BUILD CACHES `NEXT_DIST_DIR` MAKES. `web/next.config.ts`
