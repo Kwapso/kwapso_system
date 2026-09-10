@@ -11,11 +11,23 @@
 // guess its account, and prints exactly what it will remove before it does.
 //
 // TWO STORES, AND THEY MUST GO TOGETHER. The passages live in the team's own D1
-// (`knowledge_sources`, `knowledge_chunks`, `knowledge_terms`) and their
-// embeddings live in an account-wide Vectorize index, partitioned by team
-// namespace (R26). Emptying one and not the other leaves the search able to
-// match a passage the database can no longer read back — which is not an empty
-// knowledge base, it is a broken one.
+// (`knowledge_sources`, `knowledge_chunks`, `knowledge_terms`, plus 0073's
+// `knowledge_sightings` and `knowledge_names`) and their embeddings live in an
+// account-wide Vectorize index, partitioned by team namespace (R26). Emptying
+// one and not the other leaves the search able to match a passage the database
+// can no longer read back — which is not an empty knowledge base, it is a
+// broken one.
+//
+// `knowledge_chunks_fts` (0073, BM25) is EXTERNAL-CONTENT — it stores no text
+// of its own, only postings keyed to `knowledge_chunks.rowid` — so it is
+// cleared with FTS5's own `'delete-all'` command rather than a row-by-row
+// DELETE. That command works regardless of what state the base table is in
+// (before or after its own rows go), which is exactly why it is used here
+// instead of matching the migration's per-row keyed-delete shape: a full wipe
+// has no per-row text to hand it, and a bare `DELETE FROM knowledge_chunks_fts`
+// issued AFTER the base rows are already gone silently deletes nothing (there
+// is nothing left to read the postings' old values back from) — an empty
+// result that looks identical to success.
 //
 // SO THE VECTORS GO BY ID, read out of the rows before the rows are removed,
 // never by clearing the index: the index is ACCOUNT-WIDE, and another team's
@@ -98,6 +110,8 @@ for (const team of teams) {
     "SELECT (SELECT COUNT(*) FROM knowledge_sources) AS sources," +
       " (SELECT COUNT(*) FROM knowledge_chunks) AS chunks," +
       " (SELECT COUNT(*) FROM knowledge_terms) AS terms," +
+      " (SELECT COUNT(*) FROM knowledge_sightings) AS sightings," +
+      " (SELECT COUNT(*) FROM knowledge_names) AS names," +
       " (SELECT COUNT(*) FROM knowledge_ingest) AS cursors"
   ))[0] ?? {}
   plan.push({ team, db, counts })
@@ -105,7 +119,8 @@ for (const team of teams) {
   totalChunks += Number(counts.chunks) || 0
   console.log(
     `  ${team.name}\n    sources ${counts.sources} · chunks ${counts.chunks} · ` +
-      `terms ${counts.terms} · cursors ${counts.cursors}`
+      `terms ${counts.terms} · sightings ${counts.sightings} · names ${counts.names} · ` +
+      `cursors ${counts.cursors}`
   )
 }
 
@@ -130,9 +145,29 @@ for (const { team, db } of plan) {
     }
     console.log("")
   }
-  /* CHUNKS AND TERMS FIRST, then the sources they hang off, then the cursors —
-     children before parents, so a foreign key can never refuse half of it. */
-  for (const table of ["knowledge_terms", "knowledge_chunks", "knowledge_sources", "knowledge_ingest"])
+  /* THE FTS INDEX GOES BY ITS OWN COMMAND, not a DELETE — it is EXTERNAL-
+     CONTENT (0073), so it stores no text of its own, only postings keyed to
+     `knowledge_chunks.rowid`. `'delete-all'` truncates those postings
+     directly and is proven safe regardless of ordering against the base
+     table (measured: run before or after `knowledge_chunks` empties, either
+     way nothing is left to MATCH afterwards); an ordinary `DELETE FROM
+     knowledge_chunks_fts` issued once the base rows are already gone was
+     measured to throw nothing and remove nothing — a silent no-op that
+     leaves stale postings a later rowid could resurrect. */
+  await d1(db, "INSERT INTO knowledge_chunks_fts(knowledge_chunks_fts) VALUES('delete-all')")
+  /* SIGHTINGS BEFORE SOURCES (a sighting's foreign key points at a source);
+     CHUNKS AND TERMS BEFORE SOURCES TOO; NAMES AND CURSORS LAST — children
+     before parents, so a foreign key can never refuse half of it. `knowledge_names`
+     carries no foreign key (it indexes accounts/apps/contacts generically by
+     kind + id) so its position is not load-bearing, only tidy. */
+  for (const table of [
+    "knowledge_sightings",
+    "knowledge_terms",
+    "knowledge_chunks",
+    "knowledge_sources",
+    "knowledge_names",
+    "knowledge_ingest",
+  ])
     await d1(db, `DELETE FROM ${table}`)
   console.log(`  ${team.name}: emptied.`)
 }
@@ -144,11 +179,30 @@ for (const { team, db } of plan) {
     db,
     "SELECT (SELECT COUNT(*) FROM knowledge_sources) AS sources," +
       " (SELECT COUNT(*) FROM knowledge_chunks) AS chunks," +
+      " (SELECT COUNT(*) FROM knowledge_sightings) AS sightings," +
+      " (SELECT COUNT(*) FROM knowledge_names) AS names," +
       " (SELECT COUNT(*) FROM knowledge_ingest) AS cursors"
   ))[0] ?? {}
-  const clean = !Number(after.sources) && !Number(after.chunks) && !Number(after.cursors)
+  const clean =
+    !Number(after.sources) &&
+    !Number(after.chunks) &&
+    !Number(after.sightings) &&
+    !Number(after.names) &&
+    !Number(after.cursors)
   console.log(`  ${clean ? "OK  " : "FAIL"} ${team.name}: ${JSON.stringify(after)}`)
   if (!clean) bad++
+  /* A row count on knowledge_chunks_fts itself would prove nothing — as an
+     EXTERNAL-CONTENT table its own SELECT reads back through content_rowid to
+     `knowledge_chunks`, so it would report 0 whether or not `delete-all`
+     actually ran. `'integrity-check'` is the one command that genuinely
+     inspects the index's own shadow tables, and throws if it finds anything
+     inconsistent. */
+  try {
+    await d1(db, "INSERT INTO knowledge_chunks_fts(knowledge_chunks_fts) VALUES('integrity-check')")
+  } catch (e) {
+    console.log(`  FAIL ${team.name}: knowledge_chunks_fts failed its own integrity check — ${e.message}`)
+    bad++
+  }
 }
 console.log(bad ? "\nSOMETHING SURVIVED.\n" : "\nEmpty, and the cursors are reset so the next sweep starts from the top.\n")
 process.exit(bad ? 1 : 0)

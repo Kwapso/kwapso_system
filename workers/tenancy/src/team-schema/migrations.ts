@@ -4974,6 +4974,179 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     version: "0072_the_app_and_the_wave_get_their_number",
     sql: appAndWaveNumberSql(),
   },
+  {
+    // BUILD-5-knowledge-rebuild.md, LANE A. The team-database shape the
+    // rebuild's other lanes are built on: one identity per thing, who saw it
+    // and where, chat/meeting grain on a chunk, the account/app/contact alias
+    // index, and BM25 over chunk text. Nothing here is read by anything yet
+    // (Lanes B–F wire the ingest, the index and the screens); this migration
+    // only has to be a shape those lanes can build on without a second one.
+    //
+    // ── ONE IDENTITY PER THING (KB-AUDIT.md §1, "multi-person duplicates") ──
+    //
+    // `origin_row_id` is `<readerUserId>:<externalId>` for every Google-sourced
+    // row (see 0070's header), which is why the same Drive file shared with
+    // two people has always filed as two `knowledge_sources` rows. `identity_key`
+    // is the OTHER half — Google's own id, a message id, an event id, or a
+    // content hash for a typed note — with the reader stripped out, so ONE row
+    // exists per thing regardless of how many people have seen it. The unique
+    // index enforces that at write time rather than trusting the ingest to dedupe
+    // itself; `WHERE identity_key IS NOT NULL` because SQLite already treats
+    // every NULL as distinct, and a typed note with no external identity has
+    // nothing to collide over. Who saw it, where, and when moves to
+    // `knowledge_sightings` below — a second reader is a second sighting, never
+    // a second source.
+    //
+    // ── accounts[] / apps[] (KB-AUDIT.md §1, "one copy tagged with every
+    //    account/app it concerns") ─────────────────────────────────────────
+    //
+    // `account_id` (0012) and `app_id` (0020) are each ONE reference — right for
+    // a mirrored record, wrong for a shared Drive file or a chat thread that
+    // concerns several accounts or apps at once. `accounts`/`apps` are JSON
+    // arrays of ids, additive: the singular columns are untouched, and reading
+    // either shape is Lane B/C's decision, not this migration's.
+    //
+    // ── shared_with, separate from owner_user_id ───────────────────────────
+    //
+    // `owner_user_id` (0012) already answers "whose SIGHT of it is this" — NULL
+    // for the team's, a value for one person's personal Google connection — and
+    // is left exactly as it was. `shared_with` answers a DIFFERENT question the
+    // plan's owner ≠ shared-with ruling asked for: who may READ it once it's in
+    // — 'private' (the owner alone), 'agency' (every agency role that can read
+    // the module), or 'agency_client' (the account's own portal login too, once
+    // the portal door in §5 of the plan exists). Defaulting new rows to 'agency'
+    // matches the ruling's other half: Gmail is shared with the agency by
+    // default, and nothing here narrows a room that used to be open.
+    //
+    // ── relevancy_date ──────────────────────────────────────────────────────
+    //
+    // The plan's own definition: happened-at for a frozen thing (a meeting, a
+    // sent email), last-change for a living one (a Drive doc, a ticket mirror).
+    // Which of a source's several dates that resolves to is an ingest decision
+    // (Lane B); the column just gives it somewhere to live that isn't
+    // overloading `created_at` (audit metadata) or `record_date` (0020, the
+    // mirrored record's own single date field, kept for what it already means).
+    version: "0073_the_knowledge_base_is_rebuilt",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN identity_key TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN accounts TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE knowledge_sources ADD COLUMN apps TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE knowledge_sources ADD COLUMN shared_with TEXT NOT NULL DEFAULT 'agency';
+ALTER TABLE knowledge_sources ADD COLUMN relevancy_date TEXT;
+
+CREATE UNIQUE INDEX idx_knowledge_sources_identity ON knowledge_sources (identity_key) WHERE identity_key IS NOT NULL;
+
+-- ONE PERSON'S SIGHT OF ONE THING. The row a second (or third) reader of one
+-- Google item gets, now that \`identity_key\` above means they no longer get a
+-- second \`knowledge_sources\` row of their own — shaped to match Lane B's own
+-- \`Sighting\` type exactly ({ userId, shelf: 'private'|'team', goneAt },
+-- \`knowledge-identity.ts\`, not yet merged as this migration lands — R58 is why
+-- this note names it without the full path, which would be a comment pointing
+-- at a file that is not here yet), the type Lane B actually reads and writes,
+-- not a shape guessed at from the plan's prose.
+--
+-- \`shelf\` is THEIRS alone, not a location: 'private' or 'team', the same
+-- readable-by decision \`readableBy\`/\`stillLive\` make from a whole SET of
+-- these rows — a colleague who filed the same folder as team material gets a
+-- row of her own saying so, and neither overwrites the other. (An earlier
+-- draft of this column, \`seen_where\`, stored a folder/space id instead — a
+-- concept B1's Sighting type never carries. Caught in review before merge,
+-- not shipped: there is no data anywhere holding the old shape.)
+--
+-- \`gone_at\` is when this person stopped being able to see it (un-shared,
+-- left the space, removed from the team) — stamped, never deleted, so "she
+-- never saw it" and "she saw it until Tuesday" stay different answers, and so
+-- \`liveSightings\`/\`stillLive\` have a column to filter on at all. Without it
+-- a sighting can be recorded but never retired, which is the gap the hub
+-- caught: a set that can only grow cannot express "the last person who could
+-- see this just lost access."
+--
+-- \`seen_by_user_id\` is NOT NULL — B1's \`userId\` is required, never a
+-- team-wide anonymous sighting — so the unique index below is a real
+-- guarantee (SQLite's NULL-is-distinct rule that would have made a nullable
+-- version a courtesy rather than a constraint never comes into play). One row
+-- per (source, person): the shelf they see it on and whether they still can
+-- are both attributes OF that one sighting, not a reason for a second row.
+CREATE TABLE knowledge_sightings (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
+  seen_by_user_id TEXT NOT NULL,
+  shelf TEXT NOT NULL DEFAULT 'private' CHECK (shelf IN ('private', 'team')),
+  seen_at TEXT NOT NULL,
+  gone_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_sightings_source ON knowledge_sightings (source_id);
+CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_by_user_id);
+
+-- CHAT/MEETING GRAIN (KB-AUDIT.md §4.9's "chunk 47 has no idea which meeting
+-- it is from", and the plan's "chat = who said what when"). \`context_line\` is
+-- the cheapest-model-written sentence that situates a chunk in its document —
+-- Lane B writes it, this just gives it a column. \`speaker\`/\`said_at\` are the
+-- per-message identity a chat/transcript chunk carries when it is a run of
+-- messages rather than prose; both NULL for an ordinary document chunk.
+ALTER TABLE knowledge_chunks ADD COLUMN context_line TEXT;
+ALTER TABLE knowledge_chunks ADD COLUMN speaker TEXT;
+ALTER TABLE knowledge_chunks ADD COLUMN said_at TEXT;
+
+-- THE NAME INDEX — accounts, apps, contacts, colleagues, aliases and
+-- misspellings, replacing \`accountNamedIn\` (KB-AUDIT.md §4.2: single-token
+-- account names like "VU Solutions" → "solutions" hijacking ordinary
+-- questions). \`ref_id\` is the id of the named thing under \`kind\`; \`alias_of\`
+-- is NULL on the canonical name and the canonical name's own text on every
+-- alias, so a reader never has to walk a second table to resolve one. Scoped
+-- by \`compartment\`, the same fence every other knowledge table carries, so a
+-- name index lookup can never leak which accounts exist across a fence it has
+-- no right to see. The unique index is the one honest guarantee this
+-- migration can make on its own: alias GENERATION (which spellings exist at
+-- all) is Lane C's job, not this table's.
+CREATE TABLE knowledge_names (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  ref_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  alias_of TEXT,
+  compartment TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_names_ref ON knowledge_names (kind, ref_id);
+CREATE INDEX idx_knowledge_names_name ON knowledge_names (name);
+CREATE UNIQUE INDEX idx_knowledge_names_unique ON knowledge_names (kind, ref_id, name);
+
+-- BM25 OVER CHUNK TEXT (KB-AUDIT.md §4.4 — \`knowledge_terms\`'s raw
+-- term-frequency scorer has no IDF, so the finding that "hybrid search hurts
+-- here" was measured against something that isn't BM25). FTS5's own bm25()
+-- replaces that scorer; \`knowledge_terms\` itself is untouched by this
+-- migration — Lane C reads from the new table and retires the old one once
+-- the new arm is measured, so a re-index mid-rollout still has a working
+-- lexical arm either way.
+--
+-- EXTERNAL-CONTENT MODE, NO TRIGGERS. \`content_rowid='knowledge_chunks'\` ties
+-- every fts row to \`knowledge_chunks.rowid\` instead of storing the text
+-- twice, and the KEYED delete (\`INSERT INTO knowledge_chunks_fts
+-- (knowledge_chunks_fts, rowid, text) VALUES ('delete', ?, ?)\`) is the fix
+-- KB-AUDIT.md §4.4 names for the old design's actual complaint — a re-index
+-- was a scan of every posting in the team, and a keyed delete by rowid is one
+-- row. What it is NOT is trigger-synced, on purpose: this repo's own migration
+-- executor (\`splitStatements\`, shared/workers/d1-rest.ts) splits a script on
+-- every un-quoted \`;\` with no idea a \`CREATE TRIGGER … BEGIN … END;\` body's
+-- internal semicolons are not statement boundaries, so a trigger written here
+-- would parse and run fine against node:sqlite in a test and then shatter
+-- into broken fragments the first time \`migrateTeams\` tried to apply it for
+-- real. Application code (Lane C) keeps this table in step, the same way
+-- \`knowledge_terms\` always was.
+CREATE VIRTUAL TABLE knowledge_chunks_fts USING fts5(
+  text,
+  content='knowledge_chunks',
+  content_rowid='rowid'
+);
+
+-- Backfills whatever this team already holds, so a team migrated mid-rollout
+-- (before Lane C's rebuild script runs) still has a searchable index rather
+-- than a silently empty one.
+INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
