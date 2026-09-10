@@ -224,11 +224,13 @@ export const MANDATORY_CANARIES = new Set(["A-O1", "A-O2", "A-O3", "A-O4", "A-O5
  * not an edit to this file. Ids are the union's namespaced ones; every one
  * of these six turned out to be a duplicate present in both source files
  * (scripts/kb-exam-merge.mjs's MATCHES table has the B-side partner), so
- * each keeps its A-side id under RULING 1. Three more rows (A-M6, A-M19,
- * A-H13) are overridden to `gap` here too — see GAP_OVERRIDES below;
- * they are listed separately because the reasoning is a different shape
- * (a derivation over B's "left out on purpose" list, not a judgment about
- * the question's own expected behaviour). */
+ * each keeps its A-side id under RULING 1. Two more rows (A-M6, A-M19)
+ * are pushed to `gap` by scripts/kb-exam-merge.mjs itself (RULING 3's
+ * derivation) rather than listed here — see the comment below. A-H13 was
+ * briefly a third until the hub corrected the derivation's predicate: it
+ * cites two meeting sources and only one is absent, so it is `keyed`
+ * (plain, no override) with a thin-evidence note in its detail column
+ * instead. */
 export const OVERRIDES = {
   "A-X1": {
     disposition: "struck",
@@ -259,17 +261,24 @@ export const OVERRIDES = {
     reason:
       'aggregation across all clients — KB-AUDIT §4.7 names exactly this class ("recurring complaints across our clients") as not a retrieval problem, and the expected behaviour is disjunctive ("answers OR says it cannot generalise — never a bare refusal"), which id-in-shortlist/refusal cannot express.',
   },
-  // RULING 3's derivation (over KB-EXAM-TRANSCRIPTS.md's "left out on
-  // purpose" footer — the only staging-checked oracle either file has)
-  // converts five A rows to `gap`. Two (A-E6, A-E12) get it for free
-  // because they merged with a B row carrying the tag natively (B-G2,
-  // B-G1); the other three (A-M6, A-M19, A-H13) did not merge with
-  // anything, so scripts/kb-exam-merge.mjs writes `gap` straight into
-  // their tags — no override needed here either. `classifyByTags`'s tag
-  // rule is the ONE mechanism for all five; see each row's `detail`
-  // column in KB-EXAM-UNION.md for the derivation's reasoning (score,
-  // which left-out entry it resolved to, and — for A-H13 — the compound
-  // caveat that it also asks about "math pt 2", which is NOT left out).
+  // RULING 3's corrected derivation (over KB-EXAM-TRANSCRIPTS.md's "left
+  // out on purpose" footer — the only staging-checked oracle either file
+  // has, and the predicate: gap only if ALL of a row's meeting sources are
+  // on that list) converts four A rows to `gap`. Two (A-E6, A-E12) get it
+  // for free because they merged with a B row carrying the tag natively
+  // (B-G2, B-G1); the other two (A-M6, A-M19) did not merge with anything,
+  // so scripts/kb-exam-merge.mjs writes `gap` straight into their tags —
+  // no override needed here either. `classifyByTags`'s tag rule is the
+  // ONE mechanism for all four; see each row's `detail` column in
+  // KB-EXAM-UNION.md for the derivation's reasoning (score, which
+  // left-out entry it resolved to, and — for A-M19 — why its "ticket
+  // record" mention does not count as a competing source). A-H13 was
+  // the derivation's one false positive under the ORIGINAL predicate
+  // ("resolves to" rather than "entirely resolves to") — it cites pt 1
+  // (absent) AND pt 2 (present, 23 pieces), so gapping it would have
+  // failed a system for correctly answering from pt 2. It is `keyed`
+  // instead, to pt 2, with the pt 1 gap named in its detail column — the
+  // exam's one row testing partial knowledge rather than absence.
 }
 
 /** X8's non-owner half is a real, gradeable claim the union's own footer

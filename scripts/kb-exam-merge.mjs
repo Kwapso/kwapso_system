@@ -44,13 +44,18 @@
 // check: two A rows (E6, E12) already merge with a B row that carries
 // its own `gap` tag natively (B.G2, B.G1) — their disposition comes free
 // from the tag union below and needs no entry here. The other five of
-// the nine left-out meetings have no B row at all, and only three A rows
-// resolve to them (M6→HORST matching test run, M19→FluClinic task 3144,
-// H13→HOGO×Claude math pt 1 — the last is a partial match: H13 also asks
-// about "math pt 2", which DOES have a transcript, so this row's true
-// disposition is a compound the exam's grading model does not yet have a
-// word for; it is filed as `gap` per the letter of the rule and flagged
-// here rather than silently resolved). The remaining four left-out
+// the nine left-out meetings have no B row at all, and three A rows
+// resolve to them: M6→HORST matching test run and M19→FluClinic task
+// 3144 are both `gap` (their one MEETING source is fully absent — M19's
+// "ticket record" mention is a different door, never a candidate for the
+// ≥15-piece check, so it is not a competing source). H13→HOGO×Claude math
+// pt 1 does NOT stay gap: it also cites pt 2 (26 Aug), which DOES have a
+// transcript, so the corrected rule (RULING 3, corrected: a row is gap
+// only if ALL its meeting sources are absent — the first pass wrongly
+// gap'd this one, which would have failed a system that correctly
+// answered from pt 2) files it `keyed` to pt 2 instead, with the pt 1 gap
+// recorded in its detail column — the exam's one THIN-EVIDENCE row. The
+// remaining four left-out
 // meetings (Alaap/Alexander 27 Aug, HOGO syncs 3/7/9 Sep, FluClinic
 // planning call 2 Sep, plus the already-covered ones) have NO row in
 // either file — nothing to convert, nothing lost.
@@ -91,17 +96,42 @@ const MATCHES = [
   ...[["M17", "E13"], ["E13", "E10"], ["E14", "E11"], ["M16", "M13"], ["H10", "H9"], ["E12", "G1"], ["H8", "H7"], ["M11", "E12"], ["E6", "G2"], ["H12", "H13"], ["H9", "H8"]].map(([a, b]) => [a, b, "reworded-shifted-id"]),
 ]
 
-/** RULING 3, DERIVED: A rows whose source resolves to one of B's nine
- * "left out on purpose" meetings and are NOT already covered by merging
- * with a natively `gap`-tagged B row (E6 and E12 get `gap` free from the
- * tag union with B.G2/B.G1 and need no entry here). Each carries the score
- * and shared tokens from the derivation run, so the next person can
- * recompute rather than trust. H13 is flagged as a compound case: it also
- * asks about "math pt 2", which is NOT on the left-out list. */
+/** RULING 3, DERIVED AND CORRECTED: a row is `gap` only if ALL of its
+ * MEETING sources are on B's nine "left out on purpose" entries — the
+ * hub's fix to the first pass, which asked only whether a row "resolves
+ * to" a left-out entry and wrongly gap'd A-H13 (pt 1 absent, pt 2 present
+ * — grading that gap would have FAILED a system that correctly answered
+ * from pt 2, penalising the right behaviour). "Meeting sources" is scoped
+ * deliberately: the nine-entry list, and the ≥15-piece check behind it,
+ * measure MEETING TRANSCRIPT coverage — a `ticket record` (A-M19's second
+ * mention) is a different door entirely, never a candidate for that check,
+ * so it does not count as a competing source the way A-H13's pt 2 does.
+ * That reading is what keeps A-M19 a clean gap row (its one meeting source
+ * is fully absent) while A-H13 moves to `keyed` (one of its two meeting
+ * sources is present). Flagged rather than assumed, per the brief's own
+ * rule: any row this changes besides A-H13 is reported as a finding, not
+ * silently resolved — this file's header carries that finding for A-M19
+ * (considered, not missed).
+ *
+ * E6 and E12 get `gap` free from the tag union with the natively
+ * `gap`-tagged B.G2/B.G1 and need no entry here — both cite exactly one
+ * meeting, fully absent, so the corrected rule changes nothing about them
+ * either. */
 const DERIVED_GAP_OVERRIDES = {
   M6: { leftOut: "HORST matching test run 25 Aug", score: 0.6, note: "same meeting as B.G3, different question (threshold vs. how it went) — not merged with G3, stays a distinct gap row" },
-  M19: { leftOut: "FluClinic task 3144 meeting 25 Aug", score: 0.5, note: "no B row exists for this meeting at all" },
-  H13: { leftOut: "HOGO × Claude math pt 1 25 Aug", score: 0.38, note: "COMPOUND: also asks about math pt 2 (26 Aug), which has a transcript and is NOT on the left-out list — filed as gap per the letter of the rule; flagged for the hub/owner rather than silently resolved" },
+  M19: { leftOut: "FluClinic task 3144 meeting 25 Aug", score: 0.5, note: "no B row exists for this meeting at all; its one MEETING source is fully absent — the 'ticket record' mention is a different door (the tickets module), never a candidate for the ≥15-piece transcript check, so it is not a competing source under the corrected rule" },
+}
+
+/** A-H13 moved OUT of DERIVED_GAP_OVERRIDES: it cites two MEETING sources
+ * (pt 1, 25 Aug, absent; pt 2, 26 Aug, 23 pieces, present — cited by both
+ * B's O3 and M7) and the corrected rule only gaps a row whose sources are
+ * ALL absent. Its true disposition is the exam's one THIN-EVIDENCE row —
+ * answerable from what exists, with a named gap in what doesn't — so it
+ * falls through to plain `keyed` (its tags are just `multi`, nothing
+ * forces otherwise) and only needs its detail column corrected to say so;
+ * no sixth disposition, per the hub's own instruction. */
+const THIN_EVIDENCE_NOTES = {
+  H13: 'THIN EVIDENCE, not gap: keyed to "HOGO x Claude math pt 2, 26 Aug (23 pieces)" — pt 1 (25 Aug) has no transcript. A complete answer draws from pt 2 AND names that pt 1 was never recorded; this is the exam\'s one row testing partial knowledge, not absence.',
 }
 
 // Disposition (keyed/refusal/gap/tool/struck) is NOT decided here — it is
@@ -159,7 +189,8 @@ function buildUnion() {
     const tags = [...a.tags]
     const derived = DERIVED_GAP_OVERRIDES[a.id]
     if (derived && !tags.includes("gap")) tags.push("gap")
-    const detail = derived ? `${a.detail} — [DERIVED gap: matches B's left-out "${derived.leftOut}" (score ${derived.score}); ${derived.note}]` : a.detail
+    let detail = derived ? `${a.detail} — [DERIVED gap: matches B's left-out "${derived.leftOut}" (score ${derived.score}); ${derived.note}]` : a.detail
+    if (THIN_EVIDENCE_NOTES[a.id]) detail = `${detail} — [${THIN_EVIDENCE_NOTES[a.id]}]`
     unionRows.push({ id: `A-${a.id}`, section: a.section, level: a.level, question: a.question, tags, detail })
   }
   for (const b of B) {

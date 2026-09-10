@@ -2,9 +2,9 @@
   "examFile": ".plans/KB-EXAM-UNION.md",
   "total": 101,
   "byDisposition": {
-    "keyed": 72,
+    "keyed": 73,
     "tool": 7,
-    "gap": 8,
+    "gap": 7,
     "struck": 6,
     "refusal": 8
   },
@@ -25,7 +25,7 @@
     "exact": 6,
     "count": 7,
     "route": 7,
-    "gap": 8,
+    "gap": 7,
     "person": 8,
     "multi": 13,
     "hijack": 4,
@@ -38,7 +38,6 @@
     "A-E12",
     "A-M6",
     "A-M19",
-    "A-H13",
     "A-X4",
     "A-X5",
     "A-X6",
