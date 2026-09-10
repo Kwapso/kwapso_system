@@ -210,6 +210,40 @@ async function googleFetch(
         "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings.",
         `${detail} — the credentials are DEAD, every call on this connection will fail until the person reconnects Google in Settings.`
       )
+    // 403 IS TWO DIFFERENT ANSWERS, AND GOOGLE PICKS THE STATUS FOR BOTH.
+    //
+    // This is the third time this class of bug has been fixed, and the first two
+    // fixes were about WHERE a refusal is handled. This one is about WHAT it
+    // means, which is the half nobody checked.
+    //
+    // Gmail answers a QUOTA problem with 403, not 429: `rateLimitExceeded`,
+    // `userRateLimitExceeded`, `dailyLimitExceeded`, `quotaExceeded`. It also
+    // answers a genuine permission problem with 403. Same status, opposite
+    // instructions — one says "skip this item and carry on", the other says
+    // "you are going too fast, come back later" — and reading only the number
+    // gets one of them wrong every time:
+    //
+    //   · a quota 403 read as a per-item refusal SILENTLY DROPS MAIL. The sweep
+    //     skips the message, reports a clean pass, and moves its cursor past
+    //     things it never read.
+    //   · a quota 403 read as a permission refusal tells the owner "this item
+    //     may not be shared with you" about his own mailbox — which is the
+    //     sentence he has now seen come back twice after being told it was
+    //     fixed, and it was never true.
+    //
+    // So the REASON decides, not the status. Google puts it in the body, in the
+    // shape `{"error":{"errors":[{"reason":"rateLimitExceeded"}]}}`, and the
+    // body is already in hand as `said`. Matched as text rather than parsed:
+    // this must not throw while classifying a throw, and an unparsable body
+    // falls through to the permission reading, which is the older and stricter
+    // of the two.
+    if (res.status === 403 && /rateLimitExceeded|quotaExceeded|userRateLimit|dailyLimit/i.test(said))
+      throw new GuardError(
+        503,
+        "google_busy",
+        "Google is asking us to slow down. This will pick up on its own shortly.",
+        `${detail} — a QUOTA refusal wearing a 403. Transient, says nothing about whether the item is readable, and must never be skipped per item.`
+      )
     if (res.status === 403)
       throw new GuardError(
         403,

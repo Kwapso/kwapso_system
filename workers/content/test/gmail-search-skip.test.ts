@@ -28,7 +28,13 @@ import { gmailSearch, isConnectionLost, isItemRefusal } from "../src/lib/google-
 /** Gmail, reduced to the two calls this function makes: the id listing, then one
  * header read per id. `fails` decides which of those header reads refuses and
  * with what status — the whole point of the suite is that a refusal is GRADED. */
-function stubGmail(ids: string[], fails: Record<string, number>): { reads: string[] } {
+function stubGmail(
+  ids: string[],
+  fails: Record<string, number>,
+  /** the body Google returns with a failure — the REASON lives in here, and it
+   * is what tells a quota refusal from a permission one at the same status. */
+  body = "nope"
+): { reads: string[] } {
   const reads: string[] = []
   vi.stubGlobal("fetch", async (url: string) => {
     const u = String(url)
@@ -38,7 +44,7 @@ function stubGmail(ids: string[], fails: Record<string, number>): { reads: strin
     const id = decodeURIComponent(u.match(/\/messages\/([^/?]+)/)![1])
     reads.push(id)
     const status = fails[id]
-    if (status) return new Response("nope", { status })
+    if (status) return new Response(body, { status })
     return new Response(
       JSON.stringify({
         id,
@@ -103,5 +109,53 @@ describe("gmailSearch — one message's refusal is not the mailbox's", () => {
 
     expect(isConnectionLost({ code: "google_access_lost" })).toBe(true)
     expect(isConnectionLost({ code: "google_forbidden" })).toBe(false)
+  })
+})
+
+describe("a 403 is TWO answers, and Google picks the status for both", () => {
+  /** Gmail's own shape for a quota refusal. Note the status: 403, not 429. */
+  const QUOTA = JSON.stringify({
+    error: { code: 403, errors: [{ reason: "rateLimitExceeded", message: "User-rate limit exceeded" }] },
+  })
+
+  it("a QUOTA 403 is not a per-item refusal, and stops the pass instead of skipping mail", async () => {
+    // THE BUG THIS CLOSES, and it is the third turn of the same screw. The first
+    // two fixes were about WHERE a refusal is handled. This is about WHAT it
+    // means. Gmail answers a quota problem with 403, exactly like a permission
+    // problem — so the skip-and-carry-on rule, which is right for a message that
+    // is not shared, silently DROPS MAIL when Google is only asking us to slow
+    // down: the sweep skips it, reports a clean pass, and moves its cursor past
+    // messages it never read.
+    stubGmail(["a", "b", "c"], { b: 403 }, QUOTA)
+    await expect(gmailSearch("tok", "")).rejects.toMatchObject({ code: "google_busy" })
+  })
+
+  it("and it is not classed as an item refusal, so no loop may swallow it", () => {
+    expect(isItemRefusal({ code: "google_busy" })).toBe(false)
+    expect(isConnectionLost({ code: "google_busy" })).toBe(false)
+  })
+
+  it("says something TRUE to the person, rather than blaming their sharing", async () => {
+    // What the owner actually saw, twice, after being told it was fixed:
+    // "Google wouldn't allow that — this item may not be shared with you."
+    // about his own mailbox. It was never true.
+    stubGmail(["a"], { a: 403 }, QUOTA)
+    await expect(gmailSearch("tok", "")).rejects.toMatchObject({
+      message: expect.stringContaining("slow down"),
+    })
+  })
+
+  it("a PERMISSION 403 still skips the one item, exactly as before", async () => {
+    // The other half must not regress: an ordinary forbidden item is still a
+    // per-item fact and the other messages still come back.
+    stubGmail(["a", "b", "c"], { b: 403 }, JSON.stringify({ error: { errors: [{ reason: "forbidden" }] } }))
+    expect((await gmailSearch("tok", "")).map((m) => m.id)).toEqual(["a", "c"])
+  })
+
+  it("an unreadable body falls through to the stricter reading", async () => {
+    // Classifying a throw must not throw. An empty or unparsable body reads as
+    // a permission refusal, which is the older and narrower of the two.
+    stubGmail(["a", "b"], { b: 403 }, "")
+    expect((await gmailSearch("tok", "")).map((m) => m.id)).toEqual(["a"])
   })
 })
