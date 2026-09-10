@@ -39,6 +39,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import type { ChatMessage } from "./google-api"
+import { chunkChat } from "./knowledge-text"
 import type { ReaderEnv } from "./source-readers"
 import {
   chatMessages,
@@ -247,8 +248,24 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  *
  * A message Google gives no thread for is its own conversation of one, which is
  * both true and the safe default.
+ *
+ * ── AND WITHIN ONE THREAD, THE BODY IS CUT INTO RUNS, NOT ONE BLOB ──────────
+ *
+ * BUILD-5 §2's grain rule for chat: a piece is a RUN of a few messages, not
+ * the whole conversation. `chunkChat` (knowledge-text.ts) does the grouping;
+ * the runs are joined here with a blank line between them, which is the
+ * strongest boundary `chunkText` looks for (it splits on `\n{2,}` before it
+ * ever considers a sentence) — so once this body reaches the generic chunker
+ * downstream, a cut lands BETWEEN runs rather than through the middle of
+ * somebody's turn. Before this, an 88-message thread was one contiguous
+ * string and the paragraph cutter had no boundary to prefer over any other
+ * (KB-AUDIT.md §4.9: "one thread is one ~348-char blob… per-turn or
+ * per-topic segmentation… is the obvious direction"). The per-line
+ * `sender: text` attribution is UNCHANGED — `google-ingest.test.ts` asserts
+ * that literal shape, and the run's own speaker/time span is carried as
+ * `chunkChat`'s structured metadata rather than folded into the prose.
  */
-function chatThreads(messages: ChatMessage[]): ChatMessage[] {
+export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
   const byThread = new Map<string, ChatMessage[]>()
   for (const m of messages) {
     const key = m.thread || m.id
@@ -279,7 +296,13 @@ function chatThreads(messages: ChatMessage[]): ChatMessage[] {
       // `every` over an empty group cannot arise: a group with no messages was
       // dropped above.
       senderIsApp: ordered.every((m) => m.senderIsApp),
-      text: ordered.map((m) => `${m.sender}: ${m.text}`).join("\n"),
+      // RUNS, joined on a blank line — see the essay above. A run's own line
+      // shape is still exactly `sender: text` (chunkChat drops the timestamp
+      // from the prose on purpose), so a short thread's body is byte-for-byte
+      // what the flat join used to produce.
+      text: chunkChat(ordered.map((m) => ({ speaker: m.sender, at: m.createdAt ?? "", text: m.text })))
+        .map((piece) => piece.text)
+        .join("\n\n"),
       // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
       createdAt: last.createdAt,
       // The link opens the thread at its first message, which is where a person
