@@ -1029,7 +1029,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // (COALESCE keeps the old value only where the new one is null), so the fix
 // lands without re-reading a single row's text, and a bump would re-embed the
 // whole base to change one column. Re-pinned, exactly as the notes above record.
-const SHARED_DIGEST = "93d4992740fa64e7"
+// RE-PINNED AGAIN, 2026-09-10: `catchUp()` (knowledge-ingest.ts) now calls
+// `recordWorkerError` when a kind's sweep fails, closing the gap where that
+// path — the one that runs in front of a live question — recorded a failure
+// nowhere but its own `knowledge_ingest` row. Nothing about what any kind
+// SAYS moved: the change is to error reporting, not to a reader, and no
+// per-kind digest above moved either, which is the evidence rather than the
+// claim. A textVersion bump would be actively wrong here for the same reason
+// the note above gives — it would re-embed the whole base to change zero
+// words of anyone's indexed text.
+const SHARED_DIGEST = "e45006eafcf7b270"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
