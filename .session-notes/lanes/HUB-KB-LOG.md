@@ -710,3 +710,63 @@ fence lands, the first question its fresh reviewer asks is "what does the exam
 check about this seam?", and a grep must be a complete answer. Expected set of
 five; a different number is a finding. Warned that A-X8's owner/Aurora split still
 has no persona-aware grading and tagging must not imply otherwise.
+
+## Tick 13 — 10 Sep 2026, ~22:50
+
+**FOUR BRANCHES MERGED. main `0246975e`, check exit 0.** kb_A's two migrations
+(`generated_only`, `team_visible` ×2), kb_E's union exam, kb_B1's identity + the
+fence's proven half, kb_B2's grain and readers. Both blocked lanes are unblocked.
+The mail regroup is NOT in it — held on kb_B2's branch pending the third bug.
+
+**A FIFTH LANE STARTED: kb_CD** (the owner ran it, Sonnet high). Briefed on what
+changed after its brief was written: main moved, its Stage-1 schema already exists,
+and the three things that would have cost it a day — CREATE TRIGGER is unusable
+here and a `node:sqlite` test passes while the real path fails; `DELETE FROM <fts>`
+on an empty external-content table is a silent no-op; and the fence is TWO clauses
+with `team_visible` as a narrowing aid whose read-back join must not be deleted as
+redundant.
+
+**THE MAIL REGROUP HAS NOW PRODUCED THREE SILENT DATA-DESTROYING BUGS, SO I
+CENSUSED THE CLASS INSTEAD OF WAITING FOR THE FOURTH.** Every `externalId`
+consumer in the google path: the write (`google-read.ts:549`), the body fetch
+(:706), the dedup key (`knowledge-google.ts:250`), the known-id set feeding the
+skip (:666), `heldSources` (:1233), the retire probe (:1337) and the probe URL
+itself (`google-api.ts:2846`). Three bugs found by accident is evidence of more,
+not of bad luck.
+
+**THE CLASS, NAMED: A PRESENCE PROBE THAT 404s FOR A BENIGN REASON AND IS READ AS
+"GONE".** It has bitten this codebase before, and the fix is ten lines above the
+new bug — calendar's own comment: *"an event on a named secondary calendar is a 404
+on `primary` — which this pass reads as 'gone' and acts on."* Calendar was instance
+one, the skip was two, the mail retire probe is three. **The invariant all three
+violated is one sentence — `absent is not gone` — and it now goes into the probe.**
+
+**AND CHAT ALREADY SOLVED IT, further than either lane checked.** Chat's
+`externalId` is ALREADY thread-shaped and its retire pass does not probe at all
+(`knowledge-google.ts:1303-1310`), keying on the SPACE being live: *"normal tick —
+and absent is not gone. Keying the question on the SPACE is what makes the answer
+conservative in the right direction."*
+
+**RULED: thread-shaped probe (`GET /threads/{id}`), scope granted to kb_B2**, which
+was blocked with a red test while kb_B1 was deep in the fence. Rejected the other
+two: member-resolution rebuilds the same 404-as-gone trap one level down (a thread
+whose first message was individually deleted but is otherwise live), and chat's
+container-keying does not transfer because mail has no container a person named —
+chat's conservatism is free only where a real container exists. Told kb_B1 so they
+do not collide, and invited it to reverse me within ten minutes if retire semantics
+say otherwise.
+
+**kb_B2's OBSERVATION IS THE MOST USEFUL THING SAID ABOUT TESTING TODAY:** *the
+mock fails in the SAFE direction while the real implementation fails in the
+dangerous one.* A green test under a mock that cannot express the bug proves
+nothing. Passed to kb_B1 for the fence work, where it applies directly.
+
+**THE METER CORRECTION, MINE.** I asked kb_B1 to price the skip against the $5 cap.
+Wrong meter: COSTS.md:271 says Google does not bill per call, calls are the unit,
+and the live symptom is `google_busy` — a 403 quota refusal, not a bill. Measured:
+0.09 extra calls per mailbox per tick against ~204 saved, 0.04% and $0.00. **There
+was never a trade to make**, and I had asked two lanes to agonise over one.
+
+**Owner ticked into his own tracker at my hand, 5 of 46**, with notes written on
+four of the blanks saying WHY they are blank. Cap corrected there too — it still
+said $10 in the meter and the gate.
