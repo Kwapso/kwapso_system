@@ -517,14 +517,36 @@ export function HelpDetailScreen({
   // and report before touching the other detail screens. Each branch below
   // still returns before the "ready" body (nothing after it assumes `ticket`),
   // so no hook order changed and no other guard moved.
-  if (ticketsQ.error)
+  // EITHER READ FAILING IS A FAILURE TO LOAD — and until 2026-09-10 only the
+  // LIST's was. The by-id read is the one that can find a ticket past the
+  // cursor, so on a cold deep link it is often the ONLY read that could have
+  // answered; when it failed, this branch did not fire, the loading gate below
+  // let go (it carried `!oneQ.error`), and the screen said "That ticket no
+  // longer exists." A dropped connection is not a deletion, and that sentence
+  // is exactly the lie the comment below warns about, made one step later.
+  // `meeting-detail.tsx` had the same two queries and no `oneQ` term at all,
+  // so it hung on a skeleton for ever instead — two spellings of one bug, which
+  // is why `web/test/detail-error-states.test.ts` now censuses the shape.
+  // `!inPage` IS LOAD-BEARING, and the first draft of this guard did not have
+  // it: `ticketsQ.error || oneQ.error` blanked a screen that was ALREADY
+  // HOLDING the ticket, because the list had it and the by-id read had failed
+  // for its own reasons. An error about a read you did not need is not an error
+  // the person has. `story-born-on-a-ticket.test.tsx` caught it in the gate.
+  // Try again drops BOTH keys: which one failed is not the person's business.
+  if (ticketsQ.error || (!inPage && oneQ.error))
     return (
       <RecordScreen
         title={<Skeleton className="h-7 w-48" />}
         state="error"
         copy={{ errorTitle: t("Couldn't load the ticket.") }}
         errorAction={
-          <Button variant="secondary" onClick={() => invalidate(`help:${teamId}`)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              invalidate(`help:${teamId}`)
+              invalidate(`help:one:${helpId}`)
+            }}
+          >
             {t("Try again")}
           </Button>
         }
@@ -536,7 +558,7 @@ export function HelpDetailScreen({
   // `ticketsQ.data === undefined` — the list resolving — even once `oneQ` had
   // already answered, which is exactly the round trip the comment above this
   // block now avoids: waiting here for the list too would spend it back.
-  if (!inPage && oneQ.data === undefined && !oneQ.error)
+  if (!inPage && oneQ.data === undefined)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   if (!ticket)
     return (

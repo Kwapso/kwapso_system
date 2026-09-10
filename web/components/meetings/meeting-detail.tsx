@@ -317,14 +317,25 @@ export function MeetingDetailScreen({
 
   // THE CHROME STAYS, ONLY THE PANEL SPINS (RecordChrome's law 4) — part of
   // the rollout from help-detail (73414c58).
-  if (meetingsQ.error)
+  // EITHER READ FAILING IS A FAILURE TO LOAD. See help-detail.tsx for the whole
+  // story: this screen carried the other half of it, with no `oneQ` term
+  // anywhere, so a failed by-id read left `oneQ.data` undefined for ever and the
+  // gate below held the loading skeleton on screen with nothing coming. A
+  // spinner that never resolves is the one state a person cannot act on.
+  if (meetingsQ.error || (!inPage && oneQ.error))
     return (
       <RecordScreen
         title={<Skeleton className="h-7 w-48" />}
         state="error"
         copy={{ errorTitle: t("Couldn't load the meeting.") }}
         errorAction={
-          <Button variant="secondary" onClick={() => invalidate(meetingsKey(teamId))}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              invalidate(meetingsKey(teamId))
+              invalidate(`meeting:one:${meetingId}`)
+            }}
+          >
             {t("Try again")}
           </Button>
         }
