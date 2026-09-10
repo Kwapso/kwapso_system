@@ -160,3 +160,34 @@ export function readableBy(sightings: Sighting[], userId: string): boolean {
 export function stillLive(sightings: Sighting[]): boolean {
   return liveSightings(sightings).length > 0
 }
+
+/** MAY ANYBODY BE ANSWERED FROM THIS, or only the people who saw it?
+ *
+ * The stored half of the fence. `readableBy` above is the whole truth and needs
+ * the sightings in hand; retrieval cannot afford that, because the fence is
+ * COPIED onto every chunk and every posting so that stage one is a single-table
+ * read. So what gets stored beside a chunk is this ANSWER — and only this one,
+ * because it is the half that does not name a person and therefore fits in a
+ * column.
+ *
+ * A chunk carrying it needs no sightings at all. A chunk without it needs the
+ * one extra question, "do I have a live sighting of this", and nothing else:
+ *
+ *     readableBy(s, me)  ===  teamVisible(s) || <me has a live sighting in s>
+ *
+ * which is asserted over every shape two sightings can take, because an
+ * optimisation that is approximately right about a permission is the most
+ * expensive kind of nearly-correct there is.
+ *
+ * IT IS A DERIVED FACT, AND A COPY OF ONE IS EXACTLY WHAT WENT WRONG BEFORE.
+ * `owner_user_id` was a stored answer too, and it broke the moment one row had
+ * to answer for two people. This is the same species one level down: it goes
+ * stale when a shelf moves private to team, and — the direction that leaks —
+ * when the last team sighting is retired and only private ones remain. So
+ * whatever writes a sighting's shelf or retires one must recompute this in the
+ * same statement, and something must re-derive it across the corpus and refuse
+ * to agree with a stored value that has drifted. A stale copy of this is a
+ * silent fence widening with no code change and no deploy behind it. */
+export function teamVisible(sightings: Sighting[]): boolean {
+  return liveSightings(sightings).some((s) => s.shelf === "team")
+}

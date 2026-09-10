@@ -17,6 +17,7 @@ import {
   recordIdentity,
   sightedExternalId,
   stillLive,
+  teamVisible,
   uploadIdentity,
   type Sighting,
 } from "../src/lib/knowledge-identity"
@@ -150,5 +151,69 @@ describe("a source lives while somebody can still see it", () => {
   it("hands back only the sightings that are still there", () => {
     const live = sighting(ALEX, "private")
     expect(liveSightings([{ ...sighting(AURORA, "team"), goneAt: "2026-09-10T09:00:00.000Z" }, live])).toEqual([live])
+  })
+})
+
+// ── THE DENORMALISED FAST PATH, AND THE PROOF IT CANNOT CHANGE THE ANSWER ────
+//
+// Once two people's rows are one source, the fence cannot be a column: one
+// `owner_user_id` cannot hold a set, and it is COPIED onto `knowledge_chunks`
+// and `knowledge_terms` so that stage one of retrieval is a single-table read.
+//
+// So the stored fact becomes the ANSWER rather than the owner: `team_visible`,
+// true when any live sighting is on the team's shelf. A chunk with it set needs
+// no join at all; only private material pays for one.
+//
+// That is an optimisation over a permission decision, which is the most
+// expensive place to be approximately right — so the equality below is the
+// point of this block. `teamVisible(…) || <I have a live sighting>` must equal
+// `readableBy(…)` for every shape a source can be in, or the fast path is a
+// fence with a hole in it.
+
+describe("teamVisible, and the fast path built on it", () => {
+  const gone = (s: Sighting): Sighting => ({ ...s, goneAt: "2026-09-10T09:00:00.000Z" })
+
+  it("is true when somebody has put it on the team's shelf", () => {
+    expect(teamVisible([sighting(AURORA, "team")])).toBe(true)
+    expect(teamVisible([sighting(AURORA, "private"), sighting(ALEX, "team")])).toBe(true)
+  })
+
+  it("is false when every shelf is private, which is the whole calendar fold", () => {
+    expect(teamVisible([sighting(AURORA, "private"), sighting(ALEX, "private")])).toBe(false)
+    expect(teamVisible([])).toBe(false)
+  })
+
+  it("goes FALSE again when the last team sighting is retired", () => {
+    // The staleness that appears with no code change and no deploy: a stored
+    // flag left true here is material still answering for everybody after the
+    // only person who shared it stopped.
+    expect(teamVisible([gone(sighting(AURORA, "team")), sighting(ALEX, "private")])).toBe(false)
+  })
+
+  it("goes TRUE when a private shelf is moved to the team's", () => {
+    // The other direction, and the harmless one — a stale flag here costs a
+    // colleague an answer they should have had, rather than leaking one.
+    expect(teamVisible([sighting(AURORA, "private")])).toBe(false)
+    expect(teamVisible([sighting(AURORA, "team")])).toBe(true)
+  })
+
+  it("makes the fast path EXACTLY the fence, for every shape a source can be in", () => {
+    const people = [AURORA, ALEX]
+    const shelves = ["private", "team"] as const
+    // Every combination of two people, two shelves and present/retired — 81
+    // shapes, which is the whole space for two sightings.
+    const all: Sighting[][] = []
+    for (const a of [null, ...shelves.flatMap((s) => [sighting(AURORA, s), gone(sighting(AURORA, s))])])
+      for (const b of [null, ...shelves.flatMap((s) => [sighting(ALEX, s), gone(sighting(ALEX, s))])])
+        all.push([a, b].filter((x): x is Sighting => x !== null))
+    expect(all.length).toBeGreaterThan(20)
+    for (const sightings of all)
+      for (const me of [...people, "01J8ZZSTRANGER0000000000AA"]) {
+        const fast = teamVisible(sightings) || liveSightings(sightings).some((s) => s.userId === me)
+        expect(
+          fast,
+          `the fast path disagrees with the fence for ${JSON.stringify(sightings)} read by ${me}`
+        ).toBe(readableBy(sightings, me))
+      }
   })
 })
