@@ -585,19 +585,78 @@ export function HelpFormDialog({
      is a real and common answer rather than an unread state. The row commits on
      the click, so a real answer has to be one of the chips.
 
-     THE GATE IS AN ORDERING RULE, NOT A FENCE, and the difference is worth
-     stating because the module row one field down looks identical and is not.
-     There, `moduleForTicket` refuses a module that is not part of the named app,
-     so the picker is shut because an open one could only produce a refusal. The
-     ticket door has NO such opinion about apps: `appForTicket` checks that the
-     app is a live row in the team and nothing else, so every app on this list
-     would be accepted for every client. What the gate buys is the client's own
-     sequence — client, then app, then module, then who — which is the order the
-     rest of this form already depends downward in. Said plainly so nobody later
-     "fixes" it by narrowing the list to the client's own apps: that would hide
-     the agency's own systems (`AppRow.accountId` is null on those) from every
-     client's ticket, and the door has never asked for it. */
-  const appChoices = (appsQ.data ?? []).filter((a) => a.active)
+     THE GATE IS AN ORDERING RULE AND THE LIST IS NARROWED TOO — client,
+     2026-09-09: *"very wrong! filter the apps by selected client! Until clint is
+     not selected, show nothing."* Both halves of that sentence are here, and
+     only the first of them used to be.
+
+     WHAT THIS BLOCK USED TO SAY, because the argument was real and the reader
+     deserves it rather than a silent deletion. It read: the gate is an ordering
+     rule, not a fence, because the door has no opinion — `moduleForTicket`
+     refuses a module that is not part of the named app, so THAT picker is shut
+     because an open one could only produce a refusal, while `appForTicket`
+     checks only that the app is a live row in the team, so every app on this
+     list would be accepted for every client. And then, in as many words: *"Said
+     plainly so nobody later 'fixes' it by narrowing the list to the client's own
+     apps: that would hide the agency's own systems (`AppRow.accountId` is null
+     on those) from every client's ticket, and the door has never asked for it."*
+
+     THE CLIENT HAS RULED, TWICE IN ONE DAY, AND A RULING BEATS A COMMENT. But
+     the comment was arguing against a narrowing nobody has to write. Its cost —
+     our own systems disappearing off every client's ticket — is a cost of
+     narrowing by EQUALITY (`a.accountId === chosenAccountId`), and that is not
+     the narrowing her second correction the same day asks for. She ruled that
+     the toolbar's filters CASCADE, and the cascade she got is already written,
+     already shipped and already hers: `useFilterBar`'s `optionsFor`
+     (shared/web/screen-engine/filter-bar.tsx) narrows a child facet by
+     OWNERSHIP — `o.within == null || o.within === parent` — where `within` is
+     the app row's own `accountId` passed straight through. Its own note carries
+     the same sentence this block used to end on, and answers it: *"`within ==
+     null` is 'owned by nobody' and survives every parent: our own systems are
+     legitimately on a client's ticket, and dropping them would make those
+     tickets unreachable from this control."*
+
+     SO THIS ROW APPLIES THAT EXACT RULE, and the reason to reuse the words
+     rather than invent a second answer is that both controls narrow the same
+     column on the same screen: the toolbar's App facet on the tickets
+     collection and this form's App row. Two rules would be two ideas of which
+     apps belong to a client inside one product, which is the drift she has told
+     us twice to stop.
+
+     WHAT THE ROW OFFERS, exactly:
+
+       · NO CLIENT AND NO APP ON THE TICKET → nothing. Her first sentence,
+         unchanged, drawn by the gate below.
+       · A CLIENT CHOSEN → that client's own apps, plus the agency's own
+         systems (`accountId` null), plus "No app".
+       · NO CLIENT BUT THE TICKET ALREADY NAMES ONE (a housekeeping ticket, the
+         `appAlreadyNamed` case below) → the agency's own systems, which is what
+         `a.accountId === chosenAccountId` resolves to when both are null, and
+         is the right answer rather than a coincidence: a ticket with no client
+         is about one of ours or about nothing.
+
+     AND NOTHING EXISTING IS STRANDED. The one row the ownership rule can
+     exclude is an app belonging to a DIFFERENT client, which a ticket can
+     legally hold — the door accepts any live app for any client, exactly as the
+     retired paragraph said. So the app the ticket ALREADY NAMES is kept on the
+     list whatever it belongs to, off `initial` for `appAlreadyNamed`'s own
+     reason (the ticket AS OPENED, so the row cannot change under a hand that is
+     using it). Without that clause an edit would draw a row with no chip
+     pressed while `values.appId` still held the app, and `submit` would send a
+     value the screen had stopped showing — the same silent-hidden-value bug the
+     paragraph below describes, arriving from a third direction.
+
+     `a.active` IS NOT RELAXED FOR IT, and that asymmetry is deliberate. An
+     ARCHIVED app is not excluded by this narrowing — it was already excluded,
+     and it has to stay excluded, because `appForTicket` refuses one
+     (`deactivated_at IS NULL`): offering it would be a chip whose only possible
+     outcome is a refusal, which is the shape the module row one field down
+     exists to avoid. An app of another client is the opposite case — the door
+     takes it — so keeping that one costs nothing and losing it costs a ticket. */
+  const appChoices = (appsQ.data ?? []).filter(
+    (a) =>
+      a.active && (a.accountId == null || a.accountId === chosenAccountId || a.id === initial?.appId)
+  )
   /** THE TICKET THAT ALREADY NAMES AN APP AND NO CLIENT, which the gate above
    * would otherwise hide and then silently save.
    *
@@ -614,7 +673,13 @@ export function HelpFormDialog({
    * is a client OR an app the ticket already had, rather than a client alone.
    * Read off `initial` (the ticket AS OPENED) and not off `values`, for
    * `typeGrandfathered`'s reason one field up: a row that closed itself the
-   * moment somebody pressed "No app" would jump under their hand. */
+   * moment somebody pressed "No app" would jump under their hand.
+   *
+   * THE SAME FACT IS NOW LOAD-BEARING TWICE, and the second use is why it is
+   * worth saying so here. This boolean OPENS the row; the `a.id ===
+   * initial?.appId` clause in `appChoices` above keeps the named app ON it once
+   * it is open. An opened row that then offered no chip for the app the ticket
+   * actually has would be the same defect wearing a different shape. */
   const appAlreadyNamed = !!initial?.appId
   /** The chips, with the SAME two empty states the people row has and for the
    * same reasons — the sentence rather than a lone escape chip, because one
@@ -689,22 +754,34 @@ export function HelpFormDialog({
          the census that component exists to have ended.
 
      WHAT A CONTACT ACTUALLY HAS, said plainly because the answer decides what is
-     drawn: A NAME. `AccountLink` (shared/types.ts) carries `id`, `accountId`,
-     `personAccountId`, `personName`, `relationship`, `isMainStakeholder`,
-     `active` — and no picture, because `listAccountLinks`
-     (workers/tenancy/src/lib/accounts.ts) selects `p.name` off the joined person
-     row and nothing else off it. So the honest mark is the INITIAL, which is
-     what `RecordMarkGlyph` falls through to, in the round box, at the kit's own
-     smallest avatar size.
+     drawn: A NAME AND, SINCE THE DOOR CHANGE, A FACE. `AccountLink`
+     (shared/types.ts) carries `id`, `accountId`, `personAccountId`,
+     `personName`, `personLogoUrl`, `relationship`, `isMainStakeholder`,
+     `active`. The picture is the field this block used to say was missing, and
+     the paragraph that used to stand here is worth keeping in full because it
+     names its own remedy: *"A contact IS an account row, and 31 of the 106
+     individual accounts hold a real face in `logo_url` (`scripts/glide-visuals.mjs`
+     put them there, and record-mark.tsx's header counts them) — so the
+     photographs exist and are one `p.logo_url` away in that SELECT. Adding it is
+     a door change, not a screen one … the day `AccountLink` carries the person's
+     picture, this call site passes it as `picture` and `RecordMark` prefers it
+     over the initial with no other edit anywhere."*
 
-     THE PICTURE IS NOT INVENTED AND THE LINE IS ALREADY WRITTEN FOR IT. A
-     contact IS an account row, and 31 of the 106 individual accounts hold a real
-     face in `logo_url` (`scripts/glide-visuals.mjs` put them there, and
-     record-mark.tsx's header counts them) — so the photographs exist and are one
-     `p.logo_url` away in that SELECT. Adding it is a door change, not a screen
-     one, and it is deliberately not smuggled in here: the day `AccountLink`
-     carries the person's picture, this call site passes it as `picture` and
-     `RecordMark` prefers it over the initial with no other edit anywhere.
+     THAT IS EXACTLY WHAT HAPPENED, and it is one line at each end: `p.logo_url`
+     joined the SELECT in `listAccountLinks` and `picture` joined the option
+     below. Nothing else moved — no new component, no second mark, no fallback
+     logic here. `RecordMark` already prefers a picture and falls through to the
+     initial, so a contact with a photograph draws their face and one without
+     draws the letter tile the whole row used to be, in the same round box at the
+     same size.
+
+     A CLIENT LOGIN GETS NULL AND THEREFORE THE LETTER, decided at the door
+     rather than here (`listAccountLinks`' own note carries the argument: the
+     fence is on the company, the photograph is read off a person row beside it,
+     and a person can be a contact at two companies). It costs this screen
+     nothing — the ticket form is the AGENCY's, and a portal caller never renders
+     it — and it is said here so the next reader of this block knows the field
+     can be null for a reason other than "no photograph".
 
      "NOT SAID" GETS NO FACE, and that is the one deliberate asymmetry in the
      row. It is an escape hatch, not a person, and a round grey "N" would draw a
@@ -749,10 +826,15 @@ export function HelpFormDialog({
             value: l.personAccountId,
             label: l.personName,
             hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
-            // THE ROUND AVATAR (client, 2026-09-09). The box is `shape`, the
-            // decision to draw one at all is `face`, and the mark inside it is
-            // the person's own initial until `AccountLink` carries a picture —
-            // all three argued above.
+            // THE ROUND AVATAR (client, 2026-09-09), now with a real face in it.
+            // Four fields and each answers a different question: `picture` is
+            // WHO — the photograph off their own account row, which `RecordMark`
+            // prefers over everything else; `shape` is the BOX (a person is a
+            // circle); `face` is whether a box is drawn AT ALL, which is what
+            // keeps the letter tile for the many contacts who have no
+            // photograph; and the initial inside it is `RecordMark`'s own last
+            // resort rather than anything decided here. All four argued above.
+            picture: l.personLogoUrl,
             shape: "round" as const,
             face: true,
           })),

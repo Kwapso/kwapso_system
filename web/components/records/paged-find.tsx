@@ -84,6 +84,7 @@ import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
 import { useRemembered } from "@shared/web/remembered"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 /** One page of an answer from a list door: the rows, and where the next page
@@ -610,153 +611,173 @@ export function PagedFind<T>({
   // empty register it uses (`CollectionEmptyState`'s "Add the first", most of
   // the time) with nothing else on the card above it.
   const toolbar = genuinelyEmpty ? null : (
-    <div
-      data-slot="toolbar-row-column"
-      className={cn(
-        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND — the
-        // identical fix `ToolbarRow` (screen-bits.tsx) carries, for the
-        // identical reason: `bg-background` and `bg-[var(--surface-raised)]`
-        // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
-        // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
-        // from that file inherited the same latent mismatch.
-        // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
-        // reason the toolbar's buttons had no background. The kit rebinds
-        // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
-        // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
-        // secondary button is always the other tone from whatever it stands on
-        // and no component needs a prop. `bg-[var(--surface-raised)]` paints
-        // the identical colour but is a DIFFERENT CLASS, so no selector in that
-        // list matched, the rebind never fired, and the token stayed at its
-        // base `var(--card)` — the same #FFFEF9 this container is painted with.
-        // Beige on beige: the client, twice, "the buttons in the toolbar are
-        // missing the background". `bg-surface-raised` is a real generated
-        // utility (tokens.css bridges `--color-surface-raised` precisely so it
-        // exists), paints the same colour, and IS in the list — so every
-        // secondary control inside now resolves to `--surface-panel` #F7F2EB.
-        //
-        // THE RULE, not the patch: an element that paints a GROUND uses the
-        // named utility. The `bg-[var(--token)]` escape hatch silently freezes
-        // every ground-aware token beneath it.
-        "flex min-w-0 flex-col bg-surface-raised",
-        filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
-      )}
-    >
+    // ── THE PIN — R63, the identical two-box shape `<ToolbarRow>` carries
+    // (screen-bits.tsx has the argument in full): the pill below keeps its own
+    // fill and radius, and this box does the pinning and paints the band the
+    // rows disappear behind — the pill plus the gap under it, which used to be
+    // this column's parent's `gap-4` and is now `pb-4` INSIDE something that
+    // paints. `bg-surface-raised` is the card's own surface, the same tone the
+    // pill and the `<CollectionCard>` behind it wear, so nothing changes at
+    // rest. `--pinned-chrome-h` is what it pins below — a collection tab strip
+    // (this component draws one itself, right at the bottom of this file), a
+    // record's strip, or nothing. See shared/web/pinned-chrome.ts.
+    <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4")}>
       <div
-        data-slot="toolbar-row-track"
-        className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+        data-slot="toolbar-row-column"
+        className={cn(
+          // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND — the
+          // identical fix `ToolbarRow` (screen-bits.tsx) carries, for the
+          // identical reason: `bg-background` and `bg-[var(--surface-raised)]`
+          // coincide in LIGHT mode (both `--kw-off-beige`) and diverge in DARK
+          // mode (`--kw-unlit-page` vs `--kw-unlit-raised`), so a row copied
+          // from that file inherited the same latent mismatch.
+          // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
+          // reason the toolbar's buttons had no background. The kit rebinds
+          // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
+          // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
+          // secondary button is always the other tone from whatever it stands on
+          // and no component needs a prop. `bg-[var(--surface-raised)]` paints
+          // the identical colour but is a DIFFERENT CLASS, so no selector in that
+          // list matched, the rebind never fired, and the token stayed at its
+          // base `var(--card)` — the same #FFFEF9 this container is painted with.
+          // Beige on beige: the client, twice, "the buttons in the toolbar are
+          // missing the background". `bg-surface-raised` is a real generated
+          // utility (tokens.css bridges `--color-surface-raised` precisely so it
+          // exists), paints the same colour, and IS in the list — so every
+          // secondary control inside now resolves to `--surface-panel` #F7F2EB.
+          //
+          // THE RULE, not the patch: an element that paints a GROUND uses the
+          // named utility. The `bg-[var(--token)]` escape hatch silently freezes
+          // every ground-aware token beneath it.
+          "flex min-w-0 flex-col bg-surface-raised",
+          filterPanelOpen ? "rounded-[var(--radius)]" : "rounded-pill"
+        )}
       >
-          {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
-              control sits in one visibly distinct row. No fill and no radius of
-              its own any more — both now belong to the merged container above. */}
-          {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
-              the filter row's "Clear all" — one control quietly owning two
-              questions — and the kit's bar says "Clear filters" and now means
-              only that. */}
-          {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-              like in your atifact": the reference artifact's search element is
-              `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
-              chips/sort/count/actions after it to the track's far edge instead
-              of sitting immediately after a narrow box. Wrapped, the same
-              technique this file's own comment below already argues for a
-              `w-full` child: a `flex-1` box here claims the row's remaining
-              width, and only then does the plain `w-full` `SearchInput` inside
-              fill exactly that box. */}
-          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
-            <SearchInput
-              value={text}
-              // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
-              // keystroke, unconditionally; only the DOOR waits (`setText`
-              // above owns that decision, so the clear path and the type path
-              // cannot drift apart). `onClear` is the same call with an empty
-              // string, which `setText` reads as the deliberate act it is.
-              onChange={(e) => setText(e.currentTarget.value)}
-              onClear={() => setText("")}
-              loading={typing || found.loading}
-              placeholder={placeholder}
-              className="w-full"
-            />
-          </div>
-          {/* THE FILTER PILL, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
-              ruling, 2026-09-01, the toolbar spec Aurora approved that night
-              against a real Tickets mockup: search, then filters, then sort,
-              then create, pinned right). It says a COUNT and never the filters
-              themselves — client, 2026-09-02: "when activce filters, do not
-              display them in the toolbar. only a count niside the filter pill".
-
-              NO WRAPPING BOX AROUND THE PILL (client ruling, 2026-09-02,
-              superseding the wrapper this slot used to carry): `filterPill`
-              wraps itself in a non-growing box internally, the same "wrap a
-              `w-full` root" trick this comment used to explain (CSS Sizing
-              §5.3). Its open PANEL is the SEPARATE `filterPanel` value below,
-              never folded into this row — the split `useFilterBar` itself
-              returns (v1.2.27), replacing the single component whose OWN
-              markup this row and the column below it used to share through a
-              portal. */}
-          {showFilters && filterPill}
-          {/* THE ORDER, after search and the facet chips because the three are
-              asked with the same gesture — you type, you narrow, then you say
-              what order. What it changes is what the DOOR is asked, so the
-              answer spans the whole collection rather than the page in front
-              of you. */}
-          {showSort && (
-            <SortControl
-              options={sorts}
-              value={sortBy}
-              onValueChange={(by) => setSortBy(by)}
-              direction={sortDir ?? landsOn}
-              onDirectionChange={(dir) => setSortDir(dir)}
-              hideLabel
-            />
-          )}
-          {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT AND THE
-              ACTIONS — R53's fixed order, the same one `<ToolbarRow>` draws, so
-              a reader who learns the row on one screen has learned it on all of
-              them. Built HERE from the config rather than by the call site, for
-              the reason that law is a change of TYPE: a node slot accepts the
-              right control, no control, or the control belonging in a different
-              slot, and no census can tell which. */}
-          {view && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <ViewSwitch
-                views={view.views}
-                value={view.value}
-                onValueChange={view.onValueChange}
-                label={t("View")}
+        <div
+          data-slot="toolbar-row-track"
+          className="flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4"
+        >
+            {/* THE TRACK — same treatment as `ToolbarRow` (screen-bits.tsx): every
+                control sits in one visibly distinct row. No fill and no radius of
+                its own any more — both now belong to the merged container above. */}
+            {/* THE SEARCH CLEARS ITSELF (the kit's own ✕). It used to be cleared by
+                the filter row's "Clear all" — one control quietly owning two
+                questions — and the kit's bar says "Clear filters" and now means
+                only that. */}
+            {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+                like in your atifact": the reference artifact's search element is
+                `flex: 1 1 auto`, not a fixed width, so it grows to push the facet
+                chips/sort/count/actions after it to the track's far edge instead
+                of sitting immediately after a narrow box. Wrapped, the same
+                technique this file's own comment below already argues for a
+                `w-full` child: a `flex-1` box here claims the row's remaining
+                width, and only then does the plain `w-full` `SearchInput` inside
+                fill exactly that box. */}
+            <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+              <SearchInput
+                value={text}
+                // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
+                // keystroke, unconditionally; only the DOOR waits (`setText`
+                // above owns that decision, so the clear path and the type path
+                // cannot drift apart). `onClear` is the same call with an empty
+                // string, which `setText` reads as the deliberate act it is.
+                onChange={(e) => setText(e.currentTarget.value)}
+                onClear={() => setText("")}
+                loading={typing || found.loading}
+                placeholder={placeholder}
+                className="w-full"
               />
             </div>
-          )}
-          {/* THE FILTERED TOTAL — the exact server count of the question being
-              asked, through the one seam allowed to end in a "+" (the collection's
-              own count above is exact and never does). It appears only while
-              something IS being asked, so an unfiltered screen looks exactly as it
-              did before. */}
-          {asked && !found.loading && !typing && (
-            <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
-              {!total
-                ? matches.none
-                : total === 1
-                  ? matches.one
-                  : fill(matches.many, { count: formatSearchTotal(total) })}
-            </span>
-          )}
-          {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
-              correcting the `ml-auto` this slot carried until then. Her
-              reference artifact never stretches the track open to park the
-              button at its far edge; it is just the last chip in the same
-              left-packed cluster as search/filters/sort/the match count
-              (still rightmost of what's showing, part of the toolbar, never
-              beside the tab strip — the 2026-08-31 ruling — just not pushed
-              there by a growing gap). */}
-          {actions && (
-            <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
-          )}
-        </div>
-        {showFilters && filterPanel}
+            {/* THE FILTER PILL, BETWEEN SEARCH AND SORT — ONE ROW, ALWAYS (client
+                ruling, 2026-09-01, the toolbar spec Aurora approved that night
+                against a real Tickets mockup: search, then filters, then sort,
+                then create, pinned right). It says a COUNT and never the filters
+                themselves — client, 2026-09-02: "when activce filters, do not
+                display them in the toolbar. only a count niside the filter pill".
+
+                NO WRAPPING BOX AROUND THE PILL (client ruling, 2026-09-02,
+                superseding the wrapper this slot used to carry): `filterPill`
+                wraps itself in a non-growing box internally, the same "wrap a
+                `w-full` root" trick this comment used to explain (CSS Sizing
+                §5.3). Its open PANEL is the SEPARATE `filterPanel` value below,
+                never folded into this row — the split `useFilterBar` itself
+                returns (v1.2.27), replacing the single component whose OWN
+                markup this row and the column below it used to share through a
+                portal. */}
+            {showFilters && filterPill}
+            {/* THE ORDER, after search and the facet chips because the three are
+                asked with the same gesture — you type, you narrow, then you say
+                what order. What it changes is what the DOOR is asked, so the
+                answer spans the whole collection rather than the page in front
+                of you. */}
+            {showSort && (
+              <SortControl
+                options={sorts}
+                value={sortBy}
+                onValueChange={(by) => setSortBy(by)}
+                direction={sortDir ?? landsOn}
+                onDirectionChange={(dir) => setSortDir(dir)}
+                hideLabel
+              />
+            )}
+            {/* THE VIEW SWITCH, AFTER THE SORT AND BEFORE THE COUNT AND THE
+                ACTIONS — R53's fixed order, the same one `<ToolbarRow>` draws, so
+                a reader who learns the row on one screen has learned it on all of
+                them. Built HERE from the config rather than by the call site, for
+                the reason that law is a change of TYPE: a node slot accepts the
+                right control, no control, or the control belonging in a different
+                slot, and no census can tell which. */}
+            {view && (
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <ViewSwitch
+                  views={view.views}
+                  value={view.value}
+                  onValueChange={view.onValueChange}
+                  label={t("View")}
+                />
+              </div>
+            )}
+            {/* THE FILTERED TOTAL — the exact server count of the question being
+                asked, through the one seam allowed to end in a "+" (the collection's
+                own count above is exact and never does). It appears only while
+                something IS being asked, so an unfiltered screen looks exactly as it
+                did before. */}
+            {asked && !found.loading && !typing && (
+              <span className="text-muted-foreground text-xs tabular-nums" aria-live="polite">
+                {!total
+                  ? matches.none
+                  : total === 1
+                    ? matches.one
+                    : fill(matches.many, { count: formatSearchTotal(total) })}
+              </span>
+            )}
+            {/* THE ROW'S OWN ACTIONS, LAST IN THE ROW — client, 2 Sep 2026,
+                correcting the `ml-auto` this slot carried until then. Her
+                reference artifact never stretches the track open to park the
+                button at its far edge; it is just the last chip in the same
+                left-packed cluster as search/filters/sort/the match count
+                (still rightmost of what's showing, part of the toolbar, never
+                beside the tab strip — the 2026-08-31 ruling — just not pushed
+                there by a growing gap). */}
+            {actions && (
+              <div className="flex flex-wrap items-center gap-2">{actions({ queryString })}</div>
+            )}
+          </div>
+          {showFilters && filterPanel}
+      </div>
     </div>
   )
 
   const toolbarAndRows = (
-    <div className="flex w-full flex-col gap-4">
+    // NO `gap-*` ON THIS COLUMN ANY MORE — R63, 2026-09-10, and it is the same
+    // sentence `STICKY_FOLDER_TABS` and `ToolbarRow` both already write: a flex
+    // gap is a distance between two siblings and is never PAINTED, so the
+    // moment the row above pins, the rows below keep scrolling and carry that
+    // reserved space away with them — leaving the first row flush against a
+    // pinned bar with nothing between them. The space is unchanged and has
+    // simply moved INSIDE the pinned box, as its own `pb-4`, where it is
+    // repainted at every scroll position the row is stuck at.
+    <div className="flex w-full flex-col">
       {toolbar}
       {children({
         active,

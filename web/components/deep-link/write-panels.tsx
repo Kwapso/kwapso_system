@@ -389,7 +389,7 @@ export function WritePanels({
       {/* Destructive confirms (?confirm=members.remove | invites.revoke) — both
        * need team_members:delete, gated so a deep link can't reach them. */}
       <ConfirmAction
-        query={query}
+        kind={query.confirm}
         canRun={can("team_members", "delete")}
         memberName={
           query.confirm === "members.remove"

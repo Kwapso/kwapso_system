@@ -1082,7 +1082,44 @@ export async function setAccountActive(
 // ── the people on an account (account_links) ─────────────────────────────────
 
 /** Everyone linked to one account. Bounded: a company's contact list doesn't
- * grow without end the way its tickets do. */
+ * grow without end the way its tickets do.
+ *
+ * ── THE PERSON'S FACE COMES WITH THEIR NAME (client, 2026-09-09) ────────────
+ *
+ * *"in raides by ticket add screen: add avatar in round"*. The round box was
+ * built the day she asked; every contact drew a grey letter in it, because this
+ * SELECT took `p.name` off the joined person row and nothing else — so
+ * `AccountLink` carried no picture and the ticket form's own note said, in as
+ * many words, that the photographs "are one `p.logo_url` away in that SELECT"
+ * and that adding it is a door change rather than a screen one. This is that
+ * change. The bytes have been in R2 since `scripts/glide-visuals.mjs` ran (31
+ * contact photographs among the 86 it moved), claimed by `Account.logoUrl`'s
+ * own `STORED_FILES` line, and read by nothing on this path.
+ *
+ * ── AND A CLIENT LOGIN GETS NULL, WHICH IS THE POINT OF SAYING IT HERE ──────
+ *
+ * `toAccount` withholds three things from a portal caller and the third one is
+ * this exact shape, reasoned there in full: a person can be a contact at TWO
+ * companies, "the fence is on the ROW; this value is read from a table beside
+ * it, so the safe answer is the one that cannot be got wrong later". That is
+ * literally this statement — the fence is on `l.account_id`, and `p` is a row
+ * it does not cover. A contact of Bergman AND of Delaval sits on both contact
+ * lists, so Bergman's portal caller would newly receive a photograph off a
+ * person row their own fence never let them open. Name and role were already
+ * there and are what a contact list is FOR; a picture is a new fact, and a new
+ * fact crossing a fence is a decision somebody has to make on purpose.
+ *
+ * SO IT IS WITHHELD RATHER THAN CONDITIONED ON WHAT THE PORTAL DRAWS. The
+ * portal's company screen (`web-portal/components/company-screen.tsx`) renders
+ * these rows and passes no picture today, so nothing on screen changes either
+ * way — which is exactly why the decision has to be made at the door: "the
+ * screen doesn't use it" is not a fence, it is the shape `getAccountDetail`'s
+ * own header calls out ("the Portal-access tab was hidden client-side for
+ * months while the server shipped the rows"). The day the portal wants a
+ * colleague's face it can have one that is fenced on purpose.
+ *
+ * The `ours` spelling is `toAccount`'s, deliberately, so there is one shape in
+ * this file for "a client login does not get this". */
 export async function listAccountLinks(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1090,11 +1127,13 @@ export async function listAccountLinks(
   accountId: string
 ): Promise<AccountLink[]> {
   const fence = accountScopeClause(scope, "l.account_id")
+  const ours = scope.kind === "portal"
   const rows = await d1Query<{
     id: string
     account_id: string
     person_account_id: string
     person_name: string
+    person_logo_url: string | null
     relationship: string | null
     is_main_stakeholder: number
     deactivated_at: string | null
@@ -1102,7 +1141,8 @@ export async function listAccountLinks(
     cfg,
     guard.databaseId,
     // R14 hard cap — a contact list is bounded; move to paging before this bites.
-    `SELECT l.id, l.account_id, l.person_account_id, p.name AS person_name, l.relationship,
+    `SELECT l.id, l.account_id, l.person_account_id, p.name AS person_name,
+            p.logo_url AS person_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts p ON p.id = l.person_account_id
        ${where([fence.sql, "l.account_id = ?"])}
@@ -1115,6 +1155,7 @@ export async function listAccountLinks(
     accountId: r.account_id,
     personAccountId: r.person_account_id,
     personName: r.person_name,
+    personLogoUrl: ours ? null : r.person_logo_url,
     relationship: r.relationship,
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,
@@ -1137,7 +1178,18 @@ export async function listAccountLinks(
  *
  * `personName` carries the COMPANY's name here, because the row is being read
  * about the person: the shape is shared with the forward list so one screen
- * component can draw either, and the name is always "the other end". */
+ * component can draw either, and the name is always "the other end".
+ *
+ * AND `personLogoUrl` FOLLOWS IT, for the identical reason and off the identical
+ * row — the company's mark rather than the person's face. "The other end" is one
+ * rule about this shape, not two, and a field that was null in one of the two
+ * directions would be a hole a reader has to know about.
+ *
+ * NO PORTAL WITHHOLDING HERE, and the asymmetry with the forward read is the
+ * whole argument rather than an oversight: there the picture comes off a person
+ * row the fence does not cover, here the joined row IS the fenced row
+ * (`c.id = l.account_id`, and the fence is on `l.account_id`). There is no
+ * second row to leak from. */
 export async function listPersonCompanies(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1150,6 +1202,7 @@ export async function listPersonCompanies(
     account_id: string
     person_account_id: string
     company_name: string
+    company_logo_url: string | null
     relationship: string | null
     is_main_stakeholder: number
     deactivated_at: string | null
@@ -1157,7 +1210,8 @@ export async function listPersonCompanies(
     cfg,
     guard.databaseId,
     // R14 hard cap — a person belongs to a handful of companies.
-    `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name, l.relationship,
+    `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name,
+            c.logo_url AS company_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts c ON c.id = l.account_id
        ${where([fence.sql, "l.person_account_id = ?"])}
@@ -1170,6 +1224,7 @@ export async function listPersonCompanies(
     accountId: r.account_id,
     personAccountId: r.person_account_id,
     personName: r.company_name,
+    personLogoUrl: r.company_logo_url,
     relationship: r.relationship,
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,

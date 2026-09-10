@@ -41,6 +41,8 @@ import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
+import { cn } from "@shared/ui/lib/utils"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 export function TicketsScreen({ ready }: { ready: PortalReady }) {
@@ -133,28 +135,48 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         * `restingEmpty` above. A search box is a promise there is something to
         * find. */}
       {restingEmpty ? null : (
-        <div className="relative">
-          <MagnifyingGlass
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
-            aria-hidden
-          />
-          <Input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder={t("Search your tickets")}
-            aria-label={t("Search your tickets")}
-            className="pr-12 pl-12"
-          />
-          {term ? (
-            <button
-              type="button"
-              onClick={() => setTerm("")}
-              aria-label={t("Clear the search")}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
-            >
-              <X className="size-4" />
-            </button>
-          ) : null}
+        /* ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also
+           want the toolbar to be on top all time visible. everywhere." Two
+           front doors, so this one takes it too — in the portal's own calm
+           idiom (one box, no chips), exactly as R48's search box did.
+
+           `PINNED_TOOLBAR` is the same class the agency door's four toolbars
+           wear, and `--pinned-chrome-h` is what it pins below: here the portal
+           shell's own sticky header, which `portal-shell.tsx` measures and
+           publishes (a header of buttons has no tab strip's token geometry to
+           read). `bg-background` is the ground this screen and that header both
+           stand on — a pinned bar has to paint, or the rows scroll through it.
+
+           `pb-6 -mb-6` is this section's own `gap-6` made painted and then
+           given back, because a flex gap is a distance between two siblings and
+           is never painted: without it the first ticket row slides up flush
+           against the box the moment it sticks. The search box keeps its own
+           `relative` job for free — `position: sticky` is a positioned ancestor
+           too, so the glyph and the ✕ inside still resolve against it. */
+        <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-6 -mb-6")}>
+          <div className="relative">
+            <MagnifyingGlass
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
+              aria-hidden
+            />
+            <Input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder={t("Search your tickets")}
+              aria-label={t("Search your tickets")}
+              className="pr-12 pl-12"
+            />
+            {term ? (
+              <button
+                type="button"
+                onClick={() => setTerm("")}
+                aria-label={t("Clear the search")}
+                className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
 

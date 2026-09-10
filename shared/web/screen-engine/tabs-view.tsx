@@ -63,6 +63,8 @@ import * as React from "react"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui/components/tabs/tabs"
 import { cn } from "@shared/ui/lib/utils"
 
+import { PINNED_STRIP_MARK } from "../pinned-chrome"
+
 import { iconComponent } from "./icon"
 import { type IconName } from "./icon-names"
 
@@ -359,8 +361,20 @@ export type FolderTabStrip = {
    assistant panel and the toolbar/collection containers were the first two);
    `--tab-content-gap` is padding on this same box, so the gap below the tabs
    takes the corrected colour with it. */
+/* `PINNED_STRIP_MARK` — R63, 2026-09-10. The strip is not the only thing that
+   pins at the top of this scrollport any more: the collection TOOLBAR under it
+   does too, on the client's ruling ("on scroll down, i also want the toolbar to
+   be on top all time visible. everywhere"), and a toolbar at `top: 0` would
+   land in this strip's own band and hide it. So the strip declares itself, and
+   the front doors' `globals.css` gives `--pinned-chrome-h` to whatever CONTAINS
+   a marked strip — the toolbar below reads it as its own `top`. A plain marker
+   class rather than a `top` handed down as a class, for the reason this file's
+   header already gives one paragraph up: the strip and the row it displaces
+   have no ancestor nearer than their host's own column, and the strip cannot
+   reach it. Every host of `renderFolderTabs` is covered by that one rule; none
+   of them was told. */
 export const STICKY_FOLDER_TABS =
-  "bg-surface-raised sticky top-0 z-10 pb-[var(--tab-content-gap)] " +
+  `bg-surface-raised sticky top-0 z-10 pb-[var(--tab-content-gap)] ${PINNED_STRIP_MARK} ` +
   "[&>[role=tablist]]:self-start"
 
 /** Draw a `FolderTabStrip`, or nothing where a caller has none — the one place

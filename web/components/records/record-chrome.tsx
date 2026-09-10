@@ -1287,7 +1287,25 @@ export function RecordScreen({
  * only reaches downward, so both are set once, here, on `RecordScreen`'s own
  * root (an ancestor of both), and each rule below just reads them. */
 const RECORD_TABS_GEOMETRY =
-  "[--record-tab-strip-h:calc(var(--space-3)_+_var(--space-3)_+_0.125rem_+_(var(--text-sm)_*_var(--text-sm--line-height))_-_1px)] " +
+  // THE CALC MOVED TO `--tab-strip-h` (web/app/globals.css) AND NOTHING ELSE
+  // CHANGED — R63, 2026-09-10. It was written here because this was the only
+  // rule that needed it; the COLLECTION strip is the same line trigger and is
+  // therefore exactly as tall, and R63's pin now needs that height on both
+  // halves of the app. Every term is still the kit's own trigger read verbatim
+  // (the paragraph above), and it is still spent here under this name — one
+  // owner, read by two rules instead of one.
+  "[--record-tab-strip-h:var(--tab-strip-h)] " +
+  // R63 — WHAT A TOOLBAR ON THIS SCREEN PINS BELOW. The strip above floats at
+  // `top: 0` inside the same scrollport, so a panel's own `<ToolbarRow>` — a
+  // contact's Companies list, an account's Contacts, a wave's sprints — would
+  // pin in the strip's own band and hide it. Declared HERE, on `RecordScreen`'s
+  // own root, for exactly the reason the two properties beside it are: a custom
+  // property only reaches downward, and the strip is a SIBLING of the panels
+  // below it rather than their ancestor. The collection half of the app gets
+  // the same number from a `:has()` rule off `PINNED_STRIP_MARK`; a record
+  // screen's strip is nested one level too deep for that rule to see, and this
+  // is the file that already owns its geometry.
+  "[--pinned-chrome-h:calc(var(--record-tab-strip-h)_+_var(--record-tab-gap))] " +
   // THE GAP IS NOT THIS SCREEN'S TO CHOOSE ANY MORE — client ruling,
   // 2026-09-03: "there needs to be space between the tabs and the start of the
   // container. This is already correct on detail screens … Go and uniform

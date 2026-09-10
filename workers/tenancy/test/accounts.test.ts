@@ -22,6 +22,7 @@ import {
   getAccount,
   grantPortalAccess,
   linkPerson,
+  listAccountLinks,
   listAccounts,
   listAccountsForExport,
   listPersonCompanies,
@@ -409,6 +410,69 @@ describe("contacts", () => {
         personAccountId: IDS.victimAccount,
       })
     ).rejects.toMatchObject({ code: "invalid_input" })
+  })
+
+  /* ── A CONTACT'S OWN FACE (client, 2026-09-09: "add avatar in round") ──────
+     The picture is on the person's own account row and had never been read on
+     this path, so the ticket form's contact chips drew a grey letter for all
+     106 of them — including the 31 who have a photograph in R2. */
+  const photograph = (id: string, path: string) =>
+    db().prepare("UPDATE accounts SET logo_url = ? WHERE id = ?").run(path, id)
+
+  it("carries the person's photograph beside their name", async () => {
+    photograph(IDS.victimPerson, "/media/accounts/marta.jpg")
+    const links = await listAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    const marta = links.find((l) => l.personAccountId === IDS.victimPerson)
+    expect(marta?.personLogoUrl).toBe("/media/accounts/marta.jpg")
+    // …and a contact with no photograph says so rather than inventing one — the
+    // screen's fallback to an initial depends on the null being honest.
+    const ana = await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: "Ana" })
+    await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
+    expect(
+      (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find((l) => l.personAccountId === ana)
+        ?.personLogoUrl
+    ).toBeNull()
+  })
+
+  /* THE SAME FIELD, WITHHELD FROM A CLIENT LOGIN — and this fixture is why the
+     withholding is not paranoia. Marta is a contact of Bergman S.A. AND of
+     Bergman Marine and her own row hangs under NEITHER (`parent_account_id` is
+     null), which is the shape `listPersonCompanies` exists for. So a portal
+     caller standing at Bergman S.A. legitimately reads her LINK — the fence is
+     on `l.account_id` — while her account row is outside their world entirely.
+     The photograph is read off that outside row, which is exactly the case
+     `toAccount`'s own note reasons about for `companyName` and `relationship`. */
+  it("withholds that photograph from a client login, whose fence never reaches the person's row", async () => {
+    photograph(IDS.victimPerson, "/media/accounts/marta.jpg")
+    const scope = await accountScope(cfg, { ...guard, userId: IDS.contactUser })
+    expect(scope.kind).toBe("portal")
+    if (scope.kind !== "portal") return
+    // THE POSITIVE CONTROL FIRST, or this test could pass because the caller
+    // sees nothing at all: they DO read the link, name and role included.
+    const links = await listAccountLinks(cfg, guard, scope, IDS.victimAccount)
+    const marta = links.find((l) => l.personAccountId === IDS.victimPerson)
+    expect(marta?.personName).toBe("Marta Ruiz")
+    // …and her row is genuinely outside their fence, so this is a NEW fact
+    // crossing it rather than one they could already read another way.
+    expect(scope.accountIds).not.toContain(IDS.victimPerson)
+    expect(marta?.personLogoUrl, "a client login was handed a face off a row outside its fence").toBeNull()
+    // Staff, through the same function on the same row, still get it.
+    expect(
+      (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find(
+        (l) => l.personAccountId === IDS.victimPerson
+      )?.personLogoUrl
+    ).toBe("/media/accounts/marta.jpg")
+  })
+
+  /* THE OTHER DIRECTION carries the COMPANY's mark, because `personName` is
+     "the other end" there too — one rule about this shape, not two. No
+     withholding: the joined row IS the fenced row (`c.id = l.account_id`). */
+  it("carries the company's mark when the link is read from the person's side", async () => {
+    photograph(IDS.victimAccount, "/media/accounts/bergman.png")
+    const companies = await listPersonCompanies(cfg, guard, staff, IDS.victimPerson)
+    expect(companies.find((c) => c.accountId === IDS.victimAccount)?.personLogoUrl).toBe(
+      "/media/accounts/bergman.png"
+    )
   })
 })
 

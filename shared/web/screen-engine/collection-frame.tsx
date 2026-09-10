@@ -49,6 +49,7 @@ import { useDebouncedCallback } from "@shared/ui/components/use-debounce/use-deb
 import { useIsVisible } from "./visibility"
 import { ShapeStateBody, type ShapeStateCopy } from "@shared/ui/compositions/states/states"
 import { CollectionFrame as KitCollectionFrame } from "@shared/ui/components/collection-frame/collection-frame"
+import { PINNED_TOOLBAR, PINNED_TOOLBAR_IN_KIT_PANEL } from "../pinned-chrome"
 
 /** THE SECTION'S OWN CREATE ACTION, published to the collection inside it.
  *
@@ -722,7 +723,13 @@ function CollectionFrame<T>({
       // branch the panel as an ordinary value above, so it is passed straight
       // through as a prop like every other slot here.
       <KitCollectionFrame
-        className={className}
+        // R63 — THE PIN, REACHED THROUGH THE KIT'S OWN SLOT NAME. This branch
+        // draws no toolbar of its own: the vendored `CollectionFrame` draws it,
+        // inside a panel this app never touches, so the client's "everywhere"
+        // is answered here with a `[&_[data-slot=…]]:` rule rather than a class
+        // on an element. `shared/web/pinned-chrome.ts` has the whole argument,
+        // including what is owed upstream.
+        className={cn(PINNED_TOOLBAR_IN_KIT_PANEL, className)}
         // `tone="bare"`/`inset={false}`: this frame always renders inside
         // `AppShell`'s `ScreenShell` body pane now (COMPOSITION-MISMATCHES.md,
         // the ScreenShell-family entry) — an off-beige ground that already
@@ -795,7 +802,38 @@ function CollectionFrame<T>({
 
   return (
     <div ref={rootRef} className={cn("flex w-full flex-col gap-3", className)}>
-      {showHeader &&
+      {/* ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also
+          want the toolbar to be on top all time visible. everywhere."
+          The recipe engine's OWN header is the fourth toolbar in the app (the
+          other three are `<ToolbarRow>`, `<PagedFind>` and `<WaveFinder>` —
+          `TOOLBAR_CONTROL_OWNERS` names all four), and it is the one MOST
+          recipes take, because `useKitPanel` defaults to false. It draws two
+          blocks, one per breakpoint, so the pin goes on a box around BOTH:
+          whichever of the two a width shows, the same box is doing the
+          sticking, and there is no chance of a phone toolbar that scrolls away
+          while a desktop one does not.
+
+          `pb-3 -mb-3`, AND THE PAIR IS THE POINT. This column's own `gap-3`
+          separates the header from the rows below it, and a flex gap is a
+          distance between two siblings, never a painted box — so the moment
+          this pins, the rows scroll straight up into that 12px with nothing
+          behind them (the bug `STICKY_FOLDER_TABS` was fixed out of on
+          2026-09-03). The padding puts the identical space INSIDE the pinned
+          box, where the ground paints it, and the negative margin gives the
+          column's own gap back so the total distance is unchanged to the pixel.
+          Both read the same `3` step this column already spends, so they cancel
+          whatever that step resolves to.
+
+          NOT WHILE THE COLLECTION IS EMPTY (R50). Every control here is already
+          gated on `!isEmptyState`, so an empty collection's header is its TITLE
+          and nothing else — and a pinned title is not what was asked for. The
+          class goes with the controls. */}
+      {showHeader && (
+        <div
+          data-slot="toolbar-row-pin"
+          className={isEmptyState ? undefined : cn(PINNED_TOOLBAR, "pb-3 -mb-3")}
+        >
+        {
         (() => {
           const titleBlock = (
             <div className="flex items-baseline gap-2">
@@ -1026,7 +1064,10 @@ function CollectionFrame<T>({
               </div>
             </>
           )
-        })()}
+        })()
+        }
+        </div>
+      )}
 
       {state === "loading" ? (
         // LAW 4, THE SAME RULE THE RECORD SCREENS WERE JUST MIGRATED TO

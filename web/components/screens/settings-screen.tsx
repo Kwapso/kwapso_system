@@ -53,27 +53,48 @@
 // reorganisation of the team's whole vocabulary inside the change that adds a
 // list of one row.
 //
-// REBUILT INTO FOUR TABS, 2026-09-01 — the flat one-page-with-headings shape
-// above gave way to a real tab strip once the design kit's own Settings
-// composition (shared/ui/compositions/screens/settings.tsx, ch26.05) named
-// the shape: "a plain page-title header followed by the same underline tab
-// strip used on every detail page's sub-tabs". Four tabs, in this order:
+// REBUILT INTO A REAL TAB STRIP, 2026-09-01 — the flat one-page-with-headings
+// shape above gave way to one once the design kit's own Settings composition
+// (shared/ui/compositions/screens/settings.tsx, ch26.05) named the shape: "a
+// plain page-title header followed by the same underline tab strip used on
+// every detail page's sub-tabs".
+//
+// FIVE TABS, in the order `tabsConfig` below declares them — which is the ONLY
+// place that order lives. This list is the description, never the definition:
 //
 //   1. Appearance     — unchanged: Mode, Sidebar and Scale, exactly as they
 //                        were on the flat page.
-//   2. Members & roles — the team area's own Members and Member-roles lists
-//                        (web/components/deep-link/collection-content.tsx),
-//                        reused rather than rebuilt, stacked as two sections
-//                        on one scrolling tab instead of two destinations one
-//                        level down. Invites and Internal rates — the rest of
-//                        "This team" — stay reachable as plain links here,
-//                        since neither earned a tab of its own; the Teams
-//                        list (hidden by TEAM_SCREENS_HIDDEN) rides along
-//                        beside them, exactly as it always has.
+//   2. Team           — the team's PEOPLE and their RIGHTS, in two containers
+//                        on one page: the members gallery
+//                        (web/components/team/members-gallery.tsx) and the
+//                        roles matrix (web/components/team/roles-matrix.tsx).
+//                        It was called "Members & roles" and drew the team
+//                        area's own two recipe LISTS a second time; both are
+//                        gone — "This whole tab under settings, just call it
+//                        Team" and "Everything should be in different
+//                        containers… not taken anywhere else" (client,
+//                        2026-09-09).
+//                        THIS TAB IS THE ONLY DOOR to member management. It
+//                        carries every act on a person — change role, remove,
+//                        and revoke a pending invite — because the team area's
+//                        own Members/Invites screens are linked to by nothing
+//                        (R64 · `sections-have-a-door`;
+//                        web/components/team/member-panel.tsx has the account
+//                        of the regression that earned the law). "This team"
+//                        below the two containers is what is LEFT of the team
+//                        area after that: `adminSections`, derived, and today
+//                        exactly one row — Internal rates. It is not a door to
+//                        anything else, and nothing on this tab depends on it
+//                        continuing to exist.
+//                        INVITES left "This team" on 2026-09-09 — "the invites,
+//                        make it secondary button on the toolbar" — and is a
+//                        button in the members toolbar now.
 //   3. Integrations   — Access tokens and the Google connection: both are a
 //                        PERSON connecting something outside the app to their
 //                        own account, which is what the word means here.
-//   4. Choices        — formerly "Dropdown values", formerly its own tab on
+//   4. Modules        — the index; see the paragraph above for the word, the
+//                        position and the ruling.
+//   5. Choices        — formerly "Dropdown values", formerly its own tab on
 //                        the team area's strip
 //                        (web/components/choices/selectable-screen.tsx
 //                        explains the rename and the move). This
@@ -330,6 +351,13 @@ export function SettingsScreen({
                     onRetryMembers={() => membersQ.refresh()}
                     roles={roles}
                     canInvite={can("team_members", "create")}
+                    // THE THREE ACTS THE TAB WAS MISSING (2026-09-10, R64).
+                    // Every one of them is the person's own `team_members`
+                    // right and NOT `commercials:read`, which is what the only
+                    // remaining door into the team area happened to be gated on
+                    // — member-panel.tsx has the whole account.
+                    canEditMembers={can("team_members", "edit")}
+                    canRemoveMembers={can("team_members", "delete")}
                   />
                 )}
 

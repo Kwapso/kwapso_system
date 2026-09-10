@@ -46,6 +46,7 @@ import {
   BASE_REPOSITORY,
   LAW_ID_ORIGIN,
   KIT_COMPONENT_EXEMPT,
+  SECTION_HOSTED_ELSEWHERE,
 } from "@shared/rules/registry"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import {
@@ -3721,6 +3722,232 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
+  /** R63 — THE COLLECTION TOOLBAR IS PINNED, AND THE PIN IS THE ROW'S.
+   *
+   * Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be
+   * on top all time visible. everywhere." R48 made the search box a default,
+   * R50 made the whole row answer one question about emptiness, R53 made the
+   * slot set the row's — this makes the POSITION the row's too, on both front
+   * doors, so no screen decides it and no screen can forget it.
+   *
+   * FOUR CLAUSES, every census off the disk.
+   *
+   *  (i)   THE SEAM. `shared/web/pinned-chrome.ts` declares the pin as
+   *        `position: sticky` against `--pinned-chrome-h`, and it is a flex
+   *        COLUMN — that is what keeps R49's trailing gap inside a box that
+   *        PAINTS, which is the whole difference between a bar that occludes
+   *        the rows sliding under it and one they show through.
+   *  (ii)  EVERY TOOLBAR-OWNING COMPONENT WEARS IT. The subject is not a list
+   *        this law keeps: it is `TOOLBAR_CONTROL_OWNERS`, the census R53
+   *        already rot-checks in both directions (a file that builds a sort or
+   *        view control must be named there, and an entry that no longer does
+   *        is red) — plus the client portal's own collection rows, derived as
+   *        the files that ask the DOOR for a search (`useDoorSearch`), which is
+   *        what a portal collection's toolbar IS (R48 §ii-b: the portal draws
+   *        no `<ToolbarRow>`, deliberately, and the law is about the FUNCTION).
+   *  (iii) AND NOBODY WRITES THEIR OWN. The offset is spelled in exactly one
+   *        file. A screen that hand-rolls `top-[var(--pinned-chrome-h…)]` is
+   *        the per-screen decision this law exists to end.
+   *  (iv)  THE OFFSET IS DECLARED WHERE CHROME PINS, and nowhere else. Four
+   *        declarations, one per thing that can pin above a toolbar: both front
+   *        doors' `globals.css` (the default zero, and the `:has()` rule that
+   *        raises it for a collection tab strip), the collection strip's own
+   *        marker class, the record screen's root, and the portal shell's
+   *        measured header.
+   *
+   * MEASURED, NOT REASONED — this law's own numbers come from a browser, at
+   * 1440x900 and 375x812, against the real app: the strip pins at the pane's
+   * top edge and the toolbar lands exactly on its bottom edge (50 → 116 on
+   * Accounts, Apps, Contacts, Sprints and a record's Contacts panel), and a
+   * screen with no strip pins flush at the pane top (Knowledge, Waves). The one
+   * call site whose row is boxed in furniture of its own — the tickets
+   * Dashboard — measured a stuck range of 32px, i.e. no pin at all, until the
+   * pin moved out to the box; that is why clause (ii) is about the COMPONENT
+   * that owns a toolbar and the call site still has one thing it can get wrong.
+   */
+  it("pinned-toolbar: the collection toolbar stays on top, and the pin is the row's (R63)", () => {
+    const SEAM = join(ROOT, "shared/web/pinned-chrome.ts")
+    const seam = stripComments(readFileSync(SEAM, "utf8"))
+
+    // ── (i) THE SEAM ITSELF ────────────────────────────────────────────────
+    // READ OFF THE DECLARATION, NEVER OFF THE FILE. This file's own header
+    // explains the pin at length, so `sticky` and every other word in it
+    // appear in prose several times over — a `toContain` on the whole file
+    // would pass on a seam that had stopped declaring any of them. Comments
+    // are stripped AND the assertion is scoped to the class string itself.
+    const declared = /export const PINNED_TOOLBAR\s*=\s*([\s\S]*?)\n\n/.exec(seam)?.[1] ?? ""
+    for (const piece of [
+      "sticky",
+      "top-[var(--pinned-chrome-h,0px)]",
+      "flex-col",
+      "bg-[var(--pinned-ground)]",
+    ]) {
+      expect(
+        declared,
+        `R63 — PINNED_TOOLBAR (shared/web/pinned-chrome.ts) must carry \`${piece}\`: ` +
+          "`sticky` is the pin, `top-[var(--pinned-chrome-h,0px)]` is what it pins below, " +
+          "the flex COLUMN is what keeps R49's trailing gap inside a box that paints, " +
+          "and `bg-[var(--pinned-ground)]` is that paint — a bar the rows scroll through is not a pinned bar, " +
+          "and one that paints the wrong tone reads as a hole punched in the card it stands on"
+      ).toContain(piece)
+    }
+
+    // ── (ii) EVERY TOOLBAR-OWNING COMPONENT WEARS IT ───────────────────────
+    // The agency door's owners are R53's own census; the portal's are derived
+    // off the disk. Neither is a list this law keeps.
+    const wearsThePin = (src: string) =>
+      /\bPINNED_TOOLBAR\b/.test(src) || /\bPINNED_TOOLBAR_IN_KIT_PANEL\b/.test(src)
+
+    const unpinned: string[] = []
+    for (const rel of Object.keys(TOOLBAR_CONTROL_OWNERS)) {
+      const abs = join(ROOT, rel)
+      if (!existsSync(abs)) continue // R53's own rot-check owns that failure
+      if (!wearsThePin(stripComments(readFileSync(abs, "utf8"))))
+        unpinned.push(
+          `${rel}: owns a collection toolbar (TOOLBAR_CONTROL_OWNERS) and does not wear PINNED_TOOLBAR — ` +
+            "the client's ruling is that the toolbar stays visible on scroll EVERYWHERE, which is every row, not most of them"
+        )
+    }
+
+    let portalRowsScanned = 0
+    for (const f of sourceFiles([join(ROOT, "web-portal")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      const src = stripComments(f.source)
+      // A PORTAL COLLECTION'S TOOLBAR, derived: the portal draws no
+      // `<ToolbarRow>` on purpose (R48 §ii-b — "the law is about the FUNCTION
+      // being present, and the two front doors are deliberately different
+      // shapes"), and what it draws instead is one box holding a search that
+      // asks the DOOR. `useDoorSearch` is that question, and only a growing
+      // collection asks it.
+      if (!/\buseDoorSearch\s*\(/.test(src)) continue
+      portalRowsScanned++
+      if (!wearsThePin(src))
+        unpinned.push(
+          `${f.rel}: draws a portal collection's own search row (useDoorSearch) and does not wear PINNED_TOOLBAR`
+        )
+    }
+
+    // TWO TRIPWIRES, because a census that matched nothing would report a
+    // perfectly pinned app.
+    expect(
+      Object.keys(TOOLBAR_CONTROL_OWNERS).length,
+      "R63 — TOOLBAR_CONTROL_OWNERS is empty, so clause (ii) is guarding nothing on the agency door"
+    ).toBeGreaterThan(2)
+    expect(
+      portalRowsScanned,
+      "R63 — no file under web-portal/ asks the door for a search any more, so this law now guards nothing on the client portal. Either the portal's collections were rewritten (fix the census) or the scan is blind"
+    ).toBeGreaterThan(0)
+
+    // ── (ii-b) THE KIT'S OWN TOOLBAR, WHERE THE APP DRAWS NONE ────────────
+    // A collection on the `useKitPanel` path has no toolbar of this app's: the
+    // vendored `CollectionFrame` draws it, under `data-slot=
+    // "collection-frame-toolbar"`, inside a panel `shared/ui/` owns and a
+    // hand-edit cannot touch. So the pin reaches it as an override on the one
+    // element the app DOES own — the frame's own `className` — and every call
+    // site of it must carry that override, censused off the disk. Without this
+    // clause the whole recipe engine could lose its pin while the file still
+    // passed (ii) on its other branch's use of `PINNED_TOOLBAR`, which is
+    // exactly what a mutation of it did.
+    const kitFrames: string[] = []
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal"), join(ROOT, "shared/web")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      const src = stripComments(f.source)
+      for (const m of src.matchAll(/<KitCollectionFrame\b([\s\S]{0,2000}?)>/g)) {
+        kitFrames.push(f.rel)
+        if (!/PINNED_TOOLBAR_IN_KIT_PANEL/.test(m[1]))
+          unpinned.push(
+            `${f.rel}: renders <KitCollectionFrame> without PINNED_TOOLBAR_IN_KIT_PANEL on its className — ` +
+              "the kit draws that collection's toolbar and this app cannot edit the kit, so the pin has to travel on the frame's own class"
+          )
+      }
+    }
+    expect(
+      kitFrames.length,
+      "R63 — no <KitCollectionFrame> call site found, so clause (ii-b) is guarding nothing. Either the recipe engine stopped drawing the kit's panel (fix the census) or the scan is blind"
+    ).toBeGreaterThan(0)
+
+    expect(
+      unpinned,
+      `R63 — every component that owns a collection toolbar pins it:\n  ${unpinned.join("\n  ")}`
+    ).toEqual([])
+
+    // ── (iii) AND NOBODY WRITES THEIR OWN ──────────────────────────────────
+    const handRolled: string[] = []
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal"), join(ROOT, "shared/web")], {
+      extensions: [".ts", ".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      if (f.rel.endsWith("shared/web/pinned-chrome.ts")) continue // the seam declares it
+      if (/top-\[var\(--pinned-chrome-h/.test(stripComments(f.source)))
+        handRolled.push(
+          `${f.rel}: spells the pin's own offset by hand — import PINNED_TOOLBAR (shared/web/pinned-chrome.ts) instead, so there is one place the toolbar's position is decided`
+        )
+    }
+    expect(
+      handRolled,
+      `R63 — the pin is the seam's, never a screen's:\n  ${handRolled.join("\n  ")}`
+    ).toEqual([])
+
+    // ── (iv) THE OFFSET IS DECLARED WHERE CHROME PINS ──────────────────────
+    // Four declarations, one per thing that can pin above a toolbar. Each is
+    // asserted at its own file, because each is a different mechanism and a
+    // missing one is invisible from every other.
+    const declarations: [string, string[], string][] = [
+      [
+        "web/app/globals.css",
+        ["--pinned-chrome-h: 0px", ".pinned-strip", "--tab-strip-h", "--pinned-ground"],
+        "the agency door declares the default zero, the `:has()` rule that raises it for a collection tab strip, the strip's own token height, and the ground each painted surface publishes for a bar pinned on top of it",
+      ],
+      [
+        "web-portal/app/globals.css",
+        ["--pinned-chrome-h: 0px", "--pinned-ground"],
+        "the client portal declares the default zero its shell then measures over, and the same ground publication (a pinned bar has to paint on this door too)",
+      ],
+      [
+        // SCOPED TO THE CLASS STRING, not the file: an import of
+        // `PINNED_STRIP_MARK` that nothing spends is exactly the shape this
+        // clause has to catch, and it leaves the identifier in the file.
+        "shared/web/screen-engine/tabs-view.tsx::STICKY_FOLDER_TABS",
+        ["${PINNED_STRIP_MARK}"],
+        "a collection's own sticky tab strip declares itself, so the `:has()` rule can raise the offset for every host of renderFolderTabs without one of them being told",
+      ],
+      [
+        "web/components/records/record-chrome.tsx",
+        ["[--pinned-chrome-h:calc(var(--record-tab-strip-h)_+_var(--record-tab-gap))]"],
+        "a record screen's root declares it for the panels below its own sticky strip — a custom property only reaches downward, and the strip is their sibling",
+      ],
+      [
+        "web-portal/components/portal-shell.tsx",
+        ['setProperty("--pinned-chrome-h"', "ResizeObserver"],
+        "the portal's sticky header has no token geometry to read, so the shell measures it and republishes when it changes",
+      ],
+    ]
+    const missing: string[] = []
+    for (const [target, needles, why] of declarations) {
+      // COMMENTS STRIPPED FIRST, and it is not a nicety: every one of these
+      // files EXPLAINS its declaration in prose directly above it, so a raw
+      // `includes` passes on a file that has kept the paragraph and lost the
+      // line. Proved — deleting the portal shell's `ResizeObserver` left the
+      // word in its own comment and the check went green.
+      const [rel, scope] = target.split("::")
+      let src = stripComments(readFileSync(join(ROOT, rel), "utf8"))
+      if (scope) src = new RegExp(`export const ${scope}\\s*=([\\s\\S]*?)\\n\\n`).exec(src)?.[1] ?? ""
+      for (const needle of needles)
+        if (!src.includes(needle)) missing.push(`${target}: \`${needle}\` — ${why}`)
+    }
+    expect(
+      missing,
+      `R63 — a toolbar pinned at the wrong offset is a toolbar sitting on the strip above it. Every declaration of --pinned-chrome-h must stay where the thing it measures is drawn:\n  ${missing.join("\n  ")}`
+    ).toEqual([])
+  })
+
   /** R52 — EVERY DETAIL PATH WEARS THE SAME TITLE TREATMENT.
    *
    * THE SUBJECT IS DERIVED, never listed. A record detail is drawn by rendering
@@ -3956,6 +4183,8 @@ describe("RULES — the laws of the base", () => {
       "image-fills", // R60: web/test/an-image-fills.test.ts — every `object-*` utility AND every `fit="contain"` prop in our own source, plus the pinned, only-falling count of the ones the vendored kit still owes us
       "module-settings-two-doors", // R61: the MODULE_SETTINGS ↔ gear-mount census below, plus the two clauses that keep the Modules index derived and the gate written once
       "one-zero-register", // R62: web/test/one-zero-register.test.tsx — the two registers' own subtraction guard (read AND rendered), the no-second-register census over both front doors, and the engine's `narrowed`/`narrowedOutside` clause
+      "sections-have-a-door", // R64: the tab-section census below — TEAM_SECTIONS' own `placement: "tab"` rows against settings-screen's subtraction literal, with each subtracted section's acts derived from the recipes and proved by the door call its dispatcher makes
+    "pinned-toolbar", // R63: the seam guard + the toolbar-owner census (R53's own list, plus the portal's door-searched rows) + the nobody-hand-rolls-the-offset scan + the four declarations of --pinned-chrome-h, above
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -5085,5 +5314,197 @@ describe("R61 — a module's settings have two doors and one derivation", () => 
         `R61 — ${fn} does not ask visibleModuleSettings. All three surfaces (the gear, the page, the Modules index) answer "is there a page here for this reader" with ONE expression; a second way of asking it is how a gear starts leading somewhere that refuses the person who pressed it`
       ).toBe(true)
     }
+  })
+})
+
+describe("R64 — a team-area section has a door, or names the screen that took its place", () => {
+  // R64 — A SECTION ON THE TEAM AREA'S STRIP HAS A DOOR.
+  //
+  // WHAT SHIPPED, GREEN, ON 2026-09-09. The Settings › Team redesign turned the
+  // members ladder into a gallery that deliberately does not navigate, and left
+  // three administrative acts on the team area's own screens: change a member's
+  // role, remove a member, revoke a pending invitation. A census of every
+  // `softNavigate(...)` and `href=` under `web/` found exactly ONE link into
+  // that area anywhere in the app — `apps/stakeholders-panel.tsx`, and it points
+  // at one member's RECORD, not at the collection. The only other entrance was
+  // the "This team" list on that very tab, which by then rendered ONE row:
+  // Internal rates, gated on `commercials:read`.
+  //
+  // So an owner holding every `team_members` right and not that one could see
+  // the wall of people and change nothing about any of them. An owner who DID
+  // hold it reached member management by opening a RATE CARD and hopping
+  // sideways on the team area's tab strip, which is not a door anybody designed.
+  // And `members-gallery.tsx`'s own header told the next reader that role
+  // changes "still live on the member's own record, reached from the team area's
+  // Members section" — naming a route nothing linked to. The app's reachability
+  // lived in prose, and prose does not fail a build.
+  //
+  // WHY THIS IS A LAW ABOUT THE SUBTRACTION AND NOT ABOUT LINKS. A link census
+  // cannot see the one real door: it is written `/t/${teamId}/${item.id}` over a
+  // derived list, so the segment is a variable and no static read resolves it. A
+  // law that counted links would have had to special-case the very door it was
+  // checking. What IS greppable, deliberate and singular is the act that takes a
+  // section's door away — subtracting its key from `adminSections` — so that is
+  // the act made to say where the material went.
+  //
+  // AND IT IS WRITTEN WHILE THREE OF THE FOUR TAB SECTIONS ARE ALREADY
+  // SUBTRACTED, which is the cheapest moment to satisfy it and the last moment
+  // at which it is still free. Nothing below counts rows: every clause is a set
+  // relation or a per-section fact.
+  it("sections-have-a-door: every subtracted team-area section names its host, and that host carries its acts", () => {
+    const PAGES_REL = "web/lib/pages.ts"
+    const TAB_REL = "web/components/screens/settings-screen.tsx"
+    const SCREENS_REL = "web/lib/screens.ts"
+    const ACTIONS_REL = "web/lib/use-screen-actions.ts"
+    const pages = stripComments(read(join(ROOT, PAGES_REL)))
+    const tab = stripComments(read(join(ROOT, TAB_REL)))
+    const screens = stripComments(read(join(ROOT, SCREENS_REL)))
+    const actions = stripComments(read(join(ROOT, ACTIONS_REL)))
+
+    // ── i · THE TAB SECTIONS, off TEAM_SECTIONS' own literal ────────────────
+    // Sliced rather than imported for R61's reason one law along: what is being
+    // read is the SHAPE of the declaration (a `placement` beside a `key` on one
+    // row), and importing the array would hand back objects whose provenance
+    // this check could no longer see.
+    const tableAt = pages.indexOf("export const TEAM_SECTIONS")
+    expect(
+      tableAt,
+      `R64 — TEAM_SECTIONS is not in ${PAGES_REL} under that name. It is the table the team area's strip and the "This team" list are both derived from; if it moved, teach this law the new spelling rather than deleting it`
+    ).toBeGreaterThan(-1)
+    const table = pages.slice(tableAt, pages.indexOf("\n]", tableAt))
+    const tabSections = [...table.matchAll(/\{\s*key:\s*"([a-z0-9-]+)"[^}]*\}/g)]
+      .filter((m) => /placement:\s*"tab"/.test(m[0]))
+      .map((m) => m[1])
+
+    // TRIPWIRE 1 — THE PARSE. Every clause below is a set relation against this
+    // set, and a set relation against an empty set is empty: a regex that
+    // stopped matching would report a perfectly doored app.
+    expect(
+      tabSections.length,
+      `R64 — read no \`placement: "tab"\` section out of TEAM_SECTIONS. Either the team area has no strip left (which is a decision to take with the client, not a green build) or the slice above stopped matching ${PAGES_REL}`
+    ).toBeGreaterThan(0)
+
+    // ── ii · THE DOOR THAT IS LEFT, AND THAT IT REALLY IS ONE ───────────────
+    // The "This team" list is the app's one entrance to the team area. Checked
+    // FIRST and on its own, because everything after this is measured against
+    // what it subtracts — a check that read the subtraction off a panel that no
+    // longer navigates would be measuring a door that is not there.
+    const panelAt = tab.indexOf("const adminSections = TEAM_SECTIONS.filter(")
+    expect(
+      panelAt,
+      `R64 — ${TAB_REL} no longer derives \`adminSections\` from TEAM_SECTIONS. That list is the whole of the app's entrance to the team area; if it was renamed, teach this law the new name — if it was DELETED, every tab section below needs a SECTION_HOSTED_ELSEWHERE line, which this check will then say out loud`
+    ).toBeGreaterThan(-1)
+    expect(
+      /softNavigate\(`\/t\/\$\{teamId\}\/\$\{item\.id\}`\)/.test(tab),
+      `R64 — ${TAB_REL} draws the "This team" list but nothing in it soft-navigates into /t/<teamId>/<segment>. The offered half of this law has to be real: a section is only 'doored' by that list if pressing its row actually opens it`
+    ).toBe(true)
+
+    // THE SUBTRACTION, off the filter's own array literal. Narrow on purpose —
+    // `!["…"].includes(s.key)` is the one shape that removes a section from the
+    // list, and reading every string in the filter instead would also collect
+    // `"tab"` and `"read"`, which are not sections.
+    const subtractAt = tab.slice(panelAt).match(/!\[([^\]]*)\]\.includes\(s\.key\)/)
+    expect(
+      subtractAt,
+      `R64 — could not read the \`!["…"].includes(s.key)\` subtraction out of ${TAB_REL}'s adminSections filter. That literal is the record of which sections lost their door; if the filter changed shape, teach this law the new one`
+    ).not.toBeNull()
+    const subtracted = [...(subtractAt?.[1] ?? "").matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1])
+
+    // TRIPWIRE 2 — the subtraction is a real subset of the sections. A key that
+    // is not a tab section means the two files have drifted apart, and it is
+    // also proof this parsed words rather than noise.
+    const notSections = subtracted.filter((k) => !tabSections.includes(k))
+    expect(
+      notSections,
+      `R64 — ${TAB_REL} subtracts a key that is not a \`placement: "tab"\` section in TEAM_SECTIONS: ${notSections.join(", ")}. Either the section moved or was deleted, in which case the subtraction is dead code, or this law is reading the wrong literal`
+    ).toEqual([])
+
+    // ── iii · EVERY SUBTRACTED SECTION NAMES ITS HOST, AND ONLY THOSE ───────
+    // Both directions, because each failure is invisible alone. A subtracted
+    // section with no line is a capability nobody can reach — the 2026-09-09
+    // regression, exactly. A line for a section that is NOT subtracted is a
+    // stale claim that will one day be read as cover for a real gap.
+    const noHost = subtracted.filter((k) => !(k in SECTION_HOSTED_ELSEWHERE))
+    expect(
+      noHost,
+      `R64 — these sections were taken off the "This team" list and nothing says where their material went: ${noHost.join(", ")}. Nothing in the app links to /t/<teamId>/<segment> for them, so whatever they carried is unreachable. Build the material into a screen a person can actually reach and add a SECTION_HOSTED_ELSEWHERE line naming that file — never the other way round`
+    ).toEqual([])
+    const stale = Object.keys(SECTION_HOSTED_ELSEWHERE).filter((k) => !subtracted.includes(k))
+    expect(
+      stale,
+      `R64 — SECTION_HOSTED_ELSEWHERE names a section that is not subtracted from the "This team" list: ${stale.join(", ")}. It has its own door back, or it stopped existing; either way the line can only shrink this list, so delete it`
+    ).toEqual([])
+
+    // …and the sentence is a real one. A path with no explanation is a line the
+    // next reader cannot check against the screen.
+    for (const [k, where] of Object.entries(SECTION_HOSTED_ELSEWHERE))
+      expect(
+        where.length,
+        `R64 — the SECTION_HOSTED_ELSEWHERE line for \`${k}\` needs to say WHERE the material is and what a person does there, in a sentence somebody can go and verify`
+      ).toBeGreaterThan(40)
+
+    // ── iv · AND THE HOST CARRIES THE SECTION'S ACTS ───────────────────────
+    // The clause with the teeth, and the one the 2026-09-09 regression would
+    // have failed on: naming a host proves nothing on its own, because the
+    // gallery WAS the host and it offered none of the three acts.
+    //
+    // TWO ORACLES, deliberately, so this can never be a parser agreeing with
+    // itself. WHAT a section owes comes off the RECIPES (`web/lib/screens.ts`) —
+    // the engine's own declaration of the acts that screen offers. WHAT PROVES
+    // an act is the DOOR CLIENT CALL its dispatcher makes
+    // (`web/lib/use-screen-actions.ts`) — a different file, written for a
+    // different purpose, that neither knows nor cares about this law.
+    const actCall = new Map<string, string>()
+    for (const m of actions.matchAll(/case\s+"([a-z]+\.[A-Za-z]+)":\s*\{([\s\S]*?)\n        \}/g)) {
+      const call = m[2].match(/\b([a-zA-Z]+)\.([a-zA-Z]+)\s*\(/)
+      if (call) actCall.set(m[1], `${call[1]}.${call[2]}(`)
+    }
+    // TRIPWIRE 3 — the dispatcher parsed. Without this an unreadable switch
+    // yields an empty map, every requirement below is vacuous, and the law
+    // reports success for an app in which nothing is reachable at all.
+    expect(
+      actCall.size,
+      `R64 — read no \`case "<module>.<act>":\` out of ${ACTIONS_REL}. That switch is what turns a recipe's named act into a call on a real door; if it changed shape, teach this law the new one before trusting a green run`
+    ).toBeGreaterThan(3)
+
+    // The acts a module's recipes declare, off each recipe's own binding.
+    const actsOf = new Map<string, string[]>()
+    for (const m of screens.matchAll(
+      /binding:\s*\{\s*module:\s*"([a-z_]+)"\s*\}[\s\S]{0,2000}?actions:\s*\[([\s\S]*?)\n {2}\]/g
+    )) {
+      const ids = [...m[2].matchAll(/action:\s*"([a-z]+\.[A-Za-z]+)"/g)].map((x) => x[1])
+      if (ids.length) actsOf.set(m[1], [...(actsOf.get(m[1]) ?? []), ...ids])
+    }
+    // TRIPWIRE 4 — the recipes parsed, and at least one subtracted section
+    // actually owes something. A green run over an app where no section owes an
+    // act would be the "check that measures nothing" this repo keeps earning.
+    const owed = subtracted.filter((k) => (actsOf.get(k) ?? []).length > 0)
+    expect(
+      owed.length,
+      `R64 — no subtracted section owes a single act, which means either ${SCREENS_REL}'s recipes stopped declaring \`actions:\` (teach this law the new shape) or the three administrative acts on a team's people have been deleted. Both are a decision, not a green build`
+    ).toBeGreaterThan(0)
+
+    const missing: string[] = []
+    for (const key of subtracted) {
+      const rel = /\(([a-z0-9/.-]+\.tsx?)\)/.exec(SECTION_HOSTED_ELSEWHERE[key])?.[1] ?? ""
+      expect(
+        rel,
+        `R64 — the SECTION_HOSTED_ELSEWHERE line for \`${key}\` names no file. Write the host's repo-relative path in brackets, so this check can open it and the next reader can too`
+      ).not.toBe("")
+      expect(
+        existsSync(join(ROOT, rel)),
+        `R64 — SECTION_HOSTED_ELSEWHERE says \`${key}\` lives in ${rel} and that file does not exist`
+      ).toBe(true)
+      const host = stripComments(read(join(ROOT, rel)))
+      for (const act of actsOf.get(key) ?? []) {
+        const call = actCall.get(act)
+        if (!call) continue // an act with no dispatcher is R36's business, not this law's
+        if (!host.includes(call)) missing.push(`${key}: ${act} (${call.slice(0, -1)}) in ${rel}`)
+      }
+    }
+    expect(
+      missing,
+      `R64 — a section's host does not offer an act that section's own screen declares, so the act is reachable from nowhere: ${missing.join("; ")}. This is the exact 2026-09-09 failure — the gallery was named as the home of the members section while offering none of its acts. Wire the act into that screen; do not weaken this list`
+    ).toEqual([])
   })
 })
