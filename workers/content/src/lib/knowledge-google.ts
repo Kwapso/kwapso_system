@@ -468,6 +468,41 @@ const KNOWN_GMAIL_SAMPLE = 500
  * the newest 200 messages got a header read solely to learn a date the cursor
  * was about to discard it by. This is the same discard, made from a fact the
  * database already holds instead of a fact Google has to be asked for again. */
+/** WHETHER THIS TICK MAY SKIP A KNOWN GMAIL ID'S HEADER — named, not inlined at
+ * the call site, so a test can assert the RULE rather than infer it from
+ * behaviour (the same choice `isItemRefusal` in google-api.ts makes, and for
+ * the same reason: the day this reads `cursor !== null` alone again, a test
+ * should say so by name rather than by a mailbox slowly losing new mail).
+ *
+ * `cursor !== null` IS ONLY HALF OF "A REAL CURSOR". A null cursor means
+ * "read it all" — a first connection, or a lane `rewindGoogleLane`
+ * deliberately forgot — and skipping a known id's header there would defeat
+ * the one mechanism this app has for saying "bring that back". That much a
+ * plain null check catches.
+ *
+ * `cursor.at === ""` IS THE SAME CASE WEARING A NON-NULL OBJECT, and a plain
+ * null check does not catch it. `moment()` has exactly two shapes, a real ISO
+ * date or the empty string for a row with no readable date (its own doc —
+ * "swept FIRST rather than never"), and nothing stops a slice from being
+ * filled entirely by date-less rows, which stores `last = { at: "", id: … }`
+ * (knowledge-ingest.ts) as this lane's new position. A placeholder also
+ * carries `sortAt === ""` (see the note above `knownPlaceholder` in
+ * google-api.ts), so against an EMPTY cursor `afterCursor`'s own equality
+ * branch (`r.sortAt === cursor.at && r.originRowId > cursor.id`) can keep one
+ * — unlike against a real cursor, where a placeholder's empty sortAt is never
+ * `>` a real date and the first branch alone excludes it. Kept placeholders
+ * sort first (same reason), so `wanted` fills with content-free rows before
+ * any real new mail behind them is ever reached, and the lane's `last` stays
+ * `""` forever — the transient state `moment()`'s own comment describes
+ * becomes absorbing. See `knownGmailIds`'s own doc for what the skip trades
+ * away in return, once it is safe to apply. */
+export function gmailKnownIdsApply(
+  service: GoogleService,
+  cursor: { at: string; id: string } | null
+): boolean {
+  return service === "gmail" && cursor !== null && cursor.at !== ""
+}
+
 export async function knownGmailIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
   const prefix = `${guard.userId}:`
   try {
@@ -622,11 +657,7 @@ export function googleIngestKinds(
     toRows: (items: GoogleItem[]) => IngestRow[],
     hydrate = false
   ): Promise<IngestRow[]> => {
-    // GATED ON A REAL CURSOR, ON PURPOSE. A null cursor means "read it all" —
-    // a first connection, or a lane `rewindGoogleLane` deliberately forgot —
-    // and skipping a known id's header there would defeat the one mechanism
-    // this app has for saying "bring that back". See `knownGmailIds`'s own doc.
-    const gmailKnownIds = service === "gmail" && cursor ? await knownGmailIds(cfg, guard) : undefined
+    const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
     const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service], gmailKnownIds })
     // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
     // will FILE; this is everything the service currently holds, which is a
