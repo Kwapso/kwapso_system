@@ -37,7 +37,7 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
+import { diversify, hasRecencyIntent, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
 import { passageId } from "../src/lib/knowledge-reader"
 import type { MemberGuard } from "@shared/workers/gating"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
@@ -475,6 +475,53 @@ describe("the reader recovers a paraphrase the floor alone would refuse (BUILD-5
     // path (a model outage) nobody is watching. Refuse instead.
     expect(answer.found).toBe(false)
     expect(answer.passages).toEqual([])
+  })
+})
+
+// KB-AUDIT.md §4.5, MEASURED 10 Sep 2026: "what changed this week?" returned
+// one citation from 31 August while a 7 September source (88 chunks) existed
+// and was never retrieved — ABSENT, not ranked low, because a generic
+// recency question shares no words or meaning with any one week's specific
+// content. Neither the vector nor the lexical arm can find something they do
+// not recognise; the recency arm does not try to recognise anything, it asks
+// what is newest, and only when the question itself asked for that.
+describe("the recency arm — a question that wants what is new (KB-AUDIT.md §4.5)", () => {
+  let newestId = ""
+
+  beforeEach(async () => {
+    const oldId = await addSource(IDS.staffUser, {
+      title: "Week planning",
+      body: "The team discussed the invoice run and the sign-off steps for next month.",
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-01-01' WHERE id = '${oldId}'`)
+    newestId = await addSource(IDS.staffUser, {
+      title: "Office supplies note",
+      body: "A completely unconnected note about stationery and printer paper, sharing no topic with anything else here.",
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-09-07' WHERE id = '${newestId}'`)
+  })
+
+  it("without recency intent, a question with no shared vocabulary finds nothing — the absence the audit measured", async () => {
+    const answer = await ask(IDS.staffUser, "what's going on?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(false)
+  })
+
+  it("'latest' recovers the newest source even though it shares no words with the question", async () => {
+    const answer = await ask(IDS.staffUser, "what's the latest?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(true)
+    expect(titles(answer)).toContain("Office supplies note")
+  })
+
+  it("hasRecencyIntent is the gate — 'currently'/'today'/'this week' do NOT trigger it (measured: they collide with ordinary questions)", () => {
+    for (const ordinary of [
+      "where do things currently stand?",
+      "what is due today?",
+      "what happened this week?",
+      "since last week, has anything moved?",
+    ])
+      expect(hasRecencyIntent(ordinary), ordinary).toBe(false)
+    for (const real of ["what's the latest?", "any recent news?", "what's the newest update?", "what changed?"])
+      expect(hasRecencyIntent(real), real).toBe(true)
   })
 })
 

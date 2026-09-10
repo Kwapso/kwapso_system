@@ -2846,6 +2846,103 @@ async function nameArm(
   return rows.map((r) => ({ chunk_id: r.chunk_id, lex: 1, exact: 1 }))
 }
 
+/** WORDS THAT SIGNAL THE QUESTION WANTS WHAT IS NEW (KB-AUDIT.md §4.5).
+ * `fuse`'s own header names the bar for reopening recency: "a term that
+ * applies only when the question itself says 'latest', 'recent', 'today'" —
+ * and MEASURED, 10 Sep 2026, that suggestion was too loose to ship as
+ * written. "today", "currently"/"current" and "this week"/"since last week"
+ * all appear in ORDINARY questions this suite already exercises — "where
+ * things currently stand with ticket 3144", "what is currently happening
+ * with the Bergman dispatch rollout" — none of which are asking for the
+ * newest material; they are asking a STATUS question using everyday
+ * temporal words. Narrowed to the handful that mean "give me the newest
+ * thing" and nothing else: "latest", "recent" (bare, not "recently" — the
+ * adverb reads as ordinary phrasing the same way "currently" does), "newest",
+ * and the two audit-measured phrasings themselves. Deliberately narrow —
+ * every ordinary question is left at the behaviour the fusion weights were
+ * measured on, which is the whole point of GATING on intent rather than
+ * adding recency as a universal signal. */
+const RECENCY_WORDS = /\b(latest|recent|newest|what'?s new|what changed)\b/i
+
+export function hasRecencyIntent(question: string): boolean {
+  return RECENCY_WORDS.test(question)
+}
+
+/** How many of the newest sources this arm offers. Small — it exists to make
+ * sure the newest material is a CANDIDATE at all, not to flood the fusion
+ * with everything recent regardless of relevance. */
+const RECENCY_TOP_K = 8
+
+/** THE RECENCY ARM'S VOTE — EXACT_WEIGHT's twin, the same reasoning NAME_WEIGHT
+ * already borrows it for: when the question EXPLICITLY signals what it wants
+ * (a name, an exact reference, or here, "the latest"), that is evidence an
+ * embedding is not built to carry, and it earns the same confident weight as
+ * the other two exact signals rather than a fraction of a vote. */
+const RECENCY_WEIGHT = EXACT_WEIGHT
+
+/** THE RECENCY ARM (KB-AUDIT.md §4.5). Measured, 10 Sep 2026: "what changed
+ * this week?" returned ONE citation, from 31 August; the 7 September Week
+ * planning (88 chunks) existed and was NEVER RETRIEVED — not ranked low,
+ * ABSENT. "What are the most recent decisions we made?" was REFUSED outright.
+ * The trigger `fuse`'s header names — "a question whose newest material is
+ * not retrieved at all" — is met, and it is met for a structural reason no
+ * fusion WEIGHT can fix: "what changed" and "most recent decisions" share no
+ * words and no real meaning with any one week's specific content, so the
+ * vector and lexical arms have nothing to recognise. This arm does not try to
+ * recognise anything either — it asks what is NEWEST in the searched
+ * compartments, plainly, and only runs when the question itself asked for
+ * that (`hasRecencyIntent`). Fenced like `nameArm`: the real fence is the
+ * pool's own read-back (R26), this only has to narrow the same way every
+ * other arm's candidate read does. */
+async function recencyArm(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  compartments: string[],
+  kinds: string[] | null
+): Promise<CandidateRow[]> {
+  const owner = ownerClause(guard)
+  const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
+  const params: string[] = [...owner.params]
+  if (compartments.length) {
+    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
+    params.push(...compartments)
+  }
+  // INTERPOLATED, NOT BOUND — matching `retrieve`'s own `chipClause` a few
+  // lines below, which reads this exact list the same way: a source chip key
+  // resolves through `kindsForChips` against `SOURCE_CHIP_KEYS`, a fixed,
+  // code-declared vocabulary (shared/knowledge-chips.ts), never free text off
+  // a request. Two spellings of "bind one per element" for the same
+  // server-controlled list would be a second convention for the same fact.
+  if (kinds?.length) where.push(`kind IN (${kinds.map((k) => sqlString(k)).join(", ")})`)
+  const sources = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: RECENCY_TOP_K, said here.
+    `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}
+      ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
+    params
+  )
+  if (!sources.length) return []
+  // THE FIRST CHUNK OF EACH — a source's opening piece is its best single
+  // representative when nothing else is narrowing which paragraph matters,
+  // the same reasoning the router's own fallback read uses (`ORDER BY c.seq`
+  // picking up from the start).
+  const rows = await d1Query<{ chunk_id: string; source_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id AS chunk_id, source_id FROM knowledge_chunks
+      WHERE source_id IN (${sources.map((s) => sqlString(s.id)).join(", ")}) AND seq = 0`
+  )
+  // NEWEST FIRST, in the order `sources` already put them — a chunk read has
+  // no ORDER BY over an IN-list, so the rank `fuse` reads array POSITION from
+  // has to be restored here rather than trusted from the statement above.
+  const bySource = new Map(rows.map((r) => [r.source_id, r.chunk_id]))
+  return sources.flatMap((s) => {
+    const chunkId = bySource.get(s.id)
+    return chunkId ? [{ chunk_id: chunkId, lex: 1, exact: 1 }] : []
+  })
+}
+
 /** THE LEXICAL ARM. FTS5's own BM25 over `knowledge_chunks_fts` (0073) — one
  * keyed read, fenced by the reader and narrowed by the compartment.
  *
@@ -3075,12 +3172,20 @@ function fuse(
    * list rather than more rows in `lexical`, because it earns a different vote
    * and because a list that is empty on every question that names nobody cannot
    * disturb a single measured number. */
-  named: CandidateRow[] = []
+  named: CandidateRow[] = [],
+  /** THE NEWEST MATERIAL, if the question asked for it — see `recencyArm`.
+   * Empty on every question without recency intent, by construction
+   * (`retrieve` only calls the arm at all when `hasRecencyIntent` is true),
+   * so an ordinary question's fusion is exactly as it was measured. */
+  recency: CandidateRow[] = []
 ): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
   named.forEach((row, rank) =>
     fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + NAME_WEIGHT / (RRF_K + rank + 1))
+  )
+  recency.forEach((row, rank) =>
+    fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + RECENCY_WEIGHT / (RRF_K + rank + 1))
   )
   lexical.forEach((row, rank) =>
     fused.set(
@@ -3246,8 +3351,15 @@ export async function retrieve(
   // a question about a person — which is also why it may speak when the vector
   // arm found nothing, the case that refused the owner outright.
   const named = await nameArm(cfg, guard, terms, route.compartments, input.kinds ?? null)
+  // THE RECENCY ARM RUNS ONLY ON INTENT (KB-AUDIT.md §4.5) — gated the same
+  // way the name arm is unconditional and this is not: "what changed this
+  // week?" needs it, "capital expenditure?" must never be nudged by it, so a
+  // bounded read only happens on the question shape that asked for one.
+  const recency = hasRecencyIntent(question)
+    ? await recencyArm(cfg, guard, route.compartments, input.kinds ?? null)
+    : []
 
-  const fused = fuse(vector, lexical, named)
+  const fused = fuse(vector, lexical, named, recency)
 
   if (!fused.length)
     return knowledgeAnswer({
