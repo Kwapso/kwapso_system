@@ -640,3 +640,73 @@ returned nothing and I nearly reported "no backfill, no fence clause" off it —
 it found four files and 27 occurrences. Ticks 5, 9 and 11: a pattern that omitted a
 category, a rule too blunt for a compound row, and a shell that ate the flag. An
 empty result is the dangerous one.
+
+## Tick 12 — 10 Sep 2026, ~22:20
+
+**THE KNOWN-ID SKIP AND THREAD-AS-SOURCE ARE INCOMPATIBLE, AND THE FAILURE IS
+DATA LOSS.** kb_B1 escalated kb_B2's finding and it is worse than either of them
+first put it. Verified in the code:
+
+`google-api.ts:22` — `knownIds?.has(id) ? Promise.resolve(knownPlaceholder(id)) :
+gmailMessage(token, id, false)`, and `knownPlaceholder()` at :1390 returns
+`threadId: ""`.
+
+1. Every known message from every thread groups under ONE key, `""` — not "missing
+   from its thread" but all of them together, in one bogus group holding unrelated
+   messages from unrelated conversations. On a rewind (exactly what a `textVersion`
+   bump creates) that group is not excluded by the cursor and can file as a single
+   subjectless source.
+2. **Keeping the real `threadId` fixes the grouping and NOT the text.** A
+   placeholder carries no body by design — harmless under per-message identity,
+   where a skipped message kept its own untouched source, which is what the
+   comment above it means by "nothing downstream may ever read it". Under thread
+   identity the source is REBUILT, and rebuilding from a subset DESTROYS WORDS
+   ALREADY IN THE BASE. Silent, and worst on the rewind.
+
+**RATIFIED kb_B1's fix: the skip becomes THREAD-SHAPED.** Skip a thread only when
+none of its messages is new; when any member is new, fetch every member's body.
+Gmail's list response already carries `threadId` beside `id`, so "is any member
+new" costs no extra call — affordable under $5 — and the saving survives where it
+actually lives: threads nobody has touched, which is nearly all of them.
+
+**ROUTED to kb_B2 as a deliberate scope exception**, with the requirement that it
+land in the SAME commit as the regroup: a behaviour change and the thing that makes
+it safe cannot merge separately. kb_B1 gave B2 explicit consent to move the gmail
+kind's `textVersion` bump — a behaviour change and its cursor bump must be atomic,
+or there is a window where main files almost nothing and reports itself caught up,
+which is what chat measured on 20 Aug 2026. Identity ruling given by B1:
+`externalId = threadId`, as chat does it.
+
+**A CORRECTION TO MY OWN TICK-10 RULING.** I told kb_B2 the purge dissolves the
+transition. That was about the MIGRATION and it stands. **This is not a transition
+bug.** After a purge nothing is known, so the first rebuild is clean; the loss
+appears on every SUBSEQUENT sweep, when a thread with one new message rebuilds
+from that message alone. Steady state, not cutover — and I did not separate those
+two when I answered, which is why B2 nearly shipped it believing the purge covered
+it.
+
+**ORDERED ONE MIGRATION, FOUR COLUMNS** (supersedes "generated_only alone"):
+`knowledge_sources.generated_only`, and `team_visible` on `knowledge_sources`,
+`knowledge_chunks` and `knowledge_terms`. All `INTEGER NOT NULL DEFAULT 0`, and
+kb_B1's sentence for why is going in the migration comment: **the safe direction
+is the one that costs an answer, never the one that leaks.** Three things required
+in the comments because each is a conclusion somebody will otherwise reverse as an
+optimisation: `team_visible` is narrowing-only and never authoritative; the terms
+copy is deliberately the owner half only, inheriting `readerClause`'s existing
+asymmetry rather than a new one; and `generated_only` is recorded at ingest because
+building the body destroys the fact.
+
+**kb_E: A-H13 fixed, and its M19 reasoning is sharper than my rule.** "Ticket
+record" is a DIFFERENT DOOR, never a candidate for the ≥15-piece transcript check
+that produced the left-out list — so unlike H13's pt 2 it is not a competing
+source. H13 names two sources of the same KIND, one absent one present; M19 names
+one absent transcript plus a live record reachable by tool. Now written into
+`kb-exam-merge.mjs`, so the RULE handles the compound case rather than my sentence
+about it. gap 8→7, keyed 72→73, mustScore100 16→15.
+
+**Approved kb_E's own flag: tag A-H3 and A-H12/B-H13 `fence`.** Fence coverage must
+be ENUMERABLE BY TAG, not findable by reading detail columns — because when the
+fence lands, the first question its fresh reviewer asks is "what does the exam
+check about this seam?", and a grep must be a complete answer. Expected set of
+five; a different number is a finding. Warned that A-X8's owner/Aurora split still
+has no persona-aware grading and tagging must not imply otherwise.
