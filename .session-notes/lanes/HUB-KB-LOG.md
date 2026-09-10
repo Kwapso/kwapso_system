@@ -248,3 +248,43 @@ against ticket 2051/2621, document 78/2911, meeting 122/1958. Separates cleanly,
 nobody maintains it. Rejected the `body <= summary+40` fallback: B1 showed it is
 fuzzier, and which client's material a question routes into is the wrong place to
 approximate.
+
+## Tick 5 — 10 Sep 2026, ~19:55
+
+**kb_E measured the overlap. The headline: ID IS NOT A KEY BETWEEN THE FILES.**
+83 ids collide, only 29 are the same question. A union deduping on id would have
+silently destroyed 54 distinct questions — A.E6 is "HOGO cost-saving" and B.E6 is
+"Padelbase WFC porting", same label, unrelated topics. Real duplicates only show
+up by READING the text, which is what kb_E did. Union is 100 distinct questions,
+not 175 (naive concat) and not 88 (id-collapse).
+
+**MY SECOND PUBLISHED NUMBER WAS WRONG.** I said B was 83 rows in the rescue
+commit AND in BUILD-5's note. It is 88. My grep matched `O|E|M|H|X|D` and no `G`,
+so it dropped the five `gap` rows — the rows that file exists to contribute. An
+instrument that cannot see a category returns a confident number for the
+categories it can see. Corrected in the file's header, not by amending history,
+because the wrong figure reached two documents. Second census error of the day
+after the exam-filename one: both times I trusted a pattern I wrote over the
+thing it was pointing at.
+
+**RULINGS:** (1) union keys on TEXT; ids namespaced `A-E6`/`B-E6`, never
+renumbered, so no collision can drop a question and prior reports still resolve.
+(2) Union = 100. (3) B wins every A/B disposition conflict — verified from B's own
+footer, which names nine meetings with no transcript ≥15 pieces on staging as of
+10 Sep, against A's calendar-only reading. (4) kb_E's two fuzzy rejections stand.
+
+**kb_E UNDER-SCOPED ITS OWN CONFLICT AND I SENT IT BACK DERIVED.** It flagged
+A.E6/A.E12 against B.G1/B.G2. But B's left-out list has NINE entries, and at least
+three more A rows resolve to them: A.M6 ← HORST matching test run 25 Aug (B.G3
+already covers it), A.M19 ← FluClinic task 3144 meeting 25 Aug, A.H13 ← HOGO ×
+Claude math pt 1. Told it to DERIVE the set from B's list rather than hand-list
+the five I found, and to report the count the derivation produces — if it is more
+than five, that is the finding, not my guess at it.
+
+**`gap` is a FIFTH disposition, not a refusal.** A gap row passes by NAMING the
+meeting and saying nothing was recorded; a refusal row passes by refusing. Folding
+them would score an invented answer and a correct one identically.
+
+Union goes in a NEW file; neither source is overwritten, because both are now
+evidence of how their questions were derived and the derivation is what is under
+dispute. Baseline re-pinned ONCE, at the end. Still $0.
