@@ -1,5 +1,12 @@
 # The exam — from four weeks of meetings that actually have transcripts
 
+> **88 rows**, not 83. The hub's rescue commit (81743ce7) and BUILD-5's note both
+> said 83, counted with a pattern that matched `O|E|M|H|X|D` and omitted the `G`
+> class entirely — the five `gap` rows, which are the rows this file exists to
+> add. kb_E's parser found 88 and the file's own footer says 88. Corrected here
+> rather than by rewriting the commit, because the wrong number was published to
+> two places and a silent fix leaves no trace of which one a reader saw.
+
 Window: 13 Aug – 10 Sep 2026. Only meetings whose transcript or Gemini notes exist on
 staging with **15 or more pieces** were used (71 sources; checked 10 Sep). Every row names
 the source that answers it and its size, so Lane E can key the ids after the re-index.
