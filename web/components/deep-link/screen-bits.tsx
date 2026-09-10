@@ -60,6 +60,7 @@ import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/col
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
@@ -510,136 +511,163 @@ export function ToolbarRow({
   // she is naming.
   const expanded = Boolean(toolbarPanel)
   return (
-    <div
-      data-slot="toolbar-row-column"
-      className={cn(
-        // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (client,
-        // dark mode, Apps screen: "the background of tabs is wrong. should be
-        // same as background of content body"). `bg-background` and
-        // `bg-[var(--surface-raised)]` happen to be the same colour in LIGHT
-        // mode, which is how this shipped looking right — dark mode split
-        // them apart (`--background` → `--kw-unlit-page` #141310,
-        // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
-        // genuinely different near-black tones), and this row's card-toned
-        // surroundings suddenly sat on the wrong one of the two.
-        // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
-        // reason the toolbar's buttons had no background. The kit rebinds
-        // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
-        // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
-        // secondary button is always the other tone from whatever it stands on
-        // and no component needs a prop. `bg-[var(--surface-raised)]` paints
-        // the identical colour but is a DIFFERENT CLASS, so no selector in that
-        // list matched, the rebind never fired, and the token stayed at its
-        // base `var(--card)` — the same #FFFEF9 this container is painted with.
-        // Beige on beige: the client, twice, "the buttons in the toolbar are
-        // missing the background". `bg-surface-raised` is a real generated
-        // utility (tokens.css bridges `--color-surface-raised` precisely so it
-        // exists), paints the same colour, and IS in the list — so every
-        // secondary control inside now resolves to `--surface-panel` #F7F2EB.
-        //
-        // THE RULE, not the patch: an element that paints a GROUND uses the
-        // named utility. The `bg-[var(--token)]` escape hatch silently freezes
-        // every ground-aware token beneath it.
-        "flex min-w-0 flex-col bg-surface-raised",
-        // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
-        // reads as the same stadium pill every other toolbar control in this
-        // app wears; expanded switches to the box radius so a tall facet
-        // panel never has to fit inside a 999px curve.
-        expanded ? "rounded-[var(--radius)]" : "rounded-pill",
-        // THE GAP TO WHATEVER COMES NEXT — R49, `--toolbar-content-gap`
-        // (web/app/globals.css). Baked into the row's OWN root rather than
-        // left for a call site to add, exactly as `--tab-content-gap` is
-        // baked into the tab strip's own box rather than a sibling's margin:
-        // a call site that ALSO wraps this row in a gapped column is paying
-        // the same gap twice, which is how five different numbers
-        // (7.5/11.25/15/22.5px) ended up doing the identical job across the
-        // app's fourteen call sites. This is the ONLY place that number is
-        // spent now — see web/test/rules.test.ts's `toolbar-content-gap`.
-        "mb-[var(--toolbar-content-gap)]"
-      )}
-    >
+    // ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also want
+    // the toolbar to be on top all time visible. everywhere."
+    //
+    // A SECOND BOX, AND EACH OF THE TWO DOES A JOB THE OTHER CANNOT. The pill
+    // below is the toolbar: one fill, one radius, chosen by whether a facet
+    // panel is open, and its shape is the whole of the 2026-09-03 ruling above.
+    // A pinned bar has to OCCLUDE the rows sliding under it, which means
+    // painting a band the full height of what it displaces — the pill, plus
+    // R49's `--toolbar-content-gap` beneath it. Putting that padding inside the
+    // pill would make the pill taller and change the shape she approved; a
+    // margin below the pill would paint nothing at all, which is the exact bug
+    // `STICKY_FOLDER_TABS` was fixed out of ("a margin between two siblings is
+    // never painted", tabs-view.tsx). So the pin is its own box: a flex COLUMN,
+    // which is what keeps the pill's trailing margin INSIDE it and painted, on
+    // the same `--surface-raised` the pill and the card behind it both wear —
+    // invisible at rest, and the thing rows disappear behind on scroll.
+    //
+    // R49 IS UNTOUCHED. The number, its token and its owner are exactly where
+    // they were: `mb-[var(--toolbar-content-gap)]` on the row's own root, one
+    // element down. Nothing moved to a call site and nothing was respelled.
+    //
+    // `--pinned-chrome-h` IS WHAT IT PINS BELOW, and it is not this component's
+    // to decide — a collection strip, a record's strip or the portal's header
+    // raises it for the subtree, and a screen with nothing above pins at zero.
+    // See shared/web/pinned-chrome.ts.
+    <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
       <div
-        data-slot="toolbar-row-track"
+        data-slot="toolbar-row-column"
         className={cn(
-          // THE TRACK — client, 1 Sep 2026, pointing at her own reference
-          // artifact: every control sits in one visibly distinct row; the
-          // inline-start padding is slightly deeper than the others so the
-          // search icon doesn't sit flush on the seam. No fill and no radius
-          // of its own any more — both now belong to the merged container
-          // above, which is the whole point of this pass.
-          "flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4",
-          className
+          // THE FILL MATCHES THE CARD IT SITS IN, NOT THE PAGE GROUND (client,
+          // dark mode, Apps screen: "the background of tabs is wrong. should be
+          // same as background of content body"). `bg-background` and
+          // `bg-[var(--surface-raised)]` happen to be the same colour in LIGHT
+          // mode, which is how this shipped looking right — dark mode split
+          // them apart (`--background` → `--kw-unlit-page` #141310,
+          // `--surface-raised`/`--card` → `--kw-unlit-raised` #26241F, two
+          // genuinely different near-black tones), and this row's card-toned
+          // surroundings suddenly sat on the wrong one of the two.
+          // NAMED GROUND CLASS, NOT THE ARBITRARY FORM — and this is the whole
+          // reason the toolbar's buttons had no background. The kit rebinds
+          // `--btn-secondary-fill` off a LIST OF CLASS NAMES (tokens.css:
+          // `.bg-background, .bg-card, .bg-popover, .bg-surface-raised, …`) so a
+          // secondary button is always the other tone from whatever it stands on
+          // and no component needs a prop. `bg-[var(--surface-raised)]` paints
+          // the identical colour but is a DIFFERENT CLASS, so no selector in that
+          // list matched, the rebind never fired, and the token stayed at its
+          // base `var(--card)` — the same #FFFEF9 this container is painted with.
+          // Beige on beige: the client, twice, "the buttons in the toolbar are
+          // missing the background". `bg-surface-raised` is a real generated
+          // utility (tokens.css bridges `--color-surface-raised` precisely so it
+          // exists), paints the same colour, and IS in the list — so every
+          // secondary control inside now resolves to `--surface-panel` #F7F2EB.
+          //
+          // THE RULE, not the patch: an element that paints a GROUND uses the
+          // named utility. The `bg-[var(--token)]` escape hatch silently freezes
+          // every ground-aware token beneath it.
+          "flex min-w-0 flex-col bg-surface-raised",
+          // TWO RADII, CHOSEN BY STATE, NEVER BY CONTENT HEIGHT (R31). Collapsed
+          // reads as the same stadium pill every other toolbar control in this
+          // app wears; expanded switches to the box radius so a tall facet
+          // panel never has to fit inside a 999px curve.
+          expanded ? "rounded-[var(--radius)]" : "rounded-pill",
+          // THE GAP TO WHATEVER COMES NEXT — R49, `--toolbar-content-gap`
+          // (web/app/globals.css). Baked into the row's OWN root rather than
+          // left for a call site to add, exactly as `--tab-content-gap` is
+          // baked into the tab strip's own box rather than a sibling's margin:
+          // a call site that ALSO wraps this row in a gapped column is paying
+          // the same gap twice, which is how five different numbers
+          // (7.5/11.25/15/22.5px) ended up doing the identical job across the
+          // app's fourteen call sites. This is the ONLY place that number is
+          // spent now — see web/test/rules.test.ts's `toolbar-content-gap`.
+          "mb-[var(--toolbar-content-gap)]"
         )}
       >
-        {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
-            like in your atifact": her reference artifact's search element is
-            `flex: 1 1 auto`, not a fixed width, so it is what pushes
-            filters/sort/view/actions to the track's far edge rather than
-            leaving them clustered right after a narrow box. `flex-1` here does
-            that job regardless of what width class the search element itself
-            carries (a caller's own `w-full` fills this box; one still asking
-            for a fixed width would be overridden by this wrapper's own basis
-            the same way `filters` below already normalizes a `w-full` child –
-            see PagedFind's note on why a wrapped `w-full` child sizes to the
-            wrapper and not the row). */}
-        {search && (
-          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
-        )}
-        {/* `useFilterBar`'s own `pill` (`shared/web/screen-engine/filter-bar.tsx`)
-            renders inline here — a normal flex child, wrapped in its own
-            non-growing box internally, same as every other slot on this row.
-            Its OPEN panel is a SEPARATE value, `toolbarPanel` below — not
-            folded into this slot, which is exactly the shape a `ReactNode`
-            prop could not enforce back when one component drew both. */}
-        {filters}
-        {/* THE ROW DRAWS BOTH OF THESE (R53), from the configs above. Before
-            this, both were `React.ReactNode` and eight call sites handed
-            their `<SortControl>` to `search` instead — where it sat inside
-            the one GROWING box, at whatever label treatment each screen
-            typed, rather than in this non-growing one. The wrapper, the
-            order, the name and the hidden label are this component's now, so
-            every collection toolbar in the app draws the same chip in the
-            same place. */}
-        {sort && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <SortControl
-              options={sort.options}
-              value={sort.value}
-              onValueChange={sort.onValueChange}
-              direction={sort.direction}
-              onDirectionChange={sort.onDirectionChange}
-              label={t("Sort by")}
-              hideLabel
-              /* THE STANDING HEIGHT, SAME AS FILTER AND VIEW — client,
-                 2026-09-06: "filter sort and view should be same size, since
-                 last iteration sort is smaller, fix that."
+        <div
+          data-slot="toolbar-row-track"
+          className={cn(
+            // THE TRACK — client, 1 Sep 2026, pointing at her own reference
+            // artifact: every control sits in one visibly distinct row; the
+            // inline-start padding is slightly deeper than the others so the
+            // search icon doesn't sit flush on the seam. No fill and no radius
+            // of its own any more — both now belong to the merged container
+            // above, which is the whole point of this pass.
+            "flex flex-wrap items-center gap-2 py-1.5 pe-1.5 ps-4",
+            className
+          )}
+        >
+          {/* THE ONLY GROWING SLOT — client, 2 Sep 2026, "cluster to the right!!!!
+              like in your atifact": her reference artifact's search element is
+              `flex: 1 1 auto`, not a fixed width, so it is what pushes
+              filters/sort/view/actions to the track's far edge rather than
+              leaving them clustered right after a narrow box. `flex-1` here does
+              that job regardless of what width class the search element itself
+              carries (a caller's own `w-full` fills this box; one still asking
+              for a fixed width would be overridden by this wrapper's own basis
+              the same way `filters` below already normalizes a `w-full` child –
+              see PagedFind's note on why a wrapped `w-full` child sizes to the
+              wrapper and not the row). */}
+          {search && (
+            <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
+          )}
+          {/* `useFilterBar`'s own `pill` (`shared/web/screen-engine/filter-bar.tsx`)
+              renders inline here — a normal flex child, wrapped in its own
+              non-growing box internally, same as every other slot on this row.
+              Its OPEN panel is a SEPARATE value, `toolbarPanel` below — not
+              folded into this slot, which is exactly the shape a `ReactNode`
+              prop could not enforce back when one component drew both. */}
+          {filters}
+          {/* THE ROW DRAWS BOTH OF THESE (R53), from the configs above. Before
+              this, both were `React.ReactNode` and eight call sites handed
+              their `<SortControl>` to `search` instead — where it sat inside
+              the one GROWING box, at whatever label treatment each screen
+              typed, rather than in this non-growing one. The wrapper, the
+              order, the name and the hidden label are this component's now, so
+              every collection toolbar in the app draws the same chip in the
+              same place. */}
+          {sort && (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <SortControl
+                options={sort.options}
+                value={sort.value}
+                onValueChange={sort.onValueChange}
+                direction={sort.direction}
+                onDirectionChange={sort.onDirectionChange}
+                label={t("Sort by")}
+                hideLabel
+                /* THE STANDING HEIGHT, SAME AS FILTER AND VIEW — client,
+                   2026-09-06: "filter sort and view should be same size, since
+                   last iteration sort is smaller, fix that."
 
-                 THIS LINE USED TO PASS `size="sm"`, and that was me reading her
-                 earlier note — "the sort component everywhere, I feel it's too
-                 big, could we make it a bit more compact" — as a question about
-                 HEIGHT. It was not. Measured on verify/toolbar-trio: the pill
-                 was the right height all along and carried 26 between its arrow
-                 and its label where `ViewSwitch` carries 8. She was describing
-                 the INSIDE of the control, and shrinking the whole thing to 32
-                 answered the wrong axis — it left the row of three uneven
-                 without touching what she was actually looking at.
+                   THIS LINE USED TO PASS `size="sm"`, and that was me reading her
+                   earlier note — "the sort component everywhere, I feel it's too
+                   big, could we make it a bit more compact" — as a question about
+                   HEIGHT. It was not. Measured on verify/toolbar-trio: the pill
+                   was the right height all along and carried 26 between its arrow
+                   and its label where `ViewSwitch` carries 8. She was describing
+                   the INSIDE of the control, and shrinking the whole thing to 32
+                   answered the wrong axis — it left the row of three uneven
+                   without touching what she was actually looking at.
 
-                 So the height goes back to the 40 its neighbours wear, and the
-                 compactness she asked for is now where it belongs: the kit's
-                 own `sort-control` drops its seam-side inset to `--space-2`,
-                 the same 8 `ViewSwitch` spends between glyph and label. Two
-                 axes, two fixes, neither standing in for the other. */
-            />
-          </div>
-        )}
-        {view && (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
-          </div>
-        )}
-        {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+                   So the height goes back to the 40 its neighbours wear, and the
+                   compactness she asked for is now where it belongs: the kit's
+                   own `sort-control` drops its seam-side inset to `--space-2`,
+                   the same 8 `ViewSwitch` spends between glyph and label. Two
+                   axes, two fixes, neither standing in for the other. */
+              />
+            </div>
+          )}
+          {view && (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <ViewSwitch views={view.views} value={view.value} onValueChange={view.onValueChange} label={t("View")} />
+            </div>
+          )}
+          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        </div>
+        {toolbarPanel}
       </div>
-      {toolbarPanel}
     </div>
   )
 }

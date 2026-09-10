@@ -41,6 +41,8 @@ import { useDoorSearch } from "@/lib/search"
 import { delivery } from "@/lib/api"
 import { Input } from "@shared/ui/components/input/input"
 import { MagnifyingGlass, X } from "@shared/ui/foundations/icons"
+import { cn } from "@shared/ui/lib/utils"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useLanguage } from "@shared/web/language"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 
@@ -93,28 +95,41 @@ export function SentToUs() {
         * case above already returns null, so this box never appears over
         * nothing. It asks the door (`?q=`), so it reaches every document this
         * company has ever sent us, not the page in front of us. */}
-      <div className="relative">
-        <MagnifyingGlass
-          className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
-          aria-hidden
-        />
-        <Input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder={t("Search what you've sent")}
-          aria-label={t("Search what you've sent")}
-          className="pr-12 pl-12"
-        />
-        {term ? (
-          <button
-            type="button"
-            onClick={() => setTerm("")}
-            aria-label={t("Clear the search")}
-            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
+      {/* ── THE PIN — R63, CLIENT RULING 2026-09-10: "on scroll down, i also
+          want the toolbar to be on top all time visible. everywhere." The same
+          class the agency door's toolbars wear and the same one the portal's
+          tickets list wears one screen along; `--pinned-chrome-h` is the portal
+          shell's own measured header (portal-shell.tsx). `pb-4 -mb-4` is this
+          section's own `gap-4` made painted and then given back — a flex gap is
+          a distance between two siblings and is never painted, so without it
+          the first row slides up flush against the box the moment it sticks.
+          This section is one BLOCK on a longer page, and `position: sticky` is
+          bounded by its own containing block, so the box unpins with the
+          section rather than following the reader past the rows it narrows. */}
+      <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4 -mb-4")}>
+        <div className="relative">
+          <MagnifyingGlass
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2"
+            aria-hidden
+          />
+          <Input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder={t("Search what you've sent")}
+            aria-label={t("Search what you've sent")}
+            className="pr-12 pl-12"
+          />
+          {term ? (
+            <button
+              type="button"
+              onClick={() => setTerm("")}
+              aria-label={t("Clear the search")}
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2"
+            >
+              <X className="size-4" />
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {searching && search.failed ? (

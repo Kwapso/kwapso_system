@@ -908,6 +908,39 @@ again, which is the only property that matters here.
   over rows a term is hiding. Never a bare `<p>` for either zero: forty-three of
   those were the state of this app on 2026-09-08, twelve of them the identical
   sentence.
+- **R63 `pinned-toolbar`** — your collection's toolbar stays on top while the
+  rows scroll under it, and you do not decide that: `<ToolbarRow>`,
+  `<PagedFind>` and the recipe engine's own frame all wear `PINNED_TOOLBAR`
+  (`shared/web/pinned-chrome.ts`) already, so a screen that reaches for one of
+  the three gets the pin by doing nothing. Two things are yours. (i) **Do not
+  wrap the row in a box that is no taller than the row**: `position: sticky` is
+  bounded by its own containing block, so a toolbar boxed in furniture of its
+  own — its rows a SIBLING of that box rather than its contents — pins nowhere
+  at all and looks exactly like one that works (measured: a 32px stuck range
+  against 3,011px on Accounts). If your screen genuinely needs that shape, put
+  `PINNED_TOOLBAR` on the box instead, the way `tickets-dashboard.tsx` does, and
+  give it the ground it stands on plus the gap under it as PADDING. (ii) **A gap
+  under a pinned bar has to be painted**: a flex `gap` between the row and the
+  rows below is space the content carries away the moment the bar sticks, so it
+  belongs inside the pinned box (`pb-*`, with a matching negative margin where a
+  parent's gap already spends it) and never between two siblings. If something
+  new pins ABOVE a toolbar, raise `--pinned-chrome-h` where that thing is drawn —
+  never at the screen.
+- **R64 `sections-have-a-door`** — every act your module offers is reachable
+  from a screen a person can actually open, and if you move a section's material
+  you say where it went. The trap is specific and it has already happened once:
+  a section on the team area's own strip (`TEAM_SECTIONS`, `placement: "tab"`)
+  is reached ONLY through the derived "This team" list on Settings › Team, so
+  taking its key out of that list's `!["…"].includes(s.key)` filter removes the
+  last door to it. Do that and you owe a `SECTION_HOSTED_ELSEWHERE` line naming
+  the reachable file that carries the material — and that file must really make
+  the door call each of the section's acts dispatches
+  (`web/lib/use-screen-actions.ts`), because naming a host proves nothing on its
+  own: on 2026-09-09 the members gallery WAS named as the members section's home
+  while offering none of its three acts, and the build stayed green. More
+  generally: when you redesign a screen so that a row no longer navigates, the
+  acts that lived on the record it used to open are now YOUR screen's to carry.
+  A slide-in (`Sheet`, R59) is how the rest of this app does it.
 
 **The words** (the ones that catch every new module, every time)
 

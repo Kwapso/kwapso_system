@@ -22,6 +22,7 @@ import {
   getAccount,
   grantPortalAccess,
   linkPerson,
+  listAccountLinks,
   listAccounts,
   listAccountsForExport,
   listPersonCompanies,
@@ -409,6 +410,87 @@ describe("contacts", () => {
         personAccountId: IDS.victimAccount,
       })
     ).rejects.toMatchObject({ code: "invalid_input" })
+  })
+
+  /* ── A CONTACT'S OWN FACE (client, 2026-09-09: "add avatar in round") ──────
+     The picture is on the person's own account row and had never been read on
+     this path, so the ticket form's contact chips drew a grey letter for all
+     106 of them — including the 31 who have a photograph in R2. */
+  const photograph = (id: string, path: string) =>
+    db().prepare("UPDATE accounts SET logo_url = ? WHERE id = ?").run(path, id)
+
+  it("carries the person's photograph beside their name", async () => {
+    photograph(IDS.victimPerson, "/media/accounts/marta.jpg")
+    const links = await listAccountLinks(cfg, guard, staff, IDS.victimAccount)
+    const marta = links.find((l) => l.personAccountId === IDS.victimPerson)
+    expect(marta?.personLogoUrl).toBe("/media/accounts/marta.jpg")
+    // …and a contact with no photograph says so rather than inventing one — the
+    // screen's fallback to an initial depends on the null being honest.
+    const ana = await createAccount(cfg, guard, staff, actor, { accountType: "individual", name: "Ana" })
+    await linkPerson(cfg, guard, staff, actor, { accountId: IDS.victimAccount, personAccountId: ana })
+    expect(
+      (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find((l) => l.personAccountId === ana)
+        ?.personLogoUrl
+    ).toBeNull()
+  })
+
+  /* THE SAME FIELD, NOW SENT TO A CLIENT LOGIN TOO — the owner's ruling on
+     10 Sep 2026, "a client see his own collegues: yes", put to her as a yes/no
+     with the fence argument in front of her.
+
+     This fixture is the sharpest case for it and the reason the answer is safe
+     rather than merely permitted. Marta is a contact of Bergman S.A. AND of
+     Bergman Marine and her own row hangs under NEITHER (`parent_account_id` is
+     null). So her account row IS outside a Bergman portal caller's fence — and
+     they still read her here, because a link is reachable through the company it
+     hangs off and she is a contact AT Bergman. Every person this query can
+     return is the caller's own colleague; there is no row in it that is not.
+
+     What the ruling did NOT open is the other half, and this test guards it:
+     that she also works at Bergman Marine. That is `companyName` and
+     `relationship` on `toAccount`, still withheld. A face is about the person in
+     front of you; the other company is somebody else's business. */
+  it("sends that photograph to a client login — every person it can return is their own colleague", async () => {
+    photograph(IDS.victimPerson, "/media/accounts/marta.jpg")
+    const scope = await accountScope(cfg, { ...guard, userId: IDS.contactUser })
+    expect(scope.kind).toBe("portal")
+    if (scope.kind !== "portal") return
+    // THE POSITIVE CONTROL FIRST, or this test could pass because the caller
+    // sees nothing at all: they DO read the link, name and role included.
+    const links = await listAccountLinks(cfg, guard, scope, IDS.victimAccount)
+    const marta = links.find((l) => l.personAccountId === IDS.victimPerson)
+    expect(marta?.personName).toBe("Marta Ruiz")
+    // …and her row is genuinely outside their fence, which is what makes this
+    // the case worth pinning rather than a trivially safe one.
+    expect(scope.accountIds).not.toContain(IDS.victimPerson)
+    expect(
+      marta?.personLogoUrl,
+      "a client login was refused their own colleague's face"
+    ).toBe("/media/accounts/marta.jpg")
+    // THE BOUNDARY THAT DID NOT MOVE, asserted through the read that would
+    // actually leak it. Reading her face must not have made her OTHER companies
+    // readable — that is the fact the fence protects, and it is what keeps this
+    // test honest now the photograph is open. Staff see both companies (below);
+    // this caller must see only the one they stand in.
+    const hers = await listPersonCompanies(cfg, guard, scope, IDS.victimPerson)
+    expect(hers.map((l) => l.accountId)).toEqual([IDS.victimAccount])
+    // Staff, through the same function on the same row, still get it.
+    expect(
+      (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find(
+        (l) => l.personAccountId === IDS.victimPerson
+      )?.personLogoUrl
+    ).toBe("/media/accounts/marta.jpg")
+  })
+
+  /* THE OTHER DIRECTION carries the COMPANY's mark, because `personName` is
+     "the other end" there too — one rule about this shape, not two. No
+     withholding: the joined row IS the fenced row (`c.id = l.account_id`). */
+  it("carries the company's mark when the link is read from the person's side", async () => {
+    photograph(IDS.victimAccount, "/media/accounts/bergman.png")
+    const companies = await listPersonCompanies(cfg, guard, staff, IDS.victimPerson)
+    expect(companies.find((c) => c.accountId === IDS.victimAccount)?.personLogoUrl).toBe(
+      "/media/accounts/bergman.png"
+    )
   })
 })
 

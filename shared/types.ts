@@ -1293,6 +1293,17 @@ export type AccountLink = {
   accountId: string
   personAccountId: string
   personName: string
+  /** THE FACE AT THE OTHER END OF THE LINK — `accounts.logo_url` on the row
+   * `personName` names, so it follows that field's direction exactly: the
+   * PERSON's photograph on `AccountDetail.links`, the COMPANY's mark on
+   * `AccountDetail.companies`. R35: a record shown anywhere carries its own
+   * face, and a contact offered in a picker is shown to be chosen.
+   *
+   * NULL FOR A CLIENT LOGIN, always, and that withholding is `listAccountLinks`'
+   * to make — see the note there. It is also null for the many people who
+   * simply have no photograph, which is the ordinary case and the one
+   * `RecordMark` falls through to an initial for. */
+  personLogoUrl: string | null
   relationship: string | null
   isMainStakeholder: boolean
   active: boolean

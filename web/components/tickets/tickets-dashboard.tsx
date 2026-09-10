@@ -91,6 +91,8 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { useCached } from "@shared/web/store"
+import { cn } from "@shared/ui/lib/utils"
+import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 import { Sankey } from "@shared/ui/components/sankey/sankey"
@@ -1996,9 +1998,40 @@ export function TicketsDashboard({
           node, built once above, and `TOOLBAR_SORT_EXEMPT` still carries the
           reason a dashboard offers no order (R53). */}
       {standsOn === "screen" && !noTickets ? (
-        <Card className="mb-4">
-          <CardContent className="p-4 pb-0 lg:pb-0">{toolbar}</CardContent>
-        </Card>
+        /* ── THE PIN GOES ON THE FURNITURE, NOT ON THE ROW INSIDE IT — R63,
+           and this is the one call site in the app where that distinction is
+           load-bearing. MEASURED, at 1440x900, before and after.
+
+           `<ToolbarRow>` pins itself (screen-bits.tsx), and a `position:
+           sticky` element is bounded by its own CONTAINING BLOCK — which here
+           is this `CardContent`, a box that holds the row and nothing else. Its
+           stuck range measured 32px: the row travelled with the scroll and
+           pinned nowhere, on the one screen the client actually screenshotted.
+           Everywhere else the row shares a card with the rows it narrows, so
+           the card is thousands of pixels tall and the range is the whole
+           collection (3,011px on Accounts, 1,049 on Apps, measured the same
+           run). The dashboard is the exception because its panels are SIBLINGS
+           of this card rather than its contents — the client's own "the toolbar
+           in dashboard needs some kind of container", which is why the card is
+           here at all.
+
+           So the pin moves out to a box whose containing block IS the dashboard
+           column. The row inside still carries its own pin and is simply inert
+           there (range zero), which costs nothing and keeps R63's sentence true
+           of the row wherever else it is used.
+
+           `pb-4` IS THIS CARD'S OWN `mb-4`, MOVED AND MADE PAINTED. A margin
+           between two siblings is never painted, so a pinned bar with one under
+           it lets the panels scroll through 16px of nothing — the bug
+           `STICKY_FOLDER_TABS` was fixed out of. Same number, same distance on
+           screen, now inside the box that paints. `bg-surface-raised` is the
+           shell pane's own ground, which is what this card stands on, so at
+           rest this box is invisible. */
+        <div data-slot="toolbar-row-pin" className={cn(PINNED_TOOLBAR, "pb-4")}>
+          <Card>
+            <CardContent className="p-4 pb-0 lg:pb-0">{toolbar}</CardContent>
+          </Card>
+        </div>
       ) : (
         toolbar
       )}

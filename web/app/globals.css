@@ -131,6 +131,121 @@
 }
 
 /* ============================================================================
+   WHAT A PINNED TOOLBAR PINS BELOW (R63).
+   ============================================================================
+   Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be on
+   top all time visible. everywhere." The pin itself is one class, owned by the
+   row (`PINNED_TOOLBAR`, shared/web/pinned-chrome.ts). This is the other half
+   of it: the OFFSET, which is not zero, because a toolbar is not the only
+   thing already stuck to the top of the same scrollport.
+
+   A collection's own tab strip (`STICKY_FOLDER_TABS`,
+   shared/web/screen-engine/tabs-view.tsx) and a record's
+   (`STICKY_TABS`, web/components/records/record-chrome.tsx) both pin at
+   `top: 0` inside the kit's body pane. A toolbar pinned at `top: 0` too would
+   land in the SAME band as the strip above it, and one of the two would simply
+   be invisible — the strip, since the toolbar is later in the document.
+
+   THE DEFAULT IS ZERO AND THE EXCEPTION IS WRITTEN DOWN, the shape R48 chose
+   for the search box: a screen with nothing pinned above its toolbar pins flush
+   at the pane's own top edge (app-shell.tsx moves the pane's block-start
+   padding down one level precisely so that edge is real), and a screen with a
+   strip above raises the property for its whole subtree.
+
+   RAISED BY A RULE, NOT BY A LINE AT EACH HOST. The strip wears
+   `PINNED_STRIP_MARK` wherever `renderFolderTabs` draws it — one seam, every
+   collection screen — and `:has()` gives the property to the strip's own
+   CONTAINER, which is the nearest ancestor the toolbar below it shares. So a
+   new host of that seam is covered by this rule and never by remembering to
+   add a class. (`SectionWithCreate`'s and `PagedFind`'s own column are that
+   container today; neither had to be told.)
+
+   `--tab-strip-h` IS THE STRIP'S OWN GEOMETRY, not a measurement of a screen.
+   It was written for the record strip's escape arithmetic
+   (`--record-tab-strip-h`, record-chrome.tsx, which now reads this) off
+   tabs.tsx's own `TRIGGER_SKIN.line` verbatim: `pt-3` + `pb-[calc(space-3 +
+   0.125rem)]` + the `text-sm` line box, less the 1px `-mb-px` pull-back. Both
+   strips draw the same line trigger, so both are that tall, and the strip's
+   PAINTED height adds the gap it carries under itself as padding
+   (`--tab-content-gap` / `--record-tab-gap`, one value above).
+   ========================================================================= */
+:root {
+  --tab-strip-h: calc(
+    var(--space-3) + var(--space-3) + 0.125rem + (var(--text-sm) * var(--text-sm--line-height)) - 1px
+  );
+  --pinned-chrome-h: 0px;
+}
+
+*:has(> .pinned-strip) {
+  --pinned-chrome-h: calc(var(--tab-strip-h) + var(--tab-content-gap));
+}
+
+/* ONE PINNED TOOLBAR PER COLLECTION, AND IT IS THE OUTERMOST (R63).
+   Measured, not reasoned: on the knowledge base a `<PagedFind>` toolbar and the
+   kit frame's own `collection-frame-toolbar` are both real rows on one screen —
+   the search/sort/view row that asks the door, and the panel's own `+` — and
+   with both pinned they land in the SAME band at the top of the pane, the outer
+   one painting over the inner one's create button. Two bars stacked would eat
+   the viewport; one bar hiding the other is worse than either. The outer row is
+   the one that narrows the collection, so it is the one that stays. */
+*:has(> [data-slot="toolbar-row-pin"]) [data-slot="collection-frame-toolbar"] {
+  position: static;
+}
+
+/* ============================================================================
+   THE GROUND A PINNED BAR PAINTS (R63).
+   ============================================================================
+   A pinned toolbar has to PAINT, or the rows scroll through it — and it has to
+   paint the tone it is STANDING on, or it reads as a hole punched in the card
+   (the client's own report on the tab strip, dark mode, 2026-09-03: "fix the
+   toolbar in dark mode", a strip drawing a near-black band across a card a full
+   step lighter). Measured, dark, 2026-09-10: a `<ToolbarRow>` inside a
+   `<CollectionCard>` stands on `--surface-panel` #1C1B18 while its own pill is
+   `--surface-raised` #26241F, and the same row on the Knowledge base stands
+   directly on the shell's body pane, which IS `--surface-raised`. One hardcoded
+   fill cannot be right in both places, and a PROP would put the answer back at
+   the call site, which is the whole thing this law removes.
+
+   SO THE GROUND DECLARES ITSELF, exactly as the kit's own `tokens.css` §8 makes
+   a secondary button "the other tone from whatever it stands on" by rebinding
+   `--btn-secondary-fill` off a LIST OF GROUND CLASSES. This is that mechanism
+   with the relation removed: a ground class publishes its OWN colour, so
+   anything below it can paint the same paper without being told which. The kit
+   already uses the named utilities for every one of these (`Card`'s default is
+   `bg-surface-panel`; `ScreenShell`'s body pane is `bg-surface-raised`), which
+   is what makes the rebinding fire at all — `bg-[var(--token)]` paints the same
+   pixels and matches no selector here, the trap `<ToolbarRow>`'s own header
+   already documents.
+
+   The `:root` line is the page itself, which is what a bar pinned outside any
+   card stands on. */
+:root {
+  --pinned-ground: var(--background);
+}
+
+.bg-background {
+  --pinned-ground: var(--background);
+}
+
+.bg-card,
+.bg-surface-raised {
+  --pinned-ground: var(--surface-raised);
+}
+
+.bg-surface-page {
+  --pinned-ground: var(--surface-page);
+}
+
+.bg-surface-panel,
+.bg-secondary {
+  --pinned-ground: var(--surface-panel);
+}
+
+.bg-popover {
+  --pinned-ground: var(--popover);
+}
+
+/* ============================================================================
    THE PAGE DOES NOT SCROLL SIDEWAYS. EVER.
    ============================================================================
    The owner, more than once and finally in capitals: "there should be no scope

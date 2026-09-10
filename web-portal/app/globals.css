@@ -92,6 +92,98 @@
   }
 }
 
+/* ============================================================================
+   WHAT A PINNED TOOLBAR PINS BELOW, ON THIS DOOR (R63).
+   ============================================================================
+   Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be on
+   top all time visible. everywhere." — and "everywhere" is two front doors, so
+   this file answers the same question the agency door's `globals.css` answers,
+   with a different answer, because the two shells are not the same shape.
+
+   THE AGENCY DOOR SCROLLS A PANE; THIS ONE SCROLLS THE DOCUMENT. There is no
+   kit body pane here and no collection tab strip: `portal-shell.tsx` is a
+   `min-h-[100svh]` column whose HEADER is `sticky top-0 z-30` over the page
+   itself. So the thing a pinned toolbar has to clear is that header, and a
+   header of buttons has no tab strip's token geometry to read — it is as tall
+   as the controls inside it happen to be, in whichever of the four languages
+   the reader chose.
+
+   SO IT IS MEASURED, ONCE, WHERE IT IS DRAWN. `portal-shell.tsx` observes its
+   own header and publishes the height onto the shell root as
+   `--pinned-chrome-h`; every toolbar below inherits it through
+   `PINNED_TOOLBAR` (shared/web/pinned-chrome.ts), the same class the agency
+   door's rows wear. The zero below is the value before that first measurement
+   lands and the value on any screen drawn outside the shell.
+   ========================================================================= */
+:root {
+  --pinned-chrome-h: 0px;
+}
+
+/* ONE PINNED TOOLBAR PER COLLECTION, AND IT IS THE OUTERMOST (R63).
+   Measured, not reasoned: on the knowledge base a `<PagedFind>` toolbar and the
+   kit frame's own `collection-frame-toolbar` are both real rows on one screen —
+   the search/sort/view row that asks the door, and the panel's own `+` — and
+   with both pinned they land in the SAME band at the top of the pane, the outer
+   one painting over the inner one's create button. Two bars stacked would eat
+   the viewport; one bar hiding the other is worse than either. The outer row is
+   the one that narrows the collection, so it is the one that stays. */
+*:has(> [data-slot="toolbar-row-pin"]) [data-slot="collection-frame-toolbar"] {
+  position: static;
+}
+
+/* ============================================================================
+   THE GROUND A PINNED BAR PAINTS (R63).
+   ============================================================================
+   A pinned toolbar has to PAINT, or the rows scroll through it — and it has to
+   paint the tone it is STANDING on, or it reads as a hole punched in the card
+   (the client's own report on the tab strip, dark mode, 2026-09-03: "fix the
+   toolbar in dark mode", a strip drawing a near-black band across a card a full
+   step lighter). Measured, dark, 2026-09-10: a `<ToolbarRow>` inside a
+   `<CollectionCard>` stands on `--surface-panel` #1C1B18 while its own pill is
+   `--surface-raised` #26241F, and the same row on the Knowledge base stands
+   directly on the shell's body pane, which IS `--surface-raised`. One hardcoded
+   fill cannot be right in both places, and a PROP would put the answer back at
+   the call site, which is the whole thing this law removes.
+
+   SO THE GROUND DECLARES ITSELF, exactly as the kit's own `tokens.css` §8 makes
+   a secondary button "the other tone from whatever it stands on" by rebinding
+   `--btn-secondary-fill` off a LIST OF GROUND CLASSES. This is that mechanism
+   with the relation removed: a ground class publishes its OWN colour, so
+   anything below it can paint the same paper without being told which. The kit
+   already uses the named utilities for every one of these (`Card`'s default is
+   `bg-surface-panel`; `ScreenShell`'s body pane is `bg-surface-raised`), which
+   is what makes the rebinding fire at all — `bg-[var(--token)]` paints the same
+   pixels and matches no selector here, the trap `<ToolbarRow>`'s own header
+   already documents.
+
+   The `:root` line is the page itself, which is what a bar pinned outside any
+   card stands on. */
+:root {
+  --pinned-ground: var(--background);
+}
+
+.bg-background {
+  --pinned-ground: var(--background);
+}
+
+.bg-card,
+.bg-surface-raised {
+  --pinned-ground: var(--surface-raised);
+}
+
+.bg-surface-page {
+  --pinned-ground: var(--surface-page);
+}
+
+.bg-surface-panel,
+.bg-secondary {
+  --pinned-ground: var(--surface-panel);
+}
+
+.bg-popover {
+  --pinned-ground: var(--popover);
+}
+
 /* Tap targets, for the same reason. A 44px minimum is the accessibility floor
  * for touch, and the portal is opened on a phone more often than not. */
 @media (pointer: coarse) {

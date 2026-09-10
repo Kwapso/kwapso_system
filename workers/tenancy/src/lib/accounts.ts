@@ -1082,7 +1082,49 @@ export async function setAccountActive(
 // ── the people on an account (account_links) ─────────────────────────────────
 
 /** Everyone linked to one account. Bounded: a company's contact list doesn't
- * grow without end the way its tickets do. */
+ * grow without end the way its tickets do.
+ *
+ * ── THE PERSON'S FACE COMES WITH THEIR NAME (client, 2026-09-09) ────────────
+ *
+ * *"in raides by ticket add screen: add avatar in round"*. The round box was
+ * built the day she asked; every contact drew a grey letter in it, because this
+ * SELECT took `p.name` off the joined person row and nothing else — so
+ * `AccountLink` carried no picture and the ticket form's own note said, in as
+ * many words, that the photographs "are one `p.logo_url` away in that SELECT"
+ * and that adding it is a door change rather than a screen one. This is that
+ * change. The bytes have been in R2 since `scripts/glide-visuals.mjs` ran (31
+ * contact photographs among the 86 it moved), claimed by `Account.logoUrl`'s
+ * own `STORED_FILES` line, and read by nothing on this path.
+ *
+ * ── AND A CLIENT LOGIN GETS NULL, WHICH IS THE POINT OF SAYING IT HERE ──────
+ *
+ * `toAccount` withholds three things from a portal caller and the third one is
+ * this exact shape, reasoned there in full: a person can be a contact at TWO
+ * companies, "the fence is on the ROW; this value is read from a table beside
+ * it, so the safe answer is the one that cannot be got wrong later". That is
+ * literally this statement — the fence is on `l.account_id`, and `p` is a row
+ * it does not cover. A contact of Bergman AND of Delaval sits on both contact
+ * lists, so Bergman's portal caller would newly receive a photograph off a
+ * person row their own fence never let them open. Name and role were already
+ * there and are what a contact list is FOR; a picture is a new fact, and a new
+ * fact crossing a fence is a decision somebody has to make on purpose.
+ *
+ * AND ON 10 SEP 2026 THE OWNER MADE THAT DECISION: "a client see his own
+ * collegues: yes." It was put to her as a yes/no with the paragraph above in
+ * front of her, so the picture is now sent to a portal caller too.
+ *
+ * The half of the old argument that was WRONG is worth keeping, because it is
+ * the reason this is safe rather than merely allowed: the person row is indeed
+ * outside the fence, but this query cannot REACH a person row that is not the
+ * caller's colleague — the `where` is the fence AND `l.account_id = ?`, so every
+ * row hangs off the caller's own company. Bergman's portal caller reads Marta
+ * because Marta is a contact at Bergman. What Bergman still may not learn is
+ * that she is also at Delaval, and that is `companyName`/`relationship`, which
+ * `toAccount` still withholds. A face is about the person in front of you.
+ *
+ * The `ours` spelling is `toAccount`'s, deliberately, so there is one shape in
+ * this file for "a client login does not get this" — it now governs the two
+ * fields above rather than three. */
 export async function listAccountLinks(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1095,6 +1137,7 @@ export async function listAccountLinks(
     account_id: string
     person_account_id: string
     person_name: string
+    person_logo_url: string | null
     relationship: string | null
     is_main_stakeholder: number
     deactivated_at: string | null
@@ -1102,7 +1145,8 @@ export async function listAccountLinks(
     cfg,
     guard.databaseId,
     // R14 hard cap — a contact list is bounded; move to paging before this bites.
-    `SELECT l.id, l.account_id, l.person_account_id, p.name AS person_name, l.relationship,
+    `SELECT l.id, l.account_id, l.person_account_id, p.name AS person_name,
+            p.logo_url AS person_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts p ON p.id = l.person_account_id
        ${where([fence.sql, "l.account_id = ?"])}
@@ -1115,6 +1159,24 @@ export async function listAccountLinks(
     accountId: r.account_id,
     personAccountId: r.person_account_id,
     personName: r.person_name,
+    // THE CLIENT SEES THEIR OWN COLLEAGUES' FACES. The owner's ruling, 10 Sep
+    // 2026, asked as a yes/no with the fence argument in front of her: "a client
+    // see his own collegues: yes."
+    //
+    // It is safe for a reason worth writing down rather than trusting. The
+    // picture does come off a PERSON row the fence does not cover — that half of
+    // the old argument was true. What it missed is WHICH person rows this query
+    // can return: the `where` is the account fence AND `l.account_id = ?`, so
+    // every row is a link hanging off the caller's own company, and every person
+    // named is therefore a contact OF that company. There is no row here that is
+    // not the caller's colleague, which is exactly the set she opened.
+    //
+    // The three fields below STAY withheld and the difference is the point:
+    // `companyName` and `relationship` describe the person's OTHER companies —
+    // Marta is a contact of Bergman and of Delaval, and Bergman may not learn the
+    // second. A face is about the person in front of you; those are about
+    // somebody else's business.
+    personLogoUrl: r.person_logo_url,
     relationship: r.relationship,
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,
@@ -1137,7 +1199,21 @@ export async function listAccountLinks(
  *
  * `personName` carries the COMPANY's name here, because the row is being read
  * about the person: the shape is shared with the forward list so one screen
- * component can draw either, and the name is always "the other end". */
+ * component can draw either, and the name is always "the other end".
+ *
+ * AND `personLogoUrl` FOLLOWS IT, for the identical reason and off the identical
+ * row — the company's mark rather than the person's face. "The other end" is one
+ * rule about this shape, not two, and a field that was null in one of the two
+ * directions would be a hole a reader has to know about.
+ *
+ * NO PORTAL WITHHOLDING HERE, and since 10 Sep 2026 none on the forward read
+ * either: the owner ruled that a client sees their own colleagues' faces. The
+ * asymmetry this paragraph used to argue for is gone, and the reason it was
+ * never load-bearing is written at the forward read's own `personLogoUrl` — a
+ * link is only reachable through the company it hangs off, so every person
+ * either direction can return is already the caller's colleague. Here the joined
+ * row IS the fenced row (`c.id = l.account_id`), so there was never a second row
+ * to leak from at all. */
 export async function listPersonCompanies(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1150,6 +1226,7 @@ export async function listPersonCompanies(
     account_id: string
     person_account_id: string
     company_name: string
+    company_logo_url: string | null
     relationship: string | null
     is_main_stakeholder: number
     deactivated_at: string | null
@@ -1157,7 +1234,8 @@ export async function listPersonCompanies(
     cfg,
     guard.databaseId,
     // R14 hard cap — a person belongs to a handful of companies.
-    `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name, l.relationship,
+    `SELECT l.id, l.account_id, l.person_account_id, c.name AS company_name,
+            c.logo_url AS company_logo_url, l.relationship,
             l.is_main_stakeholder, l.deactivated_at
        FROM account_links l JOIN accounts c ON c.id = l.account_id
        ${where([fence.sql, "l.person_account_id = ?"])}
@@ -1170,6 +1248,7 @@ export async function listPersonCompanies(
     accountId: r.account_id,
     personAccountId: r.person_account_id,
     personName: r.company_name,
+    personLogoUrl: r.company_logo_url,
     relationship: r.relationship,
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,

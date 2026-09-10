@@ -356,10 +356,15 @@ describe("which app the ticket is about", () => {
   })
 
   it("draws one pill per app, each wearing its own face, once a client is set", async () => {
+    // ALL THREE BELONG TO THE CHOSEN CLIENT, which this fixture has to say out
+    // loud since the list started narrowing by owner (2026-09-09). Before that
+    // the field was simply absent and every app was offered; leaving it absent
+    // now would silently move this case onto the "owned by nobody" branch and
+    // it would go on passing while measuring something else.
     door.apps = [
-      { id: "app-1", name: "Padelbase", stage: "live", logoUrl: null, active: true },
-      { id: "app-2", name: "Ferienhaus", stage: null, logoUrl: null, active: true },
-      { id: "app-3", name: "Retired thing", stage: "live", logoUrl: null, active: false },
+      { id: "app-1", name: "Padelbase", accountId: "acct-bergman", stage: "live", logoUrl: null, active: true },
+      { id: "app-2", name: "Ferienhaus", accountId: "acct-bergman", stage: null, logoUrl: null, active: true },
+      { id: "app-3", name: "Retired thing", accountId: "acct-bergman", stage: "live", logoUrl: null, active: false },
     ]
     render(
       <HelpFormDialog
@@ -398,6 +403,106 @@ describe("which app the ticket is about", () => {
     const mark = plainest.querySelector(".bg-muted")
     expect(mark).toBeTruthy()
     expect(mark?.textContent).toBe("F")
+  })
+
+  /* ── "FILTER THE APPS BY SELECTED CLIENT!" (client, 2026-09-09) ────────────
+     The second half of the sentence whose first half ("until clint is not
+     selected, show nothing") the two cases above already prove. It shipped
+     alone: the gate was built, the narrowing was not, and a comment in the
+     dialog argued at length that narrowing would hide the agency's own systems
+     and should never be written. She ruled twice; the comment was arguing
+     against narrowing by EQUALITY, and the rule that answers both is the one
+     her cascade already uses on the toolbar — own, or nobody's. */
+  it("offers the chosen client's own systems and ours, and never another client's", async () => {
+    door.apps = [
+      { id: "app-1", name: "Padelbase", accountId: "acct-bergman", stage: "live", logoUrl: null, active: true },
+      // ANOTHER CLIENT'S. The whole defect in one row: before the narrowing it
+      // was offered on every client's ticket in the agency.
+      { id: "app-2", name: "Someone else's system", accountId: "acct-other", stage: "live", logoUrl: null, active: true },
+      // OURS — `accountId` null, the case the retired comment was defending.
+      { id: "app-3", name: "Our own admin", accountId: null, stage: "live", logoUrl: null, active: true },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("App")
+      expect(within(r).getByRole("button", { name: /Padelbase/ })).toBeTruthy()
+      return r
+    })
+    expect(
+      within(row).queryByRole("button", { name: /Someone else's system/ }),
+      "an app belonging to another client is offered on this client's ticket"
+    ).toBeNull()
+    expect(
+      within(row).getByRole("button", { name: /Our own admin/ }),
+      "the agency's own systems must survive the narrowing — the cost the retired comment named"
+    ).toBeTruthy()
+  })
+
+  it("keeps the app a ticket already names, whoever it belongs to", async () => {
+    door.apps = [
+      { id: "app-1", name: "Padelbase", accountId: "acct-bergman", stage: "live", logoUrl: null, active: true },
+      { id: "app-2", name: "Someone else's system", accountId: "acct-other", stage: "live", logoUrl: null, active: true },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        // A LEGAL ROW: `appForTicket` accepts any live app for any client, so
+        // this pair exists and an edit must not blank it. Without the escape
+        // the row would draw no pressed chip while `values.appId` still held
+        // the app, and `submit` would send a value the screen had stopped
+        // showing.
+        initial={{ description: "<p>x</p>", accountId: "acct-bergman", appId: "app-2" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("App")
+      expect(within(r).getByRole("button", { name: /Padelbase/ })).toBeTruthy()
+      return r
+    })
+    expect(
+      within(row).getByRole("button", { name: /Someone else's system/ }),
+      "the app this ticket already names was narrowed off its own edit form"
+    ).toBeTruthy()
+  })
+
+  it("offers only our own systems on a ticket that has an app and no client", async () => {
+    door.apps = [
+      { id: "app-1", name: "Padelbase", accountId: "acct-bergman", stage: "live", logoUrl: null, active: true },
+      { id: "app-3", name: "Our own admin", accountId: null, stage: "live", logoUrl: null, active: true },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        // The housekeeping ticket: no client on purpose, and about one of ours.
+        initial={{ description: "<p>x</p>", appId: "app-3" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("App")
+      expect(within(r).getByRole("button", { name: /Our own admin/ })).toBeTruthy()
+      return r
+    })
+    expect(
+      within(row).queryByRole("button", { name: /Padelbase/ }),
+      "a client's app is offered on a ticket that names no client"
+    ).toBeNull()
   })
 })
 
@@ -555,16 +660,86 @@ describe("who raised it", () => {
     const mark = marta.querySelector(".bg-muted")
     // THE MARK EXISTS AT ALL — this is the half `shape: "round"` alone never
     // bought. `RowChip` draws its `RecordMark` only when a picture, a glyph or
-    // `face` says to, and `AccountLink` carries none of the first two.
+    // `face` says to, and neither of these two contacts has a photograph.
     expect(mark).toBeTruthy()
     // ROUND, which is R35's box for a person in their own right…
     expect(mark?.className).toContain("rounded-pill")
-    // …and the honest content: `AccountLink` has no picture, so the initial.
+    // …and the honest content: no `personLogoUrl` on the row, so the initial.
+    // This is now the FALLBACK case rather than the only case — see below.
     expect(mark?.textContent).toBe("M")
 
     // "NOT SAID" IS NOT A PERSON, so it wears no face — a round grey "N" would
     // draw a colleague nobody has.
     const notSaid = within(row).getByRole("button", { name: "Not said" })
     expect(notSaid.querySelector(".bg-muted")).toBeNull()
+  })
+
+  /* ── "ADD AVATAR IN ROUND" (client, 2026-09-09), THE OTHER HALF ────────────
+     The round box shipped the day she asked and every contact drew a grey
+     letter in it, because the query behind the row selected `p.name` off the
+     joined person row and nothing else — so the photographs that
+     `scripts/glide-visuals.mjs` put in R2 reached nobody. The door now carries
+     `personLogoUrl` and this is the case that says a real face is drawn where
+     there is one, and the letter kept where there is not. Both halves in one
+     render, because "it draws the picture" and "it still draws the initial" are
+     two claims and shipping only the first would be the regression. */
+  it("draws a contact's real face where they have one, and the initial where they don't", async () => {
+    door.links = [
+      {
+        id: "l1",
+        accountId: "acct-bergman",
+        personAccountId: "p1",
+        personName: "Marta Nilsson",
+        // ONE OF THE 31. A `/media/...` path is what the door hands back — the
+        // same shape `Account.logoUrl` carries and `STORED_FILES` claims.
+        personLogoUrl: "/media/accounts/p1/logo.jpg",
+        relationship: null,
+        isMainStakeholder: true,
+        active: true,
+      },
+      {
+        id: "l2",
+        accountId: "acct-bergman",
+        personAccountId: "p2",
+        personName: "Otto Berg",
+        personLogoUrl: null,
+        relationship: null,
+        isMainStakeholder: false,
+        active: true,
+      },
+    ]
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", accountId: "acct-bergman" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("Raised by")
+      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
+      return r
+    })
+    // R40's own oracle, read the way that law reads it: the bytes reach a person
+    // through a real `src`, not through a value parked in the form. Asserting on
+    // the `<img>` rather than on the option object is the whole point — the
+    // field was on the row and rendered by nothing for two days.
+    const marta = within(row).getByRole("button", { name: /Marta Nilsson/ })
+    const photo = marta.querySelector("img")
+    expect(photo, "the contact's photograph never reached the screen").toBeTruthy()
+    expect(photo?.getAttribute("src")).toContain("/media/accounts/p1/logo.jpg")
+    // AND THE BOX IS STILL THE PERSON'S — a picture must not quietly become a
+    // square the way a client's mark is.
+    expect(marta.querySelector(".rounded-pill")).toBeTruthy()
+
+    // …AND THE UNPHOTOGRAPHED COLLEAGUE BESIDE HER KEEPS THE LETTER TILE, which
+    // is the half `face` buys and the half a "just pass the picture" change
+    // would have dropped.
+    const otto = within(row).getByRole("button", { name: /Otto Berg/ })
+    expect(otto.querySelector("img"), "an invented picture for a contact who has none").toBeNull()
+    expect(otto.querySelector(".bg-muted")?.textContent).toBe("O")
   })
 })

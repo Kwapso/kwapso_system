@@ -107,6 +107,47 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     PORTAL_SUBSCRIPTIONS
   )
 
+  /* ── WHAT A PINNED TOOLBAR ON THIS DOOR PINS BELOW (R63) ──────────────────
+   *
+   * Client ruling, 2026-09-10: "on scroll down, i also want the toolbar to be
+   * on top all time visible. everywhere." A collection's search box on this
+   * door wears `PINNED_TOOLBAR` (shared/web/pinned-chrome.ts) exactly as the
+   * agency door's four toolbars do, and reads its own `top` from
+   * `--pinned-chrome-h`. On the agency door that number is a tab strip's own
+   * token geometry. Here it is THIS header — the one thing already stuck to
+   * the top of the document — and a header of buttons has no such geometry: it
+   * is as tall as the account switcher, the two menus and the sign-out button
+   * happen to be, in whichever of the four languages the reader chose.
+   *
+   * SO IT IS MEASURED, HERE, ONCE, and published onto the shell root that
+   * every screen below inherits from. A `ResizeObserver` rather than a layout
+   * effect that runs once: the height moves when a language changes, when a
+   * long company name wraps the switcher, and when the browser's own font
+   * finishes loading — and a toolbar pinned to a stale number sits over the
+   * header or leaves a stripe of page under it, which are both worse than not
+   * pinning. Published as a CUSTOM PROPERTY rather than pushed down as a prop,
+   * because a collection's search box is several layers below this file and
+   * nothing between them has any business carrying a number about a header.
+   *
+   * Declared above every early return below, because a hook cannot sit after
+   * one — the refs simply stay null on the branches that draw no shell. */
+  const shellRef = React.useRef<HTMLDivElement>(null)
+  const headerRef = React.useRef<HTMLElement>(null)
+  React.useEffect(() => {
+    const shell = shellRef.current
+    const header = headerRef.current
+    if (!shell || !header) return
+    const publish = () =>
+      shell.style.setProperty("--pinned-chrome-h", `${Math.round(header.getBoundingClientRect().height)}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(header)
+    return () => observer.disconnect()
+    // `session.state` is the only thing that decides whether the shell (and so
+    // the header) is drawn at all — every other branch above returns a screen
+    // with neither ref in it.
+  }, [session.state])
+
   // THE APP IS STARTING. Not one screen's own wait — nothing is drawn yet and
   // nothing is known yet, including whether there is anything here for this
   // person — so it wears the mark the front door opens on rather than a spinner
@@ -172,7 +213,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
     // screens, and every dialog opened from them. `session.user.language` is
     // already resolved by the time this paints, so there is no flash of English.
     <LanguageProvider value={session.user?.language}>
-    <div className="flex min-h-[100svh] flex-col">
+    <div ref={shellRef} className="flex min-h-[100svh] flex-col">
       {/* THE STICKY HEADER'S EDGE IS AN INSET SHADOW (kit §2.7). It is
           load-bearing rather than decorative: this bar is `sticky` over
           scrolling content, and without an edge the page slides under it with
@@ -189,7 +230,7 @@ export function PortalShell({ children }: { children: (ready: PortalReady) => Re
           `var(--border)` does not.
           NOT a paper step, either: a sticky bar in a second tone reads as a
           banner the page is missing rather than as the top of the page. */}
-      <header className="bg-background sticky top-0 z-30 shadow-[var(--hairline-under-strong)]">
+      <header ref={headerRef} className="bg-background sticky top-0 z-30 shadow-[var(--hairline-under-strong)]">
         <div className="mx-auto flex w-full min-w-0 max-w-3xl items-center gap-2 overflow-hidden px-5 py-3">
           <AccountSwitcher
             accounts={session.accounts}
