@@ -361,7 +361,38 @@ function query(db, sql) {
  * Returns `{ code, message }`: 0 and a line to print, or 1 and the refusal.
  */
 export function verdict({ envName, origin, db, latest, teams, waivers, today }) {
-  const behind = teams.filter((t) => t.schema_version !== latest)
+  // ── BEHIND AND AHEAD ARE NOT THE SAME FACT, and this compared with `!==` ───
+  //
+  // A team whose version DIFFERS from the code's was called "behind" whichever
+  // direction it differed in, and the refusal then printed the migration robot
+  // as the remedy. When the estate is AHEAD that remedy cannot work, and cannot
+  // be made to work by repeating it: the robot applies the migration list
+  // bundled into the DEPLOYED tenancy worker, so a migration the code has never
+  // heard of is not "missing" — it looks, finds nothing to do, and reports
+  // success while the gate keeps refusing. A loop with a confident sentence at
+  // both ends.
+  //
+  // Met on 10 Sep 2026: staging's teams were at 0072 and this working tree's
+  // last migration was 0071, because a colleague applied a migration to the
+  // SHARED staging estate from a branch that was never merged (LANE-COMMON's
+  // "NEVER APPLY A MIGRATION TO A SHARED DATABASE", which is written down
+  // precisely because it had happened before). The deploy was blocked with a
+  // remedy that could not unblock it.
+  //
+  // Versions sort lexically by construction — every one is `NNNN_name` with a
+  // zero-padded number — so the direction is readable without parsing.
+  //
+  // AHEAD IS SAFE TO DEPLOY, and that is a claim with a mechanism behind it
+  // rather than a shrug: `migrateTeams` computes `missing = TEAM_MIGRATIONS −
+  // applied`, so a version it does not know about is simply not in the set it
+  // iterates and cannot be re-applied; and code at 0071 does not read a column
+  // 0072 added. The extra column sits there unused. What is NOT safe is the
+  // silence — somebody has a migration live on a shared estate from unmerged
+  // code — so this says so every single run, loudly, and still lets the deploy
+  // through. A gate that refuses what is safe teaches people to bypass gates.
+  const older = (a, b) => String(a ?? "") < String(b ?? "")
+  const behind = teams.filter((t) => older(t.schema_version, latest))
+  const ahead = teams.filter((t) => older(latest, t.schema_version))
 
   // The rot check runs BEFORE the verdict. A waiver is a claim about the estate,
   // and a claim that has stopped being true is worse than no claim: it reads as a
@@ -410,6 +441,32 @@ export function verdict({ envName, origin, db, latest, teams, waivers, today }) 
   }
 
   const alsoWaived = waived.size ? `, ${waived.size} waived` : ""
+
+  // AHEAD PASSES, AND SAYS SO EVERY RUN. See the long note at the top of this
+  // function: the deploy is safe, the situation is not, and the two sentences
+  // are different. Named teams and named versions, because "somebody" and
+  // "a migration" are not something anybody can act on.
+  if (ahead.length) {
+    const versions = [...new Set(ahead.map((t) => t.schema_version))].sort()
+    return {
+      code: 0,
+      message:
+        `OK, WITH A WARNING: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${db}${alsoWaived}.\n\n` +
+        `  ${ahead.length} team${ahead.length === 1 ? " is" : "s are"} AHEAD of this working tree.\n` +
+        `    this tree's last migration : ${latest}\n` +
+        `    the estate is at           : ${versions.join(", ")}\n` +
+        ahead.map((t) => `    • ${t.name} (${t.id}) at ${t.schema_version}`).join("\n") +
+        `\n\n  A migration is LIVE on a shared database from code that is not merged.\n` +
+        `  The deploy is allowed: the robot only applies migrations the deployed\n` +
+        `  worker carries, so it cannot re-apply one it has never heard of, and\n` +
+        `  code at ${latest} does not read a column a later one added.\n` +
+        `  Do NOT run the migration robot to "fix" this — it will report success\n` +
+        `  and change nothing. The fix is to merge the branch that owns those\n` +
+        `  migrations. See .session-notes/lanes/LANE-COMMON.md, "NEVER APPLY A\n` +
+        `  MIGRATION TO A SHARED DATABASE".`,
+    }
+  }
+
   return {
     code: 0,
     message: `OK: ${teams.length} live team${teams.length === 1 ? "" : "s"} in ${db} at ${latest}${alsoWaived}.`,
