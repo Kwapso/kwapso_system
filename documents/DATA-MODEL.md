@@ -1127,9 +1127,17 @@ review did on 5 Sep 2026. A conversation that can be edited afterwards is not a
 record of what was asked and answered, which is the only thing these rows are
 for. Correcting a turn means adding another one.
 
-### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest. KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors` + `0022_knowledge_files`). THE KNOWLEDGE BASE
+### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest + knowledge_sightings + knowledge_names + knowledge_chunks_fts. KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors` + `0022_knowledge_files`; rebuilt 10 Sep 2026, `0073_the_knowledge_base_is_rebuilt` + `0074_cards_and_the_fence_land_together` + `0075_the_fence_the_fold_cannot_ship_without` + `0076_the_source_gets_its_own_team_visible`, .plans/BUILD-5-knowledge-rebuild.md). THE KNOWLEDGE BASE
 One knowledge base, many **compartments**, chosen for the reader rather than by
-them. Four tables, one per job:
+them. Seven tables, one per job. **The three newest carry no live traffic yet**:
+0073–0076 laid the schema the rebuild's ingest/index/retrieval lanes build on,
+and as of 10 Sep 2026 nothing in the running app writes `identity_key`,
+`knowledge_sightings`, `knowledge_names`, `knowledge_chunks_fts`, `generated_only`
+or `team_visible` — the columns and tables exist, the one-time migration
+backfill gave them a correct starting value, and the write paths that keep
+them current are separate, in-progress lanes. Said here because a schema that
+exists and a capability that works are two different sentences, and this
+document has been the one to conflate them before.
 
 - **`knowledge_sources`**, one row per piece of material the assistant may read.
   Three families in one table, because a person edits them in one list: a `note`
@@ -1193,6 +1201,51 @@ them. Four tables, one per job:
   app) deactivates itself the same way, because the readers now RETURN those rows
   marked `retired` rather than filtering them out, which is what stopped an
   archived ticket answering questions forever.
+
+  **Six columns from the 10 Sep 2026 rebuild (0073, 0074, 0076).**
+  `identity_key` is ONE identity per real-world thing — Google's own file/
+  message/event id, or a content hash for an upload — with the READER who
+  saw it stripped out, so the same Drive folder shared with two colleagues
+  files ONCE rather than once per person (the fault the rebuild exists to
+  close: a Google source's key used to be `<readerId>:<externalId>`, so two
+  people's sight of one folder was two rows, each chunked, embedded and
+  stored separately). A UNIQUE INDEX enforces it, partial on `identity_key IS
+  NOT NULL` because a typed note has no external identity and every NULL is
+  its own value to SQLite. Who saw a de-duplicated source, where, and
+  whether they still can moved to `knowledge_sightings`, below — a second
+  reader is now a second SIGHTING, never a second source. `accounts`/`apps`
+  are JSON arrays (additive beside the pre-existing singular `account_id`/
+  `app_id`): a shared Drive file or a chat thread can concern more than one
+  account or app at once, which a single reference column could not say.
+  `shared_with` ('private' / 'agency' / 'agency_client') answers who may
+  READ a source once it is in, a different question from `owner_user_id`'s
+  "whose personal connection surfaced it" — defaults to 'agency', matching
+  Gmail's own default of being shared with the whole agency.
+  `relevancy_date` is happened-at for a frozen thing (a meeting, a sent
+  email) or last-change for a living one (a Drive doc, a ticket mirror);
+  which of a source's several dates that resolves to is an ingest decision,
+  not something the column itself enforces. `generated_only` is a source
+  saying it produced nothing beyond the sentence the app wrote for it — a
+  card, findable but never quotable (KB-AUDIT.md §4.3: a person/account/
+  contact stub winning a passage slot over somebody's actual words). It has
+  to be set by the READER, at ingest, because building the body is what
+  destroys the fact: once free text and a generated sentence are joined into
+  one string they are indistinguishable, and a census run later (measured:
+  1,309 false-positive tickets) or a kind-level flag (measured: every kind
+  the audit named has a reader that folds in real free text; only 22 of
+  3,933 sources fold none at all) both failed to recover it. `team_visible`
+  is the fence's TEAM half (below) — see `knowledge_chunks`.
+
+  **As of 10 Sep 2026 none of these six is written by the running app.** The
+  columns exist and the rebuild migrations gave every existing row a correct
+  starting value (0074/0076's backfill sets `team_visible` from the
+  `owner_user_id` this base already had; `generated_only` and `identity_key`
+  default to the behaviour that already existed). The ingest/index/retrieval
+  lanes that read and write them for real are separate, later work
+  (BUILD-5-knowledge-rebuild.md's Lanes B–D); `knowledge-identity.ts`
+  (`workers/content/src/lib/`) has the types and pure functions
+  (`identityKey`, `readableBy`, `stillLive`) these lanes build on, and holds
+  no database call of its own yet.
 - **`knowledge_chunks`**, a readable piece of a source: what retrieval scores
   and what an answer cites. Its id is DERIVED (`<sourceId>:<seq>`, zero-padded),
   which is what lets a vector be overwritten or deleted without a lookup table
@@ -1201,12 +1254,96 @@ them. Four tables, one per job:
   the search reads. Vectorize is, and it is kept for two jobs the index cannot
   do: rebuilding the index without paying to re-embed everything, and answering
   at all when no index is bound. NULL means "not embedded yet", which retrieval
-  survives by falling back to the word index alone.
-- **`knowledge_terms`**, the inverted index, as an ORDINARY indexed table rather
-  than an FTS5 virtual one. Deliberate, and the reason is the DELETE: a re-index
-  removes a source's postings, and on FTS5 that is a scan of every posting in the
-  team, while here it is one keyed delete. It also behaves identically in the
-  test harness and in D1, which a virtual table kept in step by triggers does not.
+  survives by falling back to the word index alone. **`context_line` / `speaker`
+  / `said_at`** (0073) are chat/meeting grain: `context_line` is a cheap
+  model's sentence situating a chunk in its document (chunk 47 of a transcript
+  otherwise has no idea which meeting it is from); `speaker`/`said_at` are the
+  per-message identity a run-of-messages chunk carries, both NULL for an
+  ordinary document chunk. **`team_visible`** (0075) denormalises the TEAM half
+  of `readableBy`'s two conditions (some live sighting on the 'team' shelf) onto
+  the row retrieval's stage-one read actually touches — needed the moment 0073
+  let one source carry several people's sightings, because a single
+  `owner_user_id` can no longer answer for a folded source (whichever sighting
+  wrote it last would silently decide everyone else's visibility too). **It is
+  a NARROWING AID, never the authoritative answer**: the real fence is
+  `readerClause = ownerClause AND appClause` (`workers/content/src/lib/knowledge.ts:602`)
+  — three settings, not two (private/`owner_user_id`, app/`visible_to_app_id`,
+  team) — and the app half is only ever decided by the read-back JOIN to
+  `knowledge_sources`, the same R26 argument this file already makes about the
+  vector index: the flag narrows, the team's database decides. Keeping it
+  correct after a fold — recomputed on every write that touches a sighting's
+  `shelf`/`gone_at`, in the same statement or transaction, never a trigger (this
+  repo's migration executor cannot run one at all, and the source of truth here
+  is another table's SET of rows regardless) — is the write path's job, not yet
+  built as of 10 Sep 2026.
+- **`knowledge_terms`**, the inverted index. Was an ORDINARY indexed table
+  rather than an FTS5 virtual one, and the original reason (2026-08-11) was
+  the DELETE: a re-index removes a source's postings, which on a
+  TRIGGER-synced FTS5 table sounded like a scan of every posting in the team
+  against one keyed delete here, and a trigger-kept-in-step table behaves
+  differently in the test harness than in D1. That reasoning held for a
+  trigger-synced table — which, per SEARCH.md, cannot actually be built
+  through this repo's own migration executor at all — and stopped holding
+  once EXTERNAL-CONTENT mode was tried for real: `knowledge_chunks_fts`,
+  below, gets the same keyed delete this table was built to have, kept in
+  step by application code exactly like this one, behaving identically under
+  `node:sqlite` and real D1 because nothing about it is trigger-synced. This
+  table has no IDF and no length normalisation (KB-AUDIT.md §4.4) — the
+  schema for its BM25 replacement exists; **as of 10 Sep 2026 this table is
+  still what retrieval actually reads**, wiring the new one in is later
+  work. `team_visible` (0075) is the owner half only, deliberately: no
+  app-tier column is denormalised here, the same asymmetry `owner_user_id`
+  already has on this table, defended in `readerClause`'s own doc comment —
+  a restricted chunk may reach the candidate pool through its terms and cost
+  a relevant passage its ranking slot, but it cannot reach an answer, because
+  the chunk-level join still applies the full fence before anything is read
+  back.
+- **`knowledge_sightings`** (0073). ONE PERSON'S SIGHT OF ONE THING, from one
+  place: `source_id`, `seen_where` (which folder/mailbox/space — a plain
+  ingest-defined string, not an FK, because no one table spans Drive/Gmail/
+  Calendar/Chat), `seen_by_user_id` (NOT NULL — a sighting is by definition
+  somebody's own sight of something; material nobody personally saw has ZERO
+  sighting rows, not one anonymous one, and keeps reading its visibility off
+  the source row as it always did), `shelf` ('private' | 'team', CHECK-
+  constrained), and `gone_at` (NULL while they can still see it, stamped —
+  never deleted — the moment they stop: un-shared, left the space, left the
+  team). UNIQUE on `(source_id, seen_where, seen_by_user_id)`: the same
+  person seeing the same source from a DIFFERENT place is a second real
+  sighting worth keeping (a shared Drive folder and a direct email share of
+  the same file are different provenance), not a duplicate — which is why
+  `seen_where` sits inside the key rather than beside it. As of 10 Sep 2026
+  this table is empty on every team; nothing writes to it yet.
+- **`knowledge_names`** (0073). The account/app/contact/colleague ALIAS
+  INDEX, meant to replace `accountNamedIn`'s single-token account-name
+  matching (KB-AUDIT.md §4.2 — "VU Solutions" hijacking any question
+  containing the word "solutions"). `kind` + `ref_id` name the real entity;
+  `name` is one spelling of it (canonical, an alias, or a misspelling);
+  `alias_of` is NULL on the canonical name and the canonical name's own text
+  on every alias; `compartment` is the same fence every other knowledge table
+  carries, so a lookup can never leak which accounts exist across a fence it
+  has no right to see. UNIQUE on `(kind, ref_id, name)`. As of 10 Sep 2026
+  this table is empty; alias GENERATION is separate, later work.
+- **`knowledge_chunks_fts`** (0073). BM25 over chunk text, FTS5,
+  EXTERNAL-CONTENT mode (`content='knowledge_chunks', content_rowid='rowid'`
+  — no text of its own, only postings keyed to the base table's rowid). NO
+  TRIGGERS: `shared/workers/d1-rest.ts`'s migration executor
+  (`d1ExecScript`/`splitStatements`) splits a script on every un-quoted `;`
+  with no `BEGIN`/`END` awareness, so a trigger body's internal semicolons
+  read as statement boundaries and shatter a `CREATE TRIGGER` into broken
+  fragments the moment `migrateTeams` applies it for real — a green
+  `node:sqlite` test would have proved the opposite of the truth. Kept in
+  step by application code instead: an ordinary `INSERT` on write, and a
+  KEYED `'delete'` command (by rowid, the row's own old values) on removal —
+  the exact fix `knowledge_terms`'s original design wanted and could not
+  build with the tool it had. Emptying the whole table uses FTS5's own
+  `'delete-all'`, never a bare `DELETE`: measured, a plain `DELETE FROM` issued
+  once the base rows are already gone throws nothing and removes nothing,
+  leaving stale postings a reused rowid can resurrect; reading the result back
+  uses `'integrity-check'`, never a row count (an external-content table's own
+  `SELECT` reads through `content_rowid` to the base table, so it reports
+  whatever THAT says regardless of the postings' real state). As of 10 Sep
+  2026 this table holds whatever existed at migration time and nothing since
+  — retrieval still reads `knowledge_terms`, above.
 - **`knowledge_ingest`**, one row per source KIND: the cursor it reached, when it
   last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12). The
   cursor is what makes ingestion resumable, a tick that dies halfway costs the
@@ -1241,8 +1378,9 @@ filter somebody wrote correctly today. That objection is answered rather than
 dropped, and both halves are Law R26: a namespace is a PARTITION Vectorize
 applies before the search, not a filter; and nothing readable ever comes out of
 the index, it is asked for ids and scores alone, and every passage in every
-answer is read back out of THIS database, under the caller's own owner clause,
-with excluded sources gone. The vector store narrows; the database decides. The
+answer is read back out of THIS database, under the caller's own full fence
+(`readerClause` — owner AND app, `knowledge.ts:602`), with excluded sources
+gone. The vector store narrows; the database decides. The
 full argument, and what would change our mind, is at the top of
 `workers/content/src/lib/knowledge-vectors.ts`; the numbers that forced the move
 are in `.plans/BUILD-4-knowledge-retrieval.md`.
