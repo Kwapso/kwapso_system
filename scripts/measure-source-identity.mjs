@@ -101,11 +101,16 @@ for (const team of teams) {
       WHERE deactivated_at IS NULL AND origin_row_id IS NOT NULL AND origin_table LIKE 'google_%'
       ORDER BY id LIMIT 20000`
   )
+  console.log(`${team.name} (${team.database_id})`)
   if (!rows.length) {
-    console.log(`${team.name}: no live Google sources\n`)
+    // No Google material is not "nothing to measure": a base full of the app's
+    // own records can still repeat itself, and the sameness half below is the
+    // half that would say so.
+    console.log("  no live Google sources")
+    await sameness(team)
+    console.log("")
     continue
   }
-  console.log(`${team.name} (${team.database_id})`)
 
   const byService = new Map()
   for (const r of rows) {
@@ -175,5 +180,74 @@ for (const team of teams) {
         ` would fold if the cross-mailbox message header were read (${shared.length} messages, by subject and minute)`
     )
   }
+
+  // ── SAMENESS, WHICH IS A DIFFERENT QUESTION FROM IDENTITY ──────────────────
+  //
+  // Identity asks what a thing IS and folds copies of ONE artefact. Sameness
+  // asks what it SAYS: the Gemini notes file, the meeting it came out of and
+  // the "Notes:" mail Gemini posted to three people are four artefacts that
+  // repeat one set of words, and no id-based key will ever join them.
+  //
+  // The audit (.plans/KB-AUDIT.md §4.1) measured 990 redundant chunk copies of
+  // 9,781 and proposed "dedupe on content hash at ingest ... removes ~10% of
+  // the index". THAT ESTIMATE DOES NOT SURVIVE BEING SPLIT BY LEVEL, which is
+  // what the two counts below are for: a source-level hash reaches only the
+  // sources whose WHOLE text matches, and most of the redundancy sits inside
+  // sources whose whole texts differ. Whoever implements the fix needs to know
+  // which half they are buying before they promise ten per cent.
+  await sameness(team)
   console.log("")
+}
+
+/** How much of the base repeats itself, counted at BOTH levels, because a fix
+ * aimed at one of them cannot collect the other's winnings. */
+async function sameness(team) {
+  const [chunks] = await sql(
+    team.database_id,
+    `SELECT COUNT(*) n FROM knowledge_chunks c
+       JOIN knowledge_sources s ON s.id = c.source_id AND s.deactivated_at IS NULL`
+  )
+  if (!chunks.n) return
+  const [chunkDup] = await sql(
+    team.database_id,
+    `SELECT COALESCE(SUM(n - 1), 0) redundant FROM
+       (SELECT c.text, COUNT(*) n FROM knowledge_chunks c
+          JOIN knowledge_sources s ON s.id = c.source_id AND s.deactivated_at IS NULL
+         GROUP BY c.text HAVING COUNT(*) > 1)`
+  )
+  const [sources] = await sql(
+    team.database_id,
+    "SELECT COUNT(*) n FROM knowledge_sources WHERE deactivated_at IS NULL"
+  )
+  const [sourceDup] = await sql(
+    team.database_id,
+    `SELECT COALESCE(SUM(n - 1), 0) redundant FROM
+       (SELECT content_hash, COUNT(*) n FROM knowledge_sources
+         WHERE deactivated_at IS NULL AND content_hash IS NOT NULL
+         GROUP BY content_hash HAVING COUNT(*) > 1)`
+  )
+  console.log(
+    `  sameness: ${chunkDup.redundant} of ${chunks.n} live chunks are an exact copy of another` +
+      ` (${((100 * chunkDup.redundant) / chunks.n).toFixed(1)}%)`
+  )
+  console.log(
+    `            a SOURCE-level content hash reaches ${sourceDup.redundant} of ${sources.n} sources` +
+      ` (${((100 * sourceDup.redundant) / sources.n).toFixed(1)}%)` +
+      (chunkDup.redundant
+        ? " — the rest of the repetition is inside sources whose whole texts differ, and only a chunk-level key reaches it"
+        : "")
+  )
+  // WHICH DOORS REPEAT EACH OTHER. The pair is what says whether a fold is
+  // expressible as an identity at all: two rows of one kind may be one artefact
+  // seen twice, while two kinds sharing words are two artefacts saying one thing.
+  const pairs = await sql(
+    team.database_id,
+    `SELECT a.kind ka, b.kind kb, COUNT(*) n FROM knowledge_chunks c1
+       JOIN knowledge_sources a ON a.id = c1.source_id AND a.deactivated_at IS NULL
+       JOIN knowledge_chunks c2 ON c2.text = c1.text AND c2.id > c1.id
+       JOIN knowledge_sources b ON b.id = c2.source_id AND b.deactivated_at IS NULL
+      GROUP BY 1, 2 ORDER BY n DESC LIMIT 6`
+  )
+  for (const p of pairs)
+    console.log(`            ${p.ka} + ${p.kb}: ${p.n} shared chunk pairs`)
 }
