@@ -1,5 +1,15 @@
 # COSTS.md — what this app costs to run
 
+**§2's "One knowledge question" revised 2026-09-10** (owner tracker item `g-costs`) —
+BUILD-5-knowledge-rebuild.md's Stage 2 added a SECOND optional spender to the door
+(`read`, the reader that re-reads a shortlist before deciding what is evidence — Kimi
+K2.6, gated and metered exactly like the existing `compose`) alongside the ORIGINAL
+optional spender (`compose`, the answer writer, unchanged). The old figure priced
+embedding + compose only, which was already stale the day `read` shipped and would have
+stayed that way silently. See the section for the measured reader cost and the planner's
+own estimate, written and reviewed BEFORE any planner code exists — the hub's own
+condition for authorising it.
+
 **Written 2026-09-05. Per-action figures revised 2026-09-06**, when the two-stage tool
 catalogue cut what a model step sends by 69.8% and left this file's headline 3.4× too
 high — see §2. The PRICES are unchanged and still as read on 2026-09-05; what moved is
@@ -207,15 +217,118 @@ At 500 imports/month: **$5.80/month.**
 
 ### One knowledge question
 
+**THE ONLY PART THAT ALWAYS RUNS** — retrieval itself, no model decision, no spend
+gate — is the embedding and the index query. Everything below it is OPTIONAL, asked
+for by a query parameter (`read=1`, `compose=1`), gated on `agent:create` and metered
+through `consumeAiUnit` (`payToRead`/`payToWrite`, `routes/knowledge.ts`) — a caller
+that asks for neither spends only the line below.
+
 ```
 question embedding        ~20 tok × $0.012/M          = $0.0000002
 Vectorize, two-stage      2,048 dims × $0.01/M        = $0.0000205
-composed answer (only when `compose` is set, ANSWER_MAX_TOKENS = 900):
-  ~4,000 in × $0.270/M + 900 out × $0.850/M           = $0.0018450
-                                             TOTAL   ≈ $0.0019
+                                    ALWAYS-ON TOTAL  ≈ $0.00002
 ```
 
-**57× cheaper than an agent turn**, which is exactly what the two-model design intended.
+**`read=1` — the reader (BUILD-5 §5-6, Kimi K2.6). MEASURED, not estimated**: the
+system prompt and a 12-passage shortlist (`READER_SHORTLIST_CAP`, the fan-out's own
+ceiling) built from the SHIPPED prompt functions
+(`workers/content/src/lib/knowledge-reader.ts`), character-counted with no model call —
+the same method `scripts/measure-preamble.mjs` uses for the assistant's own preamble,
+at this file's own chars-per-token ratio (§2's preamble measurement, 3.82):
+
+```
+system prompt          1,261 chars  (~330 tok)
+12-passage shortlist   8,430 chars  (~2,207 tok)   — READER_SHORTLIST_CAP × up to READER_PASSAGE_CHARS (600) each
+                                          INPUT   ≈ 2,537 tok
+output ceiling                              200 tok   (READER_MAX_TOKENS)
+
+cost   2,537 × $0.950/M + 200 × $4.000/M = $0.002410 + $0.000800 = $0.0032   (worst case, full shortlist)
+```
+
+A thinner shortlist costs proportionally less — a typical 6-passage read is roughly
+half the input, ≈$0.0018.
+
+**`compose=1` — the writer (R23, `llama-4-scout`). Unchanged from the prior figure**:
+
+```
+composed answer (ANSWER_MAX_TOKENS = 900):
+  ~4,000 in × $0.270/M + 900 out × $0.850/M           = $0.0018450
+```
+
+**FOUR SHAPES A QUESTION CAN TAKE, and the door lets a caller ask for any of them:**
+
+| shape | spend | cost |
+|---|---|---|
+| retrieval only (neither flag) | 0 AI units | ≈ $0.00002 |
+| `read=1` alone | 1 unit | ≈ $0.0032 |
+| `compose=1` alone (today's Knowledge tab, and every MCP call before 10 Sep) | 1 unit | ≈ $0.0018 |
+| `read=1` AND `compose=1` (a full "re-read, then write" turn) | **2 units** | ≈ $0.0050 |
+
+**TWO UNITS IS CORRECT, NOT A BUG TO FIX.** The allowance is metered in REQUESTS
+(`shared/workers/credits.ts`'s own opening line: "allowance of AI requests"), and
+reading the shortlist
+and writing the answer are two separate model calls whichever door reaches them —
+charging one for both would be under-metering, the exact hole this cost file exists to
+close. Still **2.6× cheaper than an agent turn** even at the most expensive shape
+(`$0.0050` vs `$0.0368`), which is what the two-model design intended and remains true
+with the reader added.
+
+### With the planner — ESTIMATED, not measured, and not yet built
+
+BUILD-5's loop adds a THIRD optional spender: a planner that decides whether a question
+needs decomposing into more than one search (`plan`, hard-capped at 12 fan-out
+branches). No code exists yet — this is the arithmetic the hub asked for BEFORE it does,
+because the shape of the number is a design input, not a report card.
+
+```
+IF every question ran the planner:
+  read + compose + plan  = 3 AI units/question
+  at the $0.0050 two-unit figure above, a THIRD model call of similar
+  size to the reader's system-prompt-only overhead (no shortlist to read yet —
+  the planner sees only the question) — call it ~400 in / 150 out tokens:
+    400 × $0.950/M + 150 × $4.000/M = $0.00038 + $0.00060 = $0.0010
+  THREE-UNIT TURN  ≈ $0.0060                                    (+20% over two units)
+```
+
+**That 20% is the number that matters, and it is why the planner ships with a
+heuristic fast path (hub condition, 10 Sep 2026): an ordinary, single-topic question
+must never pay for a decomposition it did not need.** Most questions — the whole
+measured corpus of "chatty near-miss" questions this suite's own fixtures use — are one
+topic, one search; only a genuinely multi-hop or ambiguous question needs more than one
+branch. **If the fast path holds, the planner's real-world cost is closer to 0% of
+questions paying the third unit than 100%**, and the $0.0060 figure above is a CEILING
+a caller almost never actually pays — the same shape `MAX_STEPS`'s worst-case agent-turn
+figure ($0.174) already is against the typical one ($0.0368). Re-measure this the day
+the planner ships and the heuristic's real hit rate is known; until then, treat the
+ceiling as the number to budget against and the typical case as unknown.
+
+**A MONTHLY PROJECTION, at the same 20,000-questions/month estimate §2's tenant table
+already uses, three ways:**
+
+| shape everyone used | monthly cost | vs the old ($0.0019/question, $38/mo) figure |
+|---|---|---|
+| retrieval only | $0.40 | −99% (the old figure priced `compose` as always-on; a caller asking for neither flag was never actually this cheap in the old arithmetic) |
+| `compose=1` only (today's real usage) | $36 | −5% (rounding — this is the shape the old figure actually described) |
+| `read=1` + `compose=1`, every question | $100 | **2.6× the old figure** |
+| …if the planner's ceiling were paid by every question too | $120 | **3.2× the old figure** |
+
+**The 2.6×/3.2× multipliers are the headline finding of this section.** They are not a
+reason to withhold the reader (KB-AUDIT.md §3's own measured case — a paraphrase
+refused with the right document as the #1 nearest neighbour — is the more expensive
+failure), but they are the number that should be in front of whoever sets `read=1`'s
+default and decides whether the assistant's own knowledge-base calls should ask for it
+on every turn or only when a first pass refuses. That default is not this lane's to
+set — flagged here so the decision is made with the arithmetic in view rather than
+found later in a bill.
+
+**Still cheaper than an agent turn at every shape, though the margin is no longer
+one number.** Against the typical 3-step turn (`$0.0368`): retrieval alone is ~1,840×
+cheaper, `compose` or `read` alone are 11-20× cheaper, and the most expensive shape —
+`read` AND `compose` together — is still **7.4× cheaper** (`$0.0050` vs `$0.0368`), or
+**6.1×** even at the planner's own estimated ceiling (`$0.0060`). The two-model design's
+core saving holds throughout; what has changed is that "a knowledge question" is no
+longer one number, it is four (five once the planner ships), and the caller's own query
+parameters pick which one applies.
 
 ### A month, per tenant
 
@@ -228,10 +341,16 @@ measurement): 1,000 signups, 500 imports, 20,000 assistant replies per month.
 | …if every reply hit `MAX_STEPS` | 20,000 × $0.1740 | $3,480 |
 | imports | 500 × $0.0116 | $5.80 |
 | signup emails | 1,000 × $0.0004 | $0.40 |
-| knowledge questions (say 20,000) | 20,000 × $0.0019 | $38 |
+| knowledge questions (say 20,000) — TODAY'S SHAPE, `compose=1` as the norm | 20,000 × $0.0018 | $36 |
 | plan base | — | $5 |
 | everything else (requests, D1, R2, DO) | inside the included allowances at today's volume — see §4 | $0 |
-| | | **≈ $785/month** |
+| | | **≈ $783/month** |
+
+**The knowledge-questions row is one of four possible numbers, not one** — see "With
+the planner" above for the full table (retrieval-only $0.40/mo up to $120/mo if every
+question paid for the reader, the writer AND the planner's ceiling). $36 is kept as the
+headline because it is today's actual shape (`compose=1`, no `read` or `plan` default
+turned on anywhere yet); the day a default changes, this row changes with it.
 
 **One line is 94% of the bill** — it was 98% and $2,235/month on the pre-split preamble.
 Any cost work that is not about the assistant is still rounding, but the preamble is no
