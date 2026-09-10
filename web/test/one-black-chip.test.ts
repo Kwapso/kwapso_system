@@ -106,42 +106,84 @@ const INVERSE_BADGE_OK: Record<string, string> = {
  * main's own edits (the reviewer row, the screen-recording row, a page of
  * stories leaving the words of the work behind) landed ABOVE these lines in
  * five files. The reasons are unchanged — only the addresses are. */
-const REF_AS_STRING_OK: Record<string, string> = {
-  "web/lib/picker-sources.ts:70":
-    "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
-    "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
-    "its name from this one field. A ticket option leads with its number " +
-    "because that is what somebody types to find it.",
-  "web/lib/picker-sources.ts:89": "same slot, a story option — see the ticket one above.",
-  "web/components/work/stories-screen.tsx:154":
-    "the ticket picker on the story form, building the same `PickerOption.label` " +
-    "the two lines in picker-sources.ts build.",
-  "web/components/tickets/help-detail.tsx:973":
-    "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
-    "entry is being logged against, inside sentences and a dialog title, not on " +
-    "a row of its own. (Re-pinned from :931 to :945 on 7 Sep 2026 when the " +
-    "activity rail landed above this line, to :909 later the same day when " +
-    "the `awaiting_validation` retirement took the confirm button and the " +
-    "`run` helper it was the last caller of out of this file, and to :973 on " +
-    "10 Sep 2026 when round_trip_review's cold-deep-link fix added comment " +
-    "lines above it.)",
-  "web/components/tickets/help-detail.tsx:1116":
-    "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
-    "string slot as picker-sources.ts, for the ticket the form is pinned to. " +
-    "(Re-pinned from :1074 to :1088 and then to :1052 on 7 Sep 2026, both times " +
-    "riding the same edits as :909 above, and to :1116 on 10 Sep 2026 for the " +
-    "same reason as :973 above.)",
-  "web/components/work/story-detail.tsx:445":
-    "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:931.",
-  "web/components/work/sprints-screen.tsx:523":
-    "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
-    "the chip would be wrong even if the slot allowed it: a day cell is a few " +
-    "characters wide and a lozenge in it is furniture, not information.",
-  "web-portal/components/delivery-block.tsx:79":
-    "A REACT LIST KEY (`id:`), never rendered — the client reads `s.name` and " +
-    "the dates on that row. Kept as the key because a sprint's reference is the " +
-    "stablest thing about it.",
-}
+/** THE SLOTS THAT GENUINELY CANNOT HOLD A CHIP, keyed by WHAT THE LINE SAYS
+ * rather than by which line it is.
+ *
+ * It was `path:line` until 2026-09-10, and the reasons had turned into a
+ * changelog of its own maintenance: help-detail.tsx alone was re-pinned from
+ * :931 to :945 to :909 to :973 to :995 in four days, and its sibling from :1074
+ * to :1088 to :1052 to :1116 to :1138, every time by somebody who had come to
+ * this file to do something else entirely. A pin that moves whenever an
+ * UNRELATED line is added above it does not identify a call site — it
+ * identifies a position, and the position is not what was reviewed. Twice in
+ * one session it turned a green branch red for no reason a reader could act on.
+ *
+ * A `contains` fragment is checked against the offending line itself, so it
+ * moves with the code and dies with it. Ambiguity is the thing a substring can
+ * newly get wrong, so it is asserted away below: a fragment matching two sites
+ * in its file fails, because otherwise one reviewed exemption could silently
+ * cover a second site nobody ever looked at. */
+type RefAsString = { file: string; contains: string; why: string }
+
+const REF_AS_STRING_OK: RefAsString[] = [
+  {
+    file: "web/lib/picker-sources.ts",
+    contains: "label: t.ref ?",
+    why:
+      "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
+      "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
+      "its name from this one field. A ticket option leads with its number " +
+      "because that is what somebody types to find it.",
+  },
+  {
+    file: "web/lib/picker-sources.ts",
+    contains: "label: s.ref ?",
+    why: "same slot, a story option — see the ticket one above.",
+  },
+  {
+    file: "web/components/work/stories-screen.tsx",
+    contains: "label: t.ref ?",
+    why:
+      "the ticket picker on the story form, building the same `PickerOption.label` " +
+      "the two lines in picker-sources.ts build.",
+  },
+  {
+    file: "web/components/tickets/help-detail.tsx",
+    contains: "recordLabel={[ticket.ref",
+    why:
+      "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
+      "entry is being logged against, inside sentences and a dialog title, not on " +
+      "a row of its own.",
+  },
+  {
+    file: "web/components/tickets/help-detail.tsx",
+    contains: "label: [ticket.ref",
+    why:
+      "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
+      "string slot as picker-sources.ts, for the ticket the form is pinned to.",
+  },
+  {
+    file: "web/components/work/story-detail.tsx",
+    contains: "recordLabel={story.ref ?",
+    why: "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx above.",
+  },
+  {
+    file: "web/components/work/sprints-screen.tsx",
+    contains: "title: s.ref ?",
+    why:
+      "`CalendarEntry.title` is typed `string`, and a month grid is the one place " +
+      "the chip would be wrong even if the slot allowed it: a day cell is a few " +
+      "characters wide and a lozenge in it is furniture, not information.",
+  },
+  {
+    file: "web-portal/components/delivery-block.tsx",
+    contains: "s.ref ?? s.name",
+    why:
+      "A REACT LIST KEY (`id:`), never rendered — the client reads `s.name` and " +
+      "the dates on that row. Kept as the key because a sprint's reference is the " +
+      "stablest thing about it.",
+  },
+]
 
 
 /** THE FILE'S LINES WITH EVERY COMMENT REMOVED AND NOT ONE LINE LOST, so a
@@ -192,7 +234,9 @@ describe("one black chip, one reference", () => {
 
   it("a reference is never glued into the name beside it", () => {
     const offenders: string[] = []
-    const used = new Set<string>()
+    /** Which sites each exemption actually covered — the input to BOTH rot
+     * checks below: none is a dead line, more than one is an ambiguous one. */
+    const hits = new Map<RefAsString, string[]>()
     for (const file of sourceFiles(ROOTS, {
       extensions: [".ts", ".tsx"],
       skipTests: true,
@@ -209,8 +253,11 @@ describe("one black chip, one reference", () => {
         if (!/\.ref\b/.test(line)) return
         if (!REF_INTERPOLATED.test(line) && !REF_JOINED.test(line)) return
         const at = `${file.rel}:${i + 1}`
-        if (REF_AS_STRING_OK[at]) {
-          used.add(at)
+        const excused = REF_AS_STRING_OK.filter(
+          (e) => e.file === file.rel && line.includes(e.contains)
+        )
+        if (excused.length > 0) {
+          for (const e of excused) hits.set(e, [...(hits.get(e) ?? []), at])
           return
         }
         offenders.push(`${at}  ${line.trim()}`)
@@ -224,11 +271,23 @@ describe("one black chip, one reference", () => {
         offenders.join("\n  ")
     ).toEqual([])
 
-    const stale = Object.keys(REF_AS_STRING_OK).filter((at) => !used.has(at))
+    const stale = REF_AS_STRING_OK.filter((e) => !hits.has(e)).map((e) => `${e.file}  ${e.contains}`)
     expect(
       stale,
-      `REF_AS_STRING_OK names lines that no longer glue a reference into a string — the file moved, ` +
-        `the line shifted, or the surface was fixed. Re-pin or delete:\n  ${stale.join("\n  ")}`
+      `REF_AS_STRING_OK names code that no longer glues a reference into a string — the file moved ` +
+        `or the surface was fixed. Delete the entry (it can no longer need "re-pinning"):\n  ` +
+        stale.join("\n  ")
+    ).toEqual([])
+
+    // AND THE FAILURE A SUBSTRING CAN HAVE THAT A LINE NUMBER COULD NOT. One
+    // reviewed exemption must not quietly cover a second site nobody read.
+    const ambiguous = [...hits.entries()]
+      .filter(([, at]) => at.length > 1)
+      .map(([e, at]) => `${e.file}  "${e.contains}" matches ${at.length}: ${at.join(", ")}`)
+    expect(
+      ambiguous,
+      `an exemption's \`contains\` matches more than one site in its file, so it excuses a line ` +
+        `nobody reviewed. Make it specific enough to name one:\n  ` + ambiguous.join("\n  ")
     ).toEqual([])
   })
 
