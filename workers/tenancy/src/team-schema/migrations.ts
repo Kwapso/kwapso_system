@@ -5036,48 +5036,72 @@ ALTER TABLE knowledge_sources ADD COLUMN relevancy_date TEXT;
 
 CREATE UNIQUE INDEX idx_knowledge_sources_identity ON knowledge_sources (identity_key) WHERE identity_key IS NOT NULL;
 
--- ONE PERSON'S SIGHT OF ONE THING. The row a second (or third) reader of one
--- Google item gets, now that \`identity_key\` above means they no longer get a
--- second \`knowledge_sources\` row of their own — shaped to match Lane B's own
--- \`Sighting\` type exactly ({ userId, shelf: 'private'|'team', goneAt },
--- \`knowledge-identity.ts\`, not yet merged as this migration lands — R58 is why
--- this note names it without the full path, which would be a comment pointing
--- at a file that is not here yet), the type Lane B actually reads and writes,
--- not a shape guessed at from the plan's prose.
+-- ONE PERSON'S SIGHT OF ONE THING, FROM ONE PLACE. The row a second (or
+-- third) reader of one Google item gets, now that \`identity_key\` above means
+-- they no longer get a second \`knowledge_sources\` row of their own. Shaped
+-- against Lane B's own \`Sighting\` type ({ userId, shelf: 'private'|'team',
+-- goneAt }, \`knowledge-identity.ts\` — named by basename only, R58: the file
+-- ships on Lane B's own branch, not yet merged as this migration lands, and a
+-- comment pointing at the full path would be a path that is not there). This
+-- table carries one column beyond that type, \`seen_where\` — read below for why
+-- that is not a contradiction.
 --
--- \`shelf\` is THEIRS alone, not a location: 'private' or 'team', the same
--- readable-by decision \`readableBy\`/\`stillLive\` make from a whole SET of
--- these rows — a colleague who filed the same folder as team material gets a
--- row of her own saying so, and neither overwrites the other. (An earlier
--- draft of this column, \`seen_where\`, stored a folder/space id instead — a
--- concept B1's Sighting type never carries. Caught in review before merge,
--- not shipped: there is no data anywhere holding the old shape.)
+-- TWO FACTS THAT LOOK LIKE ONE AND ARE NOT. \`seen_where\` is a PLACE — which
+-- Drive folder, which mailbox, which space a sweep found the thing in.
+-- \`shelf\` is a VISIBILITY — private or team — and it is the FENCE:
+-- \`readableBy\` gates on it, not on where something sits. One column cannot
+-- hold both without losing one of the two facts, and the second draft of this
+-- migration made exactly that mistake — collapsing \`seen_where\` into
+-- \`shelf\` on the reasoning that B1's TS type only names one of them. It does,
+-- because \`identityKey()\`/\`readableBy()\` only ever need the fence; the PLACE
+-- is read and written by the ingest lane that fills this table, never by the
+-- fence logic, which is why it does not appear in the type Lane B showed and
+-- is still a real column this schema needs. The same person can see the same
+-- source from two different places (a shared Drive folder AND a direct email
+-- share, say), and that is two sightings worth keeping, not a duplicate to
+-- collapse — which is also why \`seen_where\` sits inside the unique index
+-- below rather than beside it.
+--
+-- \`shelf\` is folding what \`knowledge_sources.owner_user_id\` used to answer
+-- alone (NULL = team, a value = one person's) onto the SET of a source's
+-- sightings instead — necessary the moment one source can hold two people's
+-- rows, because a single column can no longer carry two people's different
+-- answers (Aurora filed a folder privately; Alex filed the same folder as the
+-- team's). \`readableBy\`/\`stillLive\` decide from the whole set: some live
+-- sighting on the team shelf, or one that is the caller's own — the same set
+-- \`owner_user_id IS NULL OR = me\` used to return, proved equivalent by Lane
+-- B's own test rather than asserted here. CHECK-constrained to the type's own
+-- two values, matching this file's own precedent (\`account_type\`, 0007).
 --
 -- \`gone_at\` is when this person stopped being able to see it (un-shared,
--- left the space, removed from the team) — stamped, never deleted, so "she
--- never saw it" and "she saw it until Tuesday" stay different answers, and so
--- \`liveSightings\`/\`stillLive\` have a column to filter on at all. Without it
--- a sighting can be recorded but never retired, which is the gap the hub
--- caught: a set that can only grow cannot express "the last person who could
--- see this just lost access."
+-- left the space, removed from the team) — stamped, never deleted (deactivate
+-- never delete, CLAUDE.md), so "she never saw it" and "she saw it until
+-- Tuesday" stay different answers, and so \`liveSightings\`/\`stillLive\` have a
+-- column to filter on at all. Without it a sighting can be recorded but never
+-- retired, and the owner's own tracker item — a removed source or sighting
+-- drops out of answers within one sweep — has nowhere to write its ending.
 --
--- \`seen_by_user_id\` is NOT NULL — B1's \`userId\` is required, never a
--- team-wide anonymous sighting — so the unique index below is a real
--- guarantee (SQLite's NULL-is-distinct rule that would have made a nullable
--- version a courtesy rather than a constraint never comes into play). One row
--- per (source, person): the shelf they see it on and whether they still can
--- are both attributes OF that one sighting, not a reason for a second row.
+-- \`seen_by_user_id\` is NOT NULL: a sighting is BY DEFINITION somebody's own
+-- sight of something, never a team-wide anonymous one. Material nobody
+-- personally saw (a ticket, an account, any of the app's own mirrored
+-- records) has ZERO sighting rows, not one anonymous one — its readability
+-- keeps coming from the source row exactly as it always did. That is what
+-- makes the unique index below a real guarantee rather than a courtesy:
+-- every column in it is NOT NULL, so SQLite's NULL-is-distinct rule (the
+-- caveat \`identity_key\`'s partial index above exists to route around) never
+-- comes into play here at all.
 CREATE TABLE knowledge_sightings (
   id TEXT PRIMARY KEY,
   source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
+  seen_where TEXT NOT NULL,
   seen_by_user_id TEXT NOT NULL,
-  shelf TEXT NOT NULL DEFAULT 'private' CHECK (shelf IN ('private', 'team')),
+  shelf TEXT NOT NULL CHECK (shelf IN ('private', 'team')),
   seen_at TEXT NOT NULL,
   gone_at TEXT,
   created_at TEXT NOT NULL
 );
 CREATE INDEX idx_knowledge_sightings_source ON knowledge_sightings (source_id);
-CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_by_user_id);
+CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_where, seen_by_user_id);
 
 -- CHAT/MEETING GRAIN (KB-AUDIT.md §4.9's "chunk 47 has no idea which meeting
 -- it is from", and the plan's "chat = who said what when"). \`context_line\` is
