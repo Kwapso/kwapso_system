@@ -264,6 +264,68 @@
 // and the kit's own `CompactFacet` are single-valued by construction — and the
 // day a door learns a list, this adapter is still the one place that changes.
 //
+// ── THE FILTERS CASCADE — CLIENT RULING, 2026-09-09 ──────────────────────────
+//
+// Her screenshot: the tickets toolbar reading Client "Any client" and App
+// "Kwapso Portal", and under it "Nothing matched. Try fewer words, or clear the
+// filters." Verbatim: *"very wrong! filter the apps by selected client! Until
+// clint is not selected, show nothing."* — *"filter by selected client only!"* —
+// *"whe using fulters this is how they shoudl work: is client has sth (f.e.
+// Kwapos) the filter apps should only show apps of this client. and so on"*.
+//
+// WHAT WENT WRONG IS NOT THAT A FILTER RETURNED NOTHING. The App control listed
+// every app of every client, so the ROW offered a combination that cannot match,
+// and an empty list arrived looking like a broken screen. Everything else in
+// this app already refuses to draw that shape — `translatedFacets` drops a facet
+// with no options ("an empty dropdown is a control that can only disappoint"),
+// the ticket form shuts its Module picker because "a picker that can only
+// produce a refusal is worse than no picker" — and the filter row was the one
+// place nothing said it.
+//
+// SO THE NARROWING IS HERE, ONCE, AND NOT ON THE TICKETS SCREEN. Her "and so on"
+// is explicit: this is the rule for the filter row, not a fix to one control.
+// `useFilterBar` is the single function drawing every facet on both front doors,
+// so a pair declared anywhere gets the identical behaviour and the next one is a
+// field on a declaration rather than a second implementation. Three properties,
+// all of them below, all of them driven by `FilterFacet.dependsOn` (config.ts,
+// where the ruling and the derivation are written out in full):
+//
+//   • A CHOSEN PARENT NARROWS THE CHILD. `FacetOption.within` carries the
+//     record's own owning id (an app's `accountId`, a sprint's `appId`) — the
+//     same column the doors themselves narrow by, so nothing is hand-listed and
+//     nothing can go stale. A facet whose options are DERIVED from the rows
+//     needs no tagging at all: the rows carry the owner, so the option list is
+//     derived from the rows the parent already leaves.
+//
+//   • NO PARENT, NO OPTIONS — AND THE CONTROL SAYS WHAT TO DO FIRST. Drawn
+//     disabled, in place, wearing `dependsOn.emptyText` ("Choose a client
+//     first." — the ticket form's own sentence for exactly this state, reused
+//     rather than re-authored). It is NOT hidden: a control that vanishes moves
+//     every control after it as somebody fills the row in, which is the same
+//     argument `help-form-dialog.tsx` makes at length about its own App and
+//     People rows, and a toolbar that changes shape under the reader is the
+//     variation the client has twice told us to stop.
+//
+//   • A STRANDED SELECTION CLEARS ITSELF, OUT LOUD. Pick a client, pick one of
+//     its apps, then pick a different client: the App value is now a combination
+//     that cannot match — precisely the fault she reported, arriving from the
+//     other direction. It is CLEARED rather than kept, because the toolbar must
+//     never hold an impossible pair; and it is ANNOUNCED, because a filter
+//     somebody deliberately set may not disappear without a word. Keeping it and
+//     letting the result be empty was the other candidate and is rejected on its
+//     own terms: it reproduces her screenshot exactly, one control along.
+//
+// WHAT THIS IS NOT, AND THE DISTINCTION IS LOAD-BEARING. It is not "narrow every
+// facet by every other facet". That is the vanishing-options bug this file's own
+// header already forbids ("distinct values are derived from it when a facet
+// omits `options` — so choices don't vanish as you filter"), and `apps-screen`,
+// `sprints-screen`, `deliverables-panel` and `triageFacets` each repeat the
+// warning at their own call site. The difference is DIRECTION: a cascade runs
+// down an OWNERSHIP edge and only down it. A client owns apps, so Client narrows
+// App; an app does not own its client, so App never narrows Client. Symmetric
+// narrowing is what empties a menu and leaves no way back except Clear; a
+// directed one cannot, because the parent's own list is never touched.
+//
 // CLEARING A FACET IS `null` NOW, NOT A SENTINEL STRING. The old `Select`
 // composition needed `ANY_VALUE`, a two-underscore placeholder, because Radix
 // reserves the empty string for `SelectItem`'s own placeholder state and
@@ -285,6 +347,7 @@ import {
   FilterBar as KitFilterBar,
   RangeFacet,
 } from "@shared/ui/components/filter-bar/filter-bar"
+import { toast } from "@shared/ui/components/sonner/sonner"
 import { cn } from "@shared/ui/lib/utils"
 import { useT } from "@shared/web/language"
 
@@ -377,9 +440,131 @@ function useFilterBar<T>({
     wasOpen.current = open
   }, [open])
 
-  if (facets.length === 0) return { pill: null, panel: null }
+  /** WHAT THIS FACET'S PARENT IS SET TO — `""` when it has no parent to be set,
+   * which is every facet in the app that declares no `dependsOn`. Read off
+   * `values` and never off a snapshot, so the child's list follows the parent
+   * within the same render the parent was picked in (there is no Apply step on
+   * this row: "the moment I select sth on a dropdown its applied", the client,
+   * 2026-09-02). */
+  const parentValue = (f: FilterFacet): string =>
+    f.dependsOn ? (values[f.dependsOn.field] ?? "") : ""
 
-  const optionsFor = (f: FilterFacet): FacetOption[] => f.options ?? facetOptions(data, f.field)
+  /** THE FACET IS GATED — it hangs off another and that other is not answered
+   * yet. Its control still draws (see the panel below); it just has nothing to
+   * offer and says what to do first instead. */
+  const isGated = (f: FilterFacet): boolean => Boolean(f.dependsOn) && parentValue(f) === ""
+
+  /** WHAT THIS FACET MAY OFFER RIGHT NOW — the cascade, applied in the one place
+   * every facet on both front doors passes through (the header carries the
+   * client's 2026-09-09 ruling and the whole argument).
+   *
+   * THREE BRANCHES, AND THE THIRD IS THE ONE WORTH READING. A facet with no
+   * parent is exactly what it always was — declared options, or the distinct
+   * values of the WHOLE data set — so every facet in the app that declares no
+   * `dependsOn` is byte-for-byte unchanged. A gated one offers nothing. A
+   * narrowed one is filtered by OWNERSHIP:
+   *
+   *   • DECLARED options carry it themselves (`FacetOption.within` — an app's
+   *     own `accountId`, passed straight through from the row). `within == null`
+   *     is "owned by nobody" and survives every parent: our own systems are
+   *     legitimately on a client's ticket, and dropping them would make those
+   *     tickets unreachable from this control. That clause is argued in full on
+   *     `FacetOption.within` itself.
+   *
+   *   • DERIVED options (a facet that declares none, on a BOUNDED collection the
+   *     browser holds whole) need no tagging at all, and this is where the
+   *     derivation is at its most honest: the rows carry the owner, so the
+   *     option list comes off the rows the parent already leaves. A row with no
+   *     owner is kept for the same reason `within == null` is. */
+  const optionsFor = (f: FilterFacet): FacetOption[] => {
+    const dep = f.dependsOn
+    if (!dep) return f.options ?? facetOptions(data, f.field)
+    const parent = values[dep.field] ?? ""
+    if (parent === "") return []
+    if (f.options) return f.options.filter((o) => o.within == null || o.within === parent)
+    return facetOptions(
+      data.filter((row) => {
+        const owner = (row as Record<string, unknown>)[dep.field]
+        return owner == null || String(owner) === "" || String(owner) === parent
+      }),
+      f.field
+    )
+  }
+
+  /* ── A STRANDED SELECTION CLEARS ITSELF, AND SAYS SO ──────────────────────
+     The reader picks a client, picks one of its apps, then picks a DIFFERENT
+     client. The App value they set is now a pair that cannot match — her own
+     screenshot, arriving from the other direction — and the toolbar may not
+     hold one. So it is dropped.
+
+     CLEARED RATHER THAN KEPT, and that is a real choice between two defensible
+     answers. Keeping it and letting the result come back empty preserves the
+     reader's own click, which is not nothing; it also puts the screen back in
+     exactly the state the client called "very wrong", one control along, and
+     leaves them to work out which of two filters is the impossible one. The
+     whole fault she reported is a row offering a combination that cannot
+     match, so a row that CREATES one when the parent moves has not been fixed.
+
+     BUT NEVER SILENTLY. A filter somebody deliberately set disappearing with no
+     word is its own small betrayal — the reader is now looking at more rows
+     than they asked for and nothing on screen says why. The pill's count
+     dropping by one is a signal only to somebody already watching it. So it is
+     announced, naming BOTH controls, so the sentence explains itself without
+     the panel being open.
+
+     IN AN EFFECT, NOT IN RENDER: `onChange` is the host's own state setter and
+     calling it while rendering is a write during another component's render.
+     Keyed on WHICH fields are stranded, so it fires once per change and not
+     once per render; the refs carry the latest handler and translator without
+     putting either in the dependency list, where an inline arrow (which is what
+     every call site passes) would re-fire the effect on every render. */
+  const stranded = facets
+    .filter((f) => f.dependsOn && (values[f.field] ?? "") !== "")
+    .filter((f) => !optionsFor(f).some((o) => o.value === values[f.field]))
+    .map((f) => ({
+      field: f.field,
+      label: f.label,
+      // The parent's own WORD, so the sentence reads "…the Client you picked"
+      // rather than naming a query parameter at somebody. A `dependsOn` naming
+      // a facet that is not in this row is a mis-declaration the census beside
+      // this file catches; the field name is the honest fallback meanwhile.
+      parent: facets.find((p) => p.field === f.dependsOn?.field)?.label ?? f.dependsOn?.field ?? "",
+    }))
+  const strandedFields = stranded.map((s) => s.field).join(",")
+  /** THE LATEST HANDLER AND THE LATEST LIST, off the dependency array. Every
+   * call site passes `onChange` as an inline arrow, so naming it as a
+   * dependency would re-run this effect on every render of every screen with a
+   * filter row — and `stranded` is a fresh array each render for the same
+   * reason. The FIELDS are what actually changed, and they are a string. */
+  const latest = React.useRef({ stranded, onChange })
+  latest.current = { stranded, onChange }
+  React.useEffect(() => {
+    if (strandedFields === "") return
+    const { stranded: gone, onChange: drop } = latest.current
+    for (const s of gone) {
+      drop(s.field, "")
+      // `t` is read from the enclosing render rather than through the ref
+      // because the extractor's `t-call` position is an IDENTIFIER named `t`
+      // (scripts/lib/i18n-source.mjs) — `latest.current.t("…")` is a property
+      // access and would not be extracted, so the sentence would ship in
+      // English to somebody who chose German with a green build, which is
+      // precisely the failure R28 exists to catch.
+      toast.info(
+        t("Cleared the {what} filter — it doesn't fit the {parent} you picked.", {
+          what: s.label,
+          parent: s.parent,
+        })
+      )
+    }
+    // `latest` is a ref and never changes identity, so the fields string is the
+    // whole of what this effect actually reacts to. Once the host drops the
+    // value the string goes empty and the effect's next run returns on the
+    // first line — it cannot re-fire on the clearing it just did, which is also
+    // why naming `t` here (the lint asks, and it is right to) costs nothing: a
+    // re-run on a new translator identity meets that same guard.
+  }, [strandedFields, t])
+
+  if (facets.length === 0) return { pill: null, panel: null }
 
   /** HOW MANY FACETS ARE ON. The one definition in this row — the pill's count
    * reads it, and so does the panel's "Clear filters", which is not worth
@@ -526,11 +711,31 @@ function useFilterBar<T>({
               }
             : o
         )
+        // NO PARENT YET — THE CONTROL STAYS AND SAYS WHAT TO DO FIRST (client
+        // ruling, 2026-09-09: "Until clint is not selected, show nothing").
+        // "Show nothing" is read as its options and not as the control: the
+        // field keeps its place, disabled, wearing `dependsOn.emptyText` where
+        // "Any app" would otherwise sit — the exact pattern the ticket form
+        // already draws for this exact question, and for the reason that form
+        // spells out at length ("a row that appears and disappears inside a
+        // fixed order moves every field under it as somebody fills the form
+        // in"). A filter panel is the same shape of promise: the reader is
+        // choosing among a known set of controls, and one of them evaporating
+        // because of what they picked in another is a panel that cannot be
+        // learned. Disabled is also the kit's own stated answer for a value the
+        // reader may see and not change (`CompactFacet` state 10), so this
+        // borrows a drawn state rather than inventing one.
+        const gated = isGated(f)
         return (
           <div key={f.field} className="min-w-[11rem] max-w-[15rem] flex-1">
             <CompactFacet
               label={f.label}
-              placeholder={t("Any {what}", { what: f.label.toLowerCase() })}
+              placeholder={
+                gated && f.dependsOn
+                  ? f.dependsOn.emptyText
+                  : t("Any {what}", { what: f.label.toLowerCase() })
+              }
+              disabled={gated}
               options={kitOptions}
               // THE KIT'S OWN SEARCH MATCH IS BACKWARDS THE MOMENT A LABEL
               // BECOMES A NODE. `defaultFilterOption` (the kit file) matches

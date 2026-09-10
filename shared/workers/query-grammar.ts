@@ -730,6 +730,19 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "name",
     fields: [
       ID,
+      // THE APP'S NUMBER, publishable here since migration 0072 put one on every
+      // app the client's own order names. It was absent while the column was
+      // null on every row in the estate, which made it look like a decision and
+      // was not one: the agency door has SEARCHED this column (and its aliases)
+      // since 7 Sep 2026 and the apps screen draws it as the black chip in front
+      // of the name, so a person can read A0004 off a list and quote it — and
+      // `query_records`, the surface with no screen and no one to notice, would
+      // have answered "no such record". That is one question with two answers on
+      // two surfaces, which is exactly the gap R55's fifth clause exists to
+      // close. `renumbered` because `apps` is a kind the alias table covers; it
+      // holds nothing for an app today, for the same reason and with the same
+      // answer the door's own comment gives.
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "name", column: "name", type: "text" },
       { name: "url", column: "url", type: "text" },
       { name: "stage", column: "stage", type: "enum", values: APP_STAGE_NAMES },
@@ -809,6 +822,10 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
     defaultSort: "startsOn",
     fields: [
       ID,
+      // Numbered by migration 0072, alongside apps — see the note on the apps
+      // module for why a reference column that is null everywhere is still a
+      // field this surface has to publish.
+      { name: "ref", column: "ref", type: "text", identity: true, renumbered: true },
       { name: "name", column: "name", type: "text" },
       { name: "goal", column: "goal", type: "text", bulky: true },
       { name: "startsOn", column: "starts_on", type: "date" },

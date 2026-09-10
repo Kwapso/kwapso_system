@@ -133,7 +133,10 @@ const REF_AS_STRING_OK: RefAsString[] = [
       "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
       "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
       "its name from this one field. A ticket option leads with its number " +
-      "because that is what somebody types to find it.",
+      "because that is what somebody types to find it. (feat/ui-ux grew the " +
+      "line above this one so an account option routes through the one " +
+      "`accountOption` seam — the kind of edit that used to re-pin this entry " +
+      "and now does nothing to it.)",
   },
   {
     file: "web/lib/picker-sources.ts",

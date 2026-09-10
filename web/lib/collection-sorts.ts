@@ -47,6 +47,17 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
     options: [
       { value: "rank", label: "Priority order", defaultDir: "desc" },
       { value: "created", label: "Newest first", defaultDir: "desc" },
+      // WHEN IT WAS CLOSED — client, 2026-09-09. THE WHOLE MENU IS DECLARED
+      // HERE, AND ONE TAB SHOWS LESS OF IT. This file is the collection's
+      // vocabulary and `paged-sort.test.ts` holds it to exactly the names
+      // `TICKET_SORTS` knows, so an option withheld by a tab still has to exist
+      // here or the two halves of the seam stop matching. WHICH tab may offer
+      // which of these is `helpTabSorts` (web/lib/live-resources.ts), the same
+      // shape `helpTabFacets` already uses for the toolbar's filters — and it
+      // is the reason this one is not simply deleted from the list: a sort a
+      // reader can reach on the Closed tab is a sort the door has to know
+      // everywhere, because the door has no idea which tab asked.
+      { value: "closed", label: "Recently closed", defaultDir: "desc" },
       { value: "updated", label: "Recently changed", defaultDir: "desc" },
       { value: "status", label: "Stage", defaultDir: "asc" },
       { value: "kind", label: "Type", defaultDir: "asc" },
@@ -93,7 +104,12 @@ export const COLLECTION_SORTS: Record<string, CollectionSort> = {
     options: [
       { value: "when", label: "Most recent first", defaultDir: "desc" },
       { value: "title", label: "Name", defaultDir: "asc" },
-      { value: "client", label: "Client", defaultDir: "asc" },
+      // THE LABEL IS ACCOUNT SINCE 2026-09-09 (her ruling: "the filter client
+      // is the company, so it's the account"); the VALUE stays "client"
+      // because it is the sort key the meetings door answers to, not a word
+      // anybody reads. Same ruling as CLAUDE.md's `help`/Tickets: the
+      // human-facing word moves, the identifier stays.
+      { value: "client", label: "Account", defaultDir: "asc" },
       { value: "added", label: "Recently added", defaultDir: "desc" },
     ],
   },

@@ -54,6 +54,14 @@ export const SHELL_MODULES = [
   // or not the nav rail offers it. `processes` above is here for exactly the
   // same reason, and became contextual on the same day.
   "brand", "purposes",
+  // SETTINGS, WHICH IS NOT A TEAM SECTION AND IS HERE ANYWAY. It grew a level
+  // under it on 2026-09-09 — `/settings/tickets` is one module's own settings
+  // page — and a second segment is a second segment whether the first one is a
+  // sidebar module or an account screen. Without this line the asset layer
+  // answers /settings/tickets before this Worker runs, and a pasted link or a
+  // reload lands on the 404 page while the soft-navigated route works
+  // perfectly, which is the exact half-working shape this list exists to stop.
+  "settings",
 ]
 
 type Env = {

@@ -189,6 +189,14 @@ export const TAB_ICONS: Record<string, IconName> = {
   archived: "archive",
   week: "calendar-dot",
   calendar: "calendar-blank",
+  // THE MEETINGS STRIP'S MIDDLE TAB (client ruling, 2026-09-09: "tabs for
+  // meetings: this week, mine, all"). It means the meetings THIS PERSON was in
+  // the room for, so it takes the person glyph rather than a collection one —
+  // the tab is about the reader, not about a kind of record. Here rather than
+  // at the call site because `tab-icons` in web/test/rules.test.ts requires
+  // every tab value in either app to resolve through this vocabulary: the same
+  // tab must draw the same glyph wherever a second screen grows one.
+  mine: "user",
   // the agency's own record (the Kwapso screen)
   details: "scroll",
   team: "building",

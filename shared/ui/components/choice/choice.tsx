@@ -168,9 +168,12 @@ export interface ChoiceProps
   /**
    * A picture between the mark and the words — a logo, an avatar, a
    * thumbnail. Ruling 30's record mark: a 32 SQUARE at the 6 selection
-   * radius, contained rather than cropped, `flex: none`. 32 rather than the
-   * menu row's 24 because a choice row is two lines tall and a 24 mark
-   * floats in it. Ignored when `icon` is given; a row carries one mark.
+   * radius, the picture FILLING that square and cropping to it, `flex: none`.
+   * 32 rather than the menu row's 24 because a choice row is two lines tall
+   * and a 24 mark floats in it — the SIZE differs from the menu row's and the
+   * FIT deliberately does not, because both are the record mark `AvatarImage`
+   * already draws (RULES.md §4.4). Ignored when `icon` is given; a row
+   * carries one mark.
    */
   image?: string;
   /**
@@ -371,8 +374,14 @@ const Choice = React.forwardRef<HTMLLabelElement, ChoiceProps>(
             src={image}
             alt={imageAlt}
             data-slot="choice-image"
+            /* `object-cover`, at 32 rather than 24 — the third of the three
+               option marks corrected together on 2026-09-09. A choice row is
+               the one of the three that sits beside a DESCRIPTION, so it is
+               also the one where a letterboxed mark read worst: a square of
+               quiet paper with a thin band of logo in it, next to two lines
+               of type. RULES.md §4.4. */
             className={cn(
-              "size-[var(--avatar-md)] shrink-0 object-contain",
+              "size-[var(--avatar-md)] shrink-0 object-cover",
               "rounded-[var(--radius-select)] bg-surface-quiet",
             )}
           />

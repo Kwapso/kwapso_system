@@ -32,7 +32,7 @@ import { useLanguage } from "@shared/web/language"
 
 export type TodoFormValues = { accountId: string; title: string; detail: string; dueOn: string }
 
-const accountField = { ...defaultFieldConfig, label: "Which client", required: true }
+const accountField = { ...defaultFieldConfig, label: "Which account", required: true }
 const titleField = { ...defaultFieldConfig, label: "What we need from them", required: true }
 const detailField = { ...defaultFieldConfig, label: "Anything else they should know", required: false }
 /** WHEN THE CLIENT HAS TO COME BACK TO US. Called Deadline, which is the word
@@ -117,7 +117,7 @@ export function TodoFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          placeholder={t("Pick the client")}
+          placeholder={t("Pick the account")}
           searchPlaceholder={t("Search accounts…")}
           emptyText={t("No account matched.")}
           disabled={busy}

@@ -149,9 +149,17 @@ describe("the strict-superset bar: a folded door's own `q` search, read off its 
     // rather than patched here, because `doorParams` is R19/R22/R27's shared
     // oracle and widening it belongs in its own reviewed change, not folded
     // silently into a fix for a different law.
-    expect(withQ.map((w) => w.toolName)).toEqual(
-      expect.arrayContaining(["list_accounts", "list_processes", "list_meetings"])
-    )
+    //
+    // `list_meetings` WAS HERE until 9 Sep 2026 and is not any more, because it
+    // is no longer folded: the meetings door grew a `view=mine` — an identity
+    // predicate over the guest list with a fenced `creator_id` fallback — that
+    // the grammar cannot say, so the strict-superset bar stopped holding and the
+    // tool went back on the agent's catalogue (tools.ts's `REPLACED_BY_QUERY`
+    // header argues it at length). This census is derived from that map, so the
+    // name leaving is the correct consequence and not a check going blind: the
+    // `guests` field it earned stays declared on `QUERY_MODULES.meetings`, where
+    // `q`, `staleCheck` and every ordinary `contains` still use it.
+    expect(withQ.map((w) => w.toolName)).toEqual(expect.arrayContaining(["list_accounts", "list_processes"]))
   })
 
   for (const { toolName, door, modName } of withQ) {
@@ -172,6 +180,103 @@ describe("the strict-superset bar: a folded door's own `q` search, read off its 
       ).toEqual([])
     })
   }
+})
+
+/* ────────── THE OTHER HALF OF THE BAR: A DERIVED VIEW IS NOT A FILTER ────────
+ *
+ * `REPLACED_BY_QUERY`'s own sentence has always had TWO clauses: "every
+ * parameter it parses maps to a declared field, AND it offers no derived view
+ * (`scope=mine`, `view=overdue`, `when=current`) that a filter cannot express".
+ * The `q` check above is the first clause. Nothing checked the second, and on
+ * 9 Sep 2026 that cost exactly what it was written to prevent.
+ *
+ * WHAT HAPPENED. The meetings door grew a fourth view, `view=mine` — the
+ * client's ruling, "i was in the room": a LIKE against the mirrored Google guest
+ * list for the CALLER's own address, with a fenced `creator_id` fallback for
+ * rows that carry no guest list. It is an identity predicate joined by OR to a
+ * conjunction, and `ParsedQuery.where` is a flat AND of clauses whose only OR is
+ * one op across several fields — so the grammar could not say it, `query_records`
+ * stopped being a strict superset of that door, and the agent silently lost
+ * "which meetings was I in". Every check in this file stayed green: the name was
+ * still a real shared GET, the module was still nameable, the tool was still
+ * gone, and `q` still reached only declared columns. The fold's own comment went
+ * on asserting a superset that had stopped being true.
+ *
+ * WHY A DERIVED VIEW IS THE THING TO CATCH, rather than this one value. A view
+ * is a NAMED SET decided inside a door's own source. Its meaning is not on the
+ * wire and its membership can GROW without anybody touching the grammar, the
+ * catalogue or this file — which makes "is this fold still a superset?" a
+ * question re-asked by nobody. A field comparison cannot rot that way: the
+ * grammar either declares the field or refuses the filter, out loud.
+ *
+ * SO: a folded door may offer no derived view, unless the value carries a
+ * written line here. The table is EMPTY today and that is the honest state —
+ * `list_meetings` was the only folded door that ever had one, and it is folded
+ * no longer. A line is how somebody argues one back in, the way `guests` was
+ * argued in: named value, named reason, and rot-checked so it cannot outlive the
+ * door that made it true. */
+const DERIVED_VIEWS_OK: Record<string, string> = {}
+
+/** The values a door's own source compares its `view`/`scope` filter against —
+ * `filter.view === "week"`, `filter.scope !== "mine"` — read out of the same
+ * four-hop reach `likeColumns` uses, because a door's views live in the same
+ * `whereFor`-shaped helper its LIKE clauses do. */
+function derivedViews(src: string): string[] {
+  return [...new Set([...src.matchAll(/\.(?:view|scope)\s*(?:===|!==)\s*"([^"]+)"/g)].map((m) => m[1]))]
+}
+
+describe("the strict-superset bar: a folded door offers no derived view", () => {
+  const folded = Object.keys(REPLACED_BY_QUERY).flatMap((toolName) => {
+    const shared = SHARED_TOOLS.find((t) => t.name === toolName)
+    const door = shared && DOORS.find((d) => d.method === shared.method && d.path === shared.path)
+    return door ? [{ toolName, door }] : []
+  })
+
+  /** THE ORACLE, PROVED AGAINST THE DOOR THAT EARNED THIS CHECK — and the reason
+   * an empty `DERIVED_VIEWS_OK` is not a check that measures nothing.
+   *
+   * Every assertion below is "no folded door has a view", which an extractor
+   * that had quietly stopped matching would also satisfy, for ever, in silence.
+   * So the extractor is aimed at the meetings door — no longer folded, and the
+   * one door in the estate known to carry four views — and required to see all
+   * four INCLUDING the one that broke the fold. A refactor that renames
+   * `whereFor`, moves the views out of it, or changes how a view is compared
+   * fails HERE, loudly, instead of turning the rule above into a formality. */
+  it("the extractor can still see a door's views (must not go blind)", () => {
+    const meetings = SHARED_TOOLS.find((t) => t.name === "list_meetings")
+    const door = meetings && DOORS.find((d) => d.method === meetings.method && d.path === meetings.path)
+    expect(door, "list_meetings has no door in the census — re-point this oracle").toBeDefined()
+    expect(derivedViews(reachableLibBodies(door!)).sort()).toEqual(["all", "mine", "upcoming", "week"])
+  })
+
+  for (const { toolName, door } of folded) {
+    it(`${toolName} is folded, so its door names no set of its own`, () => {
+      const unexplained = derivedViews(reachableLibBodies(door)).filter(
+        (v) => !DERIVED_VIEWS_OK[`${toolName}:${v}`]
+      )
+      expect(
+        unexplained,
+        `${toolName}'s door decides "${unexplained.join('", "')}" in its own source, so its tool offers a set ` +
+          `the query grammar cannot be asked for. A named set can GROW without the grammar hearing about it — ` +
+          `which is how \`view=mine\` silently narrowed this fold. Widen the grammar and write the value into ` +
+          `DERIVED_VIEWS_OK with the argument, or take the tool back out of REPLACED_BY_QUERY.`
+      ).toEqual([])
+    })
+  }
+
+  it("no line in DERIVED_VIEWS_OK outlives the door that earned it", () => {
+    const live = new Set(folded.flatMap(({ toolName, door }) => derivedViews(reachableLibBodies(door)).map((v) => `${toolName}:${v}`)))
+    const stale = Object.keys(DERIVED_VIEWS_OK).filter((k) => !live.has(k))
+    expect(
+      stale,
+      `these excuses name a view no folded door offers any more: ${stale.join(", ")}. The list only shrinks.`
+    ).toEqual([])
+  })
+
+  it("every excuse is an argument somebody can disagree with", () => {
+    for (const [k, why] of Object.entries(DERIVED_VIEWS_OK))
+      expect(why.length, `${k} needs a reason, not a note`).toBeGreaterThan(40)
+  })
 })
 
 describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
@@ -252,7 +357,18 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     // no record — so there is no right it could sensibly demand, and it exists
     // because the summaries it stands behind were cut from 69,892 characters to
     // 19,494. It costs 133 characters and gives back 50,359.
-    const UNGATED_CEILING = 54
+    //
+    // 54 → 55 on 2026-09-09, and this one is a RESTORATION rather than a new
+    // tool: `list_meetings` came off `REPLACED_BY_QUERY` because the meetings
+    // door grew a `view=mine` the query grammar cannot express, so
+    // `query_records` is no longer a strict superset of it. It is a READ, and
+    // reads carry no `TOOL_GATES` line by design ("Reads carry no hint — they
+    // just need the module's read right"), so restoring it necessarily moves
+    // this number. The door still gates on `meetings:read` and still refuses a
+    // portal caller; nothing here grants anything. Under the two-stage
+    // catalogue what it costs a step is its NAME in the index, not its
+    // definition.
+    const UNGATED_CEILING = 55
     expect(
       ungated.map((t) => t.name).sort(),
       `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +

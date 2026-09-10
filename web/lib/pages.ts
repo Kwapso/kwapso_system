@@ -241,8 +241,30 @@ export type TeamSection = {
 }
 
 export const TEAM_SECTIONS: TeamSection[] = [
-  // Overview leads with team metadata, not a collection → no countCacheKey (LAW R8 exception).
-  { key: "overview", title: "Overview", module: "teams", segment: "", placement: "tab" },
+  // THE TEAM OVERVIEW IS GONE — CLIENT RULING, 2026-09-09, verbatim: "This
+  // overview about the team should not even exist. Only in the settings, under
+  // the tab, it should not move from there."
+  //
+  // It was `{ key: "overview", title: "Overview", module: "teams", segment: "" }`
+  // — the bare `/t/<teamId>`, a description block carrying Created / Created by
+  // / Last updated and an Edit action, and the first tab on the team area's own
+  // strip. What it was FOR was "the team, as a record". What the client wanted
+  // was the team's PEOPLE and their RIGHTS, which is Settings › Team now, in two
+  // containers on one page — so the overview was a destination whose whole job
+  // was to be a stop on the way to the two things anybody actually opened.
+  //
+  // A BOOKMARK TO IT STILL WORKS AND LANDS WHERE THE TEAM LIVES NOW.
+  // `/t/<teamId>` is not a 404 and is not a dead screen: `module-content.tsx`'s
+  // `team` branch soft-navigates to `/settings?tab=team`, which is the honest
+  // answer to "where did this go" — the address a person saved still opens the
+  // material they saved it for. It is a REDIRECT rather than a second mount of
+  // the tab, because two addresses drawing one screen is how a screen ends up
+  // with two behaviours.
+  //
+  // The team RECORD did not stop existing, only its screen: its name and logo
+  // are edited on /kwapso (the agency's own Details tab, which is the team
+  // record by another name and already carries `teams:edit`), and its audit
+  // block was three rows nothing linked to.
   { key: "members", title: "Members", module: "team_members", segment: "members", placement: "tab", countCacheKey: "members" },
   { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "tab", countCacheKey: "member_roles" },
   { key: "invites", title: "Invites", module: "team_members", segment: "invites", placement: "tab", countCacheKey: "invites" },

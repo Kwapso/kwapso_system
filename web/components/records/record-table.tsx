@@ -309,6 +309,7 @@ export function RecordTable<T extends TableRowData>({
   refColumn,
   className,
   useKitPanel,
+  narrowedOutside,
 }: {
   columns: TableColumn[]
   rows: T[]
@@ -328,6 +329,11 @@ export function RecordTable<T extends TableRowData>({
    * chrome around it is the frame's decision either way, so this component
    * needs nothing of its own to carry the flag, only a place to pass it. */
   useKitPanel?: boolean
+  /** R62 — forwarded straight to `CollectionFrame` (see its own doc). A table
+   * whose rows were narrowed by a `<PagedFind>` above it passes `found.active`
+   * here, so the frame's zero state says "Nothing matched" and withdraws
+   * "Add the first" instead of claiming the collection is empty. */
+  narrowedOutside?: boolean
   /** THE ROW KEY HOLDING THIS RECORD'S REFERENCE — the short code a person
    * quotes on the phone. Drawn as the black chip in FRONT of the first
    * column's cell, which is the client's own instruction ("put the ID before
@@ -371,6 +377,7 @@ export function RecordTable<T extends TableRowData>({
       searchKeys={columns.map((c) => c.key) as (keyof T)[]}
       className={className}
       useKitPanel={useKitPanel}
+      narrowedOutside={narrowedOutside}
       renderItems={(page) => (
         <div className="overflow-hidden rounded-[var(--radius)] bg-surface-panel">
           <Table>

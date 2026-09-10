@@ -232,7 +232,7 @@ export function DraftReviewDialog({
                 kept={values.keepRoles}
                 onToggle={(key, keep) => toggle("keepRoles", key, keep)}
                 onWhole={(keys) => setWhole("keepRoles", keys)}
-                unmatchedHint={t("Not one of this client's roles yet. Keeping it changes nothing until somebody records the role.")}
+                unmatchedHint={t("Not one of this account's roles yet. Keeping it changes nothing until somebody records the role.")}
                 emptyText={t("The call didn't name who does the work.")}
               />
             )
@@ -243,7 +243,7 @@ export function DraftReviewDialog({
                 kept={values.keepTools}
                 onToggle={(key, keep) => toggle("keepTools", key, keep)}
                 onWhole={(keys) => setWhole("keepTools", keys)}
-                unmatchedHint={t("Not one of this client's tools yet. Keeping it changes nothing until somebody records the tool.")}
+                unmatchedHint={t("Not one of this account's tools yet. Keeping it changes nothing until somebody records the tool.")}
                 emptyText={t("The call didn't name what the work is done in.")}
               />
             )
@@ -469,7 +469,7 @@ function MatchKind({
       {row.matchedName ? (
         <span className="text-muted-foreground flex items-center gap-1 text-xs">
           <User className="size-3.5 shrink-0" />
-          {t("Matched to {name} on this client's record.", { name: row.matchedName })}
+          {t("Matched to {name} on this account's record.", { name: row.matchedName })}
         </span>
       ) : (
         <span className="text-warning flex items-start gap-1 text-xs">

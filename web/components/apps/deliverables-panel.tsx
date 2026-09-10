@@ -287,18 +287,16 @@ export function DeliverablesPanel({ teamId, appId }: { teamId: string; appId: st
         actions={canCreate && <AddButton label={t("Add a deliverable")} onClick={() => setAddOpen(true)} />}
       />
 
+      {/* R62 — ONE REGISTER, BOTH ZEROS, the add button the only difference.
+          No `deliverables` import target exists — a handover is filed one at a
+          time, with a title/kind/date/link/picture a spreadsheet row cannot
+          carry on its own. */}
       {rows.length === 0 ? (
-        q.data.length === 0 ? (
-          // No `deliverables` import target exists — a handover is filed one
-          // at a time, with a title/kind/date/link/picture a spreadsheet row
-          // cannot carry on its own.
-          <CollectionEmptyState
-            title={t("Nothing has been handed over on this app yet.")}
-            onCreate={canCreate ? () => setAddOpen(true) : undefined}
-          />
-        ) : (
-          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
-        )
+        <CollectionEmptyState
+          filtered={q.data.length > 0}
+          title={t("Nothing has been handed over on this app yet.")}
+          onCreate={canCreate ? () => setAddOpen(true) : undefined}
+        />
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((d) => {

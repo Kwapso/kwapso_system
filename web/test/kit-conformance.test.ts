@@ -4,10 +4,17 @@
 //
 // `shared/ui/` has shipped a rulebook (`docs/RULES.md`) since the day it was
 // vendored, and until kit v1.2.70 nothing in this repository executed a line of
-// it. Three of its rules are now EXECUTABLE — `foundations/rules/{radii,
-// palette,borders}.mjs`, run through `conformance.mjs` — and they arrive with
-// the tag, inside `foundations/`, because that is one of the nine entries
+// it. Four of its rules are now EXECUTABLE — `foundations/rules/{radii,
+// palette,borders,images}.mjs`, run through `conformance.mjs` — and they arrive
+// with the tag, inside `foundations/`, because that is one of the nine entries
 // `scripts/sync-design.mjs` copies.
+//
+// `images` is the newest (kit v1.2.75) and the only one this app had already
+// written for itself BEFORE the kit shipped it: R60, `web/test/an-image-fills.
+// test.ts`, from the client's 2026-09-09 ruling. The two now run side by side
+// and that is not duplication worth deleting — R60 also counts the KIT's own
+// debt and holds the `RecordMark` clause, neither of which a law shipped by the
+// kit can check about itself.
 //
 // The first run of them against this app returned 46 findings. Thirty were CSS
 // borders, which the kit has forbidden since §2.7 and which accumulated for one
@@ -23,8 +30,9 @@
 // re-derived them would be re-deriving them in every app — which is precisely
 // what the owner asked to stop ("the only UI&UX input for other apps. I wanna
 // avoid iteration there"). R31 and R32 in `shared/rules/registry.ts` are this
-// app's own hand-written versions of two of these three laws, arrived at by
-// iterating with the client. A second app would have paid for them again.
+// app's own hand-written versions of two of these four laws, and R60 is a third
+// — all arrived at by iterating with the client. A second app would have paid
+// for them again.
 //
 // The EXEMPTIONS cannot live in the kit, and the reason is mechanical rather
 // than tasteful: `shared/ui/` is HASH-PINNED. `web/test/vendored-kit.test.ts`
@@ -204,7 +212,7 @@ describe("kit conformance — the vendored kit's own laws, run against this app"
     }
   })
 
-  it("kit-conformance: radii, palette and borders pass, with no blind spot and no rotted exemption", () => {
+  it("kit-conformance: radii, palette, borders and images pass, with no blind spot and no rotted exemption", () => {
     // `only: null` is "run every law", spelled out rather than left off: the
     // kit's own CLI passes the flag's value through whether or not it was
     // given, so the parameter has no default and omitting it here would be a
@@ -217,7 +225,18 @@ describe("kit conformance — the vendored kit's own laws, run against this app"
      * new entry, an extension the kit stops reading. */
     expect(files.length, "the conformance walk read almost nothing — the census is broken, not clean").
       toBeGreaterThan(200)
-    expect(results.length, "three laws ship in this kit tag and three must run").toBe(3)
+    /* THE LAWS ARE NAMED, NOT COUNTED. This asserted `.toBe(3)` until v1.2.75
+     * arrived carrying a fourth (`images`, foundations/rules/images.mjs — the
+     * kit's own enforcement of the client's 2026-09-09 fill-not-fit ruling,
+     * which is R60 on this side). A bare count told the truth and told it
+     * uselessly: "expected 4 to be 3" names neither the law that arrived nor
+     * the law that would have LEFT, and a tag that dropped `borders` while
+     * adding `images` would have kept this line green with a law silently gone.
+     * The names cost nothing and say which. */
+    expect(
+      results.map((r: { law: string }) => r.law).sort(),
+      "the laws shipping in this kit tag are not the laws that ran — a law arrived, left, or was renamed upstream"
+    ).toEqual(["borders", "images", "palette", "radii"])
 
     /* A LAW THAT CANNOT SEE ITS SUBJECT HAS NOT PASSED. Each law upstream
      * declares its own ways of going blind — a vocabulary read off an empty

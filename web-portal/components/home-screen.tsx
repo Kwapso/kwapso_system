@@ -37,6 +37,7 @@ import { cacheKeys } from "@/lib/live-resources"
 import { useTickets } from "@/lib/tickets"
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
+import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import { WaitingOnYou } from "@/components/waiting-on-you"
@@ -153,10 +154,14 @@ export function HomeScreen({ ready }: { ready: PortalReady }) {
         ) : newest.length === 0 ? (
           // REGRESSION FIX, 2026-09-01: was `border border-dashed` — see
           // impact-screen.tsx's own note on this box for the full reasoning.
-          <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-            <p>{t("You haven't asked us for anything yet.")}</p>
-            <p className="mt-1 text-sm">{t("When you do, it'll live here, and so will our reply.")}</p>
-          </div>
+          /* R62 — the portal's one zero register. No act inside the box here
+             on purpose: the page-level "Ask us something" sits directly above
+             this section, and the same act offered twice on one screen is the
+             two-mango shape B3 forbids. */
+          <PortalEmpty
+            title={t("You haven't asked us for anything yet.")}
+            description={t("When you do, it'll live here, and so will our reply.")}
+          />
         ) : (
           <div className="flex flex-col gap-4">
             {newest.map((t) => (

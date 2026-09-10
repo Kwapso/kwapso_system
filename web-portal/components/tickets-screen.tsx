@@ -37,6 +37,7 @@ import { useTickets } from "@/lib/tickets"
 import { useDoorSearch } from "@/lib/search"
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
+import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import { TicketRow } from "@/components/ticket-row"
 import type { PortalReady } from "@/components/portal-shell"
@@ -170,10 +171,12 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
             <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
           </div>
         ) : search.rows.length === 0 ? (
-          <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-            <p>{t("Nothing matched that.")}</p>
-            <p className="mt-1 text-sm">{t("Try fewer words, or clear the search to see everything.")}</p>
-          </div>
+          /* R62 — THE SAME BODY AS THE RESTING ZERO BELOW, MINUS THE BUTTON.
+             Client, 2026-09-09: "the empty because of filters hosul look the
+             same as empty collection but the add button." The two boxes were
+             hand-written twins that had already drifted (`gap-1` here,
+             `mt-1` there); they are one component now and the fact rides in. */
+          <PortalEmpty filtered title={t("Nothing here yet.")} />
         ) : (
           <div className="flex flex-col gap-4">
             {/* The door's exact count for THIS search (R16), not the length of
@@ -209,16 +212,11 @@ export function TicketsScreen({ ready }: { ready: PortalReady }) {
         // empty screens said something true and offered nothing to press,
         // while the act sat in an icon-only `+` a first-time reader has no
         // reason to look at.
-        <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-          <p>{t("Nothing here yet.")}</p>
-          <p className="text-sm">
-            {t("Anything you ask us, a question, a problem, a change, lives on this page.")}
-          </p>
-          <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
-            <Plus className="size-3.5" />
-            {t("Ask us something")}
-          </Button>
-        </div>
+        <PortalEmpty
+          title={t("Nothing here yet.")}
+          description={t("Anything you ask us, a question, a problem, a change, lives on this page.")}
+          action={{ label: t("Ask us something"), onClick: () => setRaising(true) }}
+        />
       ) : (
         <div className="flex flex-col gap-4">
           {(tickets ?? []).map((t) => (

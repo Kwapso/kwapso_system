@@ -140,22 +140,27 @@ const RAW_DATE_EXEMPT: Record<string, string> = {
     "is the one that is. (Re-pinned from :139 on 7 Sep 2026, when R54 put the " +
     "actor's trim and its reasoning above this line, and to :167 on 8 Sep " +
     "2026 when the main × feat/ui-ux merge put the scope fields above it.)",
-  "web/components/deep-link/shape.tsx:91":
+  "web/components/deep-link/shape.tsx:96":
     "same shape as use-record-activity.ts:167 — `dateTime: a.createdAt` " +
     "beside its own already-formatted `timestamp: formatRelative(...)`, one " +
     "line up, for the same `<time dateTime>` attribute. (Re-pinned from :83 " +
-    "on 7 Sep 2026, when `shapeActivity` gained a named return type — " +
-    "`ActivityFeedRow` — and the import and its note landed above this line.)",
-  "web/components/work/work-panels.tsx:1491":
+    "on 7 Sep 2026, when `shapeActivity` gained a named return type, and to :90 on 9 Sep 2026 when `TeamMeta` left the import block with the deleted team-overview shaper — " +
+    "`ActivityFeedRow` — and the import and its note landed above this line; " +
+    "and to :96 the same day, when the contacts TABLE landed and `REF_LEADS_NAME` " +
+    "joined the import block above it with the note saying why the class is " +
+    "shared rather than respelled.)",
+  "web/components/work/work-panels.tsx:1500":
     "`dateTime: todo.completedAt ?? undefined` for a to-do's checklist row, " +
     "beside its own already-formatted `when: todo.completedAt ? t(\"done " +
     "{date}\", ...)` one line up — the `<time dateTime>` attribute again, not " +
     "text. (Re-pinned from :1479 on 7 Sep 2026: the row's label above it grew " +
     "from a `ref · title` string into the black reference chip beside the " +
     "title, which is thirteen lines of JSX where there was one; from " +
-    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; and " +
+    ":1492 to :1494 the same day, when R54 gave the row's actor its trim; " +
     "back to :1491 the same day again, when the ticket panel above lost its " +
-    "`marks` prop and the `<RecordMark>` it drew — three lines net.)",
+    "`marks` prop and the `<RecordMark>` it drew — three lines net; and to " +
+    ":1500 on 9 Sep 2026, when R62 folded this file's two zero states into one " +
+    "`CollectionEmptyState` call and its note, nine lines net, landed above.)",
 }
 
 describe("no screen shows a raw timestamp", () => {

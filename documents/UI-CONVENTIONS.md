@@ -225,15 +225,22 @@ blank a screen team-wide.
 ### 2b. Not engine-expressible → a host-composed component
 
 When a screen needs a control the engine has no block for, the host composes it from
-library primitives itself. The canonical example is **`role-detail.tsx`**: a role's
-permission grid is a bespoke `PermissionMatrix` with no screen-engine block, so
-`screens.ts` deliberately has **no `roles.detail` recipe**,
+library primitives itself. The canonical example is **`roles-matrix.tsx`**: every
+role's permission grid is a bespoke `PermissionMatrix` with no screen-engine
+block, so `screens.ts` deliberately has **no `roles.detail` recipe**,
 
 ```ts
 // web/lib/screens.ts (registry comment)
-// Roles DETAIL has no recipe — its permission grid has no engine block, so the
-// host composes it from the library PermissionMatrix (see role-detail.tsx).
+// Roles has no DETAIL recipe and, since 2026-09-09, no detail SCREEN either:
+// the client folded every role's permission sheet onto one grid on Settings ›
+// Team, which the host composes from the library PermissionMatrix (see
+// roles-matrix.tsx). The grid never had an engine block and still does not.
 ```
+
+(It was `role-detail.tsx`, one role per page, until the client's 2026-09-09
+ruling — "all the roles together, I want to have an overview" — folded the
+per-role screen into that one grid. The POINT of the example is unchanged: a
+control the engine has no block for is composed by the host from kit parts.)
 
 The bespoke details are **not a list anybody keeps**. They are DERIVED off disk
 by `recordDetailComponents()` in `web/test/rules.test.ts`, from two independent
@@ -625,7 +632,7 @@ text button, not yet an icon button); when they *do* carry an icon, use `UserMin
 `Prohibit` respectively. The mapping is the law regardless of whether a given action is wired
 with its icon yet. Do not pick a different icon at a call site.
 
-Real usage (`role-detail.tsx`, `knowledge-detail.tsx`):
+Real usage (`roles-matrix.tsx`, `knowledge-detail.tsx`):
 
 ```tsx
 <Button variant="outline" size="sm" onClick={() => setEditingOpen(true)} className="shrink-0 gap-1.5">

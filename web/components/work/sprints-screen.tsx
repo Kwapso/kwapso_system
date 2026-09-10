@@ -52,7 +52,7 @@ import { CollectionHeading } from "@/components/records/collection-heading"
 import { BandCard, SprintBurndownChart } from "@/components/screens/pulse"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
-import { EmptyLine, SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import {
   SprintFormDialog,
   sprintTypeName,
@@ -281,7 +281,7 @@ function shapeSprints(sprints: Sprint[], today: string, lang: Language, marks?: 
       // facet says the SAME three words the Overview groups under, so narrowing
       // this list and reading that one are one question asked twice rather than
       // two vocabularies for one idea.
-      account: s.accountName ?? "No client",
+      account: s.accountName ?? "No account",
       app: s.appName ?? "No app",
       state: STATE_HEADING[sprintState(s, today)],
     })),
@@ -578,7 +578,16 @@ export function SprintsScreen({
           active question with no matches leaves every one of them null and
           this is the only line left to say why the screen is blank. */}
       {sprints.length > 0 && askingSprints && narrowedSprints.length === 0 && (
-        <EmptyLine concept="sprints">{t("Nothing matched.")}</EmptyLine>
+        /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON (client, 2026-09-09).
+           This was an `EmptyLine` — one grey line with a glyph — while
+           `sprintsEmpty` one line up drew the full register, so the two zeros
+           on this one tab looked like different screens. `filtered` says
+           "Nothing matched." and withdraws "Add the first" itself. */
+        <CollectionEmptyState
+          filtered
+          title={t("No sprints yet.")}
+          onCreate={canCreate ? () => setAddOpen(true) : undefined}
+        />
       )}
       {SPRINT_STATES.map((state) => {
         const inState = narrowedSprints.filter((s) => sprintState(s, today) === state)

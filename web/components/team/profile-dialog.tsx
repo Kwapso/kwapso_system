@@ -13,13 +13,13 @@ import {
 } from "@shared/ui/components/avatar/avatar"
 import { Button } from "@shared/ui/components/button/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@shared/ui/components/dialog/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@shared/ui/components/sheet/sheet"
 import { Field } from "@shared/web/field"
 import { FileUpload } from "@shared/ui/components/file-upload/file-upload"
 import { Input } from "@shared/ui/components/input/input"
@@ -94,13 +94,34 @@ export function ProfileDialog({
   const initials = personInitials(firstName, lastName)
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Edit your profile")}</DialogTitle>
-          <DialogDescription>{t("Your name and photo across the app.")}</DialogDescription>
-        </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      {/* A FORM IS A SLIDE-IN — client ruling, 2026-09-09, over a screenshot
+          of the "New access token" dialog: "This should be a slide-in, like
+          all the other screens. The only ones that are overlays are the
+          warnings, such as archive or delete, and so on." A general ruling on
+          the CLASS, not a fix for one dialog, so it lands on this form too.
+          Not a style preference; do not revert it as one. Law R59.
+
+          This form has the most reason of any in the app to be a drawer: it
+          is the tallest of the four that were centred — an avatar, a file
+          picker and two fields — and a centred modal grows off BOTH edges of
+          a short window, which is the exact defect FormShell's own header
+          records (a 738px dialog on a 1280×640 window with its title clipped
+          above the viewport and its Save button below it). A drawer is
+          full-height by construction, so the fields scroll and the commit
+          control does not move.
+
+          The footer sits OUTSIDE the <form> and is wired back with
+          `form="profile-form"`: `SheetHeader`/`SheetFooter` carry `sheet-*`
+          slots and are exempt from `SheetContent`'s "every other child
+          scrolls" rule, so they pin and only the middle child scrolls. Inside
+          the form the footer would have scrolled away with the fields. */}
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>{t("Edit your profile")}</SheetTitle>
+          <SheetDescription>{t("Your name and photo across the app.")}</SheetDescription>
+        </SheetHeader>
+        <form id="profile-form" className="flex flex-col gap-4" onSubmit={submit}>
           <div className="flex flex-col items-center gap-4">
             <Avatar className="size-20">
               {(photo || user?.imageUrl) && (
@@ -126,14 +147,18 @@ export function ProfileDialog({
               disabled={busy}
             />
           </Field>
-          <DialogFooter>
-            <Button type="submit" disabled={busy || !firstName.trim() || !lastName.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? t("Saving…") : t("Save")}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+        <SheetFooter>
+          <Button
+            type="submit"
+            form="profile-form"
+            disabled={busy || !firstName.trim() || !lastName.trim()}
+          >
+            {busy ? <Spinner /> : null}
+            {busy ? t("Saving…") : t("Save")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

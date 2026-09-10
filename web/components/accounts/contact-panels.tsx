@@ -200,8 +200,14 @@ export function CompaniesPanel({
           }}
         />
       )}
+      {/* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client, 2026-09-09:
+          "the empty because of filters hosul look the same as empty collection
+          but the add button." This was a bare grey line while the resting zero
+          above returns the full register; they are one body now, chosen by
+          `filtered`. This panel is read-only, so there was never a button here
+          to subtract — the point is that it now LOOKS like its sibling. */}
       {shown.length === 0 && (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        <CollectionEmptyState filtered title={t("Not linked to a company.")} />
       )}
       <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {shown.map((c) => (
@@ -347,8 +353,10 @@ export function ContactTicketsPanel({
           }
         />
       )}
+      {/* R62 — the same register as the resting zero above, minus the add
+          button. See `ContactCompaniesPanel`'s own note. */}
       {shown.length === 0 && (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        <CollectionEmptyState filtered title={t("No tickets raised for them yet.")} />
       )}
       <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {shown.map((ticket) => (
@@ -476,8 +484,10 @@ export function ContactMeetingsPanel({
           }}
         />
       )}
+      {/* R62 — the same register as the resting zero above, minus the add
+          button. See `ContactCompaniesPanel`'s own note. */}
       {shown.length === 0 && (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        <CollectionEmptyState filtered title={t("No meetings with them yet.")} />
       )}
       <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
         {shown.map((m) => (

@@ -428,7 +428,10 @@ export const tenancy = {
    * `entityTotal` / `individualTotal` are the Companies / Contacts / All strip's
    * two other badges: the COLLECTION's counts rather than this call's, so a badge
    * on a tab nobody has pressed does not move while somebody types in the search
-   * box. */
+   * box. `individualPortalTotal` is the third of them and belongs to the CONTACTS
+   * screen's own strip (All / In portal, client 2026-09-09) — same door, same
+   * read, same sentence: six of 110 is a number the browser cannot work out from
+   * a page of fifty. */
   accounts: (
     /** The door's own question, spread straight into the query string
      * (`listQuery`) so a filter cannot be lost between the find bar and the
@@ -440,6 +443,10 @@ export const tenancy = {
       status?: string
       /** "yes" = only the put-away ones, "no" = only the live ones */
       archived?: string
+      /** "yes" = only the people holding a live portal login, "no" = only those
+       * without one. The contacts screen's In portal tab sends this rather than
+       * slicing the page it holds. */
+      portal?: string
       parentId?: string
       /** WHAT ORDER, one of the door's own sort names (ACCOUNT_SORTS), with
        * `dir` flipping it. Omit both for the door's default (newest first) —
@@ -449,9 +456,14 @@ export const tenancy = {
       cursor?: string | null
     } = {}
   ) =>
-    api<PagedResponse<{ accounts: Account[]; entityTotal: number; individualTotal: number }>>(
-      `/api/tenancy/accounts${listQuery(opts)}`
-    ),
+    api<
+      PagedResponse<{
+        accounts: Account[]
+        entityTotal: number
+        individualTotal: number
+        individualPortalTotal: number
+      }>
+    >(`/api/tenancy/accounts${listQuery(opts)}`),
 
   /** One account opened: the record, its parent, its people, its logins, and the
    * two exact totals its tabs badge. */

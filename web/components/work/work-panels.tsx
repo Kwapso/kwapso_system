@@ -300,10 +300,19 @@ function PagedPanelBody<T>({
         const rows = found.active ? found.rows : restingData
         if (rows === null || rows === undefined) return <Skeleton variant="list" lines={3} />
         if (rows.length === 0) {
-          return found.active ? (
-            <p className="text-muted-foreground text-sm">{found.emptyText}</p>
-          ) : (
-            <CollectionEmptyState title={emptyTitle} onCreate={onNew} />
+          // R62 — ONE REGISTER, BOTH ZEROS (client, 2026-09-09: "the empty
+          // because of filters hosul look the same as empty collection but the
+          // add button"). The narrowed half was a bare grey `<p>` carrying the
+          // find's own sentence, beside the full register the resting half
+          // drew — and this is EVERY nested work panel (Stories, Processes, App
+          // meetings, App tickets, To-dos), so it was the same mismatch five
+          // times. `filtered` picks the words and takes `onNew` away.
+          return (
+            <CollectionEmptyState
+              filtered={found.active}
+              title={emptyTitle}
+              onCreate={onNew}
+            />
           )
         }
         return (
@@ -912,7 +921,7 @@ export function AppMeetingsPanel({
         one: t("1 meeting matches"),
         many: t("{count} meetings match"),
       }}
-      // "Client" comes off the top-level menu: an app belongs to one account
+      // "Account" comes off the top-level menu: an app belongs to one account
       // always (the owner's ruling), so every meeting here is already that
       // account's and ordering by it would be furniture.
       sorts={translatedSorts("meetings", t).filter((o) => o.value !== "client")}

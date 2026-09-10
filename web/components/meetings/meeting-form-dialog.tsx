@@ -26,7 +26,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 import { ApiFailure } from "@/lib/api"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { toLocalInput, toMoment } from "@shared/web/format"
@@ -225,7 +225,7 @@ export function MeetingFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+          options={accountOptions.map(accountOption)}
           emptyOption={{ value: NONE, label: t("Nobody, it is ours") }}
           placeholder={t("Nobody, it is ours")}
           searchPlaceholder={t("Search accounts…")}

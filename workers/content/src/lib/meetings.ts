@@ -253,8 +253,19 @@ export type MeetingFilter = {
   /** 'upcoming' is what has not started yet, BY THE CLOCK — it used to be
    * "everything nobody has ticked", which is a different set the moment somebody
    * forgets to tick. 'week' is the week we are in, past and upcoming both (9.1);
-   * 'all' shows the lot, cancelled ones included. */
+   * 'all' shows the lot, cancelled ones included; 'mine' is the meetings the
+   * CALLER was in the room for (client ruling, 2026-09-09 — see `caller`). */
   view?: string
+  /** WHO IS ASKING — the session's own user id and address, set by the door from
+   * the guard and the actor and NEVER read off the query string.
+   *
+   * It is not a filter a caller may spell, and that is the whole reason it sits
+   * apart from the six above. "Mine" is a question about the person holding the
+   * request; an `?attendee=` a caller could type would be a different capability
+   * (whose meetings is Alaap in), decided by nobody, exposed on the machine
+   * surface by R19 the moment it was parsed, and impossible to take back. The
+   * door supplies it; nothing on the wire can. */
+  caller?: { userId: string; email: string }
   /** ONE CALENDAR MONTH, `YYYY-MM`. The meetings list is ordered by start time DESCENDING
    * and it PAGES, so "the month on screen" is not a question the loaded page can
    * answer: on 19 Aug 2026 page one ran from June 2027 to August 2027 while the
@@ -325,6 +336,139 @@ function whereFor(filter: MeetingFilter): { sql: string; params: (string | numbe
     const { from, to } = thisWeek()
     where.push("m.starts_at >= ? AND m.starts_at < ?")
     params.push(from, to)
+  }
+  // ── "MINE" MEANS I WAS IN THE ROOM ────────────────────────────────────────
+  //
+  // THE CLIENT'S RULING, 2026-09-09, in her own words when she was told the tab
+  // did not exist: *"i was in the room"*. Not "I created it", not "I am the
+  // organiser", not "it is on an account I look after. ATTENDANCE.
+  //
+  // WHAT THE ROW ACTUALLY HOLDS. There is no attendance table. A meeting that
+  // came from Google carries `google_attendees_json`, the guest list mirrored
+  // whole (`mirrorOf` below writes `JSON.stringify(event.attendees)`), each
+  // entry a `MeetingGuest` with an `email`. A meeting somebody typed in here
+  // carries nothing at all — the column is NULL, because only the sweep ever
+  // writes it. So this is two sentences, not one.
+  //
+  // 1 · THE ADDRESS IS IN THE GUEST LIST. Matched as TEXT against the JSON,
+  //     which is exactly what the `q` search two blocks down already does over
+  //     the same column and for the same reason — the mirror is the only place
+  //     the people are. The needle is the address WRAPPED IN ITS OWN QUOTES
+  //     (`%"aurora@kwapso.com"%`) rather than bare: an unanchored `%addr%`
+  //     would match `xaurora@kwapso.com` too, and a quoted string in this blob
+  //     is either an `email` or the `name` beside it, which is the same person
+  //     either way. `likeLiteral` is what stops an `_` in an address — they are
+  //     common — meaning "any character".
+  //
+  //     The address is the caller's OWN, and it is the same identity
+  //     `ourStaffAmong` resolves an attendee to (LOWER(users.email)). That
+  //     helper is not called here on purpose: it goes the other way (addresses →
+  //     staff) and it reads the GLOBAL core database, so using it would mean a
+  //     second round trip in the middle of building a WHERE, on every page of a
+  //     paged list. The RULE is shared; the read is not.
+  //
+  // 2 · THERE IS NO GUEST LIST AT ALL — fall back to who recorded it. A meeting
+  //     nobody synced from a calendar has no attendance to test, so on the
+  //     attendance rule alone it would be in NOBODY's Mine, for ever: 458 live
+  //     meetings on staging, 251 with a guest list, which leaves ~207 rows that
+  //     would silently belong to no one. The person who wrote a meeting down is
+  //     the only person the row knows was involved with it, and for the typed-in
+  //     case that is the honest answer.
+  //
+  //     IT IS FENCED TO ROWS WITH NO LIST, and that fence is load-bearing rather
+  //     than tidy. On a row that CAME from Google, `creator_id` is whoever
+  //     pressed sync, not whoever was invited — so an unfenced
+  //     `OR creator_id = ?` would put every meeting the first syncer ever
+  //     imported into that one person's Mine and no one else's, which is the
+  //     opposite of the ruling. Where the list is empty (`[]`, what the sweep
+  //     writes for a solo calendar block) the same `creator_id` IS the person
+  //     whose calendar it was read from, and they were in that room alone.
+  //
+  // WHAT IT COSTS — MEASURED ON STAGING, 9 Sep 2026, and the answer is not the
+  // one the first draft of this paragraph assumed (R14).
+  //
+  // The claim it made was "a LIKE over a JSON blob cannot use an index, so this
+  // is a full scan — for the rows AND for the COUNT(*)". Half of that is wrong,
+  // and the wrong half is the one that would have justified the fix.
+  //
+  //   THE ROWS ARE NOT A FULL SCAN. The list is `ORDER BY starts_at DESC LIMIT
+  //   51`, so SQLite walks `idx_meetings_when` in the order it already wants
+  //   and STOPS at the fifty-first match. D1's own `rows_read`, against the 557
+  //   meetings this base holds: 51 for Alaap, 63 for Aurora, 124 for Ishita,
+  //   127 for Alex. The predicate is evaluated per row, never sorted, never
+  //   scanned to the end. Only somebody in NO meetings pays the whole table
+  //   (557 rows, 0.9 ms), because there is no fifty-first match to stop at.
+  //
+  //   THE COUNT IS A FULL SCAN — 557 rows read, 0.6-1.3 ms — AND SO IS THE ONE
+  //   BESIDE IT. `total` for the All view is `deactivated_at IS NULL`, which
+  //   reads the same 557 rows and rides EVERY meetings response. So Mine's
+  //   count is not a new class of cost; it is the class the door already pays,
+  //   once more, once per screen mount. No link table removes it, because "how
+  //   many rows are in this collection" has no narrower question hiding inside
+  //   it — `shared/workers/count.ts` says the same thing about its own ceiling.
+  //
+  // AND THE SCAN IS 0.1% OF THE REQUEST. The team database is reached over the
+  // D1 REST door: ~500 ms of round trip around 0.6 ms of engine. A primary-key
+  // read that touches nothing costs 0.1 ms of that same 500. Making the
+  // predicate free would make the meetings list no faster by any amount a
+  // person can perceive.
+  //
+  // THE LINK TABLE WAS DESIGNED, BENCHED AND NOT BUILT. It would be exactly
+  // right: one row per (meeting, attendee) plus one per no-list meeting for its
+  // creator, built by the rule the two clauses above state. Simulated off the
+  // real 557 rows it answers IDENTICALLY to this SQL for all ten members of
+  // this team — 552 / 276 / 177 / 161 / 139 / 12 / four zeros, not one row of
+  // disagreement. It was refused on cost, not on doubt:
+  //
+  //   1 · THE OBVIOUS SHAPE IS A REGRESSION, and this is the finding worth
+  //       keeping. A link table keyed `(meeting_id, email)` and indexed on the
+  //       address turns the list from an ordered walk into a join whose matches
+  //       arrive in ADDRESS order and must then be sorted by start time to
+  //       answer `LIMIT 51`. Benched over synthetic rows shaped like these at
+  //       100,000: 0.15 ms today, 36 ms with that table. Two hundred times
+  //       WORSE on the tab it was built for.
+  //   2 · THE SHAPE THAT WINS HAS TO CARRY THE SORT KEY — `starts_at` and a
+  //       live flag denormalised beside the address, covering-indexed. That is
+  //       29x on the count at 100,000 rows, and it is three MUTABLE facts kept
+  //       in a second place by a sweep that rewrites all three. A stale copy
+  //       there does not slow anything down; it tells somebody they were not in
+  //       a room they were in.
+  //   3 · IT ONLY WINS ON ONE SORT. `MEETING_SORTS` offers four (when, title,
+  //       client, added). A covering index on start time answers the default;
+  //       the other three fall straight back to the scan.
+  //   4 · IT SPENDS THE METER THIS APP ACTUALLY PAYS. `documents/COSTS.md`
+  //       bills D1 rows WRITTEN; reads sit inside an allowance three orders of
+  //       magnitude above this traffic. The link table converts a read nobody
+  //       is billed for into writes on every calendar mirror — 1,121 pairs
+  //       rewritten on a full resync of this one team.
+  //
+  // WHAT WOULD CHANGE THE ANSWER, so the next person measures rather than
+  // re-argues. The sweep's horizon is five years back and a rolling year ahead,
+  // and this base has taken 557 rows out of 22 months of one agency's calendar
+  // — roughly 300 a year. Build it when a team's `meetings` passes ~50,000
+  // rows (where the count crosses ~15 ms and stops being noise beside the round
+  // trip), or when a second question starts asking the same scan on the same
+  // response. Not before, and not with the keyed-on-email shape.
+  //
+  // THE `q` SEARCH GETS NOTHING FROM IT EITHER, contrary to what stood here.
+  // That search matches `%needle%`, unanchored on both ends, which cannot use
+  // an index on a narrow `email` column any more than on this blob.
+  if (filter.view === "mine") {
+    if (filter.caller) {
+      where.push(
+        `((m.google_attendees_json IS NOT NULL AND LOWER(m.google_attendees_json) LIKE ? ESCAPE '\\')
+          OR (COALESCE(TRIM(m.google_attendees_json), '') IN ('', '[]') AND m.creator_id = ?))`
+      )
+      params.push(`%"${likeLiteral(filter.caller.email.toLowerCase())}"%`, filter.caller.userId)
+    } else {
+      // NOBODY IS ASKING, SO NOBODY WAS IN THE ROOM. A question about the caller
+      // with no caller attached narrows to NOTHING rather than to everything —
+      // the same rule `month` and `transcript` follow one step further on. The
+      // door always attaches one (routes/meetings.ts), so this is the shape of
+      // the failure rather than a path anything takes: it fails to an empty
+      // list, never to the whole agency's diary wearing somebody's name.
+      where.push("1 = 0")
+    }
   }
   // THE MONTH A CALENDAR IS SHOWING. A half-open range, so a meeting at
   // 23:59:59 on the 31st belongs to the month and one at 00:00 on the 1st of the

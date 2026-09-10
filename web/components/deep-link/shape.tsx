@@ -17,6 +17,12 @@ import type { ActivityFeedRow } from "@/lib/use-record-activity"
 import { nameInitials, personName } from "@/lib/identity"
 import { describeWithStaffName, staffNameFromSnapshot } from "@shared/staff-name"
 import { RecordMark } from "@shared/web/record-mark"
+// THE CLASS, NOT THE CHIP. `REF_LEADS_NAME` is the one spelling of "a shrink-0
+// thing in front of a name that truncates", written for the reference lozenge
+// and exactly as true of the contacts table's mark — the alternative was a
+// second set of the same four utilities, which is how two rows come to align
+// differently (`record-ref.tsx` carries the whole argument for each one).
+import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
 import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { translator, type Language } from "@shared/i18n"
@@ -30,7 +36,6 @@ import type {
   KnowledgeSource,
   Meeting,
   MeetingPurpose,
-  TeamMeta,
   TeamMember,
   TeamRole,
 } from "@shared/types"
@@ -92,29 +97,9 @@ export function shapeActivity(items: ActivityItem[], lang: Language): ActivityFe
   }))
 }
 
-export function shapeTeamDetail(opts: {
-  teamId: string
-  name: string
-  logoUrl: string | null
-  meta: TeamMeta
-  activity: ActivityItem[]
-  lang: Language
-}): ScreenData {
-  return {
-    record: {
-      id: opts.teamId,
-      name: opts.name,
-      image: opts.logoUrl ?? "",
-      created: formatDateTime(opts.meta.createdAt, opts.lang),
-      // R54 — the team's own audit line. The creator is the colleague who made
-      // the team; the email fallback is handed to the seam too, which returns an
-      // address whole rather than cutting it at the "@".
-      createdBy: staffNameFromSnapshot(opts.meta.creatorName) || opts.meta.creatorEmail || "",
-      updated: opts.meta.updatedAt ? formatDateTime(opts.meta.updatedAt, opts.lang) : "—",
-    },
-    sets: { activity: shapeActivity(opts.activity, opts.lang) },
-  }
-}
+/* `shapeTeamDetail` is gone with the screen it fed — the team overview, deleted
+ * on the client's 2026-09-09 ruling. web/lib/pages.ts carries the decision. */
+
 
 export function shapeMembersList(members: TeamMember[], lang: Language): ScreenData {
   return {
@@ -317,7 +302,7 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
  * somebody is scanning for, and the detail screen names it in full. */
 function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
   if (!source.accountId) return "The agency"
-  return accountNames?.get(source.accountId) ?? "A client"
+  return accountNames?.get(source.accountId) ?? "An account"
 }
 
 export function shapeKnowledgeList(
@@ -449,16 +434,15 @@ export function shapeAccountsList(
         // EVERY CLIENT IS A SQUARE, the sole traders included. They were drawn
         // circles, which is the honest shape for a person and the wrong one HERE:
         // one list, one column, and two shapes in it reading as two kinds of
-        // record when a client is a client. The crop stays with them — 31 of
-        // these hold a real face, and `fit` is what keeps squaring the box from
-        // letterboxing every one (shared/web/record-mark.tsx).
-        mark: (
-          <RecordMark
-            picture={a.logoUrl}
-            name={a.name}
-            fit={a.accountType === "individual" ? "cover" : "contain"}
-          />
-        ),
+        // record when a client is a client.
+        //
+        // AND THE CROP IS NO LONGER THIS ROW'S DECISION EITHER (R60, client
+        // 2026-09-09: "everywhere for images: do fill, not fit!"). This line
+        // used to read `a.accountType` to crop the 31 sole traders who hold a
+        // real face and contain the companies' wordmarks; every picture fills
+        // its box now, so the type is not consulted here at all
+        // (shared/web/record-mark.tsx's header carries what that cost).
+        mark: <RecordMark picture={a.logoUrl} name={a.name} />,
         // Archived rows stay visible (archive-never-delete), flagged like retired
         // roles and articles are.
         name: a.active ? a.name : `${a.name} (archived)`,
@@ -477,6 +461,82 @@ export function shapeAccountsList(
         detail: [ACCOUNT_TYPE[a.accountType], parent].filter(Boolean).join(" · ") || "—",
       }
     }),
+  }
+}
+
+/** THE CONTACTS TABLE'S ROWS — three columns, and the argument for each one.
+ *
+ * The client, 2026-09-09, looking at five options for this screen: *"for
+ * contacts lets do view table, also add column role after account"*. So the
+ * columns are the person, then Account, then Role, in that order.
+ *
+ * ── WHAT THE SCREEN USED TO SHOW, AND WHAT HAPPENED TO IT ────────────────────
+ *
+ * A contact row was `shapeAccountsList`'s: a mark, a name, and a summary line
+ * reading `Person · under Bergman S.A.`. Censused into columns, that is four
+ * facts and one of them is a constant:
+ *
+ *   • the MARK and the NAME become the first column, together, the same shape
+ *     `RecordRef` draws for a number in front of a title (`REF_LEADS_NAME` is
+ *     literally that class, reused rather than respelled — a shrink-0 thing in
+ *     front of a min-w-0 name).
+ *   • `under Bergman S.A.` becomes the ACCOUNT column, and stops being a phrase
+ *     inside a sentence. It is read off the LINK now rather than off the parent
+ *     pointer, so it and Role are two facts about ONE company (shared/types.ts's
+ *     note on `companyName` has the whole argument).
+ *   • `Person` is DROPPED and is not a loss. It was earning its place on the
+ *     Accounts list, where a row can be either kind; on a screen whose entire
+ *     question is `type=individual` it is the same word on all 110 rows, which
+ *     is a column of furniture (N1: a table's budget is six, and this spends
+ *     three).
+ *
+ * ── EM DASH, NOT "None" ──────────────────────────────────────────────────────
+ *
+ * 22 of this team's 110 contacts sit under no company and 45 carry no role, and
+ * NEITHER is an error: nobody has said yet. The app already has a word for that
+ * and it is a dash — the tickets list draws `—` for a ticket with no app, and
+ * `shapeAccountsList` above draws it for an empty summary line. A dash is quiet
+ * enough to scan past, which is what an ordinary absence should be; "None" reads
+ * like an answer somebody gave, and "Not set" reads like a fault.
+ *
+ * Also what `record-table.tsx` sorts LAST in both directions (`isBlank` names
+ * `"—"` outright), so a table ordered by a mostly-empty column opens on the rows
+ * that have something in it. */
+export function shapeContactsTable(contacts: Account[]): ScreenData {
+  return {
+    rows: contacts.map((a) => ({
+      id: a.id,
+      // THE PERSON, as the mark and the name in one cell. `RecordMark` decides
+      // the box and the fallback (R35/R60) — 31 of 110 hold a real face and the
+      // rest get their initial, so this column is initials far more often than
+      // photographs and has to look deliberate either way.
+      //
+      // THE DEFAULT SIZE (`row`), NOT `choice`, and it is a decision rather than
+      // an omission. `choice` is 24px and record-mark.tsx reserves it in writing
+      // for a checklist's checkbox row and the record picker's candidate stack —
+      // "`row` stays the size for an ordinary collection row read on its own",
+      // which is exactly what a line of this table is. It is also the size the
+      // LIST rows this table replaced were drawing (`shapeAccountsList` above,
+      // through the recipe's `leading: "mark"`), so the same person is the same
+      // size on the screen she was on yesterday. The two marks at `choice` in
+      // this app are both inside dropdowns.
+      person: (
+        <span className={REF_LEADS_NAME}>
+          <RecordMark picture={a.logoUrl} name={a.name} />
+          <span className="min-w-0 truncate">
+            {a.active ? a.name : `${a.name} (archived)`}
+          </span>
+        </span>
+      ),
+      // THE PLAIN NAME BESIDE THE NODE, and it is not a duplicate: the column
+      // above holds a React element, and `CollectionFrame`'s own search reads
+      // the row's values as text (`searchKeys`), so without this the frame
+      // would be searching `[object Object]`. It is also what a browser-side
+      // sort would compare if this column ever gained one.
+      name: a.active ? a.name : `${a.name} (archived)`,
+      account: a.companyName ?? "—",
+      role: a.relationship ?? "—",
+    })),
   }
 }
 

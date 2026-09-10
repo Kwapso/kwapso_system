@@ -76,7 +76,15 @@ async function raise(fields: Record<string, unknown>): Promise<string> {
  * map is reworded, this fails and somebody re-reads the sentence. */
 const GAP_WORDS: Record<string, string> = {
   type: "a ticket type",
-  client: "a client",
+  // "a client" UNTIL 2026-09-09, and this assertion is what made somebody
+  // re-read the sentence, exactly as the note above says it should. The word
+  // moved because the gap IS the account — `triageGaps` pushes this one when
+  // `accountId` is empty — and the screen's own version of the same sentence
+  // (`GAP_WORD`, tickets-collection.tsx) moved with it in the same change, per
+  // her ruling: "the filter client is the company, so it's the account."
+  // The KEY stays `client`: it is the `TriageGap` identifier the door and the
+  // screen both switch on, not a word anybody reads.
+  client: "an account",
   app: "an app",
   raisedBy: "who raised it",
 }
@@ -111,7 +119,7 @@ describe("pre-triage is a reason, not a status", () => {
       // already refuses "a contact belongs to one" — you cannot raise a ticket
       // naming who reported it and not naming the company they are at. So this
       // case is genuinely two gaps, and the assertion below still holds: the
-      // refusal must name the client.
+      // refusal must name the account.
       if (field === "accountId") delete rest.raisedByContactId
       const id = await raise(rest)
       const res = await call(IDS.staffUser, "POST /api/content/help/triage-read", { id })

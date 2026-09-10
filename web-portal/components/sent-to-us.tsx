@@ -34,6 +34,7 @@ import { formatDate } from "@shared/web/format"
 import { safeHref } from "@shared/web/rich-text"
 import { CollectionHeading } from "@/components/collection-heading"
 import { ErrorPanel } from "@/components/error-panel"
+import { PortalEmpty } from "@/components/portal-empty"
 import * as React from "react"
 import { usePortalTodos } from "@/lib/todos"
 import { useDoorSearch } from "@/lib/search"
@@ -125,10 +126,10 @@ export function SentToUs() {
       ) : searching && search.rows === null ? (
         <Skeleton className="h-20 w-full rounded-[var(--radius)]" />
       ) : searching && (search.rows?.length ?? 0) === 0 ? (
-        <div className="text-muted-foreground rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-          <p>{t("Nothing matched that.")}</p>
-          <p className="mt-1 text-sm">{t("Try fewer words, or clear the search to see everything.")}</p>
-        </div>
+        /* R62 — the portal's one zero register. This section has no resting
+           zero of its own (it returns null when the list is empty, above), so
+           the only state it can be in is this one. */
+        <PortalEmpty filtered title={t("Nothing here yet.")} />
       ) : null}
 
       <ul className="flex flex-col gap-2">

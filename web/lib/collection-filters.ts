@@ -63,6 +63,14 @@ export type CollectionFacet = {
   /** the CLOSED vocabulary, where the door has one. A facet over rows leaves
    * this out and the screen fills it in — see `translatedFacets`. */
   options?: FacetOption[]
+  /** THE FACET THIS ONE HANGS OFF, where the record it names is OWNED by the
+   * record another facet in the same row names (client ruling, 2026-09-09 —
+   * `FilterFacet.dependsOn`, shared/web/screen-engine/config.ts, carries her
+   * words and the whole argument; `useFilterBar` applies it).
+   *
+   * `emptyText` is ENGLISH here like every other word in this file and goes
+   * through `t()` in `translatedFacets` below, the same as `label`. */
+  dependsOn?: { field: string; emptyText: string }
 }
 
 /** Yes and no, which four of these facets need and none of them should spell
@@ -134,12 +142,54 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
   // the census entry beside it — cheap. Reinstating a lost route to a thousand
   // archived tickets is not.
   help: [
-    { field: "accountId", label: "Client" },
+    // THE WORD IS ACCOUNT, AND IT WAS CLIENT UNTIL 2026-09-09. Her correction,
+    // on this very row: "Hey, you got it wrong. The filter client is the
+    // company, so it's the account. Let's do something: rename client to
+    // account everywhere we said client. This was a mistake." She is fixing a
+    // VOCABULARY mistake, not asking for a data-model change — the field below
+    // is still `accountId`, the door still parses `accountId`, the column is
+    // still `help.account_id`. Nothing under the label moved.
+    //
+    // WHY THIS LINE IS WHERE THE NOTE GOES: this is the control she was looking
+    // at. The same word had to move on the facet's own dependant ("Choose an
+    // account first." below), on the meetings facet further down, on the
+    // meetings SORT (`collection-sorts.ts`), on the sprints and apps facets
+    // (`web/lib/screens.ts`) and on every picker and column that named the same
+    // record — a facet whose label and whose empty sentence disagree is a row
+    // saying two words for one thing, which is the fault she reported.
+    //
+    // DO NOT RENAME IT BACK, and do not "finish" it either: "client" is still
+    // the right word for the RELATIONSHIP and the PERSON in it — the portal
+    // login who raises a ticket, the person we email an answer to, the one who
+    // may never read the agency's own notes. R34's registry note refuses to
+    // ban the word for exactly that reason. See shared/glossary.ts § account.
+    { field: "accountId", label: "Account" },
     // ROWS, NOT A CLOSED VOCABULARY: the door matches an app's id, and the
     // tickets screen fills these from the apps list it already holds — which
     // is BOUNDED (a team's own systems), so page one is the collection and the
     // menu is not the truncated one an accounts-shaped read would give.
-    { field: "appId", label: "App" },
+    //
+    // AND IT HANGS OFF THE CLIENT ABOVE IT — client ruling, 2026-09-09, on a
+    // screenshot of THIS toolbar: "very wrong! filter the apps by selected
+    // client! Until clint is not selected, show nothing." The narrowing itself
+    // is `useFilterBar`'s (one seam, every facet in both front doors); what is
+    // declared here is only that the relationship EXISTS, which it does as a
+    // real column — `apps.account_id`, the same one the apps door narrows by
+    // when it is asked `GET /api/tenancy/apps?accountId=` (`appsWhere`,
+    // workers/tenancy/src/lib/processes.ts). So this is not a second opinion
+    // about which apps are whose; it is the app record's own field, reaching a
+    // control that had been ignoring it.
+    //
+    // "Choose an account first." IS THE TICKET FORM'S OWN SENTENCE for exactly
+    // this state, said by its App row when no client is named yet
+    // (help-form-dialog.tsx). One idea, one sentence (R34) — and it is already
+    // in the catalogue, answered in all three languages, so this control adds
+    // nothing to translate.
+    {
+      field: "appId",
+      label: "App",
+      dependsOn: { field: "accountId", emptyText: "Choose an account first." },
+    },
     // THE TEAM'S OWN `Ticket type` WORDS, so the options cannot be declared
     // here: this is a per-team, editable vocabulary (`selectable_data`), not a
     // constant. It is filled in by the screen from `helpTypeOptions` — the one
@@ -188,7 +238,7 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
     },
   ],
   meetings: [
-    { field: "accountId", label: "Client" },
+    { field: "accountId", label: "Account" },
     { field: "purposeId", label: "Why we met" },
     // NO STATUS FILTER, and the reason changed under this line while it was
     // being written. It used to offer Scheduled and Held; `held` was retired the
@@ -220,8 +270,31 @@ export const COLLECTION_FILTERS: Record<string, CollectionFacet[]> = {
       ],
     },
     { field: "assigneeId", label: "Who has it" },
-    { field: "sprintId", label: "Sprint" },
+    // APP BEFORE SPRINT, which is a change of ORDER as well as of behaviour and
+    // is worth saying out loud: this array is what `translatedFacets` walks, so
+    // it is the order the panel reads in, and Sprint sat above the App it hangs
+    // off until 2026-09-09. A control that cannot be used until the one BELOW it
+    // is answered is a panel read bottom-up. The ticket form settled the same
+    // question for the same pair of ideas — "it is still the order the data
+    // depends in … so answering downward never asks a question that has no
+    // answer yet" — and this is that sentence applied to a filter row.
     { field: "appId", label: "App" },
+    // A SPRINT BELONGS TO AN APP, so the Sprint control hangs off the App one —
+    // the same ruling as the tickets toolbar above, on the OTHER ownership edge
+    // this app's filter rows actually contain (`sprints.app_id`, carried on the
+    // row as `Sprint.appId`; `stories.ts`' own reads resolve an app's name
+    // through it). Before this, picking an app and then a sprint of a different
+    // app was an offered pair that returns nothing — the client's exact
+    // complaint, one screen along, which is what "and so on" asks us to find.
+    //
+    // "Choose an app first." is the ticket form's sentence for the same shape
+    // one level down (its Module row, which belongs to an app the same way this
+    // belongs to one), already catalogued and already answered.
+    {
+      field: "sprintId",
+      label: "Sprint",
+      dependsOn: { field: "appId", emptyText: "Choose an app first." },
+    },
   ],
   workLogs: [
     // WHO LOGGED IT — a facet over rows, filled in from the team's own staff
@@ -291,7 +364,24 @@ export function translatedFacets(
       ? facet.options.map((o) => ({ value: o.value, label: t(o.label) }))
       : (rows[facet.field] ?? [])
     if (options.length === 0) continue
-    out.push({ field: facet.field, label: t(facet.label), control: "select", options })
+    out.push({
+      field: facet.field,
+      label: t(facet.label),
+      control: "select",
+      options,
+      // THE CASCADE RIDES THROUGH UNNARROWED, and that is deliberate: this
+      // function declares what a facet MAY offer over the whole collection,
+      // and `useFilterBar` is the one place that narrows it to what the
+      // parent leaves. Two narrowings would be two answers. Note also that
+      // the "drop a facet with nothing to offer" rule above is asked of the
+      // UNNARROWED list, which is the honest question — a team with apps has
+      // an App filter whichever client is picked, and a client with none gets
+      // the kit's own empty register inside the control rather than a control
+      // that comes and goes as they change clients.
+      ...(facet.dependsOn
+        ? { dependsOn: { field: facet.dependsOn.field, emptyText: t(facet.dependsOn.emptyText) } }
+        : {}),
+    })
   }
   return out
 }

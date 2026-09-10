@@ -187,3 +187,40 @@ export function describeWithStaffName(
   if (first === full) return description
   return description.startsWith(full) ? first + description.slice(full.length) : description
 }
+
+/** THE ONE SCREEN THAT SHOWS BOTH NAMES — the members gallery on Settings ›
+ * Team, and nothing else.
+ *
+ * THE CLIENT REVERSED HERSELF, TWO DAYS LATER. The 7 Sep 2026 ruling this file
+ * is built on says first name only, "across all the app". On 9 Sep 2026, looking
+ * at the members gallery she had just asked for — "let's use gallery — i wanna
+ * see avatar (in round) role (chip) and email" — she added, verbatim: "show name
+ * and surname for the members."
+ *
+ * Both rulings stand, and they are not in conflict once you read what each one is
+ * ABOUT. The first is about a person appearing INSIDE something else: an activity
+ * sentence, a picker option, an assignee, an avatar's accessible name — a
+ * mention, where the surname is noise and the first name is how a colleague is
+ * spoken about. This one is about the ROSTER: the one screen whose subject IS the
+ * people, where the reader is looking somebody up rather than reading about them,
+ * and where two colleagues called Marta are two rows a first name cannot tell
+ * apart. A directory prints both names; a sentence does not.
+ *
+ * SO IT IS A SECOND FUNCTION ON THE SAME SEAM, not a call site reaching past it.
+ * R54's whole shape is that one file turns a staff person into the word a screen
+ * shows, and the way to add a second word-form is to add it HERE, where the two
+ * rulings can sit next to each other and be read together — not to interpolate
+ * `first + " " + last` in a component, which is exactly the drift R54 exists to
+ * stop and which no later reader would find.
+ *
+ * The awkward inputs are `staffName`'s, deliberately: an email is handed back
+ * whole and never joined to anything, one name on file is that one name, and
+ * nothing is invented for a person who has neither. */
+export function staffFullName(p: StaffIdentity): string {
+  const first = (p.firstName ?? "").trim()
+  const last = (p.lastName ?? "").trim()
+  if (first && last) return `${first} ${last}`
+  // One name, an email, or nothing — `staffName`'s own ladder, so the two
+  // functions can never disagree about a person who has only half a name.
+  return staffName(p)
+}

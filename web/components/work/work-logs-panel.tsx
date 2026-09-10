@@ -440,16 +440,14 @@ export function WorkLogsPanel({
         {rows === null ? (
           <Skeleton variant="list" lines={3} />
         ) : rows.length === 0 ? (
-          personFilter ? (
-            <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
-          ) : (
-            // No `work_logs` import target — time against one record is logged
-            // live, never bulk-loaded.
-            <CollectionEmptyState
-              title={t("No time logged against this yet.")}
-              onCreate={canLog ? () => setAdding(true) : undefined}
-            />
-          )
+          /* R62 — ONE REGISTER, BOTH ZEROS, the add button the only difference.
+             No `work_logs` import target — time against one record is logged
+             live, never bulk-loaded. */
+          <CollectionEmptyState
+            filtered={Boolean(personFilter)}
+            title={t("No time logged against this yet.")}
+            onCreate={canLog ? () => setAdding(true) : undefined}
+          />
         ) : (
           <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
             {rows.map((l) => (

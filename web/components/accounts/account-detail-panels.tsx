@@ -219,7 +219,17 @@ export function ContactsPanel({
           onCreate={canCreatePerson ? onNew : undefined}
         />
       ) : sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client, 2026-09-09:
+           "the empty because of filters hosul look the same as empty collection
+           but the add button." This was a bare grey line beside the full
+           register two branches up; it is the same body now, and `filtered`
+           does the subtracting. `onCreate` is handed over unconditionally and
+           withdrawn by the component, which is the whole point. */
+        <CollectionEmptyState
+          filtered
+          title={t("No contacts yet.")}
+          onCreate={canCreatePerson ? onNew : undefined}
+        />
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {sorted.map((l) => (
@@ -399,7 +409,12 @@ export function PortalAccessPanel({
           onCreate={canGrant ? onGrant : undefined}
         />
       ) : sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+        /* R62 — the same register as the branch above, minus the add button. */
+        <CollectionEmptyState
+          filtered
+          title={t("Nobody here can sign in yet.")}
+          onCreate={canGrant ? onGrant : undefined}
+        />
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {sorted.map((p) => (

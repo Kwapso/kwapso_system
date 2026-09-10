@@ -853,6 +853,61 @@ again, which is the only property that matters here.
   must open. Write a real file's path or none: an illustrative one goes in
   `<angle brackets>` so it reads as a template, and a path named precisely
   BECAUSE the file is gone gets a reasoned `GONE_ON_PURPOSE` line.
+- **R59 `forms-are-not-overlays`** — your module's forms, editors and pickers
+  slide in; only a warning is centred. Reach for `FormShellDialog` (which is a
+  `Sheet` already, and gets you R4 and the pinned action bar at the same time),
+  or the kit's `<Sheet side="right">` if your panel is doing something that
+  wrapper cannot. A "delete this?" / "archive this?" check is an `AlertDialog`
+  and stays in the middle of the screen. A bare `<Dialog>` needs a reasoned
+  `CENTRED_DIALOG_OK` line, and it may not collect anything.
+- **R60 `image-fills`** — every picture your module draws is `object-cover`. It
+  fills the box it is given and is cropped to it; it is never `object-contain`,
+  and it never reaches the same result by handing the kit's `Image` a
+  `fit="contain"` (both spellings are censused). In practice you will not write
+  either: a record's picture is `<RecordMark>` (which is also R35), and that
+  component has no fit to pass. A wide logo losing its ends is the intent, not a
+  bug — the client's ruling, 2026-09-09. If your module genuinely shows a picture
+  that is the CONTENT rather than a mark standing for a record — an uploaded
+  file's preview, say — that is an `OBJECT_FIT_OK` line with the argument
+  written out, and the list holds exactly one today.
+- **R61 `module-settings-two-doors`** — this one only applies if your module has
+  something to SET (a vocabulary, a threshold, a rule of its own); most do not,
+  and *"only the ones with something to set"* is the client's own answer, so
+  having no settings page is a perfectly good outcome and costs you nothing
+  here. If it does: add ONE entry to `MODULE_SETTINGS`
+  (`web/components/screens/module-settings-screen.tsx`) — that is the whole
+  registration, and it gives you the full-screen page at `/settings/<segment>`,
+  a row on Settings › Modules and the gear on your own screen from one place.
+  Then mount `<ModuleSettingsGear teamId={teamId} segment="<segment>" />` in your
+  collection heading's `action` slot (never the toolbar — R50 draws no toolbar at
+  all on an empty collection, which is exactly when somebody goes looking for the
+  settings). Exactly one gear per segment, and your `segment` must be a real
+  `MODULE_PERMISSION` key. Do NOT write a row on the Modules tab and do not spell
+  your module's segment in `settings-screen.tsx`: the index is derived from the
+  table through `moduleSettingsIndex`, so the row already exists. Do not restate
+  the permission either — every section carries its own `gate` and
+  `visibleModuleSettings` is the one place it is asked, which is what stops a
+  reader being offered a door that refuses them.
+- **R62 `one-zero-register`** — your collection has TWO empty states and they are
+  different facts: RESTING (no rows at all — first run, and the screen exists to
+  be filled) and FILTERED (rows exist, but a search, a tab or a facet has
+  narrowed them to none). Draw BOTH through ONE component and pass the fact:
+  `<CollectionEmptyState filtered={…} title={…} onCreate={…} />` on the agency
+  door, `<PortalEmpty filtered={…} …>` on the portal. Hand your create action
+  over UNCONDITIONALLY — the register withdraws it on `filtered`, so there is
+  nothing for you to gate and nothing for you to forget; that is R50's own
+  lesson about `empty`, one component down. Two things to get right and both are
+  facts you already hold. (i) `title`/`description` are read only AT REST, so
+  write them as claims about the collection ("No widgets yet.") and let the
+  register say "Nothing matched." when a search is on — "No widgets yet." is
+  simply untrue mid-search. (ii) If your collection GROWS and its search lives
+  in `<PagedFind>` at the door rather than in the frame, pass
+  `narrowedOutside={found.active}` down to `ScreenRenderer`/`RecordTable`:
+  without it the frame's own query is always empty, a search that matched
+  nothing reads as "this collection is empty", and it offers "Add the first"
+  over rows a term is hiding. Never a bare `<p>` for either zero: forty-three of
+  those were the state of this app on 2026-09-08, twelve of them the identical
+  sentence.
 
 **The words** (the ones that catch every new module, every time)
 

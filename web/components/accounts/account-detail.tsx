@@ -843,7 +843,7 @@ export function AccountDetailScreen({
             return (
               <AskTheAssistant
                 context={[
-                  `the client ${account.name}`,
+                  `the account ${account.name}`,
                   account.industry ? `in ${account.industry}` : null,
                 ]
                   .filter(Boolean)

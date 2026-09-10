@@ -319,7 +319,7 @@ export function AppDetailScreen({
   }
 
   // THE REAL NAME, NEVER "A CLIENT" WHILE A REAL ACCOUNT IS LINKED — client
-  // bug, 2026-08-31: ETZI's own account chip read "A client" instead of
+  // bug, 2026-08-31: ETZI's own account chip read "An account" instead of
   // "Etzi Haus" even though `app.accountId` pointed at a real, active
   // account. Root cause was the SAME shape the comment below (THE CONTACT
   // NAMES) already names for a sibling field: `accountsQ.data` is the accounts
@@ -330,7 +330,7 @@ export function AppDetailScreen({
   // door (`tenancy.accountDetail`, below), for the stakeholder names two
   // sections down — its own `.account` is the same record, read the way R38
   // asks a detail screen to read one: by id, never by scanning a loaded page.
-  const accountName = app.accountId ? (contactsQ.data?.account.name ?? "A client") : null
+  const accountName = app.accountId ? (contactsQ.data?.account.name ?? "An account") : null
 
   // ONLY THE STAFF ON IT AND AN ADMIN OPEN THIS PAGE (CHECKLIST 8.11, Aurora's
   // ap1 over the narrower reading). The refusal is the DOOR's — the app row
@@ -389,14 +389,14 @@ export function AppDetailScreen({
   // than trailing the address. A field nobody has filled in is dropped rather
   // than shown empty (UI-RULEBOOK W2 — `hideEmpty` is the default).
   const overviewItems = [
-    { label: t("Client"), value: accountName ?? "Ours, no client" },
+    { label: t("Account"), value: accountName ?? "Ours, no account" },
     // The mark stays OUT of this sentence (shared/app-stages.ts's own rule: "it
     // sits where an icon sits and never inside a sentence") — it already draws
     // in the header band's mark square (`mark={appStageMark(app.stage)}` below).
     { label: t("Stage"), value: app.stage || "—" },
     { label: t("About"), value: app.about ? <RichText html={app.about} /> : "—" },
     {
-      label: t("Client context"),
+      label: t("Account context"),
       value: app.clientContext ? <RichText html={app.clientContext} /> : "—",
     },
     { label: t("Solution"), value: app.solution ? <RichText html={app.solution} /> : "—" },
@@ -808,9 +808,13 @@ export function AppDetailScreen({
           teamId={teamId}
         open={meetingOpen}
         onOpenChange={setMeetingOpen}
-        accountOptions={(accountsQ.data ?? [])
-          .filter((a) => a.active && a.accountType === "entity")
-          .map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW, NOT A COPY OF TWO OF ITS FIELDS. `PickableRecord`
+        // (web/lib/pickable.ts) is deliberately the loosest shape that carries a
+        // face, and an `Account` structurally satisfies it — so the `.map((a) =>
+        // ({ id, name }))` that used to sit here was the exact line that type
+        // exists to end, dropping `logoUrl` one hop before the picker that draws
+        // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active && a.accountType === "entity")}
         appOptions={[{ id: appId, name: app.name }]}
         purposeOptions={(purposesQ.data ?? [])
           .filter((x) => x.active)

@@ -432,11 +432,14 @@ describe("the account gate runs before anything is uploaded", () => {
     // No fallback, for the same reason the migration gate has none: a fallback is
     // how a gate goes quietly green. Both ways of not knowing are a throw.
     expect(() => accountGate.expectedAccount(new Map())).toThrow(/CF_ACCOUNT_ID/)
+    // The ACCOUNT IDS are invented; the FILES are two real configs, because the
+    // thrown message names them to a person and R58 holds a path in a literal to
+    // the same standard as one in a comment (web/test/named-paths.test.ts).
     expect(() =>
       accountGate.expectedAccount(
         new Map([
-          ["a".repeat(32), ["workers/one/wrangler.jsonc"]],
-          ["b".repeat(32), ["workers/two/wrangler.jsonc"]],
+          ["a".repeat(32), ["workers/auth/wrangler.jsonc"]],
+          ["b".repeat(32), ["workers/tenancy/wrangler.jsonc"]],
         ])
       )
     ).toThrow(/more than one Cloudflare account/)

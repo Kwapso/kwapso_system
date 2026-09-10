@@ -7,13 +7,13 @@ import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@shared/ui/components/dialog/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@shared/ui/components/sheet/sheet"
 import { Field } from "@shared/web/field"
 import { Input } from "@shared/ui/components/input/input"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
@@ -62,7 +62,7 @@ export function CreateTeamDialog({
   }
 
   return (
-    <Dialog
+    <Sheet
       open={open}
       onOpenChange={(o) => {
         if (busy) return
@@ -70,14 +70,44 @@ export function CreateTeamDialog({
         onOpenChange(o)
       }}
     >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Create a team")}</DialogTitle>
-          <DialogDescription>
+      {/* A FORM IS A SLIDE-IN. CLIENT, 2026-09-09, over a screenshot of the
+          "New access token" dialog: "This should be a slide-in, like all the
+          other screens. The only ones that are overlays are the warnings,
+          such as archive or delete, and so on."
+
+          The ruling is general — she was shown one dialog and answered about
+          the class — so it lands here too: this is a form, therefore a
+          drawer, not a centred modal. It is NOT a style preference and must
+          not be reverted as one. Law R59 (`forms-are-not-overlays`) holds it.
+
+          `Sheet` and not `EdgePanel`: a form is modal (you finish it or you
+          leave it) and `Sheet` is the kit's modal drawer, while `EdgePanel`
+          is deliberately NON-modal above 45rem — the shape the client picked
+          for the record's activity rail, where you keep working beside it.
+          `Sheet` also carries her OTHER standing ruling, 2026-09-04 —
+          "everythung that's slisde in in desktop, should be slide up in
+          mobile" — centrally: below 45rem `side="right"` presents and
+          animates as the bottom sheet, capped at 85dvh, with the grabber.
+          Nothing in this file implements that, and nothing in this file may.
+
+          THE FOOTER IS OUTSIDE THE <form>, WIRED BACK WITH `form=`. A drawer
+          is a three-part frame — `SheetHeader` and `SheetFooter` carry
+          `sheet-*` slots and are excluded from `SheetContent`'s blanket
+          "every other child scrolls" rule, so they pin and the middle child
+          is the only thing that scrolls. Nesting the footer inside the form
+          would have put the commit control inside the scrolling region,
+          which is the exact bug FormShell's three-row grid was built to fix
+          (a Save button below the fold). `form="create-team-form"` keeps
+          `type="submit"` wired across that DOM gap — plain HTML, no handler
+          duplicated. */}
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>{t("Create a team")}</SheetTitle>
+          <SheetDescription>
             {t("It gets its own private space. You'll be its admin.")}
-          </DialogDescription>
-        </DialogHeader>
-        <form className="flex flex-col gap-4" onSubmit={submit}>
+          </SheetDescription>
+        </SheetHeader>
+        <form id="create-team-form" className="flex flex-col gap-4" onSubmit={submit}>
           <Field config={nameField} htmlFor="team-name">
             <Input
               id="team-name"
@@ -88,14 +118,14 @@ export function CreateTeamDialog({
               autoFocus
             />
           </Field>
-          <DialogFooter>
-            <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? <Spinner /> : null}
-              {busy ? t("Creating…") : t("Create team")}
-            </Button>
-          </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+        <SheetFooter>
+          <Button type="submit" form="create-team-form" disabled={busy || !name.trim()}>
+            {busy ? <Spinner /> : null}
+            {busy ? t("Creating…") : t("Create team")}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

@@ -23,6 +23,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { primeCache } from "@shared/web/store"
+import { RememberedScreen } from "@shared/web/remembered"
 import { appsKey, meetingsKey, meetingsMonthKey, sprintsKey, tasksKey, totalKey } from "@/lib/live-resources"
 import { BASE_RECIPES } from "@/lib/screens"
 import { MeetingsScreen } from "@/components/meetings/meetings-screen"
@@ -38,8 +39,14 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
 }))
-const { door } = vi.hoisted(() => ({
+const { door, asked } = vi.hoisted(() => ({
   door: { sprints: [] as unknown[], tasks: [] as unknown[], meetings: [] as unknown[] },
+  /* WHAT THE MEETINGS DOOR WAS ACTUALLY ASKED, in call order. The Mine tab's
+     whole claim is that its rows and its badge are the DOOR's answer to a
+     question the browser cannot ask (attendance lives in a JSON mirror column),
+     so a test that only looked at what rendered would pass over a client-side
+     filter — the exact arrangement R16 exists to forbid. */
+  asked: [] as Record<string, unknown>[],
 }))
 vi.mock("@/lib/api", () => ({
   ApiFailure: class extends Error {},
@@ -57,7 +64,10 @@ vi.mock("@/lib/api", () => ({
       dueTodayDone: 0,
     }),
     todos: async () => ({ todos: [], total: 0 }),
-    meetings: async () => ({ meetings: door.meetings, total: door.meetings.length, nextCursor: null }),
+    meetings: async (opts: Record<string, unknown> = {}) => {
+      asked.push({ ...opts })
+      return { meetings: door.meetings, total: door.meetings.length, weekTotal: door.meetings.length, nextCursor: null }
+    },
     meetingPurposes: async () => ({ purposes: [], total: 0 }),
   },
   tenancy: {
@@ -275,36 +285,54 @@ const ONE_MEETING = {
   createdAt: "2026-09-01T00:00:00.000Z",
 } as unknown as Meeting
 
-function renderMeetingsCalendar(meetings: Meeting[]) {
+/** THE CALENDAR IS A VIEW NOW, NOT A TAB — the client's ruling, 2026-09-09:
+ * *"i was in the room, and calendar as a view"*. The strip is This week · Mine ·
+ * All and the month grid is reached from the toolbar's own view switch, so this
+ * suite can no longer get there with `pickTab`.
+ *
+ * IT IS REACHED THROUGH THE SCREEN'S OWN MEMORY rather than by driving the
+ * control, and that is a deliberate choice rather than a shortcut. The switch is
+ * the kit's `ViewSwitch`, which is a Radix `Select` — opening one in jsdom means
+ * stubbing `hasPointerCapture` and friends, which would make this suite a test
+ * of the mock. `useRemembered("meeting-view")` is the REAL seam the real screen
+ * reads that choice from (a person who last used the calendar comes back to it),
+ * so priming it renders exactly what they would see. The control's own presence
+ * is asserted separately below, so "the switch is gone" still fails. */
+function renderMeetingsCalendar(meetings: Meeting[], view: "list" | "calendar" = "calendar") {
   const teamId = coldTeam()
   door.meetings = meetings
   primeCache(meetingsKey(teamId), meetings)
   primeCache(meetingsKey(teamId, "week"), meetings)
+  primeCache(`meetings-mine:${teamId}`, meetings)
   primeCache(totalKey("meetings", teamId), meetings.length)
   primeCache(totalKey("meetings-week", teamId), meetings.length)
+  primeCache(totalKey("meetings-mine", teamId), meetings.length)
+  const slots: Record<string, unknown> = { "meeting-view": view }
   render(
-    <MeetingsScreen
-      teamId={teamId}
-      recipe={BASE_RECIPES["meetings.list"]}
-      rights={{ meetings: { read: true, create: true } } as never}
-      total={meetings.length}
-      purposeCount={0}
-      canCreate
-      canReadPurposes={false}
-      onPurposes={() => {}}
-      onImport={() => {}}
-      onAction={() => {}}
-      onIntent={() => {}}
-    />
+    <RememberedScreen
+      memory={{ read: (slot) => slots[slot], write: (slot, value) => void (slots[slot] = value) }}
+    >
+      <MeetingsScreen
+        teamId={teamId}
+        recipe={BASE_RECIPES["meetings.list"]}
+        rights={{ meetings: { read: true, create: true } } as never}
+        total={meetings.length}
+        purposeCount={0}
+        canCreate
+        canReadPurposes={false}
+        onPurposes={() => {}}
+        onImport={() => {}}
+        onAction={() => {}}
+        onIntent={() => {}}
+      />
+    </RememberedScreen>
   )
   return teamId
 }
 
-describe("Meetings — the Calendar tab on a team with no meetings", () => {
+describe("Meetings — the Calendar VIEW on a team with no meetings", () => {
   it("names both acts (add, import) instead of an empty month", async () => {
     renderMeetingsCalendar([])
-    await screen.findByRole("tab", { name: /Calendar/ })
-    pickTab(/Calendar/)
     expect(await screen.findByText("Nothing in Meetings yet.")).toBeTruthy()
     expect(screen.getByRole("button", { name: ADD_THE_FIRST })).toBeTruthy()
     expect(screen.getByRole("button", { name: /Import a list/ })).toBeTruthy()
@@ -313,12 +341,50 @@ describe("Meetings — the Calendar tab on a team with no meetings", () => {
 
   it("CANARY: one meeting draws the grid, not the register", async () => {
     const teamId = renderMeetingsCalendar([ONE_MEETING])
-    // The grid asks the door for the month it opens on; the same one row.
-    primeCache(meetingsMonthKey(teamId, "2026-09"), [ONE_MEETING])
-    await screen.findByRole("tab", { name: /Calendar/ })
-    pickTab(/Calendar/)
+    // The grid asks the door for the month it opens on, narrowed by the TAB it
+    // is a view of — All, on a screen nobody has switched. Same one row.
+    primeCache(meetingsMonthKey(teamId, "2026-09", { view: "all" }), [ONE_MEETING])
     expect(await screen.findByRole("button", { name: /next month/i })).toBeTruthy()
     expect(screen.queryByText("Nothing in Meetings yet.")).toBeNull()
     expect(screen.queryByRole("button", { name: ADD_THE_FIRST })).toBeNull()
+  })
+})
+
+describe("Meetings — the strip the client asked for, and the switch beside it", () => {
+  // R50 — a toolbar is drawn at all only over a collection with rows, so this
+  // one is asked of a screen that has one.
+  it("is This week · Mine · All, and Calendar is a view rather than a tab", async () => {
+    renderMeetingsCalendar([ONE_MEETING], "list")
+    expect(await screen.findByRole("tab", { name: /This week/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /Mine/ })).toBeTruthy()
+    expect(screen.getByRole("tab", { name: /All/ })).toBeTruthy()
+    // The tab she did NOT ask to keep as a tab.
+    expect(screen.queryByRole("tab", { name: /Calendar/ })).toBeNull()
+    // …because it moved HERE. The kit draws the view switch as a combobox
+    // labelled "View"; its presence is what stops the calendar being deleted by
+    // a future edit to the strip above.
+    expect(screen.getByRole("combobox", { name: /View/ })).toBeTruthy()
+  })
+
+  it("MINE IS THE DOOR'S QUESTION, not a filter over the loaded page", async () => {
+    asked.length = 0
+    renderMeetingsCalendar([ONE_MEETING], "list")
+    // ASKED ON ARRIVAL, BEFORE THE TAB IS OPENED, and that is the assertion
+    // rather than an accident of when the read fires: the badge on a tab nobody
+    // has touched still has to be an exact server count (R16), and unlike the
+    // week's there is no `mineTotal` riding the main response for it to come
+    // from. So the screen asks its own question and the answer's own `total` is
+    // the badge — which only works if the question reaches the door at all.
+    //
+    // A CLIENT-SIDE FILTER WOULD RENDER IDENTICALLY. `door.meetings` answers
+    // every call with the same row, so what is being proved here is the SHAPE of
+    // the question, not the rows that came back: `view: "mine"` went out. That
+    // is the whole difference between a tab whose badge can be trusted and the
+    // arrangement R16 was written to forbid.
+    await screen.findByRole("tab", { name: /Mine/ })
+    expect(asked.some((q) => q.view === "mine")).toBe(true)
+    // …and opening it does not turn that into a different question.
+    pickTab(/Mine/)
+    expect(asked.filter((q) => q.view === "mine").length).toBeGreaterThan(0)
   })
 })

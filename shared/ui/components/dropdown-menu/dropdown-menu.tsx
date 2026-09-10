@@ -196,8 +196,10 @@ export interface DropdownMenuItemProps
   icon?: React.ReactNode;
   /**
    * A picture leading the label — a logo, an avatar, a thumbnail. Ruling 30's
-   * record mark: a 24 SQUARE at the 6 selection radius, contained, never
-   * cropped. Ignored when `icon` is given; a row carries one mark, not two.
+   * record mark: a 24 SQUARE at the 6 selection radius, the picture FILLING
+   * that square and cropping to it, the way `AvatarImage` fills a record's
+   * own mark (RULES.md §4.4). Ignored when `icon` is given; a row carries one
+   * mark, not two.
    */
   image?: string;
   /**
@@ -289,8 +291,14 @@ const DropdownMenuItem = React.forwardRef<
             src={image}
             alt={imageAlt}
             data-slot="dropdown-menu-item-image"
+            /* `object-cover` — the same correction as `select.tsx`'s option
+               mark, made here in the same breath so the two menus that both
+               draw a record mark cannot drift apart. CH27.28's letterbox
+               sentence was overruled by the client on 2026-09-09 (*"everywhere
+               for images: do fill, not fit!"*), and the mark it disagreed with
+               is the kit's own `Avatar shape="square"`. RULES.md §4.4. */
             className={cn(
-              "size-[var(--avatar-sm)] shrink-0 object-contain",
+              "size-[var(--avatar-sm)] shrink-0 object-cover",
               "rounded-[var(--radius-select)] bg-surface-quiet",
             )}
           />

@@ -602,7 +602,13 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           service={sharing}
           draftKey={`google-source:${sharing}`}
           teamId={teamId}
-          accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+          // THE WHOLE ROW, NOT A COPY OF TWO OF ITS FIELDS. `PickableRecord`
+          // (web/lib/pickable.ts) is deliberately the loosest shape that carries a
+          // face, and an `Account` structurally satisfies it — so the `.map((a) =>
+          // ({ id, name }))` that used to sit here was the exact line that type
+          // exists to end, dropping `logoUrl` one hop before the picker that draws
+          // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
+          accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
           onSubmit={async (values) => {
             const r = await content.googleAddSources({
               service: sharing,
