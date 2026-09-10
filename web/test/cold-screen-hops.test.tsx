@@ -330,6 +330,15 @@ let seen: Seen[] = []
 /** What "painted" means for the screen currently under test. */
 let painted: () => boolean = () => false
 
+/** A REAL, macrotask delay on one door — a `setTimeout`, never a resolved
+ * Promise, because a resolved-Promise "delay" and a genuine wait are
+ * indistinguishable to `await` and would pass a sequencing test for the wrong
+ * reason (see the "ordering, not just a ceiling" describe block below). `null`
+ * (the default) delays nothing. A predicate, not a prefix, because the list and
+ * the by-id read are the SAME door on tickets and meetings (`?id=` is the only
+ * difference) — a prefix would slow both. */
+let slowDoor: { match: (p: string) => boolean; ms: number } | null = null
+
 function paintedOn(name: string): boolean {
   return document.body.textContent?.includes(name) ?? false
 }
@@ -338,6 +347,7 @@ function arriveAt(at: string, name: string) {
   path = at
   painted = () => paintedOn(name)
   seen = []
+  slowDoor = null
   window.history.replaceState({}, "", at)
 }
 
@@ -350,6 +360,7 @@ beforeEach(() => {
       // STAMPED AT DEPARTURE. Whether the person could already read the record
       // when this request left is the only fact the budget is about.
       seen.push({ path: p, afterPaint: painted() })
+      if (slowDoor?.match(p)) await new Promise((resolve) => setTimeout(resolve, slowDoor?.ms))
       return new Response(JSON.stringify(answer(p)), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -517,6 +528,47 @@ describe.each(SCREENS)("a cold deep link to $what", ({ at, name, byId, byIdCarri
     },
     ARRIVAL_TIMEOUT
   )
+})
+
+/** ORDERING, NOT JUST A CEILING. The census above proves the by-id read
+ * eventually happens and the total stays under budget — it cannot tell a
+ * by-id read that started immediately, in parallel, from one that only
+ * started after the list read resolved: with an un-delayed mock fetch, both
+ * shapes finish in the same tick and post the same count. So the list door is
+ * given a REAL, multi-second delay here, and the record must still paint —
+ * proving the by-id read does not wait on it. A gated read (`listQ.data !==
+ * undefined && !inPage ? key : null`) cannot even START until the delayed
+ * list resolves, so this fails by TIMEOUT on that shape, not by a wrong
+ * count — the same "setTimeout is the only honest gate" reasoning the
+ * deferred-work assertion above already relies on for the opposite claim. */
+const SEQUENCING = [
+  {
+    what: "a ticket",
+    at: `/t/${TEAM}/tickets/${TICKET}`,
+    name: TICKET_NAME,
+    listMatch: (p: string) => p.startsWith("/api/content/help") && !p.includes("id="),
+  },
+  {
+    what: "a meeting",
+    at: `/t/${TEAM}/meetings/${MEETING}`,
+    name: MEETING_NAME,
+    listMatch: (p: string) => p.startsWith("/api/content/meetings") && !p.includes("id="),
+  },
+] as const
+const LIST_DELAY_MS = 4_000
+const PAINT_MUST_BEAT_MS = 1_500
+
+describe.each(SEQUENCING)("$what, past the cursor, with a slow list door", ({ at, name, listMatch }) => {
+  it("the by-id read does not wait for the list", async () => {
+    listHoldsTheRecord = false
+    arriveAt(at, name)
+    slowDoor = { match: listMatch, ms: LIST_DELAY_MS }
+    const DeepLinkScreen = await coldShell()
+    render(<DeepLinkScreen />)
+    // A short ceiling, well under LIST_DELAY_MS: only reachable if the by-id
+    // read fired without waiting for the (still in-flight) list door.
+    await screen.findAllByText(new RegExp(name), {}, { timeout: PAINT_MUST_BEAT_MS })
+  }, LIST_DELAY_MS + 5_000)
 })
 
 describe("a cold deep link to a record", () => {

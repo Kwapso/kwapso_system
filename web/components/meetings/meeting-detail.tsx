@@ -97,12 +97,17 @@ export function MeetingDetailScreen({
   const { t, lang } = useLanguage()
   const meetingsQ = useCached<Meeting[]>(meetingsKey(teamId), () => listFetch.meetings(teamId))
   // The list is a PAGE (R14), so the record may not be in it — a link straight to
-  // a meeting the loaded prefix doesn't reach must still open. One read by id,
-  // only when the page didn't already have it.
+  // a meeting the loaded prefix doesn't reach must still open. The by-id read
+  // used to wait for the list to say so first (`meetingsQ.data !== undefined`),
+  // which on a cold deep link past the cursor meant two round trips in series
+  // for the one read that could actually find the meeting
+  // (round_trip_review, 2026-09-10). `!inPage` alone asks the same question of
+  // whatever the list already has — true from the first cold render, since
+  // `inPage` is `null` before `meetingsQ` has answered — so both reads start
+  // together instead.
   const inPage = meetingsQ.data?.find((m) => m.id === meetingId) ?? null
-  const oneQ = useCached<Meeting | null>(
-    meetingsQ.data !== undefined && !inPage ? `meeting:one:${meetingId}` : null,
-    () => content.meetingOne(meetingId)
+  const oneQ = useCached<Meeting | null>(!inPage ? `meeting:one:${meetingId}` : null, () =>
+    content.meetingOne(meetingId)
   )
   const item = inPage ?? oneQ.data ?? null
   // THE SECONDARY HALF, ONCE THE RECORD IS IN HAND — a picker, a badge or a
@@ -325,7 +330,11 @@ export function MeetingDetailScreen({
         }
       />
     )
-  if (meetingsQ.data === undefined || (!item && oneQ.data === undefined && !inPage))
+  // Not while the by-id read is still going, for the same reason help-detail.tsx
+  // gives: this used to also wait on `meetingsQ.data === undefined` even once
+  // `oneQ` had already answered — waiting on the list here would spend back the
+  // round trip removed above.
+  if (!item && oneQ.data === undefined && !inPage)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   if (!item)
     return (

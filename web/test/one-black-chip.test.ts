@@ -116,18 +116,21 @@ const REF_AS_STRING_OK: Record<string, string> = {
   "web/components/work/stories-screen.tsx:154":
     "the ticket picker on the story form, building the same `PickerOption.label` " +
     "the two lines in picker-sources.ts build.",
-  "web/components/tickets/help-detail.tsx:964":
+  "web/components/tickets/help-detail.tsx:973":
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
     "a row of its own. (Re-pinned from :931 to :945 on 7 Sep 2026 when the " +
-    "activity rail landed above this line, and to :909 later the same day when " +
+    "activity rail landed above this line, to :909 later the same day when " +
     "the `awaiting_validation` retirement took the confirm button and the " +
-    "`run` helper it was the last caller of out of this file.)",
-  "web/components/tickets/help-detail.tsx:1107":
+    "`run` helper it was the last caller of out of this file, and to :973 on " +
+    "10 Sep 2026 when round_trip_review's cold-deep-link fix added comment " +
+    "lines above it.)",
+  "web/components/tickets/help-detail.tsx:1116":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
     "string slot as picker-sources.ts, for the ticket the form is pinned to. " +
     "(Re-pinned from :1074 to :1088 and then to :1052 on 7 Sep 2026, both times " +
-    "riding the same edits as :909 above.)",
+    "riding the same edits as :909 above, and to :1116 on 10 Sep 2026 for the " +
+    "same reason as :973 above.)",
   "web/components/work/story-detail.tsx:445":
     "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:931.",
   "web/components/work/sprints-screen.tsx:523":
