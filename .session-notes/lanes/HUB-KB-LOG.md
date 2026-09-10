@@ -980,3 +980,68 @@ before the exam, rather than letting the exam do the indexing.**
 **Lane state: A idle (drop-column ruling pending its D1 verification), B1 on the
 fence wiring, B2 done and holding, E done and holding, CD starting Stage 2.**
 Everything green. Still $0 across every lane.
+
+## Tick 18 — 11 Sep 2026, ~02:00. THE FIRST DEPLOY.
+
+**STAGING HAS THE NEW SCHEMA. Both teams at `0076`**, verified through `cf-exec`:
+`knowledge_sightings`, `knowledge_names`, `knowledge_chunks_fts`, `identity_key`,
+`generated_only` and `team_visible` exist on real databases for the first time in
+this rebuild.
+
+**THE ACCOUNT GUARD REFUSED THE FIRST ATTEMPT AND IT WAS RIGHT.**
+`CLOUDFLARE_ACCOUNT_ID` was unset, and no worker pins an account — so wrangler
+would have uploaded to whatever this shared machine is signed in to, which is
+another client's. Nothing deployed. Re-run through `cf-exec`, which resolves the
+account from the folder and the token from the Keychain.
+
+**THE DEPLOY THEN STOPPED AT THE MIGRATION GATE, BY DESIGN.** It deployed realtime,
+auth and tenancy, then refused: teams at 0072, tree at 0076. That ordering is
+deliberate — tenancy carries the migration list, so the robot can only apply what
+the DEPLOYED worker knows, and the script's own text warns that running the check
+by hand BEFORE a deploy gives a cheerful false success. Robot run:
+`{"ok":true,"teamsChecked":2,"teamsMigrated":2,"failed":[],"remaining":false}`.
+
+**I MISREAD MY OWN INSTRUMENTS TWICE IN ONE STEP.** The harness reported the
+background task "completed (exit code 0)" — that was the wrapper's; the deploy
+exited **1**. And the file I first read was my own `tail -30`, not the log; the real
+log was 288 lines. Then, checking the label count, my `sed` range said 11 while the
+test asserted `toBe(10)` and passed. **Sixth count error today, and this one was
+caught by a test rather than by a lane.** The rule I keep proving: read the
+authoritative instrument, not a pattern I wrote to summarise it.
+
+**A LUCKY FORTY MINUTES.** I had ordered kb_A to build a DROP-COLUMN migration for
+`knowledge_sources.team_visible`. Had it shipped, the robot would have applied an
+add-then-drop pair to both teams tonight. It survived because kb_A asked instead of
+complying and because kb_B1's recompute proved kb_A's original reasoning right —
+sightings key to `source_id`, so the value is computed ONCE on the source and
+denormalised down. **I ruled from a read-side census on a write-side question.**
+Ruling reversed; three copies stand; kb_A stopped.
+
+**THE TENTH VECTORIZE LABEL LANDED WITH A DEADLINE.** `shared` was NOT on main —
+nine labels, and I had miscounted it as ten an hour earlier. **Vectorize cannot
+index retrospectively**, so a rebuild before it shipped would have written the whole
+corpus without the label and cost a full re-embed to recover. It had also been
+nearly lost twice: my merge took kb_CD's FIRST push rather than its rebased tip —
+the same stale-ref mistake I had already made and written down at tick 8.
+`vector-indexes-mirror.test.ts` is now `toBe(10)` naming `shared`, so it can no
+longer be a check that derives its expectation from the code it checks.
+
+**FENCE READY, CONFLICTS ON ONE FILE.** `fix/kb-gate` vs main conflicts only in
+`workers/content/src/lib/knowledge.ts` — kb_B1's `ownerClause`/`fastOwnerClause`
+against kb_CD's `lexicalArm` FTS5 rewrite. **Sent back to kb_B1 to resolve; a hub
+resolving two lanes' logic in a security-critical file is how a subtle wrong merge
+gets a green build.** Asked it one question I want answered BEFORE the merge rather
+than by the reviewer: `lexicalArm` now reads `knowledge_chunks_fts`, and
+`fastOwnerClause` exists because `knowledge_terms` has no `source_id` — **does the
+FTS path go through the fence at all, and which clause does it get?**
+
+**kb_B1's best catch of the night, in its own lane:** `WHERE sg.source_id = id` —
+SQLite scopes the bare `id` to the INNERMOST table, so the gate compared a
+sighting's own primary key to its own `source_id`. Never true. **Vacuously satisfied
+for every source** — the exact widening the design exists to prevent, in SQL that
+reads as correct. Caught by four tests failing `expected false, got true`, not by
+reading it twice.
+
+**REBUILD IS NOT RUN AND WILL NOT BE UNTIL:** the fence merges and deploys. Rebuild
+before it and every chunk takes `team_visible` DEFAULT 0, reading right only by
+accident. The purge itself is destructive and gets the owner's explicit word first.
