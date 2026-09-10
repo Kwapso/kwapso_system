@@ -36,6 +36,51 @@
 // and no field holds it. When transcripts land, the honest shape is a generated
 // summary for THAT kind alone, written once at ingest, with the derived line
 // still carrying the facts (who, when, which client) beneath it.
+//
+// ════════════════════════════════════════════════════════════════════════════
+// A CARD IS A PROPERTY OF THE ROW, NOT OF THE KIND — measured 10 Sep 2026
+//
+// The summary above is half of what BUILD-5 calls a CARD: a record the assistant
+// can FIND and must never QUOTE. KB-AUDIT.md §4.3 measured why one is wanted —
+// a forty-character machine-written mirror ("X is a meeting of ours on 3 Sep")
+// is dense and name-shaped, so it beats real documents on name-shaped questions.
+// Asked what one colleague had been working on, the ONLY passage returned was
+// that person's account stub.
+//
+// The fix it proposes is "keep record mirrors out of `level: chunk`", and the
+// obvious reading is a list of mirror KINDS. That reading does not survive
+// contact with the readers in knowledge-ingest.ts:
+//
+//   person   folds `headline`, `strengths`, `weaknesses`, `role_models`
+//   account  folds `about`, and the names of their apps, sprints and tickets
+//   contact  folds `about`
+//   task     folds `detail` and the notes written against logged time
+//   app      folds `about`, `client_context`, `solution`, `key_actors`
+//   todo     folds `detail`
+//
+// EVERY KIND THE AUDIT NAMED AS AN OFFENDER CAN CARRY WORDS A PERSON WROTE. The
+// stubs it saw were rows where those fields happened to be EMPTY. Only
+// `dropdown` and `portal_login` fold no free text at all — 22 of 3,933 live
+// sources on staging — and silencing those two would leave the complaint exactly
+// where it was while looking like the fix.
+//
+// Two readings were measured against staging before this was written down, and
+// both fail in the expensive direction:
+//   • ONE SHORT PIECE, per source (`chunk_count = 1` and a body inside the
+//     summary ceiling) catches 2,589 of 3,933 sources — 1,309 of 2,051 tickets
+//     among them, including "he is still twice in the system but he informed me
+//     that he is able to access the voting…", which is a person's own words. A
+//     short ticket is not a stub; it is a ticket.
+//   • EVERY LIVE SOURCE OF THE KIND IS ONE SHORT PIECE is a true census and
+//     cannot be the rule: a fresh environment holds no rows, so no kind would
+//     qualify and nothing would ever be a card. R13's own failure mode.
+//
+// So the question is per ROW and only the reader can answer it: did this row
+// produce anything beyond the sentence the app generated for it? Once the body
+// is one string the two halves are indistinguishable, so nothing downstream can
+// recover the answer — it has to be recorded where it is known, which is a
+// column the reader sets at ingest.
+// ════════════════════════════════════════════════════════════════════════════
 
 /** How long a summary may be. Long enough to name the thing, whose it is, what
  * state it is in and what it is for; short enough that a hundred of them are a
