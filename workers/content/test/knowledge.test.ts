@@ -595,7 +595,7 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
       title: "How we run a rollout",
       body: "Every rollout starts with a dry run and a written sign-off from the client.",
     })
-    // `accountNamedIn` reads `knowledge_names` (0073), not `accounts` directly —
+    // `accountsNamedIn` reads `knowledge_names` (0073), not `accounts` directly —
     // in production the sync door keeps it in step (`postKnowledgeSync`); here
     // it is built once, directly, the same way `diversify` is exercised as a
     // plain function elsewhere in this suite. `cfg`/`guard` are both ignored by
@@ -674,6 +674,26 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
     const answer = await ask(IDS.staffUser, "what does our marine insurance cover?")
     expect(answer.compartments).toEqual([])
   })
+
+  // THE DETERMINISTIC HALF OF BUILD-5's FAN-OUT: a question naming TWO clients
+  // widens the search to both of them, rather than the router's old
+  // `ORDER BY LENGTH(name) DESC` picking whichever sorted longest and silently
+  // dropping the other. No model call — this is a lookup against real named
+  // entities the team already holds records for, not a judgment about
+  // language, which is why it is safe to run on every question.
+  it("a question naming two clients searches both, not whichever name sorted longest", async () => {
+    const answer = await ask(IDS.staffUser, "when do Bergman S.A. and Delaval Group both move to the new invoice run?")
+    expect(answer.compartments.sort()).toEqual(
+      [`account:${IDS.victimAccount}`, `account:${IDS.burglarAccount}`, "agency"].sort()
+    )
+    expect(answer.reason).toContain("Bergman S.A.")
+    expect(answer.reason).toContain("Delaval Group")
+    // …and both accounts' material is actually reachable, not merely in the
+    // compartment list — the whole point of widening the search rather than
+    // widening the sentence alone.
+    expect(titles(answer)).toContain("Bergman rollout plan")
+    expect(titles(answer)).toContain("Delaval rollout plan")
+  })
 })
 
 // KB-AUDIT.md §4.2 — THE ROUTER HIJACKED BY ORDINARY WORDS. 26 of 134 staging
@@ -681,7 +701,7 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
 // ("VU Solutions" → "solutions", "re-green" → "green"), and the old router
 // (a raw scan of `accounts`) matched on that one token alone: a question
 // about "solutions" in general silently narrowed to whichever account
-// happened to be named that. `accountNamedIn` now requires a single-token
+// happened to be named that. `accountsNamedIn` now requires a single-token
 // name to be RARE across the corpus (`isRareTerm`) before it may narrow —
 // exercised here directly rather than through the fake embedding model,
 // because the fault is in ROUTING, not ranking.

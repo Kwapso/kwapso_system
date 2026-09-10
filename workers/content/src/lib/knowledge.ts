@@ -2213,15 +2213,26 @@ async function deriveCompartment(
         reason: `You asked from ${named.name}'s record, so I searched ${named.name}'s material and the agency's own.`,
       }
   }
-  // 2. THE QUESTION NAMES A CLIENT. Matched on the account's own name and
-  //    reference, and confirmed word by word (below) so "new" cannot match
-  //    "Newton Ltd".
-  const named = await accountNamedIn(cfg, guard, input.question)
-  if (named)
+  // 2. THE QUESTION NAMES ONE OR MORE CLIENTS. Matched on each account's own
+  //    name and reference, confirmed word by word (below) so "new" cannot
+  //    match "Newton Ltd" — and ALL of them widen the search, not just the
+  //    first found (BUILD-5's deterministic fan-out: "compare BERG's ticket
+  //    volume to HOGO's" used to search whichever name sorted longest and
+  //    silently drop the other).
+  const named = await accountsNamedIn(cfg, guard, input.question)
+  if (named.length === 1)
     return {
-      compartments: [accountCompartment(named.id), AGENCY_COMPARTMENT],
-      reason: `The question names ${named.name}, so I searched ${named.name}'s material and the agency's own.`,
+      compartments: [accountCompartment(named[0].id), AGENCY_COMPARTMENT],
+      reason: `The question names ${named[0].name}, so I searched ${named[0].name}'s material and the agency's own.`,
     }
+  if (named.length > 1) {
+    const names = named.map((a) => a.name)
+    const list = names.length === 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+    return {
+      compartments: [...named.map((a) => accountCompartment(a.id)), AGENCY_COMPARTMENT],
+      reason: `The question names ${list}, so I searched all of their material and the agency's own.`,
+    }
+  }
   // 3. NOTHING NAMED. Search everything — a question about our own process has
   //    no client in it, and neither does a vague one.
   return {
@@ -2343,7 +2354,7 @@ async function sourceTitles(
 
 /** IS THIS TOKEN RARE ENOUGH TO MEAN SOMETHING ON ITS OWN — the same question
  * `EXACT_TERM_MAX_CHUNKS` already answers for the lexical arm's rare-token
- * bypass, asked here for `accountNamedIn` instead of inventing a second
+ * bypass, asked here for `accountsNamedIn` instead of inventing a second
  * number for the same idea. UNFENCED (whole-team chunk count over FTS5),
  * because this runs BEFORE the compartment is known — narrowing to a
  * compartment is the very question this function exists to answer. */
@@ -2372,13 +2383,39 @@ async function isRareTerm(cfg: D1Rest, guard: MemberGuard, term: string): Promis
  * `code`, e.g. BERG) bypasses both: a code is chosen to be a short,
  * unambiguous handle on purpose, so an exact match is evidence on its own,
  * exactly as it was before this function moved off `accounts.code`. */
-async function accountNamedIn(
+/** How many DISTINCT accounts one question may name before the compartment
+ * search widens to all of them. BUILD-5-knowledge-rebuild.md's own fan-out
+ * ceiling ("hard cap 12"), reused here rather than a second number invented
+ * for the same idea — asking about more than a dozen clients in one
+ * question is pathological, and the cap exists as a sanity ceiling rather
+ * than a cost one (a compartment is a free extra value in one `IN (...)`
+ * clause, not a second search). */
+const NAMED_ACCOUNTS_CAP = 12
+
+/** EVERY account the question names, not just the first — the deterministic
+ * half of BUILD-5's "fan-out": a question naming two or more clients widens
+ * the compartment search to all of them rather than picking one arbitrarily
+ * (the router's `ORDER BY LENGTH(name) DESC` used to mean "the longest name
+ * wins", silently dropping every other one it found). Same anti-hijack rules
+ * as a single match — a name has to be ≥2 tokens or a corpus-rare single one,
+ * or match a code exactly — applied to every candidate rather than stopping
+ * at the first that passes.
+ *
+ * NOT A MODEL CALL, ON PURPOSE. This is the SAFE half of fan-out: detecting
+ * multiple NAMED, REAL entities the team already holds records for, which is
+ * a lookup against data rather than a judgment about language. It says
+ * nothing about a genuinely ambiguous multi-part question with no named
+ * entity in it ("compare what we agreed in March to what we agreed in July")
+ * — that case needs either a heuristic nobody has measured yet or a real
+ * model call, and is deliberately left alone here rather than shipped on a
+ * guess (see `retrieve`'s own header for where that stands). */
+async function accountsNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
   question: string
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string }[]> {
   const terms = questionTerms(question, 8)
-  if (!terms.length) return null
+  if (!terms.length) return []
   const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
   const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
@@ -2392,22 +2429,34 @@ async function accountNamedIn(
     params
   )
   const asked = new Set(terms)
+  const found: { id: string; name: string }[] = []
+  const seen = new Set<string>()
   for (const c of candidates) {
+    if (found.length >= NAMED_ACCOUNTS_CAP) break
+    let match: { id: string; name: string } | null = null
     // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
     // no token-count/rarity gate. `alias_of` carries the canonical name back.
     if (c.alias_of) {
-      if (asked.has(c.name.toLowerCase())) return { id: c.ref_id, name: c.alias_of }
-      continue
+      if (asked.has(c.name.toLowerCase())) match = { id: c.ref_id, name: c.alias_of }
+    } else {
+      const nameTerms = [...tokenise(c.name).keys()]
+      if (nameTerms.length && nameTerms.every((t) => asked.has(t))) {
+        if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
+          match = { id: c.ref_id, name: c.name }
+      }
     }
-    const nameTerms = [...tokenise(c.name).keys()]
-    if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
-    if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
-      return { id: c.ref_id, name: c.name }
+    // DEDUPED BY ACCOUNT, not by row: the same account's canonical name and
+    // its code can both match one question ("BERG, the Bergman account…"),
+    // and that is one account named twice, not two.
+    if (match && !seen.has(match.id)) {
+      seen.add(match.id)
+      found.push(match)
+    }
   }
-  return null
+  return found
 }
 
-/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountNamedIn` reads.
+/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountsNamedIn` reads.
  *
  * READ STRAIGHT OFF `accounts` AND `apps`, not off `knowledge_sources`. The
  * first draft of this function derived names from the SWEPT mirror instead —
@@ -2418,7 +2467,7 @@ async function accountNamedIn(
  * "named no client" — the exact silent failure KB-AUDIT.md §4.2 is about,
  * moved rather than fixed. `accounts` and `apps` are foundational tables that
  * exist the moment a record does, independent of indexing, which is what
- * `accountNamedIn`'s ORIGINAL implementation relied on by reading them
+ * `accountsNamedIn`'s ORIGINAL implementation relied on by reading them
  * directly; this keeps that guarantee.
  *
  * `contact`/`person` kinds are left to grow this table later (the migration's
@@ -2432,7 +2481,7 @@ async function accountNamedIn(
  * "Lane C's job, not this table's" — needs a model call this build has not
  * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
  * rule is ask first). A canonical name with no alias is still fully usable:
- * `accountNamedIn`'s multi-token and rare-single-token rules both read it
+ * `accountsNamedIn`'s multi-token and rare-single-token rules both read it
  * alone, and a client whose accepted name IS a single ordinary word (the
  * audit's own "green"/"solutions" cases) still resolves once it clears the
  * rarity floor — no alias required for either path.
