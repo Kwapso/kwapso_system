@@ -45,15 +45,17 @@
 // one of them may have filed it privately. Sharing one row would make the last
 // sweep to run decide who else can read somebody's document.
 
-import { sqlString, d1Query, likeLiteral, type D1Rest } from "@shared/workers/d1-rest"
+import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
+import { ulid } from "@shared/workers/id"
 import { mendMojibake } from "@shared/workers/mojibake"
-import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService } from "@shared/types"
+import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService, type GoogleShelf } from "@shared/types"
 import type { Env } from "../env"
 import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
 import { calendarEventIdInText, googlePresence, type ProbableService } from "./google-api"
 import { hydrateText, readGoogleMaterial } from "./google-read"
-import { indexSource } from "./knowledge"
+import { execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
+import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
 import { brand } from "@shared/brand"
 import {
@@ -244,10 +246,18 @@ function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: str
   }
 }
 
-/** One person's sight of one item, as a source row id. See the header: the
- * reader is IN the id, so two colleagues naming the same folder get a row each. */
+/** THE THING'S OWN ID, NEVER THE READER'S — the fix kb_B1's identity gate names
+ * in its own header. Two colleagues naming the same folder now build the SAME
+ * key here, which is the whole point: one source, two sightings, not two
+ * sources. `googleIdentity` refuses an empty external id rather than letting
+ * one bad item collide every unidentifiable row of a service into one. */
 function rowId(item: GoogleItem): string {
-  return `${item.ownerUserId}:${item.externalId}`
+  // The bare id — `origin_row_id`'s own value — never `identityKey`'s composite
+  // "table id" string, which is what the (separate) `identity_key` COLUMN is
+  // for. Writing the composite here was the first draft's own bug: it reads as
+  // correct (both come out of `googleIdentity`) and is caught only by
+  // `origin_row_id` visibly carrying a table name inside it.
+  return googleIdentity(item.service, item.externalId).originRowId
 }
 
 /**
@@ -284,15 +294,6 @@ export function eventNamedBy(title: string): string | null {
   const at = rest.indexOf(" @ ")
   const named = (at === -1 ? rest : rest.slice(0, at)).trim()
   return named.length ? named : null
-}
-
-/** The Drive file a document row is one person's sight of — the tail of
- * `<userId>:<driveFileId>`, which is what `rowId` builds. */
-export function driveFileIdOf(originRowId: string): string | null {
-  const at = originRowId.indexOf(":")
-  if (at === -1) return null
-  const id = originRowId.slice(at + 1).trim()
-  return id.length ? id : null
 }
 
 /** WHAT THE APP ALREADY HOLDS, for the fold below — read ONCE per sweep. */
@@ -504,20 +505,25 @@ export function gmailKnownIdsApply(
 }
 
 export async function knownGmailIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
-  const prefix = `${guard.userId}:`
   try {
+    // "KNOWN TO ME" IS STILL A QUESTION ABOUT THIS READER, even though the id
+    // itself no longer carries them — a Gmail thread id is scoped to ONE
+    // MAILBOX (kb_B1's own finding: three readers, zero id collisions across
+    // 436 live mails), so a thread known to a colleague says nothing about
+    // whether THIS mailbox has ever produced it. What changed is where the
+    // answer is READ from: not a string prefix on `origin_row_id`, which no
+    // longer names anybody, but a live sighting of THIS person's.
     const rows = await d1Query<{ origin_row_id: string }>(
       cfg,
       guard.databaseId,
       // R14 hard cap: KNOWN_GMAIL_SAMPLE.
-      `SELECT origin_row_id FROM knowledge_sources
-        WHERE origin_table = 'google_gmail' AND origin_row_id LIKE ? ESCAPE '\\'
-        ORDER BY updated_at DESC LIMIT ${KNOWN_GMAIL_SAMPLE}`,
-      [`${likeLiteral(guard.userId)}:%`]
+      `SELECT s.origin_row_id FROM knowledge_sources s
+         JOIN knowledge_sightings sg ON sg.source_id = s.id
+        WHERE s.origin_table = 'google_gmail' AND sg.seen_by_user_id = ? AND sg.gone_at IS NULL
+        ORDER BY s.updated_at DESC LIMIT ${KNOWN_GMAIL_SAMPLE}`,
+      [guard.userId]
     )
-    return new Set(
-      rows.filter((r) => r.origin_row_id.startsWith(prefix)).map((r) => r.origin_row_id.slice(prefix.length))
-    )
+    return new Set(rows.map((r) => r.origin_row_id))
   } catch {
     // FAIL SAFE, NEVER FAIL SILENT ABOUT COST: an empty set here does not mean
     // "nothing is known", it means "the read that would have told us failed" —
@@ -536,8 +542,14 @@ export function googleIngestKinds(
    * `retireVanished` below, and the reason it costs no extra Google call. The
    * sweep already asks each service what it holds; this keeps the answer instead
    * of throwing it away. Optional, because a caller that only wants to INDEX has
-   * no business being made to hold a set it will not read. */
-  seen?: Map<GoogleService, Set<string>>
+   * no business being made to hold a map it will not read.
+   *
+   * THE SHELF RIDES ALONG NOW, not just the id — `sweepGoogle` is what reads it,
+   * to write this person's SIGHTING of each item after the generic engine has
+   * filed it. A `Set` could only ever answer "is this still there"; a sighting
+   * also needs "on which shelf", which is the other half of what this pass
+   * already read off Google a moment ago. */
+  seen?: Map<GoogleService, Map<string, GoogleShelf>>
 ): IngestKind[] {
   /** WHAT GOOGLE SENT, WITH THE KNOWN DAMAGE MENDED — see shared/workers/mojibake.
    *
@@ -609,10 +621,11 @@ export function googleIngestKinds(
     })))
 
   const folded = (service: GoogleService, r: IngestRow, targets: FoldTargets): IngestRow => {
-    if (service === "drive") {
-      const fileId = driveFileIdOf(r.originRowId)
-      return fileId && targets.transcripts.has(fileId) ? { ...r, retired: true } : r
-    }
+    // `r.originRowId` IS the Drive file id, directly — since the identity gate
+    // (kb_B1), `origin_row_id` for a `drive` row is the thing's own id and
+    // nothing else, so the ID JOIN against `transcript_file_id` this comment
+    // above promises is now literally this comparison, no parsing required.
+    if (service === "drive") return targets.transcripts.has(r.originRowId) ? { ...r, retired: true } : r
     if (service === "gmail") {
       const named = eventNamedBy(r.title)
       return named && targets.events.has(named) ? { ...r, retired: true } : r
@@ -663,7 +676,7 @@ export function googleIngestKinds(
     // will FILE; this is everything the service currently holds, which is a
     // different and much larger sentence — and it is the only one that can tell
     // "Google no longer has this" from "the cursor has already passed it".
-    if (seen) seen.set(service, new Set(items.map((i) => i.externalId)))
+    if (seen) seen.set(service, new Map(items.map((i) => [i.externalId, i.shelf])))
     const wanted = afterCursor(inCursorOrder(toRows(items)), cursor).slice(0, limit)
     // THE FOLD RIDES THE SAME EXIT `mended` DOES, and for the same reason: a
     // fifth lane added tomorrow is covered because it goes through `slice`, not
@@ -1026,7 +1039,7 @@ export async function sweepGoogle(
   // if a fetch had happened). Derived from the same read as the filter below,
   // in the same breath, so the flag can never disagree with the behaviour.
   const connectedServices = [...connected]
-  const seen = new Map<GoogleService, Set<string>>()
+  const seen = new Map<GoogleService, Map<string, GoogleShelf>>()
   // A KIND SCOPE HAS CLOSED DOES NOT RUN AT ALL, and that is not merely an
   // economy. A closed kind reads nothing, so its `seen` set would be empty —
   // and an empty `seen` is the input `retireVanished` reads as "Google returned
@@ -1088,6 +1101,12 @@ export async function sweepGoogle(
     `google-knowledge:${guard.userId}`,
     async () => {
       const results = await sweepKinds(env, cfg, guard, kinds, options.limit ?? INGEST_SOURCES_PER_TICK)
+      // AFTER the sweep, never instead of it: the generic engine has just
+      // upserted or updated every source `seen` names, so the source id this
+      // needs to attach a sighting to is guaranteed to exist by the time this
+      // runs — see `writeSightings`'s own header for what "not found" means
+      // when it does not.
+      await writeSightings(cfg, guard, seen)
       // AFTER the sweep, never instead of it: the reads above are what filled
       // `seen`, and a retire pass that ran first would be reasoning about last
       // tick's world.
@@ -1206,24 +1225,28 @@ const RETIRE_SCAN_CAP = 500
  * same head of the queue examined for ever while the tail is never reached. */
 const RETIRE_PROBES_PER_TICK = 25
 
-/** One live source of this person's, and the Google id behind it. */
-type HeldSource = { id: string; externalId: string }
+/** One live SIGHTING of this person's — the source it is on, the Google id
+ * behind it, and `seenWhere`, needed to retire exactly this sighting and no
+ * other should this person hold the same source through two services (they
+ * cannot today, but the key does not assume it stays that way). */
+type HeldSource = { id: string; externalId: string; seenWhere: string }
 
 /**
- * THE SOURCES THIS PERSON STILL HOLDS FOR ONE KIND.
+ * THE SOURCES THIS PERSON STILL HOLDS FOR ONE KIND — via their own SIGHTING,
+ * not via `origin_row_id`.
  *
- * Keyed on `origin_row_id` rather than on `owner_user_id`, and that is not a
- * shortcut: a source filed as TEAM material has a null owner (see `fencing`), so
- * an owner column cannot find one. The reader's id is the first half of every
- * Google `origin_row_id` by construction (see `rowId`), which makes it the one
- * key that finds this person's rows whichever shelf they sit on.
- */
+ * `origin_row_id` used to carry the reader's own id as its first half (see
+ * `rowId`'s old comment), which made a string match the cheapest way to find
+ * "this person's rows". It no longer does — the identity gate (kb_B1) made
+ * `origin_row_id` the THING's own id, the same for every reader who sees it —
+ * so who holds it is answerable only from `knowledge_sightings` now, and this
+ * joins there instead of parsing a prefix that no longer exists. */
 async function heldSources(
   cfg: D1Rest,
   guard: MemberGuard,
   originTable: string
 ): Promise<HeldSource[]> {
-  const rows = await d1Query<{ id: string; origin_row_id: string }>(
+  const rows = await d1Query<{ id: string; origin_row_id: string; seen_where: string }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: RETIRE_SCAN_CAP, said here and named above.
@@ -1234,18 +1257,14 @@ async function heldSources(
     // head every tick and never reach a person's five-hundred-and-first source.
     // Shuffling costs nothing at this size and means every source is looked at
     // within a handful of ticks.
-    `SELECT id, origin_row_id FROM knowledge_sources
-      WHERE origin_table = ? AND origin_row_id LIKE ? ESCAPE '\\'
-        AND deactivated_at IS NULL
+    `SELECT s.id, s.origin_row_id, sg.seen_where FROM knowledge_sources s
+       JOIN knowledge_sightings sg ON sg.source_id = s.id
+      WHERE s.origin_table = ? AND sg.seen_by_user_id = ? AND sg.gone_at IS NULL
+        AND s.deactivated_at IS NULL
       ORDER BY RANDOM() LIMIT ${RETIRE_SCAN_CAP}`,
-    [originTable, `${likeLiteral(guard.userId)}:%`]
+    [originTable, guard.userId]
   )
-  // The id after the reader's own — see `rowId`. A row whose shape does not
-  // match is skipped rather than guessed at.
-  const prefix = `${guard.userId}:`
-  return rows
-    .filter((r) => r.origin_row_id.startsWith(prefix))
-    .map((r) => ({ id: r.id, externalId: r.origin_row_id.slice(prefix.length) }))
+  return rows.map((r) => ({ id: r.id, externalId: r.origin_row_id, seenWhere: r.seen_where }))
 }
 
 /** STOP QUOTING IT. The same two steps the ingest engine takes for an archived
@@ -1263,6 +1282,44 @@ async function retire(env: Env, cfg: D1Rest, guard: MemberGuard, sourceId: strin
     [now, now, sourceId]
   )
   await indexSource(env, cfg, guard, sourceId)
+}
+
+/** RETIRE ONE PERSON'S SIGHTING — never the source outright, unless this was
+ * the last one. Under the old shape, "Google no longer has this" and "the
+ * SOURCE is gone" were the same fact, because a source was one person's row.
+ * They are not the same fact any more: Aurora losing a Drive folder must not
+ * take the same material away from Alex, who still holds it. So this marks
+ * only HER sighting gone, recomputes what that leaves (`teamVisibleRecomputeSql`,
+ * spliced after the write as its own header requires), and only calls the
+ * whole-source `retire` above when `stillLive` says nobody's left — the exact
+ * question this file's identity gate was built to let the retire pass ask. */
+async function retireSighting(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  sourceId: string,
+  seenWhere: string
+): Promise<void> {
+  const now = new Date().toISOString()
+  const script = `
+UPDATE knowledge_sightings SET gone_at = ${sqlString(now)}
+ WHERE source_id = ${sqlString(sourceId)} AND seen_where = ${sqlString(seenWhere)}
+   AND seen_by_user_id = ${sqlString(guard.userId)} AND gone_at IS NULL;
+${teamVisibleRecomputeSql(sourceId)}
+`
+  await execKnowledgeScript(cfg, guard.databaseId, script)
+  const rows = await d1Query<{ shelf: GoogleShelf; seen_by_user_id: string; gone_at: string | null }>(
+    cfg,
+    guard.databaseId,
+    "SELECT shelf, seen_by_user_id, gone_at FROM knowledge_sightings WHERE source_id = ?",
+    [sourceId]
+  )
+  const sightings: Sighting[] = rows.map((r) => ({
+    userId: r.seen_by_user_id,
+    shelf: r.shelf,
+    goneAt: r.gone_at,
+  }))
+  if (!stillLive(sightings)) await retire(env, cfg, guard, sourceId)
 }
 
 /**
@@ -1296,11 +1353,64 @@ async function scopedCalendarIds(cfg: D1Rest, guard: MemberGuard): Promise<strin
   return scope.containers.map((c) => c.externalId)
 }
 
+/** THE OTHER HALF OF THE FOLD — writing this person's SIGHT of what `seen`
+ * already read, now that the generic engine has filed a source for each item
+ * under its own identity. This is the piece that makes the identity gate real:
+ * without it, `rowId`'s change alone would have taken today's one-row-per-
+ * person duplication and turned it into "one row, whoever's sweep runs last
+ * decides who it belongs to" — the exact bug per-person rows existed to avoid,
+ * reintroduced one column over. Identity and sighting-writing land together
+ * or not at all; that was true from the first report on this gate.
+ *
+ * `seen` carries EVERY item this tick's read returned — not just the ones
+ * whose text changed (`wanted`, inside `slice`), because a sighting means "I
+ * can still see this", and an item Google did not change is still seen. A
+ * fold-worthy item Google hands back every tick therefore gets its sighting
+ * kept alive every tick, cheaply — the SQL's own `WHERE … OR gone_at IS NOT
+ * NULL` guard (inside the upsert below) means an unchanged, already-live
+ * sighting moves zero rows and costs nothing beyond the one lookup. */
+async function writeSightings(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  seen: Map<GoogleService, Map<string, GoogleShelf>>
+): Promise<void> {
+  const now = new Date().toISOString()
+  for (const [service, items] of seen)
+    for (const [externalId, shelf] of items) {
+      const { originTable, originRowId } = googleIdentity(service, externalId)
+      const rows = await d1Query<{ id: string }>(
+        cfg,
+        guard.databaseId,
+        "SELECT id FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ? LIMIT 1",
+        [originTable, originRowId]
+      )
+      const source = rows[0]
+      // NOT FOUND: this item is outside the slice the generic engine actually
+      // filed this tick — past `INGEST_SOURCES_PER_TICK`, or a fold rule
+      // dropped it (a calendar entry with nothing in it yet, see `folded`).
+      // Nothing lost: `seen` is read fresh every tick, so an item that is
+      // still there next time gets its sighting written then. Sighting a
+      // source that does not exist would be a foreign-key violation, and
+      // silently skipping it here is what "not filed yet" is supposed to mean.
+      if (!source) continue
+      const script = `
+INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, gone_at, created_at)
+  VALUES (${sqlString(ulid())}, ${sqlString(source.id)}, ${sqlString(service)}, ${sqlString(guard.userId)},
+    ${sqlString(shelf)}, ${sqlString(now)}, NULL, ${sqlString(now)})
+  ON CONFLICT (source_id, seen_where, seen_by_user_id)
+  DO UPDATE SET shelf = excluded.shelf, seen_at = excluded.seen_at, gone_at = NULL
+  WHERE knowledge_sightings.shelf IS NOT excluded.shelf OR knowledge_sightings.gone_at IS NOT NULL;
+${teamVisibleRecomputeSql(source.id)}
+`
+      await execKnowledgeScript(cfg, guard.databaseId, script)
+    }
+}
+
 async function retireVanished(
   env: Env,
   cfg: D1Rest,
   guard: MemberGuard,
-  seen: Map<GoogleService, Set<string>>
+  seen: Map<GoogleService, Map<string, GoogleShelf>>
 ): Promise<void> {
   // CHAT FIRST, because it asks Google nothing.
   //
@@ -1321,7 +1431,7 @@ async function retireVanished(
     )
     for (const held of await heldSources(cfg, guard, "google_chat"))
       if (!liveSpaces.has(spaceOfThread(held.externalId)))
-        await retire(env, cfg, guard, held.id)
+        await retireSighting(env, cfg, guard, held.id, held.seenWhere)
   }
 
   for (const service of ["drive", "gmail", "calendar"] as ProbableService[]) {
@@ -1350,6 +1460,6 @@ async function retireVanished(
       service === "calendar" ? await scopedCalendarIds(cfg, guard) : ["primary"]
     for (const held of candidates)
       if ((await googlePresence(service, token, held.externalId, calendarIds)) === "gone")
-        await retire(env, cfg, guard, held.id)
+        await retireSighting(env, cfg, guard, held.id, held.seenWhere)
   }
 }

@@ -195,6 +195,15 @@ function readTeamVisible(table: "knowledge_sources" | "knowledge_chunks" | "know
   )
 }
 
+function readOwner(
+  table: "knowledge_sources" | "knowledge_chunks" | "knowledge_terms",
+  where: string
+): (string | null)[] {
+  return (db().prepare(`SELECT owner_user_id v FROM ${table} WHERE ${where}`).all() as { v: string | null }[]).map(
+    (r) => r.v
+  )
+}
+
 describe("teamVisibleRecomputeSql — the write side, exercised for real", () => {
   it("sets team_visible on the source AND denormalises it to the chunk and the term, in one script", async () => {
     seedSource("S_RC", null, 0)
@@ -204,6 +213,10 @@ describe("teamVisibleRecomputeSql — the write side, exercised for real", () =>
     expect(readTeamVisible("knowledge_sources", "id = 'S_RC'")).toEqual([1])
     expect(readTeamVisible("knowledge_chunks", "source_id = 'S_RC'")).toEqual([1])
     expect(readTeamVisible("knowledge_terms", "chunk_id = 'C_RC'")).toEqual([1])
+    // team_visible=1 means owner_user_id is not the deciding fact for this
+    // source any more — the recompute leaves it NULL, never the team sighter's
+    // own id, which would be a stale narrow value nobody asked it to keep.
+    expect(readOwner("knowledge_sources", "id = 'S_RC'")).toEqual([null])
   })
 
   it("flips back to 0 the moment the only team sighting retires — the leaking direction", async () => {
@@ -229,6 +242,45 @@ describe("teamVisibleRecomputeSql — the write side, exercised for real", () =>
     db().exec(teamVisibleRecomputeSql("S_RC3"))
     expect(readTeamVisible("knowledge_sources", "id = 'S_RC3'")).toEqual([0])
     expect(readTeamVisible("knowledge_chunks", "source_id = 'S_RC3'")).toEqual([0])
+  })
+
+  it("gives owner_user_id to the single private sighter, denormalised to chunk and term too", async () => {
+    seedSource("S_RC4", null, 0)
+    seedChunkAndTerm("S_RC4", "C_RC4")
+    seedSighting("S_RC4", COLLEAGUE, "private")
+    db().exec(teamVisibleRecomputeSql("S_RC4"))
+    expect(readOwner("knowledge_sources", "id = 'S_RC4'")).toEqual([COLLEAGUE])
+    expect(readOwner("knowledge_chunks", "source_id = 'S_RC4'")).toEqual([COLLEAGUE])
+    expect(readOwner("knowledge_terms", "chunk_id = 'C_RC4'")).toEqual([COLLEAGUE])
+  })
+
+  it("clears owner_user_id to NULL the instant a second private sighter appears — the calendar fold's own shape", async () => {
+    seedSource("S_RC5", null, 0)
+    seedChunkAndTerm("S_RC5", "C_RC5")
+    seedSighting("S_RC5", COLLEAGUE, "private")
+    db().exec(teamVisibleRecomputeSql("S_RC5"))
+    expect(readOwner("knowledge_sources", "id = 'S_RC5'")).toEqual([COLLEAGUE])
+    seedSighting("S_RC5", IDS.staffUser, "private")
+    db().exec(teamVisibleRecomputeSql("S_RC5"))
+    expect(
+      readOwner("knowledge_sources", "id = 'S_RC5'"),
+      "two private sighters and a stale single owner is exactly the locked-out-colleague bug"
+    ).toEqual([null])
+    expect(readOwner("knowledge_chunks", "source_id = 'S_RC5'")).toEqual([null])
+    expect(readOwner("knowledge_terms", "chunk_id = 'C_RC5'")).toEqual([null])
+  })
+
+  it("returns to a single owner once retirement leaves exactly one live private sighting", async () => {
+    seedSource("S_RC6", null, 0)
+    seedChunkAndTerm("S_RC6", "C_RC6")
+    seedSighting("S_RC6", COLLEAGUE, "private")
+    seedSighting("S_RC6", IDS.staffUser, "private")
+    db().exec(teamVisibleRecomputeSql("S_RC6"))
+    expect(readOwner("knowledge_sources", "id = 'S_RC6'")).toEqual([null])
+    db().exec(`UPDATE knowledge_sightings SET gone_at = '2026-02-01T00:00:00.000Z'
+                WHERE source_id = 'S_RC6' AND seen_by_user_id = '${COLLEAGUE}';`)
+    db().exec(teamVisibleRecomputeSql("S_RC6"))
+    expect(readOwner("knowledge_sources", "id = 'S_RC6'")).toEqual([IDS.staffUser])
   })
 })
 

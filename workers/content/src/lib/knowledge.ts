@@ -705,17 +705,27 @@ function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } 
   }
 }
 
-/** THE WRITE SIDE OF `team_visible` — SQL TEXT, not a call.
+/** THE WRITE SIDE OF `team_visible` AND `owner_user_id` — SQL TEXT, not a call.
  *
  * Every writer that changes what a source's sightings SAY (a new sighting, a
- * shelf moved private→team, one retired) must recompute `team_visible` on the
- * source and denormalise the same value onto every chunk and posting it owns,
- * in the SAME statement or transaction as that write — never a follow-up call
- * that can be skipped. This function is the exact condition the hub set
- * before any of this could be trusted to store an answer (tick 8): the
- * recompute must be atomic with the write that made it stale, or the gap
- * between them is a window where the flag says one thing and the sightings
- * say another, silently.
+ * shelf moved private→team, one retired) must recompute BOTH stored facts a
+ * fold leaves behind — `team_visible` (`teamVisible`, knowledge-identity.ts)
+ * and the single-owner case (`singleOwnerOf`, same file) — and denormalise
+ * both onto every chunk and posting the source owns, in the SAME statement or
+ * transaction as that write — never a follow-up call that can be skipped.
+ * This function is the exact condition the hub set before any of this could
+ * be trusted to store an answer (tick 8): the recompute must be atomic with
+ * the write that made it stale, or the gap between them is a window where the
+ * stored facts say one thing and the sightings say another, silently.
+ *
+ * WHY `owner_user_id` NEEDS THIS TOO, and did not from the start. Chunks and
+ * terms copy `owner_user_id` at INDEX time (`indexSource`), which only runs
+ * again when a source's TEXT changes — and a new sighting, a shelf move or a
+ * retirement changes none of it. Without this, the denormalised copies would
+ * go on citing whoever the LAST re-index saw, forever, the moment a second
+ * sighting arrived with no accompanying content change — silent, and
+ * invisible to every test that only ever changes text and sightings
+ * together.
  *
  * SO IT RETURNS TEXT RATHER THAN EXECUTING ANYTHING. A separate async call is
  * a separate network round trip a future writer's own `d1ExecScript` can be
@@ -725,13 +735,15 @@ function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } 
  * disciplined against; the string is unusable any other way, which is the
  * point.
  *
- * THREE STATEMENTS, ONE COMPUTED VALUE, in SQL rather than round-tripped
- * through this process — `EXISTS(...)` evaluates to SQLite's own 0 or 1, so
- * the three UPDATEs share one true source of truth rather than three chances
- * for a client-computed value to be stale by the time the third statement
- * runs. `gone_at IS NULL` is a LIVE sighting; `shelf = 'team'` is the only
- * shelf this flag ever models — see `ownerClause`'s own header for why the
- * app tier can never ride this column.
+ * THREE STATEMENTS, TWO COMPUTED VALUES, in SQL rather than round-tripped
+ * through this process — `EXISTS(...)` and the owner subquery each evaluate
+ * once and are reused across all three UPDATEs, so they share one true source
+ * of truth rather than six chances for a client-computed value to be stale by
+ * the time the last statement runs. `gone_at IS NULL` is a LIVE sighting;
+ * `shelf = 'team'` is the only shelf `team_visible` ever models — see
+ * `ownerClause`'s own header for why the app tier can never ride this column.
+ * The owner subquery is `singleOwnerOf` in SQL: exactly one live sighting,
+ * and it is private, names that person; anything else is `NULL`.
  *
  * ── THE ONE THING A CALLER MUST GET RIGHT, SAID EXACTLY: SPLICE ORDER ──────
  *
@@ -771,10 +783,17 @@ export function teamVisibleRecomputeSql(sourceId: string): string {
     SELECT 1 FROM knowledge_sightings
      WHERE source_id = ${id} AND gone_at IS NULL AND shelf = 'team'
   )`
+  // `singleOwnerOf`, in SQL: COUNT = 1 makes MAX(shelf) and MAX(seen_by_user_id)
+  // that one row's own values (MAX of one value is that value), so the CASE
+  // reads exactly as "exactly one live sighting, and it is private".
+  const singleOwner = `(
+    SELECT CASE WHEN COUNT(*) = 1 AND MAX(shelf) = 'private' THEN MAX(seen_by_user_id) ELSE NULL END
+      FROM knowledge_sightings WHERE source_id = ${id} AND gone_at IS NULL
+  )`
   return `
-UPDATE knowledge_sources SET team_visible = ${teamSightingExists} WHERE id = ${id};
-UPDATE knowledge_chunks SET team_visible = ${teamSightingExists} WHERE source_id = ${id};
-UPDATE knowledge_terms SET team_visible = ${teamSightingExists}
+UPDATE knowledge_sources SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner} WHERE id = ${id};
+UPDATE knowledge_chunks SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner} WHERE source_id = ${id};
+UPDATE knowledge_terms SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner}
   WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ${id});
 `
 }

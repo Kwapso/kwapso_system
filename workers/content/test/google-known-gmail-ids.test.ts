@@ -63,7 +63,12 @@ describe("gmailKnownIdsApply — the gate the skip is not allowed to clear on tr
 })
 
 describe("knownGmailIds — what the header skip is allowed to trust", () => {
-  it("asks knowledge_sources for THIS person's gmail rows only, capped", async () => {
+  it("asks THIS person's own SIGHTINGS of gmail rows only, capped", async () => {
+    // THE SHAPE CHANGED (kb_B1's identity gate): origin_row_id no longer
+    // carries the reader, so "known to me" is no longer a string prefix on
+    // knowledge_sources — it is a JOIN to knowledge_sightings, scoped by
+    // seen_by_user_id. Same guarantee (two colleagues' gmail never share a
+    // "known" set), a different SQL shape to prove it with.
     rows = []
     await knownGmailIds({} as never, guard)
 
@@ -73,35 +78,21 @@ describe("knownGmailIds — what the header skip is allowed to trust", () => {
     // "known gmail", they are a different origin_table entirely.
     expect(sql).toContain("FROM knowledge_sources")
     expect(sql).toContain("origin_table = 'google_gmail'")
+    // THE JOIN THAT REPLACED THE PREFIX MATCH.
+    expect(sql).toContain("knowledge_sightings")
+    expect(sql).toContain("seen_by_user_id")
+    expect(sql).toContain("gone_at IS NULL")
     // R14: a stated cap, not an unbounded read.
     expect(sql).toMatch(/LIMIT \d+/)
-    // THE PERSON, not the team — two colleagues' gmail must never share a
-    // "known" set, exactly as they never share a shelf (see the module header).
-    // The bound value is LIKE-escaped (likeLiteral backslash-escapes `_`), so
-    // the check reverses that rather than assert on the raw userId.
-    expect(
-      params.some((p) => typeof p === "string" && p.replaceAll("\\", "").startsWith(guard.userId))
-    ).toBe(true)
+    // THE PERSON, not the team — bound plainly now, since there is no prefix
+    // string left to escape: the JOIN's own equality is the fence.
+    expect(params).toContain(guard.userId)
   })
 
-  it("strips the userId prefix, so the caller gets Gmail's own ids back", async () => {
-    rows = [
-      { origin_row_id: `${guard.userId}:MSG_A` },
-      { origin_row_id: `${guard.userId}:MSG_B` },
-    ]
+  it("hands the caller Gmail's own ids back, unmodified — there is no prefix left to strip", async () => {
+    rows = [{ origin_row_id: "MSG_A" }, { origin_row_id: "MSG_B" }]
     const known = await knownGmailIds({} as never, guard)
     expect(known).toEqual(new Set(["MSG_A", "MSG_B"]))
-  })
-
-  it("never returns another person's row, even if one leaked past the query", async () => {
-    // Defence in depth: the WHERE clause is what should stop this, but the
-    // function's own filter is the last line and is worth its own assertion —
-    // a row whose prefix does not match this guard's userId must not surface
-    // as "known" and silently suppress a header read that was never this
-    // person's to skip.
-    rows = [{ origin_row_id: `${guard.userId}:MSG_A` }, { origin_row_id: "U_OTHER:MSG_X" }]
-    const known = await knownGmailIds({} as never, guard)
-    expect(known).toEqual(new Set(["MSG_A"]))
   })
 
   it("fails SAFE: a broken read is an empty set, never a thrown error", async () => {
