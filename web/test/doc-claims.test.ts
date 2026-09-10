@@ -525,9 +525,21 @@ describe("README.md states what is true now, not when it became true", () => {
     // Same tripwire as above: a map that names nothing passes a scan over nothing.
     expect(canon.length, "the canon collapsed — see the tripwire above").toBeGreaterThan(30)
     const missing = canon.filter((f) => !readme.includes(f))
+    // THE FAILURE NAMES BOTH CAUSES, because for a year it named the wrong one.
+    // A review skill writes its report to the repo ROOT, and a report that
+    // nothing ignores is read here as canon — so the message was "not reachable
+    // from README.md's doc map", which sends the reader to edit the doc map and
+    // link a file that should never have been read as a document. Twelve skills
+    // write such a report and .gitignore excused five of them, so five of the
+    // twelve failed usefully and seven failed misleadingly.
     expect(
       missing,
-      `these documents are not reachable from README.md's doc map: ${missing.join(", ")}`
+      `these documents are not reachable from README.md's doc map: ${missing.join(", ")}\n` +
+        `If one of those is a REVIEW SKILL's report rather than a document — anything ` +
+        `matching *-review.md or *-report.md — it does not belong in the doc map at all: ` +
+        `give it a line in .gitignore beside the others, which is where this check reads ` +
+        `"not ours" from. scaling-review.md is the one report that IS a document, and ` +
+        `.gitignore says why.`
     ).toEqual([])
   })
 })
