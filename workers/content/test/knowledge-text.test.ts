@@ -18,8 +18,10 @@ import {
   contextLinePrompt,
   decodeEmbedding,
   encodeEmbedding,
+  freshnessOf,
   plainText,
   questionTerms,
+  relevancyDate,
   similarity,
   tokenise,
 } from "../src/lib/knowledge-text"
@@ -339,5 +341,51 @@ describe("contextLinePrompt — the pure half of the context-line call", () => {
   it("bounds how much of a long piece it shows the model — the $1.70 budget depends on a short prompt", () => {
     const prompt = contextLinePrompt({ sourceTitle: "x", piece: "word ".repeat(2000) })
     expect(prompt.length).toBeLessThan(2000)
+  })
+})
+
+// ── RELEVANCY DATE — BUILD-5 §2's third grain rule: "happened-at for frozen
+// things, last-change for living things." Lane A's migration (fix/kb-model,
+// 0073) gives `knowledge_sources.relevancy_date` somewhere to live and says
+// in its own words which half is whose: "which of a source's several dates
+// this resolves to is an ingest decision" — the CLASSIFICATION (frozen vs
+// living, a property of what the kind IS) is this file's job; writing the
+// column is the ingest sweep's, once it exists.
+
+describe("freshnessOf — a property of what the kind IS, not how it is read", () => {
+  it("classifies a one-time event as frozen: it happened, and does not change afterwards", () => {
+    expect(freshnessOf("calendar")).toBe("frozen")
+    expect(freshnessOf("gmail")).toBe("frozen")
+    expect(freshnessOf("meeting")).toBe("frozen")
+  })
+
+  it("classifies something that keeps changing as living", () => {
+    expect(freshnessOf("chat")).toBe("living")
+    expect(freshnessOf("drive")).toBe("living")
+    expect(freshnessOf("ticket")).toBe("living")
+    expect(freshnessOf("story")).toBe("living")
+  })
+
+  it("is unclassified rather than guessed for a kind nobody has decided about yet", () => {
+    expect(freshnessOf("some_future_kind")).toBeNull()
+  })
+})
+
+describe("relevancyDate — the one decision, once the kind is known", () => {
+  it("picks happened-at for a frozen thing, even when a later last-change date exists", () => {
+    expect(relevancyDate("frozen", "2026-09-07T10:00:00Z", "2026-09-09T00:00:00Z")).toBe(
+      "2026-09-07T10:00:00Z"
+    )
+  })
+
+  it("picks last-change for a living thing, even when it is older than when it was first created", () => {
+    expect(relevancyDate("living", "2026-01-01T00:00:00Z", "2026-09-07T10:00:00Z")).toBe(
+      "2026-09-07T10:00:00Z"
+    )
+  })
+
+  it("is null rather than a wrong guess when the date this freshness needs is missing", () => {
+    expect(relevancyDate("frozen", null, "2026-09-09T00:00:00Z")).toBeNull()
+    expect(relevancyDate("living", "2026-01-01T00:00:00Z", null)).toBeNull()
   })
 })

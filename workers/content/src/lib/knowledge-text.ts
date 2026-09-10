@@ -267,6 +267,87 @@ export function contextLinePrompt(input: { sourceTitle: string; piece: string })
   return `Source: ${input.sourceTitle}\nPassage: ${piece}\n\nIn one short sentence, say what this passage is about — for someone skimming a search result who has not read the source. Reply with only that sentence.`
 }
 
+/** RELEVANCY DATE — BUILD-5 §2's third grain rule, and the reason
+ * `knowledge_sources.relevancy_date` exists (Lane A's migration, 0073): "which
+ * of a source's several dates this resolves to is an ingest decision" — that
+ * migration's own words for the boundary this file sits on. The CLASSIFICATION
+ * below is a property of what a kind IS (this file's half of the B1/B2 seam);
+ * writing the column, for a kind whose SQL this file has no business reading,
+ * is the sweep's.
+ *
+ * FROZEN — something that happened once and does not change afterwards: a
+ * calendar event, a sent email, a meeting. Its relevancy is WHEN IT HAPPENED,
+ * however long ago that was, because a later edit does not exist to prefer.
+ *
+ * LIVING — something that keeps being touched: a chat thread gaining replies,
+ * a Drive document being edited, a ticket or a story moving through its own
+ * lifecycle. Its relevancy is its LAST CHANGE, because KB-AUDIT.md §4.5 is
+ * exactly the cost of getting this backwards: "a question whose newest
+ * material is NOT RETRIEVED AT ALL" when a living thing is dated by when it
+ * was first created rather than when it was last true. */
+export type Freshness = "frozen" | "living"
+
+/** ONE KIND, ONE ANSWER. Google's four kinds are this file's own — google-read.ts
+ * already picks the right raw field for each (`event.start`, `mail.date`,
+ * the folded thread's newest message, `file.modifiedTime`), and this table is
+ * what makes that a stated decision rather than four separate ones nobody
+ * wrote down. The rest are the ingest sweep's app-record kinds
+ * (knowledge-ingest.ts), most of which currently stamp `record_date` from
+ * `created_at` alone — CORRECT for a kind that only ever happens once, and a
+ * live bug for one that doesn't, per KB-AUDIT.md §4.5's own measurement. Wiring
+ * `updated_at` (or whatever a kind's own last-change column is) is the
+ * sweep's, not this file's; the classification is the fact this table states
+ * so that wiring has an answer to consult rather than a guess to make per
+ * kind. A kind not listed is unclassified rather than defaulted — `null`, not
+ * a guess dressed as one. */
+const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
+  // Google kinds — google-read.ts's own four.
+  calendar: "frozen",
+  gmail: "frozen",
+  chat: "living",
+  drive: "living",
+  // App-record kinds (knowledge-ingest.ts). A ONE-TIME EVENT stays frozen
+  // even though its row can technically be edited (a meeting's start time
+  // corrected after the fact is still describing when the meeting WAS, not a
+  // second event) — matching what the sweep already does for these two.
+  meeting: "frozen",
+  sprint: "frozen",
+  portal_login: "frozen",
+  // Everything that is worked on, replied to, or moves through a status over
+  // its life. A ticket answered yesterday is more relevant to "what's
+  // happening with HOGO" than one opened a year ago and touched since —
+  // exactly what `created_at` alone cannot say.
+  ticket: "living",
+  account: "living",
+  contact: "living",
+  app: "living",
+  process: "living",
+  story: "living",
+  todo: "living",
+  task: "living",
+  person: "living",
+}
+
+/** Which half of `FRESHNESS_BY_KIND` a kind falls in, or `null` for one this
+ * table has not decided about — the honest state a new kind starts in, never
+ * a silent default in either direction. */
+export function freshnessOf(kind: string): Freshness | null {
+  return FRESHNESS_BY_KIND[kind] ?? null
+}
+
+/** THE ONE DECISION, once the kind is known: happened-at for frozen, last-change
+ * for living. Null when the date THAT freshness needs is missing — never the
+ * other date instead, which would be answering a different question than the
+ * one asked ("when did this happen" is not "when was this last touched",
+ * however tempting either is as a fallback for the other). */
+export function relevancyDate(
+  freshness: Freshness,
+  happenedAt: string | null,
+  lastChangeAt: string | null
+): string | null {
+  return (freshness === "frozen" ? happenedAt : lastChangeAt) ?? null
+}
+
 /** The words a piece of text contributes to the inverted index, with how often
  * each appears (capped, so a template repeating "invoice" forty times does not
  * outrank a source that is actually about invoices).
