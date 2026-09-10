@@ -770,3 +770,72 @@ was never a trade to make**, and I had asked two lanes to agonise over one.
 **Owner ticked into his own tracker at my hand, 5 of 46**, with notes written on
 four of the blanks saying WHY they are blank. Cap corrected there too — it still
 said $10 in the meter and the gate.
+
+## Tick 14 — 10 Sep 2026, ~23:40
+
+**I PUSHED A RED MAIN.** Merged kb_B1's cards, ran the gate, and pushed in the same
+command chain — so the push happened before I read the exit code. `REAL_EXIT=1`.
+`knowledge-backfill.test.ts:308` asserted every source has chunks; a card writes
+none BY DESIGN, and 142 sources — exactly the cards — failed it.
+
+**Fixed forward and made the test STRONGER, not looser.** Excluding cards alone
+would have turned it into a test that passes when cards silently stop being made.
+Three assertions now: cards must EXIST (or the exclusion is vacuous), a card must
+have zero chunks (chunks are what make a source quotable), every non-card source
+is still chunked. Main green at exit 0, 153+12+2 files.
+
+**The lesson, and it is mine.** kb_B1's branch was green against ITS OWN BASE and I
+merged it without re-gating against a main that had moved four merges since.
+`npm run check` on a lane's branch proves the lane; it does not prove the merge.
+**And never chain the push to the gate** — `merge && check && push` pushes whatever
+the check said, because the shell does not care. Gate, READ, then push.
+
+**A flaky test found on the way, unrelated to the KB.** `web/test/splash.test.ts`
+("crosses from stacked samples to swept trails to one uniform rim") failed under
+the full run and passes 3/3 in isolation. It is an animation-timing assertion and
+this machine is running five Claude sessions plus a full gate. Same class as the
+scroll-measurement lesson: a timing test on a loaded machine reports noise as a
+finding. Not fixed, recorded — it will bite somebody at a worse moment.
+
+**MERGED THIS TICK:** kb_A's 0076 (later retracted, see below), kb_B1's cards.
+**Cards live effect, from the source tables rather than chunk lengths:** ticket
+**0 of 2,052** · story 7/339 · task 60/256 · sprint 112/112 · app 28/28 · account
+132/134. Zero tickets is the number three designs had to die to reach.
+
+**RULED: 0076 IS DROPPED — two copies of `team_visible`, not three.** kb_B1
+censused all eight fence sites and asked for fewer copies; kb_A built the column
+because I ASKED FOR IT and refused to revert on a peer's say-so, which was the
+right boundary. I verified the census myself: all six source-level sites resolve
+through the one seam (`readerClause`/`ownerClause`) and
+`idx_knowledge_sightings_source` exists, so the EXISTS goes in ONE place, not six.
+**And I owned the honest part: that column was on my list because kb_B1 asked for
+it in report 6 and I passed it through without deriving the need.** Two conditions:
+the EXISTS lives inside the seam, never at a call site; and the corpus-wide
+rot-check must survive as a two-hop derivation.
+
+**RULED: rollups become cards. Staleness is the decisive argument, not the audit.**
+A rollup body says "their tickets — 12 still open" at INDEX time; retrieval quotes
+it days later and asserts a false number WITH A CITATION, which is the most
+expensive wrong answer this base can produce — worse than the refusal it replaces,
+because a person cannot tell it from a fact. Accepted knowingly that this narrows
+deliberate enrichment work from an earlier round. **Asked kb_B1 the question that
+follows: if the rollup body is no longer quoted and the router never searched it,
+is it read by ANYTHING? If not, it is write-only and this repo has a law about
+exactly that.**
+
+**kb_B1 CORRECTED kb_B2's PREMISE AND IT REACHED THE TEST IN TIME.** kb_B2 believed
+a threadId 404s on `/messages` "essentially always — different id spaces". Gmail
+sets a thread's id to its FIRST message's id: same space, and 197 of 266 live
+threads are single-message. So the bug is not catastrophic-and-obvious; it fires
+**exactly when a thread's first message was individually deleted while the thread
+lives on** — rare, silent, and it destroys a live conversation while looking like
+the feature working. **The test must assert THAT case**, or it encodes a false
+premise and goes green against a still-wrong implementation. kb_B1 stated its own
+confidence as confidence rather than fact, which is why this was actionable.
+
+Also from kb_B1: under that premise, "resolve to a member message" is not a weaker
+option, **it IS the status quo** — so rejecting it is a bug fix, not a preference.
+And `absent is not gone` is the FOURTH instance: calendar's `primary`-404, mail's
+thread-404, chat's space-keying that exists to avoid asking, and kb_B1's own
+`heldSources` prefix case where "I cannot find your rows" would read as "you have
+no rows" — same sentence, opposite direction.
