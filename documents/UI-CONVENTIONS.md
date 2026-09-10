@@ -245,8 +245,10 @@ control the engine has no block for is composed by the host from kit parts.)
 The bespoke details are **not a list anybody keeps**. They are DERIVED off disk
 by `recordDetailComponents()` in `web/test/rules.test.ts`, from two independent
 signals: a component under `web/components/` named `*-detail.tsx`, or one that
-renders an `<ActivityPanel>` (a record's own history feed, which nothing but a
-record detail has any business drawing). `RECORD_DETAIL_NOT` in the registry is
+renders a `<RecordScreen>`. The second signal USED to be `<ActivityPanel>`, and
+had to move on 7 Sep 2026: retiring the Activity tab meant no detail rendered
+that panel any more, and a census whose signal matches nothing reports the same
+all-clear as one that matched everything and found no fault. `RECORD_DETAIL_NOT` in the registry is
 the reasoned residue, rot-checked so it can only shrink. **Do not add a screen to
 a list to make it obeyed — name the file `*-detail.tsx` and it is.**
 
@@ -351,7 +353,7 @@ code. The UI laws:
 
 | ID | Law (plain English) | Check id |
 |----|---------------------|----------|
-| **R2** | Every record-detail screen exposes **Overview + Activity** tabs. | `record-detail-tabs` |
+| **R2** | Every record-detail screen draws its strip through `TabsView`, and its history is REACHABLE (the Activity TAB was retired 7 Sep 2026). | `record-detail-tabs` |
 | **R3** | Collection tab strips use the library **`TabsView`**, no hand-rolled button toggles. | `no-handrolled-toggles` |
 | **R4** | Every form/dialog renders through the shared **`FormShell`**. | `forms-use-formshell` |
 | **R6** | Product terms live in **ONE glossary**, the app speaks one dictionary. | `glossary-wellformed` |
@@ -363,18 +365,22 @@ read through one generic path, covered in CACHING.md / DATA-MODEL.md. `R5`'s web
 does show up in `rules.test.ts`: the app must read record activity through the one
 `recordActivity` fetcher.)
 
-### R2, record detail = Overview + Activity, via `TabsView` + `ActivityFeed`
+### R2, record detail = the strip through `TabsView`, the history through the rail
 
 Every record you can open has, at minimum, an **Overview** tab (the key facts at a
-glance) and an **Activity** tab (what changed and who changed it). Recipe details get
-these as recipe data (see §2a). The **bespoke** details must render them themselves,
-and the check verifies exactly that, reading the source for the two library names:
+glance), and its history is REACHABLE — from the ink footer's Latest activity
+eyebrow, which opens the slide-in `ActivityRail`. It used to be a second tab; the
+client retired that on 7 Sep 2026 ("kill all old activity tabs"), so a detail left
+with one panel draws no strip at all and is named in `RECORD_TABS_SINGLE_PANEL`.
+Recipe details get their tabs as recipe data (see §2a). The **bespoke** details
+must render the strip themselves, and the check verifies exactly that:
 
 ```ts
 // web/test/rules.test.ts — the SUBJECT is read off disk, never hand-listed
-for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <ActivityPanel>
+for (const c of recordDetailComponents()) {          // *-detail.tsx, or renders <RecordScreen
+  // A detail with ONE panel draws no strip and is named in RECORD_TABS_SINGLE_PANEL.
+  if (RECORD_TABS_SINGLE_PANEL[c.name]) continue
   expect(c.source, `${c.name} must use library TabsView`).toContain("TabsView")
-  expect(c.source, `${c.name} must render an ActivityPanel (the Activity tab)`).toContain("ActivityPanel")
 }
 ```
 
@@ -390,8 +396,10 @@ this red.
 badge; Activity carries `formatCount(activity.total)`.
 
 **No exceptions today.** `role-detail`, the last one, grew its tabs on 2026-07-06
-(Permissions is its main tab, then Overview + Activity): **every record detail in
-the app carries the tabs, machine-checked.**
+(Permissions is its main tab, then Overview; the Activity tab it grew that day was
+retired with all the others on 7 Sep 2026): **every record detail in the app draws
+its strip through the library, machine-checked** — except the ones a single panel
+leaves with no strip to draw.
 
 And the *census* is the part that had to change, not the screens. It used to be
 an inclusion list, `RECORD_DETAIL_COMPONENTS`, so R2 and R8 walked exactly the
@@ -840,7 +848,7 @@ alive underneath, that's the "immovable, contentless page" feel.
 - [ ] New component file? It is **mounted** (something imports it) or **parked** with
       its reason in `web/test/orphan-components.test.ts`'s `PARKED` list (§2) — the
       census fails the build on a component nothing imports.
-- [ ] New record detail? It has **Overview + Activity** tabs (R2), recipe data, or, if
+- [ ] New record detail? Its strip is the library `TabsView` and its history is reachable from the ink footer's rail, NOT an Activity tab (R2) — recipe data, or, if
       bespoke, `TabsView` + `ActivityFeed`, and it's registered (or a reasoned
       exception) in `shared/rules/registry.ts`.
 - [ ] Any tab strip / toggle uses the library **`TabsView`** (R3), no `variant={x===y?…}`.

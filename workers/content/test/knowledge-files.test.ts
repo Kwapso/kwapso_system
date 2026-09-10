@@ -28,6 +28,17 @@ function aiEnv(toMarkdown: (...args: unknown[]) => unknown): Env {
 
 const bytes = (text: string) => new TextEncoder().encode(text)
 
+/** THE FOUR BYTES EVERY ZIP OPENS WITH - "PK" and two control bytes - which is
+ * how a reader tells a .docx or an .xlsx from anything else.
+ *
+ * Spelled as ESCAPES, and named, rather than typed as raw bytes into a string
+ * literal. Identical at runtime; the difference is on disk. Two raw control
+ * bytes make `grep` classify the whole FILE as binary, and a binary file is
+ * SKIPPED IN SILENCE - no output, exit 1, and nothing to tell it apart from an
+ * honest zero matches. On 8 Sep 2026 that silence was read as "the feature has
+ * been deleted" twice, in two different sessions, about two different files. */
+const ZIP_MAGIC = "PK\u0003\u0004"
+
 describe("readability: which files we can read, and how", () => {
   it("reads plain text itself, without a conversion round-trip", () => {
     expect(readability("text/plain", "notes.txt")).toBe("text")
@@ -140,7 +151,7 @@ describe("extractFile: the file is kept, the words are only claimed when they ex
   it("gives an unreadable kind no words and a reason", async () => {
     const toMarkdown = vi.fn()
     const out = await extractFile(aiEnv(toMarkdown), {
-      bytes: bytes("PK"),
+      bytes: bytes(ZIP_MAGIC),
       contentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       fileName: "pitch.pptx",
     })

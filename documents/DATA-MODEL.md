@@ -705,7 +705,7 @@ fact this table already holds.
   in activity, like closed on x, reopen on y, closed again on z."*
 - **A ticket with no rows reports NOTHING, never zero.** Every ticket that existed
   before this migration has an empty history and cannot be given one; the reader
-  answers `recorded: false` and the Activity tab prints it in words. A ticket
+  answers `recorded: false` and the history rail prints it in words. A ticket
   raised before and moved after has a real sequence that does not start at the
   beginning (`fromCreation: false`), and says so. **Nothing is backfilled** —
   0066 lists the four reasons the activity feed cannot supply the past.

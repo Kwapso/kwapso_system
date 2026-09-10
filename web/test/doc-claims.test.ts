@@ -101,8 +101,32 @@ function skillDocs(): string[] {
  * other forty-two. Nothing would have been red. So the two directories are read
  * together, and the count is asserted below rather than trusted — a canon that
  * shrinks to a handful is a bug in this file, not a tidy repository. */
+/** AN ARTEFACT IS NOT A DOCUMENT, AND THE REPO ALREADY SAYS WHICH IS WHICH.
+ * A skill that writes its report to the repo root (`lean-mean-report.md`,
+ * `story-review.md`, `interface-lessness-report.md`) leaves a `.md` file there that
+ * is git-ignored PRECISELY because it is machine output, not canon — `.gitignore`
+ * says so in its own words, and this reads that answer rather than guessing at one
+ * with a name pattern.
+ *
+ * Derived HERE, once, and applied to the walk itself. It used to be re-derived in
+ * two places lower down and applied to two assertions out of the nine that scan
+ * DOCS, so a stale audit report at the root — "seven workers", "R1–R19" — turned
+ * the build red on any machine that had merely RUN a review. Both of those
+ * sentences were true when the skill wrote them, which is the definition of an
+ * artefact and the reason the doc-map assertion excused one in the first place;
+ * the other seven scans never got the same sentence. Filtering the walk means the
+ * next scan added to this file inherits the answer instead of having to remember
+ * it. */
+const ARTEFACTS_AT_ROOT = new Set(
+  read(join(ROOT, ".gitignore"))
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("/") && l.endsWith(".md"))
+    .map((l) => l.slice(1))
+)
+
 const canonDocs = (): string[] => [
-  ...readdirSync(ROOT).filter((f) => f.endsWith(".md")),
+  ...readdirSync(ROOT).filter((f) => f.endsWith(".md") && !ARTEFACTS_AT_ROOT.has(f)),
   ...readdirSync(join(ROOT, "documents"))
     .filter((f) => f.endsWith(".md"))
     .map((f) => join("documents", f)),
@@ -221,6 +245,21 @@ describe("docs agree with the roster on disk", () => {
       canonDocs().filter((d) => d.startsWith("documents")).length,
       "documents/ holds the canon; if it is empty the walk is reading the wrong place"
     ).toBeGreaterThan(20)
+    // AND THE SAME QUESTION OF THE SUBTRACTION. ARTEFACTS_AT_ROOT is read out of
+    // .gitignore, so a rewrite that drops those lines — or moves them behind a
+    // pattern this reader does not parse — empties the set in silence, and every
+    // scan below quietly starts grading machine output as canon again. An empty
+    // exclusion list is indistinguishable from a repository with no artefacts,
+    // which is why it is asserted rather than assumed.
+    expect(
+      [...ARTEFACTS_AT_ROOT],
+      "no root .md is ignored any more — did .gitignore change shape? The skills still " +
+        "write their reports to the root, and this set is what keeps them out of the canon"
+    ).not.toEqual([])
+    expect(
+      canonDocs().filter((d) => ARTEFACTS_AT_ROOT.has(d)),
+      "the walk is handing back a file .gitignore calls an artefact"
+    ).toEqual([])
   })
 
   it("the roster itself is readable, and exactly two doors are public", () => {
@@ -300,7 +339,16 @@ describe("docs agree with the roster on disk", () => {
       // and a noisy check gets switched off.
       for (const m of src.matchAll(/\bR1\s*[–-]\s*R(\d+)\b/g)) {
         if (Number(m[1]) === highest) continue
-        wrong.push(`${doc}: "${m[0].trim()}" — the registry declares ${ids.length} laws, up to R${highest}`)
+        // DISTINCT ids, not raw matches. `ids` counts every `id: "R<n>"` in the
+        // file, and `LAW_ID_ORIGIN` carries seven COLLISION RECORDS — R20 to R26,
+        // each naming a law `main` minted and one `feat/ui-ux` minted under the
+        // same number during the 8 Sep renumbering. So the message said "the
+        // registry declares 65 laws" while it declares 58, and the number a
+        // reader was being corrected WITH was itself wrong. The assertion was
+        // always right (`highest` is a Math.max); only the sentence lied.
+        wrong.push(
+          `${doc}: "${m[0].trim()}" — the registry declares ${new Set(ids).size} laws, up to R${highest}`
+        )
       }
     }
 
@@ -458,21 +506,12 @@ describe("README.md states what is true now, not when it became true", () => {
     // The map claims to list them all, and AGENTS.md — the cross-tool filename an
     // agent opens by habit — was the one it never mentioned. A map with a hole in
     // it is worse than no map: a reader trusts it and stops looking.
-    // TRACKED documents only. A skill that writes its report to the repo root
-    // (lean-mean-report.md, interface-lessness-report.md) leaves a .md file that
-    // is git-ignored precisely because it is an ARTEFACT, not a document — and
-    // demanding README link to a file that is not in the repository would make
-    // the build red on a machine that had merely run an audit. So the ignore
-    // list is the definition of "is this ours": root-level entries in
-    // .gitignore, read from the file rather than hard-coded, so a new artefact
-    // is excused the moment somebody ignores it and never before.
-    const ignoredAtRoot = new Set(
-      read(join(ROOT, ".gitignore"))
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.startsWith("/") && l.endsWith(".md"))
-        .map((l) => l.slice(1))
-    )
+    // TRACKED documents only — `canonDocs()` has already dropped the root
+    // artefacts, using .gitignore as the repo's own answer to "is this ours"
+    // (see ARTEFACTS_AT_ROOT). Demanding README link to a file that is not in
+    // the repository would make the build red on a machine that had merely run
+    // an audit; that reasoning was written here first and now governs the walk
+    // itself, so every scan in this file gets it rather than this one alone.
     // The audit artefacts still land at the ROOT, which is why the ignore list is
     // read there — but the canon they had to be told apart from now lives in
     // `documents/`, and nothing in that folder is ever an artefact. Matching on the
@@ -481,14 +520,208 @@ describe("README.md states what is true now, not when it became true", () => {
     // reaches the reader, which is the whole property being checked.
     const canon = canonDocs()
       .map((f) => f.split(sep).pop() as string)
-      .filter((f) => f !== "README.md" && !ignoredAtRoot.has(f))
+      .filter((f) => f !== "README.md")
       .sort()
     // Same tripwire as above: a map that names nothing passes a scan over nothing.
     expect(canon.length, "the canon collapsed — see the tripwire above").toBeGreaterThan(30)
     const missing = canon.filter((f) => !readme.includes(f))
+    // THE FAILURE NAMES BOTH CAUSES, because for a year it named the wrong one.
+    // A review skill writes its report to the repo ROOT, and a report that
+    // nothing ignores is read here as canon — so the message was "not reachable
+    // from README.md's doc map", which sends the reader to edit the doc map and
+    // link a file that should never have been read as a document. Twelve skills
+    // write such a report and .gitignore excused five of them, so five of the
+    // twelve failed usefully and seven failed misleadingly.
     expect(
       missing,
-      `these documents are not reachable from README.md's doc map: ${missing.join(", ")}`
+      `these documents are not reachable from README.md's doc map: ${missing.join(", ")}\n` +
+        `If one of those is a REVIEW SKILL's report rather than a document — anything ` +
+        `matching *-review.md or *-report.md — it does not belong in the doc map at all: ` +
+        `give it a line in .gitignore beside the others, which is where this check reads ` +
+        `"not ours" from. scaling-review.md is the one report that IS a document, and ` +
+        `.gitignore says why.`
     ).toEqual([])
+  })
+})
+
+/** A RULING CHANGED THE CODE. DID IT CHANGE THE PROSE?
+ *
+ * Nothing here asked that question until 2026-09-10, and the cost of not asking
+ * was six instances of one shape in a single session: R57's component count,
+ * the Laws range, a lane brief's worktree path, the .gitignore artefacts, and
+ * the Activity-tab retirement TWICE - once closed in one file and left live in
+ * five others (including eight lines below the amendment itself), then swept on
+ * `grep "Activity tab"`, which cannot match "Overview + Activity", so seven more
+ * survived.
+ *
+ * THE SECOND SWEEP IS WHY THIS EXISTS. Nobody was careless. A person swept
+ * properly, read every hit and decided each honestly - WITH A PATTERN. A pattern
+ * is a hand-listed census, which is the exact thing R14, R19, R22, R36, R47 and
+ * R54 exist to forbid, and this one inherited the blind spot of the list it was
+ * meant to supersede. So the vocabulary stops being somebody's memory and
+ * becomes data.
+ *
+ * Each entry is a thing the product RETIRED and the phrases that describe it as
+ * still living. A phrase is allowed when a RETIREMENT MARKER sits within two
+ * lines of it, so the canon may narrate the history freely and may not state the
+ * dead thing as present. Rot-checked: a phrase nothing says any more is a line
+ * to delete, or this becomes a record of what the docs used to be wrong about.
+ *
+ * NARROW ON PURPOSE, like GLOSSARY_SYNONYMS. And matched on WORD BOUNDARIES: the
+ * first draft flagged "an activity table past ~5M rows" because "activity tab"
+ * is a substring of "activity table", which is the same class of sloppiness the
+ * check is here to catch. */
+const RETIRED_IN_THE_CANON: Record<string, { since: string; phrases: RegExp[] }> = {
+  "the record Activity tab": {
+    since: "2026-09-07, the client's ruling: kill all old activity tabs",
+    phrases: [/overview \s*\+\s*activity/i, /\bactivity tabs?\b/i, /<ActivityPanel>/i],
+  },
+}
+
+/** Words that make a mention HISTORY rather than a claim. Generous on purpose:
+ * the failure caught here is a doc asserting a dead thing is alive, and a
+ * passage that mentions the retirement at all is not doing that. */
+const RETIREMENT_MARKERS =
+  /retir|\bwas\b|\bwere\b|used to|until|no longer|any more|not an? |since |kill|remov|shipped|grew|old /i
+
+/** DOCUMENTS THAT ARE HISTORY BY DECLARATION, where describing the old world is
+ * the job. Data with a reason each, rot-checked below so the list can only
+ * shrink - the same shape every exemption in this repo takes. */
+const HISTORY_DOCS: Record<string, string> = {
+  "documents/ROADMAP.md":
+    "README's doc map calls it 'history, not a plan' in those words - the build record of a round that closed on 2026-07-02, so it describes the app as it was and must not be edited to describe the app as it is",
+  "documents/SCREEN-ENGINE-PLAN.md":
+    "the screen-recipe engine's own build plan, declared history by README's map; it records what that round shipped, Activity tab included",
+}
+
+/** THE RESIDUE THE MARKERS CANNOT READ, decided by a person and written down.
+ *
+ * `RETIREMENT_MARKERS` is a heuristic and it is doing real work — it clears most
+ * of the canon's history-telling without anybody listing it. But it is a
+ * HAND-LIST OF WORDS, and the first three lines it could not read were narrated
+ * with "shipping", "went with" and a clause the splitter cut the marker off
+ * from. Widening the vocabulary every time it misses one is the exact failure
+ * this whole control exists because of: `story_checks_out_review` spent six
+ * rounds proving that a pattern is a hand-listed census, and a longer pattern is
+ * a longer hand-list.
+ *
+ * So the residue becomes BOUNDED data instead. Each key is a distinctive
+ * fragment of the line — not a line NUMBER, which every edit above it would
+ * shift — and each value says why that mention is history. Rot-checked: a
+ * fragment that no longer appears, or one whose line the markers now clear on
+ * their own, turns the build red and the line gets deleted. It can only shrink,
+ * and a human read every entry in it. */
+const NARRATES_THE_RETIREMENT: Record<string, string> = {
+  '"kill all old activity tabs", the history reached instead from':
+    "R2's own law text quoting the client's ruling — the sentence that RETIRES the tab. The marker is the quote itself and the clause splitter cuts it off from the mention",
+  "shipping an Activity tab with no count at all":
+    "R8's *Earned by:* clause, describing the world before the amendment. 'shipping' is a gerund the marker list does not carry, and adding it would clear live prose too",
+  'activity tabs"): a record\'s history is reached from the ink footer':
+    "UI-CONVENTIONS' own code comment, where the client's quoted ruling WRAPS across two lines — 'The client retired it on 7 Sep 2026 (\"kill all old' ends the line above. The clause splitter cannot see a marker that is on the previous line, and widening it to neighbours wholesale would restore the exact blind spot this control was tightened to close",
+  "The `<ActivityPanel>` half went with the Activity tab on 7 Sep 2026":
+    "BUILD-A-MODULE's correction of its own false clause, 10 Sep 2026 — it says the obligation moved, in the sentence that says so. 'went with' is not a marker and should not become one",
+}
+
+describe("a ruling that changed the code changed the prose too", () => {
+  const isPlan = (doc: string): boolean => doc.startsWith(".plans/")
+  // WHAT A SKILL LEAVES AT THE ROOT is not in DOCS at all any more — see
+  // ARTEFACTS_AT_ROOT beside the walk. This block used to derive that set a
+  // second time and skip on it here; `/-review[.]md$/` before that matched
+  // `story-review.md` and NOT `lean-mean-report.md` or
+  // `interface-lessness-report.md`, a predicate already a hand-list of two
+  // thirds of its own subject, which is the shape this whole file spent a day
+  // learning to distrust.
+
+  it("no document states a retired thing as if it were still there", () => {
+    const offenders: string[] = []
+    for (const doc of DOCS) {
+      if (HISTORY_DOCS[doc] || isPlan(doc)) continue
+      let lines: string[]
+      try {
+        lines = read(join(ROOT, doc)).split("\n")
+      } catch {
+        continue
+      }
+      for (const [thing, { phrases }] of Object.entries(RETIRED_IN_THE_CANON))
+        lines.forEach((line, i) => {
+          // PER CLAUSE, NOT PER LINE — the blind spot `story_checks_out_review`
+          // found ninety seconds after this shipped, by constructing the case
+          // it thought might be missed rather than reverting one it knew was
+          // caught. A marker anywhere on the line used to wave the WHOLE line
+          // through, so this sentence passed while half of it was false:
+          //
+          //   "(it was <ActivityPanel> until 7 Sep 2026) and asserts each
+          //    contains TabsView + <ActivityPanel>."
+          //
+          // The first mention is history, the second is a live claim about an
+          // assertion the check stopped making, and they are one clause apart
+          // in the very line where the review had said that reading for one
+          // shape makes a second shape in the same line invisible.
+          //
+          // So each MATCH is judged on its own surroundings: the text between
+          // the clause breaks either side of it, widened to the neighbouring
+          // lines only when the clause itself is short, because prose wraps and
+          // a retirement is routinely narrated in the sentence above.
+          const context = (at: number): string => {
+            const before = line.slice(0, at)
+            const after = line.slice(at)
+            const open = Math.max(
+              ...[".", ";", "—", ")", " and ", " but "].map((d) => before.lastIndexOf(d))
+            )
+            const shut = Math.min(
+              ...[".", ";", "—", "(", " and ", " but "]
+                .map((d) => after.indexOf(d))
+                .filter((n) => n >= 0)
+                .concat([after.length])
+            )
+            const clause = line.slice(open + 1, at + shut)
+            // A clause too short to carry its own history is read with its
+            // neighbours; a full one is judged alone.
+            return clause.length < 40 ? lines.slice(Math.max(0, i - 2), i + 3).join(" ") : clause
+          }
+          let flagged = false
+          for (const re of phrases) {
+            const rx = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`)
+            for (const m of line.matchAll(rx)) {
+              if (flagged) break
+              if (RETIREMENT_MARKERS.test(context(m.index ?? 0))) continue
+              if (Object.keys(NARRATES_THE_RETIREMENT).some((frag) => line.includes(frag))) continue
+              offenders.push(`${doc}:${i + 1} states ${thing} as live: ${line.trim().slice(0, 90)}`)
+              flagged = true
+            }
+          }
+        })
+    }
+    expect(
+      offenders,
+      "a document describes something the product retired as if it were still there. " +
+        "Say it in the past tense, or name the retirement within two lines"
+    ).toEqual([])
+  })
+
+  it("every retired thing is still worth naming, and every history exemption is real", () => {
+    const canon = DOCS.map((d) => {
+      try {
+        return read(join(ROOT, d))
+      } catch {
+        return ""
+      }
+    }).join("\n")
+    for (const [thing, { phrases }] of Object.entries(RETIRED_IN_THE_CANON))
+      expect(
+        phrases.some((re) => re.test(canon)),
+        `RETIRED_IN_THE_CANON lists "${thing}", which the canon no longer mentions at all - delete the entry`
+      ).toBe(true)
+    for (const [frag, why] of Object.entries(NARRATES_THE_RETIREMENT)) {
+      expect(
+        canon.includes(frag),
+        `NARRATES_THE_RETIREMENT still lists "${frag.slice(0, 40)}…", which the canon no longer says — delete the line`
+      ).toBe(true)
+      expect(why.length, `"${frag.slice(0, 30)}…" needs a real reason`).toBeGreaterThan(40)
+    }
+    for (const [doc, why] of Object.entries(HISTORY_DOCS)) {
+      expect(existsSync(join(ROOT, doc)), `HISTORY_DOCS names ${doc}, which is gone - delete the line`).toBe(true)
+      expect(why.length, `${doc} needs a real reason`).toBeGreaterThan(40)
+    }
   })
 })

@@ -1,0 +1,313 @@
+{
+  "meta": {
+    "tool": "plan_with_questions",
+    "slug": "kwapso-kb-final-round",
+    "respondent": "Alaap K",
+    "answered": 46,
+    "total": 46,
+    "exported_at": "2026-09-10T09:10:58.121Z"
+  },
+  "answers": {
+    "purge-ok": {
+      "section": "The whole plan in five sentences",
+      "question": "Are you comfortable with that split: throw away all derived data and rebuild it, keep the code and fix it?",
+      "selected": "I want the code rebuilt from scratch too, whatever it costs",
+      "notes": "And if you'd purge and re-import all of the data."
+    },
+    "container-shape": {
+      "section": "Where things live",
+      "question": "How should a source that concerns several clients be stored?",
+      "selected": "One copy, tagged with every account it is about (recommended)",
+      "notes": ""
+    },
+    "google-filing": {
+      "section": "Where things live",
+      "question": "When you name a Drive folder or Chat space as a source, how should its account be decided?",
+      "selected": "Match the name against the account list and ask you to confirm once (recommended)",
+      "notes": ""
+    },
+    "visibility-states": {
+      "section": "Where things live",
+      "question": "Confirm the three sharing states.",
+      "selected": "Private (owner only) · Agency · Agency + that client (recommended)",
+      "notes": ""
+    },
+    "email-default": {
+      "section": "Where things live",
+      "question": "Your own Gmail and Calendar: what is the default when it comes in?",
+      "selected": "Shared with the agency by default; I mark private ones",
+      "notes": "For each source, we should be able to mark it. We should be able to control owner, shared with, and compartment. Also, when I go into the details, I should be able to see the number of pieces per source and which piece. I should be able to see the last modified timestamp too. "
+    },
+    "client-portal": {
+      "section": "Where things live",
+      "question": "Should clients get answers from the knowledge base in their portal, in this build?",
+      "selected": "No — agency only for now; design the fence so it can be added later (recommended)",
+      "notes": "And when they do add sources into their own compartment, they become the owner, but they don't have an option to limit this information. Everything they share will go into, of course, their own account compartment or app compartment, however we're doing it. I think app compartment is better: account compartment and sub-compartment per app.\n\nWhenever they upload anything there, in the future, when we build the ability for them to interact with the knowledge base, it builds up there. They can add things to their own compartment to that app, and whatever they upload is shared with them and the agency by default. They can't change that.\n\nOf course, if we build this in the future, just make sure that we document that this is what we want to build, and we keep it open-ended so that we can build on this. "
+    },
+    "chk-visibility": {
+      "section": "Where things live",
+      "question": "Alaap’s own Gmail holds a thread with FluClinic about Stripe. He has not shared it. Aurora asks “what did FluClinic say about Stripe?” What happens?",
+      "selected": "Aurora’s answer cannot use it; if Alaap asks, his can",
+      "notes": "Yeah, of course this is true. "
+    },
+    "date-rule": {
+      "section": "What every piece carries",
+      "question": "Confirm the relevancy-date rule.",
+      "selected": "Frozen things (mail, chat, transcripts, events): when they happened. Living things (docs, sheets, records): last change (recommended)",
+      "notes": "Remember that we should have a compartment per account and then a sub-compartment per app. Just generally telling you. "
+    },
+    "context-line": {
+      "section": "What every piece carries",
+      "question": "Add the context line to every piece?",
+      "selected": "Yes, written by the cheapest capable model (recommended)",
+      "notes": ""
+    },
+    "records-as-cards": {
+      "section": "What every piece carries",
+      "question": "Turn app records (tickets, stories, tasks, accounts, contacts, sprints, processes) into find-only cards, read live when needed?",
+      "selected": "Yes, all of them (recommended)",
+      "notes": ""
+    },
+    "chk-widen": {
+      "section": "What every piece carries",
+      "question": "A 100-page PDF is 100 pieces. A question matches piece 47 only. What does the new system do before answering?",
+      "selected": "Reads 46 and 48 as well, and tells the reader which document all of it is from",
+      "notes": ""
+    },
+    "dedup-canonical": {
+      "section": "Getting material in, once",
+      "question": "When one thing arrives several ways, which copy is the source of record?",
+      "selected": "The richest text wins; the others are recorded as sightings and linked (recommended)",
+      "notes": ""
+    },
+    "dedup-upload": {
+      "section": "Getting material in, once",
+      "question": "You upload a PDF that is already in the library, byte for byte. What should happen?",
+      "selected": "Refused with a link to the existing one (recommended)",
+      "notes": ""
+    },
+    "chat-grain": {
+      "section": "Getting material in, once",
+      "question": "Google Chat: what is one piece?",
+      "selected": "A run of consecutive messages from one thread, each stamped with speaker and time (recommended)",
+      "notes": "Also, remember that compartments are happening per account and then per app as well. Also, what we'll see for many things, like emails and anything from Google, is that they have the capacity to be shared by multiple people. Alex, Aurora, and Alaap can share the same space with the knowledge base, but all of them are in the same space. That data: how do we make sure that there are not three duplicate sources? How does this work? "
+    },
+    "sheets": {
+      "section": "Getting material in, once",
+      "question": "Spreadsheets: how should a sheet become pieces?",
+      "selected": "Each sheet tab becomes one document of plain text",
+      "notes": ""
+    },
+    "video": {
+      "section": "Getting material in, once",
+      "question": "Loom, Tella and YouTube links uploaded from the app — get the transcript?",
+      "selected": "Must-have now: YouTube captions + Loom/Tella transcript APIs, and Whisper on Workers AI for anything without one",
+      "notes": "Only search for transcripts, no need to transcribe audio, so no need for Wispr. "
+    },
+    "live-google": {
+      "section": "Getting material in, once",
+      "question": "During a question, should the system read Google live, or trust the index it refreshed within the last fifteen minutes?",
+      "selected": "Trust the index; read app records live, never Google (recommended)",
+      "notes": "Quick question: if we could also read Google Live, then what is the point of the knowledge base? Just curious, please answer this: if everything can just be read live, why even store everything in this vectorized format and index stuff? "
+    },
+    "sync-cadence": {
+      "section": "Getting material in, once",
+      "question": "How fresh does Google material need to be?",
+      "selected": "Fifteen minutes is fine (today)",
+      "notes": ""
+    },
+    "chk-gate": {
+      "section": "Getting material in, once",
+      "question": "Alaap uploads “FluClinic API guide.pdf”. Two weeks later Ishita uploads the identical file. What does the system say to Ishita?",
+      "selected": "“Already in the library since [date] — here it is”",
+      "notes": ""
+    },
+    "brain": {
+      "section": "How a question gets answered",
+      "question": "Which model runs the planner, the re-read and the writing?",
+      "selected": "Stay on Cloudflare Workers AI only (Kimi / Llama) — under a cent; weaker planning and judgement; nothing leaves the platform",
+      "notes": ""
+    },
+    "rerank-policy": {
+      "section": "How a question gets answered",
+      "question": "The re-read step specifically (reading forty passages against the question): same policy as above, or its own?",
+      "selected": "Same brain as the loop — one policy, one place text goes (recommended)",
+      "notes": ""
+    },
+    "latency": {
+      "section": "How a question gets answered",
+      "question": "How long may a good answer take?",
+      "selected": "Up to a minute — thoroughness over speed",
+      "notes": "Anything under a minute or equal to a minute is great, as long as we can see how it's thinking, what happened, and the answers are brilliant. "
+    },
+    "show-thinking": {
+      "section": "How a question gets answered",
+      "question": "Show the loop’s steps in the interface while it runs (“planning… searching 3 ways… re-reading 40… writing”)?",
+      "selected": "Yes — it is honest and it makes waiting bearable (recommended)",
+      "notes": ""
+    },
+    "fanout-cap": {
+      "section": "How a question gets answered",
+      "question": "How many parallel searches and lookups may one question launch?",
+      "selected": "Up to 12 — dig as deep as it wants",
+      "notes": ""
+    },
+    "structured-route": {
+      "section": "How a question gets answered",
+      "question": "Confirm: counting, ranking and “across all clients” questions go to the record tools, never to the passages.",
+      "selected": "Yes (recommended)",
+      "notes": ""
+    },
+    "answer-language": {
+      "section": "How a question gets answered",
+      "question": "Half your material is German. If the question is in German, the answer is…",
+      "selected": "Always in the asker’s app language setting",
+      "notes": ""
+    },
+    "chk-route": {
+      "section": "How a question gets answered",
+      "question": "Aurora asks “which client has the most open tickets?” Which path does the planner take?",
+      "selected": "Call the ticket tool for every client and count",
+      "notes": "Ideally, this would be it. Also, I've been toying around with the idea for a master index. For example, when I ask it a question that involves pronouns, including an app, an account, or a stakeholder, there should just be one centralised index with the name and path to the correct table or database, depending on whether sharded or not sharded. I hope this makes sense.\nSometimes I can ask a question like, \"Oh, is Paras from the flu clinic opening any new tickets? What was the average number of tickets opened in the last 7 days?\" Now, because I mentioned flu clinic and I mentioned Paras, the first thing it can do is figure out:\n- What is flu clinic?\n- What is Paras?\n- Is Paras a stakeholder?\n- Is Paras an app?\n- Is Paras an account?\n- Is flu clinic an app?\n- Is flu clinic an account?\nOne centralised index, I think, will help with that a lot. What do you say?"
+    },
+    "chk-refuse": {
+      "section": "How a question gets answered",
+      "question": "Someone asks “what is the capital of France?” The reader receives the forty nearest passages, all about clients. What should it do?",
+      "selected": "Say the library holds nothing on this",
+      "notes": ""
+    },
+    "bar-shape": {
+      "section": "Deciding honestly",
+      "question": "Who makes the “we have nothing on that” call?",
+      "selected": "The reader, after reading the shortlist; a low score only filters obvious nonsense first (recommended)",
+      "notes": ""
+    },
+    "uncertain": {
+      "section": "Deciding honestly",
+      "question": "The reader finds something relevant but thin. Should it…",
+      "selected": "Answer, and say plainly what is missing (recommended)",
+      "notes": ""
+    },
+    "refusal-log": {
+      "section": "Deciding honestly",
+      "question": "Log every refusal with what the shortlist held, so we can see false refusals within a day?",
+      "selected": "Yes, always (recommended)",
+      "notes": ""
+    },
+    "exam-failed": {
+      "section": "The exam",
+      "question": "Write down real questions you have asked the knowledge base that gave a bad answer or a refusal. As many as you remember, one per line. These become the first rows of the exam.",
+      "selected": null,
+      "notes": "- How does a chemist get reimbursed for a jab?\n- What did we agree with Asekurans about the extraction transcript?\n- What are the latest 10 to 15 rules on the HOGO HORST matching?\n- What was the latest bug with flu clinic?\n- What is happening with Paddlebase?\n- How many days in advance can trainers book trainings?\n- How many apps does Paddlebase have?\n- How does the knowledge base work in the Kwapso system?"
+    },
+    "exam-authors": {
+      "section": "The exam",
+      "question": "Who writes the rest of the exam?",
+      "selected": "Let the agent draft them from the material and I approve",
+      "notes": ""
+    },
+    "exam-modes": {
+      "section": "The exam",
+      "question": "Which kinds of question must the exam cover? Tick all.",
+      "selected": [
+        "Paraphrases — the same fact in different words",
+        "German questions",
+        "Counting and ranking questions",
+        "Questions we genuinely have nothing on (must refuse)",
+        "“Latest” and “this week” questions",
+        "Multi-hop — needs two sources joined",
+        "Questions about a person"
+      ],
+      "notes": ""
+    },
+    "exam-gate": {
+      "section": "The exam",
+      "question": "Rule: no ranking change ships unless the exam score does not drop. Agree?",
+      "selected": "Yes — the exam is the gate (recommended)",
+      "notes": ""
+    },
+    "budget": {
+      "section": "Cost and scale",
+      "question": "What monthly ceiling for the knowledge base’s AI spend would make you comfortable?",
+      "selected": "Up to €50",
+      "notes": ""
+    },
+    "usage-guess": {
+      "section": "Cost and scale",
+      "question": "How many people will ask questions daily, six months from now?",
+      "selected": "5–15 (team + a couple of clients)",
+      "notes": ""
+    },
+    "chk-scale": {
+      "section": "Cost and scale",
+      "question": "The library grows from 10,000 pieces to 1,000,000. What happens to the cost of one question?",
+      "selected": "It stays about the same",
+      "notes": ""
+    },
+    "parallel": {
+      "section": "How we build it",
+      "question": "How many lanes can you run at once?",
+      "selected": "Four or more — I have the usage for it",
+      "notes": ""
+    },
+    "build-models": {
+      "section": "How we build it",
+      "question": "Confirm the model split for the build.",
+      "selected": "Opus plans and reviews; Sonnet builds every lane (recommended)",
+      "notes": ""
+    },
+    "timeline": {
+      "section": "How we build it",
+      "question": "Which do you want?",
+      "selected": "Everything in one push, however long it takes",
+      "notes": ""
+    },
+    "cut-order": {
+      "section": "How we build it",
+      "question": "If it slips, what must survive the cut? Tick everything that ships no matter what.",
+      "selected": [
+        "The bar becomes a judgement, not a number",
+        "The dedup gate",
+        "Pieces carry the full identity card and context line",
+        "Records become cards, read live",
+        "The answer loop with a real reader",
+        "Counting questions routed to tools",
+        "The exam",
+        "Google material filed to accounts",
+        "Video transcripts",
+        "Client portal answers"
+      ],
+      "notes": ""
+    },
+    "staging-rule": {
+      "section": "How we build it",
+      "question": "Nothing reaches production until the new exam passes on staging and you have asked it your own ten questions. Agree?",
+      "selected": "Yes (recommended)",
+      "notes": ""
+    },
+    "laws": {
+      "section": "How we build it",
+      "question": "Some of this touches the machine-checked laws (R23 cited answers, R26 the fence, R47 assistant coverage). Each change must go through the seam the law guards and add a rot-checked entry where one is needed. Confirm the lanes are told this, and that a lane which cannot satisfy a law stops and reports rather than working around it.",
+      "selected": "Yes — laws are the contract (recommended)",
+      "notes": ""
+    },
+    "worries": {
+      "section": "How we build it",
+      "question": "What worries you most about this build? Tick all.",
+      "selected": [
+        "It burns my usage and does not finish",
+        "It finishes and the answers are still mediocre",
+        "Something breaks the permission fence",
+        "The agents change more than they were asked to",
+        "The exam gets written to pass rather than to test"
+      ],
+      "notes": ""
+    },
+    "missing": {
+      "section": "How we build it",
+      "question": "What is missing entirely — something you expected to be asked and were not?",
+      "selected": "I have written it in the notes",
+      "notes": "Well, there's a lot to think about.\n1. The index of all proper nouns or available items.\n2. Compartmentalization of accounts and then sub-compartmentalization of apps per account, because there are some accounts with three or four apps, so that could get confusing if it's not segregated, right?\nOf course, it can pull from all apps simultaneously, right, because there are many systems that we build that consist of one or two apps that work together. It just knows that this is from this app, this is from this app, and it can read both and answer how the two apps work together.\nNow I also want to get a breakdown of this: how we get the material and collection, splitting into pieces, turning meaning into numbers. How are we getting the right answer out?\n- Searching twice at once\n- Rereading the shortlist\n- Deciding honestly\n- Grounding\nHow do we answer with receipts? How do we send the odd ones elsewhere? How do we mark the homework?\nAlso, everything that was broken:\n- Collection\n- Splitting into pieces\n- Searching twice\n- Rereading the shortlist\n- Deciding honestly\n- Sending the odd ones elsewhere when marking the homework\nHow do we plan to fix this? You're going to test it with all these new questions, right? Also, at what point does Cloudflare have a scaling problem in terms of its vectorize and all of that?\nApart from that, nothing. I just want to now clear the card. Explanation: I want to know exactly what it is that we have now done, all of this research and found out, that we need to do that wasn't there before. If we do everything that we say we're going to do, how close are we to actually building an enterprise-grade knowledge base tool?"
+    }
+  }
+}

@@ -1,5 +1,18 @@
 # Machine output — never committed (unanchored: applies in every folder)
-node_modules/
+#
+# NO TRAILING SLASH, for the reason spelled out at `glide/data` below: a
+# trailing slash means "a DIRECTORY", and a SYMLINK to one is not a directory.
+# `node_modules/` therefore ignored the folder and not a link named the same
+# thing — so on 2026-09-10 `feat/ui-ux` merged a tracked symlink called
+# `node_modules` pointing at `/Users/aurora/Developer/Claude/kwapso/
+# kwapso_system/node_modules`, an absolute path on one person's laptop. On
+# every other machine a fresh checkout of `main` got a dead link where the
+# dependencies go, and every npm command, build and test resolved into
+# nothing. It is the same trap the glide rule already carried a paragraph
+# about, one directory up, which is why the paragraph is repeated here rather
+# than cross-referenced: the person who adds the next ignore line reads the
+# top of this file, not the middle.
+node_modules
 .next/
 out/
 # …AND THE SIBLING BUILD CACHES `NEXT_DIST_DIR` MAKES. `web/next.config.ts`
@@ -52,6 +65,39 @@ out/
 /story-review.md
 /ocean-review.html
 /ocean-review.md
+/error-log-review.html
+/error-log-review.md
+/error-capture.json
+/spend-review.html
+/spend-review.md
+# THE OTHER SEVEN. Twelve review skills say "write the report to the project
+# root" in their own SKILL.md; this list had five of them, and the seven below
+# were added on 2026-09-10 after `round_trip_review` reported a score and its
+# file turned out to be excused by nothing. Run one of those seven and the very
+# next `npm run check` goes red — on the DOC-MAP assertion, which tells you a
+# document is not reachable from README, so the reader goes and edits README's
+# doc map to link a file that should never have been read as a document at all.
+#
+# Hand-kept, and it cannot be otherwise: the skills live in ~/.claude/skills/,
+# outside this repository (see /skills/ below), so nothing here can census them.
+# To re-derive it when a review skill is added:
+#   grep -l "project root as" ~/.claude/skills/*/SKILL.md
+/activity-log-review.html
+/activity-log-review.md
+/base-fork-review.html
+/base-fork-review.md
+/dead-end-review.html
+/dead-end-review.md
+/first-run-review.html
+/first-run-review.md
+/realtime-review.html
+/realtime-review.md
+/round-trip-review.html
+/round-trip-review.md
+/speed-review.html
+/speed-review.md
+# `error_analyst` writes only the HTML to the root; its JSON is above.
+/error-report.html
 # NOT scaling-review.md/.html. README's doc map lists it as item 27 and
 # DATA-MODEL.md cites it for a claim, so it is a DOCUMENT that two other
 # documents depend on — ignoring it left the map pointing at a file a fresh
@@ -75,6 +121,11 @@ out/
 # pattern ignores the CONTENTS and re-admits the one subfolder.
 .session-notes/*
 !.session-notes/lanes/
+# A lane's SCREENSHOTS are evidence, not knowledge. They live inside the project
+# because every folder must (the owner's rule), and out of git because the lane's
+# own REPORT already says what each one shows — five megabytes of finished-lane
+# PNGs would sit in the history for ever to save re-reading a paragraph.
+.session-notes/lanes/shots/
 
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.

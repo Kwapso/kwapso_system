@@ -210,11 +210,60 @@ async function googleFetch(
         "Google wouldn't allow that any more, the connection may have been removed in your Google account. Connect it again in Settings.",
         `${detail} — the credentials are DEAD, every call on this connection will fail until the person reconnects Google in Settings.`
       )
+    // 403 IS TWO DIFFERENT ANSWERS, AND GOOGLE PICKS THE STATUS FOR BOTH.
+    //
+    // This is the third time this class of bug has been fixed, and the first two
+    // fixes were about WHERE a refusal is handled. This one is about WHAT it
+    // means, which is the half nobody checked.
+    //
+    // Gmail answers a QUOTA problem with 403, not 429: `rateLimitExceeded`,
+    // `userRateLimitExceeded`, `dailyLimitExceeded`, `quotaExceeded`. It also
+    // answers a genuine permission problem with 403. Same status, opposite
+    // instructions — one says "skip this item and carry on", the other says
+    // "you are going too fast, come back later" — and reading only the number
+    // gets one of them wrong every time:
+    //
+    //   · a quota 403 read as a per-item refusal SILENTLY DROPS MAIL. The sweep
+    //     skips the message, reports a clean pass, and moves its cursor past
+    //     things it never read.
+    //   · a quota 403 read as a permission refusal tells the owner "this item
+    //     may not be shared with you" about his own mailbox — which is the
+    //     sentence he has now seen come back twice after being told it was
+    //     fixed, and it was never true.
+    //
+    // So the REASON decides, not the status. Google puts it in the body, in the
+    // shape `{"error":{"errors":[{"reason":"rateLimitExceeded"}]}}`, and the
+    // body is already in hand as `said`. Matched as text rather than parsed:
+    // this must not throw while classifying a throw, and an unparsable body
+    // falls through to the permission reading, which is the older and stricter
+    // of the two.
+    if (res.status === 403 && /rateLimitExceeded|quotaExceeded|userRateLimit|dailyLimit/i.test(said))
+      throw new GuardError(
+        503,
+        "google_busy",
+        "Google is asking us to slow down. This will pick up on its own shortly.",
+        `${detail} — a QUOTA refusal wearing a 403. Transient, says nothing about whether the item is readable, and must never be skipped per item.`
+      )
     if (res.status === 403)
       throw new GuardError(
         403,
         "google_forbidden",
         "Google wouldn't allow that — this item may not be shared with you.",
+        `${detail} — a fact about this RESOURCE, not the connection: the next call may be fine.`
+      )
+    // 404 IS THE SAME SENTENCE AS 403, and it took a fourth instance of this bug
+    // to say so. Every list Google answers is a snapshot: a message the sweep
+    // was handed the id of two seconds ago can be deleted before the header
+    // call goes out, a Drive shortcut can point at a file somebody moved. That
+    // is a fact about ONE item and the next call is fine — the same shape as a
+    // 403 — but it fell into the 502 below and read as "Google couldn't answer
+    // that just now", which is a sentence about the SERVICE, so every caller
+    // that tolerates a per-item refusal by code refused to tolerate it.
+    if (res.status === 404)
+      throw new GuardError(
+        404,
+        "google_gone",
+        "That item isn't in Google any more.",
         `${detail} — a fact about this RESOURCE, not the connection: the next call may be fine.`
       )
     throw new GuardError(
@@ -231,6 +280,49 @@ async function googleFetch(
   // which is what every caller here already treats an absent field as.
   const text = await res.text()
   return text ? JSON.parse(text) : {}
+}
+
+/** IS THIS REFUSAL ABOUT ONE ITEM, OR ABOUT THE CONNECTION?
+ *
+ * "One item's refusal is one item's" is the sentence four loops in this codebase
+ * had each written out for themselves — the Drive folder walk, the Drive file
+ * read, the hydration loop, and (after four weeks of not having it) the Gmail
+ * header batch. Each spelled it the same way, as `code !== "google_access_lost"`,
+ * and that phrasing is why the fourth one was missing: a rule written as an
+ * EXCEPTION has to be remembered at every new call site, and nothing can check
+ * that it was. Written as a name, a loop that skips per-item refusals says so,
+ * and a reader of a new loop can see at a glance whether it decided.
+ *
+ * `google_forbidden` (403) is "not this one, and the next may be fine".
+ * `google_gone` (404) is the same sentence about an item that has since been
+ * deleted — every list Google hands back is a snapshot.
+ *
+ * DELIBERATELY NOT `google_access_lost` (401), which is a fact about the
+ * CONNECTION and true of every call it will ever make: tolerating it per item
+ * turns a revoked token into a clean, empty, successful pass, which is a worse
+ * failure than the one this predicate exists to fix. And deliberately not
+ * `google_refused` (502) or a timeout: those are TRANSIENT and say nothing about
+ * whether the item is readable, so the loops that swallow them do it with their
+ * own eyes open, in their own comment, rather than under this name.
+ */
+export function isItemRefusal(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code
+  return code === "google_forbidden" || code === "google_gone"
+}
+
+/** IS THIS REFUSAL ABOUT THE CONNECTION ITSELF?
+ *
+ * The other half of the pair, and the one every skipping loop must ask before it
+ * skips anything. `google_access_lost` (401) means the credentials are dead, so
+ * it is true of every call this connection will ever make: a loop that swallows
+ * it once per item turns a revoked grant into a clean, empty, SUCCESSFUL pass —
+ * a knowledge base quietly reading nothing, with nothing anywhere saying why.
+ *
+ * Named for the same reason as `isItemRefusal`: three loops spelled this test
+ * out as a string comparison and a fourth call site forgot to spell it at all.
+ */
+export function isConnectionLost(e: unknown): boolean {
+  return (e as { code?: unknown } | null)?.code === "google_access_lost"
 }
 
 /** Text out of a Google response, or "" — used everywhere a field may be absent
@@ -457,7 +549,7 @@ export async function driveList(
         // whole listing would come back EMPTY AND SUCCESSFUL — a knowledge base
         // reading nothing, with nothing anywhere saying why. That is a worse
         // failure than the one this catch was added to fix.
-        if ((e as { code?: string })?.code === "google_forbidden") break
+        if (isItemRefusal(e)) break
         throw e
       }
       for (const raw of Array.isArray(data.files) ? data.files : [])
@@ -534,9 +626,15 @@ export async function driveFilesById(token: string, fileIds: string[]): Promise<
     url.searchParams.set("supportsAllDrives", "true")
     try {
       out.push(toDriveFile(await googleFetch(url.toString(), token), ""))
-    } catch {
+    } catch (e) {
       // Gone, or no longer shared with this person. The other named files are
       // still the honest answer.
+      //
+      // BUT NOT A DEAD CONNECTION. This was a bare `catch {}`, which swallowed
+      // a 401 once per named file and answered with an empty list — the same
+      // silent failure the folder walk's comment above spends a paragraph on,
+      // sitting six hundred lines away in the file that fixed it.
+      if (isConnectionLost(e)) throw e
     }
   }
   return out
@@ -1216,10 +1314,47 @@ export async function gmailSearch(
   // is two hundred sockets at Gmail in a few seconds, and Gmail answers that
   // with a refusal — which arrived as "Google couldn't answer that just now" and
   // cost the whole mail lane a pass. The work is the same; only the rate changes.
+  //
+  // ONE MESSAGE'S REFUSAL IS ONE MESSAGE'S — and this is the loop that did not
+  // know it, for four weeks, under a green build.
+  //
+  // `Promise.all` REJECTS ON THE FIRST REJECTION. So one message Gmail would not
+  // hand over — a 403 on a confidential-mode or delegated item, a 404 on one
+  // deleted between the id listing and this header call, both of which are
+  // ordinary in a real mailbox — threw out of `gmailSearch`, out of
+  // `readGoogleMaterial`, and landed in `sweepKinds`' catch, which recorded it
+  // as the MAIL LANE'S failure. The whole pass was discarded, the cursor held,
+  // and "Google wouldn't allow that — this item may not be shared with you."
+  // sat in red under the Bring it in button on the knowledge base until the lane
+  // next had a completely clean run. Measured on staging, 9 Sep 2026: all three
+  // connections carried exactly that sentence.
+  //
+  // The Drive half of this bug was found and fixed three times — the folder
+  // walk, the file read, the hydration loop — and each fix repaired the instance
+  // it was reported for. The mail half was never the reported one, so it was
+  // never looked at. `allSettled` + `isItemRefusal` is the same decision the
+  // other three make, made here too, by name.
   const out: MailMessage[] = []
   const BATCH = 10
-  for (let i = 0; i < ids.length; i += BATCH)
-    out.push(...(await Promise.all(ids.slice(i, i + BATCH).map((id) => gmailMessage(token, id, false)))))
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const settled = await Promise.allSettled(
+      ids.slice(i, i + BATCH).map((id) => gmailMessage(token, id, false))
+    )
+    for (const [n, r] of settled.entries()) {
+      if (r.status === "fulfilled") {
+        out.push(r.value)
+        continue
+      }
+      // ANYTHING THAT IS NOT ABOUT THIS ONE MESSAGE STILL THROWS. A dead token
+      // (401) tolerated ten at a time would come back as a smaller mailbox and
+      // no error anywhere; a rate limit or a Google outage (502) says nothing
+      // about whether the message is readable, and swallowing it would move the
+      // sweep on past mail it never actually read.
+      if (!isItemRefusal(r.reason)) throw r.reason
+      const reason = r.reason instanceof Error ? r.reason.message : String(r.reason)
+      console.error(`gmail message ${ids[i + n]} skipped: ${reason}`)
+    }
+  }
   return out
 }
 

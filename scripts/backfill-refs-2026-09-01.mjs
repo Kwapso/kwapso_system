@@ -313,7 +313,12 @@ function planApps(db) {
   )
   const byKey = new Map()
   for (const r of rows) {
-    const key = `${r.name} ${r.account_name ?? ""}`
+    // A NUL separates the two halves of the key, spelled as an ESCAPE rather
+    // than typed as a raw byte. Identical at runtime; the difference is on
+    // disk, where one raw control byte makes `grep` skip the whole FILE in
+    // silence (no output, exit 1, indistinguishable from zero matches).
+    // web/test/source-scan.test.ts is what found this one.
+    const key = `${r.name}\u0000${r.account_name ?? ""}`
     if (!byKey.has(key)) byKey.set(key, [])
     byKey.get(key).push(r)
   }
@@ -321,7 +326,7 @@ function planApps(db) {
   const ambiguous = []
   const consumed = new Set()
   APP_ORDER.forEach((entry, idx) => {
-    const key = `${entry.name} ${entry.account}`
+    const key = `${entry.name}\u0000${entry.account}`
     const candidates = (byKey.get(key) || []).filter((c) => !consumed.has(c.id))
     if (candidates.length === 1) {
       const aRef = `A${String(idx + 1).padStart(4, "0")}`

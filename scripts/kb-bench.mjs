@@ -50,6 +50,7 @@ import { readFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
@@ -85,8 +86,8 @@ function productionComposeModel() {
   return found[1]
 }
 
-const { retrieve } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
-const { writeAnswer } = await import(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts"))
+const { retrieve } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
+const { writeAnswer } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts"))
 
 /* ------------------------------ the REST doors ----------------------------- */
 

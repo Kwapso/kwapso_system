@@ -241,6 +241,35 @@ describe("a path THROUGH the gate, not only a refusal", () => {
     expect(call(rolled, "0058_new").message).toMatch(/^OK: 1 live team /)
   })
 
+  it("AHEAD is not behind, and the difference is the whole point", () => {
+    // 10 Sep 2026. The gate compared with `!==`, so a team whose version merely
+    // DIFFERED was called behind whichever way it differed — and the refusal
+    // then printed the migration robot as the remedy. When the estate is AHEAD
+    // that remedy cannot work and cannot be made to work by repeating it: the
+    // robot applies only the migrations the DEPLOYED worker carries, so one it
+    // has never heard of is not "missing". It looks, finds nothing, reports
+    // success, and the gate keeps refusing. A loop with a confident sentence at
+    // both ends, and it blocked a real deploy.
+    const ahead = [{ id: "T1", name: "Kwapso", schema_version: "0072_later" }]
+    const { code, message } = call(ahead, "0071_now")
+    expect(code, "ahead is safe to deploy — see the note on `verdict`").toBe(0)
+    expect(message).toContain("AHEAD of this working tree")
+    expect(message).toContain("Kwapso (T1) at 0072_later")
+    // And it must NOT send anybody to the robot, which is what the old refusal did.
+    expect(message).toContain("Do NOT run the migration robot")
+    expect(message).not.toMatch(/curl .*migrate-teams/)
+  })
+
+  it("still refuses when the estate is genuinely behind, ahead or not", () => {
+    // Both directions in one estate: one team behind is still a refusal, because
+    // the dangerous case is code expecting a column that is not there.
+    const mixed = [
+      { id: "T1", name: "Kwapso", schema_version: "0072_later" },
+      { id: "T2", name: "Smoke", schema_version: "0057_previous" },
+    ]
+    expect(call(mixed, "0071_now").code).toBe(1)
+  })
+
   it("names the teams and the version each is actually at", () => {
     const { message } = call(behind, "0058_new")
     expect(message).toContain("Kwapso (T1) is at 0057_previous")

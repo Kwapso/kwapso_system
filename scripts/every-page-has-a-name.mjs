@@ -23,6 +23,7 @@
 
 import { chromium } from "playwright"
 import { FRONT_DOORS } from "./lib/front-doors.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const API = process.env.SMOKE_BASE ?? "https://kwapso-staging.kwapso.workers.dev"
 const AGENCY = process.env.AGENCY_BASE ?? FRONT_DOORS.staging.agency
@@ -47,7 +48,7 @@ if (!KEY) {
 // tick over the pages it stopped visiting.
 let TEAM_SECTIONS
 try {
-  ;({ TEAM_SECTIONS } = await import("../web/lib/pages.ts"))
+  ;({ TEAM_SECTIONS } = await importTs("../web/lib/pages.ts"))
 } catch (err) {
   console.log(`FAIL could not read web/lib/pages.ts, so the walk list cannot be derived: ${err.message}`)
   process.exit(1)

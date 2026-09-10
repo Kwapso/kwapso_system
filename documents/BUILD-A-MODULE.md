@@ -392,7 +392,9 @@ hand-listed count. Sidebar sections don't need one.
 
 R8 covers the **other** tab strip too, the tabs on one record's own screen (step
 6). Don't stop at this one; a module whose team tab is counted and whose record
-Activity tab isn't is only half in-rule.
+history rail isn't is only half in-rule. (The record's ACTIVITY TAB was retired
+7 Sep 2026 — "kill all old activity tabs" — so what carries the count now is the
+ink footer's Latest activity eyebrow, which opens the slide-in `ActivityRail`.)
 
 ```ts
 { key: "notes", title: "Notes", module: "notes", segment: "notes",
@@ -513,7 +515,7 @@ mirroring the brand library.
 - **Create handler**, a small callback that calls the api, then
   **`primeCache(notesKey(teamId), next)`** so the new row appears instantly for
   the actor (everyone else gets the realtime ping), and `invalidate` on the record's
-  activity key after an edit so its Activity tab reflects the new row. See
+  activity key after an edit so its history rail reflects the new row. See
   `saveInternalRecord` (`web/lib/use-screen-actions.ts`), which does both for the
   brand library.
 
@@ -570,7 +572,8 @@ const tabsConfig = { ...defaultTabsConfig, variant: "line", tabs: [
     badge: formatCount(activity.total), badgeVariant: "" },   // ← R8/R16: the exact total
 ]}
 // renderPanel: overview → <OverviewList items={overviewItems}/>,
-//              activity → <ActivityPanel activity={activity}/>
+//              (the Activity tab was retired 7 Sep 2026 — the history is
+//               reached from the ink footer's rail, not from a tab)
 ```
 
 Note which tabs carry a badge: the ones that reveal a collection do, and the one
@@ -578,7 +581,7 @@ that shows the record itself does not, that difference is Law R8, and an uncount
 tab needs a reasoned `RECORD_TAB_COUNT_EXCEPTIONS` line.
 
 After an edit or (de)activate, prime the list cache with the returned rows and
-`invalidate(\`activity:record:<table>:<id>\`)` so the Activity tab reflects the new
+`invalidate(\`activity:record:<table>:<id>\`)` so the history rail reflects the new
 row (`saveInternalRecord` / `setInternalActive` in
 `web/lib/use-screen-actions.ts` do exactly this). Action buttons carry their kit
 icon (CLAUDE.md): edit = `Pencil`, deactivate = `Power`, destructive actions get the
@@ -601,7 +604,7 @@ where a test looks for it.
 | Law | What it checks | What you do |
 |---|---|---|
 | **R1** publish-seam | `workers/content/test/publish-seam.test.ts` reads `ROUTES` + handler source: every `mutation` must contain a `publishChange` call; non-GET routes must be classified. | Classify each route (3e) and actually publish (3d). A `housekeeping` route (e.g. upload) must be added to the test's reviewed `HOUSEKEEPING` set. |
-| **R2** record-detail-tabs | `web/test/rules.test.ts` DERIVES the bespoke record details off disk — a component under `web/components` named `*-detail.tsx`, or one that renders an `<ActivityPanel>` — and asserts each contains `TabsView` + `<ActivityPanel>`. | Nothing to register. Name it `note-detail.tsx` and Layer 5 is forced from the moment the file exists. (It used to be a hand-kept list, and four record details were missing from it; `RECORD_DETAIL_NOT` is now the reasoned residue, for a file that is NOT a record detail.) |
+| **R2** record-detail-tabs | `web/test/rules.test.ts` DERIVES the bespoke record details off disk — a component under `web/components` named `*-detail.tsx`, or one that renders a `<RecordScreen>` (it was `<ActivityPanel>` until 7 Sep 2026; retiring the Activity tab meant nothing rendered that panel, and a signal matching nothing is a census gone blind) — and asserts each contains `TabsView` — and only that. The `<ActivityPanel>` half went with the Activity tab on 7 Sep 2026: R2 turned a per-SCREEN obligation into a per-HOST one, so the check follows the history to the rail its two hosts mount rather than demanding a panel on every detail. A detail left with one panel draws no strip at all and is named in `RECORD_TABS_SINGLE_PANEL`. | Nothing to register. Name it `note-detail.tsx` and Layer 5 is forced from the moment the file exists. (It used to be a hand-kept list, and four record details were missing from it; `RECORD_DETAIL_NOT` is now the reasoned residue, for a file that is NOT a record detail.) |
 | **R3** no-handrolled-toggles | No component fakes a tab strip with `variant={x === y ? …}`. | Use `TabsView` for any tab strip (the Tickets list's All / My / Archived strip does). |
 | **R4/R7** forms | Every dialog in `FORM_DIALOGS` imports `FormShell` and `useFormDraft`. | If you add a `note-form-dialog`, add it to `FORM_DIALOGS` (registry.ts) and build it on `FormShell` + `useFormDraft`. |
 | **R5** generic-activity-path | The activity read has a generic `record` scope; the web reads via `recordActivity`. | Read history only via `tenancy.recordActivity(...)` (Layer 5). No new SQL. |
@@ -696,7 +699,9 @@ AFTER SHIP
 - **A per-module activity query.** Read history only via the generic `record` path (R5).
 - **A collection tab with a hand-listed count.** Declare a `countCacheKey` (R8).
 - **A record tab with no count.** Every tab that reveals a collection carries it,
-  a record's Activity tab included (R8); an uncounted tab needs a reasoned
+  a record's history included (R8) — reached from the ink footer's Latest
+  activity eyebrow since the Activity TAB was retired 7 Sep 2026, not from a tab;
+  an uncounted tab needs a reasoned
   `RECORD_TAB_COUNT_EXCEPTIONS` line.
 - **Refetching the whole list on a change.** Row-level live-sync only. (CACHING.md.)
 - **A new worker for a new module, or a second copy of a library component.**

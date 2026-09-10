@@ -123,14 +123,15 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { cloudflareCredentials } from "./lib/cf-credentials.mjs"
+import { importTs } from "./lib/import-ts.mjs"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const DRY = process.argv.includes("--dry")
 const TRIALS = Number(process.env.BENCH_TRIALS ?? 5)
 
-const { systemFor } = await import(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
-const { toolSpecs } = await import(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
+const { systemFor } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "agent.ts"))
+const { toolSpecs } = await importTs(join(REPO, "workers", "data-ops", "src", "lib", "tools.ts"))
 
 function deployedModel() {
   const src = readFileSync(join(REPO, "workers", "data-ops", "wrangler.jsonc"), "utf8")

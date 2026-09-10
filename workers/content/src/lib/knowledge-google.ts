@@ -296,7 +296,96 @@ export function driveFileIdOf(originRowId: string): string | null {
 }
 
 /** WHAT THE APP ALREADY HOLDS, for the fold below — read ONCE per sweep. */
-type FoldTargets = { transcripts: Set<string>; events: Set<string> }
+/** THE SAME CALL UNDER TWO OF GOOGLE'S OWN IDS — settled, so the artefact
+ * reaches the meeting it came out of.
+ *
+ * ── WHAT WENT WRONG, IN ONE PAIR OF STRINGS ─────────────────────────────
+ *
+ *   the source says   742htcuo14uqtaa8v9f53lq7ef_20260904T100000Z
+ *   the meeting says  742htcuo14uqtaa8v9f53lq7ef_20260904T103000Z
+ *
+ * Same series, same Friday, thirty minutes apart. A recurring occurrence's id
+ * is the series id plus the instance's start, so when the standing call MOVES
+ * — the Jourfix went from 10:00 to 10:30 — everything Google wrote before the
+ * move keeps the old stamp and everything after it carries the new one. Both
+ * are Google's, both name the same hour of the same day, and an equality join
+ * matches neither to the other.
+ *
+ * Measured on staging, 9 Sep 2026: 142 event ids on live sources matched no
+ * meeting we hold, and 37 of them are exactly this — the call IS in the base,
+ * under the other stamp.
+ *
+ * ── WHY THE WINDOW IS TWELVE HOURS AND NOT "THE NEAREST ONE" ────────────
+ *
+ * "Resolve an occurrence to the nearest occurrence of its series" was the
+ * shape first proposed, and the data refused it: the MEDIAN distance to the
+ * nearest occurrence we hold is 112 DAYS, because the calendar sweep fills a
+ * recurring series FORWARDS (out to Aug 2027 on staging) while the knowledge
+ * base holds artefacts from occurrences behind it. Nearest-match would have
+ * hung last August's minutes on next August's meeting — a wrong answer
+ * wearing the shape of a right one, which is the more expensive kind.
+ *
+ * Inside half a day it is the same call by construction: a series cannot have
+ * two occurrences twelve hours apart and still be the weekly, daily or
+ * fortnightly rhythm these all are. Outside it, this refuses, and 105 sources
+ * keep a null — the honest answer, and the one the Meetings backfill question
+ * is really about.
+ *
+ * ── AND IT SELF-HEALS ──────────────────────────────────────────────────
+ *
+ * It runs on every read of every lane, and the upsert writes `event_id` on
+ * every pass (COALESCE keeps a value only where the new one is null), so a
+ * source read BEFORE its meeting existed is settled by a later tick with no
+ * backfill to run and no repair door for anybody to remember. */
+export function settledEvent(r: IngestRow, targets: FoldTargets): IngestRow {
+  const stated = r.eventId
+  // Nothing to settle, or the id already names a call we hold.
+  if (!stated || targets.events.has(stated)) return r
+  const cut = stated.indexOf("_")
+  if (cut <= 0) return r
+  const held = targets.occurrences.get(stated.slice(0, cut))
+  if (!held?.length) return r
+  // `YYYYMMDDTHHMMSSZ` → an instant. Anything else is not an occurrence stamp
+  // and is left exactly as Google gave it.
+  const s = stated.slice(cut + 1)
+  if (!/^\d{8}T\d{6}Z$/.test(s)) return r
+  const at = Date.parse(
+    `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`
+  )
+  if (!Number.isFinite(at)) return r
+  // NEAREST within the window, not merely the first one inside it. With a
+  // weekly series the two are the same answer; they stop being the same the day
+  // somebody schedules a series twice in one day, and a rule that is only right
+  // because of the data it happens to meet is not a rule.
+  let best: { id: string; gap: number } | null = null
+  for (const o of held) {
+    const started = Date.parse(o.startsAt)
+    if (!Number.isFinite(started)) continue
+    const gap = Math.abs(started - at)
+    if (gap <= SAME_CALL_WINDOW_MS && (!best || gap < best.gap)) best = { id: o.id, gap }
+  }
+  return best ? { ...r, eventId: best.id } : r
+}
+
+/** HOW FAR APART TWO OF GOOGLE'S IDS MAY BE AND STILL NAME THE SAME CALL.
+ *
+ * Twelve hours, and the number is chosen by what a recurring call IS rather than
+ * by taste: every standing series in this base is daily, weekly or fortnightly,
+ * so it cannot hold two occurrences half a day apart, and inside that window a
+ * match is the same call by construction rather than by proximity. See
+ * `settledEvent` for the measurement that ruled out matching on nearness alone.
+ */
+const SAME_CALL_WINDOW_MS = 12 * 60 * 60 * 1000
+
+export type FoldTargets = {
+  transcripts: Set<string>
+  events: Set<string>
+  /** THE CALLS WE HOLD, GROUPED BY THEIR SERIES — the oracle behind
+   * `settledEvent`. Keyed by `recurring_event_id`, each entry the occurrence's
+   * own Google id and when it actually starts. Only meetings that carry a
+   * series are in here: a one-off has nothing to be confused with. */
+  occurrences: Map<string, { id: string; startsAt: string }[]>
+}
 async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTargets> {
   const [meetings, events] = await Promise.all([
     // R14 hard cap: one team's meetings, stated at the statement.
@@ -304,11 +393,15 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
       title: string
       transcript_file_id: string | null
       superseded_transcript_ids: string | null
+      google_event_id: string | null
+      recurring_event_id: string | null
+      starts_at: string | null
       words: number
     }>(
       cfg,
       guard.databaseId,
       `SELECT title, transcript_file_id, superseded_transcript_ids,
+              google_event_id, recurring_event_id, starts_at,
               LENGTH(COALESCE(transcript_text, '')) AS words
          FROM meetings WHERE deactivated_at IS NULL LIMIT ${FOLD_ORACLE_CAP}`
     ),
@@ -340,6 +433,13 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
       ...held.flatMap((m) => (m.superseded_transcript_ids ?? "").split(",").filter(Boolean)),
     ]),
     events: new Set([...meetings.map((m) => m.title), ...events.map((e) => e.title)]),
+    occurrences: meetings.reduce((by, m) => {
+      if (!m.recurring_event_id || !m.google_event_id || !m.starts_at) return by
+      const list = by.get(m.recurring_event_id) ?? []
+      list.push({ id: m.google_event_id, startsAt: m.starts_at })
+      by.set(m.recurring_event_id, list)
+      return by
+    }, new Map<string, { id: string; startsAt: string }[]>()),
   }
 }
 
@@ -425,6 +525,7 @@ export function googleIngestKinds(
     (oracle ??= readFoldTargets(cfg, guard).catch(() => ({
       transcripts: new Set<string>(),
       events: new Set<string>(),
+      occurrences: new Map<string, { id: string; startsAt: string }[]>(),
     })))
 
   const folded = (service: GoogleService, r: IngestRow, targets: FoldTargets): IngestRow => {
@@ -487,7 +588,8 @@ export function googleIngestKinds(
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
-    const fold = (r: IngestRow) => statedEvent(service, folded(service, mended(r), targets))
+    const fold = (r: IngestRow) =>
+      settledEvent(statedEvent(service, folded(service, mended(r), targets)), targets)
     if (!hydrate || wanted.length === 0) return wanted.map(fold)
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.

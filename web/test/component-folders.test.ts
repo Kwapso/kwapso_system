@@ -1,8 +1,9 @@
 // THE COMPONENT TAXONOMY IS A LAW, NOT A HABIT.
 //
-// `web/components` was 148 flat files until 7 Sep 2026. The fold gave it one
-// folder per MODULE or per KIND — and left the arrangement enforced by nobody,
-// in a repo whose other fifty-two invariants are all machine-checked. A convention nothing checks is
+// `web/components` was 128 flat files until 7 Sep 2026, beside three folders that
+// already held twenty more — 148 components in all, before and after. The fold
+// gave it one folder per MODULE or per KIND — and left the arrangement enforced
+// by nobody, in a repo whose other fifty-seven invariants are all machine-checked. A convention nothing checks is
 // a convention that survives exactly as long as the person who remembers it: the
 // next component dropped at the top level would have been green, and the one
 // after it would have made "the top level is empty" untrue for good.
