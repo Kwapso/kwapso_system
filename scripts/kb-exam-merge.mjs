@@ -198,6 +198,24 @@ function buildUnion() {
     unionRows.push({ id: `B-${b.id}`, section: b.section, level: b.level, question: b.question, tags: [...b.tags], detail: b.detail })
   }
 
+  // FENCE COVERAGE MUST BE ENUMERABLE BY TAG, not found by reading every
+  // row's detail column — the hub's ruling, made urgent by kb_B1's
+  // read-fence work turning up a multi-private fold with no correct
+  // `owner_user_id` and a third visibility tier the sightings model has
+  // no shelf for. Two rows carried a fence CONCERN in prose but not the
+  // tag: A-H3 ("only what the asker may read") and A-H12 ("fence
+  // applies", inherited from its merge with B-H13). Additive only — every
+  // existing tag stays. Neither row's DISPOSITION changes: both are
+  // already `tool` (count outranks fence in classifyByTags, which has no
+  // rule for `fence` at all), so this is a label for the full-loop exam
+  // and the next reviewer to find by grep, not a new claim this harness
+  // grades. It does NOT touch A-X8's persona split — that row's two
+  // different correct behaviours by asker identity are still handled only
+  // by striking A-X8 and deriving X8-notowner; tagging elsewhere cannot
+  // and does not imply this harness can grade by identity now.
+  const FENCE_ADDITIONS = new Set(["A-H3", "A-H12"])
+  for (const r of unionRows) if (FENCE_ADDITIONS.has(r.id) && !r.tags.includes("fence")) r.tags.push("fence")
+
   const byLevel = new Map()
   for (const r of unionRows) {
     if (!byLevel.has(r.level)) byLevel.set(r.level, [])

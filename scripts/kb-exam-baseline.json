@@ -28,9 +28,9 @@
     "gap": 7,
     "person": 8,
     "multi": 13,
+    "fence": 6,
     "hijack": 4,
     "absent": 7,
-    "fence": 4,
     "de": 10
   },
   "mustScore100": [

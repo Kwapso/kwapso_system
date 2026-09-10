@@ -241,3 +241,22 @@ test("A-H13 is keyed, not gap — corrected predicate: gap only if ALL meeting s
   assert.ok(!h13.tags.includes("gap"), "the gap tag must not survive the correction, or classifyByTags would re-gap it")
   assert.match(h13.detail, /THIN EVIDENCE/, "the pt 1 gap must stay visible in the detail column even though the row itself is keyed")
 })
+
+test("fence coverage is enumerable by tag — exactly the five rows the hub named, and tagging changed no disposition", () => {
+  const { rows } = loadExam()
+  const fenced = rows.filter((r) => r.tags.includes("fence")).map((r) => r.id)
+  // Six entries: the five union rows plus X8-notowner, which inherits the
+  // tag from its parent A-X8 rather than naming a sixth source row.
+  assert.deepEqual(fenced.sort(), ["A-H12", "A-H3", "A-X8", "A-X9", "B-G4", "X8-notowner"].sort())
+  // Additive only: A-H3 and A-H12 keep every tag they had before, and
+  // neither picked up a new disposition — `fence` has no classifyByTags
+  // rule, so `count` (already present on both) still decides them.
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  assert.deepEqual(byId.get("A-H3").tags.sort(), ["count", "fence", "person", "synth"].sort())
+  assert.equal(byId.get("A-H3").disposition, "tool")
+  assert.deepEqual(byId.get("A-H12").tags.sort(), ["count", "fence", "multi", "person", "route"].sort())
+  assert.equal(byId.get("A-H12").disposition, "tool")
+  // A-X8's persona split is untouched — still struck, still carrying its
+  // own reason, not silently reinterpreted now that other rows are tagged.
+  assert.equal(byId.get("A-X8").disposition, "struck")
+})
