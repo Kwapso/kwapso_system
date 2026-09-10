@@ -45,7 +45,10 @@
 
 import type { Ai } from "@cloudflare/workers-types"
 
+import { queryText } from "@shared/workers/validate"
+
 import { looksLikeProse, officeText, readsLikeWords } from "./file-text"
+import { contextLinePrompt } from "./knowledge-text"
 
 /** Everything a reader needs from the worker. Narrow on purpose: a reader has no
  * business with a database, a guard or a token. */
@@ -64,6 +67,14 @@ export type ReaderName =
   | "office-zip"
   /** The bytes ARE the words. No call, no cost. */
   | "plain"
+  /** YouTube's unauthenticated captions endpoint. First-class per BUILD-5 —
+   * see the essay above `LINK_TYPES`. */
+  | "youtube-captions"
+  /** Loom's public oEmbed title. Best-effort: there is no public transcript
+   * endpoint, so this is a name, not the recording's content. */
+  | "loom-best-effort"
+  /** Tella's public oEmbed title. Same shape and the same honesty as Loom. */
+  | "tella-best-effort"
 
 /** A KIND OF THING SOMEBODY BRINGS, and the readers to try for it in order. */
 export type SourceType = {
@@ -331,4 +342,278 @@ export async function readSource(
     return text
   }
   return ""
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VIDEO LINKS — BUILD-5 §1 ("Collect"): YouTube captions first-class, Loom
+// and Tella best-effort, no Whisper.
+//
+// A video link is not bytes: there is nothing for `SOURCE_TYPES` above to
+// classify, because there is no upload and no Drive file to open. `LINK_TYPES`
+// is the same R42 shape — a type resolves to a declared, ordered list of
+// readers, or to none at all — applied to a URL instead of a mime/extension
+// pair, so "which reader reads this link" has the same one answer.
+//
+// WHY THIS IS SAFE AGAINST THE 27 AUG RULING IT NARROWS. `shared/media-links.ts`
+// records the owner's earlier decision to refuse EVERY video link outright,
+// specifically because "no auth" is not "supported" and a silent break in an
+// undocumented endpoint would leave a source looking filed while answering
+// nothing forever. BUILD-5 (10 Sep 2026) is the SAME owner narrowing that
+// ruling for exactly one endpoint he now wants relied on — YouTube's public,
+// long-standing `timedtext` captions endpoint — while leaving the refusal in
+// place for everything without a caption or transcript surface. This table
+// does not touch that ruling: it is additive, and the gate that decides
+// whether a video link is accepted at all is the ingest door's to wire, not
+// this file's — this table only says what happens once something DOES ask it
+// to read one.
+//
+// AN EMPTY READ HERE IS THE HONEST ANSWER, same as everywhere else in this
+// file: no caption track, an endpoint that has changed shape, or a network
+// failure all end the same way, "", never a thrown error — because a lookup
+// that took the sweep down with it is worse than one link staying unread.
+//
+// LOOM AND TELLA HAVE NO PUBLIC TRANSCRIPT SURFACE AT ALL. Their oEmbed
+// endpoints are the one thing either publishes without authentication, and an
+// oEmbed reply carries a title, not the recording's words — so "best-effort"
+// here means exactly that title, honestly labelled as weak signal rather than
+// a transcript this table does not have. NOT VERIFIED AGAINST A LIVE ACCOUNT:
+// flagged in the lane report so a real Loom/Tella link is smoke-tested before
+// this ships, the same way a real PDF was what found the subsetted-font gap
+// in the reader above it.
+
+/** A KIND OF LINK, resolved by host rather than by mime/extension. */
+export type LinkType = {
+  /** What a person calls it. */
+  label: string
+  /** Matched on the registrable host, same rule as `isVideoLink` — `www.` and
+   * any subdomain are covered without a wildcard that would also catch an
+   * unrelated domain sharing the suffix. */
+  hosts: readonly string[]
+  readers: readonly ReaderName[]
+  why: string
+}
+
+export const LINK_TYPES: readonly LinkType[] = [
+  {
+    label: "YouTube video",
+    hosts: ["youtube.com", "youtu.be"],
+    readers: ["youtube-captions"],
+    why: "YouTube's timedtext endpoint answers for any video that has a caption track, manual or auto-generated, with no auth — first-class per BUILD-5",
+  },
+  {
+    label: "Loom recording",
+    hosts: ["loom.com"],
+    readers: ["loom-best-effort"],
+    why: "no public transcript endpoint exists; the oEmbed title is the only words available without auth, so this is best-effort rather than a real transcript",
+  },
+  {
+    label: "Tella recording",
+    hosts: ["tella.tv", "tella.video"],
+    readers: ["tella-best-effort"],
+    why: "same shape as Loom — the oEmbed title only, no public transcript access exists",
+  },
+]
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "")
+  } catch {
+    return null
+  }
+}
+
+/** WHICH KIND OF LINK IS THIS, out of the declared list. `null` for anything
+ * not named here — which, unlike a file's `classify`, is NOT read as plain
+ * text: an arbitrary URL has no bytes for this table to fall back to, so
+ * `readersForLink` answers `[]` and the caller's own fetch (if it has one) is
+ * a different feature from this table. */
+export function classifyLink(url: string): LinkType | null {
+  const host = hostOf(url)
+  if (!host) return null
+  return LINK_TYPES.find((t) => t.hosts.some((h) => host === h || host.endsWith(`.${h}`))) ?? null
+}
+
+/** THE READERS TO TRY, IN ORDER, for a link. Empty means an honest refusal —
+ * the same R42 answer as `readersFor`, and no door may choose one of its own
+ * for a link either. */
+export function readersForLink(url: string): readonly ReaderName[] {
+  return classifyLink(url)?.readers ?? []
+}
+
+/** Every video id shape YouTube hands a link out in: the long `?v=` form, the
+ * `youtu.be/` short form, and the `/embed/` and `/shorts/` paths. Exported
+ * because the caption endpoints below need the bare id, not the URL. */
+export function youtubeVideoId(url: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, "")
+  if (host === "youtu.be") return parsed.pathname.slice(1).split("/")[0] || null
+  if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+    // R20's query-boundary census holds THIS `.get(` to the same positional
+    // rule as a request's own query string: the value came from a link
+    // somebody typed into a form, same as any other stored text, so it gets
+    // the same hygiene (type-checked, NUL-stripped, capped) rather than an
+    // exemption for "it isn't really a request".
+    const v = queryText(parsed.searchParams.get("v"), "v", 32)
+    if (v) return v
+    const embed = parsed.pathname.match(/^\/(?:embed|shorts|live)\/([^/]+)/)
+    if (embed) return embed[1]
+  }
+  return null
+}
+
+/** THE R11-SHAPED CEILING on a link fetch, same reasoning as `CONVERT_TIMEOUT_MS`
+ * above: nothing here has its own AbortSignal, so this bounds how long a caller
+ * waits rather than how long the request may run. */
+const LINK_FETCH_TIMEOUT_MS = 10_000
+
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCharCode(Number(d)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
+/** ONE `<text>` PER CAPTION LINE, in YouTube's `timedtext` XML. The times are
+ * dropped on purpose — retrieval chunks this like any other prose, and a
+ * caption's timing is not a fact a citation needs. */
+function captionsFromTimedText(xml: string): string {
+  const lines: string[] = []
+  const re = /<text[^>]*>([\s\S]*?)<\/text>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml))) {
+    const line = decodeXmlEntities(m[1].replace(/<[^>]+>/g, " ")).trim()
+    if (line) lines.push(line)
+  }
+  return lines.join(" ")
+}
+
+/** A link fetch that yields text, or null for anything that did not — a
+ * non-2xx, a thrown network error, or a redirect this reader has no business
+ * following into somewhere else. */
+async function fetchLinkText(url: string): Promise<string | null> {
+  try {
+    const res = await withTimeout(fetch(url), LINK_FETCH_TIMEOUT_MS)
+    if (!res.ok) return null
+    return await res.text()
+  } catch {
+    return null
+  }
+}
+
+/** THE TRACK, THEN THE CAPTIONS — two calls, because auto-generated captions
+ * rarely sit at a predictable language code, and guessing `lang=en` misses
+ * most of them. The `list` call is YouTube's own directory of what a video
+ * actually has; the first track named is read, whatever language it is in,
+ * because a video's own auto-captions are the material this reader exists
+ * for, not a language preference. */
+async function readYouTubeCaptions(videoId: string): Promise<string> {
+  const listXml = await fetchLinkText(
+    `https://www.youtube.com/api/timedtext?type=list&v=${encodeURIComponent(videoId)}`
+  )
+  if (!listXml) return ""
+  const track = listXml.match(/lang_code="([^"]+)"/)
+  if (!track) return ""
+  const captionXml = await fetchLinkText(
+    `https://www.youtube.com/api/timedtext?lang=${encodeURIComponent(track[1])}&v=${encodeURIComponent(videoId)}`
+  )
+  return captionXml ? captionsFromTimedText(captionXml) : ""
+}
+
+/** THE ONLY WORDS EITHER PLATFORM PUBLISHES WITHOUT AUTH — a title, through
+ * the oEmbed endpoint every embeddable video service is expected to answer.
+ * Not a transcript; see the essay above `LINK_TYPES` for why this is still
+ * "best-effort" rather than nothing. */
+async function readOEmbedTitle(oembedUrl: string, videoUrl: string): Promise<string> {
+  const json = await fetchLinkText(`${oembedUrl}?url=${encodeURIComponent(videoUrl)}`)
+  if (!json) return ""
+  try {
+    const parsed = JSON.parse(json) as { title?: unknown }
+    return typeof parsed.title === "string" ? parsed.title.trim() : ""
+  } catch {
+    return ""
+  }
+}
+
+async function runLinkReader(reader: ReaderName, url: string): Promise<string> {
+  if (reader === "youtube-captions") {
+    const id = youtubeVideoId(url)
+    return id ? await readYouTubeCaptions(id) : ""
+  }
+  if (reader === "loom-best-effort") return readOEmbedTitle("https://www.loom.com/v1/oembed", url)
+  if (reader === "tella-best-effort") return readOEmbedTitle("https://www.tella.tv/oembed", url)
+  return ""
+}
+
+/** ONE LINK'S WORDS, by the same table shape as `readSource`. A reader that
+ * yields nothing or throws is the next one's turn, exactly as above; empty at
+ * the end is the honest "there are no words we could read here". */
+export async function readLink(url: string): Promise<string> {
+  for (const reader of readersForLink(url)) {
+    let text = ""
+    try {
+      text = await runLinkReader(reader, url)
+    } catch {
+      continue
+    }
+    if (text && looksLikeProse(text)) return text
+  }
+  return ""
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// THE CONTEXT LINE — BUILD-5 §2 ("Split into pieces"): one short sentence per
+// piece, generated by the cheapest capable model, so a passage found by
+// search carries enough context to make sense out of order.
+//
+// `contextLinePrompt` (in `knowledge-text.ts`, pure, no imports) builds the
+// prompt; this is the one place that spends a model call on it, matching the
+// AI-calling shape `runReader` already uses above for the document converter.
+
+/** What this needs from the worker to ask the model. Narrower than `ReaderEnv`
+ * would need to be if the two were merged: a context line has no business
+ * with anything else `Ai` can do. */
+export type ContextLineEnv = { AI: Ai }
+
+/** THE DECLARED MODEL. Named once, so the law and the cost line in BUILD-5 §3
+ * ($1.70 across ~10k pieces) both point at the same string. */
+const CONTEXT_LINE_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
+
+const CONTEXT_LINE_TIMEOUT_MS = 10_000
+
+/** A RUNAWAY COMPLETION IS STILL ONE SENTENCE, capped so a model that ignores
+ * the prompt's instruction cannot turn a one-line context sentence into
+ * another chunk's worth of prose stored beside the one it was meant to
+ * summarise. */
+const CONTEXT_LINE_MAX_CHARS = 240
+
+/** ONE SENTENCE OF CONTEXT for one piece. A model failure — a timeout, a
+ * malformed reply, the binding erroring — is an honest empty line rather than
+ * a thrown error: the piece still indexes and searches on its own words, it
+ * just carries no context sentence, which is a true and recoverable state
+ * (the next sweep can try again) rather than a lost source. */
+export async function contextLineFor(
+  env: ContextLineEnv,
+  input: { sourceTitle: string; piece: string }
+): Promise<string> {
+  try {
+    const out = (await withTimeout(
+      env.AI.run(
+        CONTEXT_LINE_MODEL as never,
+        { messages: [{ role: "user", content: contextLinePrompt(input) }] } as never
+      ),
+      CONTEXT_LINE_TIMEOUT_MS
+    )) as { choices?: { message?: { content?: unknown } }[] }
+    const said = out?.choices?.[0]?.message?.content
+    return typeof said === "string" ? said.trim().slice(0, CONTEXT_LINE_MAX_CHARS) : ""
+  } catch {
+    return ""
+  }
 }

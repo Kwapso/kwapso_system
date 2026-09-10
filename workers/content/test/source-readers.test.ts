@@ -16,16 +16,22 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { stripComments } from "@shared/rules/source-scan"
 
 import {
+  LINK_TYPES,
   SOURCE_TYPES,
   UNREADABLE_TYPES,
   classify,
+  classifyLink,
+  contextLineFor,
   declaredUnreadable,
+  readLink,
   readersFor,
+  readersForLink,
+  youtubeVideoId,
   type ReaderName,
 } from "../src/lib/source-readers"
 
@@ -123,5 +129,155 @@ describe("R42 — no door chooses its own reader", () => {
     const table = stripComments(readFileSync(join(SRC, "source-readers.ts"), "utf8"))
     expect(table).toMatch(/\benv\.AI\.toMarkdown\b/)
     expect(table).toMatch(/\bofficeText\(/)
+  })
+})
+
+// ── VIDEO LINKS — BUILD-5 §1: YOUTUBE CAPTIONS FIRST-CLASS, LOOM/TELLA
+// BEST-EFFORT, NO WHISPER ──────────────────────────────────────────────────
+//
+// A video link is not bytes; there is no upload and nothing for the file table
+// above to classify. `LINK_TYPES` is the same idea (a type resolves to a
+// declared order of readers, or to no reader at all) applied to a URL instead
+// of a mime/extension pair.
+
+describe("youtubeVideoId — every shape YouTube hands out a video in", () => {
+  it("reads the v= param off a watch URL", () => {
+    expect(youtubeVideoId("https://www.youtube.com/watch?v=abc123XYZ_-")).toBe("abc123XYZ_-")
+  })
+
+  it("reads the short youtu.be form", () => {
+    expect(youtubeVideoId("https://youtu.be/abc123XYZ_-")).toBe("abc123XYZ_-")
+    expect(youtubeVideoId("https://youtu.be/abc123XYZ_-?t=30")).toBe("abc123XYZ_-")
+  })
+
+  it("reads /embed/ and /shorts/ paths", () => {
+    expect(youtubeVideoId("https://www.youtube.com/embed/abc123XYZ_-")).toBe("abc123XYZ_-")
+    expect(youtubeVideoId("https://www.youtube.com/shorts/abc123XYZ_-")).toBe("abc123XYZ_-")
+  })
+
+  it("is null for a non-YouTube URL and for garbage", () => {
+    expect(youtubeVideoId("https://vimeo.com/12345")).toBeNull()
+    expect(youtubeVideoId("not a url")).toBeNull()
+    expect(youtubeVideoId("https://www.youtube.com/")).toBeNull()
+  })
+})
+
+describe("classifyLink / readersForLink", () => {
+  it("names YouTube, Loom and Tella, each with their own reader", () => {
+    expect(readersForLink("https://www.youtube.com/watch?v=x")).toEqual(["youtube-captions"])
+    expect(readersForLink("https://loom.com/share/abc")).toEqual(["loom-best-effort"])
+    expect(readersForLink("https://www.tella.tv/video/abc")).toEqual(["tella-best-effort"])
+  })
+
+  it("matches a subdomain, not just the bare host", () => {
+    expect(classifyLink("https://share.loom.com/x")?.label).toBe("Loom recording")
+  })
+
+  it("names no reader at all for a host none of this names — an honest refusal", () => {
+    expect(readersForLink("https://vimeo.com/12345")).toEqual([])
+    expect(classifyLink("https://example.com/x")).toBeNull()
+  })
+
+  it("every LINK_TYPES entry says why, same rot check as the file table", () => {
+    for (const t of LINK_TYPES) expect(t.why.length, `${t.label} has no reason`).toBeGreaterThan(20)
+  })
+})
+
+describe("readLink", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it("reads YouTube captions: discovers the track, then reads it", async () => {
+    const calls: string[] = []
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      calls.push(url)
+      if (url.includes("type=list")) {
+        return new Response('<transcript_list><track lang_code="en" name=""/></transcript_list>', {
+          status: 200,
+        })
+      }
+      return new Response(
+        '<transcript><text start="0" dur="1.5">Hello &amp; welcome</text>' +
+          '<text start="1.5" dur="2">to the walkthrough</text></transcript>',
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
+
+    const text = await readLink("https://www.youtube.com/watch?v=abc123")
+    expect(text).toBe("Hello & welcome to the walkthrough")
+    expect(calls[0]).toContain("type=list")
+    expect(calls[1]).toContain("lang=en")
+  })
+
+  it("a video with no caption track at all is an honest empty, not a throw", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<transcript_list></transcript_list>", { status: 200 })) as unknown as typeof fetch
+    expect(await readLink("https://www.youtube.com/watch?v=nocaps")).toBe("")
+  })
+
+  it("a YouTube fetch that fails outright is the same honest empty", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("network down")
+    }) as unknown as typeof fetch
+    expect(await readLink("https://www.youtube.com/watch?v=x")).toBe("")
+  })
+
+  it("Loom best-effort reads the oEmbed title — there is no public transcript to read", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ title: "Q3 planning walkthrough" }), { status: 200 })
+    ) as unknown as typeof fetch
+    expect(await readLink("https://www.loom.com/share/abc123")).toBe("Q3 planning walkthrough")
+  })
+
+  it("Tella best-effort, same shape as Loom", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ title: "Onboarding demo" }), { status: 200 })
+    ) as unknown as typeof fetch
+    expect(await readLink("https://www.tella.tv/video/xyz")).toBe("Onboarding demo")
+  })
+
+  it("a Loom/Tella oEmbed that 404s is an honest empty, never a throw", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("not found", { status: 404 })) as unknown as typeof fetch
+    expect(await readLink("https://loom.com/share/gone")).toBe("")
+  })
+
+  it("a link nothing here names resolves to no reader and an empty read", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called")
+    }) as unknown as typeof fetch
+    expect(await readLink("https://vimeo.com/1")).toBe("")
+  })
+})
+
+// ── THE CONTEXT LINE — BUILD-5 §2: ONE SENTENCE PER PIECE, CHEAPEST CAPABLE
+// MODEL ──────────────────────────────────────────────────────────────────
+
+describe("contextLineFor", () => {
+  let env: { AI: { run: ReturnType<typeof vi.fn> } }
+  beforeEach(() => {
+    env = { AI: { run: vi.fn() } }
+  })
+
+  it("asks the declared model and returns its one sentence, trimmed", async () => {
+    env.AI.run.mockResolvedValue({ choices: [{ message: { content: "  This covers the Q3 renewal terms.  " } }] })
+    const line = await contextLineFor(env as never, {
+      sourceTitle: "Renewal email thread",
+      piece: "We agreed to renew at the same rate through March.",
+    })
+    expect(line).toBe("This covers the Q3 renewal terms.")
+    expect(env.AI.run.mock.calls[0][0]).toBe("@cf/meta/llama-4-scout-17b-16e-instruct")
+  })
+
+  it("a model failure is an honest empty line, never a thrown error", async () => {
+    env.AI.run.mockRejectedValue(new Error("model unavailable"))
+    const line = await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })
+    expect(line).toBe("")
+  })
+
+  it("a non-string reply is the same honest empty", async () => {
+    env.AI.run.mockResolvedValue({ choices: [{ message: {} }] })
+    expect(await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })).toBe("")
   })
 })

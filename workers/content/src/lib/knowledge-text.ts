@@ -132,6 +132,132 @@ function hardCut(sentence: string): string[] {
   return out
 }
 
+/* ---------------------------------- grain ---------------------------------- */
+// BUILD-5 §2 ("Split into pieces") — three source shapes, three grain rules,
+// none of them the paragraph cutter above:
+//
+//   • a CHAT piece is a RUN of a few messages, carrying who spoke and when;
+//   • a MAIL thread is the source and each message is its own piece — no
+//     size-based merging, because the thread's natural boundary already is
+//     a message;
+//   • a SPREADSHEET TAB is a source whose header line rides every piece,
+//     because a citation into the middle of a tab means nothing without the
+//     columns it belongs to.
+//
+// Pure, like everything above: a message list or a table of rows in, text
+// (and the metadata a piece carries beside it) out.
+
+export type ChatMessage = { speaker: string; at: string; text: string }
+export type ChatPiece = { text: string; speakers: string[]; startAt: string; endAt: string }
+
+/** How many messages one run may carry before it stops being "a few" and
+ * starts being the whole conversation glued together. A run also ends early
+ * on `CHUNK_TARGET_CHARS`, same as the paragraph cutter, so a chat piece and
+ * a document piece read as roughly the same mouthful to someone skimming a
+ * result. */
+const MAX_MESSAGES_PER_CHAT_PIECE = 6
+
+/** ONE PIECE PER RUN. A message with no words (an empty edit, a reaction with
+ * no text this reader can see) is dropped rather than filed as a blank
+ * turn — its neighbours still carry the run. */
+export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
+  const pieces: ChatPiece[] = []
+  let run: { speaker: string; at: string; text: string }[] = []
+  let length = 0
+
+  const flush = () => {
+    if (!run.length) return
+    pieces.push({
+      text: run.map((m) => `${m.speaker} (${m.at}): ${m.text}`).join("\n"),
+      speakers: [...new Set(run.map((m) => m.speaker))],
+      startAt: run[0].at,
+      endAt: run[run.length - 1].at,
+    })
+    run = []
+    length = 0
+  }
+
+  for (const raw of messages) {
+    const text = plainText(raw.text).trim()
+    if (!text) continue
+    if (run.length >= MAX_MESSAGES_PER_CHAT_PIECE || (run.length > 0 && length + text.length > CHUNK_TARGET_CHARS))
+      flush()
+    run.push({ speaker: raw.speaker, at: raw.at, text })
+    length += text.length
+  }
+  flush()
+  return pieces
+}
+
+export type MailMessage = { from: string; at: string; text: string }
+export type MailPiece = { text: string; from: string; at: string }
+
+/** EVERY MESSAGE IS ITS OWN PIECE. A three-word reply stays a piece of its
+ * own rather than folding into its neighbour — the thread already gave every
+ * message a boundary, so this function's only job is to drop the ones with
+ * nothing in them. */
+export function chunkMail(messages: MailMessage[]): MailPiece[] {
+  const pieces: MailPiece[] = []
+  for (const raw of messages) {
+    const text = plainText(raw.text).trim()
+    if (!text) continue
+    pieces.push({ text, from: raw.from, at: raw.at })
+  }
+  return pieces
+}
+
+const sheetLine = (cells: string[]): string => cells.map((c) => plainText(c).trim()).join(" | ")
+
+/** THE TAB, CUT INTO PIECES THAT ALL CARRY THE HEADER. Rows are grouped up to
+ * the same character target `chunkText` uses; the header is counted against
+ * that budget too, so a wide tab still keeps its pieces close to the size
+ * every other piece in the base is. A single row too big to share a piece
+ * with the header (a huge free-text cell) still gets its own piece rather
+ * than being dropped — the same "never lose the tail" rule `hardCut` follows
+ * above. */
+export function chunkSheetTab(header: string[], rows: string[][]): string[] {
+  if (!rows.length) return []
+  const headerLine = sheetLine(header)
+  const pieces: string[] = []
+  let current: string[] = []
+  let length = headerLine.length
+
+  const flush = () => {
+    if (!current.length) return
+    pieces.push([headerLine, ...current].join("\n"))
+    current = []
+    length = headerLine.length
+  }
+
+  for (const row of rows) {
+    const line = sheetLine(row)
+    if (!line) continue
+    if (current.length > 0 && length + line.length + 1 > CHUNK_TARGET_CHARS) flush()
+    current.push(line)
+    length += line.length + 1
+  }
+  flush()
+  return pieces
+}
+
+/** How much of a piece the context-line prompt shows the model. Kept small on
+ * purpose: BUILD-5's own budget is $1.70 across roughly ten thousand pieces,
+ * so the prompt has to stay tiny for one model's per-token price to add up to
+ * cents rather than dollars. */
+const CONTEXT_LINE_PIECE_CHARS = 600
+
+/** THE PURE HALF OF THE CONTEXT-LINE CALL — what to ask, never how. The
+ * calling half (`contextLineFor` in `source-readers.ts`, which already owns
+ * this app's one AI-calling shape for a document reader) sends this string to
+ * the model and reads back one sentence. Kept here, alongside the chunker,
+ * because what the model is SHOWN is a property of the text, not of the
+ * worker calling it — and because this file's no-imports rule is what lets
+ * the retrieval bench load it straight into plain Node. */
+export function contextLinePrompt(input: { sourceTitle: string; piece: string }): string {
+  const piece = plainText(input.piece).slice(0, CONTEXT_LINE_PIECE_CHARS)
+  return `Source: ${input.sourceTitle}\nPassage: ${piece}\n\nIn one short sentence, say what this passage is about — for someone skimming a search result who has not read the source. Reply with only that sentence.`
+}
+
 /** The words a piece of text contributes to the inverted index, with how often
  * each appears (capped, so a template repeating "invoice" forty times does not
  * outrank a source that is actually about invoices).
