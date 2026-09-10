@@ -1045,3 +1045,67 @@ reading it twice.
 **REBUILD IS NOT RUN AND WILL NOT BE UNTIL:** the fence merges and deploys. Rebuild
 before it and every chunk takes `team_visible` DEFAULT 0, reading right only by
 accident. The purge itself is destructive and gets the owner's explicit word first.
+
+## Tick 19 — 11 Sep 2026, ~03:00. FIVE WAYS A GREEN TEST MEANT NOTHING.
+
+Recording this as a class, because five distinct instances surfaced in one night
+and no law in this repo covers any of them. Every one was green. Every one was in
+code somebody had reviewed.
+
+1. **A ceiling that derives its expectation from the code it checks.**
+   `expect(METADATA_INDEXES.length).toBeLessThanOrEqual(10)` — imported from the
+   file under test. Green at nine, green at ten, green for ever. It was the ONLY
+   thing standing behind the owner's tracker item `c-label`.
+2. **An equivalence test where both sides shared one blind spot.** kb_B1's cases
+   included `[]`, and the legacy side's `.some()` on an empty array is trivially
+   false — matching the model's false BY COINCIDENCE, because a legacy source
+   always had exactly one row. Its words: *two functions sharing one blind spot
+   look exactly like agreement in a diff.* It hid a real divergence.
+3. **A loop over a set that became empty.** kb_CD: `for (const t of terms)
+   expect(...)` — the BM25 rewrite emptied `terms`, so the loop asserts NOTHING
+   and passes. The invariant did not break; its SUBJECT stopped existing.
+4. **The right test on the wrong field.** The app-fence test asserted `.found` and
+   the source list, and stayed green through a live title disclosure in `.reason`.
+5. **No test at all, invisible until mutated.** `appClause`'s admin bypass —
+   kb_review dropped the clause and all 65 tests stayed green.
+
+**The through-line: a test reports that it RAN, never that it CHECKED anything.**
+Four of the five were caught by MUTATION — breaking the subject and seeing whether
+anything went red — and the fifth by reading a field nobody had asserted on. That
+is now the standing ask of every lane.
+
+**TWO COLLISIONS ON MONOTONIC NUMBERS, two hours apart, same cause.** Another
+session is working in this repository concurrently — not one of our lanes. It
+landed R65-R67 (UI laws), the rate-card migrations 0077-0078, and a catalogue
+regeneration. So kb_A's law R65 → R68, and kb_CD's migration 0077 → 0079. **There
+is no lock on a law number, a migration number or a rule id**, and both collisions
+happened in the gap between choosing a number and pushing it. The only defence is
+to fetch immediately before claiming one — the same sentence as the stale-ref rule,
+one layer up.
+
+**MERGED THIS TICK:** kb-F's card wording (`dc94425a`) — and the wording found a
+BUG. "{count} sightings" became "{count} people have seen this", which made kb-F
+check the query: `COUNT(*)` over live rows, against a unique index of
+`(source_id, seen_where, seen_by_user_id)`. One person can hold TWO live sightings
+of one source — a shared Drive folder AND a direct email share. A row count is a
+correct answer to "how many sightings" and a WRONG answer to "how many people".
+Now `COUNT(DISTINCT seen_by_user_id)`. **The vague word was hiding a vague number**,
+and nothing would have caught it while the label and the query were imprecise in
+the same direction.
+
+**GLOSSARY: "passage" added, "sighting" refused.** Searching the catalogue before
+approving copy found "passage" ALREADY in shipped user-visible copy and never
+defined — R34's check reads a narrow deny-list of SYNONYMS, so a term the app uses
+and has never defined passes every check in silence. That is a gap in a law, found
+by using it.
+
+**kb_CD retired `knowledge_terms`'s writes** after verifying the negative across
+template-built names, MCP, the tool catalogue, the portal, `scripts/` and
+migrations — the five `scripts/` hits are DELETEs plus one diagnostic `COUNT(*)`,
+never a functional read. Left `teamVisibleRecomputeSql`'s own write alone as
+kb_B1's, rather than deciding it.
+
+**Tracker 7/48** — `f-kit` ticked on kb-F's exact command and output rather than
+its summary. Every unticked item now carries a note saying why.
+
+**The purge is still blocked on the fold-writer, and that is the right blocker.**
