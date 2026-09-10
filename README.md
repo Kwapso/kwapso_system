@@ -95,6 +95,17 @@ cross-tool filename a tool opens out of habit). **Every other document is in
 root holding forty-six documents is a root nobody can see the code in. Nothing was
 renamed and nothing was dropped; `git log --follow` still reaches every one of them.
 
+**Five more root folders, named here so `ls` isn't the only way to find them.**
+Each holds a small, real, tracked record of one decision or lane process — not
+overflow, and not part of the numbered forty-two: [`docs-audit/`](docs-audit/)
+(reconciliation notes and a ruling from a specific audit), [`docs-lane/`](docs-lane/)
+(merge notes and an upstream ask composed for one docs lane), [`verify/`](verify/)
+(a decisions record from a verification pass), [`design/`](design/) (the design-system
+commission brief and the gap decisions it produced), and [`interfacelessness/`](interfacelessness/)
+(one support script for the `interfacelessness_review` skill, not a document at all).
+None of these are referenced from CONTRIBUTING.md's walkthrough; open them directly
+when you need the specific record they hold.
+
 **Making your FIRST change?** [CONTRIBUTING.md](documents/CONTRIBUTING.md) is the path
 through all of this once, in the order the work happens: clone → the planning
 ritual → where the change goes → `npm run check` → the commit convention → ship.
