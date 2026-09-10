@@ -21,8 +21,8 @@ Last updated 17 Aug 2026.
 type; `0026` retires the duplicated dropdown values older teams carry; `0027`
 gives a task its admin fields; `0030` adds who is on an app and who the client's
 people are; `0031` adds the role rate card and the role on a process — that rate
-card was removed again on 10 Sep 2026 (as were the other two, `0073` and
-`0074`), and the role was not; `0032`
+card was removed again on 10 Sep 2026 (as were the other two, `0077` and
+`0078`), and the role was not; `0032`
 gives Meetings its transcript and its series. Every one runs against every
 existing team through `POST /api/tenancy/admin/migrate-teams`. A team created
 after these changes needs none of them: the schema builds the new tables and no

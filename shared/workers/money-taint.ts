@@ -23,7 +23,7 @@
 // price, the savings priced off the client's own role rates". The client then
 // retired the ACCOUNT RATE CARD too — "the whole account rates also killed it" —
 // so the first item on that list stopped existing, `lib/rates.ts` went the way
-// `internal-money.ts` had, and team migration 0074 drops `account_rates`.
+// `internal-money.ts` had, and team migration 0078 drops `account_rates`.
 //
 // The DOCTRINE was unaffected, which is exactly why the enumeration had to be
 // fixed rather than left: a law's stated reason that has quietly stopped being

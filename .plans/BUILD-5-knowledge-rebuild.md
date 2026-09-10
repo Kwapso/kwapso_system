@@ -1,6 +1,6 @@
 # BUILD-5 — the knowledge base, rebuilt
 
-Decided by the owner on 10 Sep 2026 from the audit (`KB-AUDIT.md`) and the briefing
+Decided by the owner on 10 Sep 2026 from the audit (`.plans/KB-AUDIT.md`) and the briefing
 round (`planning-answers/kwapso-kb-final-round-alaap-k-2026-09-10.json`). This is the
 handover document. Hub-and-spoke: ONE Opus planner (the hub) owns this file, writes lane
 briefs, merges, and runs the gate. Sonnet lanes build. No lane spawns an agent. Ever.
@@ -15,7 +15,10 @@ Rebuild the knowledge module from scratch, inside the base. The base — permiss
 (R26), gating (R10), validation (R20), the laws in `shared/rules/registry.ts` and every
 seam test — is the CONTRACT the new code must satisfy; none of it is rewritten. All derived
 data is purged and everything is re-pulled, re-synced and re-indexed. Cloudflare AI spend
-during the build is capped at **$10**, measured on our workers only. Nothing ships to
+during the build is capped at **$5** — the owner cut it from $10 on 10 Sep 2026 — measured
+on our workers only, which means off the app's OWN rows and not off Cloudflare's
+account-wide neuron API, because this account also runs rest-o and hogo-matching and
+rest-o's agent uses the same kimi model as ours. Nothing ships to
 production until the new exam passes on staging and the owner has asked it his own
 questions by hand.
 
@@ -33,6 +36,29 @@ what we build. (Ahead / level / behind = against Glean, Dropbox Dash, NotebookLM
 - **Found:** no Google material was ever filed to a client; two of three connected people
   contributed nothing; the `app` label already exists in the index (filing never used it).
 - **Broken:** filing; multi-person duplicates (one Google item = one source per person).
+- **MEASURED 10 Sep, and it corrects the audit's own headline.** KB-AUDIT §4.1 says
+  "dedupe on content hash at ingest — removes ~10% of the index". The finding
+  reproduces (925 of 9,921 live chunks are exact copies, 9.3%); the FIX does not
+  reach it. A source-level content hash reaches **114 of 3,933 sources, 2.9%** —
+  about a third — because most repetition sits INSIDE sources whose whole texts
+  differ. An identity is a source-level key BY CONSTRUCTION, so lane B1 cannot
+  deliver the 10% and nobody should carry that number to the gate. The remainder
+  needs a CHUNK-level key (lane C). Two blocks, each needing a different key:
+  email+email 668 chunk pairs (182 of 436 live mails), document+meeting 582 chunk
+  pairs (20 documents, 15 meetings). Of the mail block, a source content hash folds
+  the larger part and the RFC-822 header is required for the rest. SETTLED 10 Sep,
+  with populations: 436 live email sources; 182 of them share exact chunk text with
+  another; a source-level content hash catches **125 (69%)** and misses **57 (31%)**.
+  The earlier 125/84 did not add up because both figures were `COUNT(DISTINCT
+  source_id)` over overlapping sets — one mail can share text with an equal-hash twin
+  AND a different-hash twin at once, so it was counted twice; 125 + 84 = 209 > 182 was
+  exactly that overlap. **And the figure that sizes the prize is 66 rows removed across
+  59 hash groups, not 125** — a fold keeps one per group. So: the hash is worth
+  building, and the RFC-822 header is a real second build for the remaining 31%. Title+date is the WEAKER key (reaches
+  112 where the hash reaches 125): if only one is built, build the hash. And
+  `event_id` does NOT express the meeting fold though it looks as though it should
+  — coverage is event 66/66, meeting 47/122, email 30/436, **document 0** — because
+  a Gemini notes MAIL is not a calendar notice and Drive files carry none.
 - **Build:** one gate, one identity per thing (Google id / message id / event id / content
   hash); sightings table; sources carry `accounts[]`, `apps[]`, `owner`, `shared_with`
   (private · agency · agency+client); named folder/space → account confirmed once by a
@@ -178,7 +204,7 @@ merge; any lane that will exceed its line stops and reports.
 
 ## 6. How to hand this over — paste to the planner
 
-> You are the hub. Read `.plans/BUILD-5-knowledge-rebuild.md`, `KB-AUDIT.md`, CLAUDE.md
+> You are the hub. Read `.plans/BUILD-5-knowledge-rebuild.md`, `.plans/KB-AUDIT.md`, CLAUDE.md
 > and RULES.md. Write ONE design note (schema, seams, contracts) and get it approved by the
 > owner before any lane starts. Then write one self-contained brief per lane (A–G): it
 > must carry its own worktree setup, its exact files, its test to write first, its cost

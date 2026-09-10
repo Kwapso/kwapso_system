@@ -8,7 +8,7 @@
 // trimming a document without saying so, or by turning a conversion failure
 // into a 500 that loses the upload.
 
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import { GuardError } from "@shared/workers/gating"
@@ -16,6 +16,7 @@ import { indexableText } from "../src/lib/knowledge"
 import {
   capToRow,
   extractFile,
+  extractLink,
   readability,
   unreadableNote,
 } from "../src/lib/knowledge-files"
@@ -325,5 +326,57 @@ describe("indexableText: a title is not material", () => {
     expect(
       indexableText({ title: "Runbook", body: "the window is four hours", file_url: "/media/internal/x/y" })
     ).toContain("four hours")
+  })
+})
+
+// THE THIRD READER, completing the story: a file's bytes go through
+// `extractFile` above, and a video LINK — the one thing this app accepts with
+// no bytes at all — goes through `extractLink`. Same two promises either way:
+// the source is kept regardless, and the words are only ever claimed when
+// `readLink` (source-readers.ts) actually found some.
+describe("extractLink: a video link, kept either way", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  it("reads YouTube captions when there is a track", async () => {
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      if (url.includes("type=list"))
+        return new Response('<transcript_list><track lang_code="en" name=""/></transcript_list>', { status: 200 })
+      return new Response('<transcript><text start="0" dur="1">Hello there</text></transcript>', { status: 200 })
+    }) as unknown as typeof fetch
+
+    expect(await extractLink("https://www.youtube.com/watch?v=abc123")).toEqual({
+      text: "Hello there",
+      note: null,
+    })
+  })
+
+  it("says so honestly when a YouTube video has no caption track", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<transcript_list></transcript_list>", { status: 200 })) as unknown as typeof fetch
+    const out = await extractLink("https://www.youtube.com/watch?v=nocaps")
+    expect(out.text).toBeNull()
+    expect(out.note).toContain("kept here")
+  })
+
+  it("reads a Loom title as best-effort words, and says the video is still kept when there are none", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ title: "Q3 planning walkthrough" }), { status: 200 })
+    ) as unknown as typeof fetch
+    expect(await extractLink("https://www.loom.com/share/abc123")).toEqual({
+      text: "Q3 planning walkthrough",
+      note: null,
+    })
+  })
+
+  it("names something a person can act on for a link nothing here reads at all", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called — vimeo has no declared reader")
+    }) as unknown as typeof fetch
+    const out = await extractLink("https://vimeo.com/12345")
+    expect(out.text).toBeNull()
+    expect(out.note).toContain("kept here")
   })
 })

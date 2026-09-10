@@ -44,10 +44,16 @@ describe("the runbook's Vectorize indexes mirror the code's", () => {
     ).toEqual(METADATA_INDEXES.map((i) => ({ property: String(i.property), type: i.type })))
   })
 
-  it("leaves room: Vectorize allows ten metadata indexes per index", () => {
-    // The runbook's own note says the tenth slot is deliberately free. If a
-    // tenth is ever spent, that sentence has to move too — this is what makes
-    // spending it a decision rather than an accident.
-    expect(METADATA_INDEXES.length).toBeLessThanOrEqual(10)
+  it("spends exactly ten metadata indexes — Vectorize's own ceiling, and no more", () => {
+    // A CEILING, NOT A PIN, until this line: `toBeLessThanOrEqual(10)` derives
+    // its own expectation from the very list it is checking, so it was green
+    // at nine and would stay green at nine forever — kb_A found the gap (hub
+    // tick, 10 Sep 2026) chasing the owner's tracker item `c-label`, which
+    // believed this test already pinned ten. `shared` (0073's
+    // `knowledge_sources.shared_with`) is the tenth, and BUILD-5 §3 says the
+    // label budget is then SPENT: no eleventh slot, ever, on this index — a
+    // pin is what makes that a fact rather than a hope.
+    expect(METADATA_INDEXES.length).toBe(10)
+    expect(METADATA_INDEXES.map((i) => i.property)).toContain("shared")
   })
 })

@@ -644,7 +644,7 @@ describe("the fences did not move", () => {
       ).toBe(false)
 
     // AND THE TABLE THAT WAS ALL MONEY. `account_rates` was the last one and it
-    // is dropped by team migration 0074, so this is a RETIREMENT PIN rather than
+    // is dropped by team migration 0078, so this is a RETIREMENT PIN rather than
     // a derivation: it says the name is gone and fails if it comes back into the
     // sweep, which is what the column census above cannot say about a table
     // whose columns it no longer finds.
@@ -895,8 +895,22 @@ function digest(text: string): string {
 /** WHICH READER EACH DECLARED VERSION BELONGS TO. Regenerate with the failure
  * message above, deliberately — the point is that a text change cannot be made
  * without somebody deciding whether the rows already indexed need re-writing. */
+// RE-PINNED 10 Sep 2026 AT EVERY CURRENT VERSION, and not one bumped. Each
+// reader gained a `generatedOnly` line — whether THIS row produced anything
+// beyond the sentence the app wrote for it (KB-AUDIT.md §4.3, findable but never
+// quoted). That is a fact ABOUT the body and not a word IN it: every title,
+// summary and body these readers build is character for character what it was.
+//
+// A bump would have been the wrong repair, and an expensive one — a full
+// re-chunk and re-embed of every mirrored row in the base, against a cap the
+// owner cut from $10 to $5 the same day, to re-write text that did not change.
+// The comment above says the price is only real when the words changed; here
+// they did not. What the flag DOES need is for a row that has just become a card
+// to drop the pieces it already has, and that is done where it belongs — in the
+// sweep's own hash-skip, once per row, self-healing (`nowACard` in
+// knowledge-ingest.ts) — rather than by walking the whole corpus back.
 const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
-  ticket: { version: 1, digest: "6e4ce9bc6f3df27b" },
+  ticket: { version: 1, digest: "1e8c5c3262287da0" },
   // v2: "when we last spoke" is keyed on the CLOCK rather than on a retired
   // `held` status, so a client we saw in April no longer reads as last seen in
   // March. Every account already indexed says the old date until it is re-written.
@@ -906,12 +920,12 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // `TICKET_TYPE_KEPT_FOR_MIGRATION` in shared/types.ts carries it). Same reason
   // as v2 and the same shape: an account already indexed goes on saying the old
   // number, out loud, to somebody looking at a screen that disagrees.
-  account: { version: 3, digest: "cd3575a2b7dbd60f" },
-  contact: { version: 1, digest: "797da075c7f5ddaa" },
-  app: { version: 1, digest: "6b67fb58910c7241" },
-  process: { version: 1, digest: "ddbb403661a7013c" },
-  sprint: { version: 1, digest: "3421ad8399adb0a1" },
-  story: { version: 1, digest: "0809d2076e8ddfab" },
+  account: { version: 3, digest: "25e874faac53268c" },
+  contact: { version: 1, digest: "83d7be3dfb3fd58b" },
+  app: { version: 1, digest: "4cc1a834e6b82312" },
+  process: { version: 1, digest: "908921c603bedcd9" },
+  sprint: { version: 1, digest: "d583d89b784d61ed" },
+  story: { version: 1, digest: "234755039c3242c1" },
   // v2: the summary says "already happened" / "still to come" from the start
   // time, where it used to quote the retired status column.
   // v3: a meeting that has not happened and carries no agenda, notes or
@@ -936,8 +950,8 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // already indexed says exactly what it said before and a bump would re-read
   // 465 sources to rewrite none of them. What moved is which PARENT the row
   // carries, which is a column and not a word.
-  meeting: { version: 5, digest: "9c446131f6e8f455" },
-  todo: { version: 1, digest: "e00d2b0c6bb86edb" },
+  meeting: { version: 5, digest: "ea4451ecac7c35d3" },
+  todo: { version: 1, digest: "bb89254e6f041dc8" },
   // RE-PINNED 20 Aug 2026 AT THE SAME VERSION, and the version staying at 1 is
   // the point. `task` is declared last, so its slice used to run to the end of
   // the file and its digest covered every helper below the table. Bounding the
@@ -951,7 +965,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // the task builder is byte for byte what it was — so nothing needs re-indexing
   // and the version must not move. That this keeps happening to whichever kind is
   // declared last is worth knowing before reaching for a bump.
-  task: { version: 1, digest: "b837d2e036f69056" },
+  task: { version: 1, digest: "5dc7103f84e1ca87" },
   // R47's three (1 Sep 2026). Every one starts at v1 because no row of them has
   // ever been indexed — there is nothing behind a cursor to leave saying the old
   // words.
@@ -975,7 +989,11 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // comment's text and KEEPS its newline, so a long note still moves the hash —
   // which is why the version stays at 3, nothing is re-indexed, and only the
   // digest is re-pinned.
-  person: { version: 3, digest: "011e338664d69945" },
+  // Re-pinned on the 10 Sep 2026 merge with the knowledge-base rebuild, which
+  // rewrote this kind's note on the other line. The reader's TEXT is untouched
+  // by both lines — hence version 3, unmoved — so this is a comment-only re-pin
+  // of the kind the header above already describes.
+  person: { version: 3, digest: "075e20f57d17a4b1" },
   // v2 (10 Sep 2026): THE READER WAS SAYING SOMETHING FALSE, and this is the
   // bump that reaches the rows already filed. It used to take
   // `MAX(CASE WHEN is_default = 1 … THEN value END)` and write "<X> is picked
@@ -988,8 +1006,14 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // choices are protected, and that protection is not a pre-selection. Every
   // dropdown source already in the base says the old words, which is exactly the
   // case the version mechanism exists for, so this one really must move.
-  dropdown: { version: 2, digest: "389770fef4ffa5d0" },
-  portal_login: { version: 1, digest: "d759a60ff2f459f0" },
+  // Digest re-pinned (not the version) on the 10 Sep 2026 merge: the other line
+  // gave every kind a `generatedOnly` flag, which is metadata about the row and
+  // not one word of what a person reads. v2 above is still the last change to
+  // the TEXT, so the cursor must not walk the corpus again for this.
+  dropdown: { version: 2, digest: "635adabd4e4c63af" },
+  // Same merge, same reason as `dropdown` above: `generatedOnly` moved the hash
+  // and not the sentence, so the version holds at 1.
+  portal_login: { version: 1, digest: "8fa96a5eebfff039" },
 }
 
 /** Everything in the sweep that is NOT inside a kind: the shared helpers each
@@ -1079,7 +1103,7 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // claim. A textVersion bump would be actively wrong here for the same reason
 // the note above gives — it would re-embed the whole base to change zero
 // words of anyone's indexed text.
-const SHARED_DIGEST = "e45006eafcf7b270"
+const SHARED_DIGEST = "4836e0b2cc6a2e78"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

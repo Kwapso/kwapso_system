@@ -590,7 +590,7 @@ const RETIRED_IN_THE_CANON: Record<string, { since: string; phrases: RegExp[] }>
   // feature; and "margin" ONLY where it is qualified as money.
   "the internal rate cards and the margin": {
     since:
-      "2026-09-10, the client's ruling: \"kill the whole internal rates thing. will develop this in the future much much more but for now i iwanna wipe it clean\". Both tables dropped by team migration 0073, the two screens and lib/internal-money.ts deleted, six agent tools and seven doors removed, and R24's structural inbound half retired with them",
+      "2026-09-10, the client's ruling: \"kill the whole internal rates thing. will develop this in the future much much more but for now i iwanna wipe it clean\". Both tables dropped by team migration 0077, the two screens and lib/internal-money.ts deleted, six agent tools and seven doors removed, and R24's structural inbound half retired with them",
     phrases: [
       /\binternal_role_rates\b/,
       /\binternal_rates\b/,
@@ -616,7 +616,7 @@ const RETIRED_IN_THE_CANON: Record<string, { since: string; phrases: RegExp[] }>
   // else in this repo.
   "the account rate card": {
     since:
-      "2026-09-10, the client's ruling: \"The whole account rates also killed it\", an hour after she retired the internal rates. Table dropped by team migration 0074, lib/rates.ts and web/components/money/ deleted, four doors and three agent/MCP tools removed, `set_record_active` lost its `account_rate` record, and the Rates tab on a client's record went with the card it drew",
+      "2026-09-10, the client's ruling: \"The whole account rates also killed it\", an hour after she retired the internal rates. Table dropped by team migration 0078, lib/rates.ts and web/components/money/ deleted, four doors and three agent/MCP tools removed, `set_record_active` lost its `account_rate` record, and the Rates tab on a client's record went with the card it drew",
     phrases: [
       /\baccount_rates\b/,
       /\baccount rate cards?\b/i,

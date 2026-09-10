@@ -16,7 +16,7 @@
 // wipe it clean". Then, of the half that was left: "the whole account rates also
 // killed it". Law R24's structural half went with the first ruling (RULES.md
 // records why); `lib/internal-money.ts` and `lib/rates.ts` are both gone, and
-// team migration 0074 drops `account_rates` the way 0073 dropped the other two.
+// team migration 0078 drops `account_rates` the way 0077 dropped the other two.
 //
 // ── WHY THIS FILE STAYS, RATHER THAN FOLDING INTO routes/processes.ts ────────
 //

@@ -159,3 +159,66 @@ describe("a 403 is TWO answers, and Google picks the status for both", () => {
     expect((await gmailSearch("tok", "")).map((m) => m.id)).toEqual(["a"])
   })
 })
+
+// A KNOWN ID'S HEADER TEACHES NOTHING — documents/COSTS.md §3, 2026-09-10. The
+// suite above proves a per-item REFUSAL is safe to skip; this proves a per-item
+// READ is safe to skip too, for the one reason gmail gets this and Drive/Calendar
+// do not: a message cannot change after it is received, so the only thing its
+// header was ever bought for — the date the cursor uses to discard it, on every
+// steady-state tick, after the fact — is a fact the database already holds once
+// a message has been filed once.
+describe("gmailSearch — a known id's header is a call that teaches nothing", () => {
+  it("does not fetch the header for a known id, and still returns something for it", async () => {
+    const { reads } = stubGmail(["a", "b", "c"], {})
+
+    const out = await gmailSearch("tok", "", undefined, [], new Set(["b"]))
+
+    // THE EFFICIENCY CLAIM: Google was never asked about "b".
+    expect(reads.sort()).toEqual(["a", "c"])
+    // THE SAFETY CLAIM: "b" is still in the answer — `seen` (knowledge-google.ts)
+    // records every id `gmailSearch` returns, and an id silently dropped here
+    // would read to `retireVanished` as a message that vanished from the
+    // account, which it did not.
+    expect(out.map((m) => m.id).sort()).toEqual(["a", "b", "c"])
+    const known = out.find((m) => m.id === "b")!
+    // A NULL DATE IS THE WHOLE MECHANISM: `moment(null)` is the empty string,
+    // which sorts before every real cursor, so a known id is excluded from
+    // `wanted` the same way an old one always was — just without paying for
+    // its header first.
+    expect(known.date).toBeNull()
+    expect(known.subject).toBe("")
+  })
+
+  it("skips every known id across a page, in one batch or several", async () => {
+    const ids = Array.from({ length: 15 }, (_, i) => `m${i}`)
+    const { reads } = stubGmail(ids, {})
+    const known = new Set(["m0", "m5", "m11", "m14"])
+
+    const out = await gmailSearch("tok", "", undefined, [], known)
+
+    expect(reads.sort()).toEqual(ids.filter((id) => !known.has(id)).sort())
+    expect(out.map((m) => m.id).sort()).toEqual([...ids].sort())
+  })
+
+  it("still classifies a refusal correctly for the ids it does read", async () => {
+    // The known-id skip must not blunt the suite above: a real refusal on an
+    // UNKNOWN id in the same batch is still graded, not swallowed by proximity
+    // to a skip.
+    const QUOTA = JSON.stringify({
+      error: { code: 403, errors: [{ reason: "quotaExceeded" }] },
+    })
+    stubGmail(["a", "b", "c"], { c: 403 }, QUOTA)
+
+    await expect(gmailSearch("tok", "", undefined, [], new Set(["a"]))).rejects.toMatchObject({
+      code: "google_busy",
+    })
+  })
+
+  it("an empty or absent known-ids set changes nothing — every id is read, as before", async () => {
+    const { reads } = stubGmail(["a", "b"], {})
+
+    expect((await gmailSearch("tok", "")).map((m) => m.id).sort()).toEqual(["a", "b"])
+    expect((await gmailSearch("tok", "", undefined, [], new Set())).map((m) => m.id).sort()).toEqual(["a", "b"])
+    expect(reads.sort()).toEqual(["a", "a", "b", "b"])
+  })
+})

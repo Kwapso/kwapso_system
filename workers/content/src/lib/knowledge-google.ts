@@ -448,6 +448,86 @@ async function readFoldTargets(cfg: D1Rest, guard: MemberGuard): Promise<FoldTar
  * outgrows it wants a decision rather than a silent truncation. */
 const FOLD_ORACLE_CAP = 20000
 
+/** HOW MANY OF THIS PERSON'S ALREADY-FILED GMAIL IDS ONE TICK WILL SAMPLE. R14
+ * hard cap. `gmailSearch` can only ever list GMAIL_SWEEP_PAGES × GOOGLE_PAGE_SIZE
+ * = 200 ids in one tick, so a known id outside this sample just costs one
+ * redundant, harmless header read on that one message — not a correctness
+ * question, an efficiency one, and a generous one at that. */
+const KNOWN_GMAIL_SAMPLE = 500
+
+/** IDS THIS PERSON'S GMAIL LANE HAS ALREADY FILED — active or retired, because
+ * a retired row still means "already processed", and that is the only signal
+ * `gmailSearch`'s header skip needs (see its own doc). Never applied unless the
+ * caller already holds a cursor for this lane (see `slice` below): a null
+ * cursor means either a first connection or a deliberate `rewindGoogleLane`,
+ * and both mean "read it all again" — which is exactly what NOT calling this
+ * preserves, untouched.
+ *
+ * THIS IS WHY THE SWEEP HAS BEEN COSTING ~204 GMAIL CALLS A TICK PER MAILBOX
+ * EVEN WHEN NOTHING IS NEW (documents/COSTS.md §3, 2026-09-10): every one of
+ * the newest 200 messages got a header read solely to learn a date the cursor
+ * was about to discard it by. This is the same discard, made from a fact the
+ * database already holds instead of a fact Google has to be asked for again. */
+/** WHETHER THIS TICK MAY SKIP A KNOWN GMAIL ID'S HEADER — named, not inlined at
+ * the call site, so a test can assert the RULE rather than infer it from
+ * behaviour (the same choice `isItemRefusal` in google-api.ts makes, and for
+ * the same reason: the day this reads `cursor !== null` alone again, a test
+ * should say so by name rather than by a mailbox slowly losing new mail).
+ *
+ * `cursor !== null` IS ONLY HALF OF "A REAL CURSOR". A null cursor means
+ * "read it all" — a first connection, or a lane `rewindGoogleLane`
+ * deliberately forgot — and skipping a known id's header there would defeat
+ * the one mechanism this app has for saying "bring that back". That much a
+ * plain null check catches.
+ *
+ * `cursor.at === ""` IS THE SAME CASE WEARING A NON-NULL OBJECT, and a plain
+ * null check does not catch it. `moment()` has exactly two shapes, a real ISO
+ * date or the empty string for a row with no readable date (its own doc —
+ * "swept FIRST rather than never"), and nothing stops a slice from being
+ * filled entirely by date-less rows, which stores `last = { at: "", id: … }`
+ * (knowledge-ingest.ts) as this lane's new position. A placeholder also
+ * carries `sortAt === ""` (see the note above `knownPlaceholder` in
+ * google-api.ts), so against an EMPTY cursor `afterCursor`'s own equality
+ * branch (`r.sortAt === cursor.at && r.originRowId > cursor.id`) can keep one
+ * — unlike against a real cursor, where a placeholder's empty sortAt is never
+ * `>` a real date and the first branch alone excludes it. Kept placeholders
+ * sort first (same reason), so `wanted` fills with content-free rows before
+ * any real new mail behind them is ever reached, and the lane's `last` stays
+ * `""` forever — the transient state `moment()`'s own comment describes
+ * becomes absorbing. See `knownGmailIds`'s own doc for what the skip trades
+ * away in return, once it is safe to apply. */
+export function gmailKnownIdsApply(
+  service: GoogleService,
+  cursor: { at: string; id: string } | null
+): boolean {
+  return service === "gmail" && cursor !== null && cursor.at !== ""
+}
+
+export async function knownGmailIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<string>> {
+  const prefix = `${guard.userId}:`
+  try {
+    const rows = await d1Query<{ origin_row_id: string }>(
+      cfg,
+      guard.databaseId,
+      // R14 hard cap: KNOWN_GMAIL_SAMPLE.
+      `SELECT origin_row_id FROM knowledge_sources
+        WHERE origin_table = 'google_gmail' AND origin_row_id LIKE ? ESCAPE '\\'
+        ORDER BY updated_at DESC LIMIT ${KNOWN_GMAIL_SAMPLE}`,
+      [`${likeLiteral(guard.userId)}:%`]
+    )
+    return new Set(
+      rows.filter((r) => r.origin_row_id.startsWith(prefix)).map((r) => r.origin_row_id.slice(prefix.length))
+    )
+  } catch {
+    // FAIL SAFE, NEVER FAIL SILENT ABOUT COST: an empty set here does not mean
+    // "nothing is known", it means "the read that would have told us failed" —
+    // and the caller cannot tell the two apart. That is fine, because the only
+    // consequence of an empty set is paying for the expensive, always-correct
+    // path this function exists to make less FREQUENT, never the cheap one.
+    return new Set()
+  }
+}
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -577,7 +657,8 @@ export function googleIngestKinds(
     toRows: (items: GoogleItem[]) => IngestRow[],
     hydrate = false
   ): Promise<IngestRow[]> => {
-    const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service] })
+    const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
+    const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service], gmailKnownIds })
     // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
     // will FILE; this is everything the service currently holds, which is a
     // different and much larger sentence — and it is the only one that can tell
@@ -650,7 +731,15 @@ export function googleIngestKinds(
       table: "google_gmail",
       label: "mail with a client",
       windowed: true,
-      textVersion: 1,
+      // 2 SINCE 10 SEP 2026 — the unit changed from a message to a thread and
+      // the body changed with it (google-read.ts's `mailThreads`, BUILD-5
+      // §2), so every stored cursor has to rewind. Without the bump the
+      // sweep keeps the position it reached over the OLD per-message rows,
+      // finds almost every thread to be "before" it, and files almost
+      // nothing while reporting itself caught up — chat measured exactly
+      // this on 20 Aug 2026 (`read: 1, indexed: 1, caughtUp: true` against
+      // five spaces holding fifty messages each) when it made the same move.
+      textVersion: 2,
       read: (_cfg, _guard, cursor, limit) =>
         slice(
           "gmail",
@@ -734,6 +823,13 @@ export function googleIngestKinds(
               // is a fact read off the item, not a match made against it.
               eventId: item.externalId || null,
               eventIdFrom: item.externalId ? "origin" : null,
+              // AN ENTRY WITH NO DESCRIPTION IS THE APP'S OWN SENTENCE — "Met on
+              // 3 Sep." and nothing else. Findable, never quoted: KB-AUDIT.md
+              // §4.3 measured `event` at forty characters a chunk, the shortest
+              // in the base, which is exactly what makes it beat real documents
+              // on name-shaped questions. An agenda somebody typed is material
+              // and keeps its pieces.
+              generatedOnly: !item.text,
               title: item.title,
               body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
                 .filter(Boolean)

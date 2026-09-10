@@ -536,13 +536,187 @@ function toSource(r: SourceRow): KnowledgeSource {
   }
 }
 
-/** THE PERSONAL FENCE, as SQL. A source with an owner is readable only by that
- * owner: it arrived through what THEY can see (their own connection, or a note
- * they marked private), so it is theirs to be answered from. Everything else is
- * the team's. Applied to every read on this module, including the search — a
- * fence with an exception is not a fence. */
-function ownerClause(guard: MemberGuard, column = "owner_user_id"): { sql: string; params: string[] } {
-  return { sql: `(${column} IS NULL OR ${column} = ?)`, params: [guard.userId] }
+/** THE PERSONAL FENCE, as SQL — LIVE against a source's own sightings, not a
+ * denormalised copy, because every read that reaches `knowledge_sources`
+ * through this function is R14-capped to a handful of rows and
+ * `idx_knowledge_sightings_source` (migration 0073) makes the join a keyed
+ * lookup rather than a scan. See `fastOwnerClause` below for the one table
+ * this reasoning does NOT apply to.
+ *
+ * THREE BRANCHES, and only TWO of them have a counterpart in
+ * knowledge-identity.ts's TS model — SAID PLAINLY because an earlier version
+ * of this header claimed all three matched `readableBy` (now `sightingsAdmit`)
+ * "exactly", and that sentence was false the moment this function grew a
+ * branch the TS side was never given the column to build:
+ *
+ *   1. `team_visible = 1` — the STORED half of the answer (0075/0076),
+ *      recomputed from live sightings by `recomputeTeamVisible` whenever one
+ *      changes. Reading it here rather than re-deriving "does a live team
+ *      sighting exist" inline is not an optimisation, it is the CONTRACT: this
+ *      function and the flag must always agree, and the corpus-wide rot-check
+ *      (knowledge-fence.test.ts) is what catches them drifting apart.
+ *      MATCHES `teamVisible(sightings)` in knowledge-identity.ts.
+ *   2. A source with NO sightings at all answers exactly as it always did:
+ *      `owner_user_id IS NULL` is the team's, `owner_user_id = me` is mine — a
+ *      typed private note or an uploaded file, which never gets a sighting
+ *      because nobody's Google connection produced it. GATED ON
+ *      `NOT EXISTS (any sighting for this source)`, and the gate is not
+ *      defensive dressing: once a source has sightings, `owner_user_id` is no
+ *      longer trustworthy on its own (see `fastOwnerClause` for the reason
+ *      that column can end up `NULL` even with no team sighting present), so
+ *      an ungated `owner_user_id IS NULL` would read a merely-AMBIGUOUS source
+ *      as team-readable — the exact widening this function exists to refuse.
+ *      NO TS COUNTERPART. `sightingsAdmit`/`teamVisible` take a `Sighting[]`
+ *      and never see `owner_user_id`, so neither one can decide this branch —
+ *      not a gap in the model, a question outside what it was ever handed.
+ *      Proven correct on its own, against the real door, in
+ *      knowledge-fence.test.ts ("a source with no sightings").
+ *   3. EXISTS a LIVE sighting that is mine. The branch that answers for
+ *      exactly the population this whole design exists to serve: several
+ *      people's own sight of one thing, folded into one source, where no
+ *      single column could ever have named all of them.
+ *      Together with branch 1, MATCHES `sightingsAdmit(sightings, me)` — but
+ *      only once a source HAS sightings; see branch 2 for the case it does
+ *      not, which sightingsAdmit was never asked about at all.
+ *
+ * ONE COLUMN CANNOT HOLD A SET is the whole of why this function exists. The
+ * old single-line version — `owner_user_id IS NULL OR owner_user_id = me` —
+ * read correctly for a source at most one person had ever seen. It cannot
+ * read correctly for the calendar fold, where measured on staging every one of
+ * 27 doubly-or-triply-sighted events is private, on the private shelf, seen by
+ * more than one person: `NULL` there would answer for everybody, and a single
+ * saved id would lock the others out. See scripts/measure-source-identity.mjs. */
+function ownerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
+  // ALWAYS QUALIFIED, never bare `id` — `knowledge_sightings` has an `id`
+  // column of its own (its primary key), and inside the correlated subqueries
+  // below an unprefixed `id` resolves to THAT column, not to the source this
+  // clause is about: the innermost matching table wins column-name scoping,
+  // so `sg.source_id = id` would silently compare a sighting's own id to its
+  // own source_id and never match, making every NOT EXISTS below vacuously
+  // true and the gate it exists to be a no-op. Caught by knowledge-fence.test.ts,
+  // not by inspection — the bug reads as correct SQL. `knowledge_sources.id` is
+  // safe unprefixed because it is the literal, unaliased table name every bare
+  // caller of this function actually queries.
+  const id = prefix ? `${prefix}id` : "knowledge_sources.id"
+  const owner = `${prefix}owner_user_id`
+  const teamVisible = `${prefix}team_visible`
+  return {
+    sql: `(
+      ${teamVisible} = 1
+      OR (
+        NOT EXISTS (SELECT 1 FROM knowledge_sightings sg WHERE sg.source_id = ${id})
+        AND (${owner} IS NULL OR ${owner} = ?)
+      )
+      OR EXISTS (
+        SELECT 1 FROM knowledge_sightings sg
+         WHERE sg.source_id = ${id} AND sg.gone_at IS NULL AND sg.seen_by_user_id = ?
+      )
+    )`,
+    params: [guard.userId, guard.userId],
+  }
+}
+
+/** THE FAST OWNER CHECK — for the ONE table `ownerClause` above deliberately
+ * does not reach: `knowledge_terms`, the lexical arm's stage one, read before
+ * any join and before the compartment or the app fence have narrowed anything.
+ * `knowledge_terms` carries no `source_id` at all (only `chunk_id`), so a
+ * sightings-aware check here would be a two-hop join through
+ * `knowledge_chunks` on every candidate read — exactly the cost the
+ * denormalised `team_visible` copy exists to avoid (0075's own migration
+ * comment; the header on knowledge_chunks/knowledge_terms in
+ * team-schema/migrations.ts makes the identical argument about `compartment`
+ * and the un-folded `owner_user_id`).
+ *
+ * `owner_user_id` alongside `team_visible` still narrows the common case (no
+ * sighting, or one) for free, exactly as it always has — that column's WRITE
+ * path belongs to each ingest reader (knowledge-ingest.ts, knowledge-google.ts)
+ * and is untouched by any of this. Once a source has more than one DISTINCT
+ * PRIVATE sighter, no single column can name them all, and the honest value
+ * for `owner_user_id` on its chunks and terms is `NULL` — read here as "narrow
+ * it in for everyone" rather than "nobody restricts it". THAT IS R26'S OWN
+ * BARGAIN, one layer down: a wrong label here costs a relevant passage its
+ * place in the ranking; it cannot cost a caller an answer they should never
+ * have had, because the read-back through `knowledge_sources` — `ownerClause`
+ * above, which DOES consult sightings — is what actually decides. */
+function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } {
+  return {
+    sql: `(team_visible = 1 OR owner_user_id IS NULL OR owner_user_id = ?)`,
+    params: [guard.userId],
+  }
+}
+
+/** THE WRITE SIDE OF `team_visible` — SQL TEXT, not a call.
+ *
+ * Every writer that changes what a source's sightings SAY (a new sighting, a
+ * shelf moved private→team, one retired) must recompute `team_visible` on the
+ * source and denormalise the same value onto every chunk and posting it owns,
+ * in the SAME statement or transaction as that write — never a follow-up call
+ * that can be skipped. This function is the exact condition the hub set
+ * before any of this could be trusted to store an answer (tick 8): the
+ * recompute must be atomic with the write that made it stale, or the gap
+ * between them is a window where the flag says one thing and the sightings
+ * say another, silently.
+ *
+ * SO IT RETURNS TEXT RATHER THAN EXECUTING ANYTHING. A separate async call is
+ * a separate network round trip a future writer's own `d1ExecScript` can be
+ * built without — awaited, forgotten, or raced against the very insert it was
+ * meant to follow. Splicing this into THAT SAME script makes "wrote a
+ * sighting without recomputing" impossible to construct rather than merely
+ * disciplined against; the string is unusable any other way, which is the
+ * point.
+ *
+ * THREE STATEMENTS, ONE COMPUTED VALUE, in SQL rather than round-tripped
+ * through this process — `EXISTS(...)` evaluates to SQLite's own 0 or 1, so
+ * the three UPDATEs share one true source of truth rather than three chances
+ * for a client-computed value to be stale by the time the third statement
+ * runs. `gone_at IS NULL` is a LIVE sighting; `shelf = 'team'` is the only
+ * shelf this flag ever models — see `ownerClause`'s own header for why the
+ * app tier can never ride this column.
+ *
+ * ── THE ONE THING A CALLER MUST GET RIGHT, SAID EXACTLY: SPLICE ORDER ──────
+ *
+ * `d1ExecScript` runs the statements in ONE script in the order they are
+ * written, and each later statement sees every earlier one's effect — that is
+ * the whole reason a script is atomic in the first place. This function's
+ * `EXISTS` subqueries read `knowledge_sightings` AS THE SCRIPT STANDS AT THE
+ * MOMENT THEY RUN. So:
+ *
+ *   THE STATEMENT(S) THAT INSERT, UPDATE OR RETIRE A SIGHTING FOR THIS SOURCE
+ *   MUST APPEAR EARLIER IN THE SAME SCRIPT STRING THAN THIS FUNCTION'S OUTPUT.
+ *
+ *       const script = `
+ *         INSERT INTO knowledge_sightings (...) VALUES (...);
+ *         ${teamVisibleRecomputeSql(sourceId)}
+ *       `
+ *       await d1ExecScript(cfg, guard.databaseId, script)
+ *
+ * GET THE ORDER BACKWARDS — recompute text placed BEFORE the sighting write —
+ * and the `EXISTS` runs against the sightings table as it stood a moment
+ * EARLIER, before the very write that was supposed to make it correct. That
+ * produces exactly the staleness this function exists to prevent, self
+ * inflicted, inside the one script that was supposed to be atomic against it.
+ * A stale-high result from this failure mode never leaks (it only narrows a
+ * caller in early, which R26 accepts); a stale-LOW one silently refuses
+ * material to everybody it should still answer for, the moment the ordering
+ * mistake happens to land on a source's LAST live sighting retiring.
+ *
+ * Multiple sighting writes for the SAME source in one script — a fold adding
+ * one sighter while retiring another — are fine in any order AMONG
+ * THEMSELVES, as long as all of them precede this function's text. A caller
+ * recomputing with no sighting write in the same script at all (a resync, a
+ * repair pass) may splice this anywhere; there is nothing to race against. */
+export function teamVisibleRecomputeSql(sourceId: string): string {
+  const id = sqlString(sourceId)
+  const teamSightingExists = `EXISTS (
+    SELECT 1 FROM knowledge_sightings
+     WHERE source_id = ${id} AND gone_at IS NULL AND shelf = 'team'
+  )`
+  return `
+UPDATE knowledge_sources SET team_visible = ${teamSightingExists} WHERE id = ${id};
+UPDATE knowledge_chunks SET team_visible = ${teamSightingExists} WHERE source_id = ${id};
+UPDATE knowledge_terms SET team_visible = ${teamSightingExists}
+  WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ${id});
+`
 }
 
 /** THE APP FENCE, as SQL — the middle setting the module was missing (12.3).
@@ -600,7 +774,7 @@ function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: stri
  * argument a third time. A fence written twice is a fence that will be amended
  * once. */
 export function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
-  const owner = ownerClause(guard, `${prefix}owner_user_id`)
+  const owner = ownerClause(guard, prefix)
   const app = appClause(guard, prefix)
   return { sql: `${owner.sql} AND ${app.sql}`, params: [...owner.params, ...app.params] }
 }
@@ -1279,6 +1453,16 @@ async function clearIndex(
     "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ? AND seq >= ?)",
     [sourceId, fromSeq]
   )
+  // KEEPING `knowledge_chunks_fts` IN STEP — the same keyed 'delete' the
+  // migration's own test demonstrates, reading the rows' CURRENT text WHILE
+  // they still exist, immediately before the statement that removes them.
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO knowledge_chunks_fts (knowledge_chunks_fts, rowid, text)
+       SELECT 'delete', rowid, text FROM knowledge_chunks WHERE source_id = ? AND seq >= ?`,
+    [sourceId, fromSeq]
+  )
   await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_chunks WHERE source_id = ? AND seq >= ?", [
     sourceId,
     fromSeq,
@@ -1422,15 +1606,27 @@ export async function indexSource(
   sourceId: string,
   opts: { force?: boolean; slices?: number } = {}
 ): Promise<IndexProgress> {
-  const rows = await d1Query<SourceRow & { content_hash: string | null; embed_attempts: number }>(
+  const rows = await d1Query<
+    SourceRow & {
+      content_hash: string | null
+      embed_attempts: number
+      generated_only: number
+      shared_with: string
+      team_visible: number
+    }
+  >(
     cfg,
     guard.databaseId,
     // `file_url` rides along because `indexableText` needs it: a file with no
     // body indexes to nothing, and the difference between "no body" and "a file
     // with no body" is the difference between a note somebody left blank and a
-    // document we could not read.
+    // document we could not read. `shared_with` (0073) rides along for the
+    // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts. `team_visible`
+    // rides along so the chunk/term write below can denormalise it — see that
+    // write's own comment for why silently defaulting to 0 was a real gap.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
-            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, deactivated_at, created_at
+            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only, shared_with,
+            team_visible, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1447,7 +1643,13 @@ export async function indexSource(
 
   const text = indexableText(source)
   const hash = contentHash(text)
-  const chunks = chunkText(text)
+  // A CARD IS EVERY WORD THE APP WROTE FOR THIS ROW, so it is never cut into
+  // pieces and there is nothing to quote. It keeps its record vector below, so
+  // the router can still route to it — findable, never quoted (KB-AUDIT.md
+  // §4.3). The reader decided this per ROW at ingest, because every mirror kind
+  // can also carry words a person typed and only the reader can tell.
+  const card = source.generated_only === 1
+  const chunks = card ? [] : chunkText(text)
   const total = Math.min(chunks.length, MAX_CHUNKS_PER_SOURCE)
   // NOT SILENT. A mirrored row bigger than the indexer's ceiling keeps the part
   // that fits — making an existing record unfindable would be a worse answer
@@ -1480,7 +1682,10 @@ export async function indexSource(
       [hash, total, overflow, sourceId]
     )
   }
-  if (!total || from >= total) return { total, indexed: from, done: true }
+  // A CARD FALLS THROUGH. Everything below is a no-op for it except the record
+  // vector, and returning here would make it invisible rather than unquotable —
+  // the opposite of the intent, and identical on a green build.
+  if (!card && (!total || from >= total)) return { total, indexed: from, done: true }
 
   const labels = labelsFor(source)
   const now = new Date().toISOString()
@@ -1500,6 +1705,14 @@ export async function indexSource(
       // this matches nothing; it is one statement per twenty chunks either way.
       const statements: string[] = [
         `DELETE FROM knowledge_terms WHERE chunk_id IN (${ids.map(sqlString).join(", ")});`,
+        // KEEPING `knowledge_chunks_fts` (0073) IN STEP — application code's job,
+        // because a trigger cannot survive this repo's migration executor (see
+        // the migration's own header). External-content FTS5's 'delete' command
+        // needs the OLD text to remove the right postings, so it is read back
+        // with a plain SELECT, BEFORE the chunk rows below overwrite it. On a
+        // first write this matches no row and deletes nothing, which is correct.
+        `INSERT INTO knowledge_chunks_fts (knowledge_chunks_fts, rowid, text)
+           SELECT 'delete', rowid, text FROM knowledge_chunks WHERE id IN (${ids.map(sqlString).join(", ")});`,
       ]
       batch.forEach((chunk, offset) => {
         const seq = from + start + offset
@@ -1515,15 +1728,37 @@ export async function indexSource(
         // overwrites, and the guard on the DO UPDATE means an IDENTICAL rewrite
         // moves zero rows and says nothing. `created_at` is deliberately not in
         // the SET list: a piece was first indexed when it was first indexed.
+        // TEAM_VISIBLE RIDES ALONG FROM THE SOURCE, the same way owner_user_id
+        // and compartment already do — WITHOUT this, a chunk written or
+        // rewritten after 0075/0076's one-time backfill takes the column's
+        // DEFAULT 0 for ever, silently, because nothing else in this statement
+        // ever sets it. Copying it here is what keeps the denormalised copy a
+        // copy: the moment a source's own team_visible changes, the next
+        // re-index (which content or force already trigger on every write this
+        // module makes) carries the new value down onto every chunk and
+        // posting it owns.
+        //
+        // `source.owner_user_id` RIDES ALONG UNCHANGED TOO, and `labelsFor`'s
+        // own header (below) is the one place that says what it MUST be once a
+        // fold merges more than one private sighter — read it before writing
+        // that merge. A stale single value copied here would exclude a
+        // legitimate colleague from this very candidate pool with no
+        // downstream fence able to rescue it.
         statements.push(
-          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
-             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, text = excluded.text, embedding = excluded.embedding
-             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id;`
+          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, team_visible, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
+             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, text = excluded.text, embedding = excluded.embedding
+             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id OR knowledge_chunks.team_visible IS NOT excluded.team_visible;`
+        )
+        // THE FRESH POSTING — read back AFTER the row above has written the new
+        // text, same rowid (an UPDATE never changes SQLite's own rowid, only a
+        // DELETE+INSERT would), new words.
+        statements.push(
+          `INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id = ${sqlString(chunkId)};`
         )
         for (const [term, weight] of tokenise(chunk))
           statements.push(
-            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${weight})
-               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, weight = excluded.weight;`
+            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, team_visible, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${weight})
+               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, weight = excluded.weight;`
           )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
       })
@@ -1561,6 +1796,13 @@ export async function indexSource(
   // no vectors — blanking the hash is what makes the next sweep pick it up again
   // instead of skipping it forever as "unchanged". Self-healing without a repair
   // door anybody has to remember.
+  // ...AND IT MUST NOT FIRE ON A CARD. A card has no embedded chunks by design,
+  // which this self-heal reads as failure — so without the guard the sweep
+  // blanks every card's hash, re-reads and re-writes all of them on every tick,
+  // for ever, and counts a failed attempt each time. Silent, indistinguishable
+  // from ordinary sweep activity, and it spends against a cap the owner has
+  // already cut once.
+  if (!card) {
   const embedded = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
@@ -1588,6 +1830,7 @@ export async function indexSource(
     await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET embed_attempts = 0 WHERE id = ?", [
       sourceId,
     ])
+  }
 
   return { total, indexed: from, done: from >= total }
 }
@@ -1666,7 +1909,34 @@ export async function indexOneSource(
  * built in ONE place so a chunk and its record's summary can never disagree
  * about whose material they are. Every key is present on every vector, because
  * Vectorize has no "is null": an absent key is a hole in every filter, so
- * "nothing here" has a spelling of its own. */
+ * "nothing here" has a spelling of its own.
+ *
+ * ── WHAT `owner` MUST BE, ONCE A SOURCE HAS MORE THAN ONE PRIVATE SIGHTER ──
+ *
+ * `source.owner_user_id ?? TEAM_SHELF` is correct only because `owner_user_id`
+ * is trusted, by construction, to name AT MOST ONE PERSON — or nobody, which is
+ * NULL and reads here as team-wide. The moment a fold merges two or more
+ * DISTINCT PRIVATE sightings into one source (the calendar fold's own shape —
+ * measured on staging, every one of its 27 multi-sighted events is private,
+ * seen by more than one person, no team sighting), no single value can name
+ * them all, and the whoever writes that merge MUST set `owner_user_id = NULL`
+ * on the source, DELIBERATELY, rather than leave it at whatever the last
+ * ingest reader to run happened to write.
+ *
+ * GET THIS WRONG AND NOTHING DOWNSTREAM CAN RESCUE IT. `ownerClause`
+ * (knowledge.ts, above) decides the real answer from live sightings and cannot
+ * be widened by a stale `owner_user_id` — but it only ever sees a source
+ * Vectorize's own ANN search already returned as a CANDIDATE. A chunk labelled
+ * `owner: <one stale person's id>` is excluded from every OTHER sighted
+ * colleague's search at THIS layer, before `ownerClause` is ever consulted —
+ * a false refusal with no correct read-back to appeal to, because a vector
+ * Vectorize never returns as a candidate never reaches it. `NULL` is the only
+ * honest value once one column can no longer name the truth: over-inclusive at
+ * the narrowing stage (R26's own bargain — a wrong label costs a relevant
+ * passage its ranking slot, never a caller an answer they should never have
+ * had), and correctly decided, for real, at the read-back through
+ * `ownerClause`. This is not written here as documentation of a decision
+ * already made — the fold-merge writer that must make it does not exist yet. */
 function labelsFor(source: {
   kind: string
   compartment: string
@@ -1677,6 +1947,7 @@ function labelsFor(source: {
   record_date: string | null
   created_at: string
   owner_user_id: string | null
+  shared_with: string
 }): VectorLabels {
   const when = Date.parse(source.record_date ?? source.created_at)
   return {
@@ -1689,6 +1960,7 @@ function labelsFor(source: {
     ticket: source.ticket_id ?? NONE,
     sprint: source.sprint_id ?? NONE,
     date: Number.isFinite(when) ? Math.floor(when / 1000) : 0,
+    shared: source.shared_with,
   }
 }
 
@@ -1816,14 +2088,33 @@ async function accountById(
 }
 
 /** The titles of a handful of sources, for the sentence the router says out
- * loud. Fenced like every other read here. */
+ * loud.
+ *
+ * FENCED WITH `readerClause`, BOTH HALVES, AND THE REASON IS THE WHOLE POINT.
+ * This used to say "fenced like every other read here" while using
+ * `ownerClause` alone — a comment asserting a property the code did not have.
+ * Every OTHER read here is `readerClause` (owner AND app); this one was the
+ * exception and its own comment hid that.
+ *
+ * What it cost: an app-restricted source's TITLE and its EXISTENCE reached a
+ * colleague who is not on that app, through the router's `reason` sentence and
+ * its `records` — while `found` was correctly false and no passage or citation
+ * leaked. The content fence held; the sentence ABOUT the content did not. R23
+ * makes the reasoning part of the answer, so a fence the reasoning does not
+ * honour is not a fence.
+ *
+ * WHY THIS ONE AND NOT `nameArm`, which also narrows with the owner half alone:
+ * `nameArm` produces CANDIDATES that must still cross the full-fence read-back
+ * before they can become an answer, which is R26's bargain — the index narrows,
+ * the team's database decides. These titles cross nothing. They go straight into
+ * a sentence a person reads. */
 async function sourceTitles(
   cfg: D1Rest,
   guard: MemberGuard,
   ids: string[]
 ): Promise<Map<string, string>> {
   if (!ids.length) return new Map()
-  const owner = ownerClause(guard)
+  const owner = readerClause(guard)
   const rows = await d1Query<{ id: string; title: string }>(
     cfg,
     guard.databaseId,
@@ -1839,11 +2130,37 @@ async function sourceTitles(
   return new Map(rows.map((r) => [r.id, r.title]))
 }
 
-/** The account a question names, or null. Two passes on purpose: SQL NARROWS
- * (one LIKE per question word, so the read is bounded by the team's own account
- * list), then code CONFIRMS — every word of the account's own name has to appear
- * in the question. Without the second pass a three-letter word inside a longer
- * name would file a question under a client it never mentioned. */
+/** IS THIS TOKEN RARE ENOUGH TO MEAN SOMETHING ON ITS OWN — the same question
+ * `EXACT_TERM_MAX_CHUNKS` already answers for the lexical arm's rare-token
+ * bypass, asked here for `accountNamedIn` instead of inventing a second
+ * number for the same idea. UNFENCED (whole-team chunk count over FTS5),
+ * because this runs BEFORE the compartment is known — narrowing to a
+ * compartment is the very question this function exists to answer. */
+async function isRareTerm(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    "SELECT COUNT(*) AS n FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?",
+    [`"${term}"`]
+  )
+  return (rows[0]?.n ?? 0) <= EXACT_TERM_MAX_CHUNKS
+}
+
+/** The account a question names, or null. Reads `knowledge_names` (0073)
+ * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
+ *
+ * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
+ * "DEMO" → "demo" — 26 of 134 staging accounts have a single-token name, and
+ * the token is often an ordinary English word, so "what solutions have we
+ * proposed for data import?" used to silently narrow to VU Solutions. TWO
+ * WAYS a candidate may still win: its name is ≥2 tokens, every one of them
+ * present in the question (two specific words appearing together is not a
+ * coincidence the way one common word is); or it is a single token that is
+ * RARE across the corpus (`isRareTerm`) — "Paddlebase" and "Asekurans" are
+ * still one token each, and still have to resolve. An ALIAS (the account's own
+ * `code`, e.g. BERG) bypasses both: a code is chosen to be a short,
+ * unambiguous handle on purpose, so an exact match is evidence on its own,
+ * exactly as it was before this function moved off `accounts.code`. */
 async function accountNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1851,25 +2168,124 @@ async function accountNamedIn(
 ): Promise<{ id: string; name: string } | null> {
   const terms = questionTerms(question, 8)
   if (!terms.length) return null
-  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`).concat(terms.map(() => "LOWER(code) = ?"))
-  const params = [...terms.map((t) => `%${likeLiteral(t)}%`), ...terms]
-  const candidates = await d1Query<{ id: string; name: string; code: string | null }>(
+  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
+  const params = terms.map((t) => `%${likeLiteral(t)}%`)
+  const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: a question can only ever pull back a handful of candidates,
-    // however many accounts happen to contain one of its words.
-    `SELECT id, name, code FROM accounts
-      WHERE deactivated_at IS NULL AND (${clauses.join(" OR ")})
+    // however many indexed names happen to contain one of its (at most 8) words.
+    `SELECT ref_id, name, alias_of FROM knowledge_names
+      WHERE kind = 'account' AND (${clauses.join(" OR ")})
       ORDER BY LENGTH(name) DESC LIMIT 10`,
     params
   )
   const asked = new Set(terms)
   for (const c of candidates) {
-    if (c.code && asked.has(c.code.toLowerCase())) return { id: c.id, name: c.name }
+    // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
+    // no token-count/rarity gate. `alias_of` carries the canonical name back.
+    if (c.alias_of) {
+      if (asked.has(c.name.toLowerCase())) return { id: c.ref_id, name: c.alias_of }
+      continue
+    }
     const nameTerms = [...tokenise(c.name).keys()]
-    if (nameTerms.length && nameTerms.every((t) => asked.has(t))) return { id: c.id, name: c.name }
+    if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
+    if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
+      return { id: c.ref_id, name: c.name }
   }
   return null
+}
+
+/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountNamedIn` reads.
+ *
+ * READ STRAIGHT OFF `accounts` AND `apps`, not off `knowledge_sources`. The
+ * first draft of this function derived names from the SWEPT mirror instead —
+ * simpler, one shape for every kind — and it broke the one thing this table
+ * exists to fix: an account that exists but has nothing indexed about it yet
+ * (a brand-new client, or a team the sweep has not reached) would have NO
+ * candidate row at all, so a question naming it correctly would route as
+ * "named no client" — the exact silent failure KB-AUDIT.md §4.2 is about,
+ * moved rather than fixed. `accounts` and `apps` are foundational tables that
+ * exist the moment a record does, independent of indexing, which is what
+ * `accountNamedIn`'s ORIGINAL implementation relied on by reading them
+ * directly; this keeps that guarantee.
+ *
+ * `contact`/`person` kinds are left to grow this table later (the migration's
+ * own comment names them as in scope) — `nameArm` already has a working,
+ * independently-tested route to colleagues (`knowledge_sources kind='person'`
+ * directly), so nothing in this build regresses by their absence here.
+ *
+ * ALIASES ARE DELIBERATELY THIN: an account's own `code` (BERG, HOGO) is the
+ * only one generated, because it is DATA the app already holds, not a guess.
+ * Misspelling/nickname GENERATION — 0073's own migration comment says that is
+ * "Lane C's job, not this table's" — needs a model call this build has not
+ * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
+ * rule is ask first). A canonical name with no alias is still fully usable:
+ * `accountNamedIn`'s multi-token and rare-single-token rules both read it
+ * alone, and a client whose accepted name IS a single ordinary word (the
+ * audit's own "green"/"solutions" cases) still resolves once it clears the
+ * rarity floor — no alias required for either path.
+ *
+ * A FULL REBUILD, NOT AN UPSERT. The population is a few hundred rows at
+ * most (every live account and app this team holds), so deleting and
+ * reinserting is simpler than an upsert keyed on `(kind, ref_id, name)` —
+ * which cannot express a RENAME, because the old name is part of the key an
+ * upsert would leave behind as an orphan row. */
+export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
+  const accounts = await d1Query<{ id: string; name: string; code: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by how many accounts this team holds — an
+    // agency's own client roster, not a growing log.
+    "SELECT id, name, code FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+  )
+  const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
+    cfg,
+    guard.databaseId,
+    "SELECT id, name, account_id FROM apps WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+  )
+
+  type NameRow = {
+    id: string
+    kind: string
+    ref_id: string
+    name: string
+    alias_of: string | null
+    compartment: string
+  }
+  const rows: NameRow[] = []
+  for (const a of accounts) {
+    if (!a.name) continue
+    const compartment = accountCompartment(a.id)
+    rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.name, alias_of: null, compartment })
+    if (a.code)
+      rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.code.toLowerCase(), alias_of: a.name, compartment })
+  }
+  for (const app of apps) {
+    if (!app.name) continue
+    rows.push({
+      id: ulid(),
+      kind: "app",
+      ref_id: app.id,
+      name: app.name,
+      alias_of: null,
+      compartment: app.account_id ? accountCompartment(app.account_id) : AGENCY_COMPARTMENT,
+    })
+  }
+
+  const now = new Date().toISOString()
+  await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_names")
+  const REBUILD_BATCH = 200
+  for (let i = 0; i < rows.length; i += REBUILD_BATCH) {
+    const batch = rows.slice(i, i + REBUILD_BATCH)
+    const statements = batch.map(
+      (r) =>
+        `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at) VALUES (${sqlString(r.id)}, ${sqlString(r.kind)}, ${sqlString(r.ref_id)}, ${sqlString(r.name)}, ${sqlString(r.alias_of)}, ${sqlString(r.compartment)}, ${sqlString(now)})
+           ON CONFLICT (kind, ref_id, name) DO NOTHING;`
+    )
+    await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
+  }
+  return { written: rows.length }
 }
 
 /* -------------------------------- retrieval ------------------------------- */
@@ -2218,14 +2634,55 @@ async function nameArm(
   return rows.map((r) => ({ chunk_id: r.chunk_id, lex: 1, exact: 1 }))
 }
 
-/** THE LEXICAL ARM. One keyed read over the inverted index, fenced by the reader
- * and narrowed by the compartment.
+/** THE LEXICAL ARM. FTS5's own BM25 over `knowledge_chunks_fts` (0073) — one
+ * keyed read, fenced by the reader and narrowed by the compartment.
  *
- * It used to be stage ONE, and everything else only saw what it handed on. Now
- * it runs beside the vector arm, gated and quiet, and neither can cap the other.
- * It is still here, and it must stay: a reference code, an error string, an
- * invoice number are things a person types EXACTLY, and an embedding is
- * indifferent to exactly. */
+ * REPLACES `knowledge_terms` (KB-AUDIT.md §4.4): that table's scorer was a raw
+ * term-frequency SUM with no IDF and no length normalisation — a chunk saying
+ * "invoice" five times outscored one that said it once in a five-word note
+ * regardless of how common "invoice" is across the corpus — and the audit's
+ * "hybrid search costs nine points of recall" finding was measured against
+ * that scorer, not against BM25. FTS5's `bm25()` is a real BM25 (term
+ * frequency, inverse document frequency, document-length normalisation), so
+ * this is now the arm that measurement should have been run against. See
+ * `retrieve`'s header for the re-measured RRF weights.
+ *
+ * SAME SHAPE AS BEFORE, ON PURPOSE. `termFloor`'s proportional floor and the
+ * exact-token bypass (`exactTerms`, `EXACT_TERM_MAX_CHUNKS`) are UNCHANGED;
+ * only the source of a chunk's term coverage and its relevance number moved.
+ * `fuse` never reads `.lex`'s VALUE, only the ARRAY POSITION this function
+ * hands back, so nothing downstream had to change to accept a bm25 number in
+ * place of a weight sum.
+ *
+ * ONE TERM, ONE BRANCH. FTS5 has no "how many of these N terms does this row
+ * contain" primitive the way a `GROUP BY chunk_id` over a term-postings table
+ * did, so `scoped` is a UNION ALL of one `MATCH` per term. Each term is
+ * double-quoted in its MATCH string so a token that happens to collide with an
+ * FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal search rather
+ * than a syntax error — `tokenise()` already drops the ordinary stopwords that
+ * would otherwise raise this, but a quoted term costs nothing and closes the
+ * case a future stopword list forgets.
+ *
+ * THE FENCE IS APPLIED ONCE, on the union's output, not once per branch —
+ * per-branch fencing would multiply the fence's own parameters by up to 24
+ * terms and blow the budget below for nothing: every branch shares the same
+ * owner and compartment.
+ *
+ * THE PARAMETER BUDGET, same discipline as the ceiling this arm used to
+ * document. Worst case is MAX_QUESTION_TERMS (24) terms, every one of them
+ * digit-bearing (all 24 "rare"): the branches bind 2 params each (48), the
+ * fence binds one owner id plus a handful of compartments, the rare-term
+ * filter binds at most 24 more, and the combined MATCH for `bm25()` binds 1 —
+ * about 76 against D1's ceiling of 100. Higher than the old arm's 53 because
+ * this one binds two params per term-branch instead of one, and still well
+ * inside the ceiling MAX_QUESTION_TERMS was chosen to respect.
+ *
+ * bm25() IS ASCENDING — SQLite's convention is a MORE NEGATIVE number for a
+ * BETTER match (measured against this exact table: a chunk repeating both
+ * query terms scored more negative than one containing them once each), the
+ * opposite of the old `SUM(weight)`. That is why the final `ORDER BY` reads
+ * `ASC` where the old one read `DESC`; the array POSITION `fuse` reads is
+ * unchanged — the exact bypass still leads, relevance still breaks the tie. */
 async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -2240,74 +2697,90 @@ async function lexicalArm(
   role: LexicalRole
 ): Promise<CandidateRow[]> {
   if (!terms.length) return []
-  const owner = ownerClause(guard)
-  const where = [`term IN (${terms.map(() => "?").join(", ")})`, owner.sql]
-  const params: (string | number)[] = [...terms, ...owner.params]
+  // THE FAST CHECK, DELIBERATELY, NOT A SIGHTINGS-AWARE ONE — and this table is
+  // NOT the reason `fastOwnerClause` exists (`knowledge_chunks`, unlike
+  // `knowledge_terms`, carries `source_id` and would cost only a one-hop join),
+  // so the choice needed its own reasoning rather than inheriting
+  // `fastOwnerClause`'s own doc comment by proximity.
+  //
+  // THIS IS STAGE ONE OF THE LEXICAL ARM, run over every candidate BM25 matches
+  // before `LIMIT LEXICAL_TOP_K` narrows it — not the tiny, R14-capped handful
+  // of rows `ownerClause`'s correlated EXISTS was priced for. A precise fence
+  // here buys nothing a wrong one could not also buy: whatever survives this
+  // narrowing still crosses the read-back join to `knowledge_sources`
+  // (`retrieve`'s `reader.sql`) before it can become an answer, and THAT join
+  // is sightings-aware. R26's own bargain, restated at a third table now: the
+  // index narrows, the team's database decides, and precision at the narrowing
+  // stage only ever costs a relevant passage its ranking slot — never a caller
+  // an answer they should never have had. See `ownerClause`'s header for the
+  // measured shape this protects (the calendar fold: 100% of it multi-private,
+  // no team sighting) — this arm reaches the same rows, just later.
+  const owner = fastOwnerClause(guard)
+  const fenceWhere = [owner.sql]
+  const fenceParams: (string | number)[] = [...owner.params]
   if (compartments.length) {
-    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
-    params.push(...compartments)
+    fenceWhere.push(`k.compartment IN (${compartments.map(() => "?").join(", ")})`)
+    fenceParams.push(...compartments)
   }
+
+  // ONE UNION-ALL BRANCH PER TERM. `?` for the term's own label (read back as
+  // `scoped.term`) and `?` for the MATCH query, quoted — see the header.
+  const branches = terms
+    .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
+    .join(" UNION ALL ")
+  const branchParams: string[] = []
+  for (const t of terms) branchParams.push(t, `"${t}"`)
+
   // THE ONE CLAUSE THAT LETS AN EXACT TERM PAST THE PROPORTIONAL FLOOR, and it
   // is absent — statement for statement, parameter for parameter — from a
   // question that has no exact term in it. The floor's measured behaviour on
   // every other question is therefore untouched by this, which is the whole of
   // what the no-exact-term case is promised.
-  //
-  // The exact tokens are bound AFTER the WHERE's, because SQLite numbers `?` by
-  // where it appears in the text and `rare` is written after the scoped read.
   const rare = exact.filter((t) => terms.includes(t))
-  const bypass = rare.length
-    ? `OR SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END) > 0`
-    : ""
-  if (rare.length) params.push(...rare)
+  // THE COMBINED QUERY, for `bm25()` alone — every branch's row set is by
+  // construction a subset of what this OR-of-all-terms query matches, so the
+  // join below can never drop a row `scoped` found.
+  const combinedMatch = terms.map((t) => `"${t}"`).join(" OR ")
+
   const rows = await d1Query<CandidateRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: the lexical arm returns at most LEXICAL_TOP_K rows, whatever
-    // the compartment holds. The statement binds at most 24 terms + 1 owner + a
-    // handful of compartments + at most those same 24 terms again for the exact
-    // list — 53 or so against D1's ceiling of 100, and the term list is capped at
-    // MAX_QUESTION_TERMS precisely so this arithmetic stays true.
+    // R14 hard cap: LIMIT ${LEXICAL_TOP_K} at the statement, same as before.
     //
-    // `COUNT(*)` counts the DISTINCT terms of the question this chunk contains;
-    // the primary key is (term, chunk_id), so a row per term is a term. That is
-    // the number the floor is expressed in — SUM(weight) says how loudly a chunk
-    // matched, and only this says how MUCH of the question it answered.
-    //
-    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK, and that is the
-    // second half of the same bug. Filtering afterwards meant the LIMIT chose the
-    // ten LOUDEST chunks first and the floor then threw most of them away — so a
-    // chunk holding every word of the question could be cut before the floor ever
-    // saw it, by ten chunks that repeated one word. Deciding eligibility in the
-    // statement makes the ten a page of chunks that already qualify. The number
-    // is derived from the question's own term count and is an integer, so it is
-    // interpolated like every other server-owned value (CONVENTIONS).
-    //
-    // THE EXACT TOKEN LEADS THE ORDER, and without that the weight below buys
-    // nothing. `lex` is the SUM of term weights, so a chunk echoing a dozen of
-    // the question's ordinary words ("could", "somebody", "currently", "week")
-    // outranks the one chunk that holds the reference, which matched a single
-    // term. Fusion is by RANK, so losing the order loses the fight before the
-    // weight is ever applied — which is what a test with six chatty near-misses
-    // around one short handover note showed the moment it was written. On a
-    // question with no rare exact token `exact` is the literal 0 for every row,
-    // so this is `ORDER BY lex DESC` exactly as it was measured.
+    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK — the same reason
+    // as before: filtering afterwards would let the LIMIT choose loudest first
+    // and throw the floor's own candidates away before it ever saw them.
+    // `termFloor(...)` is a derived integer, interpolated like every other
+    // server-owned value (CONVENTIONS), never bound.
     `WITH scoped AS (
-       SELECT chunk_id, term, weight FROM knowledge_terms WHERE ${where.join(" AND ")}
+       SELECT u.row_id, u.term FROM (${branches}) u
+       JOIN knowledge_chunks k ON k.rowid = u.row_id
+       WHERE ${fenceWhere.join(" AND ")}
      )${
        rare.length
-         ? `, rare AS (
+         ? `, rareTerms AS (
        SELECT term FROM scoped WHERE term IN (${rare.map(() => "?").join(", ")})
         GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
      )`
          : ""
-     }
-     SELECT chunk_id, SUM(weight) AS lex, ${
-       rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END)" : "0"
-     } AS exact FROM scoped
-      GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, role)} ${bypass}
-      ORDER BY exact DESC, lex DESC LIMIT ${LEXICAL_TOP_K}`,
-    params
+     },
+     counted AS (
+       SELECT row_id, COUNT(*) AS hits,
+         ${rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
+       FROM scoped GROUP BY row_id
+        HAVING hits >= ${termFloor(terms.length, role)} ${rare.length ? "OR exact > 0" : ""}
+     ),
+     ranked AS (
+       SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
+       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
+     )
+     SELECT k.id AS chunk_id, ranked.rel AS lex, counted.exact AS exact
+       FROM counted
+       JOIN ranked ON ranked.row_id = counted.row_id
+       JOIN knowledge_chunks k ON k.rowid = counted.row_id
+      ORDER BY counted.exact DESC, ranked.rel ASC
+      LIMIT ${LEXICAL_TOP_K}`,
+    [...branchParams, ...fenceParams, ...(rare.length ? rare : []), combinedMatch]
   )
   return rows
 }

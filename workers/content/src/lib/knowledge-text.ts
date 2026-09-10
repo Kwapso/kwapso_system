@@ -132,6 +132,278 @@ function hardCut(sentence: string): string[] {
   return out
 }
 
+/* ---------------------------------- grain ---------------------------------- */
+// BUILD-5 §2 ("Split into pieces") — three source shapes, three grain rules,
+// none of them the paragraph cutter above:
+//
+//   • a CHAT piece is a RUN of a few messages, carrying who spoke and when;
+//   • a MAIL thread is the source and each message is its own piece — no
+//     size-based merging, because the thread's natural boundary already is
+//     a message;
+//   • a SPREADSHEET TAB is a source whose header line rides every piece,
+//     because a citation into the middle of a tab means nothing without the
+//     columns it belongs to.
+//
+// Pure, like everything above: a message list or a table of rows in, text
+// (and the metadata a piece carries beside it) out.
+
+export type ChatMessage = { speaker: string; at: string; text: string }
+export type ChatPiece = { text: string; speakers: string[]; startAt: string; endAt: string }
+
+/** How many messages one run may carry before it stops being "a few" and
+ * starts being the whole conversation glued together. A run also ends early
+ * on `CHUNK_TARGET_CHARS`, same as the paragraph cutter, so a chat piece and
+ * a document piece read as roughly the same mouthful to someone skimming a
+ * result. */
+const MAX_MESSAGES_PER_CHAT_PIECE = 6
+
+/** ONE PIECE PER RUN. A message with no words (an empty edit, a reaction with
+ * no text this reader can see) is dropped rather than filed as a blank
+ * turn — its neighbours still carry the run.
+ *
+ * THE TEXT CARRIES "WHO", NEVER "WHEN" — `${speaker}: ${text}`, the same line
+ * shape this app has always attributed a chat message with. The time is real
+ * metadata (`startAt`/`endAt`), kept OFF the indexed prose on purpose: a raw
+ * ISO instant on every line is the PDF-metadata mistake again (source-readers.ts's
+ * `runReader` comment) — every message would share the same dozen timestamp
+ * characters and resemble every other message more than it resembles a
+ * question, for a fact a citation can already show from the piece's own
+ * columns once they exist. */
+export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
+  const pieces: ChatPiece[] = []
+  let run: { speaker: string; at: string; text: string }[] = []
+  let length = 0
+
+  const flush = () => {
+    if (!run.length) return
+    pieces.push({
+      text: run.map((m) => `${m.speaker}: ${m.text}`).join("\n"),
+      speakers: [...new Set(run.map((m) => m.speaker))],
+      startAt: run[0].at,
+      endAt: run[run.length - 1].at,
+    })
+    run = []
+    length = 0
+  }
+
+  for (const raw of messages) {
+    const text = plainText(raw.text).trim()
+    if (!text) continue
+    if (run.length >= MAX_MESSAGES_PER_CHAT_PIECE || (run.length > 0 && length + text.length > CHUNK_TARGET_CHARS))
+      flush()
+    run.push({ speaker: raw.speaker, at: raw.at, text })
+    length += text.length
+  }
+  flush()
+  return pieces
+}
+
+export type MailMessage = { from: string; at: string; text: string }
+export type MailPiece = { text: string; from: string; at: string }
+
+/** EVERY MESSAGE IS ITS OWN PIECE. A three-word reply stays a piece of its
+ * own rather than folding into its neighbour — the thread already gave every
+ * message a boundary, so this function's only job is to drop the ones with
+ * nothing in them. */
+export function chunkMail(messages: MailMessage[]): MailPiece[] {
+  const pieces: MailPiece[] = []
+  for (const raw of messages) {
+    const text = plainText(raw.text).trim()
+    if (!text) continue
+    pieces.push({ text, from: raw.from, at: raw.at })
+  }
+  return pieces
+}
+
+const sheetLine = (cells: string[]): string => cells.map((c) => plainText(c).trim()).join(" | ")
+
+/** THE TAB, CUT INTO PIECES THAT ALL CARRY THE HEADER. Rows are grouped up to
+ * the same character target `chunkText` uses; the header is counted against
+ * that budget too, so a wide tab still keeps its pieces close to the size
+ * every other piece in the base is. A single row too big to share a piece
+ * with the header (a huge free-text cell) still gets its own piece rather
+ * than being dropped — the same "never lose the tail" rule `hardCut` follows
+ * above. */
+export function chunkSheetTab(header: string[], rows: string[][]): string[] {
+  if (!rows.length) return []
+  const headerLine = sheetLine(header)
+  const pieces: string[] = []
+  let current: string[] = []
+  let length = headerLine.length
+
+  const flush = () => {
+    if (!current.length) return
+    pieces.push([headerLine, ...current].join("\n"))
+    current = []
+    length = headerLine.length
+  }
+
+  for (const row of rows) {
+    const line = sheetLine(row)
+    if (!line) continue
+    if (current.length > 0 && length + line.length + 1 > CHUNK_TARGET_CHARS) flush()
+    current.push(line)
+    length += line.length + 1
+  }
+  flush()
+  return pieces
+}
+
+/** How much of a piece the context-line prompt shows the model. Kept small on
+ * purpose: BUILD-5's own budget is $1.70 across roughly ten thousand pieces,
+ * so the prompt has to stay tiny for one model's per-token price to add up to
+ * cents rather than dollars. */
+const CONTEXT_LINE_PIECE_CHARS = 600
+
+/** THE PURE HALF OF THE CONTEXT-LINE CALL — what to ask, never how. The
+ * calling half (`contextLineFor` in `source-readers.ts`, which already owns
+ * this app's one AI-calling shape for a document reader) sends this string to
+ * the model and reads back one sentence. Kept here, alongside the chunker,
+ * because what the model is SHOWN is a property of the text, not of the
+ * worker calling it — and because this file's no-imports rule is what lets
+ * the retrieval bench load it straight into plain Node. */
+export function contextLinePrompt(input: { sourceTitle: string; piece: string }): string {
+  const piece = plainText(input.piece).slice(0, CONTEXT_LINE_PIECE_CHARS)
+  return `Source: ${input.sourceTitle}\nPassage: ${piece}\n\nIn one short sentence, say what this passage is about — for someone skimming a search result who has not read the source. Reply with only that sentence.`
+}
+
+/** RELEVANCY DATE — BUILD-5 §2's third grain rule, and the reason
+ * `knowledge_sources.relevancy_date` exists (Lane A's migration, 0073): "which
+ * of a source's several dates this resolves to is an ingest decision" — that
+ * migration's own words for the boundary this file sits on. The CLASSIFICATION
+ * below is a property of what a kind IS (this file's half of the B1/B2 seam);
+ * writing the column, for a kind whose SQL this file has no business reading,
+ * is the sweep's.
+ *
+ * FROZEN — something that happened once and does not change afterwards: a
+ * calendar event, a sent email, a meeting. Its relevancy is WHEN IT HAPPENED,
+ * however long ago that was, because a later edit does not exist to prefer.
+ *
+ * LIVING — something that keeps being touched: a chat thread gaining replies,
+ * a Drive document being edited, a ticket or a story moving through its own
+ * lifecycle. Its relevancy is its LAST CHANGE, because KB-AUDIT.md §4.5 is
+ * exactly the cost of getting this backwards: "a question whose newest
+ * material is NOT RETRIEVED AT ALL" when a living thing is dated by when it
+ * was first created rather than when it was last true. */
+export type Freshness = "frozen" | "living"
+
+/** ONE KIND, ONE ANSWER. Google's four kinds are this file's own — google-read.ts
+ * already picks the right raw field for each (`event.start`, the thread's
+ * last message for both chat and gmail now that both are grouped by
+ * conversation, `file.modifiedTime`), and this table is what makes that a
+ * stated decision rather than four separate ones nobody wrote down. The rest
+ * are the ingest sweep's app-record kinds (knowledge-ingest.ts), most of
+ * which currently stamp `record_date` from `created_at` alone — CORRECT for
+ * a kind that only ever happens once, and a live bug for one that doesn't,
+ * per KB-AUDIT.md §4.5's own measurement. Wiring `updated_at` (or whatever a
+ * kind's own last-change column is) is the sweep's, not this file's; the
+ * classification is the fact this table states so that wiring has an answer
+ * to consult rather than a guess to make per kind. A kind not listed is
+ * unclassified rather than defaulted — `null`, not a guess dressed as one. */
+const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
+  // Google kinds — google-read.ts's own four.
+  calendar: "frozen",
+  // GMAIL MOVED FROM FROZEN TO LIVING the day it became thread-grouped
+  // (google-read.ts's `mailThreads`, BUILD-5 §2). A single message never
+  // changes once sent, which was the whole argument for "frozen" — but the
+  // SOURCE is the thread now, and a thread keeps gaining replies exactly the
+  // way a chat conversation does. Same reasoning as chat's own frozen→living
+  // call, made when it was folded into one source per conversation.
+  gmail: "living",
+  chat: "living",
+  drive: "living",
+  // App-record kinds (knowledge-ingest.ts). A ONE-TIME EVENT stays frozen
+  // even though its row can technically be edited (a meeting's start time
+  // corrected after the fact is still describing when the meeting WAS, not a
+  // second event) — matching what the sweep already does for these two.
+  meeting: "frozen",
+  sprint: "frozen",
+  // Everything that is worked on, replied to, or moves through a status over
+  // its life. A ticket answered yesterday is more relevant to "what's
+  // happening with HOGO" than one opened a year ago and touched since —
+  // exactly what `created_at` alone cannot say.
+  ticket: "living",
+  account: "living",
+  contact: "living",
+  app: "living",
+  process: "living",
+  story: "living",
+  todo: "living",
+  task: "living",
+  person: "living",
+  // PORTAL_LOGIN, CORRECTED FROM AN EARLIER DRAFT OF THIS TABLE THAT HAD IT
+  // FROZEN. A login grant is edited after it is made — deactivated,
+  // reactivated, its `app_restriction` changed — so "when was this granted"
+  // is the wrong question once any of that has happened. Caught by reading
+  // knowledge-ingest.ts's own SELECT rather than trusting the first
+  // classification: it computes `COALESCE(pu.updated_at, pu.created_at) AS
+  // sort_at` exactly like every other living kind below, which a one-time
+  // event's query never bothers to.
+  portal_login: "living",
+}
+
+/** THE CENSUS THE HUB ASKED FOR (read-only — knowledge-ingest.ts is not mine
+ * to edit): for every kind classified "living" above whose `recordDate:` I
+ * could find in knowledge-ingest.ts, whether that kind's own SELECT already
+ * carries a last-change value or would need a real schema/query change.
+ *
+ * THE ANSWER IS THE SAME FOR ALL TEN, AND IT MAKES THE FIX SMALLER THAN THE
+ * FINDING SUGGESTED. Every one of them ALREADY selects
+ * `COALESCE(x.updated_at, x.created_at) AS sort_at` — grep `AS sort_at` in
+ * that file and count 13, one per kind including the frozen ones — and
+ * already returns it as `sortAt: r.sort_at` on the very same row for cursor
+ * ordering. `recordDate:` just reads `.created_at` off that SAME row instead
+ * of `.sort_at` a few lines below it. So this is not "nine kinds need a new
+ * column read"; it is "nine (in fact ten) lines read the wrong field the
+ * query already computed."
+ *
+ * kind          | line (recordDate:)      | sort_at already selected?
+ * ------------- | ------------------------ | --------------------------------
+ * ticket        | 435 (`r.created_at`)     | yes — line 385, TICKET_SORT
+ * account       | 621 (`r.created_at`)     | yes — line 525
+ * contact       | 698 (`r.created_at`)     | yes — line 665
+ * app           | 789 (`r.created_at`)     | yes — line 746
+ * process       | 896 (`r.created_at`)     | yes — line 841
+ * story         | 1085 (`r.created_at`)    | yes — line 1034
+ * todo          | 1371 (`r.created_at`)    | yes — line 1328
+ * task          | 1458 (`r.created_at`)    | yes — line 1415
+ * portal_login  | 1843 (`r.created_at`)    | yes — line 1802
+ * person        | 1685 (`m.created_at`)    | yes — line 1514
+ *
+ * PERSON IS THE TENTH, AND IT IS WHY A GREP FOR ONE SPELLING UNDERCOUNTS.
+ * The hub's own census (`grep "recordDate: r.created_at"`) found nine — it
+ * is exact for that literal string, and person's `read` closure maps over
+ * `members.map((m) => …)`, so its identical bug reads `m.created_at`. Same
+ * fault, same fix, different receiver variable — worth restating the lesson
+ * this whole exchange has been about: a zero (or a nine) from a grep is a
+ * fact about the string, not yet a fact about the code.
+ *
+ * meeting/sprint/calendar/gmail/chat/drive are absent from this table on
+ * purpose — they are frozen (or, for gmail/chat, already read their OWN
+ * living value through a different field entirely: the folded thread's
+ * newest message), so `created_at`-alone or their own start-time field is
+ * already the right answer for them and there is nothing to fix. */
+
+/** Which half of `FRESHNESS_BY_KIND` a kind falls in, or `null` for one this
+ * table has not decided about — the honest state a new kind starts in, never
+ * a silent default in either direction. */
+export function freshnessOf(kind: string): Freshness | null {
+  return FRESHNESS_BY_KIND[kind] ?? null
+}
+
+/** THE ONE DECISION, once the kind is known: happened-at for frozen, last-change
+ * for living. Null when the date THAT freshness needs is missing — never the
+ * other date instead, which would be answering a different question than the
+ * one asked ("when did this happen" is not "when was this last touched",
+ * however tempting either is as a fallback for the other). */
+export function relevancyDate(
+  freshness: Freshness,
+  happenedAt: string | null,
+  lastChangeAt: string | null
+): string | null {
+  return (freshness === "frozen" ? happenedAt : lastChangeAt) ?? null
+}
+
 /** The words a piece of text contributes to the inverted index, with how often
  * each appears (capped, so a template repeating "invoice" forty times does not
  * outrank a source that is actually about invoices).

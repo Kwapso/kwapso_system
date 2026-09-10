@@ -43,6 +43,7 @@ import {
   KNOWLEDGE_KINDS,
   listSources,
   KNOWLEDGE_SORTS,
+  rebuildNameIndex,
   retrieve,
   setSourceActive,
   updateSource,
@@ -816,6 +817,15 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
   await refusePortalCaller(cfg, guard)
   const results = await sweepAll(env, cfg, guard)
   if (results.some((r) => r.indexed > 0)) await publishChange(env, guard.teamId, "knowledge")
+  // THE NAME INDEX, KEPT IN STEP HERE — a client, app, contact or colleague
+  // renamed (or created, or deactivated) is a source row the sweep above just
+  // touched, so the same tick that brings the material in step is the same
+  // tick that keeps `accountNamedIn`'s router current. Unconditional rather
+  // than gated on `results` having indexed anything: the population is a few
+  // hundred rows at most, so a full rebuild every tick is bounded work, not a
+  // growing one (R14 is about unbounded READS; this is a small, deterministic
+  // WRITE with no AI spend).
+  await rebuildNameIndex(cfg, guard)
   return json({
     results,
     caughtUp: results.every((r) => r.caughtUp && !r.error),

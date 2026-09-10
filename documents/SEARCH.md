@@ -81,7 +81,10 @@ For record modules where Glide-style "match anything on the detail screen" is
 wanted (tickets, imported datasets), each per-team database gets a
 **SQLite FTS5** virtual table mirroring the record table's text columns. The
 worker queries it with `MATCH` and returns ranked hits. This is what makes search
-span *all* of a record's fields, not just a column, at scale.
+span *all* of a record's fields, not just a column, at scale. **Not built for any
+record module yet** — the knowledge base is the first FTS5 table this codebase
+actually ships (below), and the pattern here is corrected against what building
+that one proved, rather than left as the untested sketch it was until 10 Sep 2026.
 
 ## FTS5 design (per-team, per record module)
 
@@ -90,25 +93,56 @@ physics, same as every other per-team table ([ARCHITECTURE.md](ARCHITECTURE.md) 
 Pattern, added by the module's team-schema migration when that module is built:
 
 ```sql
--- one virtual table per searchable record table (e.g. help, the tickets table)
+-- one virtual table per searchable record table (e.g. help, the tickets table),
+-- EXTERNAL-CONTENT: it stores no text of its own, only postings keyed to the
+-- base table's rowid.
 CREATE VIRTUAL TABLE help_fts USING fts5(
   description, help_type, status,        -- the text fields shown on the detail
   content='help', content_rowid='rowid'
 );
--- triggers keep it in lock-step with the base table (no app code to forget)
-CREATE TRIGGER help_ai AFTER INSERT ON help BEGIN
-  INSERT INTO help_fts(rowid, description, help_type, status)
-  VALUES (new.rowid, new.description, new.help_type, new.status);
-END;
-CREATE TRIGGER help_ad AFTER DELETE ON help BEGIN
-  INSERT INTO help_fts(help_fts, rowid, description, help_type, status)
-  VALUES('delete', old.rowid, old.description, old.help_type, old.status);
-END;
-CREATE TRIGGER help_au AFTER UPDATE ON help BEGIN
-  INSERT INTO help_fts(help_fts, rowid, ...) VALUES('delete', old.rowid, ...);
-  INSERT INTO help_fts(rowid, ...) VALUES (new.rowid, ...);
-END;
 ```
+
+**No triggers — this repo's own migration executor cannot run one.**
+`shared/workers/d1-rest.ts`'s `d1ExecScript` (`splitStatements`) splits a
+migration's SQL on every un-quoted `;` with no idea that a `CREATE TRIGGER …
+BEGIN … END;` body's internal semicolons are not statement boundaries, so a
+trigger written into a migration parses and passes against `node:sqlite` in a
+test (which understands `BEGIN`/`END` natively) and then shatters into broken
+fragments the first time the migration robot applies it against real D1 —
+a green test proving the opposite of the truth. Confirmed by building
+`knowledge_chunks_fts` (0073, .plans/BUILD-5-knowledge-rebuild.md): zero
+`CREATE TRIGGER` statements exist anywhere else in this repo's migration
+ledger, this pattern is why, and this file is what told the next person to
+try it anyway. So the FTS table is kept in step by APPLICATION CODE, the
+same worker route that writes the base row:
+
+```sql
+-- on insert (or re-index): add the posting
+INSERT INTO help_fts(rowid, description, help_type, status)
+VALUES (:rowid, :description, :help_type, :status);
+
+-- on update: retire the old posting by its OWN old values, then add the new one
+INSERT INTO help_fts(help_fts, rowid, description, help_type, status)
+VALUES ('delete', :rowid, :old_description, :old_help_type, :old_status);
+INSERT INTO help_fts(rowid, description, help_type, status)
+VALUES (:rowid, :new_description, :new_help_type, :new_status);
+
+-- on delete: the keyed 'delete' command, by rowid — a scan of nothing
+INSERT INTO help_fts(help_fts, rowid, description, help_type, status)
+VALUES ('delete', :rowid, :description, :help_type, :status);
+```
+
+The keyed delete's own values must be the row's OWN old values — external-content
+FTS5 needs them to remove the right postings, not a scan. And a bare
+`DELETE FROM help_fts` issued once the base row is already gone is a silent
+no-op that removes nothing (measured while building `knowledge_chunks_fts`):
+it throws no error, and a later INSERT reusing the same rowid comes back
+matching text that was supposedly deleted. Emptying the whole table for real
+uses FTS5's own `'delete-all'` command instead, and reading it back afterwards
+uses `'integrity-check'`, never a plain row count — an external-content
+table's own `SELECT` reads back through `content_rowid` to the base table, so
+it reports whatever the base table says regardless of whether the postings
+were actually cleared.
 
 Query path (in the module's worker): `SELECT h.* FROM help_fts f JOIN help h
 ON h.rowid = f.rowid WHERE help_fts MATCH ? ORDER BY rank LIMIT ?`, then the
@@ -124,8 +158,10 @@ Rules for FTS5 here:
 - **One virtual table per searchable record table**, created by that module's
   team-schema migration and rolled to every team via `migrate-teams` (the locked
   maintenance path). New module = new migration, never a change to others.
-- **Triggers keep it in sync**. Never write the FTS table from app code, so it
-  can't drift from the base rows.
+- **Application code keeps it in sync, never a trigger** (see above) — the same
+  worker route that writes the base row issues the matching FTS write in the
+  same request, so it can't drift from the base rows without the base write
+  itself failing too.
 - **Mirror only the text fields the detail screen shows** (Glide parity), not ids
   or audit columns.
 - The same FTS table sits behind the splitter read-path (`d1QueryAcross`) if a
@@ -152,12 +188,24 @@ screen, and through `ask_knowledge` on the machine surface.
 Three things about it belong here, so that a reader who came to this file looking
 for "how does search work" leaves knowing it exists:
 
-- **It does not use FTS5, and that is deliberate**, which is why Layer 3 below
-  being unbuilt is not a contradiction. Its word index is `knowledge_terms`, an
-  ORDINARY indexed table, because the operation that matters is the DELETE: a
-  re-index removes one source's postings, which on FTS5 is a scan of every posting
-  in the team and here is one keyed delete. It also behaves identically in the test
-  harness and in D1, which a virtual table kept in step by triggers does not.
+- **It used `knowledge_terms`, an ordinary indexed table, instead of FTS5 — a
+  decision this section corrected on 10 Sep 2026.** The original reasoning was
+  the DELETE: a re-index removes one source's postings, which on FTS5 sounded
+  like a scan of every posting in the team against one keyed delete on an
+  ordinary table, and a virtual table kept in step by triggers behaves
+  differently in the test harness than in D1. That reasoning held for a
+  TRIGGER-synced FTS5 table — which, per Layer 3 above, cannot actually be
+  built through this repo's migration executor at all — and stopped holding
+  the moment external-content mode was tried for real: `knowledge_chunks_fts`
+  (0073, .plans/BUILD-5-knowledge-rebuild.md) gets the same keyed delete
+  `knowledge_terms` was built to have (`INSERT INTO knowledge_chunks_fts
+  (knowledge_chunks_fts, rowid, text) VALUES ('delete', ?, ?)`, a rowid lookup,
+  never a scan), kept in step by application code exactly like `knowledge_terms`
+  always was, and it behaves identically under `node:sqlite` and real D1
+  because nothing here is trigger-synced. `knowledge_terms` itself has no IDF
+  and no length normalisation (KB-AUDIT.md §4.4) — the schema for its
+  BM25 replacement exists; wiring retrieval onto it is a later lane's work,
+  not this migration's.
 - **The ranking half is vectors, not words**, one account-wide Cloudflare Vectorize
   index, every team in its own NAMESPACE. Law **R26** is both halves of why that is
   safe: a namespace is a PARTITION Vectorize applies *before* the search (not a

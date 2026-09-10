@@ -1,0 +1,96 @@
+{
+  "examFile": ".plans/KB-EXAM-UNION.md",
+  "total": 101,
+  "byDisposition": {
+    "keyed": 73,
+    "tool": 7,
+    "gap": 7,
+    "struck": 6,
+    "refusal": 8
+  },
+  "byLevel": {
+    "O": 8,
+    "E": 14,
+    "M": 26,
+    "H": 18,
+    "X": 22,
+    "G": 3,
+    "DE": 10
+  },
+  "byTag": {
+    "para": 51,
+    "de-name": 2,
+    "latest": 14,
+    "synth": 9,
+    "exact": 6,
+    "count": 7,
+    "route": 7,
+    "gap": 7,
+    "person": 8,
+    "multi": 13,
+    "fence": 6,
+    "hijack": 4,
+    "absent": 7,
+    "de": 10
+  },
+  "mustScore100": [
+    "A-E6",
+    "A-E12",
+    "A-M6",
+    "A-M19",
+    "A-X4",
+    "A-X5",
+    "A-X6",
+    "A-X7",
+    "A-X9",
+    "B-G3",
+    "B-G4",
+    "B-G5",
+    "A-D9",
+    "A-D10",
+    "X8-notowner"
+  ],
+  "mandatory": [
+    {
+      "id": "A-O1",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O2",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O3",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O4",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O5",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O6",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-O7",
+      "disposition": "tool"
+    },
+    {
+      "id": "A-O8",
+      "disposition": "keyed"
+    },
+    {
+      "id": "A-X10",
+      "disposition": "tool"
+    },
+    {
+      "id": "A-X6",
+      "disposition": "refusal"
+    }
+  ],
+  "retrieval": null
+}

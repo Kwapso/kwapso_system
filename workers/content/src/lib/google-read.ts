@@ -39,6 +39,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import type { ChatMessage } from "./google-api"
+import { chunkChat, chunkMail } from "./knowledge-text"
 import type { ReaderEnv } from "./source-readers"
 import {
   chatMessages,
@@ -150,6 +151,12 @@ export type GoogleReadRequest = {
   /** calendar only — the window to read. */
   from?: string
   to?: string
+  /** GMAIL ONLY — ids this lane has already filed, so their header is worth
+   * skipping. Built by the caller (only the automatic sweep does), never by
+   * this function: it has no database to read one from, and building it here
+   * for every caller would cost a query nobody but the sweep can use. See
+   * `gmailSearch`'s own doc for what skipping one actually means. */
+  gmailKnownIds?: Set<string>
 }
 
 /**
@@ -241,8 +248,24 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  *
  * A message Google gives no thread for is its own conversation of one, which is
  * both true and the safe default.
+ *
+ * ── AND WITHIN ONE THREAD, THE BODY IS CUT INTO RUNS, NOT ONE BLOB ──────────
+ *
+ * BUILD-5 §2's grain rule for chat: a piece is a RUN of a few messages, not
+ * the whole conversation. `chunkChat` (knowledge-text.ts) does the grouping;
+ * the runs are joined here with a blank line between them, which is the
+ * strongest boundary `chunkText` looks for (it splits on `\n{2,}` before it
+ * ever considers a sentence) — so once this body reaches the generic chunker
+ * downstream, a cut lands BETWEEN runs rather than through the middle of
+ * somebody's turn. Before this, an 88-message thread was one contiguous
+ * string and the paragraph cutter had no boundary to prefer over any other
+ * (KB-AUDIT.md §4.9: "one thread is one ~348-char blob… per-turn or
+ * per-topic segmentation… is the obvious direction"). The per-line
+ * `sender: text` attribution is UNCHANGED — `google-ingest.test.ts` asserts
+ * that literal shape, and the run's own speaker/time span is carried as
+ * `chunkChat`'s structured metadata rather than folded into the prose.
  */
-function chatThreads(messages: ChatMessage[]): ChatMessage[] {
+export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
   const byThread = new Map<string, ChatMessage[]>()
   for (const m of messages) {
     const key = m.thread || m.id
@@ -273,7 +296,13 @@ function chatThreads(messages: ChatMessage[]): ChatMessage[] {
       // `every` over an empty group cannot arise: a group with no messages was
       // dropped above.
       senderIsApp: ordered.every((m) => m.senderIsApp),
-      text: ordered.map((m) => `${m.sender}: ${m.text}`).join("\n"),
+      // RUNS, joined on a blank line — see the essay above. A run's own line
+      // shape is still exactly `sender: text` (chunkChat drops the timestamp
+      // from the prose on purpose), so a short thread's body is byte-for-byte
+      // what the flat join used to produce.
+      text: chunkChat(ordered.map((m) => ({ speaker: m.sender, at: m.createdAt ?? "", text: m.text })))
+        .map((piece) => piece.text)
+        .join("\n\n"),
       // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
       createdAt: last.createdAt,
       // The link opens the thread at its first message, which is where a person
@@ -282,6 +311,74 @@ function chatThreads(messages: ChatMessage[]): ChatMessage[] {
     })
   }
   return out
+}
+
+/**
+ * ONE SOURCE PER MAIL THREAD, not per message. BUILD-5 §2, in the plan's own
+ * words: "mail thread = source, message = piece." The same map-by-key shape
+ * as `chatThreads` above; the one real difference is the plan's own — a mail
+ * message already has its own boundary a chat turn does not, so the body is
+ * assembled with `chunkMail` (one piece PER MESSAGE) rather than `chunkChat`
+ * (runs of a few, because a chat message alone is rarely a whole thought).
+ *
+ * GRAIN'S DECISION, NOT IDENTITY'S — the grouping key is whatever thread id
+ * THIS list read returned. Gmail's thread id is per-mailbox exactly as its
+ * message id is, so this does not merge one conversation across two
+ * colleagues' mailboxes: the cross-mailbox identity is still the RFC-822
+ * `Message-ID` header, still unread anywhere in this app. What an item's
+ * `externalId` becomes from here, and whether a thread's identity needs more
+ * than this id, is kb_B1's call — this function only decides which messages
+ * are the same conversation IN ONE MAILBOX.
+ *
+ * THE ONE GAP THIS CANNOT CLOSE ALONE: `google-api.ts`'s known-id skip
+ * answers a message the sweep already has on file with a PLACEHOLDER whose
+ * `threadId` is `""` (`knownPlaceholder`) — a real fetch is skipped because a
+ * Gmail message never changes once received, but the real thread id it
+ * would have carried is thrown away with it. So a placeholder can never join
+ * its real thread's group here; it falls back to a lone group keyed by its
+ * own id, which is HARMLESS (that group is excluded by the cursor exactly
+ * as a lone message always was) but means a thread with some already-known
+ * messages and one new reply reassembles from the new message ALONE — the
+ * older ones are missing from the body, not merely un-refreshed. Gmail's own
+ * list response already carries `threadId` beside `id` for every message,
+ * known or not, so this is fixable with no extra call; it is just not this
+ * function's fix, since the id is thrown away one file over
+ * (`gmailSearch`/`knownPlaceholder`, google-api.ts) before it ever reaches
+ * here. Flagged to kb_B1 rather than worked around.
+ */
+export function mailThreads(messages: MailMessage[]): { threadId: string; ordered: MailMessage[] }[] {
+  const byThread = new Map<string, MailMessage[]>()
+  for (const m of messages) {
+    const key = m.threadId || m.id
+    byThread.set(key, [...(byThread.get(key) ?? []), m])
+  }
+  return [...byThread.entries()].map(([threadId, group]) => ({
+    threadId,
+    // Oldest first, same reading order chatThreads gives a conversation.
+    ordered: [...group].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")),
+  }))
+}
+
+/** EVERY MEMBER MESSAGE'S FULL BODY, read and assembled with `chunkMail` —
+ * one piece per message, joined on a blank line for the same reason
+ * `chatThreads`' runs are: `chunkText` downstream prefers that boundary over
+ * any other, so a citation never lands split across two messages.
+ *
+ * NOT WRAPPED IN ITS OWN TRY/CATCH ON PURPOSE. A member message Google
+ * refuses mid-thread propagates to `hydrateText`'s existing per-item catch,
+ * which is the same "one item's refusal is one item's" rule this file
+ * already applies to a single-message gmail item or a Drive file — the
+ * THREAD is the item now, so its refusal is the thread's, not carved up by
+ * which message inside it failed. */
+async function mailThreadText(token: string, messageIds: string[]): Promise<string> {
+  const messages: { from: string; at: string; text: string }[] = []
+  for (const id of messageIds) {
+    const full = await gmailMessage(token, id)
+    if (full.text) messages.push({ from: full.from, at: full.date ?? "", text: full.text })
+  }
+  return chunkMail(messages)
+    .map((piece) => piece.text)
+    .join("\n\n")
 }
 
 
@@ -322,17 +419,22 @@ export async function scopedGmailSearch(
   guard: MemberGuard,
   token: string,
   contactQuery: string,
-  search?: string
+  search?: string,
+  /** See `gmailSearch`'s own doc — passed straight through. Only the
+   * automatic sweep ever builds one; an interactive read (the manual button,
+   * `routes/google.ts`'s mail search) never passes this and reads in full,
+   * exactly as before. */
+  knownIds?: Set<string>
 ): Promise<MailMessage[]> {
   const scope = await googleScope(cfg, guard, "gmail")
-  if (scope.mode !== "only") return gmailSearch(token, contactQuery, search)
+  if (scope.mode !== "only") return gmailSearch(token, contactQuery, search, [], knownIds)
   if (scope.containers.length === 0) return []
   const labels = scope.containers.slice(0, SCOPE_CONTAINER_CAP).map((c) => c.externalId)
   if (scope.containers.length > labels.length)
     console.error(
       `[google] mail scope walked ${labels.length} of ${scope.containers.length} labels for ${guard.userId}`
     )
-  return gmailSearch(token, contactQuery, search, labels)
+  return gmailSearch(token, contactQuery, search, labels, knownIds)
 }
 
 /** THIS PERSON'S CALENDAR, narrowed to the calendars and the kinds of event they
@@ -531,25 +633,50 @@ export async function readGoogleMaterial(
       // THROUGH THE SCOPED READ, never `gmailSearch` directly — the sweep is the
       // largest consumer of a person's mailbox and would be the worst place for
       // the fence to be missing.
-      for (const mail of await scopedGmailSearch(cfg, guard, token, "", request.search))
+      // ONE SOURCE PER THREAD, NOT PER MESSAGE. See `mailThreads`.
+      for (const { threadId, ordered } of mailThreads(
+        await scopedGmailSearch(cfg, guard, token, "", request.search, request.gmailKnownIds)
+      )) {
+        const first = ordered[0]
+        const last = ordered[ordered.length - 1]
+        if (!first || !last) continue
+        // THE FIRST MEMBER THAT RESOLVES, over the whole thread — a thread
+        // where only the second reply mentions a known contact is still that
+        // client's, not "nobody's" because the opening message did not name
+        // one. Same fence, same cap-can-miss caveat as the single-message
+        // read this replaces.
+        let accountId: string | null = null
+        for (const m of ordered) {
+          accountId = accountForAddresses(contacts, m.from, m.to)
+          if (accountId) break
+        }
         items.push({
           service: "gmail",
           sourceId: null,
-          externalId: mail.id,
-          title: mail.subject || "(no subject)",
-          url: mail.url,
-          text: mail.snippet,
-          updatedAt: mail.date,
+          externalId: threadId,
+          // THE ORIGINAL SUBJECT, not the last reply's "Re: Re: Re:" — the
+          // thread's own opening line is what a person would search for.
+          title: first.subject || "(no subject)",
+          url: first.url,
+          // UNHYDRATED HERE, same as every list read (see the doc comment on
+          // `text` in shared/types.ts) — `hydrateText` reads every member
+          // message below and assembles the thread with `chunkMail`.
+          text: "",
+          // AS RECENT AS ITS LAST REPLY, matching chatThreads' own reasoning:
+          // a conversation is as recent as the last thing said in it.
+          updatedAt: last.date,
           // A mailbox is nobody's team material. See the doc comment above.
           shelf: "private",
           ownerUserId: guard.userId,
-          // The fence GUARANTEES a known contact is on this message — that is
-          // the whole reason it was returned — so the account is a lookup rather
-          // than a guess. The cap is the one case it can miss: a query narrowed
-          // to forty addresses can return a thread whose match is one of them,
-          // which it always is.
-          accountId: accountForAddresses(contacts, mail.from, mail.to),
+          accountId,
+          // WHICH MESSAGES `hydrateText` reads to assemble this thread's
+          // body. See `mailThreads`' own doc for the one gap this carries
+          // forward rather than silently fixing: a message the known-id skip
+          // already has on file is missing from this list, not merely
+          // unrefreshed in it.
+          threadMessageIds: ordered.map((m) => m.id),
         })
+      }
     }
   }
 
@@ -689,10 +816,17 @@ export async function hydrateText(
     // the whole hydration would come back looking like a clean, empty pass.
     let text = ""
     try {
+      // A GMAIL ITEM IS A THREAD NOW (`mailThreads`), so its words are every
+      // member message's body, assembled — not the one body a message-shaped
+      // item used to need. `threadMessageIds` is absent only for an item
+      // built before this shape existed (there are none live; kept as a
+      // fallback to the item's own id rather than a hard requirement, the
+      // same generosity `item.text` already shows an item this loop cannot
+      // read at all).
       text =
         item.service === "drive"
           ? await driveFileText(env, token, item.externalId)
-          : (await gmailMessage(token, item.externalId)).text
+          : await mailThreadText(token, item.threadMessageIds ?? [item.externalId])
     } catch (e) {
       if (isConnectionLost(e)) throw e
       const reason = e instanceof Error ? e.message : String(e)

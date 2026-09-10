@@ -2682,4 +2682,15 @@ export type GoogleItem = {
    * TEXT — which is the one thing that must never decide this (lib/knowledge-google.ts,
    * the chat kind's `retired`). */
   appOnly?: boolean
+  /** GMAIL ONLY — the ids of every message this THREAD is made of, oldest
+   * first. BUILD-5 §2: "mail thread = source, message = piece." A mail
+   * item's `text` is unhydrated ("") from the list read same as any other
+   * service; `hydrateText` reads every one of these ids' full bodies and
+   * reassembles the thread with `chunkMail`. Only the ids Gmail's list read
+   * gave a REAL thread id to land here — a message the known-id skip already
+   * has on file comes back with none (google-api.ts's `knownPlaceholder`),
+   * so it is missing from an existing thread's list rather than re-fetched
+   * (`google-read.ts`'s `mailThreads` says why, and what it costs). Absent
+   * on every other service. */
+  threadMessageIds?: string[]
 }

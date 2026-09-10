@@ -4993,6 +4993,383 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     version: "0072_the_app_and_the_wave_get_their_number",
     sql: appAndWaveNumberSql(),
   },
+  {
+    // BUILD-5-knowledge-rebuild.md, LANE A. The team-database shape the
+    // rebuild's other lanes are built on: one identity per thing, who saw it
+    // and where, chat/meeting grain on a chunk, the account/app/contact alias
+    // index, and BM25 over chunk text. Nothing here is read by anything yet
+    // (Lanes B–F wire the ingest, the index and the screens); this migration
+    // only has to be a shape those lanes can build on without a second one.
+    //
+    // ── ONE IDENTITY PER THING (KB-AUDIT.md §1, "multi-person duplicates") ──
+    //
+    // `origin_row_id` is `<readerUserId>:<externalId>` for every Google-sourced
+    // row (see 0070's header), which is why the same Drive file shared with
+    // two people has always filed as two `knowledge_sources` rows. `identity_key`
+    // is the OTHER half — Google's own id, a message id, an event id, or a
+    // content hash for a typed note — with the reader stripped out, so ONE row
+    // exists per thing regardless of how many people have seen it. The unique
+    // index enforces that at write time rather than trusting the ingest to dedupe
+    // itself; `WHERE identity_key IS NOT NULL` because SQLite already treats
+    // every NULL as distinct, and a typed note with no external identity has
+    // nothing to collide over. Who saw it, where, and when moves to
+    // `knowledge_sightings` below — a second reader is a second sighting, never
+    // a second source.
+    //
+    // ── accounts[] / apps[] (KB-AUDIT.md §1, "one copy tagged with every
+    //    account/app it concerns") ─────────────────────────────────────────
+    //
+    // `account_id` (0012) and `app_id` (0020) are each ONE reference — right for
+    // a mirrored record, wrong for a shared Drive file or a chat thread that
+    // concerns several accounts or apps at once. `accounts`/`apps` are JSON
+    // arrays of ids, additive: the singular columns are untouched, and reading
+    // either shape is Lane B/C's decision, not this migration's.
+    //
+    // ── shared_with, separate from owner_user_id ───────────────────────────
+    //
+    // `owner_user_id` (0012) already answers "whose SIGHT of it is this" — NULL
+    // for the team's, a value for one person's personal Google connection — and
+    // is left exactly as it was. `shared_with` answers a DIFFERENT question the
+    // plan's owner ≠ shared-with ruling asked for: who may READ it once it's in
+    // — 'private' (the owner alone), 'agency' (every agency role that can read
+    // the module), or 'agency_client' (the account's own portal login too, once
+    // the portal door in §5 of the plan exists). Defaulting new rows to 'agency'
+    // matches the ruling's other half: Gmail is shared with the agency by
+    // default, and nothing here narrows a room that used to be open.
+    //
+    // ── relevancy_date ──────────────────────────────────────────────────────
+    //
+    // The plan's own definition: happened-at for a frozen thing (a meeting, a
+    // sent email), last-change for a living one (a Drive doc, a ticket mirror).
+    // Which of a source's several dates that resolves to is an ingest decision
+    // (Lane B); the column just gives it somewhere to live that isn't
+    // overloading `created_at` (audit metadata) or `record_date` (0020, the
+    // mirrored record's own single date field, kept for what it already means).
+    version: "0073_the_knowledge_base_is_rebuilt",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN identity_key TEXT;
+ALTER TABLE knowledge_sources ADD COLUMN accounts TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE knowledge_sources ADD COLUMN apps TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE knowledge_sources ADD COLUMN shared_with TEXT NOT NULL DEFAULT 'agency';
+ALTER TABLE knowledge_sources ADD COLUMN relevancy_date TEXT;
+
+CREATE UNIQUE INDEX idx_knowledge_sources_identity ON knowledge_sources (identity_key) WHERE identity_key IS NOT NULL;
+
+-- ONE PERSON'S SIGHT OF ONE THING, FROM ONE PLACE. The row a second (or
+-- third) reader of one Google item gets, now that \`identity_key\` above means
+-- they no longer get a second \`knowledge_sources\` row of their own. Shaped
+-- against Lane B's own \`Sighting\` type ({ userId, shelf: 'private'|'team',
+-- goneAt }, \`knowledge-identity.ts\` — named by basename only, R58: the file
+-- ships on Lane B's own branch, not yet merged as this migration lands, and a
+-- comment pointing at the full path would be a path that is not there). This
+-- table carries one column beyond that type, \`seen_where\` — read below for why
+-- that is not a contradiction.
+--
+-- TWO FACTS THAT LOOK LIKE ONE AND ARE NOT. \`seen_where\` is a PLACE — which
+-- Drive folder, which mailbox, which space a sweep found the thing in.
+-- \`shelf\` is a VISIBILITY — private or team — and it is the FENCE:
+-- \`readableBy\` gates on it, not on where something sits. One column cannot
+-- hold both without losing one of the two facts, and the second draft of this
+-- migration made exactly that mistake — collapsing \`seen_where\` into
+-- \`shelf\` on the reasoning that B1's TS type only names one of them. It does,
+-- because \`identityKey()\`/\`readableBy()\` only ever need the fence; the PLACE
+-- is read and written by the ingest lane that fills this table, never by the
+-- fence logic, which is why it does not appear in the type Lane B showed and
+-- is still a real column this schema needs. The same person can see the same
+-- source from two different places (a shared Drive folder AND a direct email
+-- share, say), and that is two sightings worth keeping, not a duplicate to
+-- collapse — which is also why \`seen_where\` sits inside the unique index
+-- below rather than beside it.
+--
+-- \`shelf\` is folding what \`knowledge_sources.owner_user_id\` used to answer
+-- alone (NULL = team, a value = one person's) onto the SET of a source's
+-- sightings instead — necessary the moment one source can hold two people's
+-- rows, because a single column can no longer carry two people's different
+-- answers (Aurora filed a folder privately; Alex filed the same folder as the
+-- team's). \`readableBy\`/\`stillLive\` decide from the whole set: some live
+-- sighting on the team shelf, or one that is the caller's own — the same set
+-- \`owner_user_id IS NULL OR = me\` used to return, proved equivalent by Lane
+-- B's own test rather than asserted here. CHECK-constrained to the type's own
+-- two values, matching this file's own precedent (\`account_type\`, 0007).
+--
+-- \`gone_at\` is when this person stopped being able to see it (un-shared,
+-- left the space, removed from the team) — stamped, never deleted (deactivate
+-- never delete, CLAUDE.md), so "she never saw it" and "she saw it until
+-- Tuesday" stay different answers, and so \`liveSightings\`/\`stillLive\` have a
+-- column to filter on at all. Without it a sighting can be recorded but never
+-- retired, and the owner's own tracker item — a removed source or sighting
+-- drops out of answers within one sweep — has nowhere to write its ending.
+--
+-- \`seen_by_user_id\` is NOT NULL: a sighting is BY DEFINITION somebody's own
+-- sight of something, never a team-wide anonymous one. Material nobody
+-- personally saw (a ticket, an account, any of the app's own mirrored
+-- records) has ZERO sighting rows, not one anonymous one — its readability
+-- keeps coming from the source row exactly as it always did. That is what
+-- makes the unique index below a real guarantee rather than a courtesy:
+-- every column in it is NOT NULL, so SQLite's NULL-is-distinct rule (the
+-- caveat \`identity_key\`'s partial index above exists to route around) never
+-- comes into play here at all.
+CREATE TABLE knowledge_sightings (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL REFERENCES knowledge_sources (id),
+  seen_where TEXT NOT NULL,
+  seen_by_user_id TEXT NOT NULL,
+  shelf TEXT NOT NULL CHECK (shelf IN ('private', 'team')),
+  seen_at TEXT NOT NULL,
+  gone_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_sightings_source ON knowledge_sightings (source_id);
+CREATE UNIQUE INDEX idx_knowledge_sightings_unique ON knowledge_sightings (source_id, seen_where, seen_by_user_id);
+
+-- CHAT/MEETING GRAIN (KB-AUDIT.md §4.9's "chunk 47 has no idea which meeting
+-- it is from", and the plan's "chat = who said what when"). \`context_line\` is
+-- the cheapest-model-written sentence that situates a chunk in its document —
+-- Lane B writes it, this just gives it a column. \`speaker\`/\`said_at\` are the
+-- per-message identity a chat/transcript chunk carries when it is a run of
+-- messages rather than prose; both NULL for an ordinary document chunk.
+ALTER TABLE knowledge_chunks ADD COLUMN context_line TEXT;
+ALTER TABLE knowledge_chunks ADD COLUMN speaker TEXT;
+ALTER TABLE knowledge_chunks ADD COLUMN said_at TEXT;
+
+-- THE NAME INDEX — accounts, apps, contacts, colleagues, aliases and
+-- misspellings, replacing \`accountNamedIn\` (KB-AUDIT.md §4.2: single-token
+-- account names like "VU Solutions" → "solutions" hijacking ordinary
+-- questions). \`ref_id\` is the id of the named thing under \`kind\`; \`alias_of\`
+-- is NULL on the canonical name and the canonical name's own text on every
+-- alias, so a reader never has to walk a second table to resolve one. Scoped
+-- by \`compartment\`, the same fence every other knowledge table carries, so a
+-- name index lookup can never leak which accounts exist across a fence it has
+-- no right to see. The unique index is the one honest guarantee this
+-- migration can make on its own: alias GENERATION (which spellings exist at
+-- all) is Lane C's job, not this table's.
+CREATE TABLE knowledge_names (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  ref_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  alias_of TEXT,
+  compartment TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_names_ref ON knowledge_names (kind, ref_id);
+CREATE INDEX idx_knowledge_names_name ON knowledge_names (name);
+CREATE UNIQUE INDEX idx_knowledge_names_unique ON knowledge_names (kind, ref_id, name);
+
+-- BM25 OVER CHUNK TEXT (KB-AUDIT.md §4.4 — \`knowledge_terms\`'s raw
+-- term-frequency scorer has no IDF, so the finding that "hybrid search hurts
+-- here" was measured against something that isn't BM25). FTS5's own bm25()
+-- replaces that scorer; \`knowledge_terms\` itself is untouched by this
+-- migration — Lane C reads from the new table and retires the old one once
+-- the new arm is measured, so a re-index mid-rollout still has a working
+-- lexical arm either way.
+--
+-- EXTERNAL-CONTENT MODE, NO TRIGGERS. \`content_rowid='knowledge_chunks'\` ties
+-- every fts row to \`knowledge_chunks.rowid\` instead of storing the text
+-- twice, and the KEYED delete (\`INSERT INTO knowledge_chunks_fts
+-- (knowledge_chunks_fts, rowid, text) VALUES ('delete', ?, ?)\`) is the fix
+-- KB-AUDIT.md §4.4 names for the old design's actual complaint — a re-index
+-- was a scan of every posting in the team, and a keyed delete by rowid is one
+-- row. What it is NOT is trigger-synced, on purpose: this repo's own migration
+-- executor (\`splitStatements\`, shared/workers/d1-rest.ts) splits a script on
+-- every un-quoted \`;\` with no idea a \`CREATE TRIGGER … BEGIN … END;\` body's
+-- internal semicolons are not statement boundaries, so a trigger written here
+-- would parse and run fine against node:sqlite in a test and then shatter
+-- into broken fragments the first time \`migrateTeams\` tried to apply it for
+-- real. Application code (Lane C) keeps this table in step, the same way
+-- \`knowledge_terms\` always was.
+CREATE VIRTUAL TABLE knowledge_chunks_fts USING fts5(
+  text,
+  content='knowledge_chunks',
+  content_rowid='rowid'
+);
+
+-- Backfills whatever this team already holds, so a team migrated mid-rollout
+-- (before Lane C's rebuild script runs) still has a searchable index rather
+-- than a silently empty one.
+INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks;
+`,
+  },
+  {
+    // FINDABLE, BUT NOT QUOTABLE (KB-AUDIT.md §4.3 — templated record mirrors
+    // eating answer slots; a person/account/contact stub winning a passage
+    // slot over somebody's actual words). Three designs were tried and
+    // failed before this column, worth recording because the failures are
+    // what prove a column is the right shape rather than a convenience:
+    //
+    //   1. A CENSUS ("every live source of this kind produces exactly one
+    //      short chunk") measured 2,589 of 3,933 sources, 1,309 of them
+    //      tickets — a short ticket is not a stub, so length alone cannot
+    //      tell the two apart.
+    //   2. A KIND-LEVEL FLAG ("declare person/account/contact as card-only
+    //      kinds") turned out false on inspection: every kind the audit
+    //      named has a reader that folds in real free text a person wrote
+    //      (person: headline/strengths/weaknesses; account: about plus its
+    //      apps/sprints/tickets by name; task: detail and logged-time
+    //      notes). The audit's stubs were rows where those fields happened
+    //      to be EMPTY, not a property of the kind. Only \`dropdown\` and
+    //      \`portal_login\` fold no free text at all — 22 of 3,933 live
+    //      sources — so a kind-level flag would read as "the audit's
+    //      complaint is fixed" while leaving it exactly where it was.
+    //   3. So: card-ness is a property of the ROW, decided by the READER,
+    //      at the moment it builds the body — the only moment "did this row
+    //      say anything beyond the sentence the app generated for it" is
+    //      still a fact anybody holds. Once the two halves are joined into
+    //      one body string they are indistinguishable, and nothing
+    //      downstream (chunking, embedding, a later re-read of the row) can
+    //      recover which case a given source was. THAT is why this cannot
+    //      be derived later, by a census or by anything else — it has to be
+    //      recorded at ingest or not at all.
+    //
+    // DEFAULT 0 is the safe direction, not a guess: a wrong 0 (a real stub
+    // marked quotable) costs one weak answer slot — the pre-existing bug,
+    // unchanged. A wrong 1 (real material marked generated-only) SILENTLY
+    // stops a person's own words from ever being quoted, which is worse and
+    // invisible. So every row that predates this column, and every kind's
+    // reader until it is taught to set the flag, reads as quotable — the
+    // behaviour this base already has today, not a new restriction imposed
+    // by a column nobody has wired up yet.
+    //
+    // Plain INTEGER NOT NULL DEFAULT 0, no CHECK: this schema's own 0/1
+    // boolean convention throughout (role_permissions.can_read, 0007;
+    // dropdown_values.is_default, 0001), never constrained beyond the type.
+    version: "0074_findable_but_not_quotable",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN generated_only INTEGER NOT NULL DEFAULT 0;
+`,
+  },
+  {
+    // THE FENCE THE FOLD CANNOT SHIP WITHOUT (kb_B1's analysis, hub tick 8).
+    //
+    // Retrieval's compartment fence reads \`owner_user_id\` straight off
+    // \`knowledge_chunks\`/\`knowledge_terms\` today: NULL means the team's, a
+    // value means one person's — a single column answering a question about
+    // ONE person's sight of a source. 0073 folded the multi-person duplicate
+    // so two people's DIFFERENT answers about the same source both have
+    // somewhere to live (\`knowledge_sightings\`, one row per person, each
+    // with its own \`shelf\`) — which is exactly what makes a single
+    // \`owner_user_id\` column on the chunk unable to answer for a folded
+    // source any more: whichever sighting last touched it would silently
+    // decide the OTHER person's visibility too.
+    //
+    // \`team_visible\` is the team half of \`readableBy\`'s two conditions
+    // (knowledge-identity.ts, fix/kb-gate) — true when SOME live sighting
+    // (\`gone_at IS NULL\`) sits on the 'team' shelf — denormalised onto the
+    // chunk and its terms for the same reason \`compartment\`/\`owner_user_id\`
+    // already are: retrieval's first stage has to be a single-table read.
+    //
+    // ── WHAT THIS MIGRATION DOES AND DOES NOT DO ───────────────────────────
+    //
+    // It adds the column and backfills it from the ONLY fact available at
+    // this moment — every existing row's own \`owner_user_id\`, because no
+    // source has been folded yet and \`knowledge_sightings\` holds nothing to
+    // read instead. That backfill is proved to preserve the exact population
+    // \`owner_user_id IS NULL\` already returns (see the migration test) —
+    // nothing gains or loses team visibility AT THE MIGRATION BOUNDARY.
+    //
+    // It does NOT keep the flag correct AFTER a fold, and cannot: the moment
+    // a source gains a second sighting, or a sighting's \`shelf\`/\`gone_at\`
+    // changes, \`team_visible\` is a claim about a fact that just moved. That
+    // recompute is the write path's job (kb_B1's — the read/write side this
+    // migration was commissioned beside), and it is a REQUIREMENT ON THAT
+    // CODE rather than something SQL here can enforce: every write that
+    // touches a sighting's \`shelf\` or \`gone_at\` must recompute
+    // \`team_visible\` for every chunk/term of that sighting's source in the
+    // SAME statement or transaction, never a follow-up write that can be
+    // skipped or fail independently. (Same reason this is not a trigger as
+    // every other denormalised-copy column in this file is not one — see
+    // 0073's \`knowledge_chunks_fts\` header for why a trigger cannot even be
+    // expressed through this repo's own migration executor. Here the
+    // reason is sharper still: the source of truth for a recompute is
+    // ANOTHER table's SET of rows, which a single-row \`BEGIN...END\` trigger
+    // body cannot aggregate over even where triggers work at all.) A test
+    // that recomputes \`team_visible\` from \`knowledge_sightings\` across a
+    // whole corpus and asserts equality is what keeps that promise honest —
+    // kb_B1's, not this file's, because it has to run against the sightings
+    // the write path actually produced.
+    //
+    // ── THE DEFAULT IS THE OPPOSITE DIRECTION FROM 0074's, ON PURPOSE ──────
+    //
+    // 0074's \`generated_only\` defaults to 0 (quotable) because a forgotten
+    // flag there should not silently withhold a person's own words. Here a
+    // forgotten flag should not silently WIDEN who can read something, so
+    // the safe default flips: 0 (NOT team-visible, private) is the direction
+    // that costs a missed answer rather than an over-shared one for any row
+    // written by code that has not yet been taught to set this column.
+    version: "0075_the_fence_the_fold_cannot_ship_without",
+    sql: `
+ALTER TABLE knowledge_chunks ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE knowledge_terms ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+
+UPDATE knowledge_chunks
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+
+UPDATE knowledge_terms
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+`,
+  },
+  {
+    // THE SOURCE'S OWN team_visible — 0075 gave the fence's team half to
+    // \`knowledge_chunks\` and \`knowledge_terms\`, the two tables retrieval
+    // reads from, and missed the table the flag is actually COMPUTED against.
+    // \`knowledge_sightings\` is keyed to \`knowledge_sources\`, not to a chunk
+    // or a term, so kb_B1's write path needs a home on the SOURCE to stamp
+    // \`team_visible\` from the sightings SET before it can denormalise that
+    // same value down onto every chunk and term the source owns. Without this
+    // column the source itself never learns its own fence, and 0075's two
+    // copies would have nothing correct to be copies OF once a real fold runs.
+    //
+    // Not folded into 0075 because 0075 already merged (\`main\`) before this
+    // gap surfaced — the ledger is append-only, so the fix is a new entry,
+    // never an edit to a shipped one.
+    //
+    // **THREE THINGS THAT MUST STAY TRUE, each a conclusion somebody will
+    // otherwise reverse as an optimisation** (restated here because this is
+    // where a reader following \`knowledge_sources.team_visible\` will land,
+    // and 0075's own comment is now only half the story):
+    //
+    //   1. team_visible IS A NARROWING AID, NEVER THE AUTHORITATIVE ANSWER.
+    //      The real fence is \`readerClause = ownerClause AND appClause\`
+    //      (workers/content, knowledge.ts:602) — THREE settings, not two:
+    //      private (\`owner_user_id\`), APP (\`knowledge_sources.visible_to_app_id\`,
+    //      riding \`app_staff\`), and team. \`team_visible\` only ever models the
+    //      OWNER half. The authoritative check is still the read-back JOIN to
+    //      \`knowledge_sources\` that applies \`appClause\` (\`readerClause\`'s own
+    //      doc comment makes exactly this argument already, in R26's words:
+    //      the index — and now this flag — narrows, the team's database
+    //      decides) — an optimiser who trusts this flag alone and drops that
+    //      join silently bypasses the app fence.
+    //   2. \`knowledge_terms.team_visible\` (0075) is DELIBERATELY the owner
+    //      half only, with no app-tier column beside it, inheriting exactly
+    //      the asymmetry \`knowledge_terms.owner_user_id\` already has and
+    //      \`readerClause\`'s own comment defends: a restricted chunk may
+    //      reach the candidate pool through its terms and cost a relevant
+    //      passage its ranking slot, but it cannot reach an answer, because
+    //      the chunk-level join still applies the full fence before anything
+    //      is read back.
+    //   3. THIS DOES NOT FORECLOSE \`visible_to_app_id\`'s OWN FOLD PROBLEM,
+    //      still open: two sources merging, one app-restricted and one not,
+    //      is a second one-column-two-values fault the same shape as
+    //      \`owner_user_id\`'s, one column over — measurement in progress
+    //      (kb_B1). This column says nothing about how that merge resolves
+    //      and does not need to change once it is decided.
+    //
+    // Backfilled the same way 0075 backfilled the other two — from the only
+    // fact available before any fold has run, \`owner_user_id IS NULL\` —
+    // proved (migration test) to preserve exactly today's population.
+    // Default 0 for the same reason as every column in this pair: the safe
+    // direction costs a missed answer, never an over-shared one.
+    version: "0076_the_source_gets_its_own_team_visible",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+
+UPDATE knowledge_sources
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+`,
+  },
 
   {
     // THE INTERNAL RATES GO, AND THE ROWS GO WITH THEM — the client's ruling,
@@ -5058,7 +5435,7 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     // `internal_role_rates` to drop. The indexes go with their tables; SQLite
     // drops them automatically, and naming them separately would be a statement
     // that fails on the second run.
-    version: "0073_the_internal_rates_are_wiped_clean",
+    version: "0077_the_internal_rates_are_wiped_clean",
     sql: `
 DROP TABLE IF EXISTS internal_rates;
 DROP TABLE IF EXISTS internal_role_rates;
@@ -5070,7 +5447,7 @@ DROP TABLE IF EXISTS internal_role_rates;
     // an hour after the first, verbatim: "The whole account rates also killed
     // it."
     //
-    // 0073 is its sibling and the two were written the same afternoon. Read that
+    // 0077 is its sibling and the two were written the same afternoon. Read that
     // entry first: everything it argues about a DROP applies here word for word,
     // and this note only says what is different.
     //
@@ -5083,7 +5460,7 @@ DROP TABLE IF EXISTS internal_role_rates;
     // \`kind\` column, so that no forgotten WHERE clause could turn what we charge
     // into what we cost. Both halves are now gone, an hour apart.
     //
-    // ── THIS IS A DROP, FOR 0073's FOUR REASONS, AND THEY HOLD ─────────────
+    // ── THIS IS A DROP, FOR 0077's FOUR REASONS, AND THEY HOLD ─────────────
     //
     //   1. DEACTIVATE-NEVER-DELETE IS ABOUT A ROW IN A LIVING FEATURE. By the
     //      time this runs there is no reader left: no type (\`AccountRate\` is
@@ -5098,14 +5475,14 @@ DROP TABLE IF EXISTS internal_role_rates;
     //      last year — the thing deactivate-never-delete exists to keep true —
     //      is in the history, where this base has always kept it.
     //   3. PRECEDENT, TWICE NOW. 0025 dropped four tables when the client retired
-    //      those modules; 0073 dropped two this morning. This is the third, by
+    //      those modules; 0077 dropped two this morning. This is the third, by
     //      the same person, for the same reason.
     //   4. THE MEASURED SIZE. Live staging, 10 Sep 2026: FOUR rows, across
     //      sixteen team databases.
     //
-    // ── THE ONE THING THAT IS DIFFERENT FROM 0073 ──────────────────────────
+    // ── THE ONE THING THAT IS DIFFERENT FROM 0077 ──────────────────────────
     //
-    // 0073's tables had been read by nothing since 25 Aug 2026. THIS ONE WAS
+    // 0077's tables had been read by nothing since 25 Aug 2026. THIS ONE WAS
     // LIVE. Four doors served it this morning, a tab on every client's record
     // drew it, and the client's own portal read a projection of it on the value
     // screen. So the loss is real rather than notional, and it is worth naming
@@ -5121,7 +5498,7 @@ DROP TABLE IF EXISTS internal_role_rates;
     //
     // ── IT IS NOT SAFE AGAINST AN OLD READER. SAID PLAINLY. ────────────────
     //
-    // Exactly as 0073 is not, and for the same mechanism. The tenancy worker
+    // Exactly as 0077 is not, and for the same mechanism. The tenancy worker
     // that is live until the deploy finishes still serves
     // \`GET /api/tenancy/rates\`, its three writes, AND — the sharper one —
     // \`GET /api/tenancy/impact\`, which is on the CLIENT PORTAL's own allow-list
@@ -5136,14 +5513,14 @@ DROP TABLE IF EXISTS internal_role_rates;
     // not care whether it is still standing. There is no window in which new code
     // needs old rows.
     //
-    // AND IF BOTH 0073 AND 0074 ARE APPLIED IN ONE PASS, that is one deploy of
+    // AND IF BOTH 0077 AND 0078 ARE APPLIED IN ONE PASS, that is one deploy of
     // tenancy followed by one apply. They are not independent of each other in
     // ORDER — both must come after the worker — only in subject.
     //
     // \`IF EXISTS\`, and the index is not named separately: SQLite drops a
     // table's indexes with it, and naming \`idx_account_rates_label\` here would
     // be a statement that fails on the second run of a rebuilt ledger.
-    version: "0074_the_account_rate_card_is_killed_too",
+    version: "0078_the_account_rate_card_is_killed_too",
     sql: `
 DROP TABLE IF EXISTS account_rates;
 `,
