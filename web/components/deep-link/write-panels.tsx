@@ -37,7 +37,7 @@ import {
 } from "@shared/ui/components/alert-dialog/alert-dialog"
 import { Spinner } from "@shared/ui/components/spinner/spinner"
 import type { InternalKind } from "@/lib/use-screen-actions"
-import { ApiFailure } from "@/lib/api"
+import { ApiFailure, content } from "@/lib/api"
 import { personName } from "@/lib/identity"
 import { type usePermissions } from "@/lib/perms"
 import { type useActiveTeam } from "@/lib/use-active-team"
@@ -46,7 +46,7 @@ import { type useScreenData } from "@/lib/use-screen-data"
 import { appsKey, listFetch } from "@/lib/live-resources"
 import { useCached } from "@shared/web/store"
 import { reportError } from "@shared/web/log"
-import type { AppRow, TeamRole } from "@shared/types"
+import type { AppRow, KnowledgeSource, TeamRole } from "@shared/types"
 import { useT } from "@shared/web/language"
 
 /** Everything the write layer needs from the host: the URL's ?panel/?confirm, the
@@ -64,6 +64,9 @@ export type WritePanelsProps = Pick<
   | "departmentOptions"
   | "brandQ"
   | "purposesQ"
+  // The row an EDIT panel on a source prefills from — the same list the
+  // knowledge collection screen already holds, read rather than re-fetched.
+  | "knowledgeQ"
 > &
   Pick<
     ReturnType<typeof useScreenActions>,
@@ -71,6 +74,7 @@ export type WritePanelsProps = Pick<
     | "createHelp"
     | "createAccount"
     | "createKnowledge"
+    | "editKnowledge"
     | "uploadKnowledgeFile"
     | "saveInternalRecord"
     | "setInternalActive"
@@ -129,6 +133,8 @@ export function WritePanels({
   createHelp,
   createAccount,
   createKnowledge,
+  editKnowledge,
+  knowledgeQ,
   uploadKnowledgeFile,
   saveInternalRecord,
   setInternalActive,
@@ -161,6 +167,27 @@ export function WritePanels({
       (appsQ.data ?? []).filter((a) => a.canOpen && a.active).map((a) => ({ id: a.id, name: a.name })),
     [appsQ.data]
   )
+
+  // CORRECT A SOURCE'S FILING (?panel=edit&module=knowledge&id) — reached from
+  // its row on the knowledge list as well as from its own record screen, both
+  // opening the one door. THE LIST ROW IS NOT THE RECORD (the same trap
+  // `knowledge-detail.tsx` names): `knowledgeQ`'s rows carry no body at all
+  // (LIST_COLS excludes it, a 300-page contract is not a list), so prefilling
+  // straight from the row would submit an emptied-out document the instant
+  // somebody only meant to re-file it. The DETAIL read — the same
+  // `knowledge:one:<id>` cache key the record screen and `editKnowledge` both
+  // already use — is what the form prefills from; the list row is only the
+  // instant paint while it arrives.
+  const knowledgeEditing = query.panel === "edit" && query.module === "knowledge" && !!query.id
+  const knowledgeOneQ = useCached<KnowledgeSource | null>(
+    teamId && knowledgeEditing ? `knowledge:one:${query.id}` : null,
+    () => content.knowledgeOne(query.id as string)
+  )
+  const knowledgeEditRow =
+    knowledgeOneQ.data ?? knowledgeQ.data?.find((s) => s.id === query.id) ?? null
+  const knowledgeMirrored = !!knowledgeEditRow && knowledgeEditRow.originRowId !== null
+  const knowledgeTextOwnedElsewhere =
+    !!knowledgeEditRow && (knowledgeMirrored || knowledgeEditRow.fileUrl !== null)
 
   // WHICH agency-internal form the URL is asking for, and everything it needs to
   // open prefilled. Resolved once, here, because "is this panel mine?" and "what
@@ -295,6 +322,42 @@ export function WritePanels({
         accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
         appOptions={openableApps}
         onSubmit={createKnowledge}
+      />
+
+      {/* Correct a source's filing or sharing (?panel=edit&module=knowledge&id)
+          — gated by edit, reached from the row on the list as well as from the
+          record screen's own Edit button, both opening this one dialog. Waits
+          on the DETAIL read (see `knowledgeOneQ` above) before it draws, so a
+          fast click-and-submit can never send an emptied body. */}
+      <KnowledgeFormDialog
+        open={knowledgeEditing && !!knowledgeEditRow && can("knowledge", "edit")}
+        onOpenChange={(o) => !o && closePanel()}
+        draftKey={query.id ? `knowledge:edit:${query.id}` : undefined}
+        teamId={teamId}
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
+        appOptions={openableApps}
+        textOwnedElsewhere={knowledgeTextOwnedElsewhere}
+        titleOwnedElsewhere={knowledgeMirrored}
+        textOwnedNote={
+          knowledgeEditRow?.fileUrl
+            ? t(
+                "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it."
+              )
+            : undefined
+        }
+        initial={
+          knowledgeEditRow
+            ? {
+                title: knowledgeEditRow.title,
+                body: knowledgeEditRow.body ?? "",
+                sourceUrl: knowledgeEditRow.sourceUrl ?? "",
+                accountId: knowledgeEditRow.accountId ?? "",
+                visibility: knowledgeEditRow.visibility,
+                visibleToAppId: knowledgeEditRow.visibleToAppId ?? "",
+              }
+            : undefined
+        }
+        onSubmit={(values) => editKnowledge(query.id as string, values)}
       />
 
       {/* Upload a FILE into the knowledge base (?panel=upload&module=knowledge)

@@ -460,6 +460,24 @@ type SourceRow = {
   editor_name: string | null
   updated_at: string | null
   deactivated_at: string | null
+  /** JSON arrays, 0073 — every account/app this source concerns, additive
+   * beside the singular `account_id`/`app_id` above. `'[]'` on every row
+   * today: nothing writes them yet (DATA-MODEL.md says so), so a reader
+   * falls back to the singular columns rather than treating an empty array
+   * as "filed nowhere". */
+  accounts: string
+  apps: string
+  /** 0073, defaults `'agency'` on every row and nothing writes it yet either
+   * — read for display, never treated as the authoritative fence. */
+  shared_with: string
+  /** 0074 — a source that produced nothing beyond the sentence the app wrote
+   * for it: findable, never quotable. Written by the sweep per kind. */
+  generated_only: number
+  /** ONE PERSON'S SIGHT OF ONE THING, live ones only (`gone_at IS NULL`) —
+   * a row with `gone_at` set has ended and does not count. Correlated
+   * subquery rather than a join: `knowledge_sightings` is keyed and indexed
+   * on `source_id`, so this is one indexed lookup per row, not a scan. */
+  sightings_count: number
 }
 
 /** The columns a LIST carries — everything except the material itself.
@@ -473,7 +491,9 @@ const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_i
   file_url, file_name, file_type, file_bytes, file_note, owner_user_id,
   visible_to_app_id, (SELECT name FROM apps WHERE id = visible_to_app_id) AS visible_to_app_name, indexed_at,
   chunk_count, indexed_chunks, index_error,
-  created_at, creator_name, editor_name, updated_at, deactivated_at`
+  created_at, creator_name, editor_name, updated_at, deactivated_at,
+  accounts, apps, shared_with, generated_only,
+  (SELECT COUNT(*) FROM knowledge_sightings WHERE source_id = knowledge_sources.id AND gone_at IS NULL) AS sightings_count`
 
 /** The columns ONE source carries. The body comes too — but only as far as a
  * person can read (see BODY_INLINE_CHARS), because a detail screen is a screen. */
@@ -486,6 +506,19 @@ const DETAIL_COLS = LIST_COLS.replace("NULL AS body", `substr(body, 1, ${bodyInl
  * presenting an excerpt as the whole thing. */
 function bodyInlineChars(): number {
   return TEXT_LIMITS.long
+}
+
+/** A JSON array column, defensively — same shape as `sharding.ts`'s
+ * `parseList`: anything that isn't an array of strings reads as empty
+ * rather than throwing, because this is a DISPLAY read and a malformed row
+ * should never turn a list screen into an error page. */
+function parseIdList(json: string): string[] {
+  try {
+    const v = JSON.parse(json)
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
+  } catch {
+    return []
+  }
 }
 
 function toSource(r: SourceRow): KnowledgeSource {
@@ -533,6 +566,14 @@ function toSource(r: SourceRow): KnowledgeSource {
     creatorName: r.creator_name,
     editorName: r.editor_name,
     updatedAt: r.updated_at,
+    // 0073's additive arrays — empty on every row today (nothing writes them
+    // yet), so a reader falls back to the singular `accountId`/`appId` above
+    // rather than reading an empty array as "filed nowhere".
+    accounts: parseIdList(r.accounts),
+    apps: parseIdList(r.apps),
+    sharedWith: r.shared_with === "private" || r.shared_with === "agency_client" ? r.shared_with : "agency",
+    generatedOnly: r.generated_only === 1,
+    sightingsCount: r.sightings_count,
   }
 }
 

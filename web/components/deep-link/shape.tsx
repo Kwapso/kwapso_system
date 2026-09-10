@@ -24,7 +24,6 @@ import { RecordMark } from "@shared/web/record-mark"
 // differently (`record-ref.tsx` carries the whole argument for each one).
 import { REF_LEADS_NAME } from "@shared/web/record-ref"
 import { ticketTitle } from "@shared/web/ticket-chips"
-import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { translator, type Language } from "@shared/i18n"
 import type {
   Account,
@@ -33,7 +32,6 @@ import type {
   HelpTicket,
   Invite,
   InviteAudit,
-  KnowledgeSource,
   Meeting,
   MeetingPurpose,
   TeamMember,
@@ -294,42 +292,6 @@ export const KNOWLEDGE_KIND: Record<string, string> = {
   person: "About a colleague",
   dropdown: "From a dropdown list",
   portal_login: "From a portal login",
-}
-
-/** Where a source is filed, as a person reads it: an account compartment shows
- * the account, the agency's own shows the agency. The id is deliberately NOT
- * printed — a ULID in a filter dropdown is noise; the account's own name is what
- * somebody is scanning for, and the detail screen names it in full. */
-function knowledgeFiledUnder(source: KnowledgeSource, accountNames?: Map<string, string>): string {
-  if (!source.accountId) return "The agency"
-  return accountNames?.get(source.accountId) ?? "An account"
-}
-
-export function shapeKnowledgeList(
-  sources: KnowledgeSource[],
-  accountNames?: Map<string, string>
-): ScreenData {
-  return {
-    rows: sources.map((s) => ({
-      id: s.id,
-      mark: (
-        <span className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-[var(--radius)]">
-          <Icon
-            name={(KNOWLEDGE_KIND_ICON[s.kind] ?? "file") as IconName}
-            aria-hidden
-            className="size-4"
-          />
-        </span>
-      ),
-      // A source taken AWAY from the assistant stays in the list (deactivate-not-
-      // delete) and says so, the same way a retired article does — seeing what
-      // you excluded is half of trusting what you did not.
-      name: s.active ? s.title : `${s.title} (not in use)`,
-      detail: `${KNOWLEDGE_KIND[s.kind] ?? s.kind} · ${knowledgeFiledUnder(s, accountNames)}${
-        s.visibility === "private" ? " · private to you" : ""
-      }`,
-    })),
-  }
 }
 
 /* -------------------------------- meetings -------------------------------- */

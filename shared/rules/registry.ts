@@ -1247,9 +1247,21 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // happened to already be answered because those two English words are
   // shared verbatim with `shared/scale.ts`'s own Compact/Comfortable/Large
   // set. Nothing was left in English on purpose; nothing was deferred.
-  de: 0,
-  es: 0,
-  ca: 0,
+  // RAISED 0 -> 11 in all three, 10 Sep 2026, kb_F's own source-card build.
+  // Eleven new sentences (the knowledge-list card: compartment/app/sharing/
+  // pieces/sightings/last-modified, the edit affordance, and the file-backed
+  // edit note) shipped in English rather than guessed at in German, Spanish
+  // and Catalan by a build lane forbidden from spending on a translation
+  // model (`scripts/i18n-translate.mjs` calls one) and not confident enough
+  // in its own Catalan to hand-translate a real product string. Two of the
+  // eleven — "0 pieces — findable, but the assistant won't quote it" and the
+  // sightings/pieces counts — are ALSO wording the hub's own brief flagged as
+  // provisional pending a glossary decision, so translating them now would
+  // mean translating them twice. Accepted debt, not a regression to chase:
+  // raise it back to 0 once a translation pass answers these eleven.
+  de: 11,
+  es: 11,
+  ca: 11,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
