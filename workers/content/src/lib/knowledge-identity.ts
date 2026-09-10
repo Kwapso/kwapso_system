@@ -222,7 +222,21 @@ export function stillLive(sightings: Sighting[]): boolean {
  * carries its own answer. Delete it because "the flag already decided" and the
  * app fence is bypassed in silence — the fastest possible route to material
  * escaping the room it was limited to, written by somebody removing what reads
- * as a duplicate check. */
+ * as a duplicate check.
+ *
+ * AND A SOURCE WITH NO SIGHTINGS IS NOT A SOURCE NOBODY MAY READ. Most of the
+ * base has none and never will: a ticket, an account, a sprint is the team's,
+ * and nobody personally SAW it — a sighting is one person's own sight of
+ * material that arrived through their connection, which an app record never
+ * did. So this function answers about the sightings a source HAS, and a source
+ * with none keeps the value 0075/0076 backfilled from `owner_user_id`. The
+ * recompute fires when a sighting is written, moved or retired, and on nothing
+ * else.
+ *
+ * Getting that backwards is a whole-corpus outage rather than a leak: derive
+ * "no sightings" as "no team sighting" and every ticket in the base stops
+ * answering for everybody at once. It is the safe direction, which is exactly
+ * why it would ship. */
 export function teamVisible(sightings: Sighting[]): boolean {
   return liveSightings(sightings).some((s) => s.shelf === "team")
 }
