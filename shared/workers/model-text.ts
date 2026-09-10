@@ -30,6 +30,18 @@ export type CheapTextEnv = {
  * to when no Anthropic key is set. Named once so the two callers cannot drift. */
 export const CHEAP_TEXT_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
 
+/** THE READER'S MODEL — BUILD-5-knowledge-rebuild.md §5: "the reader re-reads
+ * the shortlist (Kimi K2.6 on Workers AI)". The same engine `workers/data-ops`
+ * pins for the assistant's own turn (`AGENT_MODEL`,
+ * `workers/data-ops/wrangler.jsonc`), reused rather than re-chosen: a
+ * shortlist judgment is a harder read than a one-paragraph write (`cheapText`'s
+ * job), and the owner's own trade — priced in COSTS.md — is staying on
+ * Cloudflare rather than reaching for a frontier model outside it. NOT the
+ * default for `cheapAnswer`/`cheapText`: those stay on the cheap model for
+ * every existing caller, and a reader call names this model explicitly via
+ * `opts.model`. */
+export const READER_TEXT_MODEL = "@cf/moonshotai/kimi-k2.6"
+
 /** What one cheap call came back with: the model's words, and whether the
  * provider CUT THEM OFF rather than the model finishing its sentence.
  *
@@ -60,7 +72,12 @@ export async function cheapAnswer(
   env: CheapTextEnv,
   system: string,
   user: string,
-  opts?: { maxTokens?: number }
+  // `model` is an ESCAPE HATCH, not a second way to pick the cheap path: it
+  // exists for a caller who deliberately wants a DIFFERENT model for a harder
+  // job (the knowledge reader, `READER_TEXT_MODEL`) without duplicating this
+  // function. Left unset, `env.WORKERS_AI_MODEL || CHEAP_TEXT_MODEL` still
+  // decides, exactly as it always has.
+  opts?: { maxTokens?: number; model?: string }
 ): Promise<CheapAnswer> {
   const body: Record<string, unknown> = {
     messages: [
@@ -70,7 +87,7 @@ export async function cheapAnswer(
   }
   if (opts?.maxTokens) body.max_tokens = opts.maxTokens
   const out = (await env.AI.run(
-    (env.WORKERS_AI_MODEL || CHEAP_TEXT_MODEL) as never,
+    (opts?.model || env.WORKERS_AI_MODEL || CHEAP_TEXT_MODEL) as never,
     body as never
   )) as ModelOutput
   return {
@@ -86,7 +103,7 @@ export async function cheapText(
   env: CheapTextEnv,
   system: string,
   user: string,
-  opts?: { maxTokens?: number }
+  opts?: { maxTokens?: number; model?: string }
 ): Promise<string> {
   return (await cheapAnswer(env, system, user, opts)).text
 }

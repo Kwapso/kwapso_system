@@ -37,7 +37,9 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify, rebuildNameIndex } from "../src/lib/knowledge"
+import { diversify, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
+import { passageId } from "../src/lib/knowledge-reader"
+import type { MemberGuard } from "@shared/workers/gating"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 
@@ -83,7 +85,18 @@ function fakeVector(text: string): number[] {
 
 function env(
   userId: string,
-  opts: { brokenModel?: boolean; noVectorStore?: boolean; minScore?: string } = {}
+  opts: {
+    brokenModel?: boolean
+    noVectorStore?: boolean
+    minScore?: string
+    /** The READER's own floor (KNOWLEDGE_READER_MIN_SCORE) — a SEPARATE var
+     * from `minScore` on purpose (see `retrieve`'s own comment on `floor`):
+     * a test exercising the reader path sets this rather than `minScore`,
+     * proving the two are genuinely independent rather than one relaxed
+     * reading of the other. Unset means the code's own default
+     * (READER_HALLUCINATION_FLOOR). */
+    readerMinScore?: string
+  } = {}
 ) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
   return {
@@ -97,6 +110,7 @@ function env(
     // against the real model on 7,441 real chunks. Setting it here is the same
     // act as setting it for a new model in production.
     KNOWLEDGE_MIN_SCORE: opts.minScore ?? "0.35",
+    KNOWLEDGE_READER_MIN_SCORE: opts.readerMinScore,
     AI: {
       run: async (_model: string, input: { text: string[] }) => {
         embedded.push(...input.text)
@@ -382,6 +396,85 @@ describe("R23 — a question the team's material cannot answer is refused, not a
     const answer = await ask(IDS.staffUser, "capital expenditure?", undefined, NOTHING_CLOSE_ENOUGH)
     expect(answer.found).toBe(true)
     expect(titles(answer)).toContain("Capital expenditure sign-off")
+  })
+})
+
+// BUILD-5-knowledge-rebuild.md §5-6, KB-AUDIT.md §3's own case: "the retrieval
+// is working, the floor is discarding the win". A paraphrase whose vector score
+// sits under the ordinary floor is refused with NO reader; the SAME question,
+// the SAME material, is answered honestly once a reader is supplied — because
+// the floor that applies is a different one (KNOWLEDGE_READER_MIN_SCORE, a
+// hallucination guard) and the real decision moves to what the reader says.
+// `retrieve()` is called directly rather than through `ask()`'s HTTP door,
+// because `read` is a function and cannot cross that boundary — the door
+// wiring (gating + metering a real model call) is a separate, not-yet-built
+// piece; this proves the mechanism `retrieve()` itself now has.
+describe("the reader recovers a paraphrase the floor alone would refuse (BUILD-5 §5-6)", () => {
+  const guard: MemberGuard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Team Assembly",
+      body: "The monthly team assembly happens on the first Friday. Aurora organises it and rotates who leads it next time.",
+    })
+  })
+
+  /** A reader that keeps everything it is shown — proves the RECOVERY half. */
+  const keepEverything = async (_q: string, shortlist: { sourceId: string; seq: number }[]) => ({
+    relevant: shortlist.map(passageId),
+  })
+  /** A reader that has genuinely looked and found nothing — proves that
+   * widening the floor does not mean the reader rubber-stamps whatever it is
+   * shown; an HONEST refusal is still available after reading. */
+  const keepNothing = async () => ({ relevant: [] })
+
+  // The reader's OWN floor, set low enough that the fake model's cosine for
+  // this genuine-but-partial overlap (2 of the question's 4 terms) clears it
+  // — the fake model's scale has nothing to do with bge-m3's, so this number
+  // means nothing beyond "this suite's stand-in model, this fixture". Paired
+  // with the SAME impossibly strict `minScore` as the no-reader test above, so
+  // every reader test here proves the two floors are genuinely independent
+  // vars, not one relaxed reading of the other.
+  const READER_OPTS = { ...NOTHING_CLOSE_ENOUGH, readerMinScore: "0.15" }
+
+  it("without a reader, the strict floor refuses the paraphrase", async () => {
+    const answer = await retrieve(env(IDS.staffUser, NOTHING_CLOSE_ENOUGH), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+    })
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(false)
+  })
+
+  it("with a reader, KNOWLEDGE_MIN_SCORE stops being the question — the reader's own floor and verdict decide", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: keepEverything,
+    })
+    expect(answer.found, `still refused; reason: ${answer.reason}`).toBe(true)
+    expect(titles(answer)).toContain("Team Assembly")
+  })
+
+  it("and a reader that genuinely finds nothing still produces an honest refusal, not a rubber stamp", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: keepNothing,
+    })
+    expect(answer.found).toBe(false)
+    expect(answer.passages).toEqual([])
+    expect(answer.citations).toEqual([])
+  })
+
+  it("a reader that fails to run refuses honestly, rather than exposing the widened pool unjudged", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: async () => null,
+    })
+    // The pool this would have shown a reader was built against the LOW
+    // hallucination-guard floor, not the strict one — so a failed reader must
+    // NOT fall through to answering from it: that would be exactly the
+    // uncalibrated-cosine failure this mechanism exists to fix, on the one
+    // path (a model outage) nobody is watching. Refuse instead.
+    expect(answer.found).toBe(false)
+    expect(answer.passages).toEqual([])
   })
 })
 

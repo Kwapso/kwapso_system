@@ -138,6 +138,7 @@ import {
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
+import { passageId, READER_SHORTLIST_CAP } from "./knowledge-reader"
 import {
   chunkVectorId,
   deleteVectors,
@@ -362,6 +363,21 @@ const DEFAULT_PASSAGES = 6
  * that measured it is kept — see .plans/BUILD-4-knowledge-retrieval.md). A test
  * running against a stand-in model sets its own, for the same reason. */
 const MIN_VECTOR_SCORE = 0.5
+
+/** THE FLOOR WHEN A READER IS GOING TO LOOK ANYWAY (BUILD-5 §6: "a low
+ * absolute score (~0.30) only guards nonsense; thin material → answer and say
+ * what is missing"). KB-AUDIT.md §3 measured the cost of using
+ * `MIN_VECTOR_SCORE` as the SOLE decision: a paraphrase sits 0.05–0.06 lower
+ * than its direct twin, which is exactly the band 0.50 cuts — "Who is
+ * responsible for organising the monthly get-together?" scored 0.444 against
+ * the right document (Team Assembly) and was refused outright, correct
+ * document, wrong decision layer.
+ *
+ * ONLY IN EFFECT WHEN `input.read` IS SUPPLIED. Every existing caller (no
+ * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
+ * silent change to what "found" means for a caller that never asked for the
+ * reader. See `retrieve`'s own comment at the point this is used. */
+const READER_HALLUCINATION_FLOOR = 0.3
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
@@ -2995,6 +3011,28 @@ type ScoredRow = {
   record_date: string | null
 }
 
+/** ONE `ScoredRow`, AS THE ANSWER SEES IT. Factored out because `retrieve`
+ * builds this shape TWICE once the reader is in the loop — once for the
+ * shortlist it hands the reader, once for the final passages an answer
+ * carries — and a mapping written twice is a mapping that drifts the first
+ * time only one copy is edited. */
+function toPassage(row: ScoredRow, score: number): KnowledgePassage {
+  return {
+    sourceId: row.source_id,
+    title: row.title,
+    kind: row.kind,
+    url: row.source_url,
+    // `origin_table`/`origin_row_id` already rode the read that built `row`,
+    // so the link to the record costs nothing extra.
+    recordPath: recordPath(row.origin_table, row.origin_row_id, row.compartment),
+    compartment: row.compartment,
+    seq: row.seq,
+    text: plainText(row.text),
+    score: Math.round(score * 1000) / 1000,
+    recordDate: row.record_date ?? null,
+  }
+}
+
 /** WEIGHTED RECIPROCAL RANK FUSION. Two ranked lists whose scores mean entirely
  * different things (a cosine, and a sum of term weights), combined by the one
  * thing they share — position. Each contributes weight/(K + rank).
@@ -3096,6 +3134,19 @@ export async function retrieve(
      * gates and meters it (routes/knowledge.ts); this function only decides
      * WHETHER there is anything worth writing about. */
     compose?: (material: KnowledgePassage[], sources: KnowledgeCitation[]) => Promise<string | null>
+    /** RE-READ THE SHORTLIST (BUILD-5 §5-6) before deciding what counts as
+     * evidence. Absent means the caller wants the pre-Stage-2 behaviour
+     * exactly — `MIN_VECTOR_SCORE` alone decides, unchanged. Present, and it
+     * costs a model call: the door that supplies it gates and meters it
+     * (`routes/knowledge.ts`), same shape as `compose` above and the same
+     * reason — this function only decides whether there is a shortlist worth
+     * reading. Present also means the candidate floor WIDENS to
+     * `KNOWLEDGE_READER_MIN_SCORE` (a hallucination guard, not a real
+     * decision), so a `null` verdict (the reader could not run) is read as NO
+     * EVIDENCE, not as "fall back to the floor" — the widened pool was never
+     * safe to expose unjudged. See the point this is used in the function
+     * body, and `knowledge-reader.ts`'s own header, for the whole argument. */
+    read?: (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
   }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
@@ -3122,7 +3173,23 @@ export async function retrieve(
   // below the floor it is merely the least unlike, and letting it through is how
   // a knowledge base answers a question about parental leave out of a note about
   // dispatch outages.
-  const floor = numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
+  //
+  // WIDENED WHEN A READER IS COMING, THROUGH A SEPARATE VAR — not a fallback
+  // switched on `input.read` inside the SAME `numberVar(env.KNOWLEDGE_MIN_SCORE,
+  // …)` call, because that would have made the two floors inseparable: any
+  // deployment (or test) that pins `KNOWLEDGE_MIN_SCORE` explicitly — which is
+  // every existing test in this suite — would silently pin the reader's floor
+  // to the SAME number too, and "the reader gets its own, lower floor" would
+  // have been true only on an environment that set neither var. Two floors, two
+  // vars, independently measured: `input.read` present means something is
+  // about to actually READ these passages rather than trust their score alone,
+  // so `KNOWLEDGE_READER_MIN_SCORE` (default `READER_HALLUCINATION_FLOOR`) is a
+  // guard against pure noise, and the real decision moves to the reader below.
+  // Absent `input.read`, this is `KNOWLEDGE_MIN_SCORE` / `MIN_VECTOR_SCORE`
+  // exactly as before Stage 2 — no existing caller's answers change.
+  const floor = input.read
+    ? numberVar(env.KNOWLEDGE_READER_MIN_SCORE, READER_HALLUCINATION_FLOOR)
+    : numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
   const vector = hits.filter((h) => h.score >= floor)
 
 
@@ -3285,20 +3352,43 @@ export async function retrieve(
     ranked = diversify(revived.map((row, i) => ({ row, score: 1 / (RRF_K + i) })))
   }
   ranked = await widenNeighbours(cfg, guard, reader, ranked, want)
-  const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => ({
-    sourceId: row.source_id,
-    title: row.title,
-    kind: row.kind,
-    url: row.source_url,
-    // The read above already carries `origin_table` and `origin_row_id` for the
-    // live cross-check, so the link to the record costs nothing extra.
-    recordPath: recordPath(row.origin_table, row.origin_row_id, row.compartment),
-    compartment: row.compartment,
-    seq: row.seq,
-    text: plainText(row.text),
-    score: Math.round(score * 1000) / 1000,
-    recordDate: row.record_date ?? null,
-  }))
+
+  // THE READER (BUILD-5 §5-6): re-reads a shortlist and decides what is real
+  // evidence, rather than trusting the floor's score alone. Runs on the whole
+  // RANKED POOL capped at READER_SHORTLIST_CAP (12) — wider than `want` (the
+  // six an answer carries), the same way a person skims more than they end up
+  // quoting — and its OWN order becomes the ranking for exactly the passages
+  // it was shown: a passage past the shortlist the reader never saw has not
+  // been vouched for, and is dropped along with the ones it actively rejected.
+  if (input.read && ranked.length) {
+    const shortlist = ranked.slice(0, READER_SHORTLIST_CAP)
+    const verdict = await input.read(
+      question,
+      shortlist.map(({ row, score }) => toPassage(row, score))
+    )
+    // BOTH OUTCOMES CLEAR `ranked` TO EMPTY UNLESS THE READER SAYS OTHERWISE —
+    // and that is deliberately the SAME handling for "the reader looked and
+    // found nothing" and "the reader could not run". `ranked` at this point was
+    // built against the WIDENED floor (`READER_HALLUCINATION_FLOOR`), which by
+    // design is not a safe floor on its own — it is a hallucination guard, and
+    // the reader's judgment is what was supposed to turn it into a real
+    // decision. A reader that FAILED never supplied that judgment, so passing
+    // the widened, unjudged pool through anyway would reintroduce exactly the
+    // failure this whole mechanism exists to fix — a low, uncalibrated cosine
+    // standing in for a real "is this evidence" decision, quietly, on the one
+    // path (a model outage) where nobody is watching. Refusing is the safe
+    // direction: it costs an answer the strict floor might have allowed
+    // through cleanly, never a confident one built on unverified material.
+    const byId = new Map(shortlist.map((r) => [passageId({ sourceId: r.row.source_id, seq: r.row.seq }), r]))
+    ranked = verdict
+      ? verdict.relevant.flatMap((id) => {
+          const r = byId.get(id)
+          return r ? [r] : []
+        })
+      : []
+  }
+
+  const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => toPassage(row, score))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
   const evidence = {
     question,
