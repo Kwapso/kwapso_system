@@ -543,6 +543,34 @@ const HISTORY_DOCS: Record<string, string> = {
     "the screen-recipe engine's own build plan, declared history by README's map; it records what that round shipped, Activity tab included",
 }
 
+/** THE RESIDUE THE MARKERS CANNOT READ, decided by a person and written down.
+ *
+ * `RETIREMENT_MARKERS` is a heuristic and it is doing real work — it clears most
+ * of the canon's history-telling without anybody listing it. But it is a
+ * HAND-LIST OF WORDS, and the first three lines it could not read were narrated
+ * with "shipping", "went with" and a clause the splitter cut the marker off
+ * from. Widening the vocabulary every time it misses one is the exact failure
+ * this whole control exists because of: `story_checks_out_review` spent six
+ * rounds proving that a pattern is a hand-listed census, and a longer pattern is
+ * a longer hand-list.
+ *
+ * So the residue becomes BOUNDED data instead. Each key is a distinctive
+ * fragment of the line — not a line NUMBER, which every edit above it would
+ * shift — and each value says why that mention is history. Rot-checked: a
+ * fragment that no longer appears, or one whose line the markers now clear on
+ * their own, turns the build red and the line gets deleted. It can only shrink,
+ * and a human read every entry in it. */
+const NARRATES_THE_RETIREMENT: Record<string, string> = {
+  '"kill all old activity tabs", the history reached instead from':
+    "R2's own law text quoting the client's ruling — the sentence that RETIRES the tab. The marker is the quote itself and the clause splitter cuts it off from the mention",
+  "shipping an Activity tab with no count at all":
+    "R8's *Earned by:* clause, describing the world before the amendment. 'shipping' is a gerund the marker list does not carry, and adding it would clear live prose too",
+  'activity tabs"): a record\'s history is reached from the ink footer':
+    "UI-CONVENTIONS' own code comment, where the client's quoted ruling WRAPS across two lines — 'The client retired it on 7 Sep 2026 (\"kill all old' ends the line above. The clause splitter cannot see a marker that is on the previous line, and widening it to neighbours wholesale would restore the exact blind spot this control was tightened to close",
+  "The `<ActivityPanel>` half went with the Activity tab on 7 Sep 2026":
+    "BUILD-A-MODULE's correction of its own false clause, 10 Sep 2026 — it says the obligation moved, in the sentence that says so. 'went with' is not a marker and should not become one",
+}
+
 describe("a ruling that changed the code changed the prose too", () => {
   const isPlan = (doc: string): boolean => doc.startsWith(".plans/")
   const isArtefact = (doc: string): boolean => /-review[.]md$/.test(doc)
@@ -559,12 +587,52 @@ describe("a ruling that changed the code changed the prose too", () => {
       }
       for (const [thing, { phrases }] of Object.entries(RETIRED_IN_THE_CANON))
         lines.forEach((line, i) => {
-          if (!phrases.some((re) => re.test(line))) return
-          // TWO LINES EITHER SIDE, because prose wraps and a retirement is
-          // routinely narrated in the sentence above the phrase it retires.
-          const near = lines.slice(Math.max(0, i - 2), i + 3).join(" ")
-          if (RETIREMENT_MARKERS.test(near)) return
-          offenders.push(`${doc}:${i + 1} states ${thing} as live: ${line.trim().slice(0, 90)}`)
+          // PER CLAUSE, NOT PER LINE — the blind spot `story_checks_out_review`
+          // found ninety seconds after this shipped, by constructing the case
+          // it thought might be missed rather than reverting one it knew was
+          // caught. A marker anywhere on the line used to wave the WHOLE line
+          // through, so this sentence passed while half of it was false:
+          //
+          //   "(it was <ActivityPanel> until 7 Sep 2026) and asserts each
+          //    contains TabsView + <ActivityPanel>."
+          //
+          // The first mention is history, the second is a live claim about an
+          // assertion the check stopped making, and they are one clause apart
+          // in the very line where the review had said that reading for one
+          // shape makes a second shape in the same line invisible.
+          //
+          // So each MATCH is judged on its own surroundings: the text between
+          // the clause breaks either side of it, widened to the neighbouring
+          // lines only when the clause itself is short, because prose wraps and
+          // a retirement is routinely narrated in the sentence above.
+          const context = (at: number): string => {
+            const before = line.slice(0, at)
+            const after = line.slice(at)
+            const open = Math.max(
+              ...[".", ";", "—", ")", " and ", " but "].map((d) => before.lastIndexOf(d))
+            )
+            const shut = Math.min(
+              ...[".", ";", "—", "(", " and ", " but "]
+                .map((d) => after.indexOf(d))
+                .filter((n) => n >= 0)
+                .concat([after.length])
+            )
+            const clause = line.slice(open + 1, at + shut)
+            // A clause too short to carry its own history is read with its
+            // neighbours; a full one is judged alone.
+            return clause.length < 40 ? lines.slice(Math.max(0, i - 2), i + 3).join(" ") : clause
+          }
+          let flagged = false
+          for (const re of phrases) {
+            const rx = new RegExp(re.source, re.flags.includes("g") ? re.flags : `${re.flags}g`)
+            for (const m of line.matchAll(rx)) {
+              if (flagged) break
+              if (RETIREMENT_MARKERS.test(context(m.index ?? 0))) continue
+              if (Object.keys(NARRATES_THE_RETIREMENT).some((frag) => line.includes(frag))) continue
+              offenders.push(`${doc}:${i + 1} states ${thing} as live: ${line.trim().slice(0, 90)}`)
+              flagged = true
+            }
+          }
         })
     }
     expect(
@@ -587,6 +655,13 @@ describe("a ruling that changed the code changed the prose too", () => {
         phrases.some((re) => re.test(canon)),
         `RETIRED_IN_THE_CANON lists "${thing}", which the canon no longer mentions at all - delete the entry`
       ).toBe(true)
+    for (const [frag, why] of Object.entries(NARRATES_THE_RETIREMENT)) {
+      expect(
+        canon.includes(frag),
+        `NARRATES_THE_RETIREMENT still lists "${frag.slice(0, 40)}…", which the canon no longer says — delete the line`
+      ).toBe(true)
+      expect(why.length, `"${frag.slice(0, 30)}…" needs a real reason`).toBeGreaterThan(40)
+    }
     for (const [doc, why] of Object.entries(HISTORY_DOCS)) {
       expect(existsSync(join(ROOT, doc)), `HISTORY_DOCS names ${doc}, which is gone - delete the line`).toBe(true)
       expect(why.length, `${doc} needs a real reason`).toBeGreaterThan(40)
