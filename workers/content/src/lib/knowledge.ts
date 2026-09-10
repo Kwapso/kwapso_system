@@ -659,7 +659,40 @@ function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } 
  * for a client-computed value to be stale by the time the third statement
  * runs. `gone_at IS NULL` is a LIVE sighting; `shelf = 'team'` is the only
  * shelf this flag ever models — see `ownerClause`'s own header for why the
- * app tier can never ride this column. */
+ * app tier can never ride this column.
+ *
+ * ── THE ONE THING A CALLER MUST GET RIGHT, SAID EXACTLY: SPLICE ORDER ──────
+ *
+ * `d1ExecScript` runs the statements in ONE script in the order they are
+ * written, and each later statement sees every earlier one's effect — that is
+ * the whole reason a script is atomic in the first place. This function's
+ * `EXISTS` subqueries read `knowledge_sightings` AS THE SCRIPT STANDS AT THE
+ * MOMENT THEY RUN. So:
+ *
+ *   THE STATEMENT(S) THAT INSERT, UPDATE OR RETIRE A SIGHTING FOR THIS SOURCE
+ *   MUST APPEAR EARLIER IN THE SAME SCRIPT STRING THAN THIS FUNCTION'S OUTPUT.
+ *
+ *       const script = `
+ *         INSERT INTO knowledge_sightings (...) VALUES (...);
+ *         ${teamVisibleRecomputeSql(sourceId)}
+ *       `
+ *       await d1ExecScript(cfg, guard.databaseId, script)
+ *
+ * GET THE ORDER BACKWARDS — recompute text placed BEFORE the sighting write —
+ * and the `EXISTS` runs against the sightings table as it stood a moment
+ * EARLIER, before the very write that was supposed to make it correct. That
+ * produces exactly the staleness this function exists to prevent, self
+ * inflicted, inside the one script that was supposed to be atomic against it.
+ * A stale-high result from this failure mode never leaks (it only narrows a
+ * caller in early, which R26 accepts); a stale-LOW one silently refuses
+ * material to everybody it should still answer for, the moment the ordering
+ * mistake happens to land on a source's LAST live sighting retiring.
+ *
+ * Multiple sighting writes for the SAME source in one script — a fold adding
+ * one sighter while retiring another — are fine in any order AMONG
+ * THEMSELVES, as long as all of them precede this function's text. A caller
+ * recomputing with no sighting write in the same script at all (a resync, a
+ * repair pass) may splice this anywhere; there is nothing to race against. */
 export function teamVisibleRecomputeSql(sourceId: string): string {
   const id = sqlString(sourceId)
   const teamSightingExists = `EXISTS (
