@@ -574,3 +574,69 @@ kb_B1 and kb_B2 both believed was missing, the purge ruling above, and the $10
 cap. In each case the document was right there and stale-looking or assumed-read.
 A hub that only answers the questions asked will keep missing these; the answer is
 to re-read the plan against each report rather than against memory.
+
+## Tick 11 — 10 Sep 2026, ~21:55
+
+**THE FENCE IS TWO CLAUSES AND EVERY LANE — AND I — HAD BEEN TREATING IT AS ONE.**
+Found by reading `knowledge.ts` rather than any lane's summary of it:
+
+    readerClause(guard, prefix) = ownerClause AND appClause          // :602
+
+There are **THREE** visibility settings, not two: `visibility: r.owner_user_id ?
+"private" : r.visible_to_app_id ? "app" : "team"` (:521). The middle one is the
+app tier — "the middle setting the module was missing (12.3)" — riding `app_staff`
+rather than a parallel access-control table. **kb_B1's `Sighting.shelf` is
+`"private" | "team"` and kb_A's CHECK allows only those two, so the app tier has
+no shelf.** `teamVisible(s) === true` therefore does NOT mean "the team may read
+this"; it means "no owner blocks it".
+
+**Three consequences sent to kb_B1, in danger order:**
+
+(a) **`team_visible` must never become the authoritative answer.** The
+architecture already separates narrowing from deciding, in R26's own words in
+`readerClause`'s doc comment: `knowledge_terms` carries `owner_user_id` and
+DELIBERATELY carries no app, because the index NARROWS and the team's database
+DECIDES — a restricted chunk may reach the candidate pool and cost a passage its
+place, but not an answer, because the read-back joins `knowledge_sources` with the
+full clause. So the stored flag is a narrowing aid of the same species as the
+existing denormalised `owner_user_id`. An optimiser who later trusts the flag and
+drops the read-back join silently bypasses the app fence. To be written into the
+flag's own doc comment.
+
+(b) **The fold has a SECOND one-column-two-values fault nobody had looked at.**
+Two sources folding, one with `visible_to_app_id = X` and one NULL: NULL widens
+(app-restricted becomes team-readable), X narrows. Asked kb_B1 to MEASURE it the
+way it measured the calendar — and to record a zero as "a case the design must
+still decide", not "a case that does not exist", because the calendar taught us
+"surely rare" and "100% of them" can be the same question.
+
+(c) **kb_B1's equality proof is sound and narrower in scope than it reads.** It
+pins `teamVisible` to `readableBy` — both its own functions, in its own model. It
+does NOT pin `readableBy` to the fence live today. There is no backfill: I grepped
+0073 for `INSERT INTO knowledge_sightings` and found none. Under the purge that
+may be moot (rows re-pulled, sightings written fresh) — but it must be SAID rather
+than assumed. An internally consistent proof over a model nobody tied to reality
+is exactly what a fresh reviewer should catch.
+
+**Ruling unchanged, third condition added:** the app fence survives, and the flag
+is documented as narrowing-only.
+
+**kb_B1 owned its `seen_where` error** and sharpened the reasoning past mine: with
+one row per person the Drive lane and the mail lane FIGHT OVER THAT ROW — one
+stamps `gone_at`, the other clears it — the `owner_user_id` fault one level down,
+in the very table built to fix it.
+
+**MERGED kb_A's SEARCH.md correction** (`823dd03f`, check exit 0). It fixed the
+RULE as well as the example — an example a reader copies is half the damage, a
+rule telling them to attempt the unbuildable thing is the other half. It flagged
+SEARCH.md:197's "per-team FTS5 terms search" misnomer WITHOUT fixing it, correctly:
+outside both findings, and fixing every adjacent imprecision is how a doc
+correction becomes an unreviewable diff. Follow-up for whenever that fallback is
+rewired.
+
+**A NOTE ON MY OWN GREPS, THIRD TIME TODAY.** My first search for the fence
+returned nothing and I nearly reported "no backfill, no fence clause" off it —
+`--include=*.ts` is unquoted-glob-expanded by zsh and the command had died. Quoted,
+it found four files and 27 occurrences. Ticks 5, 9 and 11: a pattern that omitted a
+category, a rule too blunt for a compound row, and a shell that ate the flag. An
+empty result is the dangerous one.
