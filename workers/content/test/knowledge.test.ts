@@ -37,7 +37,9 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify, rebuildNameIndex } from "../src/lib/knowledge"
+import { diversify, hasRecencyIntent, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
+import { passageId } from "../src/lib/knowledge-reader"
+import type { MemberGuard } from "@shared/workers/gating"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 
@@ -83,7 +85,18 @@ function fakeVector(text: string): number[] {
 
 function env(
   userId: string,
-  opts: { brokenModel?: boolean; noVectorStore?: boolean; minScore?: string } = {}
+  opts: {
+    brokenModel?: boolean
+    noVectorStore?: boolean
+    minScore?: string
+    /** The READER's own floor (KNOWLEDGE_READER_MIN_SCORE) — a SEPARATE var
+     * from `minScore` on purpose (see `retrieve`'s own comment on `floor`):
+     * a test exercising the reader path sets this rather than `minScore`,
+     * proving the two are genuinely independent rather than one relaxed
+     * reading of the other. Unset means the code's own default
+     * (READER_HALLUCINATION_FLOOR). */
+    readerMinScore?: string
+  } = {}
 ) {
   const base = makeEnv(() => db(), userId) as unknown as Record<string, unknown>
   return {
@@ -97,6 +110,7 @@ function env(
     // against the real model on 7,441 real chunks. Setting it here is the same
     // act as setting it for a new model in production.
     KNOWLEDGE_MIN_SCORE: opts.minScore ?? "0.35",
+    KNOWLEDGE_READER_MIN_SCORE: opts.readerMinScore,
     AI: {
       run: async (_model: string, input: { text: string[] }) => {
         embedded.push(...input.text)
@@ -227,18 +241,29 @@ describe("a source a person writes is answerable straight away", () => {
       title: "How we handle a dispatch outage",
       body: "When the dispatch screen logs people out, restart the session service and tell the client within the hour.",
     })
-    // Chunked, tokenised and embedded in the same call — the owner asked for
-    // instant syncing, and "instant" is what makes a note worth typing.
+    // Chunked and embedded in the same call — the owner asked for instant
+    // syncing, and "instant" is what makes a note worth typing.
     const chunks = db().prepare("SELECT COUNT(*) n FROM knowledge_chunks WHERE source_id = ?").get(id) as {
       n: number
     }
     expect(chunks.n).toBeGreaterThan(0)
-    const terms = db()
+    // FTS5 (0073), NOT `knowledge_terms` — the lexical arm's own index, kept in
+    // step by `indexSource` itself (see its comment). `knowledge_terms` is
+    // written by nothing any more (tracker item `a-fts`, step 1: retired 10 Sep
+    // 2026, verified off disk that nothing anywhere reads it before the writes
+    // stopped) — asserted here as a real negative rather than left silent, so a
+    // write that creeps back in fails loudly rather than quietly reviving a
+    // dead table.
+    const fts = db()
       .prepare(
-        "SELECT COUNT(*) n FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ?)"
+        `SELECT COUNT(*) n FROM knowledge_chunks_fts f
+           JOIN knowledge_chunks c ON c.rowid = f.rowid
+          WHERE c.source_id = ?`
       )
       .get(id) as { n: number }
-    expect(terms.n).toBeGreaterThan(0)
+    expect(fts.n).toBeGreaterThan(0)
+    const terms = db().prepare("SELECT COUNT(*) n FROM knowledge_terms").get() as { n: number }
+    expect(terms.n, "knowledge_terms must stay empty — nothing writes to it any more").toBe(0)
 
     const answer = await ask(IDS.staffUser, "what do we do when the dispatch screen logs people out?")
     expect(answer.found).toBe(true)
@@ -383,6 +408,175 @@ describe("R23 — a question the team's material cannot answer is refused, not a
     expect(answer.found).toBe(true)
     expect(titles(answer)).toContain("Capital expenditure sign-off")
   })
+
+  // BUILD-5 §5-6, 0077: a refusal remembers what it saw. Proved here rather
+  // than left to the migration test alone, because "the table exists and can
+  // hold a row" and "retrieve() actually writes one" are different claims —
+  // the same gap `stripTrailingSourceList` (knowledge-compose.ts) was earlier
+  // named as: a predicate nobody calls is not a guard.
+  it("a refusal writes a row to knowledge_refusals, with the question and the reason it carried", async () => {
+    const before = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    const answer = await ask(IDS.staffUser, "What is the capital of France?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(false)
+    const after = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    expect(after.n, "no row was written for a real refusal").toBe(before.n + 1)
+    const row = db()
+      .prepare(
+        "SELECT question, reason, shortlist, top1_score, asked_by_user_id FROM knowledge_refusals ORDER BY created_at DESC LIMIT 1"
+      )
+      .get() as {
+      question: string
+      reason: string
+      shortlist: string
+      top1_score: number | null
+      asked_by_user_id: string
+    }
+    expect(row.question).toBe("What is the capital of France?")
+    expect(row.reason.length).toBeGreaterThan(0)
+    expect(row.asked_by_user_id).toBe(IDS.staffUser)
+    // The shortlist is always valid JSON — an array, whether or not there was
+    // anything in it to log.
+    expect(Array.isArray(JSON.parse(row.shortlist))).toBe(true)
+    // KB-AUDIT.md §3's own instrument: the raw top-1 cosine, captured even
+    // though this question was refused before it ever reached the floor
+    // decision — there IS a nearest neighbour (the base holds two real
+    // sources), it is just not close enough, and that number is the whole
+    // point of this column.
+    expect(row.top1_score, "the raw top-1 score must be captured, not just the fused shortlist").not.toBeNull()
+  })
+
+  it("an answer that DOES find something writes no refusal row", async () => {
+    const before = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    await ask(IDS.staffUser, "capital expenditure?", undefined, NOTHING_CLOSE_ENOUGH)
+    const after = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    expect(after.n).toBe(before.n)
+  })
+})
+
+// BUILD-5-knowledge-rebuild.md §5-6, KB-AUDIT.md §3's own case: "the retrieval
+// is working, the floor is discarding the win". A paraphrase whose vector score
+// sits under the ordinary floor is refused with NO reader; the SAME question,
+// the SAME material, is answered honestly once a reader is supplied — because
+// the floor that applies is a different one (KNOWLEDGE_READER_MIN_SCORE, a
+// hallucination guard) and the real decision moves to what the reader says.
+// `retrieve()` is called directly rather than through `ask()`'s HTTP door,
+// because `read` is a function and cannot cross that boundary — the door
+// wiring (gating + metering a real model call) is a separate, not-yet-built
+// piece; this proves the mechanism `retrieve()` itself now has.
+describe("the reader recovers a paraphrase the floor alone would refuse (BUILD-5 §5-6)", () => {
+  const guard: MemberGuard = { userId: IDS.staffUser, teamId: IDS.team, roleId: IDS.adminRole, databaseId: "db" }
+
+  beforeEach(async () => {
+    await addSource(IDS.staffUser, {
+      title: "Team Assembly",
+      body: "The monthly team assembly happens on the first Friday. Aurora organises it and rotates who leads it next time.",
+    })
+  })
+
+  /** A reader that keeps everything it is shown — proves the RECOVERY half. */
+  const keepEverything = async (_q: string, shortlist: { sourceId: string; seq: number }[]) => ({
+    relevant: shortlist.map(passageId),
+  })
+  /** A reader that has genuinely looked and found nothing — proves that
+   * widening the floor does not mean the reader rubber-stamps whatever it is
+   * shown; an HONEST refusal is still available after reading. */
+  const keepNothing = async () => ({ relevant: [] })
+
+  // The reader's OWN floor, set low enough that the fake model's cosine for
+  // this genuine-but-partial overlap (2 of the question's 4 terms) clears it
+  // — the fake model's scale has nothing to do with bge-m3's, so this number
+  // means nothing beyond "this suite's stand-in model, this fixture". Paired
+  // with the SAME impossibly strict `minScore` as the no-reader test above, so
+  // every reader test here proves the two floors are genuinely independent
+  // vars, not one relaxed reading of the other.
+  const READER_OPTS = { ...NOTHING_CLOSE_ENOUGH, readerMinScore: "0.15" }
+
+  it("without a reader, the strict floor refuses the paraphrase", async () => {
+    const answer = await retrieve(env(IDS.staffUser, NOTHING_CLOSE_ENOUGH), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+    })
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(false)
+  })
+
+  it("with a reader, KNOWLEDGE_MIN_SCORE stops being the question — the reader's own floor and verdict decide", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: keepEverything,
+    })
+    expect(answer.found, `still refused; reason: ${answer.reason}`).toBe(true)
+    expect(titles(answer)).toContain("Team Assembly")
+  })
+
+  it("and a reader that genuinely finds nothing still produces an honest refusal, not a rubber stamp", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: keepNothing,
+    })
+    expect(answer.found).toBe(false)
+    expect(answer.passages).toEqual([])
+    expect(answer.citations).toEqual([])
+  })
+
+  it("a reader that fails to run refuses honestly, rather than exposing the widened pool unjudged", async () => {
+    const answer = await retrieve(env(IDS.staffUser, READER_OPTS), {} as never, guard, {
+      question: "who organises our monthly get-together?",
+      read: async () => null,
+    })
+    // The pool this would have shown a reader was built against the LOW
+    // hallucination-guard floor, not the strict one — so a failed reader must
+    // NOT fall through to answering from it: that would be exactly the
+    // uncalibrated-cosine failure this mechanism exists to fix, on the one
+    // path (a model outage) nobody is watching. Refuse instead.
+    expect(answer.found).toBe(false)
+    expect(answer.passages).toEqual([])
+  })
+})
+
+// KB-AUDIT.md §4.5, MEASURED 10 Sep 2026: "what changed this week?" returned
+// one citation from 31 August while a 7 September source (88 chunks) existed
+// and was never retrieved — ABSENT, not ranked low, because a generic
+// recency question shares no words or meaning with any one week's specific
+// content. Neither the vector nor the lexical arm can find something they do
+// not recognise; the recency arm does not try to recognise anything, it asks
+// what is newest, and only when the question itself asked for that.
+describe("the recency arm — a question that wants what is new (KB-AUDIT.md §4.5)", () => {
+  let newestId = ""
+
+  beforeEach(async () => {
+    const oldId = await addSource(IDS.staffUser, {
+      title: "Week planning",
+      body: "The team discussed the invoice run and the sign-off steps for next month.",
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-01-01' WHERE id = '${oldId}'`)
+    newestId = await addSource(IDS.staffUser, {
+      title: "Office supplies note",
+      body: "A completely unconnected note about stationery and printer paper, sharing no topic with anything else here.",
+    })
+    db().exec(`UPDATE knowledge_sources SET record_date = '2026-09-07' WHERE id = '${newestId}'`)
+  })
+
+  it("without recency intent, a question with no shared vocabulary finds nothing — the absence the audit measured", async () => {
+    const answer = await ask(IDS.staffUser, "what's going on?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(false)
+  })
+
+  it("'latest' recovers the newest source even though it shares no words with the question", async () => {
+    const answer = await ask(IDS.staffUser, "what's the latest?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found, `answered out of ${titles(answer).join(", ") || "nothing"}`).toBe(true)
+    expect(titles(answer)).toContain("Office supplies note")
+  })
+
+  it("hasRecencyIntent is the gate — 'currently'/'today'/'this week' do NOT trigger it (measured: they collide with ordinary questions)", () => {
+    for (const ordinary of [
+      "where do things currently stand?",
+      "what is due today?",
+      "what happened this week?",
+      "since last week, has anything moved?",
+    ])
+      expect(hasRecencyIntent(ordinary), ordinary).toBe(false)
+    for (const real of ["what's the latest?", "any recent news?", "what's the newest update?", "what changed?"])
+      expect(hasRecencyIntent(real), real).toBe(true)
+  })
 })
 
 describe("the compartment is derived, and it is the reasoning that ships", () => {
@@ -401,7 +595,7 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
       title: "How we run a rollout",
       body: "Every rollout starts with a dry run and a written sign-off from the client.",
     })
-    // `accountNamedIn` reads `knowledge_names` (0073), not `accounts` directly —
+    // `accountsNamedIn` reads `knowledge_names` (0073), not `accounts` directly —
     // in production the sync door keeps it in step (`postKnowledgeSync`); here
     // it is built once, directly, the same way `diversify` is exercised as a
     // plain function elsewhere in this suite. `cfg`/`guard` are both ignored by
@@ -480,6 +674,26 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
     const answer = await ask(IDS.staffUser, "what does our marine insurance cover?")
     expect(answer.compartments).toEqual([])
   })
+
+  // THE DETERMINISTIC HALF OF BUILD-5's FAN-OUT: a question naming TWO clients
+  // widens the search to both of them, rather than the router's old
+  // `ORDER BY LENGTH(name) DESC` picking whichever sorted longest and silently
+  // dropping the other. No model call — this is a lookup against real named
+  // entities the team already holds records for, not a judgment about
+  // language, which is why it is safe to run on every question.
+  it("a question naming two clients searches both, not whichever name sorted longest", async () => {
+    const answer = await ask(IDS.staffUser, "when do Bergman S.A. and Delaval Group both move to the new invoice run?")
+    expect(answer.compartments.sort()).toEqual(
+      [`account:${IDS.victimAccount}`, `account:${IDS.burglarAccount}`, "agency"].sort()
+    )
+    expect(answer.reason).toContain("Bergman S.A.")
+    expect(answer.reason).toContain("Delaval Group")
+    // …and both accounts' material is actually reachable, not merely in the
+    // compartment list — the whole point of widening the search rather than
+    // widening the sentence alone.
+    expect(titles(answer)).toContain("Bergman rollout plan")
+    expect(titles(answer)).toContain("Delaval rollout plan")
+  })
 })
 
 // KB-AUDIT.md §4.2 — THE ROUTER HIJACKED BY ORDINARY WORDS. 26 of 134 staging
@@ -487,7 +701,7 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
 // ("VU Solutions" → "solutions", "re-green" → "green"), and the old router
 // (a raw scan of `accounts`) matched on that one token alone: a question
 // about "solutions" in general silently narrowed to whichever account
-// happened to be named that. `accountNamedIn` now requires a single-token
+// happened to be named that. `accountsNamedIn` now requires a single-token
 // name to be RARE across the corpus (`isRareTerm`) before it may narrow —
 // exercised here directly rather than through the fake embedding model,
 // because the fault is in ROUTING, not ranking.

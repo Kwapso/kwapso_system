@@ -138,6 +138,7 @@ import {
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
+import { passageId, READER_SHORTLIST_CAP } from "./knowledge-reader"
 import {
   chunkVectorId,
   deleteVectors,
@@ -362,6 +363,21 @@ const DEFAULT_PASSAGES = 6
  * that measured it is kept — see .plans/BUILD-4-knowledge-retrieval.md). A test
  * running against a stand-in model sets its own, for the same reason. */
 const MIN_VECTOR_SCORE = 0.5
+
+/** THE FLOOR WHEN A READER IS GOING TO LOOK ANYWAY (BUILD-5 §6: "a low
+ * absolute score (~0.30) only guards nonsense; thin material → answer and say
+ * what is missing"). KB-AUDIT.md §3 measured the cost of using
+ * `MIN_VECTOR_SCORE` as the SOLE decision: a paraphrase sits 0.05–0.06 lower
+ * than its direct twin, which is exactly the band 0.50 cuts — "Who is
+ * responsible for organising the monthly get-together?" scored 0.444 against
+ * the right document (Team Assembly) and was refused outright, correct
+ * document, wrong decision layer.
+ *
+ * ONLY IN EFFECT WHEN `input.read` IS SUPPLIED. Every existing caller (no
+ * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
+ * silent change to what "found" means for a caller that never asked for the
+ * reader. See `retrieve`'s own comment at the point this is used. */
+const READER_HALLUCINATION_FLOOR = 0.3
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
@@ -1643,12 +1659,15 @@ async function clearIndex(
       chunkVectorId(sourceId, fromSeq + i)
     ),
   ])
-  await d1Query(
-    cfg,
-    guard.databaseId,
-    "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ? AND seq >= ?)",
-    [sourceId, fromSeq]
-  )
+  // `knowledge_terms`'s own delete USED TO SIT HERE. Retired (tracker item
+  // `a-fts`) once `lexicalArm`'s move to `knowledge_chunks_fts` left it with
+  // no reader anywhere in the app, the MCP surface or `scripts/` — verified
+  // off disk, not assumed: zero `SELECT … FROM knowledge_terms` outside a
+  // diagnostic COUNT(*) in wipe-knowledge.mjs. Step 1 of 2 (hub ruling,
+  // 10 Sep 2026): stop writing first, fully reversible, the table and its
+  // rows are untouched. Dropping the table is step 2 and waits until this
+  // has run live through a real rebuild with nothing missing it.
+  //
   // KEEPING `knowledge_chunks_fts` IN STEP — the same keyed 'delete' the
   // migration's own test demonstrates, reading the rows' CURRENT text WHILE
   // they still exist, immediately before the statement that removes them.
@@ -1895,12 +1914,13 @@ export async function indexSource(
     for (let start = 0; start < piece.length; start += CHUNK_WRITE_BATCH) {
       const batch = piece.slice(start, start + CHUNK_WRITE_BATCH)
       const ids = batch.map((_, offset) => chunkVectorId(sourceId, from + start + offset))
-      // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE. A chunk keeps its id when
-      // its text changes, so its old words would otherwise stay in the inverted
-      // index pointing at a piece that no longer contains them. On a first write
-      // this matches nothing; it is one statement per twenty chunks either way.
+      // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE, in the FTS5 index — a chunk
+      // keeps its id when its text changes, so its old words would otherwise
+      // stay behind pointing at a piece that no longer contains them.
+      // `knowledge_terms`'s own delete USED TO SIT HERE too; retired alongside
+      // `clearIndex`'s (see that function's comment for the full reasoning and
+      // the verification this rests on).
       const statements: string[] = [
-        `DELETE FROM knowledge_terms WHERE chunk_id IN (${ids.map(sqlString).join(", ")});`,
         // KEEPING `knowledge_chunks_fts` (0073) IN STEP — application code's job,
         // because a trigger cannot survive this repo's migration executor (see
         // the migration's own header). External-content FTS5's 'delete' command
@@ -1951,11 +1971,6 @@ export async function indexSource(
         statements.push(
           `INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id = ${sqlString(chunkId)};`
         )
-        for (const [term, weight] of tokenise(chunk))
-          statements.push(
-            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, team_visible, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${weight})
-               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, weight = excluded.weight;`
-          )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
       })
       await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
@@ -2198,15 +2213,26 @@ async function deriveCompartment(
         reason: `You asked from ${named.name}'s record, so I searched ${named.name}'s material and the agency's own.`,
       }
   }
-  // 2. THE QUESTION NAMES A CLIENT. Matched on the account's own name and
-  //    reference, and confirmed word by word (below) so "new" cannot match
-  //    "Newton Ltd".
-  const named = await accountNamedIn(cfg, guard, input.question)
-  if (named)
+  // 2. THE QUESTION NAMES ONE OR MORE CLIENTS. Matched on each account's own
+  //    name and reference, confirmed word by word (below) so "new" cannot
+  //    match "Newton Ltd" — and ALL of them widen the search, not just the
+  //    first found (BUILD-5's deterministic fan-out: "compare BERG's ticket
+  //    volume to HOGO's" used to search whichever name sorted longest and
+  //    silently drop the other).
+  const named = await accountsNamedIn(cfg, guard, input.question)
+  if (named.length === 1)
     return {
-      compartments: [accountCompartment(named.id), AGENCY_COMPARTMENT],
-      reason: `The question names ${named.name}, so I searched ${named.name}'s material and the agency's own.`,
+      compartments: [accountCompartment(named[0].id), AGENCY_COMPARTMENT],
+      reason: `The question names ${named[0].name}, so I searched ${named[0].name}'s material and the agency's own.`,
     }
+  if (named.length > 1) {
+    const names = named.map((a) => a.name)
+    const list = names.length === 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+    return {
+      compartments: [...named.map((a) => accountCompartment(a.id)), AGENCY_COMPARTMENT],
+      reason: `The question names ${list}, so I searched all of their material and the agency's own.`,
+    }
+  }
   // 3. NOTHING NAMED. Search everything — a question about our own process has
   //    no client in it, and neither does a vague one.
   return {
@@ -2328,7 +2354,7 @@ async function sourceTitles(
 
 /** IS THIS TOKEN RARE ENOUGH TO MEAN SOMETHING ON ITS OWN — the same question
  * `EXACT_TERM_MAX_CHUNKS` already answers for the lexical arm's rare-token
- * bypass, asked here for `accountNamedIn` instead of inventing a second
+ * bypass, asked here for `accountsNamedIn` instead of inventing a second
  * number for the same idea. UNFENCED (whole-team chunk count over FTS5),
  * because this runs BEFORE the compartment is known — narrowing to a
  * compartment is the very question this function exists to answer. */
@@ -2357,13 +2383,39 @@ async function isRareTerm(cfg: D1Rest, guard: MemberGuard, term: string): Promis
  * `code`, e.g. BERG) bypasses both: a code is chosen to be a short,
  * unambiguous handle on purpose, so an exact match is evidence on its own,
  * exactly as it was before this function moved off `accounts.code`. */
-async function accountNamedIn(
+/** How many DISTINCT accounts one question may name before the compartment
+ * search widens to all of them. BUILD-5-knowledge-rebuild.md's own fan-out
+ * ceiling ("hard cap 12"), reused here rather than a second number invented
+ * for the same idea — asking about more than a dozen clients in one
+ * question is pathological, and the cap exists as a sanity ceiling rather
+ * than a cost one (a compartment is a free extra value in one `IN (...)`
+ * clause, not a second search). */
+const NAMED_ACCOUNTS_CAP = 12
+
+/** EVERY account the question names, not just the first — the deterministic
+ * half of BUILD-5's "fan-out": a question naming two or more clients widens
+ * the compartment search to all of them rather than picking one arbitrarily
+ * (the router's `ORDER BY LENGTH(name) DESC` used to mean "the longest name
+ * wins", silently dropping every other one it found). Same anti-hijack rules
+ * as a single match — a name has to be ≥2 tokens or a corpus-rare single one,
+ * or match a code exactly — applied to every candidate rather than stopping
+ * at the first that passes.
+ *
+ * NOT A MODEL CALL, ON PURPOSE. This is the SAFE half of fan-out: detecting
+ * multiple NAMED, REAL entities the team already holds records for, which is
+ * a lookup against data rather than a judgment about language. It says
+ * nothing about a genuinely ambiguous multi-part question with no named
+ * entity in it ("compare what we agreed in March to what we agreed in July")
+ * — that case needs either a heuristic nobody has measured yet or a real
+ * model call, and is deliberately left alone here rather than shipped on a
+ * guess (see `retrieve`'s own header for where that stands). */
+async function accountsNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
   question: string
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string }[]> {
   const terms = questionTerms(question, 8)
-  if (!terms.length) return null
+  if (!terms.length) return []
   const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
   const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
@@ -2377,22 +2429,34 @@ async function accountNamedIn(
     params
   )
   const asked = new Set(terms)
+  const found: { id: string; name: string }[] = []
+  const seen = new Set<string>()
   for (const c of candidates) {
+    if (found.length >= NAMED_ACCOUNTS_CAP) break
+    let match: { id: string; name: string } | null = null
     // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
     // no token-count/rarity gate. `alias_of` carries the canonical name back.
     if (c.alias_of) {
-      if (asked.has(c.name.toLowerCase())) return { id: c.ref_id, name: c.alias_of }
-      continue
+      if (asked.has(c.name.toLowerCase())) match = { id: c.ref_id, name: c.alias_of }
+    } else {
+      const nameTerms = [...tokenise(c.name).keys()]
+      if (nameTerms.length && nameTerms.every((t) => asked.has(t))) {
+        if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
+          match = { id: c.ref_id, name: c.name }
+      }
     }
-    const nameTerms = [...tokenise(c.name).keys()]
-    if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
-    if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
-      return { id: c.ref_id, name: c.name }
+    // DEDUPED BY ACCOUNT, not by row: the same account's canonical name and
+    // its code can both match one question ("BERG, the Bergman account…"),
+    // and that is one account named twice, not two.
+    if (match && !seen.has(match.id)) {
+      seen.add(match.id)
+      found.push(match)
+    }
   }
-  return null
+  return found
 }
 
-/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountNamedIn` reads.
+/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountsNamedIn` reads.
  *
  * READ STRAIGHT OFF `accounts` AND `apps`, not off `knowledge_sources`. The
  * first draft of this function derived names from the SWEPT mirror instead —
@@ -2403,7 +2467,7 @@ async function accountNamedIn(
  * "named no client" — the exact silent failure KB-AUDIT.md §4.2 is about,
  * moved rather than fixed. `accounts` and `apps` are foundational tables that
  * exist the moment a record does, independent of indexing, which is what
- * `accountNamedIn`'s ORIGINAL implementation relied on by reading them
+ * `accountsNamedIn`'s ORIGINAL implementation relied on by reading them
  * directly; this keeps that guarantee.
  *
  * `contact`/`person` kinds are left to grow this table later (the migration's
@@ -2417,7 +2481,7 @@ async function accountNamedIn(
  * "Lane C's job, not this table's" — needs a model call this build has not
  * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
  * rule is ask first). A canonical name with no alias is still fully usable:
- * `accountNamedIn`'s multi-token and rare-single-token rules both read it
+ * `accountsNamedIn`'s multi-token and rare-single-token rules both read it
  * alone, and a client whose accepted name IS a single ordinary word (the
  * audit's own "green"/"solutions" cases) still resolves once it clears the
  * rarity floor — no alias required for either path.
@@ -2830,6 +2894,103 @@ async function nameArm(
   return rows.map((r) => ({ chunk_id: r.chunk_id, lex: 1, exact: 1 }))
 }
 
+/** WORDS THAT SIGNAL THE QUESTION WANTS WHAT IS NEW (KB-AUDIT.md §4.5).
+ * `fuse`'s own header names the bar for reopening recency: "a term that
+ * applies only when the question itself says 'latest', 'recent', 'today'" —
+ * and MEASURED, 10 Sep 2026, that suggestion was too loose to ship as
+ * written. "today", "currently"/"current" and "this week"/"since last week"
+ * all appear in ORDINARY questions this suite already exercises — "where
+ * things currently stand with ticket 3144", "what is currently happening
+ * with the Bergman dispatch rollout" — none of which are asking for the
+ * newest material; they are asking a STATUS question using everyday
+ * temporal words. Narrowed to the handful that mean "give me the newest
+ * thing" and nothing else: "latest", "recent" (bare, not "recently" — the
+ * adverb reads as ordinary phrasing the same way "currently" does), "newest",
+ * and the two audit-measured phrasings themselves. Deliberately narrow —
+ * every ordinary question is left at the behaviour the fusion weights were
+ * measured on, which is the whole point of GATING on intent rather than
+ * adding recency as a universal signal. */
+const RECENCY_WORDS = /\b(latest|recent|newest|what'?s new|what changed)\b/i
+
+export function hasRecencyIntent(question: string): boolean {
+  return RECENCY_WORDS.test(question)
+}
+
+/** How many of the newest sources this arm offers. Small — it exists to make
+ * sure the newest material is a CANDIDATE at all, not to flood the fusion
+ * with everything recent regardless of relevance. */
+const RECENCY_TOP_K = 8
+
+/** THE RECENCY ARM'S VOTE — EXACT_WEIGHT's twin, the same reasoning NAME_WEIGHT
+ * already borrows it for: when the question EXPLICITLY signals what it wants
+ * (a name, an exact reference, or here, "the latest"), that is evidence an
+ * embedding is not built to carry, and it earns the same confident weight as
+ * the other two exact signals rather than a fraction of a vote. */
+const RECENCY_WEIGHT = EXACT_WEIGHT
+
+/** THE RECENCY ARM (KB-AUDIT.md §4.5). Measured, 10 Sep 2026: "what changed
+ * this week?" returned ONE citation, from 31 August; the 7 September Week
+ * planning (88 chunks) existed and was NEVER RETRIEVED — not ranked low,
+ * ABSENT. "What are the most recent decisions we made?" was REFUSED outright.
+ * The trigger `fuse`'s header names — "a question whose newest material is
+ * not retrieved at all" — is met, and it is met for a structural reason no
+ * fusion WEIGHT can fix: "what changed" and "most recent decisions" share no
+ * words and no real meaning with any one week's specific content, so the
+ * vector and lexical arms have nothing to recognise. This arm does not try to
+ * recognise anything either — it asks what is NEWEST in the searched
+ * compartments, plainly, and only runs when the question itself asked for
+ * that (`hasRecencyIntent`). Fenced like `nameArm`: the real fence is the
+ * pool's own read-back (R26), this only has to narrow the same way every
+ * other arm's candidate read does. */
+async function recencyArm(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  compartments: string[],
+  kinds: string[] | null
+): Promise<CandidateRow[]> {
+  const owner = ownerClause(guard)
+  const where = [owner.sql, "deactivated_at IS NULL", "record_date IS NOT NULL"]
+  const params: string[] = [...owner.params]
+  if (compartments.length) {
+    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
+    params.push(...compartments)
+  }
+  // INTERPOLATED, NOT BOUND — matching `retrieve`'s own `chipClause` a few
+  // lines below, which reads this exact list the same way: a source chip key
+  // resolves through `kindsForChips` against `SOURCE_CHIP_KEYS`, a fixed,
+  // code-declared vocabulary (shared/knowledge-chips.ts), never free text off
+  // a request. Two spellings of "bind one per element" for the same
+  // server-controlled list would be a second convention for the same fact.
+  if (kinds?.length) where.push(`kind IN (${kinds.map((k) => sqlString(k)).join(", ")})`)
+  const sources = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: RECENCY_TOP_K, said here.
+    `SELECT id FROM knowledge_sources WHERE ${where.join(" AND ")}
+      ORDER BY record_date DESC LIMIT ${RECENCY_TOP_K}`,
+    params
+  )
+  if (!sources.length) return []
+  // THE FIRST CHUNK OF EACH — a source's opening piece is its best single
+  // representative when nothing else is narrowing which paragraph matters,
+  // the same reasoning the router's own fallback read uses (`ORDER BY c.seq`
+  // picking up from the start).
+  const rows = await d1Query<{ chunk_id: string; source_id: string }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id AS chunk_id, source_id FROM knowledge_chunks
+      WHERE source_id IN (${sources.map((s) => sqlString(s.id)).join(", ")}) AND seq = 0`
+  )
+  // NEWEST FIRST, in the order `sources` already put them — a chunk read has
+  // no ORDER BY over an IN-list, so the rank `fuse` reads array POSITION from
+  // has to be restored here rather than trusted from the statement above.
+  const bySource = new Map(rows.map((r) => [r.source_id, r.chunk_id]))
+  return sources.flatMap((s) => {
+    const chunkId = bySource.get(s.id)
+    return chunkId ? [{ chunk_id: chunkId, lex: 1, exact: 1 }] : []
+  })
+}
+
 /** THE LEXICAL ARM. FTS5's own BM25 over `knowledge_chunks_fts` (0073) — one
  * keyed read, fenced by the reader and narrowed by the compartment.
  *
@@ -2995,6 +3156,28 @@ type ScoredRow = {
   record_date: string | null
 }
 
+/** ONE `ScoredRow`, AS THE ANSWER SEES IT. Factored out because `retrieve`
+ * builds this shape TWICE once the reader is in the loop — once for the
+ * shortlist it hands the reader, once for the final passages an answer
+ * carries — and a mapping written twice is a mapping that drifts the first
+ * time only one copy is edited. */
+function toPassage(row: ScoredRow, score: number): KnowledgePassage {
+  return {
+    sourceId: row.source_id,
+    title: row.title,
+    kind: row.kind,
+    url: row.source_url,
+    // `origin_table`/`origin_row_id` already rode the read that built `row`,
+    // so the link to the record costs nothing extra.
+    recordPath: recordPath(row.origin_table, row.origin_row_id, row.compartment),
+    compartment: row.compartment,
+    seq: row.seq,
+    text: plainText(row.text),
+    score: Math.round(score * 1000) / 1000,
+    recordDate: row.record_date ?? null,
+  }
+}
+
 /** WEIGHTED RECIPROCAL RANK FUSION. Two ranked lists whose scores mean entirely
  * different things (a cosine, and a sum of term weights), combined by the one
  * thing they share — position. Each contributes weight/(K + rank).
@@ -3037,12 +3220,20 @@ function fuse(
    * list rather than more rows in `lexical`, because it earns a different vote
    * and because a list that is empty on every question that names nobody cannot
    * disturb a single measured number. */
-  named: CandidateRow[] = []
+  named: CandidateRow[] = [],
+  /** THE NEWEST MATERIAL, if the question asked for it — see `recencyArm`.
+   * Empty on every question without recency intent, by construction
+   * (`retrieve` only calls the arm at all when `hasRecencyIntent` is true),
+   * so an ordinary question's fusion is exactly as it was measured. */
+  recency: CandidateRow[] = []
 ): { id: string; score: number }[] {
   const fused = new Map<string, number>()
   vector.forEach((hit, rank) => fused.set(hit.id, (fused.get(hit.id) ?? 0) + 1 / (RRF_K + rank + 1)))
   named.forEach((row, rank) =>
     fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + NAME_WEIGHT / (RRF_K + rank + 1))
+  )
+  recency.forEach((row, rank) =>
+    fused.set(row.chunk_id, (fused.get(row.chunk_id) ?? 0) + RECENCY_WEIGHT / (RRF_K + rank + 1))
   )
   lexical.forEach((row, rank) =>
     fused.set(
@@ -3058,6 +3249,67 @@ function fuse(
   return [...fused.entries()]
     .map(([id, score]) => ({ id, score }))
     .sort((a, b) => b.score - a.score)
+}
+
+/** How many of the fused candidates a refusal keeps — enough to see whether
+ * anything was CLOSE, never the whole pool. This table is a diagnostic, not a
+ * second copy of the ranking. */
+const REFUSAL_SHORTLIST_CAP = 10
+
+/** THE REFUSAL LOG (0077, BUILD-5 §5-6). NEVER THROWS: a failure here is
+ * recorded (ERROR-HANDLING.md's one seam) and swallowed inside `write()`,
+ * because a refusal that could not be LOGGED must still be returned to the
+ * person who asked — the diagnostic is a courtesy to whoever investigates
+ * later, not part of the answer contract. Deferred where a deferrer is set up
+ * (`env.DEFER`, the same per-request seam `publishChange` already rides — a
+ * person asking a question neither knows nor should wait for this) and
+ * awaited plainly where one is not (a cron, a test, a lib called directly). */
+async function logRefusal(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  question: string,
+  compartments: string[],
+  reason: string,
+  shortlist: { id: string; score: number }[],
+  /** THE RAW COSINE OF THE NEAREST VECTOR NEIGHBOUR, before any floor —
+   * KB-AUDIT.md §3's own number: "you will see the 0.44-0.49 band
+   * immediately." `null` when there is nothing to report one for (no vector
+   * store, an unembeddable question, or literally no neighbours), which is a
+   * different fact from a low score and must stay distinguishable from one. */
+  top1Score: number | null
+): Promise<void> {
+  const write = (async () => {
+    try {
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        `INSERT INTO knowledge_refusals (id, question, compartments, reason, shortlist, top1_score, asked_by_user_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ulid(),
+          question,
+          JSON.stringify(compartments),
+          reason,
+          JSON.stringify(
+            shortlist
+              .slice(0, REFUSAL_SHORTLIST_CAP)
+              .map((s) => ({ id: s.id, score: Math.round(s.score * 1000) / 1000 }))
+          ),
+          top1Score === null ? null : Math.round(top1Score * 1000) / 1000,
+          guard.userId,
+          new Date().toISOString(),
+        ]
+      )
+    } catch (e) {
+      await recordWorkerError(env.DB, "content", "knowledge refusal log", e, undefined, {
+        teamId: guard.teamId,
+        userId: guard.userId,
+      })
+    }
+  })()
+  if (env.DEFER) env.DEFER(write)
+  else await write
 }
 
 /** Answer a question from the team's own material.
@@ -3096,6 +3348,19 @@ export async function retrieve(
      * gates and meters it (routes/knowledge.ts); this function only decides
      * WHETHER there is anything worth writing about. */
     compose?: (material: KnowledgePassage[], sources: KnowledgeCitation[]) => Promise<string | null>
+    /** RE-READ THE SHORTLIST (BUILD-5 §5-6) before deciding what counts as
+     * evidence. Absent means the caller wants the pre-Stage-2 behaviour
+     * exactly — `MIN_VECTOR_SCORE` alone decides, unchanged. Present, and it
+     * costs a model call: the door that supplies it gates and meters it
+     * (`routes/knowledge.ts`), same shape as `compose` above and the same
+     * reason — this function only decides whether there is a shortlist worth
+     * reading. Present also means the candidate floor WIDENS to
+     * `KNOWLEDGE_READER_MIN_SCORE` (a hallucination guard, not a real
+     * decision), so a `null` verdict (the reader could not run) is read as NO
+     * EVIDENCE, not as "fall back to the floor" — the widened pool was never
+     * safe to expose unjudged. See the point this is used in the function
+     * body, and `knowledge-reader.ts`'s own header, for the whole argument. */
+    read?: (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
   }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
@@ -3118,11 +3383,34 @@ export async function retrieve(
           ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
         })
       : []
+  // THE RAW NEAREST-NEIGHBOUR SCORE, BEFORE ANY FLOOR — kept for the refusal
+  // log alone (KB-AUDIT.md §3: "log every refusal with its top-1 score"),
+  // never for ranking or for the floor decision itself, both of which read
+  // `vector` below. `searchVectors` returns matches ordered best-first
+  // (Vectorize's own contract), so this is genuinely the nearest neighbour and
+  // not an arbitrary row.
+  const top1Score = hits[0]?.score ?? null
   // NOT EVERY NEAREST NEIGHBOUR IS EVIDENCE. There is always a closest thing;
   // below the floor it is merely the least unlike, and letting it through is how
   // a knowledge base answers a question about parental leave out of a note about
   // dispatch outages.
-  const floor = numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
+  //
+  // WIDENED WHEN A READER IS COMING, THROUGH A SEPARATE VAR — not a fallback
+  // switched on `input.read` inside the SAME `numberVar(env.KNOWLEDGE_MIN_SCORE,
+  // …)` call, because that would have made the two floors inseparable: any
+  // deployment (or test) that pins `KNOWLEDGE_MIN_SCORE` explicitly — which is
+  // every existing test in this suite — would silently pin the reader's floor
+  // to the SAME number too, and "the reader gets its own, lower floor" would
+  // have been true only on an environment that set neither var. Two floors, two
+  // vars, independently measured: `input.read` present means something is
+  // about to actually READ these passages rather than trust their score alone,
+  // so `KNOWLEDGE_READER_MIN_SCORE` (default `READER_HALLUCINATION_FLOOR`) is a
+  // guard against pure noise, and the real decision moves to the reader below.
+  // Absent `input.read`, this is `KNOWLEDGE_MIN_SCORE` / `MIN_VECTOR_SCORE`
+  // exactly as before Stage 2 — no existing caller's answers change.
+  const floor = input.read
+    ? numberVar(env.KNOWLEDGE_READER_MIN_SCORE, READER_HALLUCINATION_FLOOR)
+    : numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
   const vector = hits.filter((h) => h.score >= floor)
 
 
@@ -3179,10 +3467,21 @@ export async function retrieve(
   // a question about a person — which is also why it may speak when the vector
   // arm found nothing, the case that refused the owner outright.
   const named = await nameArm(cfg, guard, terms, route.compartments, input.kinds ?? null)
+  // THE RECENCY ARM RUNS ONLY ON INTENT (KB-AUDIT.md §4.5) — gated the same
+  // way the name arm is unconditional and this is not: "what changed this
+  // week?" needs it, "capital expenditure?" must never be nudged by it, so a
+  // bounded read only happens on the question shape that asked for one.
+  const recency = hasRecencyIntent(question)
+    ? await recencyArm(cfg, guard, route.compartments, input.kinds ?? null)
+    : []
 
-  const fused = fuse(vector, lexical, named)
+  const fused = fuse(vector, lexical, named, recency)
 
-  if (!fused.length)
+  if (!fused.length) {
+    // No fused candidates at all — the shortlist worth logging is empty, and
+    // that emptiness is itself the fact: nothing narrowed by compartment or
+    // touched by any arm, not "something close that fell short".
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
     return knowledgeAnswer({
       question,
       compartments: route.compartments,
@@ -3191,6 +3490,7 @@ export async function retrieve(
       passages: [],
       candidates: 0,
     })
+  }
 
   // THE DATABASE DECIDES (R26). Everything above chose ids; the words come from
   // here, out of the team's own database, under the caller's own fence, with
@@ -3285,20 +3585,43 @@ export async function retrieve(
     ranked = diversify(revived.map((row, i) => ({ row, score: 1 / (RRF_K + i) })))
   }
   ranked = await widenNeighbours(cfg, guard, reader, ranked, want)
-  const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => ({
-    sourceId: row.source_id,
-    title: row.title,
-    kind: row.kind,
-    url: row.source_url,
-    // The read above already carries `origin_table` and `origin_row_id` for the
-    // live cross-check, so the link to the record costs nothing extra.
-    recordPath: recordPath(row.origin_table, row.origin_row_id, row.compartment),
-    compartment: row.compartment,
-    seq: row.seq,
-    text: plainText(row.text),
-    score: Math.round(score * 1000) / 1000,
-    recordDate: row.record_date ?? null,
-  }))
+
+  // THE READER (BUILD-5 §5-6): re-reads a shortlist and decides what is real
+  // evidence, rather than trusting the floor's score alone. Runs on the whole
+  // RANKED POOL capped at READER_SHORTLIST_CAP (12) — wider than `want` (the
+  // six an answer carries), the same way a person skims more than they end up
+  // quoting — and its OWN order becomes the ranking for exactly the passages
+  // it was shown: a passage past the shortlist the reader never saw has not
+  // been vouched for, and is dropped along with the ones it actively rejected.
+  if (input.read && ranked.length) {
+    const shortlist = ranked.slice(0, READER_SHORTLIST_CAP)
+    const verdict = await input.read(
+      question,
+      shortlist.map(({ row, score }) => toPassage(row, score))
+    )
+    // BOTH OUTCOMES CLEAR `ranked` TO EMPTY UNLESS THE READER SAYS OTHERWISE —
+    // and that is deliberately the SAME handling for "the reader looked and
+    // found nothing" and "the reader could not run". `ranked` at this point was
+    // built against the WIDENED floor (`READER_HALLUCINATION_FLOOR`), which by
+    // design is not a safe floor on its own — it is a hallucination guard, and
+    // the reader's judgment is what was supposed to turn it into a real
+    // decision. A reader that FAILED never supplied that judgment, so passing
+    // the widened, unjudged pool through anyway would reintroduce exactly the
+    // failure this whole mechanism exists to fix — a low, uncalibrated cosine
+    // standing in for a real "is this evidence" decision, quietly, on the one
+    // path (a model outage) where nobody is watching. Refusing is the safe
+    // direction: it costs an answer the strict floor might have allowed
+    // through cleanly, never a confident one built on unverified material.
+    const byId = new Map(shortlist.map((r) => [passageId({ sourceId: r.row.source_id, seq: r.row.seq }), r]))
+    ranked = verdict
+      ? verdict.relevant.flatMap((id) => {
+          const r = byId.get(id)
+          return r ? [r] : []
+        })
+      : []
+  }
+
+  const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => toPassage(row, score))
   const live = await crossCheck(cfg, guard, ranked.slice(0, want).map((r) => r.row))
   const evidence = {
     question,
@@ -3315,6 +3638,12 @@ export async function retrieve(
   // only if there was any. A writer that ran before this decision could be given
   // material the caller was never going to see.
   const decided = knowledgeAnswer(evidence)
+  // THE INTERESTING CASE: real candidates existed (`fused` is non-empty) and
+  // none survived to become an answer. This shortlist is what tells "the base
+  // genuinely holds nothing" apart from "something was close" — logged with
+  // the FUSED candidates rather than the (empty, by construction) `passages`.
+  if (!decided.found)
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
   if (!input.compose || !decided.found) return decided
   const written = await input.compose(decided.passages, decided.citations)
   // Nothing written (the model was unreachable, or said nothing) is not an error:

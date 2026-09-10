@@ -126,6 +126,17 @@ export type Env = {
    * answering questions it has nothing on. */
   KNOWLEDGE_MIN_SCORE?: string
 
+  /** THE SAME QUESTION, ASKED FOR THE READER'S FLOOR ONLY (BUILD-5 §5-6). When
+   * `retrieve()` is handed a reader, it decides what is real evidence by
+   * actually reading it rather than trusting a raw cosine — so this floor only
+   * has to guard against pure nonsense, not carry the whole decision the way
+   * `KNOWLEDGE_MIN_SCORE` does. A SEPARATE var, not a second meaning for that
+   * one: see `retrieve`'s own comment for why sharing one var would have made
+   * pinning `KNOWLEDGE_MIN_SCORE` (which every test in this suite does)
+   * silently pin this too. Unset means `READER_HALLUCINATION_FLOOR`
+   * (lib/knowledge.ts). */
+  KNOWLEDGE_READER_MIN_SCORE?: string
+
   /** The embedding model id, so swapping it is config rather than a deploy of
    * new code. Whatever it is, it must be the SAME model that wrote the vectors
    * already stored — a change here makes every existing embedding incomparable,

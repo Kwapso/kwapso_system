@@ -55,6 +55,14 @@ describe("every door that spends the AI allowance gates on the agent module", ()
       spenders.map(([name]) => name),
       "the content worker's answer-writer must be in the census — it spends the same allowance"
     ).toContain("payToWrite")
+    // BUILD-5 §5-6's reader (`payToRead`, workers/content/src/routes/knowledge.ts)
+    // is a SECOND spender in the SAME worker, gated and metered on its own —
+    // asking for both `read` and `compose` on one turn spends two units, and a
+    // census that only ever found `payToWrite` would grade half of that turn.
+    expect(
+      spenders.map(([name]) => name),
+      "the content worker's reader must be in the census too — read=1 spends the same allowance, separately from compose=1"
+    ).toContain("payToRead")
   })
 
   it("each one opens with requireRight(agent) BEFORE it spends", () => {

@@ -50,6 +50,7 @@ import {
   type SourceInput,
 } from "../lib/knowledge"
 import { writeAnswer } from "../lib/knowledge-compose"
+import { readShortlist } from "../lib/knowledge-reader"
 import { extractFile, unreadableNote } from "../lib/knowledge-files"
 import { presignedKey, UPLOAD_TARGETS } from "../lib/upload-targets"
 import { confirmStored } from "./uploads"
@@ -159,6 +160,40 @@ export async function payToWrite(
   }
   await logUsage(env, guard.teamId, actor, 1, source, `Knowledge base: ${question}`.slice(0, 140), "prompt")
   return written
+}
+
+/** THE READER, GATED AND METERED (BUILD-5 §5-6) — `payToWrite`'s exact shape,
+ * one door along: `requireRight(agent, create)` BEFORE the spend
+ * (ai-cost-gate.test.ts reads this function by name the same way it reads
+ * `payToWrite`), one AI unit consumed, refunded if the reader could not
+ * produce a verdict, logged if it could. `read=1` is a SEPARATE query
+ * parameter from `compose=1` — a caller may ask for one, the other, or both,
+ * and a turn that asks for both spends TWO units, not one, because reading
+ * the shortlist and writing the answer are two model calls whichever way this
+ * door is reached. That is a real, new line in what a Stage-2 turn can cost —
+ * said here rather than left for whoever turns this on in production to
+ * discover from a bill. */
+// Exported for the same reason `payToWrite` is: a spender the census cannot
+// SEE is a spender nobody grades.
+export async function payToRead(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  actor: Actor,
+  question: string,
+  shortlist: KnowledgePassage[]
+): Promise<{ relevant: string[] } | null> {
+  await requireRight(cfg, guard, "agent", "create")
+  const spend = await consumeAiUnit(env, guard.teamId)
+  if (!spend.ok) return null
+  const source: UsageSource = spend.source === "credit" ? "credit" : "free"
+  const verdict = await readShortlist(env, question, shortlist)
+  if (!verdict) {
+    await refundAiUnits(env, guard.teamId, source === "free" ? 1 : 0, source === "credit" ? 1 : 0)
+    return null
+  }
+  await logUsage(env, guard.teamId, actor, 1, source, `Knowledge base (read): ${question}`.slice(0, 140), "prompt")
+  return verdict
 }
 
 /** GET /api/content/knowledge/ask — answer a question from the team's own
@@ -277,6 +312,12 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
   // Checked where it sits (R20): the door reads exactly one spelling of yes, so
   // there is no truthiness anywhere on this path.
   const write = queryText(url.searchParams.get("compose"), "Compose") === "1"
+  // RE-READ THE SHORTLIST (BUILD-5 §5-6) — SEPARATE from `compose` above, on
+  // purpose: a caller may want the honest, reader-widened decision without
+  // paying for prose too (the Knowledge tab's evidence view, say), or the
+  // reverse. `payToRead` gates and meters itself exactly as `payToWrite` does,
+  // so a question the base cannot even build a shortlist for costs nothing.
+  const reread = queryText(url.searchParams.get("read"), "Read") === "1"
   // WHICH DOORS THIS CONVERSATION IS USING — the source chips, as a comma list of
   // chip keys. Every value is checked against the declared set at the boundary
   // (R20): an allow-list `.includes` is the checking position, so an invented key
@@ -299,6 +340,10 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
       compose: write
         ? (material, sources) => payToWrite(env, cfg, guard, actor, question, material, sources)
         : undefined,
+      // The reader is only ever REACHED once there is a shortlist worth
+      // reading — `retrieve` calls it after widening its own floor, and it
+      // gates and meters itself exactly as the writer does.
+      read: reread ? (q, shortlist) => payToRead(env, cfg, guard, actor, q, shortlist) : undefined,
     })
   )
 }
@@ -820,7 +865,7 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
   // THE NAME INDEX, KEPT IN STEP HERE — a client, app, contact or colleague
   // renamed (or created, or deactivated) is a source row the sweep above just
   // touched, so the same tick that brings the material in step is the same
-  // tick that keeps `accountNamedIn`'s router current. Unconditional rather
+  // tick that keeps `accountsNamedIn`'s router current. Unconditional rather
   // than gated on `results` having indexed anything: the population is a few
   // hundred rows at most, so a full rebuild every tick is bounded work, not a
   // growing one (R14 is about unbounded READS; this is a small, deterministic
