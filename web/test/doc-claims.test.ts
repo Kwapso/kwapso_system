@@ -492,3 +492,104 @@ describe("README.md states what is true now, not when it became true", () => {
     ).toEqual([])
   })
 })
+
+/** A RULING CHANGED THE CODE. DID IT CHANGE THE PROSE?
+ *
+ * Nothing here asked that question until 2026-09-10, and the cost of not asking
+ * was six instances of one shape in a single session: R57's component count,
+ * the Laws range, a lane brief's worktree path, the .gitignore artefacts, and
+ * the Activity-tab retirement TWICE - once closed in one file and left live in
+ * five others (including eight lines below the amendment itself), then swept on
+ * `grep "Activity tab"`, which cannot match "Overview + Activity", so seven more
+ * survived.
+ *
+ * THE SECOND SWEEP IS WHY THIS EXISTS. Nobody was careless. A person swept
+ * properly, read every hit and decided each honestly - WITH A PATTERN. A pattern
+ * is a hand-listed census, which is the exact thing R14, R19, R22, R36, R47 and
+ * R54 exist to forbid, and this one inherited the blind spot of the list it was
+ * meant to supersede. So the vocabulary stops being somebody's memory and
+ * becomes data.
+ *
+ * Each entry is a thing the product RETIRED and the phrases that describe it as
+ * still living. A phrase is allowed when a RETIREMENT MARKER sits within two
+ * lines of it, so the canon may narrate the history freely and may not state the
+ * dead thing as present. Rot-checked: a phrase nothing says any more is a line
+ * to delete, or this becomes a record of what the docs used to be wrong about.
+ *
+ * NARROW ON PURPOSE, like GLOSSARY_SYNONYMS. And matched on WORD BOUNDARIES: the
+ * first draft flagged "an activity table past ~5M rows" because "activity tab"
+ * is a substring of "activity table", which is the same class of sloppiness the
+ * check is here to catch. */
+const RETIRED_IN_THE_CANON: Record<string, { since: string; phrases: RegExp[] }> = {
+  "the record Activity tab": {
+    since: "2026-09-07, the client's ruling: kill all old activity tabs",
+    phrases: [/overview \s*\+\s*activity/i, /\bactivity tabs?\b/i, /<ActivityPanel>/i],
+  },
+}
+
+/** Words that make a mention HISTORY rather than a claim. Generous on purpose:
+ * the failure caught here is a doc asserting a dead thing is alive, and a
+ * passage that mentions the retirement at all is not doing that. */
+const RETIREMENT_MARKERS =
+  /retir|\bwas\b|\bwere\b|used to|until|no longer|any more|not an? |since |kill|remov|shipped|grew|old /i
+
+/** DOCUMENTS THAT ARE HISTORY BY DECLARATION, where describing the old world is
+ * the job. Data with a reason each, rot-checked below so the list can only
+ * shrink - the same shape every exemption in this repo takes. */
+const HISTORY_DOCS: Record<string, string> = {
+  "documents/ROADMAP.md":
+    "README's doc map calls it 'history, not a plan' in those words - the build record of a round that closed on 2026-07-02, so it describes the app as it was and must not be edited to describe the app as it is",
+  "documents/SCREEN-ENGINE-PLAN.md":
+    "the screen-recipe engine's own build plan, declared history by README's map; it records what that round shipped, Activity tab included",
+}
+
+describe("a ruling that changed the code changed the prose too", () => {
+  const isPlan = (doc: string): boolean => doc.startsWith(".plans/")
+  const isArtefact = (doc: string): boolean => /-review[.]md$/.test(doc)
+
+  it("no document states a retired thing as if it were still there", () => {
+    const offenders: string[] = []
+    for (const doc of DOCS) {
+      if (isArtefact(doc) || HISTORY_DOCS[doc] || isPlan(doc)) continue
+      let lines: string[]
+      try {
+        lines = read(join(ROOT, doc)).split("\n")
+      } catch {
+        continue
+      }
+      for (const [thing, { phrases }] of Object.entries(RETIRED_IN_THE_CANON))
+        lines.forEach((line, i) => {
+          if (!phrases.some((re) => re.test(line))) return
+          // TWO LINES EITHER SIDE, because prose wraps and a retirement is
+          // routinely narrated in the sentence above the phrase it retires.
+          const near = lines.slice(Math.max(0, i - 2), i + 3).join(" ")
+          if (RETIREMENT_MARKERS.test(near)) return
+          offenders.push(`${doc}:${i + 1} states ${thing} as live: ${line.trim().slice(0, 90)}`)
+        })
+    }
+    expect(
+      offenders,
+      "a document describes something the product retired as if it were still there. " +
+        "Say it in the past tense, or name the retirement within two lines"
+    ).toEqual([])
+  })
+
+  it("every retired thing is still worth naming, and every history exemption is real", () => {
+    const canon = DOCS.map((d) => {
+      try {
+        return read(join(ROOT, d))
+      } catch {
+        return ""
+      }
+    }).join("\n")
+    for (const [thing, { phrases }] of Object.entries(RETIRED_IN_THE_CANON))
+      expect(
+        phrases.some((re) => re.test(canon)),
+        `RETIRED_IN_THE_CANON lists "${thing}", which the canon no longer mentions at all - delete the entry`
+      ).toBe(true)
+    for (const [doc, why] of Object.entries(HISTORY_DOCS)) {
+      expect(existsSync(join(ROOT, doc)), `HISTORY_DOCS names ${doc}, which is gone - delete the line`).toBe(true)
+      expect(why.length, `${doc} needs a real reason`).toBeGreaterThan(40)
+    }
+  })
+})

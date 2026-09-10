@@ -21,7 +21,8 @@ It obeys the same laws with three recorded differences, and they are written her
 because an exception nobody can find is a bypass with better manners:
 
 - **R2 on the portal. `PORTAL_ACTIVITY_EXEMPT`** (in the registry). Every record
-  detail in the base carries Overview + Activity, because a record's history is what
+  detail in the base makes its history REACHABLE — an Activity tab until 7 Sep 2026,
+  the ink footer's rail since — because a record's history is what
   makes a shared workspace trustworthy. On the client's side that same feed is a
   disclosure: its rows name the staff who moved a ticket or edited an account, and the
   portal shows work status but never who inside the agency is doing it (SCOPE ch.06).

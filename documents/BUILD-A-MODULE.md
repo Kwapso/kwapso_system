@@ -572,7 +572,8 @@ const tabsConfig = { ...defaultTabsConfig, variant: "line", tabs: [
     badge: formatCount(activity.total), badgeVariant: "" },   // ← R8/R16: the exact total
 ]}
 // renderPanel: overview → <OverviewList items={overviewItems}/>,
-//              (no activity tab: the history is the ink footer's rail, 7 Sep 2026)
+//              (the Activity tab was retired 7 Sep 2026 — the history is
+//               reached from the ink footer's rail, not from a tab)
 ```
 
 Note which tabs carry a badge: the ones that reveal a collection do, and the one
@@ -603,7 +604,7 @@ where a test looks for it.
 | Law | What it checks | What you do |
 |---|---|---|
 | **R1** publish-seam | `workers/content/test/publish-seam.test.ts` reads `ROUTES` + handler source: every `mutation` must contain a `publishChange` call; non-GET routes must be classified. | Classify each route (3e) and actually publish (3d). A `housekeeping` route (e.g. upload) must be added to the test's reviewed `HOUSEKEEPING` set. |
-| **R2** record-detail-tabs | `web/test/rules.test.ts` DERIVES the bespoke record details off disk — a component under `web/components` named `*-detail.tsx`, or one that renders an `<ActivityPanel>` — and asserts each contains `TabsView` + `<ActivityPanel>`. | Nothing to register. Name it `note-detail.tsx` and Layer 5 is forced from the moment the file exists. (It used to be a hand-kept list, and four record details were missing from it; `RECORD_DETAIL_NOT` is now the reasoned residue, for a file that is NOT a record detail.) |
+| **R2** record-detail-tabs | `web/test/rules.test.ts` DERIVES the bespoke record details off disk — a component under `web/components` named `*-detail.tsx`, or one that renders a `<RecordScreen>` (it was `<ActivityPanel>` until 7 Sep 2026; retiring the Activity tab meant nothing rendered that panel, and a signal matching nothing is a census gone blind) — and asserts each contains `TabsView` + `<ActivityPanel>`. | Nothing to register. Name it `note-detail.tsx` and Layer 5 is forced from the moment the file exists. (It used to be a hand-kept list, and four record details were missing from it; `RECORD_DETAIL_NOT` is now the reasoned residue, for a file that is NOT a record detail.) |
 | **R3** no-handrolled-toggles | No component fakes a tab strip with `variant={x === y ? …}`. | Use `TabsView` for any tab strip (the Tickets list's All / My / Archived strip does). |
 | **R4/R7** forms | Every dialog in `FORM_DIALOGS` imports `FormShell` and `useFormDraft`. | If you add a `note-form-dialog`, add it to `FORM_DIALOGS` (registry.ts) and build it on `FormShell` + `useFormDraft`. |
 | **R5** generic-activity-path | The activity read has a generic `record` scope; the web reads via `recordActivity`. | Read history only via `tenancy.recordActivity(...)` (Layer 5). No new SQL. |
