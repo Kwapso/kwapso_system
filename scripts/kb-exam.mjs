@@ -62,11 +62,20 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const BASELINE_PATH = join(HERE, "kb-exam-baseline.json")
 
-/** The hub's plan (§9) places the drafted questions at `.plans/KB-EXAM.md`.
- * `kb-exam-draft.md` is kept as a fallback name only because an earlier
- * draft of this same file briefly lived there mid-session — if both exist,
- * the canonical one wins. */
-const EXAM_CANDIDATES = [join(REPO, ".plans", "KB-EXAM.md"), join(REPO, ".plans", "kb-exam-draft.md")]
+/** THE UNION WINS. KB-EXAM.md ("84 calendar events") and
+ * KB-EXAM-TRANSCRIPTS.md (the grounded rewrite, "71 sources ≥15 pieces" —
+ * rescued from an untracked file that was one `rm` from gone, see
+ * scripts/kb-exam-merge.mjs) turned out to share 75 of their ~87 rows once
+ * read as text rather than by id; KB-EXAM-UNION.md is the hub-ruled merge
+ * of both (100 distinct questions, every id namespaced by origin — RULING
+ * 1: key on text, never on id). The two source files are kept as fallbacks
+ * only for a worktree that predates the merge; once the union exists it is
+ * canon and the sources are read-only history. */
+const EXAM_CANDIDATES = [
+  join(REPO, ".plans", "KB-EXAM-UNION.md"),
+  join(REPO, ".plans", "KB-EXAM.md"),
+  join(REPO, ".plans", "kb-exam-draft.md"),
+]
 
 export function findExamFile() {
   for (const p of EXAM_CANDIDATES) if (existsSync(p)) return p
@@ -88,6 +97,11 @@ export const KNOWN_TAGS = new Set([
   "hijack",
   "route",
   "synth",
+  // KB-EXAM-TRANSCRIPTS.md's own tag, carried into the union: "the meeting
+  // happened but no notes exist". Grades as its own disposition (`gap`,
+  // below) — a name-the-meeting-and-say-nothing-was-recorded claim, which
+  // is a different pass condition from a plain refusal.
+  "gap",
   // KB-EXAM.md's printed "Tags:" legend does not list this one, but it
   // appears on O2 and X16 and is unambiguous in context — a German
   // client name given the way a person would actually say it
@@ -97,7 +111,11 @@ export const KNOWN_TAGS = new Set([
   "de-name",
 ])
 
-export const KNOWN_LEVELS = new Set(["O", "E", "M", "H", "X", "DE"])
+// "G" (honest gaps) is KB-EXAM-TRANSCRIPTS.md's own level, carried into
+// the union — three of its rows (the ones with no A-side counterpart at
+// all) live under it; the other two gap-tagged B rows merged into A rows
+// and kept A's E-level.
+export const KNOWN_LEVELS = new Set(["O", "E", "M", "H", "X", "G", "DE"])
 
 /* -------------------------------- parsing ------------------------------ */
 
@@ -133,7 +151,9 @@ export function parseExam(markdown) {
       .map((c) => c.trim())
     if (cells.length < 3) continue
     const [id, question, tagsCell, ...rest] = cells
-    if (!/^[A-Za-z]+\d+$/.test(id)) continue // header row ("#") or the "---" separator
+    // Bare ids ("O1") for the two source drafts; "A-O1" / "B-G3" for the merged
+    // union file (RULING 1: namespaced by origin, never renumbered).
+    if (!/^([AB]-)?[A-Za-z]+\d+$/.test(id)) continue // header row ("#") or the "---" separator
     if (!section) throw new Error(`kb-exam: row ${id} appears before any section heading`)
     rows.push({
       id,
@@ -152,72 +172,126 @@ export function parseExam(markdown) {
 
 /* ----------------------------- classification --------------------------- */
 
-/** THE DEFAULT READ, off tags alone. */
+/** THE DEFAULT READ, off tags alone.
+ *
+ * `tool` is its own disposition, deliberately separate from `struck`. The
+ * hub named two count-tagged rows (O7, X10) "unstrikeable" — part of the
+ * ten canaries that must always pass — and a bucket called "struck" cannot
+ * also be called unstrikeable, whatever the reasoning under it. `tool` says
+ * plainly what is true of every count-tagged row: id-in-shortlist does not
+ * apply to it (there is no passage to shortlist — it is answered by a door
+ * call), it is never scored by THIS harness, and it is never dropped —
+ * the full-loop exam grades it against the tool call instead. */
 function classifyByTags(tags) {
+  // A `gap` row is its own claim — "name the meeting, say nothing was
+  // recorded" — checked first because it is the more specific fact about
+  // the row; `absent`/`fence` never co-occur with it in practice, but if
+  // they ever did, "the meeting exists and has nothing" outranks "refuse
+  // outright" as the truer description of what a gap row asks for.
+  if (tags.includes("gap")) return { disposition: "gap", sourceIds: null, needsKeyingAfterReindex: true }
   // The exam's own legend: "count needs a tool". KB-AUDIT.md §4.7 measured
   // exactly this failure mode live — counting and "which client has
   // most" questions answered confidently from two or three unrelated
-  // passages. So a `count` row is never graded by id-in-shortlist; it is
-  // struck here and belongs to the full-loop exam, which can check the
-  // tool call instead.
+  // passages.
   if (tags.includes("count"))
     return {
-      disposition: "struck",
+      disposition: "tool",
       reason:
-        'tagged `count` — the exam\'s legend defines count as "needs a tool"; resolved by an app/ticket/meeting-count/contact door, never a passage (KB-AUDIT §4.7: counting and aggregation are not retrieval problems). Scored by the full-loop exam against the tool call, not by id-in-shortlist.',
+        'tagged `count` — the exam\'s legend defines count as "needs a tool"; resolved by an app/ticket/meeting-count/contact door, never a passage (KB-AUDIT §4.7: counting and aggregation are not retrieval problems). Graded by the full-loop exam against the tool call, not by id-in-shortlist — never dropped.',
     }
   if (tags.includes("absent")) return { disposition: "refusal" }
   return { disposition: "keyed", sourceIds: null, needsKeyingAfterReindex: true }
 }
 
+/** THE TEN ROWS THE HUB NAMED UNSTRIKEABLE, verbatim: the owner's eight,
+ * plus the refusal canary (a question with an obviously nonexistent
+ * source) and the counting canary (KB-AUDIT §4.7's "failing invisibly"
+ * class). Two of the ten — A-O7 and A-X10 — are `tool` rows: mandatory,
+ * but graded by the full-loop exam rather than this harness, which is
+ * exactly why they need their own flag rather than living only inside
+ * `struck`'s reasons where "excluded" and "must always pass" would read
+ * as the same thing. `validateExam` fails if any of these ten ever stops
+ * existing. Ids are the UNION's namespaced ones (RULING 1) — every one of
+ * the ten turned out to be a duplicate present in both source files, so
+ * each keeps its A-side id (scripts/kb-exam-merge.mjs's MATCHES table is
+ * the audit trail for exactly which B-side row it merged with). */
+export const MANDATORY_CANARIES = new Set(["A-O1", "A-O2", "A-O3", "A-O4", "A-O5", "A-O6", "A-O7", "A-O8", "A-X6", "A-X10"])
+
 /** THE CLOSED LIST OF EXCEPTIONS the tags alone get wrong — decided now,
  * before any retrieval has run against this exam, each with the reason a
  * later reader needs to judge whether it still holds. Nothing here may be
  * added or changed after seeing a row fail; that is a stop-and-report,
- * not an edit to this file. */
+ * not an edit to this file. Ids are the union's namespaced ones; every one
+ * of these six turned out to be a duplicate present in both source files
+ * (scripts/kb-exam-merge.mjs's MATCHES table has the B-side partner), so
+ * each keeps its A-side id under RULING 1. Two more rows (A-M6, A-M19)
+ * are pushed to `gap` by scripts/kb-exam-merge.mjs itself (RULING 3's
+ * derivation) rather than listed here — see the comment below. A-H13 was
+ * briefly a third until the hub corrected the derivation's predicate: it
+ * cites two meeting sources and only one is absent, so it is `keyed`
+ * (plain, no override) with a thin-evidence note in its detail column
+ * instead. */
 export const OVERRIDES = {
-  X1: {
+  "A-X1": {
     disposition: "struck",
     reason:
       "hijack row with a purely negative expectation (\"must NOT narrow to 'VU Solutions'\") — no positive source id exists to key, and id-in-shortlist cannot express a negative constraint.",
   },
-  X2: {
+  "A-X2": {
     disposition: "struck",
-    reason: "same shape as X1 (\"must NOT narrow to 're-green'\") — no positive id to key.",
+    reason: "same shape as A-X1 (\"must NOT narrow to 're-green'\") — no positive id to key.",
   },
-  X3: {
+  "A-X3": {
     disposition: "struck",
     reason:
       "disjunctive expectation — \"resolves Markus as a person OR refuses\" — two disjoint correct behaviours have no single id-in-shortlist/refusal expression.",
   },
-  X8: {
+  "A-X8": {
     disposition: "struck",
     reason:
       "two different correct behaviours by asker identity under one row id (owner may answer from his private calendar; Aurora must refuse). This harness has no persona-aware grading yet — retrieve() would need the caller's guard threaded through, which is Lane D territory. See the derived X8-notowner row below for the half gradeable today.",
   },
-  X18: {
+  "A-X18": {
     disposition: "struck",
     reason:
       "the question names no specific week recap and four exist (14, 21, 28 Aug, 4 Sep) — no single keyable id without the owner picking one during the keying pass.",
   },
-  X20: {
+  "A-X20": {
     disposition: "struck",
     reason:
       'aggregation across all clients — KB-AUDIT §4.7 names exactly this class ("recurring complaints across our clients") as not a retrieval problem, and the expected behaviour is disjunctive ("answers OR says it cannot generalise — never a bare refusal"), which id-in-shortlist/refusal cannot express.',
   },
+  // RULING 3's corrected derivation (over KB-EXAM-TRANSCRIPTS.md's "left
+  // out on purpose" footer — the only staging-checked oracle either file
+  // has, and the predicate: gap only if ALL of a row's meeting sources are
+  // on that list) converts four A rows to `gap`. Two (A-E6, A-E12) get it
+  // for free because they merged with a B row carrying the tag natively
+  // (B-G2, B-G1); the other two (A-M6, A-M19) did not merge with anything,
+  // so scripts/kb-exam-merge.mjs writes `gap` straight into their tags —
+  // no override needed here either. `classifyByTags`'s tag rule is the
+  // ONE mechanism for all four; see each row's `detail` column in
+  // KB-EXAM-UNION.md for the derivation's reasoning (score, which
+  // left-out entry it resolved to, and — for A-M19 — why its "ticket
+  // record" mention does not count as a competing source). A-H13 was
+  // the derivation's one false positive under the ORIGINAL predicate
+  // ("resolves to" rather than "entirely resolves to") — it cites pt 1
+  // (absent) AND pt 2 (present, 23 pieces), so gapping it would have
+  // failed a system for correctly answering from pt 2. It is `keyed`
+  // instead, to pt 2, with the pt 1 gap named in its detail column — the
+  // exam's one row testing partial knowledge rather than absence.
 }
 
-/** X8's non-owner half is a real, gradeable claim KB-EXAM.md's own footer
- * requires to pass 100% of the time: "Refusal rows: X4–X7, X9, D9, D10 (+
- * X8 for a non-owner)". Striking X8 outright would lose that claim
- * entirely, so this derives the one half of it this harness CAN check
- * without a persona model: asked as anyone but the owner, the pickleball
- * question must refuse. X8 itself is kept, unmodified, alongside it — the
- * brief says keep every row, this only adds one. */
+/** X8's non-owner half is a real, gradeable claim the union's own footer
+ * requires to pass 100% of the time: "every absent row, every gap row,
+ * and the non-owner half of X8". Striking A-X8 outright would lose that
+ * claim entirely, so this derives the one half of it this harness CAN
+ * check without a persona model: asked as anyone but the owner, the
+ * pickleball question must refuse. A-X8 itself is kept, unmodified,
+ * alongside it — the brief says keep every row, this only adds one. */
 const DERIVED_ROWS = [
   {
     id: "X8-notowner",
-    derivedFrom: "X8",
+    derivedFrom: "A-X8",
     section: "X · Adversarial — the ones that used to break it",
     level: "X",
     question: "When is pickleball this week?",
@@ -229,7 +303,7 @@ const DERIVED_ROWS = [
 
 export function classify(row) {
   const decided = OVERRIDES[row.id] ?? classifyByTags(row.tags)
-  return { ...row, ...decided }
+  return { ...row, ...decided, mandatory: MANDATORY_CANARIES.has(row.id) }
 }
 
 export function loadExam(path = findExamFile()) {
@@ -253,9 +327,11 @@ export function validateExam({ rows }) {
     if (!KNOWN_LEVELS.has(row.level)) problems.push(`${row.id}: unknown level "${row.level}"`)
     if (!row.tags.length) problems.push(`${row.id}: no tags`)
     for (const t of row.tags) if (!KNOWN_TAGS.has(t)) problems.push(`${row.id}: unknown tag "${t}"`)
-    if (!["keyed", "refusal", "struck"].includes(row.disposition)) problems.push(`${row.id}: no disposition`)
-    if (row.disposition === "struck" && !row.reason) problems.push(`${row.id}: struck with no reason`)
+    if (!["keyed", "refusal", "gap", "tool", "struck"].includes(row.disposition)) problems.push(`${row.id}: no disposition`)
+    if ((row.disposition === "struck" || row.disposition === "tool") && !row.reason)
+      problems.push(`${row.id}: ${row.disposition} with no reason`)
   }
+  for (const id of MANDATORY_CANARIES) if (!seen.has(id)) problems.push(`mandatory canary ${id} is missing from the exam`)
   return problems
 }
 
@@ -269,8 +345,30 @@ export function validateExam({ rows }) {
  * that graded it anyway would report a number about a row nobody has
  * actually keyed. */
 export function grade(row, result) {
-  if (row.disposition === "struck") return { row, scored: false }
+  // Neither is scored HERE — `tool` because id-in-shortlist cannot judge a
+  // door call, `struck` because the row's own expectation is negative or
+  // disjunctive. Only `tool` is on the mandatory-canary list; `grade`
+  // itself does not special-case that, because "must always pass" is a
+  // fact about the full-loop exam's obligations, not about this function.
+  if (row.disposition === "struck" || row.disposition === "tool") return { row, scored: false }
   if (row.disposition === "refusal") return { row, scored: true, correct: result.found === false }
+  // `gap` grades like a refusal WITH A NAME ATTACHED — the hub's own
+  // words, and a different pass condition from a plain refusal on
+  // purpose. A bare refusal only needs `found === false`; a gap row must
+  // also show retrieval correctly located the meeting's own (contentless)
+  // source, or a system that never looked at all would pass identically to
+  // one that looked, found the placeholder, and honestly said so. So it
+  // needs `sourceIds` exactly as `keyed` does — the meeting's own record,
+  // not a transcript — and both conditions must hold.
+  if (row.disposition === "gap") {
+    if (!row.sourceIds || row.sourceIds.length === 0)
+      throw new Error(`${row.id} is disposition "gap" but has no sourceIds — run the keying pass before grading it`)
+    return {
+      row,
+      scored: true,
+      correct: result.found === false && row.sourceIds.some((id) => result.shortlistIds.includes(id)),
+    }
+  }
   if (!row.sourceIds || row.sourceIds.length === 0)
     throw new Error(`${row.id} is disposition "keyed" but has no sourceIds — run the keying pass before grading it`)
   return {
@@ -308,8 +406,17 @@ export function summarize(rows) {
       for (const t of r.tags) acc[t] = (acc[t] ?? 0) + 1
       return acc
     }, {}),
-    mustScore100: rows.filter((r) => r.disposition === "refusal").map((r) => r.id),
+    // The union's own footer: "Must score 100%: every absent row, every
+    // gap row, and the non-owner half of X8." `refusal` covers absent +
+    // the derived non-owner row; `gap` is its own disposition and just as
+    // mandatory, so both are in the ceiling.
+    mustScore100: rows.filter((r) => r.disposition === "refusal" || r.disposition === "gap").map((r) => r.id),
+    tool: rows.filter((r) => r.disposition === "tool").map((r) => ({ id: r.id, reason: r.reason })),
     struck: rows.filter((r) => r.disposition === "struck").map((r) => ({ id: r.id, reason: r.reason })),
+    mandatory: rows
+      .filter((r) => r.mandatory)
+      .map((r) => ({ id: r.id, disposition: r.disposition }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
   }
 }
 
@@ -326,8 +433,13 @@ export function formatReport(summary, examPath) {
     `  level         ${fmtCounts(summary.byLevel)}`,
     `  tag           ${fmtCounts(summary.byTag)}`,
     `  must score 100% (${summary.mustScore100.length}): ${summary.mustScore100.join(", ")}`,
-    `  struck, excluded from the score (${summary.struck.length}):`,
+    `  the ten mandatory canaries (${summary.mandatory.length}):`,
   ]
+  for (const m of summary.mandatory)
+    lines.push(`    ${m.id} — ${m.disposition}${m.disposition === "tool" ? "  (full-loop exam only — not scored here, never dropped)" : ""}`)
+  lines.push(`  tool, graded by the full-loop exam's tool call, not scored here (${summary.tool.length}):`)
+  for (const t of summary.tool) lines.push(`    ${t.id} — ${t.reason}`)
+  lines.push(`  struck, excluded from the score (${summary.struck.length}):`)
   for (const s of summary.struck) lines.push(`    ${s.id} — ${s.reason}`)
   return lines.join("\n")
 }
@@ -348,6 +460,7 @@ export function structuralBaseline(summary, examPath) {
     byLevel: summary.byLevel,
     byTag: summary.byTag,
     mustScore100: summary.mustScore100,
+    mandatory: summary.mandatory,
     retrieval: null,
   }
 }
@@ -364,7 +477,7 @@ export function writeBaseline(baseline) {
 /* ------------------------------------ CLI ------------------------------------ */
 
 function statusLine(s) {
-  return `${s.byDisposition.keyed ?? 0} keyed pending re-index, ${s.byDisposition.refusal ?? 0} refusal, ${s.byDisposition.struck ?? 0} struck`
+  return `${s.byDisposition.keyed ?? 0} keyed pending re-index, ${s.byDisposition.refusal ?? 0} refusal, ${s.byDisposition.gap ?? 0} gap, ${s.byDisposition.tool ?? 0} tool, ${s.byDisposition.struck ?? 0} struck`
 }
 
 function main() {
