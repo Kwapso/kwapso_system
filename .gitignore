@@ -57,6 +57,34 @@ out/
 /error-capture.json
 /spend-review.html
 /spend-review.md
+# THE OTHER SEVEN. Twelve review skills say "write the report to the project
+# root" in their own SKILL.md; this list had five of them, and the seven below
+# were added on 2026-09-10 after `round_trip_review` reported a score and its
+# file turned out to be excused by nothing. Run one of those seven and the very
+# next `npm run check` goes red — on the DOC-MAP assertion, which tells you a
+# document is not reachable from README, so the reader goes and edits README's
+# doc map to link a file that should never have been read as a document at all.
+#
+# Hand-kept, and it cannot be otherwise: the skills live in ~/.claude/skills/,
+# outside this repository (see /skills/ below), so nothing here can census them.
+# To re-derive it when a review skill is added:
+#   grep -l "project root as" ~/.claude/skills/*/SKILL.md
+/activity-log-review.html
+/activity-log-review.md
+/base-fork-review.html
+/base-fork-review.md
+/dead-end-review.html
+/dead-end-review.md
+/first-run-review.html
+/first-run-review.md
+/realtime-review.html
+/realtime-review.md
+/round-trip-review.html
+/round-trip-review.md
+/speed-review.html
+/speed-review.md
+# `error_analyst` writes only the HTML to the root; its JSON is above.
+/error-report.html
 # NOT scaling-review.md/.html. README's doc map lists it as item 27 and
 # DATA-MODEL.md cites it for a claim, so it is a DOCUMENT that two other
 # documents depend on — ignoring it left the map pointing at a file a fresh
