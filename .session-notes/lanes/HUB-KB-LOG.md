@@ -384,3 +384,77 @@ overstates the win by nearly double. B1 volunteered that. In BUILD-5 now.
 All five figures go stale when B2's mail regroup lands, BY DESIGN — Tick 6
 sequenced the regroup first so B1 measures once against the final shape. Told B1 to
 expect it and to treat a moved number as a finding, not an error.
+
+## Tick 8 — 10 Sep 2026, ~20:45
+
+**I MERGED A STALE REF AND SKIPPED A PUSHED COMMIT.** My merge at 23e9dcf3 took
+the LOCAL `fix/kb-model` (95d80005) without fetching, while kb_A's third commit
+66e015c3 sat on the remote — a commit it had already reported to me BY NAME
+before the merge. Main carried a `knowledge_sightings` with no `seen_where` and a
+two-column unique index, and kb_B1 rebased onto it.
+
+Caught by kb_A, not me: it read main directly, checked the merge's second parent,
+confirmed the remote tip was unchanged, and proposed the cheapest fix without
+pushing to main itself. Fixed at `bda6a1c8` — 66e015c3 turned out to be a clean
+descendant, so merging the REMOTE ref brought it in whole. Check exit 0.
+
+**THE RULE: fetch immediately before merging, and merge the REMOTE ref.** A lane
+that reports "pushed" has a tip past whatever you last fetched.
+
+**Settled a drift BOTH lanes had, against both of them.** kb_B1 — reading my bad
+merge — called the two-column key "cleaner than what I asked for". It is not, and
+the reason is kb_B1's OWN retire pass: `(source_id, seen_by_user_id)` gives one
+row per person per thing, so when Aurora loses the Drive folder but still has the
+material in her mail there is NO ROW to stamp `gone_at` on. Three columns retire
+the Drive sighting and leave the mail one live. kb_A's test — same person, two
+places, not deduped — is exactly that case. The place is an INGEST fact, not a
+permission fact: it does not belong on B1's `Sighting` type and it does belong in
+the key.
+
+**THE FENCE. The most important finding of the rebuild, and it is kb_B1's.**
+The read fence `owner_user_id IS NULL OR owner_user_id = me` is denormalised onto
+`knowledge_chunks` and `knowledge_terms` — three copies of one fact — and one
+column cannot hold a set. The moment two people's rows fold into one source it
+has no correct value. The datum that settles it: **all 66 live calendar rows are
+private-shelf**, folding to 33 sources of which 27 have two or three sightings, so
+**100% of the fold is the multi-private case**. `owner_user_id = NULL` would
+silently make Aurora's private calendar readable by everybody, on 27 sources.
+
+**RULED: build the stored ANSWER** — `team_visible` on chunks/terms, sightings
+join only when false. Keeps the single-table stage-one read for the corpus bulk
+(3,933 sources; calendar is 66) and pays the join only for private material.
+Option 3 (fold only where a team sighting exists) is a no-op dressed as an option
+— zero of 33 qualify — and is recorded so nobody revives it.
+
+**The failure mode kb_B1 did not name, and my approval is conditional on it:**
+`team_visible` is a DENORMALISED COPY OF A DERIVED FACT, which is what
+`owner_user_id` is one level up. It goes stale when a shelf flips private→team or
+the last team sighting is retired — a fence widening with no code change and no
+deploy. Approved ONLY with (a) recompute in the SAME statement/transaction as any
+`shelf`/`gone_at` write, never a follow-up write that can be skipped, and (b) a
+test that recomputes `team_visible` from sightings across the corpus and asserts
+equality, so a stale flag is a red build rather than a quiet leak.
+
+**Fresh-eyes review sequenced deliberately:** on the IMPLEMENTATION, from a clean
+clone, by eyes that have not read this thread — and as a MERGE GATE, not a
+follow-up. A review of a design that does not exist yet rationalises a sketch. The
+fence does not merge on a green `npm run check` alone.
+
+**kb_B1's dependency-direction catch approved:** the cards declaration goes in the
+LOWER layer, not on `INGEST_KINDS`, because `knowledge.ts ← knowledge-ingest.ts`
+means importing the kinds table into `knowledge.ts` inverts the arrow into a real
+cycle. The rot-check binds declaration to `INGEST_KINDS` instead — same guarantee,
+arrow the right way round. R13's argument applied to module structure.
+
+**kb_B2: nine call sites CONFIRMED by my own grep** — `recordDate: r.created_at`
+at knowledge-ingest.ts lines 435, 621, 698, 789, 896, 1085, 1371, 1458, 1843, and
+`updated_at` defined 40 times in migrations, so the fix is probably possible.
+Still unproven, and B2 was right to refuse to assert it: whether each kind's own
+SELECT carries an updated-at equivalent. Told it to write the CENSUS down and not
+to fix — `knowledge-ingest.ts` is not its file and it is nine gated writes of
+blast radius. This is the live mechanism behind KB-AUDIT §4.5's measured symptom.
+
+**Mail regroup answer re-sent** (the first may still be queued): build it, it goes
+first, B2 owns grain and B1 owns `externalId`, and neither may claim it fixes the
+cross-mailbox fold — both have now independently confirmed a Gmail THREAD id is
+per-mailbox exactly as a message id is.
