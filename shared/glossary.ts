@@ -140,6 +140,7 @@ export const GLOSSARY = {
   source: { term: "Source", def: "One piece of material in the knowledge base: a note you wrote, or something the app keeps in step for you." },
   compartment: { term: "Compartment", def: "The slice of the knowledge base a question is answered from, one account's world, or the agency's own." },
   citation: { term: "Citation", def: "The source an answer came from. Every answer names its own; an answer with no source isn't one." },
+  passage: { term: "Passage", def: "The part of a source an answer quotes. Press a citation to read the passage it came from." },
   activity: { term: "Activity", def: "A history of what changed on a record, and who changed it." },
   overview: { term: "Overview", def: "The key facts about a record at a glance." },
   status: { term: "Status", def: "Where a record sits in its lifecycle, a ticket runs new to resolved. An account has none: it is live, or it is archived." },
