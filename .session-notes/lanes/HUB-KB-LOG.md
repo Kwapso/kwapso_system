@@ -839,3 +839,43 @@ And `absent is not gone` is the FOURTH instance: calendar's `primary`-404, mail'
 thread-404, chat's space-keying that exists to avoid asking, and kb_B1's own
 `heldSources` prefix case where "I cannot find your rows" would read as "you have
 no rows" — same sentence, opposite direction.
+
+## Tick 15 — 11 Sep 2026, ~00:10
+
+**kb_B2's LANE IS DONE AND MERGED (`d66fbe01`, exit 0 — read before pushing this
+time).** Mail is a thread, the skip is thread-shaped, and the retire probe asks
+`GET /threads/{id}` with gone only when every member carries TRASH.
+
+**THE TEST IS BETTER THAN WHAT I ASKED FOR.** I said make it fail the way
+production would; kb_B2 asserted on the **REQUESTED URL** rather than the returned
+answer, because asserting the answer alone passes against either endpoint whenever
+the mock says 200 — its own mock-fails-safe observation turned on the test written
+to catch it. It failed the dangerous way first, showing `/messages/TH_1`.
+
+**AND THE FINDING UNDERNEATH IT IS BIGGER THAN THE BUG: this is the first time
+`googlePresence` has ever been exercised for real. Every existing caller mocked it
+away entirely.** A function that decides whether to DELETE a person's material from
+answers had no test that ran it — which means drive's, calendar's and chat's probes
+have never been run either, and calendar's is the one already known to have had
+this exact fault. On the fresh-eyes review's list.
+
+**kb_B2's three refusals, on the record:** `knowledge-shape.ts` when I had wrongly
+named it a grain file; `google-transcript.ts` three times, rather than inventing
+speaker-turn parsing against no confirmed sample; and `PRESENCE_PROBES` until it
+had a scope grant, when two prior grants would have made assuming a third feel
+reasonable. The last one is the one that mattered.
+
+**MY ARITHMETIC ERROR, TWICE STATED TO THE OWNER: the tracker has 48 items, not
+46.** 2+6+10+4+11+5+2+3 = 43, plus 5 gate. I gave him 46 in two separate reports.
+The page computes it correctly and says 48; I did not check my own count against
+the instrument that was already displaying it.
+
+**The tracker was republished from the page itself** — the owner toggling
+`d-followup` on and off. Re-read; no substantive change, five ticks stand, nothing
+to merge.
+
+**NEXT, AND IT IS MINE NOT A LANE'S: a staging deploy and a purge-and-rebuild.**
+About eight tracker items cannot move without it, kb_B2's YouTube/Loom readers have
+never met a real URL, and `rebuild-knowledge.mjs` has never run. Blocked until
+kb_B1's fence lands, because a rebuild before the fence would re-pull under a
+visibility model about to change.
