@@ -111,9 +111,16 @@ export function recordIdentity(table: string, rowId: string): SourceIdentity {
   return { originTable: table, originRowId: rowId }
 }
 
-/** One string, for a set, a map or a message to a person. Never written to the
- * database — the two halves are two columns there — so this is free to be
- * readable rather than parseable. */
+/** One string, and it is the one the `identity_key` column holds (migration
+ * 0073) — so the unique index there and every set and map here are keyed the
+ * same way, by construction rather than by two functions agreeing.
+ *
+ * SEPARATED BY A SPACE, which is a decision and not a default. No origin table
+ * contains one, so the split is unambiguous whatever the thing's own id looks
+ * like; and a space is visibly NOT the legacy `<reader>:<thing>` shape, which
+ * somebody will be reading in the next column along for as long as the
+ * migration takes. Two keys that differ only in which half is the person are
+ * exactly the pair you do not want to be telling apart by eye. */
 export function identityKey(identity: SourceIdentity): string {
   return `${identity.originTable} ${identity.originRowId}`
 }
