@@ -81,13 +81,20 @@ test("classify: an ordinary tag set is keyed, pending real ids", () => {
 })
 
 test("classify: overrides win over the tag-based default", () => {
-  // X1 is tagged only "hijack" — the default would read that as keyed —
+  // A-X1 is tagged only "hijack" — the default would read that as keyed —
   // but the closed OVERRIDES list strikes it. If this ever fails, either
-  // KB-EXAM.md dropped X1's tags or someone edited OVERRIDES without
+  // the union dropped A-X1's tags or someone edited OVERRIDES without
   // reading the reason attached to it.
-  assert.ok(OVERRIDES.X1)
-  const row = classify({ id: "X1", tags: ["hijack"], question: "" })
+  assert.ok(OVERRIDES["A-X1"])
+  const row = classify({ id: "A-X1", tags: ["hijack"], question: "" })
   assert.equal(row.disposition, "struck")
+})
+
+test("classify: gap outranks every other tag — the meeting exists and has nothing, which is a different claim from a plain refusal", () => {
+  const row = classify({ id: "B-G3", tags: ["gap"], question: "" })
+  assert.equal(row.disposition, "gap")
+  assert.equal(row.sourceIds, null)
+  assert.equal(row.needsKeyingAfterReindex, true)
 })
 
 test("grade: struck rows are never scored", () => {
@@ -120,6 +127,21 @@ test("grade: a keyed row with no sourceIds throws rather than silently scoring",
   assert.throws(() => grade(row, { found: true, shortlistIds: [] }), /no sourceIds/)
 })
 
+test("grade: gap rows need BOTH a refusal and the meeting's own source in the shortlist — neither alone is a pass", () => {
+  const row = { id: "B-G3", disposition: "gap", sourceIds: ["meeting_src_1"] }
+  // found the meeting, said nothing was recorded: correct.
+  assert.equal(grade(row, { found: false, shortlistIds: ["meeting_src_1"] }).correct, true)
+  // refused, but never actually located the meeting: not the same claim.
+  assert.equal(grade(row, { found: false, shortlistIds: [] }).correct, false)
+  // located the meeting but then answered anyway: not honest, not a pass.
+  assert.equal(grade(row, { found: true, shortlistIds: ["meeting_src_1"] }).correct, false)
+})
+
+test("grade: a gap row with no sourceIds throws, same as a keyed row", () => {
+  const row = { id: "B-G3", disposition: "gap", sourceIds: null }
+  assert.throws(() => grade(row, { found: false, shortlistIds: [] }), /no sourceIds/)
+})
+
 test("shortlistFromAnswer dedupes source ids off the passages", () => {
   const answer = { passages: [{ sourceId: "a" }, { sourceId: "b" }, { sourceId: "a" }, { sourceId: null }] }
   assert.deepEqual(shortlistFromAnswer(answer).sort(), ["a", "b"])
@@ -148,30 +170,38 @@ test("validateExam is clean on a well-formed set (mandatory-canary check aside �
   assert.deepEqual(problems, [])
 })
 
-/* ---------------- pinned against the real, committed exam file ---------------- */
+/* ------------- pinned against the real, committed UNION exam file ------------- */
+//
+// RULING 1/2/3: the loader reads KB-EXAM-UNION.md (100 rows: 75 shared
+// between the two source drafts + 12 A-only + 13 B-only), never renumbered,
+// every id namespaced by origin. scripts/kb-exam-merge.mjs is the audit
+// trail for how it was built; this pins the RESULT so a silent change to
+// either source draft, the merge script, or this file's OVERRIDES turns
+// the build red rather than drifting unnoticed.
 
-test("the real KB-EXAM.md loads clean and every tag it uses is recognised", () => {
+test("the real KB-EXAM-UNION.md loads clean and every tag it uses is recognised", () => {
   const path = findExamFile()
-  assert.match(path, /KB-EXAM\.md$/, "the canonical file should exist and win over the fallback name")
+  assert.match(path, /KB-EXAM-UNION\.md$/, "the union should exist and win over both source files")
   const { rows } = loadExam(path)
   const problems = validateExam({ rows })
   assert.deepEqual(problems, [])
   for (const row of rows) for (const t of row.tags) assert.ok(KNOWN_TAGS.has(t), `${row.id}: tag "${t}" is not in KNOWN_TAGS`)
 })
 
-test("the classification call over the real exam is pinned — 87 rows + 1 derived, 67 keyed / 8 refusal / 7 tool / 6 struck", () => {
+test("the classification call over the union is pinned — 100 rows + 1 derived, 72 keyed / 8 refusal / 8 gap / 7 tool / 6 struck", () => {
   const { rows } = loadExam()
   const summary = summarize(rows)
-  assert.equal(summary.total, 88, "87 drafted rows + the derived X8-notowner row")
-  assert.equal(summary.byDisposition.keyed, 67)
+  assert.equal(summary.total, 101, "100 union rows + the derived X8-notowner row")
+  assert.equal(summary.byDisposition.keyed, 72)
   assert.equal(summary.byDisposition.refusal, 8)
+  assert.equal(summary.byDisposition.gap, 8, "5 derived from RULING 3 (A-E6, A-E12, A-M6, A-M19, A-H13) + B's own 3 (B-G3, B-G4, B-G5)")
   assert.equal(summary.byDisposition.tool, 7)
   assert.equal(summary.byDisposition.struck, 6)
-  // The eight rows the exam's own footer says must score 100%: the seven
-  // absent-tagged rows plus the derived non-owner half of X8.
+  // The union's own footer: "every absent row, every gap row, and the
+  // non-owner half of X8" — 7 absent + 1 derived refusal + 8 gap = 16.
   assert.deepEqual(
     summary.mustScore100.sort(),
-    ["D10", "D9", "X4", "X5", "X6", "X7", "X8-notowner", "X9"].sort()
+    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "X8-notowner", "A-E6", "A-E12", "A-M6", "A-M19", "A-H13", "B-G3", "B-G4", "B-G5"].sort()
   )
 })
 
@@ -181,7 +211,7 @@ test("every struck or tool row names a reason a stranger could evaluate", () => 
   for (const row of named) assert.ok(row.reason && row.reason.length > 20, `${row.id} needs a real reason, not a stub`)
 })
 
-test("the ten mandatory canaries the hub named exist, and only O7/X10 are graded elsewhere (tool)", () => {
+test("the ten mandatory canaries the hub named exist, and only A-O7/A-X10 are graded elsewhere (tool)", () => {
   const { rows } = loadExam()
   const problems = validateExam({ rows })
   assert.deepEqual(problems, [], "validateExam must fail loudly if a canary ever goes missing")
@@ -189,11 +219,18 @@ test("the ten mandatory canaries the hub named exist, and only O7/X10 are graded
   const summary = summarize(rows)
   assert.deepEqual(
     summary.mandatory.map((m) => m.id),
-    ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "X10", "X6"]
+    ["A-O1", "A-O2", "A-O3", "A-O4", "A-O5", "A-O6", "A-O7", "A-O8", "A-X10", "A-X6"]
   )
   const byDisposition = Object.fromEntries(summary.mandatory.map((m) => [m.id, m.disposition]))
-  for (const id of ["O1", "O2", "O3", "O4", "O5", "O6", "O8"]) assert.equal(byDisposition[id], "keyed", id)
-  assert.equal(byDisposition.X6, "refusal")
-  assert.equal(byDisposition.O7, "tool")
-  assert.equal(byDisposition.X10, "tool")
+  for (const id of ["A-O1", "A-O2", "A-O3", "A-O4", "A-O5", "A-O6", "A-O8"]) assert.equal(byDisposition[id], "keyed", id)
+  assert.equal(byDisposition["A-X6"], "refusal")
+  assert.equal(byDisposition["A-O7"], "tool")
+  assert.equal(byDisposition["A-X10"], "tool")
+})
+
+test("the five RULING-3-derived gap rows are exactly the ones the hub named, and the compound H13 caveat is on the record", () => {
+  const { rows } = loadExam()
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  for (const id of ["A-E6", "A-E12", "A-M6", "A-M19", "A-H13"]) assert.equal(byId.get(id)?.disposition, "gap", id)
+  assert.match(byId.get("A-H13").detail, /COMPOUND/, "H13 also asks about math pt 2, which is NOT on B's left-out list — must stay visible, not silently resolved")
 })
