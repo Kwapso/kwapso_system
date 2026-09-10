@@ -39,8 +39,6 @@ import {
   AccordionTrigger,
 } from "@shared/ui/components/accordion/accordion"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Button } from "@shared/ui/components/button/button"
-import { Plus } from "@shared/ui/foundations/icons"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { Comments } from "@shared/ui/components/comments/comments"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -52,6 +50,7 @@ import { invalidate, useCached } from "@shared/web/store"
 import { ApiFailure, impact as impactApi, support, type PortalImpact } from "@/lib/api"
 import { cacheKeys } from "@/lib/live-resources"
 import { ErrorPanel } from "@/components/error-panel"
+import { PortalEmpty } from "@/components/portal-empty"
 import { RaiseTicketDialog } from "@/components/raise-ticket-dialog"
 import type { PortalReady } from "@/components/portal-shell"
 import { useLanguage, useT } from "@shared/web/language"
@@ -223,15 +222,10 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
          * process, so the only act that is genuinely theirs here is to ask;
          * offering it is the difference between a screen that explains itself
          * and one a first-time reader can leave. */}
-        <div className="text-muted-foreground flex flex-col items-center gap-1 rounded-[var(--radius)] bg-surface-panel p-8 text-center">
-          <p>
-            {t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
-          </p>
-          <Button className="mt-3 gap-1" onClick={() => setRaising(true)}>
-            <Plus className="size-3.5" />
-            {t("Ask us something")}
-          </Button>
-        </div>
+        <PortalEmpty
+          title={t("Nothing to show yet. As soon as we've mapped how a job used to be done and changed it, the time it gives back appears here.")}
+          action={{ label: t("Ask us something"), onClick: () => setRaising(true) }}
+        />
 
         <RaiseTicketDialog
           open={raising}

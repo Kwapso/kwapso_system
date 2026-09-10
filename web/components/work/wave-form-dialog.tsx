@@ -32,7 +32,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import { ApiFailure } from "@/lib/api"
 import { RecordPicker } from "@/components/records/record-picker"
-import { asOption, type PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
 import { useFormDraft } from "@shared/web/use-form-draft"
@@ -48,7 +48,7 @@ export type WaveFormValues = {
 // which translates a field config's own `label` and `helpText` on the way (R33):
 // `t` is a hook and a field config is a module-level constant, so this is the one
 // class of string in the app that cannot be wrapped where it is declared.
-const clientField = { ...defaultFieldConfig, label: "Client", required: true }
+const clientField = { ...defaultFieldConfig, label: "Account", required: true }
 const nameField = { ...defaultFieldConfig, label: "Wave name", required: true }
 const goalField = {
   ...defaultFieldConfig,
@@ -124,7 +124,7 @@ export function WaveFormDialog({
         <DialogDescription>
           {editing
             ? t("Rename it, or say more about what the package covers.")
-            : t("A package of sprints a client bought. You'll plan the sprints inside it next.")}
+            : t("A package of sprints an account bought. You'll plan the sprints inside it next.")}
         </DialogDescription>
       }
       submit={{ busy: busy, disabled: !ready }}
@@ -140,10 +140,14 @@ export function WaveFormDialog({
             id="wave-client"
             value={values.accountId}
             onChange={(v) => setValues((s) => ({ ...s, accountId: v }))}
-            options={clients.map(asOption)}
-            placeholder={t("Pick the client")}
-            searchPlaceholder={t("Search clients…")}
-            emptyText={t("No client matched.")}
+            // `accountOption`, not the bare `asOption` this used to call: an
+            // account always wears a mark (client, 2026-09-09), and on staging
+            // 48 of 134 hold a picture — so without `face` two rows in three
+            // drew nothing beside the ones that do.
+            options={clients.map(accountOption)}
+            placeholder={t("Pick the account")}
+            searchPlaceholder={t("Search accounts…")}
+            emptyText={t("No account matched.")}
             disabled={busy}
           />
         </Field>

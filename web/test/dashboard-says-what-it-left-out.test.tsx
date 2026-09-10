@@ -454,14 +454,18 @@ describe("the app's own tickets dashboard is the same one, narrowed", () => {
     ).toBeNull()
   })
 
-  it("offers no Client filter, because an app is built for one client", () => {
+  // "Client" UNTIL 2026-09-09 — the facet's LABEL is now "Account" (her ruling:
+  // "the filter client is the company, so it's the account"). The word this
+  // asserts had to move with it or the assertion would pass by naming a string
+  // no screen says any more, which is a check measuring nothing.
+  it("offers no Account filter, because an app is built for one account", () => {
     // The same subtraction the "Who has more" panel makes, made at the toolbar:
     // a control whose only meaningful setting is the one already in force is a
     // fact wearing a control's clothes. The Kind filter stays — a system's
     // Issues and its Requests are a real question inside one app.
     showForApp(FULL)
     expect(screen.getByRole("button", { name: /filter/i })).toBeTruthy()
-    expect(screen.queryByText("Client"), "a Client facet drew inside one app").toBeNull()
+    expect(screen.queryByText("Account"), "an Account facet drew inside one app").toBeNull()
   })
 
   it("draws the view switch, so the list is one press away", () => {
@@ -850,10 +854,10 @@ describe("a name on a ranked chart goes to its record", () => {
     ).toBeNull()
     expect(screen.getByText("No system named"), "the no-system bar vanished").toBeTruthy()
     expect(
-      screen.queryByRole("link", { name: "Unnamed client" }),
+      screen.queryByRole("link", { name: "Unnamed account" }),
       "a client with no name became a link to an account that does not answer"
     ).toBeNull()
-    expect(screen.getByText("Unnamed client"), "the unnamed client row vanished").toBeTruthy()
+    expect(screen.getByText("Unnamed account"), "the unnamed account row vanished").toBeTruthy()
   })
 })
 

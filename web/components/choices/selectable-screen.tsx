@@ -320,11 +320,68 @@ function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext
   )
 }
 
+/** ONE MODULE'S SHARE OF THE VOCABULARY, when this editor is mounted inside a
+ * module's own settings page rather than on the whole-team Choices screen.
+ *
+ * THE CLIENT'S RULING, 2026-09-09: *"the choices: yes, this would survive, but
+ * not as a general thing, but inside each module."* A ticket type and a sprint
+ * type are the same KIND of row and a different SUBJECT, and somebody who has
+ * come to a page called "Ticket settings" has already said which subject they
+ * mean — so the page shows those groups and only those.
+ *
+ * IT IS A NARROWING OF THIS SCREEN, NOT A SECOND SCREEN, and that is the whole
+ * point of the prop. `module-settings-screen.tsx` could have drawn its own list
+ * of ticket types in an afternoon; it would then have had its own rename, its
+ * own deactivate confirm, its own emoji field and its own idea of what a
+ * default is — four behaviours to keep in step with this file for ever, and a
+ * value that reads one way on Settings › Choices and another on Settings ›
+ * Tickets. Every write below still goes through the same four `tenancy.*`
+ * doors and primes the same `selectable:<teamId>` key, so an edit made here is
+ * the identical edit made there, seen live by both.
+ *
+ * `types` IS THE WHOLE NARROWING. The rows, the group datalist the create
+ * dialog offers, and R50's own "is this collection empty" question are all
+ * asked of the scoped set rather than the team's whole vocabulary — otherwise a
+ * team with no ticket types but plenty of sprint types would draw a toolbar
+ * over nothing, which is the exact shape R50 exists to refuse.
+ *
+ * `title`/`description` come with it rather than being derived, because the
+ * embedded heading's own words ("Choices" / "Ticket types, Sprint types and
+ * more") are true of the whole vocabulary and false of any slice of it. */
+export interface SelectableScope {
+  /** The `selectable_data.type` groups this mounting shows. */
+  types: string[]
+  title: string
+  description: string
+  /** MAY A NEW VALUE BE ADDED TO THIS SLICE — a fact about the vocabulary, not
+   * about the reader (the reader's own `selectable_data:create` right is asked
+   * separately and both must agree).
+   *
+   * It exists because `shared/selectable-homes.ts` already draws the line this
+   * needs: a group whose home is `"labels"` does not STORE its words anywhere —
+   * the code owns the states and these rows supply only the display word and
+   * the mark beside it. A ticket runs through the six statuses
+   * `HELP_STATUSES` declares and the server validates against that list, so a
+   * seventh "Ticket status" row would be a word for a stage that does not
+   * exist: creatable, saveable, and backing nothing. Renaming the five is the
+   * whole of what this section is for.
+   *
+   * It is ALSO how this page keeps one brand fill. The kit rules one mango per
+   * view and `AddButton` is a mango; two vocabulary sections stacked on one
+   * page would draw two. Settings › Team answers the same question by demoting
+   * the second button (`RolesMatrix`'s quiet "New role"), and the client ruled
+   * on that exception herself — "No exceptions to the rules. It was my
+   * mistake." Here the honest answer is stronger than a demotion: the second
+   * section has nothing to create, so it draws no button at all. */
+  create: boolean
+}
+
 export function SelectableScreen({
   teamId,
   onImport,
   onOpen,
   standalone = true,
+  scope,
 }: {
   teamId: string
   /** Host-provided soft-nav to the import wizard (pre-targeted to dropdown values). */
@@ -340,6 +397,10 @@ export function SelectableScreen({
    * already has its own name on the strip above it, so a second, page-sized
    * heading inside the panel would be the count and the title said twice. */
   standalone?: boolean
+  /** Present when this editor is one section of a module's own settings page —
+   * see `SelectableScope` above. Absent everywhere else, which is the team's
+   * whole vocabulary and exactly what this screen has always shown. */
+  scope?: SelectableScope
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -347,7 +408,11 @@ export function SelectableScreen({
     tenancy.selectable().then((r) => r.values)
   )
 
-  const canCreate = can("selectable_data", "create")
+  // THE READER'S RIGHT **AND** THE SLICE'S OWN ANSWER — see `SelectableScope.create`.
+  // Both have to say yes: a right the caller does not hold, and a vocabulary
+  // with nothing to add, are two different reasons for the same absent button
+  // and neither one may be inferred from the other.
+  const canCreate = can("selectable_data", "create") && (scope?.create ?? true)
   const canEdit = can("selectable_data", "edit")
   const canDelete = can("selectable_data", "delete")
 
@@ -379,10 +444,27 @@ export function SelectableScreen({
   // (shared/web/use-confirm.tsx); reactivating stays confirm-free.
   const { ask: askDeactivate, run: runActive, dialog: deactivateDialog } = useConfirm()
 
-  const values = valuesQ.data ?? []
-  // The add form's group datalist offers EVERY existing type (not just the filtered
-  // ones), so you can always add to any group.
-  const types = Array.from(new Set(values.map((v) => v.type))).sort()
+  // THE COLLECTION THIS MOUNTING IS ABOUT — the team's whole vocabulary, or one
+  // module's share of it (`scope`, above). Everything below reads THIS and not
+  // the raw response: the rows, the count, the group datalist, and R50's own
+  // "is it empty" question. One narrowing at the top rather than a `scope &&`
+  // at each of the four, because the four have to agree — a toolbar drawn over
+  // an empty scope because `empty` was asked of the unscoped set is precisely
+  // the drift R50's own header describes.
+  //
+  // A door read, not a door filter: `tenancy.selectable()` returns the whole
+  // vocabulary in one bounded response and both mountings share the one
+  // `selectable:<teamId>` cache key (R56 — a component asks a door once). A
+  // per-scope key would fetch the same rows a second time and then hold two
+  // copies that a rename on either screen could leave disagreeing.
+  const values = (valuesQ.data ?? []).filter((v) => !scope || scope.types.includes(v.type))
+  // WHAT THE CREATE DIALOG OFFERS AS A GROUP. Unscoped, that is every type the
+  // team already has (not just the filtered ones), so you can always add to any
+  // existing group. Scoped, it is the page's OWN declared types rather than the
+  // ones that happen to have a row today — a module settings page that has
+  // never had a single "Ticket status" would otherwise offer no way to make the
+  // first one, which is the one moment the offer matters most.
+  const types = scope ? [...scope.types].sort() : Array.from(new Set(values.map((v) => v.type))).sort()
   // The list is the filtered set, grouped by type.
   const q = query.trim().toLowerCase()
   const filtered = values.filter(
@@ -507,10 +589,17 @@ export function SelectableScreen({
         {standalone ? (
           <CollectionHeading sectionKey="dropdowns" total={values.length} />
         ) : (
-          <Headline as="h2" size="h4">{t("Choices")}</Headline>
+          /* SCOPED, THE SECTION SAYS WHICH SLICE IT IS. A module settings page
+             stacks several sections on one screen, so "Choices" as a heading
+             would name the mechanism rather than the subject and would be the
+             same word over each of them. `scope.title` is the section's own
+             name, supplied by the page (see `SelectableScope`). */
+          <Headline as="h2" size="h4">{scope ? scope.title : t("Choices")}</Headline>
         )}
         <p className="text-muted-foreground mt-1 text-sm">
-          {t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
+          {scope
+            ? scope.description
+            : t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
         </p>
       </div>
 
@@ -589,7 +678,16 @@ export function SelectableScreen({
             }
             actions={
               <>
-                {values.length > 0 && (
+                {/* THE CSV DOORS ARE THE WHOLE VOCABULARY'S, SO A SLICE DOES NOT
+                    OFFER THEM. `/api/tenancy/selectable/export` writes every
+                    group the team has and the importer reads the same shape
+                    back; hanging either off a page titled "Ticket settings"
+                    would be a button that quietly does more than the page it
+                    sits on says it can. Both stay on Settings › Choices, which
+                    is the screen that is about all of them. (`onImport` is
+                    host-provided and the module settings page passes none — the
+                    export is the half this component owns, so it asks here.) */}
+                {!scope && values.length > 0 && (
                   <a
                     href="/api/tenancy/selectable/export"
                     className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
@@ -611,17 +709,20 @@ export function SelectableScreen({
           // ROWS ONLY — the toolbar above is already real.
           <Skeleton variant="list" lines={5} />
         ) : grouped.length === 0 ? (
-          values.length === 0 ? (
-            // GENUINELY EMPTY — the toolbar above is gone, so this is the
-            // only "New value" (and "Import CSV") left on screen.
-            <CollectionEmptyState
-              title={t("No values yet.")}
-              onCreate={canCreate ? () => setAddOpen(true) : undefined}
-              onImport={canCreate && onImport ? onImport : undefined}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">{t("No values match your search or filter.")}</p>
-          )
+          /* R62 — ONE REGISTER, BOTH ZEROS. Client, 2026-09-09: "the empty
+             because of filters hosul look the same as empty collection but the
+             add button." At rest the toolbar above is gone (R50), so this is
+             the only "New value" (and "Import CSV") left on screen; narrowed,
+             the toolbar stays up and BOTH acts are withdrawn here by the
+             component, so the reader is pointed back at the search that
+             emptied the list rather than invited to add a duplicate of a value
+             a filter is hiding. */
+          <CollectionEmptyState
+            filtered={values.length > 0}
+            title={t("No values yet.")}
+            onCreate={canCreate ? () => setAddOpen(true) : undefined}
+            onImport={canCreate && onImport ? onImport : undefined}
+          />
         ) : (
           <div className="flex flex-col gap-6">
             {grouped.map((g) => (

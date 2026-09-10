@@ -139,6 +139,15 @@ export interface ScreenRendererProps {
   useKitPanel?: boolean
   band?: React.ReactNode
   /**
+   * R62 — IS A SEARCH ABOVE THIS RECIPE ALREADY NARROWING ITS ROWS? Forwarded
+   * to a `type: "list"` recipe's `CollectionFrame` (see its own doc). A GROWING
+   * collection's search lives in `<PagedFind>` at the door, so the frame's own
+   * query is empty and it read a search that matched nothing as "this
+   * collection is empty" — drawing the resting register, and "Add the first",
+   * over rows a term was hiding. A host under a find passes `found.active`.
+   */
+  narrowedOutside?: boolean
+  /**
    * THE DOOR ON THE RECORD FOOTER'S LATEST-ACTIVITY ROW — a node, drawn at the
    * inline end of that column's eyebrow (`RecordDetail.activityAction`), for a
    * `type: "detail"` recipe. Today the app's own `<ActivityRail>`: the link
@@ -729,7 +738,8 @@ function renderList(
   onIntent?: ScreenRendererProps["onIntent"],
   state?: ScreenRendererProps["state"],
   useKitPanel?: ScreenRendererProps["useKitPanel"],
-  band?: ScreenRendererProps["band"]
+  band?: ScreenRendererProps["band"],
+  narrowedOutside?: ScreenRendererProps["narrowedOutside"]
 ): React.ReactNode {
   const fields = recipe.fields.filter(
     (f) => gateState(rights, f.gate) !== "hidden"
@@ -867,6 +877,7 @@ function renderList(
       state={state}
       useKitPanel={useKitPanel}
       band={band}
+      narrowedOutside={narrowedOutside}
       renderItems={(page) =>
         display === "gallery" ? (
           /* The one view where an image leads (Gallery, components/gallery).
@@ -1242,6 +1253,7 @@ function ScreenRenderer({
   state,
   useKitPanel,
   band,
+  narrowedOutside,
   activityAction,
 }: ScreenRendererProps) {
   const t = useT()
@@ -1269,7 +1281,7 @@ function ScreenRenderer({
 
   const content =
     recipe.type === "list" ? (
-      renderList(t, recipe, data, rights, onAction, onIntent, state, useKitPanel, band)
+      renderList(t, recipe, data, rights, onAction, onIntent, state, useKitPanel, band, narrowedOutside)
     ) : recipe.type === "detail" ? (
       renderDetail(blockCtx, onAction, activityAction)
     ) : recipe.type === "edit" || recipe.type === "add" ? (

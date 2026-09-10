@@ -71,12 +71,14 @@
     // use can now turn the build red on a sync. That is the trade being made
     // on purpose — a kit screen that does not compile under Next is something
     // to learn at the sync, not on the day somebody first imports it.
+    "../.next-slidein/types/**/*.ts",
     ".next-avatar-verify/types/**/*.ts",
     ".next-borderfix-verify/types/**/*.ts",
     ".next-breadcrumbs-verify/types/**/*.ts",
     ".next-empty-collection-verify/types/**/*.ts",
     ".next-filters-sort-verify/types/**/*.ts",
     ".next-hoverfill-verify/types/**/*.ts",
+    ".next-kitconform-verify/types/**/*.ts",
     ".next-list-mark-verify/types/**/*.ts",
     ".next-member-row-verify/types/**/*.ts",
     ".next-nested-toolbars-verify/types/**/*.ts",
@@ -88,8 +90,7 @@
     ".next-verify-toolbars/types/**/*.ts",
     ".next-verify/types/**/*.ts",
     ".next/types/**/*.ts",
-    "next-env.d.ts",
-    ".next-kitconform-verify/types/**/*.ts"
+    "next-env.d.ts"
   ],
   "exclude": [
     "node_modules",

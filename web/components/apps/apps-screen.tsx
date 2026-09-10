@@ -146,7 +146,7 @@ function appIsActive(app: AppRow): boolean {
  * screen instead of a paged one. */
 const APP_SORTS: SortOption[] = [
   { value: "name", label: "Name" },
-  { value: "client", label: "Client" },
+  { value: "client", label: "Account" },
   { value: "created", label: "Created", defaultDir: "desc" },
 ]
 
@@ -267,10 +267,35 @@ export function AppsScreen({
   // COMPONENT could mount and unmount freely with the loading state; a hook
   // cannot skip renders the same way.
   const loadedApps = appsQ.data ?? []
+  /* AND EACH ACCOUNT WEARS ITS OWN FACE — client ruling, 2026-09-09: "for
+     accounts include icon in select components and filters". The Stage facet
+     beside this one has drawn its glyph for weeks and the tickets toolbar's own
+     Account facet since 2026-09-07, so this was the last filter row on which the
+     same record appeared as a bare word.
+     A MAP BY ID, off the accounts read this screen already holds: `accountNames`
+     one line up carries the WORD and nothing else (web/lib/account-names.ts), and
+     widening that seam to carry a picture would push a rendering concern into a
+     name lookup nine other screens share. The rows are right here.
+     A CLIENT THIS SCREEN'S PAGE ONE HAS NEVER SEEN still gets an option and still
+     gets a mark: `accountNames` already answers "An account" for a name it cannot
+     resolve (accounts PAGE, R14), and `RecordMark` draws that word's own initial
+     rather than an empty box. Same direction of failure the app facet on the
+     tickets toolbar chose out loud — an option we cannot fully describe keeps its
+     place, because the rows behind it are real.
+     `size="choice"` is the dense mark size every picker option and every other
+     marked facet in the app uses; nothing here decides a new one. */
+  const accountsById = new Map((accountsQ.data ?? []).map((a) => [a.id, a]))
   const clientOptions = Array.from(
     new Set(loadedApps.filter((a): a is AppRow & { accountId: string } => Boolean(a.accountId)).map((a) => a.accountId))
   )
-    .map((id) => ({ value: id, label: accountNames.get(id) ?? t("A client") }))
+    .map((id) => {
+      const label = accountNames.get(id) ?? t("An account")
+      return {
+        value: id,
+        label,
+        mark: <RecordMark picture={accountsById.get(id)?.logoUrl ?? null} name={label} size="choice" />,
+      }
+    })
     .sort((a, b) => a.label.localeCompare(b.label))
   const usedStages = new Set(loadedApps.map((a) => a.stage).filter((s): s is string => Boolean(s)))
   const stageOptions = APP_STAGES.filter((s) => usedStages.has(s.name)).map((s) => ({
@@ -278,7 +303,7 @@ export function AppsScreen({
     label: t(s.name),
   }))
   const facets: FilterFacet[] = [
-    { field: "accountId", label: t("Client"), control: "select", options: clientOptions },
+    { field: "accountId", label: t("Account"), control: "select", options: clientOptions },
     { field: "stage", label: t("Stage"), control: "select", options: stageOptions },
   ]
   const sortOptions = APP_SORTS.map((o) => ({ ...o, label: t(o.label) }))
@@ -356,7 +381,7 @@ export function AppsScreen({
   // fetch and no second narrowing pass: search, the facets and the sort above
   // already produced `shown`, and this is only ever a rendering of it.
   const listRows: Record<string, unknown>[] = shown.map((app) => {
-    const client = app.accountId ? (accountNames.get(app.accountId) ?? t("A client")) : t("Ours")
+    const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
     const stage = app.stage ? t(app.stage) : null
     return {
       id: app.id,
@@ -513,7 +538,15 @@ export function AppsScreen({
           <Skeleton variant="list" lines={4} />
         ) : shown.length === 0 ? (
           narrowed ? (
-            <p className="text-muted-foreground text-sm">{t("No apps match that.")}</p>
+            /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client,
+               2026-09-09. This was a bare grey line while both branches below
+               draw the full register; `filtered` makes them one body and takes
+               the create action away, so the tab's own "Add the first" cannot
+               appear over a list a search is hiding. The title is the Active
+               tab's own sentence and is unread here — `filtered` says
+               "Nothing matched." instead, because "No apps yet." is a claim
+               about the collection and it is untrue mid-search. */
+            <CollectionEmptyState filtered title={t("No apps yet.")} />
           ) : tab === "inactive" ? (
             // The same register as the Active tab below (owner ruling,
             // 2026-09-07: empty states for everything), with no act — an app

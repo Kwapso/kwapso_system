@@ -356,13 +356,13 @@ export function TimePanel({
                 // deliberately untrue, sentence over a resting empty list — it
                 // follows what was actually asked, the same as every other
                 // find bar in the app.
+                /* R62 — the two sentences and the button-suppression were
+                   hand-written here first; they are the component's job now, so
+                   this passes the FACT and stops re-deriving the answer. */
                 <CollectionEmptyState
-                  title={
-                    found.active
-                      ? t("Nothing matched. Try fewer words, or clear the filters.")
-                      : t("No time logged yet.")
-                  }
-                  onCreate={!found.active && canCreate ? () => setAddOpen(true) : undefined}
+                  filtered={found.active}
+                  title={t("No time logged yet.")}
+                  onCreate={canCreate ? () => setAddOpen(true) : undefined}
                 />
               ) : (
                 <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">

@@ -529,6 +529,35 @@ describe("the Open tab's board", () => {
     return BOARD.text
   })()
 
+  /* ── "COLUMN HEADER SHOULD HAVE NO COLOR" (client, 2026-09-09) ────────────
+
+     SHE ASKED TWICE, IN TWO SHAPES, WHICH IS WHY THIS IS PINNED. On 2026-09-07
+     she said "grerat but status (th header) have no color associated" and the
+     screen read it as a complaint about WHICH colour — the column heads and the
+     Status filter were tinting the same stage two different ways — so the dot
+     was CORRECTED rather than removed, and a long comment was written defending
+     the corrected tones. On 2026-09-09 she said it in the imperative and again
+     in the same review: "remove the color from the status header!" … "column
+     header should have no color".
+
+     So the old argument is still readable in this repo's history and is
+     precisely the kind of thing a future reader finds, believes, and acts on.
+     This is the assertion that stops them: no column on this board hands the
+     kit a `dot`, on the FIVE heads together, read off the board's own source.
+
+     A SOURCE SCAN FOR THE REASON THE REST OF THIS DESCRIBE IS ONE (see its
+     header): the board is not mounted here, and the thing being locked is what
+     the screen HANDS the kit rather than what a browser paints. The kit's own
+     `dot` is optional and both of its draw sites are gated on `!== undefined`
+     (shared/ui/components/kanban/kanban.tsx), so "passes no dot" IS "draws no
+     dot" — the kit cannot invent one. */
+  it("hands the kit no dot for any column head", () => {
+    expect(
+      [...board.matchAll(/\bdot\s*:/g)].length,
+      "a column on the Open board is passing the kit a `dot` again — the client removed the colour from these heads on 2026-09-09 (\"column header should have no color\"), and the 2026-09-07 argument for a CORRECTED dot, still in this file's history, is not a licence to restore one"
+    ).toBe(0)
+  })
+
   it("touches the loaded rows exactly once, and that touch is a PARTITION", () => {
     /* THE ONE EXCEPTION TO "NOTHING NARROWS THE DOOR'S ANSWER", ARGUED RATHER
        THAN ASSUMED — and the assertion that replaced a check the layout used to

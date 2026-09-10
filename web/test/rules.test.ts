@@ -14,6 +14,7 @@ import {
   ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  CENTRED_DIALOG_OK,
   CLIENT_REACHABLE_EXEMPT,
   COMPOSITION_EXEMPT,
   DEAF_EXEMPT,
@@ -3951,6 +3952,10 @@ describe("RULES — the laws of the base", () => {
       "one-door-per-unit", // R56: the read census below, over both front doors, grouped by component and by door
       "component-folders", // R57: web/test/component-folders.test.ts — the folder set DERIVED from web/components/README.md's own rows
       "named-paths", // R58: web/test/named-paths.test.ts — the doc census and the source census, both off the disk
+      "forms-are-not-overlays", // R59: the centred-overlay census below, over both front doors — inverted, so a form it has never seen is caught by having no reason on file
+      "image-fills", // R60: web/test/an-image-fills.test.ts — every `object-*` utility AND every `fit="contain"` prop in our own source, plus the pinned, only-falling count of the ones the vendored kit still owes us
+      "module-settings-two-doors", // R61: the MODULE_SETTINGS ↔ gear-mount census below, plus the two clauses that keep the Modules index derived and the gate written once
+      "one-zero-register", // R62: web/test/one-zero-register.test.tsx — the two registers' own subtraction guard (read AND rendered), the no-second-register census over both front doors, and the engine's `narrowed`/`narrowedOutside` clause
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -4062,22 +4067,66 @@ describe("offered-rights: no permission switch decides nothing", () => {
 
   // THE SCREEN READS THE SAME DATA. The door hands each module its offered
   // rights (`getRolePermissions`, tested in workers/tenancy/test/roles.test.ts);
-  // this holds the Roles screen to three things with them: it hands the kit the
-  // subset as `rights` (the prop the next kit tag draws from), it never shows a
-  // held tick on an unoffered box, and a press on one records nothing. Read off
-  // the source, because the screen is a host-composed component with a cache
-  // and a door behind it and a render harness would prove less than it looked.
-  it("offered-rights: the Roles screen hands the kit each module's offered rights and refuses a press on any other", () => {
-    const screen = read(join(ROOT, "web", "components", "team", "role-detail.tsx"))
-    expect(screen, "the matrix rows no longer carry `rights` from the door").toMatch(
-      /rights:\s*m\.rights\.map\(\(r\)\s*=>\s*RIGHT_TO_KIT\[r\]\)/
-    )
-    expect(screen, "a held tick is no longer filtered to the offered rights").toMatch(
-      /\.filter\(\(r\)\s*=>\s*offered\(m,\s*r\)\s*&&/
-    )
-    expect(screen, "onChange no longer refuses a press on an unoffered box").toMatch(
-      /if \(row && !offered\(row, right\)\) return/
-    )
+  // this holds the Roles screen to what it does with them. Read off the source,
+  // because the screen is a host-composed component with a cache and a door
+  // behind it and a render harness would prove less than it looked.
+  //
+  // THE SCREEN MOVED AND THE CLAUSE MOVED WITH IT, 2026-09-09. It used to read
+  // `web/components/team/role-detail.tsx` — one role at /t/<teamId>/roles/<id>,
+  // modules down the side and that one role across the top. The client's ruling
+  // deleted the per-role page and put EVERY role on one grid inside Settings ›
+  // Team ("All the roles together, I want to have an overview"), so the file to
+  // read is `roles-matrix.tsx`.
+  //
+  // AND THE UPSTREAM ASK THIS CLAUSE CARRIED HAS NOW LANDED — 2026-09-09, kit
+  // v1.2.75. READ THIS RATHER THAN SKIMMING IT: all three assertions inverted,
+  // and an inverted assertion is exactly what a weakened law looks like from a
+  // distance.
+  //
+  // WHAT THIS CLAUSE USED TO SAY, and why. `PermissionModule.rights` — the
+  // screen handing the kit each module's offered set, so an unoffered box draws
+  // an em dash instead of a switch — could not be passed. The approved grid is
+  // the TRANSPOSE of the kit's own (roles down the side, the 22 modules across)
+  // and `rights` lives on `PermissionModule`, which was the kit's ROW. Whether
+  // `delete` exists at all is a fact about the MODULE, which the transpose made
+  // the COLUMN. So the clause asserted the three things the screen could still
+  // honestly do: READ the door's offered set (`m.rights.includes(r)`), filter a
+  // held tick to it, and refuse a press on anything else. The box that still
+  // LOOKED like a switch was written up as a named regression, with the ask that
+  // would close it — "`rights` on `PermissionRole`, or an `orientation` prop on
+  // the matrix".
+  //
+  // THE KIT SHIPPED THE SECOND ONE. `orientation="roles-as-rows"` turns the
+  // drawing without moving the data, so `rights` goes back on the collection
+  // where it belongs and the transpose is retired. The screen passes it now, and
+  // fifteen of the eighty-eight boxes in every role's band stopped pretending.
+  //
+  // SO THE TWO GUARDS ARE ASSERTED **ABSENT**, and that is a tightening rather
+  // than a loosening. They were a SECOND OPINION about a question the kit now
+  // answers — and the kit answers it in the one place the screen could not
+  // reach: a filtered tick and a swallowed press still left the box DRAWN as a
+  // switch, which was the whole defect. Keeping them would leave two answers to
+  // drift apart, and would let the real fix be reverted while this clause stayed
+  // green on the leftovers. The render proof that the boxes actually close lives
+  // in `web/test/roles-matrix-boxes.test.tsx`, which is the half this law has
+  // never been able to see: `consulted()` above walks `workers/` and `shared/`
+  // for `.ts`, so R36 has never read a line of the GRID.
+  it("offered-rights: the Roles screen hands the kit each module's offered rights", () => {
+    const screen = read(join(ROOT, "web", "components", "team", "roles-matrix.tsx"))
+    expect(
+      screen,
+      "the grid no longer hands the kit the door's own `rights` — an unoffered box is a switch again"
+    ).toMatch(/rights:\s*m\.rights\.map\(/)
+    // THE RATCHET, both halves. Either one coming back means somebody restored
+    // the hand-transpose, because these only exist to paper over it.
+    expect(
+      /\.filter\(\(r\)\s*=>\s*offered\(/.test(screen),
+      "a held tick is being filtered by hand again — the kit does not count an unoffered capability as held"
+    ).toBe(false)
+    expect(
+      /!offered\(row, right\)\) return/.test(screen),
+      "onChange is swallowing a press again — an unoffered slot is not a tab stop and cannot be pressed"
+    ).toBe(false)
   })
 })
 
@@ -4677,5 +4726,364 @@ describe("R46 — every kit component and foundation is reached, or a reasoned e
       `KIT_COMPONENT_EXEMPT pins a part that is now reached, or that no longer exists — ` +
         `delete the line: ${stale.join(", ")}`
     ).toEqual([])
+  })
+})
+
+describe("R59 — a form is a slide-in; a warning is an overlay", () => {
+  // R59 — A FORM IS A SLIDE-IN; A WARNING IS AN OVERLAY.
+  //
+  // THE CLIENT, 2026-09-09, over a screenshot of the "New access token" dialog:
+  //     "This should be a slide-in, like all the other screens. The only ones
+  //      that are overlays are the warnings, such as archive or delete, and so
+  //      on."
+  //
+  // She was shown ONE dialog and answered about the CLASS, so this is a law and
+  // not a fix. A surface that COLLECTS — a form, an editor, a picker — is the
+  // kit's `Sheet`: it slides in from the inline end on desktop and, below 45rem,
+  // becomes the bottom sheet capped at 85dvh that her 2026-09-04 ruling asked
+  // for ("everythung that's slisde in in desktop, should be slide up in
+  // mobile"), implemented centrally in `shared/ui/components/sheet/sheet.tsx`
+  // so no call site can get the narrow half wrong. A surface that ASKS a yes/no
+  // question about something that already exists is an `AlertDialog`, centred.
+  //
+  // WHY THIS CHECK IS INVERTED, which is the only interesting decision in it.
+  // The obvious law is "a form may not be a centred overlay", and the obvious
+  // check is to look inside every `<DialogContent>` for a form. That was
+  // written first and thrown away: it finds four of the five real offenders and
+  // misses `role-picker-dialog.tsx` completely, because a radio group plus an
+  // onClick that writes is a form with no `<form>`, no `onSubmit` and no
+  // `FormShell` anywhere in it. Widening the pattern until it caught that one
+  // would have caught the two innocent viewers too, and a law tuned until it
+  // agrees with today's five files is a hand-kept list wearing a regex.
+  //
+  // So the law does not try to recognise a form at all. It holds EVERY centred
+  // overlay to a written reason, and lets the two surfaces that are genuinely
+  // neither pay two lines for it. The property that buys: a form added next
+  // month reaches for a `Dialog`, has no line, and is red the day it is
+  // written — whatever it is made of.
+  //
+  //
+  // AND `presentation` IS NOT THE ANSWER, WHICH NEEDS SAYING BECAUSE IT LOOKS
+  // LIKE IT. Kit v1.2.72 (synced into this tree 2026-09-09, alongside this
+  // work) added a `presentation` prop to `DialogContent` — "responsive" |
+  // "overlay" | "sheet" | "fullscreen" — and a reader who wants a form to
+  // slide in will reach for it first. NONE of the four is a desktop slide-in,
+  // read off that file's own tables rather than off the names: `overlay` is
+  // centred; `sheet` is the BOTTOM sheet at every width, including a 1920
+  // monitor; `fullscreen` has no gutter and no corner; and `responsive` is
+  // `overlay` at 45rem and up — CENTRED on a desktop — flipping to the bottom
+  // sheet only below it. Its own header says why in as many words: "A centred
+  // modal does not arrive from a side; it rises 8 and fades", and whether
+  // every modal on a phone should become a bottom sheet is "a ruling this
+  // rule does not already contain." So `presentation="responsive"` on a form
+  // would leave it exactly where the client said it must not be, and only fix
+  // the phone. The shape she asked for — in from the inline end on desktop,
+  // up from the bottom on a phone — is `Sheet side="right"`, a different
+  // component, and it is what the app's other ~35 forms already use through
+  // `FormShellDialog`. The law is deliberately blind to the prop for this
+  // reason: a `<DialogContent>` is a finding whatever `presentation` it
+  // carries, because three of the four are still centred on a desktop and the
+  // fourth is a bottom sheet on a monitor.
+  // THE EXEMPTION IS A RATCHET AND NOT A DOOR. It is rot-checked both ways —
+  // a pin whose file no longer mounts a centred overlay must go — and, the
+  // clause with the teeth, an EXEMPT overlay that grows form machinery turns
+  // the build red where it stands. Without that second clause the list is
+  // exactly the loophole the law exists to close: add a line, then add a form
+  // under it.
+  it("forms-are-not-overlays: every centred Dialog is a warning-shaped exception, and no exempt one collects", () => {
+    // The form-machinery signals. NOT the law's subject — the subject is every
+    // centred overlay — but the rot-check on the exemptions, so a viewer that
+    // quietly becomes a form cannot keep its pin.
+    const COLLECTS =
+      /\bFormShell\b|<form[\s>]|onSubmit|<Field[\s>]|<Input[\s>]|<Textarea[\s>]|<Checkbox[\s>]|<RadioGroup[\s>]|<DatePicker[\s>]|<FileUpload[\s>]|<Choice[\s>]/
+
+    const roots = [WEB, join(ROOT, "web-portal"), join(ROOT, "shared", "web")]
+    const centred: string[] = []
+    let filesScanned = 0
+    let alertMounts = 0
+    let sheetMounts = 0
+
+    for (const f of sourceFiles(roots, {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      const src = stripComments(f.source)
+      // `<AlertDialogContent` contains `<DialogContent` nowhere — the tag is a
+      // different identifier — but count it first anyway, because it is this
+      // check's canary and must be read off the same stripped source.
+      if (src.includes("<AlertDialogContent")) alertMounts++
+      if (src.includes("<SheetContent")) sheetMounts++
+      if (src.includes("<DialogContent")) centred.push(f.rel)
+    }
+
+    // TRIPWIRE 1 — the walk. A scan that opened nothing reports "no centred
+    // overlays anywhere", which is the same green as a perfectly clean app.
+    expect(
+      filesScanned,
+      "R59 — the modal census walked no files at all. The scan is blind (a moved root, a broken sourceFiles call); fix it before trusting the result"
+    ).toBeGreaterThan(100)
+
+    // TRIPWIRE 2 — the LOAD-BEARING CANARY. The two shapes this law steers
+    // between must both still be visible to it. If the kit renamed its exports
+    // or `stripComments` ate the JSX, `<DialogContent` would match nothing and
+    // this law would pass while enforcing nothing at all — and these two counts
+    // are the known-true facts that only hold if the derivation still works.
+    // The app has fourteen warnings and forty-odd drawers; the floors are set
+    // well under both so ordinary work never trips them.
+    expect(
+      alertMounts,
+      "R59 — the census found NO <AlertDialogContent> anywhere. Either the kit renamed it (so this law now guards nothing) or the app stopped drawing warnings — either way the scan is lying; fix it before trusting the centred-overlay count"
+    ).toBeGreaterThan(5)
+    expect(
+      sheetMounts,
+      "R59 — the census found NO <SheetContent> anywhere. The slide-in is the shape this law steers TOWARD, so a zero here means the scan cannot see the correct answer either; fix it before trusting the result"
+    ).toBeGreaterThan(5)
+
+    // THE LAW. A centred overlay is the warning shape, and a warning is an
+    // AlertDialog — so a `Dialog` in a front door is a surface that is neither,
+    // and it says which in writing.
+    const unlisted = centred.filter((f) => !(f in CENTRED_DIALOG_OK))
+    expect(
+      unlisted,
+      `a centred <Dialog> with no reason on file (R59) — the client ruled 2026-09-09 that a form, an editor or a picker is a SLIDE-IN (the kit's <Sheet side="right">, which also becomes the bottom sheet below 45rem) and only a warning is an overlay; move it to a Sheet, or make it an AlertDialog if it is really a yes/no warning, or add a reasoned CENTRED_DIALOG_OK line if it is genuinely neither: ${unlisted.join(", ")}`
+    ).toEqual([])
+
+    // THE RATCHET. A pin for a file that no longer mounts a centred overlay is
+    // a record of an argument nobody is having, so the list can only shrink.
+    const stale = Object.keys(CENTRED_DIALOG_OK).filter((f) => !centred.includes(f))
+    expect(
+      stale,
+      `CENTRED_DIALOG_OK pins a file that no longer draws a centred <DialogContent> — delete the line (R59's exemptions may only shrink): ${stale.join(", ")}`
+    ).toEqual([])
+
+    // THE CLAUSE WITH THE TEETH. An exemption says "this surface is neither a
+    // form nor a warning". The moment it collects anything, that sentence is
+    // false and the pin is the law being smuggled around rather than applied.
+    const collecting = Object.keys(CENTRED_DIALOG_OK).filter((f) =>
+      COLLECTS.test(stripComments(read(join(ROOT, f))))
+    )
+    expect(
+      collecting,
+      `CENTRED_DIALOG_OK pins a centred overlay that now COLLECTS something — a field, a choice or a submit makes it a form, and the client's 2026-09-09 ruling puts a form in a slide-in. Move it to a <Sheet> and delete the line: ${collecting.join(", ")}`
+    ).toEqual([])
+
+    // Every exception is an argument somebody made, not a name on a list.
+    for (const [f, why] of Object.entries(CENTRED_DIALOG_OK))
+      expect(
+        why.length,
+        `${f} is an exception to R59 — that needs a real reason, and one the client can rule on`
+      ).toBeGreaterThan(30)
+  })
+})
+
+describe("R61 — a module's settings have two doors and one derivation", () => {
+  // R61 — A MODULE'S SETTINGS HAVE TWO DOORS AND ONE DERIVATION.
+  //
+  // THE CLIENT, 2026-09-09, in two halves that only work together:
+  //     "on each module, we have a settings gear … somewhere in the settings,
+  //      we have a tab that says 'Module' or 'Business Logic' (or whatever you
+  //      define as a good word) to find the module once"
+  //     "everything around settings should be under settings screen
+  //      concentrated (and 'quick access' through the gear in each module) but
+  //      not in random places across the app"
+  //     "Does every module get the gear? Only the ones with something to set."
+  //
+  // Two entrances onto ONE page, which is only true for as long as both are
+  // computed from the same fact. `MODULE_SETTINGS` is that fact — the modules
+  // with something to set — and `visibleModuleSettings` is the one expression
+  // that narrows it to what a given reader may open. The screen asks it, the
+  // gear asks it, and `moduleSettingsIndex` (the Modules tab's rows) asks it.
+  //
+  // WHY A LAW AND NOT A COMMENT, WHICH IS THE ONLY QUESTION HERE. The pilot
+  // shipped with the second entrance unbuilt and nine lines of prose telling
+  // whoever built it to ask the same function. That is a rule addressed to a
+  // future reader, and it held for exactly as long as one person read it. The
+  // arithmetic is the argument: the index is the deliverable and FILLING it is
+  // later work, so the next several edits to `MODULE_SETTINGS` are somebody
+  // adding a module while looking at Tickets — and the gear lives in that
+  // module's own collection file, which they need not open. Forget it and the
+  // build is green with a settings page nobody standing on the module can
+  // find; add a gear for a module the table does not list and the build is
+  // green with a control that renders `null` for ever, indistinguishable on
+  // screen from a module that simply has no settings. Neither is visible to
+  // any other check in this repo.
+  //
+  // AND IT IS WRITTEN WHILE THE INDEX HAS ONE ROW ON PURPOSE. With one module
+  // the pair is trivially in step, so the law costs nothing today — which is
+  // the only moment at which writing it is free, and the last moment at which
+  // it is easy. Nothing below counts rows: every clause is a set relation or a
+  // per-segment fact, so one module satisfies it exactly as eight would, and
+  // the tripwires are about whether the census can SEE rather than how much it
+  // found (a floor of "more than one" would have been a law that only starts
+  // working after the mistake it exists to prevent).
+  it("module-settings-two-doors: a module with settings has a gear, the index is derived, and the gate is asked once", () => {
+    const HOST_REL = "web/components/screens/module-settings-screen.tsx"
+    const TAB_REL = "web/components/screens/settings-screen.tsx"
+    const host = stripComments(read(join(ROOT, HOST_REL)))
+    const tab = stripComments(read(join(ROOT, TAB_REL)))
+
+    // ── i · THE TABLE, off its own literal ──────────────────────────────────
+    // Sliced rather than imported, and that is deliberate: `MODULE_SETTINGS` is
+    // NOT exported (the gear, the screen and the index all live beside it), and
+    // exporting a constant so a test can read it would loosen the very thing
+    // this law is protecting. The slice ends at the first `]` in column zero,
+    // which is the array's own close — every `],` inside it is indented.
+    const tableAt = host.indexOf("const MODULE_SETTINGS")
+    expect(
+      tableAt,
+      "R61 — MODULE_SETTINGS is not in " + HOST_REL + " under that name. It is the fact both doors are computed from; if it moved or was renamed, teach this law the new spelling rather than deleting it"
+    ).toBeGreaterThan(-1)
+    const closeAt = host.indexOf("\n]", tableAt)
+    expect(closeAt, "R61 — could not find the end of the MODULE_SETTINGS array").toBeGreaterThan(tableAt)
+    const table = host.slice(tableAt, closeAt)
+    const declared = [...table.matchAll(/^\s*segment:\s*"([a-z0-9-]+)"/gm)].map((m) => m[1])
+
+    // TRIPWIRE 1 — THE PARSE. A set relation against an empty set is empty, so
+    // a regex that stopped matching would report a perfectly paired app. This
+    // is also a ratchet with a real meaning: settings-by-module is a shipped
+    // feature (client, 2026-09-09), and a build in which NO module has anything
+    // to set has deleted it rather than tidied it.
+    expect(
+      declared.length,
+      "R61 — read no `segment:` out of MODULE_SETTINGS. Either the table is empty (settings-by-module shipped 2026-09-09 with Tickets as the pilot — if it is genuinely being withdrawn, that is a decision to take with the client, not a green build) or the slice above stopped matching the file"
+    ).toBeGreaterThan(0)
+    expect(new Set(declared).size, "R61 — MODULE_SETTINGS declares a segment twice").toBe(declared.length)
+
+    // TRIPWIRE 2, AND A CLAUSE AT THE SAME TIME — a declared segment is a real
+    // module. `/settings/<segment>` is the app's ordinary (module, id) grammar
+    // (`parseScreenPath`), so a segment naming no module is an address nothing
+    // in the app can link to. It doubles as proof that the slice above parsed
+    // WORDS rather than noise: a broken regex yields strings, and strings that
+    // are not module names fail here rather than passing quietly.
+    const notModules = declared.filter((s) => !(s in MODULE_PERMISSION))
+    expect(
+      notModules,
+      `R61 — MODULE_SETTINGS declares a segment that names no module in MODULE_PERMISSION (web/lib/screens.ts), so /settings/<segment> is an address nothing links to: ${notModules.join(", ")}`
+    ).toEqual([])
+
+    // ── ii · THE GEARS, off every mount in the app ──────────────────────────
+    const mounts: { segment: string; rel: string }[] = []
+    let filesScanned = 0
+    for (const f of sourceFiles([join(WEB, "app"), join(WEB, "components")], {
+      extensions: [".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      filesScanned++
+      // Comments off: the gear's own definition file talks about `<ModuleSettingsGear`
+      // at length, and a census that read prose would find a mount in the file
+      // that only describes one.
+      for (const m of stripComments(f.source).matchAll(
+        /<ModuleSettingsGear\b[^>]*?\bsegment=\{?"([a-z0-9-]+)"/g
+      ))
+        mounts.push({ segment: m[1], rel: f.rel })
+    }
+
+    // TRIPWIRE 3 — the walk happened at all.
+    expect(
+      filesScanned,
+      "R61 — the gear census walked no files. The scan is blind (a moved root, a broken sourceFiles call); fix it before trusting the result"
+    ).toBeGreaterThan(100)
+
+    // TRIPWIRE 4 — the component this law is about still exists under the name
+    // the mount regex looks for. Without this, renaming the export would make
+    // BOTH halves of clause (i) read zero mounts against a table that still has
+    // entries — which fails loudly, correctly — but deleting the component AND
+    // the table together would pass silently, and that is the pair this pins.
+    expect(
+      /export function ModuleSettingsGear\b/.test(host),
+      "R61 — " + HOST_REL + " no longer exports `ModuleSettingsGear`. The gear is the client's own 'quick access' (2026-09-09); if it was renamed, teach this law the new name — the census below looks for `<ModuleSettingsGear` and would otherwise find nothing and say so"
+    ).toBe(true)
+
+    // THE LAW, FIRST DIRECTION — a module with settings has a gear. Without it
+    // the page exists and nobody standing on the module can reach it, which is
+    // precisely the half of her instruction the settings tab does not cover:
+    // the tab is where you go when you do not know where to go, the gear is for
+    // when you are already there.
+    const noGear = declared.filter((s) => !mounts.some((m) => m.segment === s))
+    expect(
+      noGear,
+      `R61 — these modules have settings and no gear anywhere in web/: ${noGear.join(", ")}. ` +
+        `Mount <ModuleSettingsGear teamId={teamId} segment="<segment>" /> in that screen's CollectionHeading ` +
+        `action slot (not the toolbar — R50 draws no toolbar on an empty collection, which is exactly when ` +
+        `somebody goes looking for the settings). If the gear is passed a variable rather than a literal, ` +
+        `this census cannot read it: spell the segment out, the way the table does.`
+    ).toEqual([])
+
+    // …AND THE SECOND — a gear on a module with nothing to set. It renders
+    // `null` for ever, so it is invisible on screen and looks exactly like a
+    // module that has no settings; nothing but this would ever report it.
+    const stray = mounts.filter((m) => !declared.includes(m.segment))
+    expect(
+      stray.map((m) => `${m.segment} (${m.rel})`),
+      "R61 — a gear names a module MODULE_SETTINGS does not declare, so it draws nothing at all and always will. " +
+        "Either add that module's page to MODULE_SETTINGS or remove the gear"
+    ).toEqual([])
+
+    // ONE GEAR PER MODULE. Two doors out of one screen is two placements to
+    // keep in step and two things to find, and the client's word was singular:
+    // "on each module, we have a settings gear".
+    const twice = declared.filter((s) => mounts.filter((m) => m.segment === s).length > 1)
+    expect(
+      twice.map((s) => `${s} (${mounts.filter((m) => m.segment === s).map((m) => m.rel).join(", ")})`),
+      "R61 — more than one gear for the same module. One module, one gear, one place to find it"
+    ).toEqual([])
+
+    // ── iii · THE INDEX IS DERIVED, NOT LISTED ─────────────────────────────
+    // The Modules tab is the client's own "find the module once". A hand-written
+    // row would work today and be wrong the first time somebody adds a module —
+    // and it would be wrong SILENTLY, because a missing row is a module you
+    // simply do not see rather than an error.
+    const panelAt = tab.indexOf('panel.value === "modules"')
+    expect(
+      panelAt,
+      "R61 — settings-screen.tsx draws no Modules panel. It is the second of the two doors the client asked for (2026-09-09, \"a tab that says 'Module' … to find the module once\"); if the panel was renamed, teach this law the new value rather than deleting it"
+    ).toBeGreaterThan(-1)
+    const nextPanel = tab.indexOf("panel.value ===", panelAt + 1)
+    const panel = tab.slice(panelAt, nextPanel === -1 ? undefined : nextPanel)
+    expect(
+      panel.includes("moduleSettingsIndex("),
+      "R61 — the Modules panel does not call moduleSettingsIndex. The rows must be derived from MODULE_SETTINGS through the same visibleModuleSettings the gear asks, so a module gains a page, a gear and a row in one edit"
+    ).toBe(true)
+    // …and it names no module of its own. Scoped to the PANEL rather than the
+    // file on purpose: this screen legitimately spells `team`, `choices` and
+    // other words that could one day also be a settings segment, and a law that
+    // failed on that would be a law people learn to work around.
+    const handListed = declared.filter((s) => panel.includes(`"${s}"`))
+    expect(
+      handListed,
+      `R61 — the Modules panel spells a module segment itself (${handListed.join(", ")}), which means a row somewhere is hand-kept. The index is moduleSettingsIndex's answer and nothing else; a segment written here is a row that will fall behind the table`
+    ).toEqual([])
+
+    // ── iv · ONE GATE, ASKED ONCE ──────────────────────────────────────────
+    // Her instruction was that a reader who may see tickets but not the team's
+    // vocabulary is not offered a door that refuses them. Three surfaces obey it
+    // by asking one function; three surfaces each spelling `selectable_data` is
+    // how one of them eventually spells it differently. `visibleModuleSettings`
+    // holds the only `can(` in the file — the gear and the screen take `can`
+    // from `usePermissions` and pass it in, and the tab never touches a right at
+    // all, it calls `moduleSettingsIndex(can)`.
+    const gateCalls = [...host.matchAll(/\bcan\(/g)].length
+    expect(
+      gateCalls,
+      "R61 — " + HOST_REL + " asks `can(` " + gateCalls + " times; the gate belongs in visibleModuleSettings and nowhere else, so that the gear, the page and the Modules row are refused and offered together. If a second call is genuinely needed, it is a change to how this screen gates and wants the client's ruling, not a second copy of this one"
+    ).toBe(1)
+
+    // …and all three consumers actually route through it. Sliced by body, so a
+    // consumer that grows its own condition is caught where it is written.
+    for (const fn of ["moduleSettingsIndex", "ModuleSettingsScreen", "ModuleSettingsGear"]) {
+      const at = host.indexOf(`export function ${fn}`)
+      expect(at, `R61 — ${HOST_REL} no longer exports ${fn}`).toBeGreaterThan(-1)
+      const ends = ["moduleSettingsIndex", "ModuleSettingsScreen", "ModuleSettingsGear"]
+        .map((o) => host.indexOf(`export function ${o}`))
+        .filter((i) => i > at)
+      const body = host.slice(at, ends.length ? Math.min(...ends) : undefined)
+      expect(
+        body.includes("visibleModuleSettings("),
+        `R61 — ${fn} does not ask visibleModuleSettings. All three surfaces (the gear, the page, the Modules index) answer "is there a page here for this reader" with ONE expression; a second way of asking it is how a gear starts leading somewhere that refuses the person who pressed it`
+      ).toBe(true)
+    }
   })
 })

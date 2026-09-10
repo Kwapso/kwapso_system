@@ -128,7 +128,7 @@ export function sprintTypeLabel(option: SprintTypeOption, lang: string): string 
 
 const nameField = { ...defaultFieldConfig, label: "Sprint name", required: true }
 const typeField = { ...defaultFieldConfig, label: "Type", required: false }
-const accountField = { ...defaultFieldConfig, label: "Client", required: false }
+const accountField = { ...defaultFieldConfig, label: "Account", required: false }
 const appField = {
   ...defaultFieldConfig,
   label: "App",
@@ -259,8 +259,8 @@ export function SprintFormDialog({
       subtitle={
         <DialogDescription>
           {isEdit
-            ? t("What it's called, when it runs, and what it was sold for. The client and the app it covers stay as they are.")
-            : t("A block of delivery work for one client, with a start, an end and a price.")}
+            ? t("What it's called, when it runs, and what it was sold for. The account and the app it covers stay as they are.")
+            : t("A block of delivery work for one account, with a start, an end and a price.")}
         </DialogDescription>
       }
       submit={{
@@ -302,7 +302,7 @@ export function SprintFormDialog({
       <Field config={accountField} htmlFor="sprint-account" className={fieldSpacing}>
         {initial || fixedAccount ? (
           <p className="text-muted-foreground text-sm" id="sprint-account">
-            {fixedAccount ? fixedAccount.name : initial?.accountName || t("Ours, no client")}
+            {fixedAccount ? fixedAccount.name : initial?.accountName || t("Ours, no account")}
           </p>
         ) : (
         <RecordPicker
@@ -311,8 +311,8 @@ export function SprintFormDialog({
           onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
           search={(term) => searchAccounts(term, { type: "entity" })}
           searchKey={pickerKey("companies", teamId)}
-          emptyOption={{ value: NONE, label: t("Ours, no client") }}
-          placeholder={t("Ours, no client")}
+          emptyOption={{ value: NONE, label: t("Ours, no account") }}
+          placeholder={t("Ours, no account")}
           searchPlaceholder={t("Search companies…")}
           emptyText={t("No company matched.")}
           disabled={busy}

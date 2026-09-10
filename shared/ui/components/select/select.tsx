@@ -449,8 +449,11 @@ export interface SelectItemProps
   /**
    * A picture leading the label — a logo, an avatar, a thumbnail. Drawn as
    * ruling 30's record mark: a 24 SQUARE at the 6 selection radius, `flex:
-   * none`, the image contained rather than stretched. Ignored when `icon` is
-   * given; a row carries one mark, never two.
+   * none`, the picture FILLING that square and cropping to it — the same
+   * treatment `AvatarImage` gives a record's own mark, so an option's mark
+   * and the record it names cannot show two silhouettes of one asset
+   * (RULES.md §4.4). Ignored when `icon` is given; a row carries one mark,
+   * never two.
    */
   image?: string;
   /**
@@ -539,10 +542,21 @@ const SelectItem = React.forwardRef<
         alt={imageAlt}
         data-slot="select-item-image"
         /* Ruling 30's square record mark at 24, ruling 03's 6 for a mark.
-           `object-contain` on the quiet ground rather than a crop, which is
-           27.28's rule for every picture the system did not shoot itself. */
+           `object-cover`, and that is a CORRECTION rather than a preference.
+           This line shipped as `object-contain` on the strength of CH27.28's
+           *"Portrait assets letterbox onto paper rather than being cropped to
+           fill"* — and the client overruled that sentence on 2026-09-09:
+           *"everywhere for images: do fill, not fit!"*, with a wide logo
+           losing its ends named as the INTENDED consequence.
+           The deeper reason is that this mark was disagreeing with the kit's
+           own. A record's mark is `Avatar shape="square"`, whose `AvatarImage`
+           has covered since it was written, and `company-hub.tsx` draws a
+           supplied company logo through exactly that. So Padelbase's logo was
+           cropped in the record and letterboxed one row down in the picker
+           that chooses it — the same asset, the same size, two silhouettes.
+           RULES.md §4.4. */
         className={cn(
-          "size-[var(--avatar-sm)] shrink-0 object-contain",
+          "size-[var(--avatar-sm)] shrink-0 object-cover",
           "rounded-[var(--radius-select)] bg-surface-quiet",
         )}
       />

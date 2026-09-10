@@ -39,20 +39,29 @@
 //               file uses that app-stages.ts never needed, because an app
 //               has nobody to wait on but the team itself.
 //
-// NO TICKET STAGE ANSWERS `blocked` ANY MORE, AND THE TIER IS NOT DEAD — read
-// this before deleting it. Until 7 Sep 2026 `awaiting_validation` held it: the
-// stage where the client had not said yes yet. The client retired that stage
-// (shared/types.ts, `HELP_STATUSES`, carries her sentence and the argument),
-// and the thing it was reaching for did not go with it — WAITING is now a
-// PREDICATE over the ticket's conversation rather than a stored word
-// (`waitingClause`, workers/content/src/lib/help.ts: "we spoke last and nobody
-// has answered"). A predicate has no row in a `Record<HelpStatus, …>` by
-// construction, so it gets `waitingDotTone()` at the foot of this file instead,
-// and `blocked` keeps its meaning and its one caller.
+// NOTHING IN THIS FILE ANSWERS `blocked` ANY MORE, AND THE TIER IS STILL NOT
+// DEAD — read this before deleting it. It lost its last answer in two steps, and
+// both were the client's.
 //
-// The tier's definition never depended on the stage, which is why it survives
-// it intact: "stuck on somebody OUTSIDE the team" described `awaiting_validation`
-// and describes the waiting predicate at least as exactly.
+//   7 Sep 2026 — she retired `awaiting_validation`, the stage where she had not
+//   said yes yet (shared/types.ts, `HELP_STATUSES`, carries her sentence). The
+//   MEANING did not go with it: waiting became a PREDICATE over the ticket's
+//   conversation rather than a stored word (`waitingClause`,
+//   workers/content/src/lib/help.ts: "we spoke last and nobody has answered"). A
+//   predicate has no row in a `Record<HelpStatus, …>` by construction, so it got
+//   `waitingDotTone()` at the foot of this file instead.
+//
+//   9 Sep 2026 — "remove the color from the status header!" … "column header
+//   should have no color". The ticket board's column heads were that function's
+//   only caller, so it is gone too (the note where it stood says the rest).
+//
+// `blocked` therefore remains a TONE this file defines and nothing here returns:
+// it is one of the kit's six, `DOT_TONE_FILL` on the tickets screen still maps
+// it because that map is a total `Record<DotTone, …>` on purpose, and the
+// DEFINITION is what the next multi-stage lifecycle will need. The tier never
+// depended on the stage, which is why it survives it intact: "stuck on somebody
+// OUTSIDE the team" described `awaiting_validation` and describes the waiting
+// predicate at least as exactly.
 import type { DotTone } from "./app-stages"
 import type { HelpStatus, StoryStatus } from "./types"
 
@@ -88,32 +97,31 @@ export function helpStatusDotTone(status: HelpStatus): DotTone {
   return HELP_STATUS_DOT_TONE[status]
 }
 
-/** WAITING'S OWN TONE — for the ticket board's fifth column, which counts a
- * PREDICATE and not a stage (`waitingClause`, workers/content/src/lib/help.ts:
- * the last reply came from our side and nobody has answered).
+/* `waitingDotTone()` STOOD HERE, AND THE CLIENT TOOK ITS ONE CALLER AWAY.
  *
- * ── WHY THIS IS A FUNCTION HERE AND NOT `"blocked"` TYPED AT THE COLUMN ─────
+ * It was added on 7 Sep 2026 for the ticket board's fifth column — the one that
+ * counts a PREDICATE and not a stage (`waitingClause`,
+ * workers/content/src/lib/help.ts: the last reply came from our side and nobody
+ * has answered). That column used to ask `helpStatusDotTone("awaiting_validation")`,
+ * which borrowed the tone of a STAGE to paint a predicate, and the call died with
+ * the stage when she retired it. A named function here kept the property the old
+ * call had — the colour was ASKED FOR rather than typed at the column — without
+ * the bug.
  *
- * The board used to ask `helpStatusDotTone("awaiting_validation")` and say so
- * out loud: the point was that the colour be ASKED FOR rather than chosen, so
- * that re-toning "the client owes us an answer" moved the column without an
- * edit. That instinct was right and its subject was wrong — it borrowed the
- * tone of a STAGE to paint a PREDICATE, and when the client retired the stage
- * on 7 Sep 2026 the call went with it. Hard-coding `"blocked"` at the column
- * would have thrown away the property along with the bug.
+ * CLIENT, 2026-09-09, over the same board: "remove the color from the status
+ * header!" … "column header should have no color". No column head on that board
+ * carries a dot any more, so nothing asks this file what colour waiting is, and
+ * an exported name nobody imports is a contract nobody agreed to
+ * (web/test/dead-exports.test.ts). It is deleted rather than parked: the seam it
+ * defended was about which SOURCE answers a colour question, and there is no
+ * longer a colour question. The meaning is untouched and was never a colour —
+ * `waitingClause` still decides who is waiting, and the board's own column says
+ * it in words.
  *
- * So waiting gets an honest entry of its own, in the file that owns what a
- * status colour MEANS, and the board asks this instead. It resolves to
- * `blocked` — the tier this file defines as "stuck on somebody OUTSIDE the
- * team", which is waiting's own sentence exactly — and it is the same poppy the
- * portal has always drawn for a ticket that needs the reader to act.
- *
- * NOT IN `HELP_STATUS_DOT_TONE`: that map is a closed `Record<HelpStatus, …>`
- * and waiting is not a status. A pseudo-key there would be a lie the type
- * system would then defend. */
-export function waitingDotTone(): DotTone {
-  return "blocked"
-}
+ * If a waiting SWATCH is ever wanted somewhere a colour is genuinely the
+ * information (a legend, a chart series), write it back here in this shape
+ * rather than typing "blocked" at that call site — that argument was correct and
+ * only its subject went away. */
 
 /** A STORY'S FOUR STAGES → THE CHIP'S DOT. Same `Record` shape, same reason:
  * a fifth `StoryStatus` fails here rather than rendering silently. */

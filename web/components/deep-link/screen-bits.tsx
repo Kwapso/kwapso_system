@@ -57,11 +57,9 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/t
 import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning } from "@shared/ui/foundations/icons"
 import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
-import { Icon, type IconName } from "@shared/web/screen-engine/icon"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
-import { CONCEPT_ICON } from "@/lib/pages"
 import { useT } from "@shared/web/language"
 
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
@@ -86,51 +84,24 @@ function StateLine({
   )
 }
 
-/** A COLLECTION WITH NOTHING IN IT — the same face `StateLine` gives a refusal
- * or a 404, for the far commoner state: a panel, a tab or a list that is empty
- * because nothing has happened yet.
+/* `EmptyLine` LIVED HERE AND IS GONE, 2026-09-09 (R62).
  *
- * WHY IT IS A SEAM AND NOT A CLASS NAME. There were twenty-five of these
- * written out by hand across the agency screens, every one a bare grey `<p>`,
- * and a lone line of grey text in the middle of a card reads as a screen that
- * FAILED rather than one with nothing on it yet — which is precisely the screen
- * a brand-new team meets on every page. `StateLine` above has said so in a
- * comment since the deep-link states were extracted; nothing else could reach
- * it.
+ * It was the app's second empty register: one grey line, a concept glyph, no
+ * sentence and nothing to press — written to replace twenty-five hand-rolled
+ * grey `<p>`s, which it did. What it could not do is be the SAME state as the
+ * one beside it: five screens drew `CollectionEmptyState`'s full register for a
+ * resting empty collection and this one line the moment a search narrowed the
+ * same collection to nothing, so the reader met two different screens by typing
+ * one letter. The client, verbatim: "the empty because of filters hosul look the
+ * same as empty collection but the add button."
  *
- * THE GLYPH IS DERIVED, never chosen here. It comes from `CONCEPT_ICON` — the
- * one icon vocabulary (UI-CONVENTIONS §4) — keyed by the concept the empty
- * collection is OF, so the face on "no meetings yet" is the face the rail, the
- * heading and the tab already wear for a meeting. A caller cannot pick a glyph
- * that disagrees with the rest of the app, because there is nowhere to pick one.
- *
- * IT IS `aria-hidden`, like every other mark on both front doors: the sentence
- * beside it carries the whole meaning, and a screen reader announcing "calendar
- * clock, no meetings with them yet" is one fact read twice.
- *
- * WHAT IT IS NOT FOR: a refusal ("you can't see the team"), a 404 ("that ticket
- * no longer exists") or a caption under a number. Those are `NoAccess`,
- * `NotFound` and ordinary copy — an empty collection is a state a person can
- * fix, and the three above are not. */
-export function EmptyLine({
-  concept,
-  children,
-}: {
-  /** the CONCEPT_ICON key for what this collection holds — `meetings`, `tickets`,
-   * `time`. Typed to the vocabulary so a key it has no entry for cannot be
-   * passed, which is the difference between "no glyph" and "a wrong one". */
-  concept: keyof typeof CONCEPT_ICON
-  children: React.ReactNode
-}) {
-  return (
-    <p className="text-muted-foreground flex items-center gap-2 text-sm">
-      <span aria-hidden className="shrink-0">
-        <Icon name={CONCEPT_ICON[concept] as IconName} className="size-4" />
-      </span>
-      {children}
-    </p>
-  )
-}
+ * So the two zeros are ONE component now — `CollectionEmptyState`
+ * (shared/web/screen-engine/collection-frame.tsx) with a `filtered` prop — and
+ * every one of this function's five call sites draws it. Nothing replaced it
+ * here because nothing needed to: a state with a title and one sentence is what
+ * that register already is. The glyph went with it, which is 27.21's own rule
+ * ("no empty-box drawing, no mascot") applied to the half of the app that had
+ * kept one. */
 
 export function NoAccess() {
   const t = useT()

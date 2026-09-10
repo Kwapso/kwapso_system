@@ -19,7 +19,8 @@ describes. The kit's copy lives at `~/Desktop/design-mothership/tokens/library-m
 `shared/ui/styles.css` — 69 of them, of which 35 are the `--color-*` aliases the
 `@theme inline` block exposes to Tailwind, so there are **34 real tokens** plus
 `--radius` and its four steps. Plus the six values `shared/web/brand-theme.tsx`
-injects from `shared/brand.ts`.
+injected from `shared/brand.ts` — that layer is gone (see the chain below), and
+naming it is how this record stays readable.
 
 **How to read a row.** The library's token NAME is what all 94 components
 reference, so the names survive the reskin and only their VALUES change. A row
@@ -239,7 +240,7 @@ addition."* Mango cannot take the job — "mango is never a status" is a named b
 So the question is what the app actually MEANS by warning, and it turns out to
 mean two things:
 
-1. **"Nothing moves until somebody outside answers."** Until 7 Sep 2026 this was `awaiting_validation` on the ticket stepper and the portal's "Waiting for your go-ahead" pill, described in the code as *"the single stage where nothing will happen until somebody outside this building answers"*. The client retired that stage; the MEANING survived it and is now the Open board's Waiting column, a predicate over the ticket's conversation rather than a stored stage (`waitingDotTone()`, `shared/status-tones.ts`).
+1. **"Nothing moves until somebody outside answers."** Until 7 Sep 2026 this was `awaiting_validation` on the ticket stepper and the portal's "Waiting for your go-ahead" pill, described in the code as *"the single stage where nothing will happen until somebody outside this building answers"*. The client retired that stage; the MEANING survived it and is now the Open board's Waiting column, a predicate over the ticket's conversation rather than a stored stage (`waitingClause`, `workers/content/src/lib/help.ts`). It wears no colour at all since 9 Sep 2026 — the client took the dots off the board's column heads — but the MEANING is what this section is about, and it is still one of the two things the app used `--warning` for.
 2. **"Work is happening."** `in_progress` and `in_review` on the two steppers.
 
 The kit answers both without inventing anything, in its own pill vocabulary:

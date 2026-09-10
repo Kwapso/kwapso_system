@@ -416,7 +416,18 @@ export function ClientOrgPanel({
             onCreate={canCreate ? () => setAddingDept(true) : undefined}
           />
         ) : shownDepartments.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+          /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client, 2026-09-09:
+             "the empty because of filters hosul look the same as empty
+             collection but the add button." All three lists on this panel drew
+             the full register at rest and a bare grey line when a search
+             narrowed them to nothing; they are one body now, and `filtered`
+             withdraws the create action rather than the call site remembering
+             to. */
+          <CollectionEmptyState
+            filtered
+            title={t("No departments yet.")}
+            onCreate={canCreate ? () => setAddingDept(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownDepartments.map((d) => (
@@ -499,7 +510,12 @@ export function ClientOrgPanel({
             onCreate={canCreate ? () => setAddingRole(true) : undefined}
           />
         ) : shownRoles.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+          /* R62 — as on Departments above. */
+          <CollectionEmptyState
+            filtered
+            title={t("No roles yet.")}
+            onCreate={canCreate ? () => setAddingRole(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownRoles.map((r) => (
@@ -649,7 +665,12 @@ export function ClientOrgPanel({
             onCreate={canCreate ? () => setAddingTool(true) : undefined}
           />
         ) : shownTools.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
+          /* R62 — as on Departments above. */
+          <CollectionEmptyState
+            filtered
+            title={t("No tools yet.")}
+            onCreate={canCreate ? () => setAddingTool(true) : undefined}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {shownTools.map((x) => (

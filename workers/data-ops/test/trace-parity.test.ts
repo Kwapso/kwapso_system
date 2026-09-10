@@ -23,6 +23,28 @@ function callsFor(name: string): { label: string; input: Record<string, unknown>
     .map((record) => ({ label: `${name} (record: ${record})`, input: { ...IDS, record } }))
 }
 
+/** TEAM-IMPLICIT DESTINATIONS — the app-level pages that draw the ACTIVE team
+ * rather than a team named in their own path, and are therefore a legitimate
+ * landing place for a trace even though they do not start `/t/<teamId>`.
+ *
+ * There is exactly one today and it arrived on 2026-09-09, when the client
+ * deleted the team overview at `/t/<teamId>` ("This overview about the team
+ * should not even exist"). `update_team` used to land there, because that screen
+ * titled itself with the team's name; the page that titles itself with the
+ * team's name now is `/kwapso`, the agency's own Details page, and it is where
+ * the name and logo are edited.
+ *
+ * THE INVARIANT IS UNCHANGED, only its spelling. What the clause below is for is
+ * "a trace lands somewhere the change is visible, in the right team" — and a
+ * trace has already switched the active team before it navigates, so a page that
+ * draws the active team satisfies that as squarely as a path-scoped one. A list
+ * rather than a loosened `startsWith`, so a future trace that simply forgot its
+ * team is still caught. */
+const TEAM_IMPLICIT_PATHS: Record<string, string> = {
+  "/kwapso":
+    "the agency's own Details page — it titles itself with the ACTIVE team's name and carries the name/logo edit, which is what the deleted team overview used to do",
+}
+
 describe("screen-trace parity: the co-pilot can show every write on a real screen", () => {
   it("every write tool traces to a screen (or is explicitly screenless)", () => {
     for (const t of TOOL_CATALOG) {
@@ -31,7 +53,11 @@ describe("screen-trace parity: the co-pilot can show every write on a real scree
       for (const call of callsFor(t.name)) {
         const target = traceFor(t.name, call.input, "team1")
         expect(target, `write tool "${call.label}" must map to a screen in agent-trace.ts (or join SCREENLESS_WRITE_TOOLS / SCREENLESS_TOGGLE_RECORDS with a reason)`).not.toBeNull()
-        expect(target?.path.startsWith("/t/team1"), `"${call.label}" must target the team host`).toBe(true)
+        const path = target?.path ?? ""
+        expect(
+          path.startsWith("/t/team1") || path in TEAM_IMPLICIT_PATHS,
+          `"${call.label}" must target the team host, or a reasoned TEAM_IMPLICIT_PATHS page`
+        ).toBe(true)
       }
     }
   })
@@ -63,7 +89,9 @@ describe("screen-trace parity: the co-pilot can show every write on a real scree
   it("creates + rename land where the change is visible, not on a form dialog", () => {
     expect(traceFor("create_role", {}, "tm")?.path).toBe("/t/tm/roles")
     expect(traceFor("invite_member", {}, "tm")?.path).toBe("/t/tm/invites")
-    expect(traceFor("update_team", {}, "tm")?.path).toBe("/t/tm")
+    // The rename lands on /kwapso — see TEAM_IMPLICIT_PATHS above for why that
+    // is the page that shows a renamed team now.
+    expect(traceFor("update_team", {}, "tm")?.path).toBe("/kwapso")
     // No trace may carry query params — the field doesn't exist, so no dialog can open.
     for (const t of TOOL_CATALOG) {
       if (!t.write || t.identityBlocked) continue

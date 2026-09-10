@@ -761,26 +761,62 @@ const AGENT_ONLY: AgentTool[] = [
  * THE BAR FOR A LINE HERE is that the grammar is a STRICT SUPERSET of the door's
  * own narrowing — every parameter it parses maps to a declared field, and it
  * offers no derived view (`scope=mine`, `view=overdue`, `when=current`) that a
- * filter cannot express. Six list tools deliberately stay: `list_help_tickets`
+ * filter cannot express. Seven list tools deliberately stay: `list_help_tickets`
  * (`scope=mine` is a join through who is staffed to an app), `list_work_logs`
  * (the same, and the model has no way to name "me"), `list_stories`,
- * `list_todos` and `list_sprints` (each carries a derived view or a month), and
+ * `list_todos` and `list_sprints` (each carries a derived view or a month),
  * `list_knowledge_sources`, which returns a SOURCE'S OWN WORDS when given an id
  * and is the one read the prompt sends the model to for reading a document
- * whole.
+ * whole — and `list_meetings`, which is the SEVENTH as of 9 Sep 2026 and had
+ * been folded in before that.
  *
- * `list_meetings` USED TO BE AN EIGHTH — its `view`, `month` and `transcript`
- * are exactly this same "derived view or a month" shape, and stayed for it. What
- * was NOT a derived view was `q`: the door's own multi-field search reaches the
- * guest list (workers/content/src/lib/meetings.ts's `whereFor` — 251 of 458 live
- * meetings carry one against 4 with an agenda), and the grammar had no field for
- * it, so folding this tool in would have silently narrowed what a caller could
- * search. Fixed by declaring `guests` beside `title`/`agenda`/`notes` in
- * `QUERY_MODULES.meetings` — now a strict superset, and this is the ninth line.
+ * ── WHY `list_meetings` CAME BACK, WRITTEN DOWN BECAUSE IT IS A REVERSAL ─────
+ *
+ * It was folded in on the reading that its `view`, `month` and `transcript` are
+ * all expressible: `view=upcoming`/`week` and `month` are `startsAt`
+ * comparisons, `transcript` is `transcriptCapturedAt` notNull/isNull, `view=all`
+ * is asking about `deactivatedAt` yourself. The one thing the grammar could NOT
+ * say was `q`'s reach into the guest list, and the fix was to WIDEN the grammar
+ * (`guests` beside `title`/`agenda`/`notes` in `QUERY_MODULES.meetings`) rather
+ * than to write the narrowing down — the precedent this whole block sets.
+ *
+ * On 9 Sep 2026 the door grew a FOURTH view, `view=mine`, on the client's own
+ * ruling ("i was in the room"). Widening the grammar again is the move this
+ * block would prescribe, and it is not available here, for reasons that are
+ * about the grammar's shape rather than about effort:
+ *
+ *   · IT IS AN IDENTITY PREDICATE, NOT A COMPARISON ON A FIELD. Every value in
+ *     `where` is text the caller sent (query-engine.ts's `checkValue`), and the
+ *     door's own `MeetingFilter.caller` is spread on AFTER `filterFrom` exactly
+ *     so nothing on the wire can spell it — an `?attendee=` a caller could type
+ *     is a different capability ("whose meetings is Alaap in"), and R19 would
+ *     publish it to both machine surfaces the moment it was parsed. The grammar
+ *     has no "me", and the only place identity touches it is `narrow`, which is
+ *     a fence the DOOR applies from a right the caller lacks, never a filter the
+ *     caller composes.
+ *   · IT IS AN `OR` OF TWO DIFFERENTLY-SHAPED ARMS. `whereFor` reads
+ *     `(guests LIKE '%"me"%') OR (guests IS EMPTY AND creator_id = me)` — the
+ *     fenced fallback that stops one syncer's imports landing in their Mine.
+ *     `ParsedQuery.where` is a flat AND of clauses, and the only OR it has is
+ *     one op and one value across several FIELDS. Two arms with different ops,
+ *     one of them a conjunction, is not a query this grammar can be handed.
+ *
+ * So expressing it needs a synthetic field whose `column` is not a column, or a
+ * magic value the engine resolves to the caller — either of which puts a
+ * per-module predicate inside the generic engine and re-invents `view` there.
+ * That is a worse answer than keeping the tool, so the tool is kept: on a
+ * strict-superset bar, `query_records` stopped being a superset of this door and
+ * the line had to go. What it costs is written down under the two-stage
+ * catalogue below — a name in the stage-one index, not a definition on every
+ * step — and `UNGATED_CEILING` moved 54 → 55 with the same reason.
  *
  * Rot-checked by `workers/data-ops/test/tool-diet.test.ts`: every name here must
- * still be a shared GET tool, and its module must still be one the grammar can
- * be asked about — so a line cannot outlive the capability that replaced it. */
+ * still be a shared GET tool, its module must still be one the grammar can be
+ * asked about, its `q` must still reach only columns the grammar declares — and,
+ * since the reversal above, its door must name NO derived view of its own, read
+ * off that door's own source. So a line cannot outlive the capability that
+ * replaced it, and a door that grows a second `view=mine` fails the build
+ * instead of quietly making this paragraph false. */
 export const REPLACED_BY_QUERY: Record<string, string> = {
   list_accounts: "query_records on `accounts` — its q/type/parentId narrowing is name+code+email (a multi-field filter), accountType and parentAccountId",
   list_apps: "query_records on `apps` — accountId, and q is a filter on the name",
@@ -791,8 +827,6 @@ export const REPLACED_BY_QUERY: Record<string, string> = {
   list_dropdown_values: "query_records on `dropdown_values` — by id, by type, or the whole vocabulary",
   list_account_rates: "query_records on `account_rates` — accountId, and it can now answer across clients rather than one at a time",
   list_roles: "query_records on `roles` — by id or the whole list, with the deactivated ones filterable rather than merely present",
-  list_meetings:
-    "query_records on `meetings` — accountId, appId and purposeId narrow it directly; `view=upcoming`/`week` and `month` are `startsAt` gte/lt/between; `transcript=yes`/`no` is `transcriptCapturedAt` notNull/isNull; `view=all` is asking about `deactivatedAt` yourself, exactly as the door's own everyday-list default works; and `q` is a multi-field contains over title, agenda, notes and the new `guests` field, which is the door's own guest-list search",
 }
 
 /** The agent's full catalog: every shared endpoint (projected, less the list

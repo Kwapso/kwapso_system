@@ -114,7 +114,11 @@ import { Queue } from "@shared/ui/components/queue/queue"
    pass (their `KIT_COMPONENT_EXEMPT` lines were deleted by the same commit —
    R46's rot-check refuses an exemption for a part that is reached). Neither is
    drawn app-side: `OpenBoard` and `ReadySplit` below supply rows and a pane. */
-import { Kanban, type KanbanColumnDot } from "@shared/ui/components/kanban/kanban"
+/* `KanbanColumnDot` USED TO BE IMPORTED BESIDE IT, for the tone each column
+   head wore. The client took the colour off the column heads on 2026-09-09 (the
+   ruling is written out at `COLUMN` below), the kit's `dot` prop is optional and
+   is simply not passed any more, so the type has nothing left to constrain. */
+import { Kanban } from "@shared/ui/components/kanban/kanban"
 import { Split } from "@shared/ui/components/split/split"
 /* THE LIST VIEW'S TABLE, composed from the kit's own primitives rather than
    drawn through `RecordTable` — the reason is written out at the `triageView
@@ -147,18 +151,23 @@ import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { TicketChips, ticketTitle, type TicketChipFacts } from "@shared/web/ticket-chips"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { CountedAbove } from "@/components/records/counted-tabs"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { InAppLink } from "@/components/shell/in-app-link"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
-import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
+// THE LABELS ONLY. The collection's DEFAULT sort used to be read here too and
+// is not any more: which order a tab opens in is a per-tab answer now
+// (`helpTabSorts`), and a screen holding both would be two places deciding one
+// thing — with the tab's answer silently losing on whichever prop forgot.
+import { translatedSorts } from "@/lib/collection-sorts"
 import { translatedFacets } from "@/lib/collection-filters"
 import {
   AddButton,
   CollectionCard,
-  EmptyLine,
   ToolbarRow,
   type ToolbarViewSlot,
 } from "@/components/deep-link/screen-bits"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { TriageStrip } from "@/components/tickets/triage-strip"
 import { TicketsDashboard } from "@/components/tickets/tickets-dashboard"
 import { CONCEPT_ICON } from "@/lib/pages"
@@ -171,7 +180,15 @@ import { assignableMembers, staffedOn } from "@/lib/members"
 import { orderTicketTypes, ticketTypeColour } from "@/lib/type-colours"
 import { HELP_STATUS } from "@/components/deep-link/shape"
 import { RecordMark } from "@shared/web/record-mark"
-import { helpStatusDotTone, waitingDotTone } from "@shared/status-tones"
+/* ONE READER OF THIS FILE LEFT, AND IT IS THE STATUS FILTER. `helpStatusDotTone`
+   still fills the swatch on each option of the Status facet below (`DOT_TONE_FILL`
+   + `helpFacets`), which is a menu of STATUSES and is untouched by the 2026-09-09
+   ruling — she took the colour off the board's COLUMN HEADS, not off the app's
+   idea of what a status colour is. `waitingDotTone` came with it until that day
+   and is gone from `shared/status-tones.ts` entirely: the board's Waiting column
+   was its only caller, and an export nobody imports is a contract nobody agreed
+   to (web/test/dead-exports.test.ts). */
+import { helpStatusDotTone } from "@shared/status-tones"
 import type { DotTone } from "@shared/app-stages"
 import type { TriageGap } from "@shared/triage-readiness"
 import { staffNameFromSnapshot } from "@shared/staff-name"
@@ -184,13 +201,19 @@ import {
   helpFacetFilter,
   helpFacetKey,
   helpKey,
+  helpTabColumns,
   helpTabFacets,
+  helpTabOrder,
+  helpTabSorts,
   listFetch,
+  TICKET_COLUMN_ORDER,
+  TICKET_COLUMNS_DEFAULT,
   OPEN_FACET,
   totalKey,
   triageKey,
   WAITING_FACET,
   type HelpFacet,
+  type TicketColumn,
 } from "@/lib/live-resources"
 import { formatCount } from "@shared/web/format-count"
 import { formatDate } from "@shared/web/format"
@@ -398,18 +421,18 @@ export function ticketFacets({
       ? clients
           .map((a) => {
             const known = accounts.get(a.accountId)
-            const label = a.accountName ?? t("A client")
+            const label = a.accountName ?? t("An account")
             return {
               value: a.accountId,
               label,
-              mark: (
-                <RecordMark
-                  picture={known?.logoUrl ?? null}
-                  name={label}
-                  size="choice"
-                  fit={known?.accountType === "individual" ? "cover" : "contain"}
-                />
-              ),
+              // FILL, NEVER FIT (R60, client 2026-09-09). This used to read the
+              // account's TYPE to decide the crop — a sole trader's photograph
+              // cropped, a company's wordmark contained — which is why `known`
+              // was looked up at all. The ruling removed that choice from the
+              // product, so the lookup is now only for the LOGO, and an account
+              // this screen's page-one cache has never heard of falls through to
+              // its own initial exactly as it always did.
+              mark: <RecordMark picture={known?.logoUrl ?? null} name={label} size="choice" />,
             }
           })
           .sort((a, b) => a.label.localeCompare(b.label))
@@ -418,9 +441,38 @@ export function ticketFacets({
     // (the client, 2026-09-06: "on filter app i wanna see the icon of the app").
     // `choice` is the dense mark size the picker's own option rows use, which is
     // exactly this context.
+    //
+    // AND EACH ONE CARRIES WHOSE IT IS — client ruling, 2026-09-09, on a
+    // screenshot of THIS control: "filter the apps by selected client!"
+    // `within` is the app row's own `accountId` passed straight through, never
+    // a second idea of which apps are whose, and the narrowing itself happens
+    // once in `useFilterBar` (the declaration is on `COLLECTION_FILTERS.help`'s
+    // `appId`; both carry the ruling in full). Three things follow from it and
+    // none of them is decided here: the list narrows to the chosen client's
+    // apps, the control says "Choose an account first." until there is one, and a
+    // stranded app clears itself when the client moves.
+    //
+    // WHY THE BROWSER'S OWN LIST IS THE HONEST SOURCE, and this is the R14
+    // question asked properly rather than waved at. The apps door narrows by
+    // exactly this column when it is asked to (`GET /api/tenancy/apps?accountId=`
+    // → `appsWhere`, workers/tenancy/src/lib/processes.ts), so the door's
+    // answer and this filter's answer are the same expression over the same
+    // field. What makes filtering in hand equal to asking is that `apps` is
+    // BOUNDED and read WHOLE — "an app is a whole built system, and an agency
+    // has tens of them, not thousands" (`listApps`' own header) — so the rows
+    // the browser holds ARE the collection, not a page of it. That is precisely
+    // the property the Client facet beside this one does NOT have, which is why
+    // it reads the door's grouped tally instead of the accounts cache. Two
+    // controls, two sources, one rule: ask whoever holds the whole answer.
+    // A second door read per client pick would buy nothing and cost R56.
     appId: tabFacets.appId
       ? apps
-          .map((a) => ({ value: a.id, label: a.name, mark: <AppMark app={a} size="choice" /> }))
+          .map((a) => ({
+            value: a.id,
+            label: a.name,
+            mark: <AppMark app={a} size="choice" />,
+            within: a.accountId,
+          }))
           .sort((a, b) => a.label.localeCompare(b.label))
       : [],
     // TYPE — the TEAM'S OWN `Ticket type` words, in the client's fixed reading
@@ -566,7 +618,7 @@ const TRIAGE_SORTS: SortOption[] = [{ value: "raised", label: "Raised", defaultD
  * THE APP'S LABEL IS THE ROW'S OWN `appName` (R35, and the reason the triage
  * door was widened today): resolving `appId` against the apps cache this screen
  * happens to hold would have been the page-one bug in a dropdown — a facet that
- * quietly says "A client" for every app past the window. The name rides the row
+ * quietly says "An account" for every app past the window. The name rides the row
  * now, so the words in this menu and the words on the card are one answer.
  *
  * A FACET WITH NOTHING TO OFFER IS NOT DRAWN, the same subtraction
@@ -628,7 +680,30 @@ export function triageFacets(
       // own option rows, which is exactly this context. An app the ticket names
       // but the apps list does not hold (archived, or not yet arrived) keeps its
       // word and simply has no mark, rather than the option vanishing.
-      return { value, label, mark: row ? <AppMark app={row} size="choice" /> : undefined }
+      //
+      // AND WHOSE IT IS, so this menu narrows to the chosen client exactly as
+      // the list tabs' own App menu does (client ruling, 2026-09-09 — the
+      // declaration and the whole argument are on `COLLECTION_FILTERS.help`'s
+      // `appId`; the narrowing is `useFilterBar`'s). It is the APP'S OWN
+      // `accountId` here too, not the client on the ticket the app turned up
+      // on, and that is the point: this is one screen with two tabs, and an App
+      // control that narrowed by one rule on Triage and another on Open would
+      // be the drift the client has twice told us to stop — two Type menus in
+      // two different orders on this exact screen is the fault that ordering
+      // note three functions up exists to record.
+      //
+      // AN APP THE APPS LIST DOES NOT HOLD IS "OWNED BY NOBODY" (`null`), which
+      // means it is offered under EVERY client rather than under none. Same
+      // direction of failure as the missing mark above: an option we cannot
+      // fully describe keeps its place instead of disappearing, because the
+      // rows behind it are real and a filter that cannot reach them is worse
+      // than one that offers a word without a picture.
+      return {
+        value,
+        label,
+        mark: row ? <AppMark app={row} size="choice" /> : undefined,
+        within: row?.accountId ?? null,
+      }
     })
     .sort((a, b) => a.label.localeCompare(b.label))
   /* THE CLIENT, WEARING ITS OWN FACE — and every fact it needs is already ON
@@ -641,18 +716,22 @@ export function triageFacets(
      name, so nothing has to be resolved at all.
      A Map by id for the same reason the apps one is: one pass, and one option
      per client however many of its tickets are in the pile.
-     THE SHAPE IS A SQUARE with the logo contained, which is what a CLIENT wears
-     everywhere in this app (`shape.tsx`'s accounts list carries the ruling: one
-     list, one column, and two shapes in it read as two kinds of record). The
-     crop a sole trader's photograph needs is not available here — the triage
-     row carries a name and a logo and not the account TYPE — so the contain is
-     unconditional, which letterboxes a face rather than cropping one. That is
-     the safe direction of the two: a whole picture in the wrong box beats a
-     cropped one, and the WORD beside it is the name either way. */
+     THE SHAPE IS A SQUARE, which is what a CLIENT wears everywhere in this app
+     (`shape.tsx`'s accounts list carries the ruling: one list, one column, and
+     two shapes in it read as two kinds of record).
+     AND THE FIT IS NO LONGER A QUESTION HERE, which retired the awkwardest half
+     of this note. It used to read: the crop a sole trader's photograph needs is
+     not available on this row — a triage row carries a name and a logo and not
+     the account TYPE — so the contain is unconditional, letterboxing a face
+     rather than cropping one, on the reasoning that a whole picture in the wrong
+     box beats a cropped one. R60 (client, 2026-09-09: "everywhere for images: do
+     fill, not fit!") makes every picture fill its box, so this row and the list
+     tab's own facet now draw the identical mark from the identical two facts,
+     and the type it could not see is a type nothing needs. */
   const accountsSeen = new Map<string, { label: string; logo: string | null }>()
   for (const w of rows)
     if (w.accountId)
-      accountsSeen.set(w.accountId, { label: w.accountName ?? t("A client"), logo: w.accountLogo })
+      accountsSeen.set(w.accountId, { label: w.accountName ?? t("An account"), logo: w.accountLogo })
   const accountOptions = [...accountsSeen]
     .map(([value, { label, logo }]) => ({
       value,
@@ -664,8 +743,18 @@ export function triageFacets(
     // HER ORDER, and the same order the list tabs' toolbar reads in
     // (`COLLECTION_FILTERS.help`): client, app, type. One screen, one reading
     // order, whichever tab a person is standing on.
-    { field: "accountId", label: t("Client"), control: "select" as const, options: accountOptions },
-    { field: "appId", label: t("App"), control: "select" as const, options: appOptions },
+    { field: "accountId", label: t("Account"), control: "select" as const, options: accountOptions },
+    // APP HANGS OFF CLIENT — the same declaration the list tabs make through
+    // `COLLECTION_FILTERS.help`, written out here because this queue builds its
+    // facets from the rows rather than from that table. Same field, same
+    // sentence, same behaviour; `useFilterBar` is the one thing that acts on it.
+    {
+      field: "appId",
+      label: t("App"),
+      control: "select" as const,
+      options: appOptions,
+      dependsOn: { field: "accountId", emptyText: t("Choose an account first.") },
+    },
     // The TEAM'S OWN WORDS, unwrapped — `helpType` is a `Ticket type` dropdown
     // value a team typed itself, so it is data rather than copy and `t()` would
     // be looking up a sentence that is not in the catalogue (R28's own
@@ -1198,6 +1287,39 @@ export function TicketsCollection({
     return { views: [list], value: "list", onValueChange: () => {} }
   })()
 
+  /* THE TOOLBAR'S ORDER CONTROL FOR THE TAB THAT IS OPEN — client, 2026-09-09:
+     "in closed tickets, I want to be able to sort by created date and closed
+     date only. Remove the rest."
+
+     PER TAB BY THE SAME RULE THE FACETS TAKE, and settled in the same place for
+     the same reason: `helpTabSorts` (web/lib/live-resources.ts) reads the tab
+     TOKEN and is driven directly by a test, which a control set spelled inside
+     a render can never be. Its whole argument — including why `closed` is the
+     one name DERIVED (a tab pinned to the resolved stage) rather than dictated
+     — is written out there. Read it before changing anything here.
+
+     A FILTER OVER THE COLLECTION'S OWN OPTIONS, NOT A SECOND LIST OF THEM: the
+     labels stay the ones `translatedSorts` already put through the reader's
+     language (R28), and this can only SUBTRACT. A tab cannot invent a sort the
+     door has never heard of, because there is nothing here to invent one from.
+
+     WHAT THE CONTROL DRAWS ON CLOSED: two options — a real choice, so the
+     ordinary chip. Neither the empty case nor the one-option case arises from
+     her ruling (two names are two), and if a later one ever cut it to one, the
+     chip should go rather than shrink: `showSort` in paged-find.tsx already
+     withdraws it at zero. That is deliberately the OPPOSITE of `ViewSwitch`'s
+     ruling one slot along, where a lone view draws a static label — a view pill
+     names WHERE YOU ARE among places you could be, so it still says something
+     alone; a sort names an ACT, and "Newest first" beside no alternative is a
+     fact about the list that the list is already showing.
+
+     COMPUTED HERE AND NOT AT THE PROP, for the reason `ticketFacets` gives just
+     below: `facets-ask-the-door` and `paged-sort` both read a FIXED window
+     after the `<PagedFind>` tag, and an argument this long inside it would push
+     the props those censuses have to see out the far end. */
+  const tabSorts = helpTabSorts(facet)
+  const sortOptions = translatedSorts("help", t).filter((o) => tabSorts.options.includes(o.value))
+
   /** THE TOOLBAR'S FILTERS FOR THE TAB THAT IS OPEN — see `ticketFacets`. */
   const helpFacets = ticketFacets({
     facet,
@@ -1211,7 +1333,24 @@ export function TicketsCollection({
   return (
     <CountedAbove active={formatCount(totals.help) !== ""}>
       <div className="flex flex-col gap-6">
-        <CollectionHeading sectionKey="tickets" total={shownTotal} />
+        {/* THE GEAR — *"on each module, we have a settings gear"* (client,
+            2026-09-09), top right of the screen, icon only. It goes in the
+            heading's own `action` slot and NOT in the toolbar, because
+            `<ToolbarRow>` draws nothing at all on an empty collection (R50) and
+            a team with no tickets yet is precisely when somebody goes looking
+            for the ticket types. `ModuleSettingsGear` draws itself or nothing —
+            it asks the settings page's own gate rather than repeating it here,
+            so a reader who may see tickets but not the team's vocabulary is
+            never offered a door that would refuse them.
+
+            ONE LINE, AND IT HAS TO STAY ONE LINE. `rules.test.ts`'s R16 ii
+            census asks whether any component file CONTAINS the literal
+            `<CollectionHeading sectionKey="tickets"` — a substring, not a
+            parse — so breaking these props across lines makes the Tickets
+            screen read as a collection with no heading at all and turns
+            `counted-collections` red. Proved on 2026-09-09 by doing exactly
+            that. */}
+        <CollectionHeading sectionKey="tickets" total={shownTotal} action={<ModuleSettingsGear teamId={teamId} segment="tickets" />} />
         {/* ONE STRIP, DRAWN THROUGH THE ONE SEAM — the client's 2026-08-31
             rulings, both on this exact screen: "there can never be 2 rows of
             tabs … just never", "toolbar must be inside of card background",
@@ -1360,8 +1499,9 @@ export function TicketsCollection({
                 one: t("1 ticket matches"),
                 many: t("{count} tickets match"),
               }}
-              sorts={translatedSorts("help", t)}
-              defaultSort={COLLECTION_SORTS.help.defaultSort}
+              // PER TAB — built above as `sortOptions`; the rule is `helpTabSorts`.
+              sorts={sortOptions}
+              defaultSort={tabSorts.defaultSort}
               // R50 — whichever tab is open, `scopedQ` is its own resting read
               // (the "all" list, or the sub-tab's own facet read), so this is
               // the one honest "is THIS tab's collection empty" answer.
@@ -1432,6 +1572,9 @@ export function TicketsCollection({
                     scope: "all",
                     view: "live",
                     ...helpFacetFilter(facet),
+                    // …then the tab's own resting ORDER (`helpTabOrder`, and
+                    // its header says why it is not a key in the filter above).
+                    ...helpTabOrder(facet),
                     ...query,
                     cursor,
                   })
@@ -1479,9 +1622,21 @@ export function TicketsCollection({
                          belongs in the right of the toolbar, part of the
                          toolbar"). Publishing a second copy of it into an empty
                          panel would have been the same act offered twice. */
-                      <EmptyLine concept="tickets">
-                        {found.emptyText ?? t("No tickets here yet.")}
-                      </EmptyLine>
+                      /* R62, 2026-09-09 — ONE REGISTER FOR BOTH ZEROS. This
+                         was an `EmptyLine`: one grey line with a glyph, on the
+                         app's busiest collection, while every panel beside it
+                         drew the full register. `filtered` picks the words —
+                         "Nothing matched." mid-search, the collection's own
+                         line at rest — and it withdraws the create action, which
+                         is why none is handed over here either way: the BUTTON
+                         is already on screen, `raiseTicket` in the toolbar
+                         directly above this, which is where the client ruled it
+                         belongs ("that button belongs in the right of the
+                         toolbar, part of the toolbar"). */
+                      <CollectionEmptyState
+                        filtered={found.active}
+                        title={t("No tickets here yet.")}
+                      />
                     ) : facet === OPEN && openView === "board" ? (
                       <OpenBoard
                         teamId={teamId}
@@ -1495,7 +1650,18 @@ export function TicketsCollection({
                     ) : facet === READY && readyView === "split" ? (
                       <ReadySplit teamId={teamId} rows={rows} onOpen={openTicket} />
                     ) : (
-                      <TicketRowsTable rows={rows} onOpen={openTicket} label={t("Tickets")} />
+                      // WHICH COLUMNS THIS TAB SHOWS — `helpTabColumns`, the
+                      // rule beside the facets' and the sorts' (client,
+                      // 2026-09-09: "ID, created date, closed date. Remove the
+                      // rest," about Closed). Every other tab gets the four she
+                      // ruled on 2026-09-06 and this call site does not know
+                      // which is which.
+                      <TicketRowsTable
+                        rows={rows}
+                        onOpen={openTicket}
+                        label={t("Tickets")}
+                        columns={helpTabColumns(facet)}
+                      />
                     )}
                     <LoadMore
                       listKey={
@@ -1567,6 +1733,23 @@ type TicketFace = {
   titleDe: string | null
   titleEn: string | null
   description: string
+  /** WHEN IT WAS CLOSED, and the ONE optional fact on this type.
+   *
+   * Optional because the two row shapes genuinely differ about it rather than
+   * because one of them forgot: `HelpTicket` carries `resolvedAt` on every row,
+   * and `TriageWaiting` — the queue's own door read — cannot, because a ticket
+   * in triage has not been triaged, let alone closed. Requiring it here would
+   * mean widening the triage door with a column that is NULL by definition and
+   * that nothing on that screen draws, which is a write with no reader.
+   *
+   * What keeps it from being a hole is that the CLOSED column is not a choice a
+   * call site makes: `helpTabColumns` (web/lib/live-resources.ts) hands it out
+   * only for a tab pinned to the `resolved` stage, and the only body that draws
+   * such a tab is the paged one, whose rows are `HelpTicket`. The cell draws an
+   * em dash if it ever arrives empty, so an unexpected absence reads as a
+   * missing answer rather than as a broken row — the same treatment `appName`
+   * already gets one line up. */
+  resolvedAt?: string | null
 }
 
 /** ONE TABLE FOR EVERY TAB THAT SHOWS ROWS — client, 2026-09-06: "For the tabs
@@ -1615,12 +1798,31 @@ function TicketRowsTable<T extends TicketFace>({
   rows,
   onOpen,
   label,
+  columns = TICKET_COLUMNS_DEFAULT,
   decide,
 }: {
   rows: readonly T[]
   onOpen: (id: string) => void
   /** The table's own accessible name, for a reader who arrives out of context. */
   label: string
+  /** WHICH FACTS THIS TAB SHOWS, and in which order — client, 2026-09-09: "ID,
+   * created date, closed date. Remove the rest," about the Closed tab.
+   *
+   * A PROP RATHER THAN A BRANCH ON THE TAB, for the reason `decide` gives one
+   * paragraph down: this file draws a header and a cell per name and does not
+   * know what "Closed" is. WHICH names a tab may pass is `helpTabColumns`
+   * (web/lib/live-resources.ts), beside the rule that already decides the same
+   * question for the toolbar's filters, and it is tested there rather than
+   * asserted here. The default is the four she ruled on 2026-09-06 (Title ·
+   * Type · App · Raised) and is read from the same file, so "every other tab is
+   * unchanged" is one constant rather than a claim about call sites.
+   *
+   * SHE REVISED THE CLOSED SET LATER THE SAME DAY — "columns for close: title
+   * (with id), type, app, raised closed" — which is the four above plus the
+   * closing date. Nothing in this file changed for it except the loss of the
+   * `ref` column that her first reading had needed; the number is back inside
+   * the title cell, where it has been on every other tab all along. */
+  columns?: readonly TicketColumn[]
   decide?: {
     /** The column's header. Say what the cells DO, or pass "" to leave it
      * announced-only — triage passes "" for the reason it always did. */
@@ -1631,14 +1833,38 @@ function TicketRowsTable<T extends TicketFace>({
   }
 }) {
   const { t, lang } = useLanguage()
-  const columns = decide ? 5 : 4
+  const span = columns.length + (decide ? 1 : 0)
+  /** WHAT EACH COLUMN IS CALLED. One map rather than a header spelled at the
+   * point it is drawn, so a tab that shows three of these and a tab that shows
+   * four cannot end up calling one fact two things. "Raised" rather than "Date"
+   * for the created column is the client's own pick ("i choose raised"); the ID
+   * column's word is the one she used in the ruling that created it. */
+  const HEADING: Record<TicketColumn, string> = {
+    title: t("Title"),
+    type: t("Type"),
+    app: t("App"),
+    created: t("Raised"),
+    closed: t("Closed"),
+  }
   return (
     <Table
       // The kit's own specimen width for a table that knows its column count.
       // Below it the container scrolls on the inline axis rather than crushing
       // the title column — the kit's stated mobile answer, and the reason it
       // never restacks a table into cards.
-      minWidth="42rem"
+      //
+      // IT FOLLOWS THE COLUMN COUNT. 42rem is the kit's own four-column
+      // specimen, and it was a constant while there was only one shape. The
+      // Closed tab is the four plus a second date (client, 2026-09-09, her
+      // revised set), so it asks for the specimen plus that column's own width
+      // rather than squeezing six more rem out of the title — a reference and a
+      // date may not truncate, so the title is the only thing that CAN give,
+      // and it is the one column somebody is reading.
+      //
+      // (It briefly went the other way: her first reading of the same day left
+      // this tab with three narrow columns and no title at all, and this line
+      // dropped to 28rem for it. That shape is gone.)
+      minWidth={columns.length > 4 ? "48rem" : "42rem"}
       aria-label={label}
     >
       <TableHeader>
@@ -1650,10 +1876,15 @@ function TicketRowsTable<T extends TicketFace>({
             lights under the pointer and then refuses the click is read as broken
             rather than as inert. */}
         <TableRow className="hover:bg-transparent">
-          <TableHead>{t("Title")}</TableHead>
-          <TableHead>{t("Type")}</TableHead>
-          <TableHead>{t("App")}</TableHead>
-          <TableHead>{t("Raised")}</TableHead>
+          {/* THE HEADER AND THE ROW ARE PUT IN ORDER BY THE SAME LIST, which is
+              what stops a three-column tab from labelling its cells wrong. The
+              cells below are written out in `TICKET_COLUMN_ORDER`'s order and
+              each one is gated on the SAME `columns.includes`, so `columns` is a
+              SET the caller passes and never a sequence: two places cannot
+              disagree about the order because only one of them decides it. */}
+          {TICKET_COLUMN_ORDER.filter((c) => columns.includes(c)).map((c) => (
+            <TableHead key={c}>{HEADING[c]}</TableHead>
+          ))}
           {decide && (
             // NO HEADER OVER THE ACTIONS when the caller passes none — client,
             // asked directly: "no header". Every other header names what the
@@ -1671,87 +1902,105 @@ function TicketRowsTable<T extends TicketFace>({
         {rows.map((w) => (
           <React.Fragment key={w.id}>
             <TableRow onClick={() => onOpen(w.id)} className="cursor-pointer">
-              <TableCell>
-                {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
-                    title to the left, with the usual black chip design."
-                    `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
-                    since 7 Sep 2026 it is the ONLY thing in either front door
-                    that draws one: this cell used to spell the badge out itself
-                    and three other surfaces spelled the identical lozenge out
-                    beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
-                    row that puts it in front — the "before the title to the
-                    left" half of her sentence, held as one string rather than
-                    as a shape each call site remembers. Both the absent case (a
-                    ticket with no number draws nothing) and `shrink-0` (a long
-                    title truncates and the number never does, because an id
-                    with its tail cut off is not useless, it is WRONG) live
-                    inside the component now. */}
-                <span className={REF_LEADS_NAME}>
-                  <RecordRef value={w.ref} />
-                  {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
-                      TBL-5): the call site puts a `Button variant="link"` in the
-                      first cell and that control owns the press. So the mouse
-                      gets the whole row, the keyboard and a screen reader get a
-                      real focusable control with the row's own name as its
-                      label, and neither is a second-class way in. It stops the
-                      click propagating so one press is never two `onOpen` calls.
+              {/* THE NUMBER HAD A COLUMN OF ITS OWN HERE FOR ONE DAY, and the
+                  reason it is gone is worth a line so nobody re-adds it. The
+                  client's first ruling of 2026-09-09 ("ID, created date, closed
+                  date") left the Closed tab with no title, so the reference
+                  became the leading column and took the row's navigation
+                  control with it. Her second ruling the same day put the title
+                  back — "columns for close: title (with id), type, app, raised
+                  closed" — which puts the number back where every other tab has
+                  always had it: inside the title cell, in front of the name, as
+                  the black `RecordRef` chip. One drawing of a reference, which
+                  is what `web/test/one-black-chip.test.ts` is the census for. */}
+              {columns.includes("title") && (
+                <TableCell>
+                  {/* THE NUMBER LEADS THE TITLE — client: "put the ID before the
+                      title to the left, with the usual black chip design."
+                      `RecordRef` (shared/web/record-ref.tsx) IS that chip, and
+                      since 7 Sep 2026 it is the ONLY thing in either front door
+                      that draws one: this cell used to spell the badge out itself
+                      and three other surfaces spelled the identical lozenge out
+                      beside it, agreeing by copy-paste. `REF_LEADS_NAME` is the
+                      row that puts it in front — the "before the title to the
+                      left" half of her sentence, held as one string rather than
+                      as a shape each call site remembers. Both the absent case (a
+                      ticket with no number draws nothing) and `shrink-0` (a long
+                      title truncates and the number never does, because an id
+                      with its tail cut off is not useless, it is WRONG) live
+                      inside the component now. */}
+                  <span className={REF_LEADS_NAME}>
+                    <RecordRef value={w.ref} />
+                    {/* THE KIT'S OWN ANSWER TO "the whole row navigates" (GAPS-D
+                        TBL-5): the call site puts a `Button variant="link"` in the
+                        first cell and that control owns the press. So the mouse
+                        gets the whole row, the keyboard and a screen reader get a
+                        real focusable control with the row's own name as its
+                        label, and neither is a second-class way in. It stops the
+                        click propagating so one press is never two `onOpen` calls.
 
-                      `variant="link"` is not a box (no height, no padding), so
-                      it inherits the cell's own type rather than drawing a
-                      control inside a row; `block` plus a measure is what lets a
-                      long title end in an ellipsis instead of pushing the other
-                      three columns off the screen. */}
-                  <Button
-                    variant="link"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onOpen(w.id)
-                    }}
-                    className="block max-w-[32rem] truncate text-start"
-                  >
-                    {ticketTitle(w)}
-                  </Button>
-                </span>
-              </TableCell>
-              <TableCell>
-                <span className="flex items-center gap-2">
-                  {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
-                      screenshot of this exact column: "for type, kill the
-                      emojis. this is legacy. in current system we use colors."
+                        `variant="link"` is not a box (no height, no padding), so
+                        it inherits the cell's own type rather than drawing a
+                        control inside a row; `block` plus a measure is what lets a
+                        long title end in an ellipsis instead of pushing the other
+                        three columns off the screen. */}
+                    <Button
+                      variant="link"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onOpen(w.id)
+                      }}
+                      className="block max-w-[32rem] truncate text-start"
+                    >
+                      {ticketTitle(w)}
+                    </Button>
+                  </span>
+                </TableCell>
+              )}
+              {columns.includes("type") && (
+                <TableCell>
+                  <span className="flex items-center gap-2">
+                    {/* THE PILL IS THE WHOLE CELL NOW — client, 2026-09-07, over a
+                        screenshot of this exact column: "for type, kill the
+                        emojis. this is legacy. in current system we use colors."
 
-                      WHAT STOOD HERE was the team's own glyph for the kind, read
-                      off the `Ticket type` dropdown value through `markMap` and
-                      drawn beside the pill. The stored glyphs are untouched (see
-                      the note beside the facets above); the READ is gone, and
-                      with it the argument this comment used to make — that
-                      dropping it "would have quietly deleted a capability nobody
-                      asked to lose". Somebody asked. A pictograph in front of a
-                      coloured pill was two marks for one fact, and the ruling
-                      picks the one the rest of the app already uses.
+                        WHAT STOOD HERE was the team's own glyph for the kind, read
+                        off the `Ticket type` dropdown value through `markMap` and
+                        drawn beside the pill. The stored glyphs are untouched (see
+                        the note beside the facets above); the READ is gone, and
+                        with it the argument this comment used to make — that
+                        dropping it "would have quietly deleted a capability nobody
+                        asked to lose". Somebody asked. A pictograph in front of a
+                        coloured pill was two marks for one fact, and the ruling
+                        picks the one the rest of the app already uses.
 
-                      THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
-                      the triage card's chips and the type picker draw — client:
-                      "Type with the colors, same as we have with the chips."
-                      `Swatch` + `ticketTypeColour` rather than a second lozenge
-                      that agrees with them today: the whole reason
-                      `lib/type-colours.ts` is one file is that a type's colour
-                      cannot be decided twice.
+                        THE SAME DOT, FROM THE SAME COMPONENT AND THE SAME MAP as
+                        the triage card's chips and the type picker draw — client:
+                        "Type with the colors, same as we have with the chips."
+                        `Swatch` + `ticketTypeColour` rather than a second lozenge
+                        that agrees with them today: the whole reason
+                        `lib/type-colours.ts` is one file is that a type's colour
+                        cannot be decided twice.
 
-                      A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
-                      so with an em dash: a column with a pill on four rows and a
-                      hole on the fifth reads as the broken row rather than the
-                      untyped one. */}
-                  <Badge variant="secondary" size="pill">
-                    <Swatch colour={ticketTypeColour(w.helpType)} />
-                    {w.helpType ?? "—"}
-                  </Badge>
-                </span>
-              </TableCell>
-              {/* THE TWO QUIET COLUMNS, as her reference draws them: the facts,
-                  in secondary ink, so the title and the coloured pill are what
-                  the eye lands on going down the page. An em dash for an absent
-                  app — a blank cell looks like a rendering fault rather than a
-                  missing answer.
+                        A TYPE THE TICKET DOES NOT HAVE STILL GETS ITS PILL, saying
+                        so with an em dash: a column with a pill on four rows and a
+                        hole on the fifth reads as the broken row rather than the
+                        untyped one. */}
+                    <Badge variant="secondary" size="pill">
+                      <Swatch colour={ticketTypeColour(w.helpType)} />
+                      {w.helpType ?? "—"}
+                    </Badge>
+                  </span>
+                </TableCell>
+              )}
+              {/* THE QUIET COLUMNS — app, and the two dates below it — as her
+                  reference draws them: the facts, in secondary ink, so the title
+                  and the coloured pill are what the eye lands on going down the
+                  page. ("The two" while there were two; the Closed tab has a
+                  third and no title above it, which is the one tab where the
+                  quiet ink is the whole row.) An em dash for an absent app — a
+                  blank cell looks like a rendering fault rather than a missing
+                  answer.
 
                   THE APP IS TEXT, NOT A LINK, AND THAT IS R37-SHAPED: a link
                   inside a row whose whole job is to open the TICKET gives one
@@ -1759,14 +2008,39 @@ function TicketRowsTable<T extends TicketFace>({
                   matter of pixels. Nothing is lost — the app is a FACET in the
                   toolbar above, and the ticket's own screen is one row-click
                   away with the app link on it. */}
-              <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
-              <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
-                {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
-                    formatter and the reader's own language, so one ticket cannot
-                    carry two spellings of one day across two views of one
-                    collection. */}
-                {formatDate(w.createdAt, lang)}
-              </TableCell>
+              {columns.includes("app") && (
+                <TableCell className="text-muted-foreground">{w.appName ?? "—"}</TableCell>
+              )}
+              {columns.includes("created") && (
+                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                  {/* THE SAME DATE THE CARD'S CHIP SHOWS, through the same shared
+                      formatter and the reader's own language, so one ticket cannot
+                      carry two spellings of one day across two views of one
+                      collection. */}
+                  {formatDate(w.createdAt, lang)}
+                </TableCell>
+              )}
+              {/* THE DAY IT WAS CLOSED — client, 2026-09-09. Same ink, same
+                  formatter and same language as the Raised column beside it,
+                  because they are two spellings of one kind of fact and a
+                  reader compares them going across the row.
+
+                  THIS COLUMN ONLY EVER APPEARS ON A TAB PINNED TO THE
+                  `resolved` STAGE, and that is the whole reason it can be
+                  trusted: a reopen NULLs `resolved_at` (the owner's ruling of
+                  2026-09-06 — the closure survives in the activity trail, "closed
+                  on x, reopen on y, closed again on z"), so anywhere an open
+                  ticket could appear this cell would say "never closed" about a
+                  ticket that has been closed twice. `helpTabColumns` is what
+                  makes that a rule rather than a call site being careful. The em
+                  dash is the same treatment the App column gets: if one ever
+                  does arrive empty it reads as a missing answer, not a broken
+                  row. */}
+              {columns.includes("closed") && (
+                <TableCell className="text-muted-foreground tabular-nums whitespace-nowrap">
+                  {w.resolvedAt ? formatDate(w.resolvedAt, lang) : "—"}
+                </TableCell>
+              )}
               {decide && (
                 <TableCell className="text-end whitespace-nowrap">{decide.cell(w)}</TableCell>
               )}
@@ -1781,7 +2055,7 @@ function TicketRowsTable<T extends TicketFace>({
                 else in the document. */}
             {decide?.strip?.(w) && (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns} className="bg-surface-quiet">
+                <TableCell colSpan={span} className="bg-surface-quiet">
                   {decide.strip(w)}
                 </TableCell>
               </TableRow>
@@ -1917,8 +2191,10 @@ function OpenBoard({
      reason two components down, and the same one it made back when the date
      lived in the chips. */
   const { t, lang } = useLanguage()
-  /** THE STAGES IN THE READER'S OWN LANGUAGE. THE DOT IS NOT HERE — it is one
-   * function call below, and 2026-09-07 is the day that stopped being a detail.
+  /** THE STAGES IN THE READER'S OWN LANGUAGE, AND THAT IS ALL A COLUMN HEAD
+   * CARRIES NOW — the name in words and the quiet count. THERE IS NO DOT
+   * ANYWHERE ON THIS BOARD'S HEADS, and 2026-09-09 is the day that became the
+   * whole answer rather than a question about which shade.
    *
    * WRITTEN OUT AS LITERALS INSIDE THE COMPONENT rather than read off
    * `HELP_STATUS` (web/components/deep-link/shape.tsx). That map is a copy TABLE
@@ -1934,45 +2210,54 @@ function OpenBoard({
    * entry was written, instead of the board quietly drawing a fourth column
    * with no name.
    *
-   * ── THE DOT USED TO BE THE FIFTH VALUE IN THIS MAP, AND IT WAS WRONG ──────
+   * ── THE DOT IS GONE, AND SHE ASKED FOR IT TWICE ─────────────────────────
    *
-   * CLIENT, 2026-09-07, over this exact board, verbatim: *"grerat but status
-   * (th header) have no color associated."* She is not asking for a brighter
-   * shade. She is reading a column head whose dot is not the colour this app
-   * gives that status, on a screen that shows her the right one six inches
-   * above: the Status FILTER on this same tab draws each stage's swatch through
-   * `helpStatusDotTone` (see `DOT_TONE_FILL` and `helpFacets` at the top of this
-   * file), so "Triaged" was a BLUE dot in the filter menu and a GREY one on the
-   * column head of the tickets it selects. One stage, two colours, one screen.
+   * CLIENT, 2026-09-09, over this exact board on staging, verbatim: *"remove the
+   * color from the status header!"* and, in the same review, *"column header
+   * should have no color"*. That is a ruling about the OBJECT, not about the
+   * shade on it: there is no dot to re-tone, because she is not asking for a
+   * different one. The kit's `dot` is optional (`dot?: KanbanColumnDot`,
+   * shared/ui/components/kanban/kanban.tsx, and both places that draw it are
+   * gated on `!== undefined`), so the whole of obeying her is not passing it.
    *
-   * THE PARAGRAPH THAT USED TO STAND HERE CLAIMED OTHERWISE — "Taken from that
-   * file's reading rather than re-decided here, because a stage's colour cannot
-   * be chosen twice" — and then wrote four literals that were the tiering of
-   * `shared/status-tones.ts` shifted one rung DOWN: `triaged` was `archived`
-   * where that file says `review`, `scheduled` was `review` where that file says
-   * `building`. A comment promising a single source is not a single source. It
-   * is replaced rather than deleted because the promise was right and only the
-   * spelling was wrong: the answer is now READ, so it cannot drift again and no
-   * comment has to be believed.
+   * WHAT USED TO STAND HERE, AND WHY IT IS REPLACED RATHER THAN DELETED. On
+   * 2026-09-07 she said *"grerat but status (th header) have no color
+   * associated"*, and this file read that as a complaint about WHICH colour: the
+   * Status FILTER six inches above draws each stage's swatch through
+   * `helpStatusDotTone`, and the column heads had four hand-written literals a
+   * rung off that file's tiering, so "Triaged" was blue in the menu and grey on
+   * the head of the tickets it selects. The fix that day made the head READ the
+   * same seam as the filter, and a long paragraph here defended the result —
+   * `triaged` is `review`, `scheduled` and `in_progress` share `building`,
+   * `ready` is `done`, Waiting is `blocked` — including a closing line saying
+   * that if four colours across five columns were not enough for her, "the fix
+   * is a kit release, not a literal here".
    *
-   * WHAT THE FIVE COLUMNS NOW WEAR, and it is `status-tones.ts`'s tiering
-   * verbatim: `triaged` is `review` (blue — somebody has read it and is looking
-   * at it), `scheduled` and `in_progress` are both `building` (charcoal, "in
-   * build / with us" in the kit's own token comment — booked in and being worked
-   * on are the same tier of the same lifecycle), `ready` is `done` (green — every
-   * story closed, only the sending left) and Waiting is `blocked`.
+   * She was reporting the ABSENCE she wanted, not a mismatch. Two days later she
+   * said the same thing in the imperative, twice, which is how a person repeats
+   * an instruction that was answered with something else. The 2026-09-07 reading
+   * was not perverse — one stage wearing two colours on one screen is a real
+   * defect and it is genuinely fixed — but the ruling it was serving never asked
+   * for a corrected dot, and this paragraph exists so nobody restores one by
+   * finding the old argument and thinking it is still live. IT IS NOT. A column
+   * head on this board carries no colour.
    *
-   * TWO COLUMNS SHARE A COLOUR AND THAT IS THE ANSWER, NOT A DEFECT LEFT IN.
-   * `scheduled` and `in_progress` are one tone because the app rules they are
-   * one tier, and the fix for two neighbours wearing charcoal is emphatically
-   * NOT to give this board its own private shade for one of them — that is
-   * precisely the second decision the client's complaint is about. The kit
-   * already rules the case: the dot never carries the state alone, and the name
-   * in words is beside it. It is the same situation the six tones have with
-   * their two greens (`--dot-shipped` and `--dot-done` are one colour, named
-   * twice), which `DOT_TONE_FILL`'s own note at the top of this file spells out.
-   * If four distinct colours across five columns is not enough for her, the
-   * vocabulary is the kit's and the fix is a kit release, not a literal here. */
+   * THE FILTER KEEPS ITS SWATCHES, and that is not the ruling half-applied. She
+   * is reading a BOARD: five heads across the top of a screen, each a word and a
+   * number, where a coloured dot is decoration on a label that already says
+   * everything. The Status facet is a MENU OF STATUSES, where the swatch is the
+   * legend that teaches the colours the ticket chips and the charts use — a
+   * different object answering a different question, and she has never asked
+   * about it. `helpStatusDotTone` is therefore still read, once, at `helpFacets`.
+   *
+   * AND NOTHING ON THE BOARD ASKS FOR A TONE ANY MORE, so `waitingDotTone()` —
+   * added on 2026-09-07 so the fifth column would stop borrowing the tone of the
+   * stage the client had just retired — lost its only caller and has been deleted
+   * from `shared/status-tones.ts` with it. Leaving it there would be a public
+   * name nobody names (web/test/dead-exports.test.ts), which is the seam left
+   * half-wired rather than the seam left honest. The MEANING it carried is not
+   * lost and was never a colour: `waitingClause` (workers/content/src/lib/help.ts)
+   * is what decides who is waiting, and the column below says so in words. */
   const COLUMN: Record<(typeof OPEN_TAB_STATUSES)[number], { title: string }> = {
     triaged: { title: t("Triaged") },
     scheduled: { title: t("Scheduled") },
@@ -2051,15 +2336,12 @@ function OpenBoard({
         ...OPEN_TAB_STATUSES.map((stage) => ({
           id: stage,
           title: COLUMN[stage].title,
-          /* THE STAGE'S OWN TONE, READ — never a literal written here. See the
-             `COLUMN` note above for the client ruling this closes and for the
-             two colours the same stage used to have on this one screen. The six
-             values `helpStatusDotTone` returns ARE the kit's six `dot` names
-             (`DotTone` in shared/app-stages.ts is the same union, restated there
-             because a worker cannot import a `.tsx`), so this satisfies
-             `KanbanColumnDot` structurally and a seventh tone in the kit would
-             fail here rather than paint nothing. */
-          dot: helpStatusDotTone(stage) satisfies KanbanColumnDot,
+          /* NO `dot`, AND THAT IS THE WHOLE OF THE 2026-09-09 RULING — "remove
+             the color from the status header!" / "column header should have no
+             color". The kit's prop is optional and its two draw sites are gated
+             on `!== undefined`, so omitting it is the supported way to say this
+             and no kit change is needed. The argument, and the 2026-09-07 one it
+             replaces, are written out at `COLUMN` above. */
           count: narrowed ? undefined : counts?.[stage],
           /* A PARTITION, NOT A NARROWING, and the difference is the whole of
              R16 on this screen. Two censuses forbid a paged screen from
@@ -2115,24 +2397,25 @@ function OpenBoard({
                once on this screen (R16). The footnote says all of this in the
                reader's own words, because a fifth column beside four is read as
                a fifth bucket unless something says otherwise.
-           THE DOT IS READ, NOT WRITTEN, EVEN THOUGH THIS COLUMN IS NOT A
-           STATUS — and that is the sharpest form of the 2026-09-07 ruling
-           ("status (th header) have no color associated"). `waiting` has no row
-           in `helpStatusDotTone` because it is a predicate, so the honest
-           question is not "which of the six do I like here" but "what colour
-           does this app give the state where the client owes us an answer" —
-           and `shared/status-tones.ts`, the file that owns what a status colour
-           MEANS, now answers it directly through `waitingDotTone()`. It
-           resolves to `blocked`, the tier that file defines as "stuck on
-           somebody OUTSIDE the team", which is this column's own sentence.
-           IT USED TO ASK `helpStatusDotTone("awaiting_validation")`, AND THE
-           CHANGE IS NOT COSMETIC. Borrowing a STAGE's tone to paint a PREDICATE
-           kept the right property — the colour was asked for rather than typed,
-           so a re-tone moved this column without an edit — by the wrong route,
-           and the route stopped existing when the client retired that stage on
-           7 Sep 2026. Hard-coding `"blocked"` here would have dropped the
-           property with the bug; a named seam keeps both, and waiting now owns
-           its colour instead of borrowing one.
+           NO DOT ON THIS HEAD EITHER, AND IT IS THE SAME RULING — client,
+           2026-09-09: "remove the color from the status header!" … "column
+           header should have no color". This column is the one that could most
+           plausibly argue for an exception, because it is not a status and a
+           colour would be the only thing marking it out from the four beside
+           it. It gets none: the FOOTNOTE under the board is what says this
+           column repeats cards from the four before it, in words, and a reader
+           who needs that sentence is not served by a poppy dot instead of it.
+           WHAT WENT WITH IT. Until 2026-09-09 this line read
+           `dot: waitingDotTone()` — a named seam added on 2026-09-07 so the
+           column would stop borrowing the tone of `awaiting_validation`, a stage
+           the client had just retired. The seam was right for the question it
+           answered and the question is no longer asked, so the function is
+           deleted rather than left exported for nobody
+           (web/test/dead-exports.test.ts). Nothing about WAITING moved: it is
+           still a predicate the door derives on every read (`waitingClause`,
+           workers/content/src/lib/help.ts), it is still the identical read the
+           Waiting TAB rests on, and it is still said in words here and in the
+           footnote — which is where it was always carried.
            IT IS NOT A FILTER. No card in this column is read by status at all —
            they come from the door's waiting predicate, below.
            NO COUNT WHILE THE TOOLBAR IS ASKING, for the reason the four stage
@@ -2142,7 +2425,6 @@ function OpenBoard({
         {
           id: WAITING,
           title: t("Waiting"),
-          dot: waitingDotTone() satisfies KanbanColumnDot,
           count: narrowed ? undefined : waitingTotal,
           cards: (waitingRows ?? []).map(boardCard),
           emptyLabel: t("Nothing is waiting on a client."),
@@ -2493,7 +2775,7 @@ function TriageQueue({
    * strings are outside the translation catalogue and a screen's are not. */
   const GAP_WORD: Record<TriageGap, string> = {
     type: t("a ticket type"),
-    client: t("a client"),
+    client: t("an account"),
     app: t("an app"),
     raisedBy: t("who raised it"),
   }
@@ -2856,17 +3138,22 @@ function TriageQueue({
      about duty in this screen and never two that drifted apart. */
   if (view.waiting.length === 0)
     return (
-      <div className="flex flex-col gap-1">
-        <EmptyLine concept="triage">{t("Nothing waiting.")}</EmptyLine>
-        <p className="text-muted-foreground text-sm">
-          {view.onDuty?.userName
+      /* R62 — THE SAME REGISTER ITS FILTERED TWIN DRAWS (below). This was an
+         `EmptyLine` plus a loose `<p>`; the register carries a title and one
+         sentence, which is exactly the two things this state has to say. Still
+         no action, for the reason above: a button here would be the app
+         inventing a task to hand her. */
+      <CollectionEmptyState
+        title={t("Nothing waiting.")}
+        description={
+          view.onDuty?.userName
             ? // R54: whoever is on triage is one of ours.
               t("No new tickets to sort. {name} is on triage this week.", {
                 name: staffNameFromSnapshot(view.onDuty.userName),
               })
-            : t("No new tickets to sort. Nobody is on triage this week.")}
-        </p>
-      </div>
+            : t("No new tickets to sort. Nobody is on triage this week.")
+        }
+      />
     )
 
   // ── THE CARD IN HAND ────────────────────────────────────────────────────
@@ -3091,7 +3378,16 @@ function TriageQueue({
         // reader who had set the App facet and typed nothing would have been
         // told her search matched nothing — a true-sounding sentence pointing
         // at the wrong control, which is the most expensive kind.
-        <EmptyLine concept="triage">{t("Nothing in the triage queue matches what you asked for.")}</EmptyLine>
+        /* R62 — the same register the resting queue draws below, minus the add
+           button (there is none here on purpose: "a button here would be the app
+           inventing a task"). The sentence is kept rather than defaulted, because
+           it names the THREE controls that can empty this list — see the note
+           above on why it stopped saying "your search". */
+        <CollectionEmptyState
+          filtered
+          title={t("Nothing waiting.")}
+          filteredTitle={t("Nothing in the triage queue matches what you asked for.")}
+        />
       ) : triageView === "list" ? (
         /* ══ THE LIST — CLIENT RULING, 2026-09-06, ROUND TEN ══════════════════
            Her whole brief, verbatim: "Now let's build the list view: 1. Title.

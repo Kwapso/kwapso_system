@@ -65,7 +65,7 @@ export function AppTiles({
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {apps.map((app) => {
-        const client = app.accountId ? (accountNames.get(app.accountId) ?? t("A client")) : t("Ours")
+        const client = app.accountId ? (accountNames.get(app.accountId) ?? t("An account")) : t("Ours")
         // Through the seam even though every part of it is ours: `base` is a
         // literal or "/t/<teamId>" and the id is a ULID, so nothing here is
         // typed by anybody. The rule is positional on purpose — a URL that

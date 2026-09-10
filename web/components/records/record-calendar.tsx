@@ -9,7 +9,7 @@
 // now carries `onSelectDay` / `onSelectEvent` / `onSelectItem`. This file is
 // now composed from `CalendarView` (the month grid) and `Agenda` (the day-by-day
 // list, itself a thin wrapper over `CalendarView`'s own `agenda` view) rather
-// than hand-rolling both — the same reason `role-detail.tsx` reaches for the
+// than hand-rolling both — the same reason `roles-matrix.tsx` reaches for the
 // kit's parts instead of drawing its own.
 //
 // WHY A CELL IS NEVER A BUTTON. The kit makes a day cell a real `<button>` when

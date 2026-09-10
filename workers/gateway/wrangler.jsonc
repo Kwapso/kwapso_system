@@ -45,7 +45,8 @@
       "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
       "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-      "/brand/*", "/purposes/*", "/contacts/*"
+      "/brand/*", "/purposes/*", "/contacts/*",
+      "/settings/*"
     ]
   },
   // THE MAINTENANCE DOORS' SPEED LIMIT (see guardMaintenance in src/index.ts).
@@ -95,7 +96,8 @@
           "/accounts/*", "/tickets/*", "/knowledge/*", "/processes/*",
           "/stories/*", "/sprints/*",
         "/waves/*", "/apps/*", "/tasks/*", "/time/*", "/meetings/*",
-          "/brand/*", "/purposes/*", "/contacts/*"
+          "/brand/*", "/purposes/*", "/contacts/*",
+          "/settings/*"
         ]
       },
       // Staging carries the same limit: a throttle only tested in production is

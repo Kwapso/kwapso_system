@@ -2,19 +2,19 @@
 
 // Role-picker dialog — pick one role from the team's roles for a given member.
 // Reusable: the Members screen uses it to change a member's role; the Roles
-// screen will reuse it later. Library primitives (Dialog + RadioGroup).
+// screen will reuse it later. Library primitives (Sheet + RadioGroup).
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@shared/ui/components/dialog/dialog"
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@shared/ui/components/sheet/sheet"
 import {
   RadioGroup,
   RadioGroupItem,
@@ -81,16 +81,39 @@ export function RolePickerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{t("Change role")}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      {/* A PICKER IS A FORM, AND THEREFORE A SLIDE-IN. Client ruling,
+          2026-09-09, over a screenshot of the "New access token" dialog:
+          "This should be a slide-in, like all the other screens. The only
+          ones that are overlays are the warnings, such as archive or delete,
+          and so on." Law R59; not a style preference, do not revert it.
+
+          WHY A PICKER FALLS ON THE FORM SIDE OF HER LINE, since she named
+          neither. Her two buckets are drawn by what the surface DOES: a
+          warning asks a yes/no question about something that already exists;
+          everything else COLLECTS an answer and commits it. This screen
+          collects one — a radio group of roles and a "Save role" button that
+          writes. That it collects by choosing rather than by typing is the
+          input control's business, not the presentation's, and the app
+          already agrees in the one place it had to decide: the record picker
+          (`components/records/record-picker.tsx`) has been a `Sheet` since
+          before this ruling. Two pickers presenting two ways would be the
+          drift the ruling exists to stop.
+
+          The footer is a real `SheetFooter` (there is no <form> here — the
+          commit is an onClick — so nothing needed hoisting or a `form=`
+          attribute). It pins: `sheet-*` slots are exempt from
+          `SheetContent`'s "every other child scrolls" rule, so a team with
+          many roles scrolls the radio group and never the Save control. */}
+      <SheetContent side="right">
+        <SheetHeader>
+          <SheetTitle>{t("Change role")}</SheetTitle>
+          <SheetDescription>
             {subjectName
               ? `Pick the role for ${subjectName}.`
               : t("Pick a role.")}
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         {currentTitle && (
           <p className="text-muted-foreground text-sm">
@@ -130,7 +153,7 @@ export function RolePickerDialog({
           ))}
         </RadioGroup>
 
-        <DialogFooter>
+        <SheetFooter>
           <Button
             onClick={() => void save()}
             disabled={busy || !selected}
@@ -138,8 +161,8 @@ export function RolePickerDialog({
             {busy ? <Spinner /> : null}
             {busy ? t("Saving…") : t("Save role")}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

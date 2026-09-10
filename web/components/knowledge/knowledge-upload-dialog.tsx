@@ -29,7 +29,7 @@ import { DialogDescription, DialogTitle } from "@shared/ui/components/dialog/dia
 import { Field } from "@shared/web/field"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { Input } from "@shared/ui/components/input/input"
 import {
@@ -264,7 +264,7 @@ export function KnowledgeUploadDialog({
           onChange={(accountId) => setValues((v) => ({ ...v, accountId }))}
           search={(term) => searchAccounts(term)}
           searchKey={pickerKey("accounts", teamId)}
-          options={accountOptions.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
+          options={accountOptions.map(accountOption)}
           emptyOption={{ value: AGENCY, label: t("The agency's own") }}
           placeholder={t("The agency's own")}
           searchPlaceholder={t("Search accounts…")}
@@ -272,7 +272,7 @@ export function KnowledgeUploadDialog({
           disabled={busy}
         />
         <p className="text-muted-foreground mt-1 text-xs">
-          {t("Filing it under a client is how a question about them finds it first.")}
+          {t("Filing it under an account is how a question about them finds it first.")}
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-file-visibility" className={fieldSpacing}>

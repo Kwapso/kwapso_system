@@ -5,7 +5,6 @@ import type {
   Invite,
   InviteAudit,
   TeamMember,
-  TeamMeta,
   TeamRole,
 } from "@shared/types"
 import { describe, expect, it } from "vitest"
@@ -21,7 +20,6 @@ import {
   shapeMemberDetail,
   shapeMembersList,
   shapeRolesList,
-  shapeTeamDetail,
 } from "@/components/deep-link/shape"
 
 /* ------------------------------ fixtures ------------------------------ */
@@ -121,14 +119,6 @@ const ticket: HelpTicket = {
   // shown by first name alone.
   raiserIsClient: false,
   editorIsClient: false,
-}
-
-const meta: TeamMeta = {
-  name: "Acme",
-  createdAt: "2026-06-01T10:00:00.000Z",
-  creatorName: "Alaap Kanchwala",
-  creatorEmail: "alaap@x.com",
-  updatedAt: null,
 }
 
 const activity: ActivityItem[] = [
@@ -333,26 +323,9 @@ describe("shapeInviteDetail", () => {
   })
 })
 
-describe("shapeTeamDetail", () => {
-  it("shapes the record fields and a shaped activity set", () => {
-    const data = shapeTeamDetail({
-      teamId: "t1",
-      name: "Acme",
-      logoUrl: null,
-      meta,
-      activity,
-      lang: "en",
-    })
-    expect(data.record?.id).toBe("t1")
-    expect(data.record?.name).toBe("Acme")
-    expect(data.record?.image).toBe("")
-    // R54, snapshot path again — `meta.creatorName`. A team is created by
-    // staff; a client login cannot reach the form that makes one.
-    expect(data.record?.createdBy).toBe("Alaap")
-    expect(data.record?.updated).toBe("—") // meta.updatedAt is null
-    expect(data.sets?.activity?.[0].id).toBe("a1")
-  })
-})
+/* `shapeTeamDetail`'s suite went with the shaper and the screen it fed — the
+ * team overview, deleted on the client's 2026-09-09 ruling. web/lib/pages.ts
+ * carries the decision and where `/t/<teamId>` lands now. */
 
 /* ------------------------------- accounts ------------------------------- */
 

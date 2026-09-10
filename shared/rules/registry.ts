@@ -537,12 +537,65 @@ export const RULES_REGISTRY: Rule[] = [
   {
     id: "R58",
     dimension: "arch",
-    law: "A PATH THIS REPO NAMES MUST RESOLVE ON DISK. Two censuses, both derived off the disk and both read through the one walker: every repo path with a real extension in `documents/**.md` and the root canon, and every path spelled out with a `.ts`/`.tsx` extension anywhere in our own source. An import specifier in this codebase never carries an extension, so the source census reads PROSE and string literals and never the module graph. The way out is a reasoned `GONE_ON_PURPOSE` line — a path a document names precisely BECAUSE it is gone (\"the clause and web/lib/use-live-refetch.ts were retired\") — rot-checked both ways, so a path that comes back and a pin nothing mentions any more both turn the build red and the list can only shrink.",
-    why: "Every law here is a source scan, and every scan reads a path it was HANDED; nothing read the paths the repo WRITES. Earned by eight dangling paths in the canon and twelve in our own source, and it is worse than untidy: FIVE of the twelve named a GUARD that does not exist. workers/auth/src/lib/sessions.ts promised the build fails if a fourth copy of the session cookie name appears and named a test file that is not there; workers/content/src/routes/triage.ts said a whole-repo census watched the triage rota and named another. Both properties are genuinely enforced, by suites under different names — so a reader who checks is reassured by a file that is not there, and a reader who does not check is reassured by nothing at all. The 7 Sep fold of web/components left one more behind, in a comment two folders away, and a human found it weeks after a green build.",
+    law: "A PATH THIS REPO NAMES MUST RESOLVE ON DISK. ONE pattern, two censuses, one walker, and EVERYTHING THE PATTERN IS BUILT FROM IS READ OFF THE DISK: the roots it accepts are the repository's own top-level folders, so a folder created tomorrow is covered the day it exists, and the exemption for a path that is OUTPUT rather than source is `.gitignore`'s own answer rather than a second list — a file this repo GENERATES is named by the script that writes it and cannot be required on a fresh clone. DOCS is every `.md` this repo writes, wherever it lives, which now includes the fifteen that sit beside the code they describe (`web/components/README.md`, which R57 derives a law out of, was read by neither half). CODE is every root that holds code of ours, at every depth, in every text extension this repo writes — `.ts`, `.tsx`, `.mts`, `.mjs`, `.sql`, `.css`, `.json`, `.jsonc`, `.md`, `.html` — and a segment may open with `[`, because seventeen real screens live under a Next catch-all the canon names constantly. An import specifier in this codebase never carries an extension, so the census reads PROSE and string literals and never the module graph. A BLINDNESS TRIPWIRE is the last clause: every file either census READS must be a path that census could RECOGNISE, so an extension, a root or a segment shape falling quietly out of the pattern is caught by the files it stopped seeing rather than by a green run that measures less. The way out is a reasoned `GONE_ON_PURPOSE` line — a path a document names precisely BECAUSE it is gone (\"the clause and web/lib/use-live-refetch.ts were retired\") — rot-checked both ways, so a path that comes back and a pin nothing mentions any more both turn the build red and the list can only shrink.",
+    why: "Every law here is a source scan, and every scan reads a path it was HANDED; nothing read the paths the repo WRITES. Earned by eight dangling paths in the canon and twelve in our own source, and WIDENED on 9 Sep 2026 because the check was narrower than its own sentence — the source half read only `.ts`/`.tsx` out of a hand-typed list of folders, so a `.md` named in worker source passed a green build (demonstrated, not argued), and the docs half read only `documents/**.md` and the root canon. Six more real dangling paths fell out of the widening, including a core migration citing a suite that has never existed for the activity table's append-only guard, which is genuinely enforced under another name — the same shape the law was earned by, still in the tree a day later. It is worse than untidy: FIVE of the twelve named a GUARD that does not exist. workers/auth/src/lib/sessions.ts promised the build fails if a fourth copy of the session cookie name appears and named a test file that is not there; workers/content/src/routes/triage.ts said a whole-repo census watched the triage rota and named another. Both properties are genuinely enforced, by suites under different names — so a reader who checks is reassured by a file that is not there, and a reader who does not check is reassured by nothing at all. The 7 Sep fold of web/components left one more behind, in a comment two folders away, and a human found it weeks after a green build.",
     checkId: "named-paths",
     status: "enforced",
   },
+  {
+    id: "R59",
+    dimension: "ui",
+    law: "A FORM IS A SLIDE-IN; A WARNING IS AN OVERLAY. The client's ruling, 2026-09-09, over a screenshot of the \"New access token\" dialog: \"This should be a slide-in, like all the other screens. The only ones that are overlays are the warnings, such as archive or delete, and so on.\" A surface that COLLECTS — a form, an editor, a picker — presents as the kit's `Sheet`, which slides in from the inline end on desktop and, below 45rem, becomes the bottom sheet capped at 85dvh that her 2026-09-04 ruling asked for. A surface that ASKS a yes/no question about something that already exists is an `AlertDialog`, centred. The check does NOT try to recognise a form, because a regex that decides what a form looks like has a hole the week somebody writes one differently: it INVERTS, and holds every centred-overlay mount — every `<DialogContent>` across `web/`, `web-portal/` and `shared/web/` — to a reasoned `CENTRED_DIALOG_OK` line. A new form added next month reaches for a `Dialog`, has no line, and is red on the day it is written. The law is deliberately blind to kit v1.2.72's new `presentation` prop, which looks like the answer and is not: of its four values `overlay` and `responsive` are both CENTRED on a desktop (`responsive` flips to the bottom sheet only below 45rem), `sheet` is a bottom sheet on a 1920 monitor, and `fullscreen` is a page — so a `<DialogContent>` is a finding whatever it carries. The shape the client asked for is `Sheet side=\"right\"`, a different component, and the one the app's other ~35 forms already use. Two rot-checks make the list a ratchet rather than a loophole: an entry whose file no longer mounts a centred overlay must go, and an EXEMPT overlay that grows form machinery (a `<form>`, a `FormShell`, a `<Field>`, an `<Input>`) turns the build red where it stands — which is the exact way an exemption would otherwise be used to smuggle back the thing the law forbids.",
+    why: "The ruling was already the app's practice and was enforced by nobody, which is the shape that always rots. `FormShellDialog` moved ~35 forms from the centred `Dialog` to a `Sheet` on 2026-08-31 and its header argues the case at length — but it argued it for its own call sites, so the five forms that never adopted the shell stayed centred under a green build, and one of them was the screen the client happened to screenshot. Detecting the fault directly was tried first and abandoned: a form-machinery scan finds four of the five and misses `role-picker-dialog.tsx` outright, because a radio group and an onClick that writes is a form with no `<form>` in it. The inversion costs two exemption lines today and cannot miss a sixth. The two it costs are honest ones and are referred back to the client rather than sorted: `agent-usage-dialog.tsx` (read where the credits went) and `record-calendar.tsx` (what is on this day) are neither forms nor warnings, and she has ruled on neither.",
+    checkId: "forms-are-not-overlays",
+    status: "enforced",
+  },
+  {
+    id: "R60",
+    dimension: "ui",
+    law: "AN IMAGE FILLS ITS BOX; IT IS NEVER SHRUNK TO FIT INSIDE ONE. The client's ruling, 2026-09-09, blanket and unhedged: \"everywhere for images: do fill, not fit!\" Every picture either front door draws is `object-cover` — it fills the box it is given and is CROPPED to it — never `object-contain`, `object-fill`, `object-none` or `object-scale-down`. TWO CENSUSES, because there are two ways to say the losing word: the CLASS, written into a className anywhere under `web/app`, `web/components`, `web/lib`, the portal's three, and `shared/web`; and the PROP, `fit=\"contain\"` handed to the kit's own `Image`, which turns exactly that value into exactly that class. Without the second half the law is a one-line evasion — delete the className, pass the prop, ship the same pixels green — and it earned its place on the first run by catching a fit in the kit's gallery that the hand census the law was written from had missed for being spelled as a prop. The vendored kit is OUT of the requirement and IN the count: `shared/ui/` held five of these and now holds ONE (kit v1.2.73 adopted this ruling upstream and four went with it; the survivor is `image.tsx`'s own `fit` branch, which must exist for as long as `Image` accepts `fit=\"contain\"` at all) and none can be fixed here (it is hash-pinned; a hand-edit is red on its own), so `KIT_CONTAIN_CEILING` pins the number for exact equality the way R44 pins a translation debt — it falls when the upstream fix is tagged and pulled, and can never rise. One reasoned, rot-checked `OBJECT_FIT_OK` line is the way out and there is exactly one: a ticket ATTACHMENT's preview, where the picture is the content rather than a mark standing for a record whose name is beside it. And one clause is held directly rather than by census: `RecordMark`, which draws almost every picture in the product, may not grow a `fit` prop again — it had one, its square DEFAULT was `contain`, and a default applies to every caller who never made the choice.",
+    why: "The cost is real and was accepted knowingly, which is why the law says it out loud rather than hiding it: a wide wordmark in a small square LOSES ITS ENDS. What it was weighed against is the aggregate — a marked column where a contained logo sits smaller, paler and a different shape from the filled face beside it and the letter tile below it, grey bars down one row in three. On staging only 48 of 134 accounts hold a picture at all, so most boxes are a solid letter tile either way and the contained ones were the odd shape out rather than the norm. A law rather than six edits for R32's reason about colour and R35's about thirteen placeholders: a fit is invisible to every other check here and only visible in aggregate, and the census this was written from found NINE `object-contain` against eleven `object-cover` without one of the nine being wrong on its own screen. Nobody files that as a bug.",
+    checkId: "image-fills",
+    status: "enforced",
+  },
+  {
+    id: "R61",
+    dimension: "ui",
+    law: "A MODULE'S SETTINGS HAVE TWO DOORS AND ONE DERIVATION. The client's ruling, 2026-09-09: a settings gear on each module's own screen — *\"Only the ones with something to set\"* — and *\"somewhere in the settings, we have a tab that says 'Module' or 'Business Logic' … to find the module once\"*, because *\"everything around settings should be under settings screen concentrated (and 'quick access' through the gear in each module) but not in random places across the app.\"* Two entrances, one page, and therefore ONE question: `visibleModuleSettings` in `web/components/screens/module-settings-screen.tsx` is the only expression that decides whether a module has settings THIS reader may open, and the gear, the page itself and the Modules tab's index all ask it. THREE CLAUSES, all derived off the disk. (i) THE PAIR: every `segment` in `MODULE_SETTINGS` has exactly ONE `<ModuleSettingsGear segment=\"…\">` mounted somewhere in `web/`, and every gear mounted names a segment that table declares — a module with settings and no gear is a page nobody standing on that module can find, and a gear on a module with nothing to set renders `null` forever and is a door drawn on a wall. (ii) THE INDEX IS DERIVED: the Modules panel on `settings-screen.tsx` calls `moduleSettingsIndex` and spells NO module segment of its own, so rows cannot be hand-kept and cannot fall behind the table. (iii) ONE GATE: the settings host contains exactly one `can(` call — the one inside `visibleModuleSettings` — so the tab, the gear and the page cannot come to hold three copies of one permission. A declared segment must also be a real `MODULE_PERMISSION` key, which is both a clause (a settings page whose segment names no module is an address nothing links to) and the census's proof that it parsed words rather than noise.",
+    why: "Everything about this shape is correct today and NOTHING held it there: the pilot's own file spent nine lines explaining that the second entrance was not built yet and that whoever built it must ask the same function — an instruction to a future reader, which is the form a rule takes right up until it is ignored. The failure mode is not hypothetical, it is arithmetic: the index is the deliverable and FILLING it is later work, so the next several edits to `MODULE_SETTINGS` will each be somebody adding a module's settings page while looking at Tickets, and the gear and the row are in two different files neither of which they have to open. One of the two gets forgotten, the build stays green, and the symptom is a module you can configure from the settings tab but not from its own screen — or worse, the other way round, since a gear on a module the table does not list draws nothing at all and looks exactly like a module with no settings. A one-row index is also the worst possible moment to write this law and the best: with one module the pair is trivially in step, so the check costs nothing to satisfy and is the only thing that will still be true at eight. Clause (iii) is the one that is not about drift but about refusal — she asked for a gear that never leads to a page that turns you away, and a tab that restated the gate would have been a second place to get that wrong.",
+    checkId: "module-settings-two-doors",
+    status: "enforced",
+  },
+  {
+    id: "R62",
+    dimension: "ui",
+    law: "THE TWO ZEROS ARE ONE REGISTER, AND THE ADD BUTTON IS THE ONLY DIFFERENCE. A collection has two empty states and they are different FACTS: RESTING (it holds no rows at all — first run, and the screen exists to be filled) and FILTERED (it holds rows a search, a tab or a facet has narrowed to none — nothing is wrong, the reader asked a question with no answer). Each front door draws BOTH through ONE component — `CollectionEmptyState` (`shared/web/screen-engine/collection-frame.tsx`) on the agency door, `PortalEmpty` (`web-portal/components/portal-empty.tsx`) on the client portal — which takes a `filtered` prop, swaps the WORDS on it, and WITHDRAWS the create action on it. Everything else is drawn identically. FOUR CLAUSES, all off the disk. (i) THE SUBTRACTION IS IN THE COMPONENT, NEVER AT THE CALL SITE: each register computes its create action through `filtered ? undefined : …` and its action row renders only that withdrawn identifier, so a caller hands its create action over unconditionally and cannot forget to gate it — R50\u2019s reason for making `empty` required, one component along. (ii) AND IT IS PROVED BY RENDERING, not by reading: the register is drawn twice in a real DOM, once `filtered` and once not, and the button must be absent from the first and present in the second — every previous attempt to settle a question about this file by reading it reached a confident wrong answer. (iii) ONE FILTERED REGISTER, NOT TWO: no `.tsx` under `web/`, `web-portal/` or `shared/web/` may render the kit\u2019s `<ShapeStateBody … filtered>`, which was the second one, unless named in `SECOND_ZERO_REGISTER_OK` with a reason; rot-checked, so the list can only shrink. (iv) AND THE ENGINE ASKS THE QUESTION HONESTLY: `CollectionFrame`\u2019s `narrowed` is its own query/facets OR the `narrowedOutside` a door-searched host hands down, and it is what it passes as `filtered` — because a GROWING collection\u2019s search lives in `<PagedFind>` at the door, so the frame\u2019s own query is always empty and every door-searched zero read as a resting one. A blindness tripwire fails the build if the call-site census matches nothing.",
+    why: "The client\u2019s own words, 2026-09-09, verbatim: \u201cthe empty because of filters hosul look the same as empty collection but the add button.\u201d THEY DID NOT. The resting zero had a good shared register and the filtered one had none: a census off the disk found 113 zero-row render sites in `web/` and 17 in `web-portal/`, and while 34 of the agency ones drew `CollectionEmptyState` — a `Headline h3`, a sentence and up to two buttons — FORTY-THREE were bare grey `<p>` tags, TWELVE of them literally the same sentence, `t(\"Nothing here matches that.\")`, copy-pasted into eight files. In every one of those eight the two zeros sat in ONE component, four lines apart: the full register when the list was empty, one grey line the moment a search narrowed the same list to nothing. A reader flipped between two different-looking screens by typing one letter. Five more drew `EmptyLine` (one grey line and a concept glyph, now deleted — it had no call sites left) and four drew the kit\u2019s `ShapeStateBody`, which is a genuinely different box: `px-6 py-[var(--space-8)]` against the register\u2019s un-inset `py-[var(--space-7)]`, so the two zeros started at different x; a raw `text-2xl` span against `Headline`\u2019s step-plus-tracking; and a `text-caption`/`max-w-[40ch]` body against `Text size=\"sm\" measure`. Four differences, not one of them a decision anybody made. AND THE KIT HALF WAS SHIPPING IN ENGLISH: `ShapeStateBody`\u2019s `noResultsTitle`/`noResultsDescription` are defaults inside `shared/ui/`, which R28\u2019s walk deliberately does not enter (`resolveImport` returns null for the vendored kit), so \u201cNo records match\u201d and \u201cEvery record is filtered out\u201d were in no catalogue and translated nowhere — on every filtered zero on the agency door, in an app whose ceiling is 0/0/0 — and the engine computed the collection\u2019s own translated sentence, passed it as `emptyTitle`, and threw it away, because `filtered` reads `noResultsTitle`. THE BUTTON WAS WRONG IN BOTH DIRECTIONS. On the door-searched half — accounts, contacts, stories, processes, knowledge sources, and every nested work panel — the host handed the frame already-narrowed rows with `searchable:false`, so the frame\u2019s own query was empty, a search that matched nothing read as \u201cthis collection is empty\u201d, and it drew \u201cAdd the first\u201d over a list a term was hiding: exactly the duplicate that composition 27.22 forbids a create button in this body to stop (\u201cclearing filters is a retreat\u201d). The fix cannot be a forty-fourth call-site patch and is not one: the FACT is a prop, the LOOK is not the call site\u2019s to choose, and the subtraction happens in the one component — which is R50\u2019s own lesson about `empty`, read one layer down. `title` and `description` are read only at rest for the same reason: \u201cNo accounts yet.\u201d is a claim about the collection and it is plainly untrue while somebody is searching it.",
+    checkId: "one-zero-register",
+    status: "enforced",
+  },
 ]
+
+/** R59 — A CENTRED OVERLAY (`<DialogContent>`) THAT IS NEITHER A FORM NOR A
+ * WARNING, and the reason it is allowed to stay centred.
+ *
+ * Keyed by repo-relative path. The client's line sorts a surface by what it
+ * DOES — collecting is a form and gets a drawer, asking a yes/no question about
+ * an existing thing is a warning and gets an `AlertDialog` — and a surface that
+ * only SHOWS is on neither side of it. Both entries here are that, and both are
+ * open questions for her rather than settled decisions by us.
+ *
+ * Rot-checked in both directions, so this list can only shrink: a file here that
+ * no longer mounts a centred overlay is a line nobody can justify, and a file
+ * here that GROWS form machinery is the law being smuggled around — either turns
+ * the build red. Adding a line to make a red build green is the one use of this
+ * list that is never correct; if the surface collects anything, it is a drawer. */
+export const CENTRED_DIALOG_OK: Record<string, string> = {
+  "web/components/assistant/agent-usage-dialog.tsx":
+    "A READ-ONLY USAGE PANEL — where the team's AI credits went, drawn as an ActivityFeed. It collects nothing (no field, no choice, no commit control; its only button is the kit's own close chip) and it asks nothing, so neither of the client's two buckets fits. Its sibling behind the next badge, agent-history-dialog.tsx, looks identical and IS a drawer, because every row there is a button that picks a thread — the pair is the clearest statement of where this law draws its line. Referred to the client 2026-09-09: a panel you only read may belong in the drawer with everything else, or the centre may be right for something you close without answering.",
+  "web/components/records/record-calendar.tsx":
+    "THE DAY LIST BEHIND A '+N more' CHIP — the records that did not fit in a month-grid cell, each one a link to its own screen. It is a disambiguation step for a click that has already happened, closer to a menu than to a screen: it collects nothing and asks nothing, and it is deliberately small and transient in a way a full-height drawer would contradict. Referred to the client 2026-09-09 with the usage panel above; if she rules that everything non-warning slides in, both lines go and both files move.",
+}
 
 /** R47 — MODULES THE ASSISTANT CANNOT ANSWER ABOUT AT ALL: no knowledge kind,
  * no gated read tool, and a reason why that is right rather than an oversight.
@@ -1123,9 +1176,29 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // because this lane's own `typeField` hint named the OLD screen name and
   // had to be corrected to "the Choices screen" first, R34, which put the
   // tab's own word in front of the same translator).
-  de: 244,
-  es: 244,
-  ca: 244,
+  //
+  // LOWERED 244 -> 0 in all three, 9 Sep 2026, the client's "translate them."
+  // The 244 the previous entry pinned — every extracted sentence with no
+  // seed/catalogue entry in any of de/es/ca at the time the count was fixed —
+  // is translated by hand in shared/i18n-seed.ts's own R44 pass, per the same
+  // 8 Sep 2026 ruling: translation is the builder's own job and never spends
+  // the owner's key. Read alongside the extraction that ran in the same
+  // change: the true count moved during the pass (peer lanes append to this
+  // seed file continuously), so the number actually answered is not a fixed
+  // 244 read off a snapshot but whatever `npm run lang` plus a fresh
+  // `coverage()` walk reported true and empty immediately before this pin was
+  // written — verified zero, not assumed zero. Two classes of entry inside
+  // that pass are not new prose: several split an existing joined
+  // title+description sentence into the two separate `t(...)` calls the
+  // screen now makes (the wording carried over unchanged from the joined
+  // entry, per the precedent already in this file for "No waves yet."), and
+  // "Regular" filled a scale-option label whose sibling "Compact"/"Large"
+  // happened to already be answered because those two English words are
+  // shared verbatim with `shared/scale.ts`'s own Compact/Comfortable/Large
+  // set. Nothing was left in English on purpose; nothing was deferred.
+  de: 0,
+  es: 0,
+  ca: 0,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
@@ -1272,6 +1345,11 @@ export const TRANSLATED_WHERE_READ: Record<
     via: ["t(o.label)"],
     why: "VALUE_SORTS, the same reasoning again — Choices' own Value/Group sort vocabulary, translated where `<SortControl>` reads it (`VALUE_SORTS.map((o) => ({ ...o, label: t(o.label) }))`) rather than at the module-level constant.",
   },
+  "web/components/screens/module-settings-screen.tsx": {
+    kinds: ["property"],
+    via: ["t(page.title)", "t(section.title)"],
+    why: "MODULE_SETTINGS — the same shape as every copy table above, and the reason it is one is the client's own ruling of 2026-09-09 (*\"a lot of them are specific to the module\"*): a module's settings page is DATA, so that the second module is an entry in a list rather than a screen somebody writes. A page's `title`/`description` and each section's sit beside the `segment` the URL is built from and the `types` the vocabulary is keyed on, which are names of data and are never translated — so the words cannot be split off into a `t(...)` at the constant without splitting the row that holds them, and `t` is a hook a module-level table could not call anyway. Every one of the four is read through `t` on the way to the screen (`t(page.title)`, `t(page.description)`, `t(section.title)`, `t(section.description)`), and the gear reads the page title through `t` a second time for its own tooltip and accessible name.",
+  },
   "web/components/work/tasks-screen.tsx": {
     kinds: ["field-label", "property"],
     via: ["translateFields(columns, t)", "t(tab.label)"],
@@ -1281,6 +1359,11 @@ export const TRANSLATED_WHERE_READ: Record<
     kinds: ["field-label"],
     via: ["translateFields(ALL_COLUMNS, t)"],
     why: "the meetings All view, host-composed for the same reason and translated through the same one call.",
+  },
+  "web/components/accounts/contacts-screen.tsx": {
+    kinds: ["field-label"],
+    via: ["translateFields(CONTACT_COLUMNS, t)"],
+    why: "the contacts table's three column headings — Contact, Account, Role — the client's own 2026-09-09 ruling (\"for contacts lets do view table, also add column role after account\"). Same shape as the meetings All view one line up and the same single read: the columns are the HOST's, spread onto the recipe AFTER `resolveRecipe` has translated it, so `translateRecipe` never sees them and `translateFields` at the point they are spread in is the one place they can ask. Declared at module level because a `TableColumn` array is a constant and `t` is a hook.",
   },
   "web/components/knowledge/google-connections.tsx": {
     kinds: ["property"],
@@ -1613,7 +1696,7 @@ export const TOOLBAR_CONTENT_GAP_EXEMPT: Record<string, string> = {}
  * can hold several. */
 export const TWO_READS_ONE_DOOR: Record<string, string> = {
   "web/components/meetings/meetings-screen.tsx::MeetingsScreen::listFetch.meetings":
-    "the month and the WEEK are two questions, not one asked twice — `meetingsKey(teamId)` is the collection and `meetingsKey(teamId, weekView)` is the strip above it, which narrows to a week the door itself resolves. Deriving the week client-side would mean the strip could only ever show what page one happened to contain.",
+    "three questions, not one asked three times — `meetingsKey(teamId)` is the collection, `meetingsKey(teamId, weekView)` is the strip above it, and `meetingsKey(teamId, \"mine\")` is the tab for the ones this reader was in the room for. Each narrowing is one the DOOR resolves and the browser cannot: the week, because the list is ordered by start time descending and page one is the furthest-out future, so deriving it client-side would show only what page one happened to contain; and Mine, because \"I was in the room\" is read off the stored guest list with a fenced creator fallback, which no filter over the rows in hand can reproduce.",
   "web/components/process/process-detail.tsx::ProcessDetailScreen::tenancy.processDetail":
     "four reads of one door because a process map can be COMPARED with itself: the current version, a named older version, the map as it stood on a date, and the one being diffed against. Three of the four are null-keyed unless a comparison is open, so an ordinary open costs one. They are four different records that happen to share a door.",
   "web/components/work/work-logs-panel.tsx::WorkLogsPanel::contentApi.workLogs":
@@ -1632,6 +1715,24 @@ export const EMPTY_TOOLBAR_EXEMPT: Record<string, string> = {
   "web/components/tickets/tickets-collection.tsx":
     "TriageQueue's <ToolbarRow> carries `empty={false}` — reached only past two earlier returns (`!view.yours`, `view.waiting.length === 0`), so the queue is guaranteed non-empty by the time this row renders; the literal records that guarantee rather than hides it.",
 }
+
+/** R62, clause (iii) — THE FILES THAT MAY STILL DRAW A SECOND FILTERED-ZERO
+ * REGISTER, and the reason each does.
+ *
+ * The law is that a collection’s two empty states are ONE component with the
+ * fact as a prop. The kit’s `<ShapeStateBody … filtered>` was the other one,
+ * and it is what the agency door drew for every filtered zero until 2026-09-09
+ * — a different box (`px-6 py-[var(--space-8)]` against the register’s
+ * un-inset `py-[var(--space-7)]`, a raw `text-2xl` span against `Headline`, a
+ * `text-caption`/40ch body against `Text size="sm" measure`) whose words were
+ * kit defaults outside R28’s walk and therefore untranslated everywhere.
+ *
+ * EMPTY ON PURPOSE, AND THAT IS THE POINT. `ShapeStateBody` is still the app’s
+ * LOADING and ERROR body and stays imported for those — this list is only about
+ * its `filtered` register. A screen that genuinely needs a second one writes the
+ * reason here where a reviewer reads it; rot-checked, so an entry whose file no
+ * longer draws one turns the build red and the list can only shrink. */
+export const SECOND_ZERO_REGISTER_OK: Record<string, string> = {}
 
 /** R53, clause (ii) — THE COMPONENTS THAT MAY BUILD A `<SortControl>` OR A
  * `<ViewSwitch>`, and the reason each owns one.
@@ -1680,6 +1781,8 @@ export const TOOLBAR_CONTROL_OWNERS: Record<string, string> = {
  * list is worse than dead — it is wrong. Rot-checked in both directions: an
  * entry whose component now passes `sort` fails the build. */
 export const TOOLBAR_SORT_EXEMPT: Record<string, string> = {
+  "web/components/team/members-gallery.tsx#MembersGallery":
+    "A GALLERY OF THE PEOPLE ON THE TEAM, and the client named its toolbar slot by slot on 2026-09-09: search, a Role filter, Invites, and the plus. There is no order to offer that anybody would ask for. The wall carries four facts — a round mark, the full name, the role chip and the email — and three of them order the same way (a person's name IS the row, an email sorts by the same name in a worse spelling, and a role is the FILTER one slot along, not a second control asking the same question). The one field that would genuinely sequence a team, the date somebody joined, is deliberately not on the card: the row this replaced spent a whole line on \"<role> · joined <date>\" and \"this takes too much space\" is the correction that produced the gallery. A sort picker offering a single option over a bounded, alphabetical wall of nine cards is a control that answers nothing.",
   "web/components/work/tasks-screen.tsx#TasksScreen":
     "THE CALENDAR TAB, and this is the screen from the client's own screenshot. Its bespoke row sits above `RecordCalendar`, a month grid: the day a task falls on IS its order, and there is nothing else a square could be put in sequence by — the same sentence meetings-screen.tsx already writes for its own calendar view (\"a calendar square does not order, the day it falls on does\"). The other five tabs draw through `RecordTable` → the kit's `CollectionFrame`, where every column header orders the whole bounded list, so a picker above them would be a second control for one question.",
   "web/components/apps/stakeholders-panel.tsx#StakeholdersPanel":
@@ -2607,13 +2710,17 @@ export const TAB_COUNT_EXCEPTIONS: Record<string, string> = {
 export const RECORD_TAB_COUNT_EXCEPTIONS: Record<string, string> = {
   // Engine-recipe details (web/lib/screens.ts) — a `description` block is the
   // record's own fields, so there is no collection to count.
-  "team.detail.overview": "the team's own metadata (created, created by, last updated) — one record, not a collection.",
   "members.detail.overview": "one member's role, joined date and email — one record, not a collection.",
   "invites.detail.overview": "one invite's role, status and dates — one record, not a collection.",
   // Bespoke details (host-composed) — the panel is the record itself.
-  "role-detail.permissions":
-    "the permission matrix is a fixed grid of the app's modules × four rights — app furniture that ships with the code, not a team collection that grows.",
-  "role-detail.overview": "one role's description, member count and audit block — one record, not a collection.",
+  //
+  // `team.detail.overview` AND THE TWO `role-detail` LINES LEFT THIS MAP ON
+  // 2026-09-09, and the reason is the same for all three: the tabs are gone
+  // because the SCREENS are. The client's ruling deleted the team overview
+  // outright ("This overview about the team should not even exist") and folded
+  // every role's permission sheet onto one matrix in Settings › Team, so a role
+  // no longer opens a page with tabs to badge. web/lib/pages.ts and
+  // web/components/team/roles-matrix.tsx carry the whole of it.
   "selectable-detail.overview":
     "one dropdown value's own fields — its group, its word, whether it is active, whether it is one of the defaults, and the four enrichments (emoji, German label, description, standard days). One record, not a collection. It is the R2 MINIMUM on purpose: a dropdown value has no collection hanging off it at all, so Overview + Activity is the whole record and the second tab is the only one that can carry a number.",
   "help-detail.overview": "one ticket's type, source and audit block — one record, not a collection.",
@@ -3047,7 +3154,7 @@ export const COMPOSITION_EXEMPT: Record<string, string> = {
   "states/empty-collection.tsx":
     "REALIZED, in substance — not a direct import. The composition's own `emptyBody` register (Headline + Text + up to two Buttons, no dashed placeholder) is a real seam now, `CollectionEmptyState` in `shared/web/screen-engine/collection-frame.tsx`, drawn by BOTH of the engine's genuinely-empty branches (kit-panel and legacy) and reused verbatim by every hand-rolled nested collection this app has (work-panels.tsx and its dozen siblings) — one register, not a fourth reinvention of 'a bare grey line'. 2026-09-01: it used to stop at an icon-only mango with no sentence and no second action, which is the client's own 'very wrong' screenshot; it now carries composition 27.21's exact two-button register — 'Add the first' (the one carved-out labelled mango) beside 'Import a list', the second only where a call site actually has a real import target for that record type. The rest of the composition (a figure strip of zero-reading stats, per-tab zero-badges) is still not adopted: `CollectionConfig` has no 'figures' or per-tab zero-badge concept, and inventing either is separate, unscoped scope.",
   "states/new-empty-record.tsx":
-    "MISMATCH. There is no standalone screen to replace: every record-detail file (`role-detail.tsx`, `sprint-detail.tsx`, `story-detail.tsx`, and others) hand-rolls its own empty-copy into its own `CollectionFrame`/`ShapeStateBody` call. A real equivalent exists, just scattered across as many files as there are record types — not a gap, a different shape.",
+    "MISMATCH. There is no standalone screen to replace: every record-detail file (`sprint-detail.tsx`, `story-detail.tsx`, `help-detail.tsx`, and others) hand-rolls its own empty-copy into its own `CollectionFrame`/`ShapeStateBody` call. A real equivalent exists, just scattered across as many files as there are record types — not a gap, a different shape.",
   "states/no-results.tsx":
     "MISMATCH, a real but non-urgent one. The composition's register states the exact total count, the single narrowest-excluding facet, and a live would-show-if-cleared number for that one facet — genuinely richer than this app's plain sentence, but the middle claim requires the engine to answer a question it has never had to (re-running row selection per candidate facet, with real unresolved edge cases: ties, a facet excluding every row alone, a search term interacting with a facet). This app's existing 'Clear filters' button already works, so the plain sentence is not a dead end — plain-and-correct beats rich-and-speculative until a dedicated pass builds and tests the computation against real filtered data.",
   "templates/collection-screen.tsx":

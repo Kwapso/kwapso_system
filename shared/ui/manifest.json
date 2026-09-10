@@ -398,7 +398,22 @@
       "file": "components/article-body/article-body.tsx",
       "exports": [
         "ArticleBody"
-      ]
+      ],
+      "props": {
+        "size": [
+          "default",
+          "lead",
+          "compact"
+        ],
+        "measure": [
+          "true",
+          "false"
+        ],
+        "quote": [
+          "pull",
+          "passage"
+        ]
+      }
     },
     "aspect-ratio": {
       "file": "components/aspect-ratio/aspect-ratio.tsx",
@@ -886,6 +901,14 @@
         "DialogTitle",
         "DialogTrigger"
       ],
+      "props": {
+        "presentation": [
+          "overlay",
+          "responsive",
+          "sheet",
+          "fullscreen"
+        ]
+      },
       "states": [
         "default",
         "hover",
@@ -4039,7 +4062,8 @@
       "item": "A non-editorial quote register on ArticleBody",
       "reason": "ArticleBody draws every `blockquote` as ruling 13's pull-quote — SerrifCondensed at the h3 step on --tracking-serif, 24px, `my-[var(--space-8)]`, \"one per page\" by editorial rule — and there is no second register and no way to opt out: the treatment is unconditional descendant CSS on the root, and ArticleBodyProps carries no variant for it. The kit's law-book does not rule on quotes at all: `blockquote` appears in none of docs/RULES.md, PATTERN.md, BUILD-A-COMPONENT.md, BUILD-A-SCREEN.md or TOKENS.md, and the only other component that draws one (typography's `Headline as=\"blockquote\"`) is documented as the same pull-quote. THE CASE THAT HAS NO ANSWER: a quoted reply inside a ticket or a meeting note — several per page, none of them editorial. `notes.tsx` names \"a quoted reply\" as a fully-composed row a call site supplies, which is the kit's model for a THREAD; it does not cover a quote a person typed mid-prose inside one body, which is what a consuming app receives when its editor emits HTML.",
       "recommendation": "A second register on ArticleBody, selected by a prop, for a quote that is a QUOTED PASSAGE rather than an editorial pull-quote — sans, body step, quiet ink, marked by a rule rather than by the serif — with the editorial rule kept as the default so nothing that draws a pull-quote today changes. Which of the two is the default, and what the non-editorial one looks like, is a design decision and is why this is logged rather than guessed (BUILD-A-COMPONENT: \"A logged gap is fine. A guess that looks like law is not.\"). The kwapso app is holding a one-line app-side override against this entry and deletes it the day the register ships.",
-      "severity": "known-limitation"
+      "resolution": "DELIVERED 2026-09-07 as `ArticleBody quote=\"pull\" | \"passage\"`, built as the recommendation was written: `passage` is sans at the body step in `--ink-tertiary` (5.899 light / 7.928 dark on the darkest paper prose meets, against 4.5), marked by a 2px rule at the inline start in that same ink, drawn as an inset shadow (`shadow-[inset_0.125rem_0_0_currentColor]` — a CSS border is a finding under the boundary law added in v1.2.70, and an inset shadow is one of the three remedies it names; the shape is `comments.tsx`'s inline-start rule at 2px in the ink. Neither law reads this mark: the border was behind an arbitrary variant and invisible to `borders.mjs`, and `check-contrast.mjs` declines it either way because the colour is `currentColor`, so `verify/article-quote` measures the computed box-shadow in the browser instead) — NOT `--hair-strong`, which measures 1.526 / 2.185 against a 3:1 floor for a mark that carries meaning and has, on a quote, no letter to mitigate it. `pull` is chapter 13's pull-quote unchanged and stays the default, so nothing that drew a quote before draws differently now. The which-is-default question the entry left open is answered the conservative way — the editorial register stays — and the entry is closed rather than the default re-decided, which would be a change to every existing quote. Drawn side by side in verify/article-quote; the app-side override this entry names can be deleted the day the tag is pulled.",
+      "severity": "resolved"
     },
     {
       "item": "A chip row that mixes the toolbar pill's type step with CH11's",

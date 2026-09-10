@@ -18,6 +18,18 @@
    Everything else this file needed is logged in GAPS-G.md (IMG-1 … IMG-5).
 
    THE LAW THIS FILE OBEYS
+   · THE PICTURE FILLS THE BOX. `fit` defaults to `cover`, and that default is
+     the client's ruling of 2026-09-09 — *"everywhere for images: do fill, not
+     fit!"*, with a wide asset losing its ends named as the intended
+     consequence. It was already the default before the ruling arrived, so
+     nothing here moved on the day; what changed is that the default stopped
+     being this file's preference and became `RULES.md` §4.4, checked by the
+     `images` law. Anyone who "tidies" it to `contain` will now be told.
+     `contain` REMAINS ON OFFER, and deliberately: the ruling is about what a
+     picture does when nobody says otherwise, and §9.1 forbids dropping a
+     variant value in any case. It is the only `contain` left in this
+     repository, and it carries the one rot-checked entry in
+     `foundations/rules/exemptions.json` that says so out loud.
    · A media box takes `--radius` (24). Not the pill, not the mark radius.
      There is no `shape` prop, because a second radius here would be a fifth
      radius in the system.
@@ -67,11 +79,20 @@ const imageVariants = cva(
   ],
   {
     variants: {
-      /** How the picture fills the frame. Both are `object-fit`, not a crop. */
+      /** How the picture meets the frame. Both are `object-fit`. */
       fit: {
-        /** Fills the box, trimming the overflow. The default for a well. */
+        /**
+         * Fills the box and trims the overflow. THE DEFAULT, and RULES.md
+         * §4.4 — a picture is the same shape as the box that holds it, and
+         * a logo losing its ends is the ruling rather than a defect.
+         */
         cover: "",
-        /** Fits inside the box, letterboxed on the quiet ground. */
+        /**
+         * Fits inside the box, letterboxed on the quiet ground. OPT-IN ONLY,
+         * for the picture whose whole point is that you see all of it — a
+         * document page, a diagram, an uploaded file being previewed before
+         * it is accepted. Never a default, and never a mark.
+         */
         contain: "",
       },
     },

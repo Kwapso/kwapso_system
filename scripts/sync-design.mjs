@@ -51,7 +51,30 @@ import { fileURLToPath } from "node:url"
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const TARGET = join(ROOT, "shared", "ui")
-const REPO = "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git"
+/* TWO URLS, TRIED IN ORDER, BECAUSE BOTH OPERATORS ARE RIGHT ABOUT THEIR OWN
+ * MACHINE — 9 Sep 2026, after this line was changed and changed back.
+ *
+ * The identity URL forces git to look up a credential filed under
+ * `alaap-kwapso`. On the machine that has one, that is the only URL that
+ * works: the plain URL lets the DEFAULT credential answer, that account cannot
+ * see the repository, and the clone returns `Repository not found` — a 404
+ * that reads like a deleted repo.
+ *
+ * On a machine WITHOUT that entry the same URL is the failure: git falls
+ * through to an interactive password prompt, and on a path with no terminal
+ * that is `could not read Password … Device not configured`. The plain URL
+ * works there, because the default credential CAN see the repository.
+ *
+ * So the fault was never the username; it is which credential the machine has
+ * filed. One line cannot be right for both, and it was reverted once in each
+ * direction. Trying them in order is: the identity first, because where it
+ * works it is the only thing that does, and the plain URL second. Whichever
+ * answers, answers — and the failure message names both so the next person
+ * does not change the line a third time. */
+const REPOS = [
+  "https://alaap-kwapso@github.com/Kwapso/kwapso-ui-ux.git",
+  "https://github.com/Kwapso/kwapso-ui-ux.git",
+]
 
 /** The kit's deliverable surface. demo/, verify/, mini-app/ and the GAPS
  * paper trail stay upstream — they are the workshop, not the product. */
@@ -110,7 +133,29 @@ const main = async () => {
   const tmp = mkdtempSync(join(tmpdir(), "kwapso-design-"))
   try {
     console.log(`sync-design: cloning Kwapso/kwapso-ui-ux at ${tag} …`)
-    execSync(`git clone --quiet --depth 1 --branch ${tag} ${REPO} ${tmp}/kit`, { stdio: "inherit" })
+    // GIT_TERMINAL_PROMPT=0 turns a hung password prompt into a fast failure,
+    // which is what makes trying the second URL possible at all.
+    const failures = []
+    let cloned = false
+    for (const repo of REPOS) {
+      try {
+        execSync(`git clone --quiet --depth 1 --branch ${tag} ${repo} ${tmp}/kit`, {
+          stdio: ["ignore", "ignore", "pipe"],
+          env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        })
+        cloned = true
+        break
+      } catch (err) {
+        failures.push(`  ${repo}\n    ${String(err.stderr ?? err.message).trim().split("\n")[0]}`)
+      }
+    }
+    if (!cloned)
+      throw new Error(
+        `sync-design: neither remote answered for ${tag}.\n${failures.join("\n")}\n` +
+          "  Both URLs are tried on purpose — see the note beside REPOS. If the\n" +
+          "  identity URL prompts, file the `alaap-kwapso` credential; if the plain\n" +
+          "  one 404s, your default account cannot see the repository."
+      )
     const sha = execSync(`git -C ${tmp}/kit rev-parse HEAD`).toString().trim()
 
     for (const entry of DELIVERED)

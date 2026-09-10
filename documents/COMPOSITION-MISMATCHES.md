@@ -939,7 +939,7 @@ item.
 
 **`states/new-empty-record.tsx` (`NewEmptyRecordScreen`)** has no standalone
 screen to replace at all — every record-detail file
-(`role-detail.tsx`, `sprint-detail.tsx`, `story-detail.tsx`,
+(`sprint-detail.tsx`, `story-detail.tsx`, `help-detail.tsx`,
 `app-detail.tsx`, `meeting-detail.tsx`, `task-detail.tsx`,
 `selectable-detail.tsx`, `knowledge-detail.tsx`, and others) hand-rolls its
 own `copy={{ emptyTitle: … }}` into its own `CollectionFrame`/

@@ -39,7 +39,7 @@ import { ApiFailure } from "@/lib/api"
 import { PRIORITY_LABEL, departmentAsks, departmentGlyph, priorityScore } from "@shared/departments"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
-import type { PickableRecord } from "@/lib/pickable"
+import { accountOption, type PickableRecord } from "@/lib/pickable"
 import type { PickablePerson } from "@/lib/members"
 import { FormShellDialog, fieldSpacing } from "@shared/web/form-shell"
 import { richTextValue } from "@shared/web/rich-text"
@@ -285,7 +285,7 @@ export function TaskFormDialog({
         <Field
           config={{
             ...defaultFieldConfig,
-            label: "Client",
+            label: "Account",
             required: asks.required,
             helpText: asks.required ? "" : "Optional. Leave it off for our own housekeeping.",
           }}
@@ -300,9 +300,9 @@ export function TaskFormDialog({
             onChange={(v) => setValues((s) => ({ ...s, accountId: v === NONE ? "" : v }))}
             search={(term) => searchAccounts(term)}
             searchKey={pickerKey("accounts", teamId)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name, picture: a.logoUrl }))}
-            emptyOption={{ value: NONE, label: t("Which client is it for?") }}
-            placeholder={t("Which client is it for?")}
+            options={accounts.map(accountOption)}
+            emptyOption={{ value: NONE, label: t("Which account is it for?") }}
+            placeholder={t("Which account is it for?")}
             searchPlaceholder={t("Search accounts…")}
             emptyText={t("No account matched.")}
             disabled={busy}

@@ -26,7 +26,6 @@ import {
 import { type ScreenQuery, type ScreenRecipe, type ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { AccountDetailScreen } from "@/components/accounts/account-detail"
-import { RoleDetailScreen } from "@/components/team/role-detail"
 import { KnowledgeDetailScreen } from "@/components/knowledge/knowledge-detail"
 import { HelpDetailScreen } from "@/components/tickets/help-detail"
 import { ProcessDetailScreen } from "@/components/process/process-detail"
@@ -44,6 +43,7 @@ import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bit
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { invalidate } from "@shared/web/store"
+import { softNavigate } from "@/lib/nav"
 import type { TaskView } from "@/lib/live-resources"
 import {
   shapeActivity,
@@ -51,7 +51,6 @@ import {
   shapeInviteDetail,
   shapeMemberDetail,
   shapePurposeDetail,
-  shapeTeamDetail,
 } from "@/components/deep-link/shape"
 import { ActivityRail } from "@/components/records/activity-rail"
 import type { ActivityItem } from "@shared/types"
@@ -220,7 +219,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     can,
     go,
     overridesQ,
-    metaQ,
+
     membersQ,
     invitesQ,
     activityQ,
@@ -228,8 +227,6 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     activityKey,
     activityFetchPage,
     inviteAuditQ,
-    teamName,
-    active,
     rights,
     onAction,
     onIntent,
@@ -338,41 +335,23 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // is the shape Law R24 is about (internal-rate-card.tsx says why).
     if (module === "internal-rates") return <InternalRateCardScreen teamId={teamId as string} />
 
-    // Team overview ----------------------------------------------------------
-    if (module === "team") {
-      const base = resolveRecipe("team.detail", overridesQ.data, t)
-      if (!base) return <NotFound />
-      if (metaQ.data === undefined) return <Skeleton variant="list" lines={3} />
-      // R8's seam, still applied: it badges whatever collection tab this recipe
-      // declares, derived from each tab's own block rather than from a list of
-      // keys. `activity` is in the totals map because the host knows that total
-      // — the team feed's exact server COUNT(*) — and it is what the slide-in
-      // off the footer's Latest activity column will show. It badges no tab
-      // today: the Activity TAB went on the client's 2026-09-06 ruling (see
-      // web/components/records/activity-panel.tsx), so this recipe is one description
-      // block and the seam is a no-op over it.
-      const recipe = withTabCounts(base, { activity: activityTotal })
-      const data = shapeTeamDetail({
-        teamId: teamId as string,
-        name: teamName,
-        logoUrl: active.ctx?.team?.logoUrl ?? null,
-        meta: metaQ.data,
-        activity: activityQ.data ?? [],
-        lang,
-      })
-      return (
-        <div className="flex flex-col gap-4">
-          <ScreenRenderer
-            recipe={recipe}
-            data={data}
-            rights={rights}
-            onAction={onAction}
-            onIntent={onIntent}
-            activityAction={scopeRail}
-          />
-        </div>
-      )
-    }
+    // THE TEAM OVERVIEW, WHICH NO LONGER EXISTS -----------------------------
+    //
+    // CLIENT RULING, 2026-09-09: "This overview about the team should not even
+    // exist. Only in the settings, under the tab, it should not move from
+    // there." The screen it used to draw — `team.detail`, one description block
+    // of Created / Created by / Last updated with an Edit action — is deleted,
+    // along with its recipe (web/lib/screens.ts) and its shaper
+    // (web/components/deep-link/shape.tsx). web/lib/pages.ts carries the whole
+    // decision where the section used to be declared.
+    //
+    // THE ADDRESS SURVIVES THE SCREEN. `/t/<teamId>` is somebody's bookmark, the
+    // base every crumb in this shell is built from, and the destination two
+    // agent traces still name; deleting the screen without answering for the
+    // address would turn all four into a blank panel. So it MOVES, through the
+    // one soft-navigation bus (R37) — no document is thrown away, the shell
+    // stays mounted, and the reader lands on the tab that now holds the team.
+    if (module === "team") return <MovedToTeamTab />
 
     // Lists — the collection half, next door. Same ctx bundle, so the seam
     // costs nothing to cross; what it buys is two files you can hold in your
@@ -460,9 +439,18 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
         />
       )
     }
-    if (module === "roles") {
-      return <RoleDetailScreen teamId={teamId as string} roleId={recordId} />
-    }
+    // A ROLE NO LONGER OPENS ITS OWN PAGE — CLIENT RULING, 2026-09-09: "I want
+    // to see the roles much differently… a matrix in which we see all the roles
+    // as rows and the properties as columns. All the roles together, I want to
+    // have an overview." The per-role screen (`role-detail.tsx`, one role's
+    // permission grid on a record screen with two tabs) is deleted; every role's
+    // sheet is one grid on Settings › Team now
+    // (web/components/team/roles-matrix.tsx), and a cell there is where a right
+    // is changed. The ADDRESS still resolves and lands on that grid, for the
+    // same reason `/t/<teamId>` does — see `MovedToTeamTab` at the foot of this
+    // file. The roles LIST is untouched: its rows open the matrix instead of a
+    // page, which is the same destination the client asked for.
+    if (module === "roles") return <MovedToTeamTab />
     if (module === "knowledge") {
       return <KnowledgeDetailScreen teamId={teamId as string} sourceId={recordId} />
     }
@@ -577,4 +565,23 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       })
     }
     return <NotFound />
+}
+
+/** WHERE `/t/<teamId>` AND `/t/<teamId>/roles/<id>` GO NOW — see the two
+ * branches above for the rulings behind each.
+ *
+ * A soft navigation and not a `<Redirect>` or a `router.replace`: this whole
+ * post-auth app is ONE shell that mounts once, and the one bus every in-app move
+ * goes through is `softNavigate` (R37). Done in an effect rather than during
+ * render, because navigating while rendering is a state update inside another
+ * component's render pass, and React is right to shout about it.
+ *
+ * It draws the ordinary loading skeleton for the frame or two it lives: a
+ * sentence saying "this moved" would be a screen, and the whole point is that
+ * there is no screen here any more. */
+function MovedToTeamTab() {
+  React.useEffect(() => {
+    softNavigate("/settings?tab=team")
+  }, [])
+  return <Skeleton variant="list" lines={3} />
 }

@@ -423,7 +423,7 @@ export function StepFormDialog({
           </Select>
         ) : (
           <p className="text-muted-foreground text-sm">
-            {t("File this map under a client and their roles can be named here.")}
+            {t("File this map under an account and their roles can be named here.")}
           </p>
         )}
       </Field>
@@ -465,7 +465,7 @@ export function StepFormDialog({
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            {t("File this map under a client and their tools can be named here.")}
+            {t("File this map under an account and their tools can be named here.")}
           </p>
         )}
       </Field>

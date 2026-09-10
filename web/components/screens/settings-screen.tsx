@@ -15,6 +15,44 @@
 //   • THE TEAMS LIST is hidden rather than removed — shared/product.ts explains
 //     at length why nothing underneath it was touched.
 //
+// A FIFTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a fifth section.
+// The client, the same day she asked for the gear on each module's own screen:
+// *"somewhere in the settings, we have a tab that says 'Module' or 'Business
+// Logic' (or whatever you define as a good word) to find the module once"*, and
+// the reason, in the sentence that governs this whole screen: *"everything
+// around settings should be under settings screen concentrated (and 'quick
+// access' through the gear in each module) but not in random places across the
+// app."* So a module's settings have exactly two doors and they are the same
+// door: the gear is the shortcut from where you are standing, this tab is the
+// place you go when you do not know where that is. Both open
+// `/settings/<segment>`, and the rows below are DERIVED from the same
+// `visibleModuleSettings` the gear asks (through `moduleSettingsIndex`), so the
+// two cannot drift into disagreeing about which modules have settings or who
+// may see them. R61 (`module-settings-two-doors`) turns that into a law.
+//
+// THE WORD IS "MODULES" because this screen already uses it: the roles matrix
+// one tab to the left has one COLUMN per module, off `TEAM_MODULES`. Two tabs
+// apart, the same noun, the same set of things. "Business Logic" — her other
+// suggestion — would have been a second name for that same set, on the same
+// screen, which is the kind of drift the rest of this file's header is a record
+// of undoing.
+//
+// PLACED FIFTH, IMMEDIATELY BEFORE CHOICES, and nothing above it moved. Two
+// reasons and they agree. Modules is the tab Choices is eventually folded INTO
+// — *"the choices: yes, this would survive, but not as a general thing, but
+// inside each module"* — so the two live next to each other until that move is
+// scoped and reviewed, and the move is then a deletion rather than a
+// re-ordering. And Appearance stays first because a tab strip with nothing
+// remembered opens on the tab to the left (her rule, 2026-09-06), and the tab
+// somebody lands on by default should not be the rarest one.
+//
+// NOT ABSORBING CHOICES YET, deliberately. She wants it eventually; it is a
+// larger move (the general Choices editor holds every group in the team, most
+// of which belong to no module that has a settings page today), and the pilot
+// this tab indexes is still being reviewed. Doing both at once would put a
+// reorganisation of the team's whole vocabulary inside the change that adds a
+// list of one row.
+//
 // REBUILT INTO FOUR TABS, 2026-09-01 — the flat one-page-with-headings shape
 // above gave way to a real tab strip once the design kit's own Settings
 // composition (shared/ui/compositions/screens/settings.tsx, ch26.05) named
@@ -66,12 +104,9 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Button } from "@shared/ui/components/button/button"
 import { Headline } from "@shared/ui/components/typography/typography"
-import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { List } from "@shared/web/list-compat"
 import { CaretRight } from "@shared/ui/foundations/icons"
-import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { AccessTokensSection } from "@/components/team/access-tokens"
 import { GoogleConnectionsSection } from "@/components/knowledge/google-connections"
@@ -91,11 +126,10 @@ import { useRemembered } from "@shared/web/remembered"
 
 import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
-import { ScreenRenderer, type ScreenIntent } from "@shared/web/screen-engine/screen-renderer"
-import type { ScreenRights } from "@shared/web/screen-engine/recipe"
-import { NoAccess, SectionWithCreate } from "@/components/deep-link/screen-bits"
-import { shapeMembersList, shapeRolesList } from "@/components/deep-link/shape"
-import { resolveRecipe, withDataDrivenCollection } from "@/lib/screens"
+import { NoAccess } from "@/components/deep-link/screen-bits"
+import { MembersGallery } from "@/components/team/members-gallery"
+import { moduleSettingsIndex } from "@/components/screens/module-settings-screen"
+import { RolesMatrix } from "@/components/team/roles-matrix"
 import { useScreenData } from "@/lib/use-screen-data"
 import { SelectableScreen } from "@/components/choices/selectable-screen"
 
@@ -110,12 +144,11 @@ export function SettingsScreen({
    * explicit link always wins over whatever tab a previous visit remembered. */
   initialTab?: string
 }) {
-  const { t, lang } = useLanguage()
+  const { t } = useLanguage()
   const { ctx } = active
   const pendingInvites = useReceivedInvites().data ?? []
   const teamId = ctx?.team?.id ?? null
-  const { can, perms } = usePermissions(teamId)
-  const rights: ScreenRights = perms ?? {}
+  const { can } = usePermissions(teamId)
 
   // Remembered with the screen (web/lib/nav-memory.ts) — reopening Settings
   // lands back on whichever tab was open, unless the URL names one.
@@ -123,15 +156,19 @@ export function SettingsScreen({
     initialTab ? initialTab : typeof remembered === "string" ? remembered : undefined
   )
 
-  // MEMBERS + MEMBER ROLES — the SAME recipes, shapers and ScreenRenderer the
-  // team area's own /t/<teamId>/members and /roles routes draw through (see
-  // collection-content.tsx's "members"/"roles" branches), reused rather than
-  // rebuilt so the lists are genuinely unchanged, just mounted from this
-  // second call site. `useScreenData` loads members only "on its own module"
-  // (its own doc), which `module: "members"` turns on; roles and the recipe
-  // overrides load across the whole team area regardless, so this one call
-  // is enough for both sections below.
-  const { membersQ, rolesQ, overridesQ } = useScreenData({
+  // MEMBERS + ROLES — ONE READ, TWO CONTAINERS. `useScreenData` loads members
+  // only "on its own module" (its own doc), which `module: "members"` turns on;
+  // roles load across the whole team area regardless, so this one call feeds
+  // both containers below and neither of them opens a door of its own for
+  // something the tab has already fetched (R56).
+  //
+  // IT USED TO FEED TWO `ScreenRenderer`s — the same recipes the team area's own
+  // /t/<teamId>/members and /roles routes draw through, mounted a second time
+  // here. Both are gone. A recipe list draws ROWS that OPEN A RECORD, and
+  // opening a record is exactly what the client told us to stop doing on this
+  // tab: "Everything should be in different containers… not taken anywhere
+  // else" (2026-09-09). The two containers below are what she approved instead.
+  const { membersQ, rolesQ } = useScreenData({
     teamId,
     enabled: !!teamId,
     module: "members",
@@ -139,50 +176,35 @@ export function SettingsScreen({
     ancestorModules: [],
   })
   const roles = rolesQ.data ?? []
-  const membersData = membersQ.data ? shapeMembersList(membersQ.data, lang) : null
-  const membersRecipeBase = resolveRecipe("members.list", overridesQ.data, t)
-  const membersRecipe =
-    membersData && membersRecipeBase
-      ? withDataDrivenCollection(membersRecipeBase, membersData.rows ?? [])
-      : null
-  const rolesData = shapeRolesList(roles)
-  const rolesRecipeBase = resolveRecipe("roles.list", overridesQ.data, t)
-  const rolesRecipe = rolesRecipeBase
-    ? withDataDrivenCollection(rolesRecipeBase, rolesData.rows ?? [])
-    : null
+  const members = membersQ.data ?? []
 
-  // Neither list recipe declares a row ACTION (`actions: []` on both —
-  // "mutating actions live on the detail"), so this is never actually called;
-  // ScreenRenderer requires the prop regardless.
-  function onAction() {
-    // no-op — see above.
-  }
-
-  // The one intent a plain list fires: opening a row. Both lists' rows carry
-  // the record's OWN address, the same one the team area's own strip opens
-  // (`/t/<teamId>/members/<id>`, `/t/<teamId>/roles/<id>`) — so "manage"
-  // (change a role, remove a member, edit a permission grid) still happens
-  // exactly where it always has, on the record's own detail screen.
-  function onIntent(intent: ScreenIntent) {
-    if (intent.kind === "open" && teamId) softNavigate(`/t/${teamId}/${intent.module}/${intent.id}`)
-  }
-
-  // THE TEAM'S OWN ADMIN NOT GIVEN A TAB OF ITS OWN — Invites (the team's own
-  // sent invites) and Internal rates. Members, Member roles and Choices each
-  // moved to a real tab; DERIVED rather than hand-listed for the same reason
-  // this list always was: a section added to the registry appears here the
-  // day it is added. Overview is left out because it is the team record
-  // itself rather than a setting.
+  // THE TEAM'S OWN ADMIN NOT GIVEN A CONTAINER OF ITS OWN — Internal rates, and
+  // whatever the registry gains next. DERIVED rather than hand-listed for the
+  // reason this list always was: a section added to the registry appears here
+  // the day it is added.
+  //
+  // THREE KEYS ARE SUBTRACTED AND EACH ONE FOR ITS OWN REASON. `members` and
+  // `roles` are the two containers on this tab. `invites` LEFT THIS LIST on
+  // 2026-09-09 — "the invites, make it secondary button on the toolbar" — so it
+  // is a button in the members toolbar now rather than a row that navigates.
+  // `overview` is not subtracted here any more because it no longer exists at
+  // all: the team-overview screen was deleted the same day ("This overview
+  // about the team should not even exist"), and web/lib/pages.ts carries the
+  // whole of that decision.
   const adminSections = TEAM_SECTIONS.filter(
     (s) =>
       s.placement === "tab" &&
-      !["overview", "members", "roles"].includes(s.key) &&
+      !["members", "roles", "invites"].includes(s.key) &&
       can(s.module, "read")
   )
 
+  // SWITCH TO A TEAM AND LAND ON ITS OWN PAGE. It used to land on `/t/<teamId>`
+  // — the team overview, deleted on 2026-09-09 — so it lands on the agency's own
+  // Details page instead, which titles itself with the team you just switched
+  // to and is therefore the one screen that PROVES the switch happened.
   async function openTeam(teamId: string) {
     if (teamId !== ctx?.team?.id) await active.switchTeam(teamId)
-    softNavigate(`/t/${teamId}`)
+    softNavigate("/kwapso")
   }
 
   if (!ctx) return null
@@ -191,8 +213,22 @@ export function SettingsScreen({
     ...RECORD_TABS_CONFIG,
     tabs: [
       { value: "appearance", label: t("Appearance"), icon: "palette", badge: "", badgeVariant: "" as const },
-      { value: "members", label: t("Members & roles"), icon: "users-three", badge: "", badgeVariant: "" as const },
+      // "This whole tab under settings, just call it Team." (client,
+      // 2026-09-09). The VALUE moved with the word — a tab whose id says
+      // `members` and whose label says Team is the next reader's wrong guess,
+      // and `?tab=` links to it are ours (settings-screen is the only writer),
+      // so there is nothing outside this file to keep in step.
+      { value: "team", label: t("Team"), icon: "users-three", badge: "", badgeVariant: "" as const },
       { value: "integrations", label: t("Integrations"), icon: "key", badge: "", badgeVariant: "" as const },
+      // THE INDEX (client, 2026-09-09) — see this file's header for the word,
+      // the position and why Choices is not folded in yet. The glyph is NOT a
+      // choice made here: `modules` is already a key in `TAB_ICONS`
+      // (shared/web/screen-engine/tabs-view.tsx, drawn as `cube` for a tool
+      // record's own Modules tab), and that table WINS over anything a call
+      // site passes. Spelled out anyway so the two agree on the page rather
+      // than by accident — the same word draws the same glyph everywhere,
+      // which is the whole reason that table exists.
+      { value: "modules", label: t("Modules"), icon: "cube", badge: "", badgeVariant: "" as const },
       { value: "choices", label: t("Choices"), icon: "git-commit", badge: "", badgeVariant: "" as const },
     ],
   }
@@ -264,99 +300,53 @@ export function SettingsScreen({
             )
           }
 
-          if (panel.value === "members") {
+          if (panel.value === "team") {
             return (
               <div className="flex flex-col gap-8">
-                {/* MEMBERS — read-only here in the sense that a member is
-                    never CREATED directly (they arrive by accepting an
-                    invite); change-role and remove both live on the row's
-                    own detail screen, exactly as they do at
-                    /t/<teamId>/members. */}
-                <section className="flex flex-col gap-3">
-                  <Headline as="h2" size="h4">{t("Members")}</Headline>
-                  {!can("team_members", "read") ? (
-                    <NoAccess />
-                  ) : membersQ.error ? (
-                    <ShapeStateBody
-                      shape="recordChrome"
-                      state="error"
-                      copy={{ errorTitle: t("Couldn't load members.") }}
-                      action={
-                        <Button variant="secondary" onClick={() => membersQ.refresh()}>
-                          {t("Try again")}
-                        </Button>
-                      }
-                    />
-                  ) : !membersData || !membersRecipe ? (
-                    <Skeleton variant="list" lines={4} />
-                  ) : (
-                    <ScreenRenderer
-                      recipe={membersRecipe}
-                      data={membersData}
-                      rights={rights}
-                      onAction={onAction}
-                      onIntent={onIntent}
-                      useKitPanel
-                    />
-                  )}
-                </section>
+                {/* TWO CONTAINERS ON ONE TAB, AND NOTHING NAVIGATES — the
+                    client's own instruction, 2026-09-09: "Everything should be
+                    in different containers, like the different sections and
+                    member roles on this single page, not taken anywhere else."
 
-                {/* MEMBER ROLES — same New/Import/Export row the team area's
-                    own Roles tab draws; New and Import both open the real
-                    /t/<teamId>/roles screen with its own dialog already open,
-                    since that dialog machinery lives on the team-scoped
-                    route and Settings has no address to hand it a panel of
-                    its own. */}
-                <section className="flex flex-col gap-3">
-                  <Headline as="h2" size="h4">{t("Member roles")}</Headline>
-                  {!can("member_roles", "read") ? (
-                    <NoAccess />
-                  ) : rolesQ.error ? (
-                    <ShapeStateBody
-                      shape="recordChrome"
-                      state="error"
-                      copy={{ errorTitle: t("Couldn't load roles.") }}
-                      action={
-                        <Button variant="secondary" onClick={() => rolesQ.refresh()}>
-                          {t("Try again")}
-                        </Button>
-                      }
-                    />
-                  ) : !rolesRecipe ? (
-                    <Skeleton variant="list" lines={4} />
-                  ) : (
-                    <SectionWithCreate
-                      show={can("member_roles", "create")}
-                      label={t("New role")}
-                      icon="plus"
-                      secondary={{
-                        show: can("member_roles", "create"),
-                        label: t("Import CSV"),
-                        onClick: () => teamId && softNavigate(`/t/${teamId}/import/member_roles`),
-                      }}
-                      download={{
-                        show: roles.length > 0,
-                        label: t("Export CSV"),
-                        href: "/api/tenancy/roles/export",
-                      }}
-                      onCreate={() => teamId && softNavigate(`/t/${teamId}/roles?panel=add&module=roles`)}
-                      useKitPanel
-                    >
-                      <ScreenRenderer
-                        recipe={rolesRecipe}
-                        data={rolesData}
-                        rights={rights}
-                        onAction={onAction}
-                        onIntent={onIntent}
-                        useKitPanel
-                      />
-                    </SectionWithCreate>
-                  )}
-                </section>
+                    MEMBERS FIRST, because inviting somebody is what this tab is
+                    for and the tab's one mango lives in that container's
+                    toolbar. ROLES SECOND, as a matrix of every role at once —
+                    "All the roles together, I want to have an overview" — with
+                    a QUIET New role button, because the kit rules one mango per
+                    view and she ruled on the exception herself: "No exceptions
+                    to the rules. It was my mistake."
+
+                    Each container owns its own reads past the two this screen
+                    already made, its own toolbar and its own dialogs; this
+                    panel is the arrangement and nothing else. */}
+                {!can("team_members", "read") ? (
+                  <NoAccess />
+                ) : (
+                  <MembersGallery
+                    teamId={teamId ?? ""}
+                    members={members}
+                    membersLoading={membersQ.data === undefined && !membersQ.error}
+                    membersError={membersQ.error}
+                    onRetryMembers={() => membersQ.refresh()}
+                    roles={roles}
+                    canInvite={can("team_members", "create")}
+                  />
+                )}
+
+                {!can("member_roles", "read") ? (
+                  <NoAccess />
+                ) : teamId ? (
+                  <RolesMatrix
+                    teamId={teamId}
+                    roles={roles}
+                    rolesLoading={rolesQ.data === undefined && !rolesQ.error}
+                    canCreate={can("member_roles", "create")}
+                  />
+                ) : null}
 
                 {/* WHAT ELSE IS ON THIS TEAM'S OWN ADMIN — see the note on
-                    `adminSections` above for why Invites and Internal rates
-                    are still plain links rather than sections of their own. */}
+                    `adminSections` above for which keys are subtracted and why
+                    each one is. */}
                 {teamId && adminSections.length > 0 && (
                   <section className="flex flex-col gap-3">
                     <Headline as="h2" size="h4">{t("This team")}</Headline>
@@ -418,6 +408,85 @@ export function SettingsScreen({
                  * connects to their own account, and both hand something the
                  * power to act as them. */}
                 <GoogleConnectionsSection teamId={ctx.team?.id ?? null} />
+              </div>
+            )
+          }
+
+          if (panel.value === "modules") {
+            // THE INDEX. One row per module that has something to set FOR THIS
+            // READER, derived — never listed. `moduleSettingsIndex` is
+            // `MODULE_SETTINGS` put through the same `visibleModuleSettings`
+            // the gear on each module's own screen asks, so the row and the
+            // gear appear and disappear together, including on permissions:
+            // somebody who may see tickets but not the team's vocabulary gets
+            // neither. Nothing about `selectable_data` is spelled out here on
+            // purpose — a second copy of the gate is how two doors start
+            // disagreeing (R61 holds this to one expression).
+            const modules = moduleSettingsIndex(can)
+
+            // NOTHING TO SHOW AND NOTHING TO EXPLAIN. The same answer the
+            // Choices tab gives a reader it refuses, and for the same reason —
+            // "no module has settings you may change" and "no module has
+            // settings" are not worth telling apart on screen, and telling them
+            // apart would disclose which modules this team has configured.
+            if (modules.length === 0) return <NoAccess />
+
+            return (
+              <div className="flex flex-col gap-4">
+                {/* THE SENTENCE THAT MAKES ONE ROW READ AS FINISHED. Today
+                    Tickets is the only module with anything to set, so this list
+                    has exactly one row — correct, and it would look like a bug
+                    without a line saying what the list is FOR. It says three
+                    things and each is load-bearing: the list holds the modules
+                    with something to set (so a short list is the answer, not a
+                    truncation), a row is the same page as that module's gear (so
+                    a reader who found it the other way is not looking at a
+                    second copy), and a module with nothing to set is absent (her
+                    own ruling, *"Only the ones with something to set"*, said out
+                    loud rather than left to be inferred from a gap). */}
+                <p className="text-muted-foreground text-sm">
+                  {t(
+                    "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed."
+                  )}
+                </p>
+
+                {/* THE SAME LIST TREATMENT "This team" TAKES one tab to the
+                    left — `surface="none"` on the named panel ground, the kit's
+                    one rectangular radius, a caret to say the row goes
+                    somewhere. Two indexes on one screen that looked different
+                    would be two ideas; they are one.
+
+                    A ROW IS A CLICK AND NOT AN ANCHOR, which the gear IS
+                    (`InAppLink`, so it can be middle-clicked and copied). That
+                    is a real difference and it is the list component's, not a
+                    decision taken here: the kit's `List` exposes `onRowSelect`
+                    and has no href for a row. Written down rather than quietly
+                    accepted — the fix is an href on the kit's row, upstream, and
+                    it would improve every list in the app at once. */}
+                <List
+                  surface="none"
+                  className="rounded-[var(--radius)] bg-surface-panel"
+                  onItemClick={(item) => softNavigate(`/settings/${item.id}`)}
+                  items={modules.map(({ page, sections }) => ({
+                    id: page.segment,
+                    // THE PAGE'S OWN NAME, so all three doors say the same
+                    // words: this row, the gear's tooltip and accessible name,
+                    // and the `<h1>` you land on. A row whose label is the
+                    // module and whose destination is titled something else is
+                    // the smallest possible way to make one page feel like two.
+                    title: t(page.title),
+                    // WHAT IS ACTUALLY CONFIGURABLE THERE, in the words the
+                    // page's own section headings use — "Ticket types · Ticket
+                    // statuses" rather than a repeat of the module's name. Off
+                    // the FILTERED sections, so the line never advertises a
+                    // block this reader will not be shown. The separator is
+                    // punctuation and not a sentence, so it is not a catalogue
+                    // string; each name is one, and each is already translated
+                    // where MODULE_SETTINGS declares it.
+                    subtitle: sections.map((s) => t(s.title)).join(" · "),
+                    trailing: <CaretRight className="text-muted-foreground size-4" />,
+                  }))}
+                />
               </div>
             )
           }

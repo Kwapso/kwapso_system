@@ -82,7 +82,7 @@ function monthOrNone(raw: string | null): string | undefined {
  * door PAGES by key — the opaque cursor comes straight back from the previous
  * response. */
 export async function getMeetings(request: Request, env: Env): Promise<Response> {
-  const { cfg, guard } = await gated(request, env, "meetings", "read")
+  const { actor, cfg, guard } = await gated(request, env, "meetings", "read")
   await refusePortalCaller(cfg, guard)
   const url = new URL(request.url)
   const id = queryText(url.searchParams.get("id"), "Id")
@@ -95,7 +95,19 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
       nextCursor: null,
     })
   }
-  const filter = filterFrom(url)
+  // WHO IS ASKING, ATTACHED HERE AND NOWHERE ELSE. `view=mine` is answered
+  // against the SESSION — `guard.userId` and `actor.email`, the same identity
+  // `ourStaffAmong` resolves an attendee address to — never against a word on
+  // the query string. `filterFrom` above parses the wire; this line is the one
+  // fact the wire may not carry, which is why it is spread on afterwards rather
+  // than folded into that function (lib/meetings.ts's `caller` says why at
+  // length). It rides EVERY read, not only the mine one, because `whereFor`
+  // reads it only when the view asks for it and a conditional here would be a
+  // second place for the two to disagree.
+  const filter: MeetingFilter = {
+    ...filterFrom(url),
+    caller: { userId: guard.userId, email: actor.email },
+  }
   const [page, total, weekTotal] = await Promise.all([
     listMeetings(
       cfg,
@@ -121,6 +133,16 @@ export async function getMeetings(request: Request, env: Env): Promise<Response>
     // week is worked out on the server, so the badge and the rows under it can
     // never mean two different weeks.
     countMeetings(cfg, guard, { ...filter, view: "week" }),
+    // THERE IS NO `mineTotal` HERE, AND THAT IS A COST DECISION rather than an
+    // omission (client ruling, 2026-09-09 — the strip is now This week · Mine ·
+    // All). The week's count is a range scan on `idx_meetings_when`; the mine
+    // count is a LIKE over a JSON blob and therefore a FULL SCAN (lib/meetings.ts
+    // says why at length). Riding it on every meetings response would put that
+    // scan on every page of every list, every Load more and every search — for a
+    // badge one tab away. The Mine tab reads its OWN slice instead and the
+    // `total` on that response IS the badge, which is the strictest reading of
+    // R16 available: the door counted the same question it listed, in the same
+    // statement pair, from the same `whereFor`.
   ])
   return pagedJson("meetings", { ...page, total }, { weekTotal })
 }

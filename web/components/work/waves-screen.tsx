@@ -210,7 +210,7 @@ export function waveTimelineWindow(
     }
     laneBars.forEach((bars, i) => {
       if (bars.length === 0) return
-      lanes.push({ id: `${head.accountId}:${i}`, label: head.accountName ?? t("No client"), bars })
+      lanes.push({ id: `${head.accountId}:${i}`, label: head.accountName ?? t("No account"), bars })
     })
   }
 
@@ -459,7 +459,11 @@ export function WaveCollection({
           />
         ) : rows.length === 0 ? (
           asking ? (
-            <p className="text-muted-foreground py-4 text-sm">{t("No waves match that.")}</p>
+            /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON (client,
+               2026-09-09). A bare grey line beside the full register one branch
+               down; one body now, and "Sell a wave" is withdrawn by the
+               component while a search is narrowing the list. */
+            <CollectionEmptyState filtered title={t("No waves yet.")} />
           ) : (
             // GENUINELY EMPTY — R50's own carve-out (composition 27.21): the
             // toolbar above is gone, so this is the only "Sell a wave" left
@@ -470,7 +474,7 @@ export function WaveCollection({
             <CollectionEmptyState
               title={t("No waves yet.")}
               description={t(
-                "A wave is a package of sprints a client bought — sell it first, plan the sprints inside it afterwards."
+                "A wave is a package of sprints an account bought — sell it first, plan the sprints inside it afterwards."
               )}
               onCreate={canCreate && clients.length > 0 ? () => setAddOpen(true) : undefined}
             />

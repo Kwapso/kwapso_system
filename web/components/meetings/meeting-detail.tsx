@@ -597,7 +597,7 @@ export function MeetingDetailScreen({
                 // so a sentence blaming Google would be wrong half the time.
                 emptyTitle={t("Nothing is filed against this call yet.")}
                 emptyDescription={t(
-                  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The client, the system and the reason we met show here too, once they are set."
+                  "Emails, chat logs and transcripts join a call when Google says which event they belong to. The account, the system and the reason we met show here too, once they are set."
                 )}
                 refusedText={t("This meeting doesn't have a map to draw.")}
               />
@@ -785,7 +785,13 @@ export function MeetingDetailScreen({
         onOpenChange={setEditing}
         draftKey={`meeting:edit:${meetingId}`}
         teamId={teamId}
-        accountOptions={(accountsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
+        // THE WHOLE ROW, NOT A COPY OF TWO OF ITS FIELDS. `PickableRecord`
+        // (web/lib/pickable.ts) is deliberately the loosest shape that carries a
+        // face, and an `Account` structurally satisfies it — so the `.map((a) =>
+        // ({ id, name }))` that used to sit here was the exact line that type
+        // exists to end, dropping `logoUrl` one hop before the picker that draws
+        // it. Client ruling, 2026-09-09: accounts wear their icon in selects.
+        accountOptions={(accountsQ.data ?? []).filter((a) => a.active)}
         appOptions={(appsQ.data ?? []).filter((a) => a.active).map((a) => ({ id: a.id, name: a.name }))}
         purposeOptions={(purposesQ.data ?? []).filter((p) => p.active).map((p) => ({ id: p.id, name: p.name }))}
         initial={{

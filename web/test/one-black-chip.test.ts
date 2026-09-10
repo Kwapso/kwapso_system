@@ -107,27 +107,36 @@ const INVERSE_BADGE_OK: Record<string, string> = {
  * stories leaving the words of the work behind) landed ABOVE these lines in
  * five files. The reasons are unchanged — only the addresses are. */
 const REF_AS_STRING_OK: Record<string, string> = {
-  "web/lib/picker-sources.ts:70":
+  "web/lib/picker-sources.ts:77":
     "`PickerOption.label` is typed `string` (web/components/records/record-picker.tsx) " +
     "— the picker draws the record's FACE from `picture`/`mark`/`swatch` and " +
     "its name from this one field. A ticket option leads with its number " +
-    "because that is what somebody types to find it.",
-  "web/lib/picker-sources.ts:89": "same slot, a story option — see the ticket one above.",
+    "because that is what somebody types to find it. (Re-pinned :70 -> :77 on " +
+    "9 Sep 2026: `searchAccounts` above it grew the argument for routing an " +
+    "account option through the one `accountOption` seam — R60's sibling ruling, " +
+    "that an account wears its icon in every select and filter.)",
+  "web/lib/picker-sources.ts:96":
+    "same slot, a story option — see the ticket one above, whose note carries the " +
+    "same 9 Sep 2026 re-pin (:89 -> :96).",
   "web/components/work/stories-screen.tsx:154":
     "the ticket picker on the story form, building the same `PickerOption.label` " +
     "the two lines in picker-sources.ts build.",
-  "web/components/tickets/help-detail.tsx:964":
+  "web/components/tickets/help-detail.tsx:966":
     "`WorkLogsPanel.recordLabel` is typed `string` — it names the record a time " +
     "entry is being logged against, inside sentences and a dialog title, not on " +
     "a row of its own. (Re-pinned from :931 to :945 on 7 Sep 2026 when the " +
     "activity rail landed above this line, and to :909 later the same day when " +
     "the `awaiting_validation` retirement took the confirm button and the " +
-    "`run` helper it was the last caller of out of this file.)",
-  "web/components/tickets/help-detail.tsx:1107":
+    "`run` helper it was the last caller of out of this file. Re-pinned :964 -> " +
+    ":966 on 9 Sep 2026: the `activityHead` prop's comment grew when the stage " +
+    "ladder left the activity rail for the record itself.)",
+  "web/components/tickets/help-detail.tsx:1177":
     "`fixedTicket.label` on the story form dialog — the same `PickerOption` " +
     "string slot as picker-sources.ts, for the ticket the form is pinned to. " +
     "(Re-pinned from :1074 to :1088 and then to :1052 on 7 Sep 2026, both times " +
-    "riding the same edits as :909 above.)",
+    "riding the same edits as :909 above. Re-pinned :1107 -> :1177 on 9 Sep " +
+    "2026: the stage ladder and the argument for where it goes landed at the " +
+    "top of the Conversation panel, above this line.)",
   "web/components/work/story-detail.tsx:445":
     "`WorkLogsPanel.recordLabel` again, for a story — see help-detail.tsx:931.",
   "web/components/work/sprints-screen.tsx:523":

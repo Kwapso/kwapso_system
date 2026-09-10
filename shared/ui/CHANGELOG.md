@@ -2,6 +2,822 @@
 
 ## Unreleased
 
+### Changed — the grid turns rather than being handed its axes backwards, and the column that names a row stops scrolling away
+
+Two things came back from the consuming application on the day it shipped a
+roles matrix built out of `PermissionMatrix`, and they are one story: **it drew
+the grid transposed, and every row-shaped thing in the component was then on
+the wrong axis.** `rights` was the first one somebody counted. It was not the
+only one, and that is why the answer is not another prop for `rights`.
+
+**THE TRANSPOSE, AND WHY IT WAS ALLOWED.** The app's Team tab draws its four
+roles down the side and its twenty-two modules across the top — the client's
+own approved shape, *"a matrix in which we see all the roles as rows and the
+properties as columns"*. `PermissionMatrix` draws CH27.12's: collections down
+the side, roles across. So the app handed its roles to `modules` and its
+modules to `roles`, which the props permitted because their own doc strings
+said "one row" and "one column" and nothing in the file said which noun was
+load-bearing. Everything worked. Then v1.2.72 added `PermissionModule.rights`
+— *"an unoffered box stops pretending to be a switch"* — and it could not be
+used at all.
+
+**`rights` IS ON THE COLLECTION AND THE COLLECTION HAD BECOME THE COLUMN.**
+Whether `teams` has a delete door is constant DOWN that column and varies
+ACROSS it; a row-shaped prop is constant across the row and varies down it. The
+two never coincide. **The app measured what that costs and the number is
+exact: eight of its twenty-two modules restrict their rights, so FIFTEEN of the
+eighty-eight boxes in every role's band still look like switches and decide
+nothing** — R36's defect, the one that prop was written to remove, surviving a
+single rotation of the drawing.
+
+**THE SHAPE THAT WAS REFUSED, AND WHY IT IS THE SMALLER DIFF AND THE WORSE
+ANSWER.** `rights` on `PermissionRole` as well was the other suggestion. Three
+reasons against, each sufficient on its own:
+
+- **It invents a product rule nobody has ruled.** On a collection, `rights`
+  means "this collection has no delete door". On a ROLE it would have to mean
+  "this role may never be given delete anywhere" — a cap on a role, a second
+  concept wearing the first one's word. The client named four actions and ruled
+  that all sixteen subsets are legal; they have never been asked about a role
+  that cannot be given one. A kit that ships that prop has legislated past its
+  own rulebook.
+- **It needs an intersection rule the moment both are set**, and there is no
+  right answer to invent: a grid whose row offers `see` and whose column offers
+  `edit` draws either nothing or something, and either way this file would be
+  deciding a product's policy inside a `&&`.
+- **It fixes one of several.** `description` is a collection's quiet line and
+  has nowhere to go in a column head; the lock's mark sits on a row and names
+  the roles it locked, which transposed must name MODULES; the narrow render
+  draws one card per collection; the width floor counts roles. Answering
+  `rights` alone leaves a grid that is right in one cell and wrong in five
+  places around it.
+
+**SO THE AXES BECAME A PROP AND THE DATA STAYED WHERE IT BELONGS.**
+`PermissionMatrix` grows `orientation`, defaulting to `"modules-as-rows"` —
+CH27.12's own, and every grid drawn before today is unchanged to the pixel.
+`"roles-as-rows"` turns it. **Nothing moves in the data:** `held`, `rights` and
+`locked` stay on `PermissionModule`, because whether a collection has a delete
+door is a fact about the collection and the drawing turning is not a fact about
+anything. A caller stops passing its roles as `modules`, and the one thing it
+has to know is which way round the grid is drawn, which is a thing it can see.
+
+What turns, and what deliberately does not:
+
+- **the row** carries the name, the quiet line and the lock's mark at either
+  orientation. `PermissionRole` grows `description` for that reason and no
+  other — the symmetric half, absent by default, so a transposed grid is a
+  whole drawing rather than one missing the line its rows can carry;
+- **the lock's mark names the other axis.** Locking is still stated per role
+  inside a module, so a locked cell is the same cell either way; the mark sits
+  on whichever entity is the row and names the other one when only some are
+  locked. Measured in the browser: drawn the kit's way the `capacity` row reads
+  *"Capacity — Locked by policy: Manager"*, and turned, the same data reads
+  *"Manager — Locked by policy: Capacity"*. `formatLockedLabel` is unchanged;
+- **the cell's sentence does not rotate.** `formatCellLabel` is still
+  `(collection, role, held, locked, notOffered)` and the default still reads
+  *"Admin · Capacity: See, Create, Edit, Delete"* — byte-identical at both
+  orientations, verified. A screen reader is not scrolling anything, and a
+  sentence that reordered itself with the drawing would make one cell announce
+  two ways in two apps;
+- **the narrow render follows the rows.** CH27.12 says *"one card per
+  collection with its roles listed inside"*; turned, that is one card per role
+  with its collections inside — the same instruction read on the axis the
+  caller chose, not a second layout;
+- **the width floor counts columns.** It always meant columns; it said "roles"
+  because until today the two were the same word.
+
+**AND THE OTHER HALF THE SAME TRANSPOSE EXPOSED: `Table` HAD A STICKY HEADER
+AND NO STICKY COLUMN.** Twenty-two columns overflow, the grid scrolls inside
+its own container — correctly, and it is why the page never scrolls sideways —
+and the column that says WHICH row this is goes with it. Scrolled to the end
+the reader sees four bands of `S C E D` with no idea which one is Admin.
+
+**IT IS THE KIT'S, NOT THE APP'S, AND THE ARGUMENT IS ONE SENTENCE:** this is a
+table that can overflow, whichever way round it is used, and `TableHeader
+sticky` has answered exactly this question on the block axis since it was
+written. There was simply no inline twin. The app could only have fixed it by
+writing `position: sticky`, a ground, a z-order, an inline-start inset and
+three row washes into a `className` on the kit's own cells — a kit bug wearing
+an app's diff (§13, and the client's *"the kit is the only UI input"*).
+
+**`TableHead` and `TableCell` grow `sticky`.** One prop on the two cells that
+need it; `Table` learns nothing and the sixteen call sites that do not want it
+are untouched. `PermissionMatrix` spends `stickyNames` and `stickyGround` on
+them and draws nothing of its own.
+
+- **THE PIN IS LOGICAL.** `start-0` is `inset-inline-start`, so the column pins
+  to the reading start and mirrors in Arabic, Urdu and Persian with no second
+  rule. `z-[1]`, not `z-10`: a sticky header is a positioned element with its
+  own stacking context, so a pinned cell inside one is already above every body
+  cell and the two numbers never have to be compared.
+- **THE PAPER IS THE CALL SITE'S, AND 1.000 IS THE RIGHT NUMBER.** A pinned
+  cell must be opaque or the scrolled cells read through it, and it must be the
+  SAME paper as the ground or it is a pale band down the side of every grid
+  that never scrolls. Everywhere else in this kit two surfaces at 1.000 is the
+  defect the contrast law hunts; here it is the point, and that law already
+  says so about a sticky strip in as many words — *"an element that names the
+  same token as its ground is a continuation, not a boundary"*. So it takes
+  `--background` and the call site swaps it, exactly as `TableHeader sticky`
+  has always asked (GAPS-D TBL-2), and `PermissionMatrix`'s `stickyGround`
+  names one of the three papers a kit table stands on rather than guessing one.
+  **`stickyNames` is OFF by default for the same reason**: a pin that guessed
+  would paint that band on every grid that never scrolls.
+- **THE ROW'S THREE WASHES ARE REPLAYED ON THE PINNED CELL.** `TableRow` paints
+  hover, selected and disabled on the `<tr>`; a cell with an opaque fill covers
+  all three, so a pinned name column would sit dead while the rest of its row
+  lit up. The three are restated on the cell in MUTUALLY EXCLUSIVE selectors —
+  disabled, then selected-and-not-disabled, then hover-and-neither — which is
+  `TableRow`'s own precedence written as CSS that cannot race. PATTERN §4
+  forbids leaning on Tailwind's emission order to break a tie; the `:not()`s
+  are what make sure there is never a tie to break.
+- **THE HOVER WASH IS A SECOND LAYER, AND THAT IS ARITHMETIC RATHER THAN
+  TASTE.** `--accent` is `rgba(26,25,24,.05)`. An alpha written as this cell's
+  `background-color` REPLACES the opaque paper instead of sitting on it, and
+  the scrolled cells come back through the ninety-five per cent that is left.
+  So the paper stays the colour layer and the wash goes on the image layer,
+  which paints above it. It composites to **#ECE7E0 light and #272623 dark —
+  the same two hexes the row's own wash makes over the same ground.** The pin
+  does not approximate the row; it repeats it.
+- **NO EDGE, and there is nowhere to draw one anyway.** Chapter 13's subtitle
+  is *"Colour separates, strokes don't"* and a pinned column is the paper
+  rather than a panel on it. It is also unbuyable: the row's hairline is an
+  inset shadow this file puts on the CELLS through `[&>*]:shadow-…`, which
+  outranks any `shadow-` a cell writes on itself, so an edge would need a
+  selector invented to beat the row.
+- **NO SCROLL PADDING FOR IT, LOGGED RATHER THAN GUESSED.** The container
+  carries `scroll-p-1` so a focus ring in an off-screen column comes fully into
+  view. Tabbing BACKWARDS to a control off-screen at the inline start still
+  brings it to the container's edge, which is under the pin. A scrollport
+  cannot measure what is pinned to it, so no number is invented; a call site
+  that knows its own name column may pass a `scroll-ps-*` through
+  `containerClassName` (§11.1).
+
+**MEASURED IN REAL CHROME, BOTH PALETTES, AT `verify/permission-turn`.** The
+transposed grid is 2559 wide in a 1190 container. Scrolled to its end the name
+cell moved **0** and a run moved **−1369**, with **56 cells passing underneath
+the pin**; with `stickyNames` dropped the name cell moved −1369 with the rest
+and nothing was underneath anything. The pinned fill reports
+`rgb(247, 242, 235)` in light and `rgb(28, 27, 24)` in dark — byte-identical to
+the ground element's own fill in both, alpha 1. Every band is **88 boxes with
+15 dashes and 73 pressable slots**, which is the application's arithmetic
+reproduced exactly; the Manager band drops to 69 pressable, which is its one
+locked collection. The pin was proved on the axis it was NOT asked for as well
+— twelve roles, the kit's own orientation, 1510 in a 1175 container, name cell
+moved 0, 88 cells underneath.
+
+Measured against the token model, light / dark: pinned paper against its own
+ground **1.000 / 1.000**; the guess — page paper on a panel ground —
+**1.103 / 1.079**, and on a card ground **1.000 / 1.198**, which is the band
+`stickyGround` exists to prevent; the selected wash on the pin against a panel
+ground **1.103 / 1.111**; the disabled wash **1.214 / 1.252**; the hover wash
+over the pin against the paper **1.103 / 1.143**; the row's name on the pinned
+paper **15.763 / 17.056** and the lock's mark **5.899 / 8.807**.
+
+**TWO PROBES, AND BOTH OF THEM FOUND SOMETHING, WHICH IS THE ONLY REASON TO
+RUN THEM.**
+
+- **The wash rules were not being emitted, and nothing looked wrong.** The
+  three replayed washes are arbitrary Tailwind variants; the classes were in
+  the DOM and the browser was painting none of them. The CSSOM probe that says
+  so returned an empty list on its first run — because it walked each sheet's
+  TOP-LEVEL rules, and Tailwind v4 emits every utility inside `@layer
+  utilities`: 134 rules seen of 1558. The probe recurses now and reports
+  exactly three matching rules, one per wash, with the declaration each one
+  makes. A check that has stopped looking prints the same green as a check that
+  passed.
+- **The contrast law cannot see a pinned cell's ground, and this is recorded
+  rather than assumed.** A probe put the wrong paper under a pinned column —
+  `bg-background` on a `--surface-raised` ground, two different names resolving
+  to one colour, 1.000 in light, the exact bug shape that law exists to catch
+  — and the run came back GREEN. Three arrangements were tried: the ground
+  inside `PermissionMatrix`, the ground on the demo's `Panel`, and the ground
+  on a bare `<div>` around the table. All green. The reason is structural: a
+  pinned cell's fill sits behind `Table` → `TableHeader` → `TableRow` →
+  `TableCell`, and the ground walker does not carry a call site's paper through
+  that many component boundaries. **The probe did fix one thing on the way** —
+  `permission-matrix.tsx`'s paper was an object literal indexed inside a
+  render, a shape the walker cannot read at all, and it is a module-level table
+  now, the `COLUMN_DOT[dot]` form the check states it reads. The blind spot is
+  written into `table.tsx` beside the numbers, which are measured off the same
+  token model the law uses.
+
+**THE SPECIMENS DRAW THE DEFECT, NOT A TIDY VERSION OF IT.** The picture law's
+own entry records specimens drawing a 32×32 square through the one slot whose
+only question was what happens to something that is not one, so: the
+`PermissionMatrix` section gains the app's grid at its real size — twenty-two
+collections, four roles, eighty-eight boxes a band, fifteen of them dashes —
+**drawn twice, once pinned and once not**, so the thing that is wrong is on the
+page beside the thing that fixes it; and a third panel draws twelve roles in
+the kit's own orientation, whose floor is 91.5rem, because a pin proved only on
+the axis that motivated it is a pin proved on half the claim. `Table` gains a
+"Pinned column" panel beside its sticky-header one, with a selected row and a
+disabled row in it so the replayed washes are visible rather than described.
+
+**WHAT A CONSUMING APPLICATION CHANGES.** `web/components/team/roles-matrix.tsx`
+stops transposing: `modules={moduleColumns}` and `roles={roleRows}` swap back
+to their own nouns, `orientation="roles-as-rows"` says which way to draw,
+`moduleLabel`/`roleLabel` name the two headings, `rights` finally goes on the
+module rows it always belonged to, and `stickyNames stickyGround="panel"` pins
+the role's name. Its `offered()` guard and the two hand-written honesty patches
+under it — filtering a held tick to the offered rights, and swallowing a press
+on an unoffered box — are deleted, because the kit does all three now. Its
+`formatCellLabel` keeps its five parameters and gets them in the kit's declared
+order at last: `(moduleLabel, roleLabel, held, locked, notOffered)`, with the
+fifth no longer arriving empty. The upstream ask written into that file's
+header — *"the kit needs the same prop on `PermissionRole` … or an
+`orientation` on the matrix itself, which is the better shape"* — is answered,
+and it is answered the way that file guessed.
+
+`npm run check` exits **0**.
+
+### Changed — a picture fills its box: the client's `"fill, not fit"`, applied where it belongs and then made a law, because the census that found the sites had already missed two
+
+The client, 2026-09-09: *"everywhere for images: do fill, not fit!"* — and she
+named the price in the same breath. **A wide logo losing its ends is the
+intended consequence, not a side effect to design around.** That sentence
+overrules `KWAPSO-SPEC.md` CH27.28's *"Portrait assets letterbox onto paper
+rather than being cropped to fill"*, which is quoted by name in four files
+here and was the stated reason for every `object-contain` in the kit.
+
+**THE COUNT THAT ARRIVED WITH THE TASK WAS WRONG, AND THAT IS THE ENTRY.** A
+grep across both repositories reported nine `object-contain` against eleven
+`object-cover`, four of the nine in this kit. It missed two, for one reason: a
+fit is not always spelled as a class.
+
+- **`components/gallery/gallery.tsx` letterboxed the entire gallery wall** —
+  written `<Image fit="contain">`, a PROP. It is the single most visible
+  picture surface either product draws and it was invisible to the count sent
+  to find it.
+- the consuming app's `attachment-preview.tsx` does the same thing the same
+  way, and was missed the same way.
+
+So the fix is not five strings. It is four components, one of which nobody
+knew about, plus a law that derives the census on every run instead of
+trusting one taken by hand on one afternoon.
+
+**THE THREE OPTION MARKS WERE DISAGREEING WITH THE KIT'S OWN RECORD MARK, AND
+THAT IS THE REAL DEFECT UNDER THE RULING.** `SelectItem`, `DropdownMenuItem`
+and `Choice` each draw a picture beside a label — ruling 30's square record
+mark, at 24, 24 and 32. All three contained. But a RECORD's mark is
+`Avatar shape="square"`, whose `AvatarImage` has covered since it was written,
+and `compositions/screens/company-hub.tsx` draws a supplied company logo
+through exactly that, under CH27.43's own sentence: *"A supplied logo is
+placed inside that square, never floated free and never allowed to set its own
+shape."* `List`'s row mark covers too. So Padelbase's logo was **cropped in
+the record and letterboxed one row down in the picker that chooses it** — one
+asset, one size, two silhouettes. All three now cover. The sizes still differ
+by row height and deliberately do; the fit no longer does.
+
+`GAPS-REVIEW1B.md` OPT-1 had this open as a question — *"the artifact draws no
+option with a picture in it"*, the mark assembled from rulings rather than
+drawn, with a **Confirm** attached. The ruling is the confirmation, and it
+went the other way from the guess.
+
+**`components/gallery/gallery.tsx` drops `fit="contain"` and passes no `fit` at
+all.** The absence is the decision: `Image` defaults to `cover`, and naming
+`fit="cover"` here would be a second copy of that default in the file least
+likely to be revisited when it moves. `fit` is not forwarded as a `Gallery`
+prop either — a wall whose tiles could each choose is the ragged wall. It is
+also the header bullet finally agreeing with itself: CH27.28's own grid
+sentence is *"the grid fills, it does not stretch — a tile never grows to
+400"*, and the whole point of `auto-fill` at a 200 minimum is that every tile
+is the same box. Identical boxes each holding a differently-shaped picture
+floating on quiet paper is a ragged wall with tidy geometry underneath.
+**What it costs is stated in the file rather than buried:** a portrait asset
+now shows its middle, and the chapter's worry about cutting a face out of the
+frame is real and is answered by the ruling, not by this note.
+
+**`components/image/image.tsx` DID NOT CHANGE A DEFAULT, BECAUSE THE DEFAULT
+WAS ALREADY RIGHT.** It has offered `fit` as a cva variant since it was
+written, defaulting to `cover`. So the ruling is about a default this file
+already had, and **not one call site in either repository re-crops** — the
+kit's own `Image` uses take the default, and of the app's five, four take it
+and one asks for `contain` explicitly. What changed is that the default
+stopped being this file's preference and became `RULES.md` §4.4, checked.
+**`contain` STAYS ON OFFER**, and that is the one `contain` kept in this
+repository: the ruling is about what a picture does when nobody says
+otherwise, and §9.1 forbids dropping a variant value in any case — an app
+pinned to an older tag would stop compiling on upgrade. It is recorded as the
+one `images` entry in `foundations/rules/exemptions.json`, with the argument
+written out, and it rot-checks against the branch itself.
+
+**`foundations/rules/images.mjs` — the fourth law in the conformance seam.**
+`docs/RULES.md` §4.4 is the prose; this is the same sentence executed, over
+the kit's own source with no arguments and over a consuming app's with paths.
+
+- **It reads four spellings**, because the hand census proved that reading one
+  is not a census: the utility (`object-contain`, `md:object-contain`,
+  `data-[state=open]:object-none`, `object-[contain]`), the `fit` prop, **a
+  component's own destructuring default `fit = "contain"`** — a component
+  quietly letterboxing for every caller who says nothing, which is worse than
+  one call site asking — and an inline `objectFit`. `fit === "contain"` is
+  excluded by a lookahead: a comparison inside `image.tsx` is the component
+  implementing the prop, not anybody choosing a value.
+- **It enumerates the SUBJECT where `borders.mjs` enumerates the exceptions,
+  and the header says why.** The boundary law cannot enumerate borders because
+  Tailwind can always grow a fourteenth spelling. `object-fit` has exactly five
+  values and a sixth would be a CSS Working Group decision. Everything else
+  under `object-*` is `object-position` — a different property, counted and
+  passed over. One such utility exists in this kit (`sign-in.tsx`'s
+  `object-[51%_50%]`) and is correctly none of this law's business.
+- **`fill` is a finding, and that is not a slip.** `object-fit: fill` stretches
+  the picture and distorts it. "Fill" is the client's own word for what she
+  wants and `fill` is not it; a law that waved it through on the strength of
+  its name would ship the one result nobody asked for. `none` and `scale-down`
+  the same.
+- **The blindness tripwire is not `borders.mjs`'s**, and the difference is the
+  point. That law can only go blind by reading no classes. This one has a
+  second and sharper way, and it is the failure that actually happened: a run
+  that **saw pictures and could not see one decision about how they fill** —
+  fits in a `.css` file this scanner does not read, or arriving through a
+  variable. Elements carrying a `src` are counted for exactly this, and a walk
+  with pictures and zero readable fits is reported BLIND, not OK.
+- **What it deliberately does not check** is in the header with its reason
+  each: whether a picture has a fit at all (an `<img>` at natural size in an
+  unsized box needs none, and there are several here — a clause demanding one
+  would put `object-cover` on every glyph-shaped `<img>` to satisfy a
+  scanner); `background-size: contain`, which is genuinely its subject, has
+  zero matches in this repository, and is named-and-unwritten the way
+  `borders.mjs` leaves `divide-*`; and which picture has a real claim to
+  letterbox, which is a judgement and therefore exemption data.
+
+**PROVEN BY BREAKING WHAT IT GUARDS, which is the only evidence a green check
+is worth.** Six probes, each run to an exit code rather than a pipe: a class
+`object-contain` (1 finding), a `fit="contain"` prop (caught where the grep
+was not), `object-fill` (caught on the trap word), an inline
+`objectFit: "scale-down"`, and `md:object-[contain]` beside
+`data-[state=open]:object-none` in one list (2 findings) — all exit 1. Then
+the tripwire: two pictures whose fit arrives through a template interpolation
+reports **BLIND**, exit 1, and goes green the moment one readable `cover`
+joins them. Then the rot check, both directions: the `image.tsx` entry over a
+root without that file reports **dead**, and the kit run with the exemption
+list emptied reports `components/image/image.tsx:261` — so the entry is
+load-bearing rather than decorative.
+
+**`docs/RULES.md` §4.4 is new prose, and §12 and §13 were corrected rather
+than appended to.** §12's table gains `images`; the adoption commands and
+`--law` list gain it. §13's classification gains the picture law to the group
+the app has no twin for — and it gains a paragraph on why, because this is the
+pattern that section exists to name: a client sentence arrived, the hand census
+sent to apply it missed two sites, the app had six live sites and no law that
+read any of them, and there was never going to be an app-side twin because the
+app's `record-mark.tsx` resolves cover-or-contain from a component's shape,
+which is an answer to the question rather than a check on it. **§13's closing
+count is also split in two, because it was ambiguous before this change and
+adding to it would have made it worse:** *"16 of 55"* is the app's laws the
+kit owns; *"five executable"* is `check-contrast.mjs` plus the four in
+`conformance.mjs`. Those are different sets and the old sentence read as one.
+
+**The specimen was drawing a square through the slot whose only question was
+what happens to something that is not one.** `demo/sections/c-d.tsx` and
+`n-s.tsx` built their option marks from a 32×32 data URI, which renders
+identically under `cover` and under `contain` — the panel could not have shown
+the defect and could not have shown the fix. A `wordmark` helper at 3:1 now
+draws one option in each of the three, so the ruling is visible: the mark
+fills its square and the ends of the word are gone. `demo/sections/f-m.tsx`'s
+`fit` panel keeps both examples and stops presenting them as peers — the cover
+example drops the redundant `fit="cover"` to show the default doing the work,
+and the labels say which is the default and which is opt-in.
+
+**Every `contain` in this repository, with its decision.** Four class sites and
+one prop site were found; four were changed, one was kept, and the kept one is
+the only `contain` left: `select.tsx`, `dropdown-menu.tsx` and `choice.tsx`
+now cover because their mark was disagreeing with the record's;
+`gallery.tsx` now covers because the ruling overrules the chapter it was
+obeying; `image.tsx`'s branch stays because it is the prop, not a picture.
+
+### Added — `PermissionModule.rights`: a collection may offer fewer capabilities than the matrix draws, and an unoffered box stops pretending to be a switch
+
+The cell has had four boxes since the client's 2026-08-24 ruling, and it drew
+four whether or not four decisions existed behind them. The switch was there
+because the GRID has four capabilities; nobody had ever asked whether the
+COLLECTION has four. The consuming application counted, and the answer was
+**fifteen of eighty-eight boxes decided nothing** — one whole collection had
+four boxes and no door behind any of them. An inert box looks exactly like a
+live one, so an owner who ticked it was told they had granted something, and
+the grid was the thing telling them.
+
+**`components/permission-matrix/permission-matrix.tsx`** —
+`PermissionModule.rights?: readonly string[]`. Absent, every capability is
+offered and every grid drawn before today is unchanged, measured rather than
+assumed. Given, it is the subset this collection offers **at all**, and the
+distance from `held` is the whole prop: `held` says whether a role HAS the
+capability, `rights` says whether the capability EXISTS here to be given.
+
+**The slot keeps its place and loses its control.** Not its place, because
+position is the one property approach A was chosen for — four collections
+drawing four, two, four and three slots would put every letter under a
+different column and there would be nothing left to read down. So an unoffered
+slot is the same 1.375rem in the same order, and what it drops is the well and
+the letter.
+
+| | offered, held | offered, not held | **not offered** |
+| --- | --- | --- | --- |
+| element | `<button role="checkbox">` | `<button role="checkbox">` | `<span aria-hidden>` |
+| fill | `--surface-inverse` | `--card` | none |
+| edge | none — the fill is the edge | `--hairline-strong` | none |
+| mark | the capability's initial | the capability's initial | `—` |
+| ink | `--ink-on-inverse` | `--ink-tertiary` | `--ink-tertiary` |
+| tab stop | yes | yes | **no** |
+| tooltip | the capability's word | the capability's word | **none** |
+
+**Why a mark and not an empty box.** Rule 5.4 says prefer nothing to a
+placeholder and never invent a dash to fill a hole — and that is about a value
+that has NOT ARRIVED, where a dash claims knowledge the component does not
+have. Here the dash IS the knowledge. The empty box cannot carry it, for a
+reason this file already had written down: a not-held slot's own edge measures
+**1.526 light / 2.185 dark**, the system's accepted failure, so an empty slot
+beside a not-held one would differ by an edge below the 3:1 floor and a reader
+could not tell "no switch" from "switch, off" — R36's defect, rebuilt inside
+the kit. The mark is `--ink-tertiary`, **5.899** on the darkest paper it meets
+in light and **7.928** in dark against 4.5, so it is legible whether or not
+the wells around it are. The glyph is the kit's own no-value em dash, the one
+the demo already draws for a value that is not there in five places, not a
+coined one; it is not a string prop because it is the same glyph in Arabic,
+Urdu and Persian, and the WORDS for the state are `notOfferedLabel`, which is.
+
+**And the lozenge breaks where the decision does not exist, which is correct.**
+Held slots fuse because a held slot drops its hairline; an unoffered slot
+between two held ones stops them fusing. Measured on Invites (`see`, `create`,
+`delete` offered, `edit` not): the run reads S·C fused, a dash, then D
+standing alone. Two adjacent decisions are one shape and two decisions with no
+decision between them are two — the silhouette is telling the truth it was
+built to tell.
+
+**It is not counted, and the disagreement is a real case.** `holds` returns
+false for an unoffered capability whatever the sheet says: a right withdrawn
+from a collection leaves rows behind it, and a capability that does not exist
+here cannot be one somebody has. Nothing is written and nothing is corrected.
+Measured on a row offering only `see` whose sheet gives the owner `edit`: with
+`rights` the cell announces **"Owner · Activity: See · Create, Edit, Delete:
+not offered"**, and with `rights` dropped the same data announces **"Owner ·
+Activity: See, Edit"**. One prop is the only variable between those two
+sentences.
+
+**Said in words, once.** The cell's accessible name names the capabilities the
+collection does not offer and the slot is `aria-hidden`, which is the rule
+`LockMark` already follows — a fact read once per cell rather than five times.
+`formatCellLabel` takes them as a **fifth parameter, not a second prop**: a
+function of four parameters is assignable to a type of five, so every existing
+formatter still compiles and still behaves, and word order stays in the
+formatter a caller already owns. On a partly-locked row both clauses land in
+order: **"Lead · Capacity: See, Locked by policy · Create, Delete: not
+offered"**.
+
+**The legend gains the third register the locked one never earned.** A legend
+turns a mark that is not words into words; the lock's mark IS words on the row
+a few millimetres away, and this one is an em dash. It is drawn only when a
+shown row actually withholds something — measured, four registers with
+`rights` and three without — and it shows the dash WHERE IT LIVES, one hole in
+a run of wells rather than a lone dash, because position is the part the
+reader has to learn.
+
+**Measured in `verify/permission-rights` with real Chrome, both palettes, 1280
+and 380.** The four slot rects in a withheld cell are **552.86 / 573.48 /
+594.11 / 614.73, all 20.63 × 20.63** — identical to the hundredth to the same
+cell with `rights` dropped, so nothing moves when a capability is withdrawn.
+An unoffered slot reports `background rgba(0,0,0,0)`, `box-shadow none`, ink
+`#5f5d59` light / `#bdb9b1` dark, and `focusable false` while its offered
+neighbour in the same run reports `focusable true`. Clicking all four slots of
+that cell through the real DOM produced exactly **one** change,
+`activity/owner/see=false` — the three dashes called nothing. The narrow
+render below 45rem draws the same four slots with the same sentence, and 380
+has no horizontal overflow.
+
+The canary is the same harness against the previous file: `rights` is not a
+prop, every slot is a well and a letter whatever the URL says, no dash appears
+anywhere, and the legend reports two registers in both modes.
+
+### Added — `CalendarView onSelectMore`: the more-line stops being a sign on a locked door
+
+GAPS-COL1 CV-3 added `formatMoreEvents` so a busy cell would SAY how many
+events it was not showing, instead of losing them silently under the chip
+column's cap. It shipped as a `<span>`. A count of hidden records that cannot
+be opened is a locked door with a sign on it: the reader is told there are
+three more and given no way to reach them, which is a worse resting state than
+the honest overflow it replaced, because it advertises the loss. The consuming
+application's answer was to fold the overflow into a fake event chip with a
+sentinel id so `onSelectEvent` would fire on it — a record that is not a record,
+invented downstream to buy a click the kit would not sell.
+
+**`components/calendar-view/calendar-view.tsx`** — `onSelectMore?: (day,
+hidden) => void`. The rule is the one the file already applies twice:
+`onSelectDay` given makes an enabled cell a real `<button>`, `onSelectEvent`
+given makes a chip one, and `onSelectMore` given makes the more-line one.
+Absent, the line is the same text it always was and not a tab stop. Read-only
+stays honest — three handlers absent is three plain elements, and no cell is
+ever drawn with the disabled skin just because nothing is listening.
+
+**It hands back the events, not the number.** `(day, events.slice(maxEvents))`,
+in the caller's own order, so the caller opens what the cell withheld without
+recounting it off a formatted string. `formatMoreEvents` keeps exactly the job
+it had — the WORDS — and what the line DOES is now a separate prop, because a
+label and a gesture are two decisions and one of them was standing in for both.
+
+**The drawing did not move, and that is a measurement.** The resting line is
+one class constant used by both elements, so a control and a caption cannot
+drift apart in a later edit. `verify/calendar-more` with real Chrome, a cell
+holding six events at `maxEvents={3}`:
+
+| | `<span>`, handler absent | `<button>`, handler given |
+| --- | --- | --- |
+| box, x · y · w · h | 225.17 · 264.94 · 146.42 · 15.19 | 225.17 · 264.94 · 146.42 · 15.19 |
+| step · ink | 11.25 · `--ink-tertiary` #5f5d59 | 11.25 · `--ink-tertiary` #5f5d59 |
+| inline inset | 7.5, the chip's own — dx 0 from the chip edge | 7.5, dx 0 |
+| text-align | start | start — a button centres, so it is told not to |
+| corner | 0 | 999 (`rounded-pill`), for the wash to have a shape |
+| cursor | auto | pointer |
+| focusable | **false** | **true** |
+
+Same rect to the hundredth in both states: the line does not shift when a
+handler arrives, and nothing above or below it reflows.
+
+**The hover is the cell's own, and it is a colour.** `--accent` — the neutral
+row and item wash this file already uses for a selectable cell and chip — over
+0.12s on `--ease-kwapso`, with the ink lifting to `--foreground` so the line
+reads as a control without borrowing a second colour. Never mango, never an
+opacity, per this component's own state 2. Measured on the cell paper:
+tertiary rests at **6.506** light / **7.928** dark, sits at **5.890** / **6.848**
+once the 5% wash is under it, and the hover ink reads **15.741** / **13.262** —
+every one over 4.5.
+
+**The click stops at the line.** Inside a pickable cell the cell is itself a
+button and the more-line sits within it, so the handler calls
+`stopPropagation`, exactly as the chip's does. Proved rather than assumed:
+with `onSelectDay` also given, clicking the line through the real DOM reported
+`received: [{ day: "sep-8", hidden: ["b4","b5","b6"] }]` and `dayPicked: []` —
+the day was not picked. Below `sm:` nothing changes: the more-line lives in the
+chip column that the phone layout already replaces with dots, so it is not
+drawn at either setting, and the 380-wide page has no horizontal overflow.
+
+The canary is the same harness against the previous file: the line is a `<span>`
+whatever the props say, the probe reports it unfocusable, and a click calls
+nothing.
+
+### Added — `ArticleBody quote="pull" | "passage"`: a quoted reply stops being a headline, and a `notDelivered` entry closes
+
+`manifest.json → notDelivered` has carried "A non-editorial quote register on
+ArticleBody" as a known limitation, and its own reasoning is the whole case:
+every `blockquote` inside the prose was drawn as ruling 13's pull-quote —
+SerrifCondensed at the h3 step, primary ink, 48 above and below, "one per
+page" — with no second register and no way to opt out, because the treatment
+was unconditional descendant CSS on the root. The kit's law-book does not rule
+on quotes at all; `blockquote` appears in none of RULES, PATTERN,
+BUILD-A-COMPONENT, BUILD-A-SCREEN or TOKENS. THE CASE THAT HAD NO ANSWER was
+a quoted reply inside a ticket or a meeting note — several per page, none of
+them editorial — which is the ORDINARY shape of user-authored prose, since an
+editor that emits HTML emits `<blockquote>` for a quote a person typed
+mid-sentence. A pull-quote is the author raising their voice; a passage is
+somebody else's words, lowered. Drawing the second as the first made every
+quoted reply a headline, and the consuming app has been holding a one-line
+override against this entry since it was logged.
+
+`components/article-body/article-body.tsx` — a third variant axis, `quote`,
+beside `size` and `measure`. `pull` is chapter 13's pull-quote and the
+DEFAULT; `passage` is the register the entry recommended, built as it was
+written: "sans, body step, quiet ink, marked by a rule rather than by the
+serif". One prop for the whole body, because the markup arrives authored and a
+component cannot mark quotes it never sees.
+
+**`pull` did not move, and that is a measurement.** The serif block left the
+shared prose list for a variant, so the class STRING changed; the computed
+style must not. `verify/article-quote` run against v1.2.64's file and this
+one, both palettes, both grounds a body lands on: family, size, leading,
+tracking, ink, margins and the gap actually drawn above each quote — identical
+on all eight `pull` rows. SerrifCondensed 22.5 / 28.125 / −0.1125, the
+primary ink, 45 above and below (24 / 48 at the 15px root). And in the
+previous build the `passage` columns came back equal to `pull` — the old
+component ignoring the prop — which is what proves the prop is the only
+variable.
+
+**What `passage` is, read off the screen rather than the class list:**
+
+| | `pull` | `passage` | the paragraph beside it |
+| --- | --- | --- | --- |
+| family · size · leading | SerrifCondensed · 22.5 · 28.125 | Saans · 15 · 21.75 | Saans · 15 · 21.75 |
+| tracking | −0.1125 | normal | normal |
+| ink, light / dark | `--foreground` | `--ink-tertiary` #5f5d59 / #bdb9b1 | `--ink-secondary` |
+| mark | none | 2px rule at the inline start, in the quote's own ink | — |
+| inset after the mark | 0 | 18.75 (the list's 20) | — |
+| space above · below | 45 · 45, its own | 13.125 · 0 — the flow's own 14, nothing of its own | 13.125 |
+
+`sameTypeAsParagraph` and `ruleIsInk` are true on all eight `passage` rows.
+The variant writes NO family, NO step and NO margin: the register is the
+absence of the serif, and the flow's `[&>*+*]` is what spaces it, so three
+quoted replies in one body read as three paragraphs somebody else wrote.
+
+**The ink is tertiary and the rule is that ink — decided by measurement, not
+taste.** "Quiet" on this ladder is one tier under the body's secondary, and
+`--ink-tertiary` is legible where a passage lands: off tokens.css, against the
+darkest paper prose meets in each palette, **5.899** on `--surface-panel` in
+light and **7.928** on `--card` in dark, against 4.5 (6.506 / 9.500 on the
+page tone). The natural reach for the mark is `--hair-strong`, the section
+rule's tone — and it measures **1.526 light / 2.185 dark** against a 3:1
+floor for a mark that carries meaning: the "system's accepted failure"
+`permission-matrix.tsx` records and mitigates with a letter in every slot. A
+quote has no letter. The rule IS the register's whole signal, so it takes the
+ink and measures what the ink measures; `currentColor`, so the two cannot
+drift. 2 is one of the two widths that live off the scale as grid lines
+(RULES §1.2), and the inset after it is the list's drawn 20, so a quote and a
+list share one left edge.
+
+> **Corrected on the way in, 2026-09-09.** This register was written against
+> v1.2.64 and drew its rule as `border-s-2 border-current`. The boundary law
+> (`foundations/rules/borders.mjs`) landed in v1.2.70, after it, and makes a
+> CSS border a finding wherever one is drawn; an inset shadow is one of the
+> three remedies it names. The rule is now
+> `shadow-[inset_0.125rem_0_0_currentColor]` — the shape `comments.tsx`
+> already uses for a quoted reply's inline-start rule, at 2px in the ink
+> rather than 1px in `--hair` — and nothing renders differently, because the
+> colour and the width are the ones that were already there.
+>
+> **Two blind spots were measured on the way, and neither is closed.** The
+> boundary law never saw the border: a utility behind an arbitrary variant
+> (`[&_blockquote]:border-s-2`) is outside what it parses — the bare spelling
+> is judged, the prefixed one is not — so this was found by hand and the run
+> over this file was green throughout. And the swap does NOT hand the mark to
+> the contrast law, which is what a first draft of this note claimed:
+> `strokes read` is 1,239 before the change, 1,239 after, and 1,239 again
+> with the variant prefix removed, because the colour is `currentColor` and
+> that law measures token values against a ground. `border-current` had the
+> same property. The contrast argument in this entry was never gate-checked
+> and still is not, which is why `verify/article-quote` was fixed rather than
+> trusted: it was reading `borderInlineStartColor`, which an element with no
+> border still reports as `currentColor` — a test that would have passed on a
+> quote drawing no rule at all — and it now reads the computed `box-shadow`
+> in both palettes. Both blind spots are stated here rather than filed as
+> law changes: widening `borders.mjs` to parse arbitrary variants is a change
+> to a law that runs against other people's source, and that is the lead's
+> call, not this merge's.
+
+**Which register is the default was the open half of the entry, and it is
+answered the conservative way.** The editorial register stays, so every quote
+drawn today draws the same tomorrow; a body of quoted replies asks for
+`quote="passage"` once. The entry is CLOSED (`severity: resolved`, with the
+resolution written into it) rather than the default re-decided, which would
+have been a change to every existing quote on the strength of a gap entry.
+An artifact question is owed, not a correction: chapter 13 draws one quote
+and says nothing about a second.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso-system before the app
+can delete the override the manifest entry names.
+
+### Added — `verify/article-quote/`
+
+Both registers, on both grounds a body lands on, in either palette by `?t=`.
+`__quote()` returns one row per blockquote of computed styles only — family,
+size, leading, tracking, ink, the rule's width, style and colour, the inset,
+the margins, and the gap actually drawn above it from rects — plus two
+booleans that are the claims themselves: `sameTypeAsParagraph` and
+`ruleIsInk`. The canary is the harness run against the previous file: `pull`
+must come back identical and `passage` must come back equal to `pull`, and
+both did.
+
+### Added — `DialogContent presentation`: where the one modal lands, and the consuming app's last reach past the kit closes
+
+The kwapso app's screen engine draws a dialog four ways — responsive (a
+bottom sheet on a phone, a centred card on a desktop), overlay, sheet and
+fullscreen — and could only do so by importing the Radix primitive underneath
+this component and drawing a second dialog on it. Its own law (R39,
+`UI_PACKAGE_EXEMPT`) carries that import as the app's LAST exemption and names
+the fix in the exemption's own words: "UPSTREAM FIX: a `presentation` prop on
+the kit's DialogContent. Delete this line the day it ships." Two dialogs on one
+primitive are two dialogs that can disagree about a scrim, a radius or an
+entrance without either file changing — and they had: the app's copy carried a
+`bg-black/50` scrim beside this file's charcoal 36% until somebody noticed the
+two side by side and corrected it by hand.
+
+`components/dialog/dialog.tsx` — `DialogContentProps.presentation?:
+"responsive" | "overlay" | "sheet" | "fullscreen"`, default `overlay`. The
+positioner's alignment and gutter (`LANDING`) and the surface's size and
+corners (`SHAPE`) are one record each, keyed by the prop; everything the
+surface IS — `--popover`, `--shadow-overlay`, the 32 inset, the scrim at 36%
+and z 60, the close chip — is unchanged and shared by all four. The type is
+exported as `DialogPresentation`.
+
+**`overlay` is the default and did not move, and that is a measurement, not a
+promise.** The classes moved from one constant into two, so the class STRING
+changed; what must not change is what it draws. `verify/dialog-presentation`
+was run against v1.2.64's `dialog.tsx` and against this one, at 380 × 812 and
+1280 × 800 — rect, the four gutters, radius, inset, width, max-width,
+max-height, fill, shadow, animation name and duration, the positioner's
+alignment and padding, the close chip's centre, the axis and distance of
+travel, and the document's horizontal overflow. **Identical, every field, at
+both widths**: 335 wide inside a 22.5 gutter on the phone (24 at the 15px
+root), 431.25 inside 30 on the desktop, a 7.5 rise over 0.2s. The 115 call
+sites that pass nothing got yesterday's dialog.
+
+> **Re-checked against v1.2.71 on the way in, 2026-09-09.** The baseline in
+> that measurement is v1.2.64's `dialog.tsx`, and this file moved once between
+> then and the tag this landed on: v1.2.70 replaced the scrim's hand-mixed
+> `color-mix(in srgb, var(--kw-charcoal) 36%, transparent)` with `bg-scrim`, a
+> NAMED utility over the `--scrim` token minted in tokens.css §3. The sentence
+> above still holds — `--scrim` is `rgba(26, 25, 24, .36)`, which is what that
+> `color-mix` resolved to, so the scrim is the same colour at the same z 60 and
+> the merge kept v1.2.70's spelling rather than reinstating v1.2.64's.
+> **The presentations do not reach it.** The scrim is drawn once on the
+> Overlay, outside `LANDING` and `SHAPE`, so all four presentations share it,
+> which is what "everything the surface IS … is unchanged and shared by all
+> four" already said.
+>
+> **And it stays the MODAL scrim, deliberately, now that there are two.**
+> v1.2.70 also minted `--scrim-drawer` at 28% and tokens.css records the rule
+> it was minted for: `edge-panel.tsx`, "whose narrow presentation is the drawer
+> and therefore wants the drawer's 28%." A `sheet` or narrow `responsive`
+> dialog takes the drawer's GEOMETRY and the drawer's MOTION (motion.css §3d),
+> so the question is live — and the answer is this entry's own rule, stated a
+> paragraph below about the 32 inset: *the presentation changes where it lands,
+> not what it is.* `Sheet` and `EdgePanel` wear 28% at z 55 and z 50 because
+> they ARE drawers; a dialog is a modal wherever it lands, so it keeps 36% at
+> z 60. Nothing here fights the scrim work; the two tokens divide on modality,
+> which is the axis they were minted on.
+
+**What the sheet is: `sheet.tsx`'s bottom sheet, and the SAME one, not a
+similar one.** The `sheet` presentation is four classes and the narrow half of
+`responsive` is those four with `max-[45rem]:` in front of each — the
+construction `NARROW_BOTTOM` uses in `sheet.tsx`, for the reason it gives
+there: "Two kinds of bottom sheet on one phone would be a worse answer than
+the side drawer we started with." Measured at 380 × 812, both presentations:
+
+| | `sheet` | `responsive` below 45rem | `overlay` (for scale) |
+| --- | --- | --- | --- |
+| anchored to | left + right + bottom | left + right + bottom | nothing — centred |
+| width | 380 | 380 | 335 |
+| height cap | 690.2 (85dvh) | 690.2 (85dvh) | 100% of a 22.5-inset track |
+| corners | 22.5 22.5 0 0 | 22.5 22.5 0 0 | 22.5 all round |
+| grabber | 39 × 4, dx 0 from the surface's centre | the same | none |
+| travel | 316.41 on Y — its own height — 0 on X | the same | 7.5 on Y |
+| duration | 0.36s, `--duration-overlay` | the same | 0.2s, `--duration-entrance` |
+| close chip, up from the foot | 279 | 279 | 536 |
+
+The two sheet columns agree to the hundredth. The one computed difference
+between them is `max-width: 100%` against `none`, which cannot draw. And the
+close chip's 257 drop toward the hand is the number the drawer's own ruling
+put on the same affordance (122 there, from a taller start). Above 45rem
+`responsive` is the overlay rect for rect, and its grabber is `display: none`.
+`fullscreen` is the whole track — 380 × 812, then 1280 × 800 — with a 0
+radius and §3's rise, because §6.2 states the fade-plus-rise "for a panel,
+dialog or page" and a surface with no gutter is the page. The document does
+not overflow sideways in any of the eight cases.
+
+**Why `responsive` is NOT the default, written down so it is not read as an
+oversight.** The client's rule of 2026-09-04 — "everythung that's slisde in in
+desktop, should be slide up in mobile" — is about panels that ARRIVE FROM THE
+SIDE; `sheet.tsx` applied it to `left` and `right` and left `top` and `bottom`
+alone for exactly that reason. A centred modal does not arrive from a side; it
+rises 8 and fades in place. Whether every modal on a phone should become a
+bottom sheet is therefore a ruling this rule does not already contain, and it
+is a change to 115 screens. The prop makes it one word per call site today, or
+one default here the day it is ruled — a design decision, logged rather than
+guessed (BUILD-A-COMPONENT §14).
+
+**The inset is the modal's 32, not the drawer's 24, and this is the one place
+the two sheets are allowed to differ.** `.kw-drawer` hands its body 24;
+`.kw-modal` states 32. A dialog that lands as a sheet is still a modal's
+content — the h3 title, the 14/300 body, the action row — that has landed
+somewhere else. The presentation changes where it lands, not what it is, and
+this file's own breakpoint note has always held that shrinking the inset
+"would break the one measurement the kit does state". Measured: `padding: 30px`
+in all eight cases.
+
+**The motion is one class reading one attribute — `motion.css` §3d.** The
+surface keeps `.motion-dialog` in every presentation and sets
+`data-presentation`; the stylesheet reads it, the way §3a reads `data-side`
+off the sheet. Below the threshold the keyframe AND the duration change — §3's
+own division of labour gives `--duration-overlay` to "a surface travelling its
+own full width or height" and `--duration-entrance` to "the 8px rise of a
+dialog" — so §3d restates the whole shorthand rather than swapping
+`animation-name` alone as §3a does. The specificity is the part that bites: a
+sheet entrance written as `.motion-dialog[data-presentation="sheet"]` alone is
+(0,2,0), the same as §3's base exit, and sits later in the file, so on the
+closed frame the sheet would have played its ENTRANCE on the way out. Both
+rules carry `data-state`, at (0,3,0), so each matches exactly one state.
+`alert-dialog` sets no `data-presentation` and is untouched. The threshold is
+the drawer's own `45rem` in the range syntax, so the motion and the geometry
+flip on the same pixel — measured: name `motion-sheet-in-bottom` and duration
+0.36s below it, `motion-rise-in` and 0.2s above.
+
+An artifact question is owed, not a correction: CH20 draws one modal and one
+drawer and says nothing about a modal on a phone. This adds the choice without
+making it.
+
+Needs a tag + `scripts/sync-design.mjs` pull into kwapso-system before the app
+can delete `shared/web/screen-engine/screen-renderer.tsx` from
+`UI_PACKAGE_EXEMPT` (`shared/ui/` there is vendored and pinned).
+
+### Added — `verify/dialog-presentation/`
+
+One presentation per URL, because the surface is fixed to the viewport and
+stacking four would give each a viewport the product never has. `__rects()`
+reports the rect against the viewport — which edges it touches, the four
+gutters, the computed radius per corner, the positioner's alignment, the
+grabber's size and its offset from the surface's centre, the close chip's
+height above the foot; `__axis()` closes, reopens and samples the transform
+matrix over real frames so the axis, the distance and the duration that PLAYED
+are numbers rather than a reading of the rule that won; `__hscroll()` says
+whether the document scrolls sideways. The canary is the harness itself run
+against the previous `dialog.tsx`: `overlay` must come back identical, and did.
+
 ### Added — the two laws the consuming app wrote because the kit was missing a part: `Title` gets its h1 rung, and `ToolbarRow` gets out of `CollectionFrame`
 
 Classifying the app's 55 laws against §11 turned up thirteen that are "the

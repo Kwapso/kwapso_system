@@ -61,6 +61,19 @@
      button and is ringed already; the grid sets no `overflow: hidden` on the
      wrapper, so the ring is never shaved.
    · No product vocabulary. These are DAYS and EVENTS.
+   · THE MORE-LINE IS A CONTROL THE MOMENT SOMETHING CAN OPEN IT, 2026-09-07.
+     GAPS-COL1 CV-3 added "+N more" so a busy day would SAY how many it was
+     not showing instead of losing them under `overflow: hidden` — and it
+     was text, with no gesture. `formatMoreEvents` changed the words and
+     nothing changed what they did. A count of hidden records that cannot
+     be opened is a locked door with a sign on it, and the consuming app
+     had to fold its overflow into a fake event chip with a sentinel id to
+     get a click at all. `onSelectMore` makes the line a real `<button>`
+     when a handler is given — the same rule `onSelectEvent` already
+     applies to a chip and `onSelectDay` to a cell: given, a control;
+     absent, the same text it always was, and no tab stop. It hands back
+     the day and the events the cell did not show, so the caller can open
+     them without recounting.
 
    RENDERING CONTEXT
    `"use client"` — the day and event handlers are created during this
@@ -147,8 +160,28 @@ const eventChipVariants = cva(
   {
     variants: {
       tone: {
-        /** The default, and the reason: see the Badge ruling in the header. */
-        quiet: "bg-surface-quiet text-ink-secondary",
+        /** The default, and the reason: see the Badge ruling in the header.
+         *
+         * THE FILL IS `--surface-panel`, NOT `--surface-quiet` — client,
+         * 2026-09-09, over a screenshot of a month grid: "on calendar, the
+         * color of the events should be the beige! #F7F2EB". That hex IS
+         * `--surface-panel` in light (`--kw-soft-paper`), so this is her naming
+         * a token rather than asking for a new colour, and it is taken by name
+         * so the dark palette follows without a second decision.
+         *
+         * WHY IT WAS THE OTHER ONE. `--surface-quiet` is the step this kit
+         * reaches for when a chip must read as a chip against anything —
+         * #E2DDD4, a full step darker. On a month grid it is too much: a day
+         * cell holds three to five of these, so the strongest thing in the
+         * cell became the containers rather than the words in them, which is
+         * what her screenshot shows.
+         *
+         * MEASURED against the day cell's own `--card`, because a chip that
+         * cannot be told from the cell is not a chip: 1.103 light, 1.111 dark,
+         * over the boundary law's 1.05 invisibility gate in both palettes. The
+         * step it replaces measured 1.339 / 1.324, so this is quieter on
+         * purpose and still a shape. */
+        quiet: "bg-surface-panel text-ink-secondary",
         /** The kit's drawn chip. Opt-in, one per view. */
         brand: "bg-surface-brand text-ink-on-accent",
         /** Informational. Charcoal label, as every accent. */
@@ -164,6 +197,13 @@ const eventChipVariants = cva(
     defaultVariants: { tone: "brand" },
   },
 );
+
+/* The more-line — CV-3's "+N more". The quietest thing in the cell on
+   purpose: the badge step, tertiary ink, tabular, on the chip's own inline
+   inset so it sits under the chips' labels. ONE drawing whether it is text
+   or a control; `onSelectMore` decides the element and adds the hover, and
+   nothing else about it moves. */
+const MORE_LINE = "px-2 text-badge text-ink-tertiary tabular-nums";
 
 /** The six status-dot tones — one per `--dot-*` token, matching `Badge`'s. */
 export type CalendarEventDot =
@@ -288,12 +328,23 @@ export interface CalendarViewProps
   days?: CalendarDay[];
   /** How many event chips a cell shows before the rest collapse into a more-line. */
   maxEvents?: number;
-  /** Turns the hidden count into the more-line. The kit draws no such line; see GAPS-COL1 CV-3. */
+  /**
+   * Turns the hidden count into the more-line's WORDS. The kit draws no such
+   * line; see GAPS-COL1 CV-3. What the line DOES is `onSelectMore`'s.
+   */
   formatMoreEvents?: (hidden: number) => string;
   /** Picking a day. Given, every enabled cell becomes a real button. */
   onSelectDay?: (day: CalendarDay) => void;
   /** Picking an event. Given, every chip becomes a real button. */
   onSelectEvent?: (event: CalendarEvent, day: CalendarDay) => void;
+  /**
+   * Opening the more-line. Given, "+N more" becomes a real button, exactly
+   * as `onSelectEvent` makes a chip one. Handed the day and the events the
+   * cell did not show — `events.slice(maxEvents)`, in the caller's order —
+   * so the caller can open them without recounting. Absent, the line is
+   * the same text it always was and no tab stop.
+   */
+  onSelectMore?: (day: CalendarDay, hidden: CalendarEvent[]) => void;
 
   /** The agenda's days, in order. Read only when `view="agenda"`. */
   agenda?: CalendarAgendaDay[];
@@ -371,13 +422,14 @@ function resolveDayState(day: CalendarDay): NonNullable<
  *                      row, each cell a day number and up to `maxEvents`
  *                      chips; or, in `agenda`, day headings over hairline-
  *                      separated rows.
- *  2. hover          — only on a SELECTABLE cell or chip: `--accent`, the
- *                      neutral row and item wash, and only on the three
- *                      unfilled states. A mango or charcoal cell washed with
- *                      5% charcoal reads as dirt, so those two keep their
- *                      fill — the same reasoning `Card` uses for its two
- *                      coloured variants. Never mango as a hover, never an
- *                      opacity.
+ *  2. hover          — only on a SELECTABLE cell, chip or more-line:
+ *                      `--accent`, the neutral row and item wash, and only
+ *                      on the three unfilled states. A mango or charcoal
+ *                      cell washed with 5% charcoal reads as dirt, so those
+ *                      two keep their fill — the same reasoning `Card` uses
+ *                      for its two coloured variants. Never mango as a
+ *                      hover, never an opacity. The more-line, when it is a
+ *                      control, also lifts its ink to the foreground.
  *  3. focus-visible  — NOT here. tokens.css §8 rings every control at once,
  *                      at the control's own radius. A selectable day is a
  *                      real `button` and is reachable already.
@@ -408,12 +460,13 @@ function resolveDayState(day: CalendarDay): NonNullable<
  *                      component does not enforce it, because a range
  *                      selection is a real case and enforcing one would
  *                      forbid it.
- * 10. read-only      — no `onSelectDay` and no `onSelectEvent`: the cells
- *                      render as plain elements. The calendar still shows
- *                      everything; only the way in is gone. This is the
- *                      honest read-only, and it is why no cell is ever drawn
- *                      with the disabled skin just because the view is not
- *                      interactive.
+ * 10. read-only      — no `onSelectDay`, no `onSelectEvent` and no
+ *                      `onSelectMore`: the cells, the chips and the
+ *                      more-line render as plain elements. The calendar
+ *                      still shows everything; only the way in is gone.
+ *                      This is the honest read-only, and it is why no cell
+ *                      is ever drawn with the disabled skin just because the
+ *                      view is not interactive.
  *
  * THREE BREAKPOINTS
  *  · mobile (base) — the grid keeps all seven columns, because six columns is
@@ -453,6 +506,7 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
       formatMoreEvents = (hidden) => `+${hidden} more`,
       onSelectDay,
       onSelectEvent,
+      onSelectMore,
       agenda,
       onSelectItem,
       footnote,
@@ -684,9 +738,38 @@ const CalendarView = React.forwardRef<HTMLDivElement, CalendarViewProps>(
                             ),
                           )}
                           {hidden > 0 ? (
-                            <span className="px-2 text-badge text-ink-tertiary tabular-nums">
-                              {formatMoreEvents(hidden)}
-                            </span>
+                            onSelectMore ? (
+                              <button
+                                type="button"
+                                data-slot="calendar-more"
+                                onClick={(e) => {
+                                  /* Inside a pickable cell the cell is a
+                                     button too; this stops there, as the
+                                     chip's click does. */
+                                  e.stopPropagation();
+                                  onSelectMore(day, events.slice(shown.length));
+                                }}
+                                className={cn(
+                                  MORE_LINE,
+                                  /* A button centres its text; the line
+                                     stays where the chips start. The wash is
+                                     the cell's own `--accent`, on a pill so
+                                     it has a shape — never mango, never an
+                                     opacity. The ink lifts to the foreground
+                                     on hover so the line reads as a control
+                                     without a second colour. */
+                                  "cursor-pointer rounded-pill text-start",
+                                  "transition-colors duration-[var(--duration-colour)] ease-kwapso",
+                                  "enabled:hover:bg-accent enabled:hover:text-foreground",
+                                )}
+                              >
+                                {formatMoreEvents(hidden)}
+                              </button>
+                            ) : (
+                              <span data-slot="calendar-more" className={MORE_LINE}>
+                                {formatMoreEvents(hidden)}
+                              </span>
+                            )
                           ) : null}
                         </span>
                       </>

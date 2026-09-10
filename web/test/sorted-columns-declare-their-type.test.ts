@@ -194,6 +194,12 @@ describe("a sortable column showing a formatted value declares what it is", () =
     // → something else, `field(` → a new helper, `<RecordTable` → a wrapper)
     // empties the census silently. An empty census passes every assertion above.
     expect(tableFiles.map((f) => f.rel).sort(), "no file renders a RecordTable any more").toEqual([
+      // The client turned the Contacts screen into a table on 2026-09-09 ("for
+      // contacts lets do view table"). It is in the census and carries NO
+      // formatted cell — a contact row has no date and no money on it — so it
+      // adds column keys and no offenders, which is the shape a new table
+      // should have.
+      "web/components/accounts/contacts-screen.tsx",
       "web/components/meetings/meetings-screen.tsx",
       "web/components/work/tasks-screen.tsx",
     ])

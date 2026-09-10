@@ -1,21 +1,21 @@
 {
  "kit": {
   "repo": "Kwapso/kwapso-ui-ux",
-  "tag": "v1.2.74",
-  "sha": "d2bdb1c3e841a118d301b2fc2281e31fd8d4874e",
-  "syncedAt": "2026-09-09"
+  "tag": "v1.2.75",
+  "sha": "26f09cb09114fbe413c81d60ab16b2e073c4d29b",
+  "syncedAt": "2026-09-10"
  },
- "generatedAt": "2026-09-09T10:36:56.553Z",
+ "generatedAt": "2026-09-10T11:15:15.942Z",
  "counts": {
   "components": 119,
   "hooks": 2,
   "withVariants": 42,
   "withoutVariants": 77,
   "cvaSites": 51,
-  "variantGroups": 77,
-  "variantOptions": 251,
-  "typedEnumProps": 40,
-  "typedBooleanProps": 312,
+  "variantGroups": 78,
+  "variantOptions": 253,
+  "typedEnumProps": 42,
+  "typedBooleanProps": 315,
   "compositions": 47,
   "icons": 1512,
   "tokens": 365,
@@ -636,8 +636,8 @@
     {
      "file": "components/article-body/article-body.tsx",
      "name": "articleBodyVariants",
-     "line": 175,
-     "base": "min-w-0 text-ink-secondary [&>*+*]:mt-[var(--space-3h)] [&>:is(h2,h3,h4)+p]:mt-[var(--space-2h)] [&>*+:is(h2,h3)]:mt-[var(--space-8)] [&>*+h4]:mt-6 [&_h2]:text-3xl [&_h2]:font-[var(--font-weight-medium)] [&_h3]:text-2xl [&_h3]:font-[var(--font-weight-medium)] [&_h4]:text-xl [&_h4]:font-[var(--font-weight-medium)] [&_:is(h2,h3,h4)]:text-balance [&_:is(h2,h3,h4)]:text-foreground [&_p]:text-pretty [&_:is(ul,ol)]:ps-5 [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:leading-[var(--leading-loose)] [&_li+li]:mt-1 [&_li>:is(ul,ol)]:mt-1 [&_ol]:tabular-nums [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong [&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso [&_a:hover]:decoration-current [&_:is(strong,b)]:font-[var(--font-weight-medium)] [&_:is(strong,b)]:text-foreground [&_:is(em,i)]:italic [&_blockquote]:font-[family-name:var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)] [&_blockquote]:text-2xl [&_blockquote]:text-foreground [&_blockquote]:my-[var(--space-8)] [&_blockquote_p]:text-inherit [&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)] [&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal [&_blockquote_footer]:text-ink-tertiary [&_code]:rounded-[var(--radius-sm)] [&_code]:bg-surface-quiet [&_code]:px-1 [&_code]:py-px [&_code]:text-caption [&_code]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet [&_pre]:p-6 [&_pre]:text-caption [&_pre]:text-ink-secondary [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_hr]:my-[var(--space-8)] [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-hair-strong [&_img]:block [&_img]:h-auto [&_img]:w-full [&_img]:rounded-[var(--radius)] [&_figure]:my-[var(--space-8)] [&_figcaption]:mt-3 [&_figcaption]:text-caption [&_figcaption]:text-ink-tertiary [&_dt]:font-[var(--font-weight-medium)] [&_dt]:text-foreground [&_dd]:mt-1 [&_dd+dt]:mt-3 [&_:is(time,data)]:tabular-nums",
+     "line": 268,
+     "base": "min-w-0 text-ink-secondary [&>*+*]:mt-[var(--space-3h)] [&>:is(h2,h3,h4)+p]:mt-[var(--space-2h)] [&>*+:is(h2,h3)]:mt-[var(--space-8)] [&>*+h4]:mt-6 [&_h2]:text-3xl [&_h2]:font-[var(--font-weight-medium)] [&_h3]:text-2xl [&_h3]:font-[var(--font-weight-medium)] [&_h4]:text-xl [&_h4]:font-[var(--font-weight-medium)] [&_:is(h2,h3,h4)]:text-balance [&_:is(h2,h3,h4)]:text-foreground [&_p]:text-pretty [&_:is(ul,ol)]:ps-5 [&_ul]:list-disc [&_ol]:list-decimal [&_:is(ul,ol)]:leading-[var(--leading-loose)] [&_li+li]:mt-1 [&_li>:is(ul,ol)]:mt-1 [&_ol]:tabular-nums [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-[0.1875rem] [&_a]:decoration-hair-strong [&_a]:transition-colors [&_a]:duration-[var(--duration-colour)] [&_a]:ease-kwapso [&_a:hover]:decoration-current [&_:is(strong,b)]:font-[var(--font-weight-medium)] [&_:is(strong,b)]:text-foreground [&_:is(em,i)]:italic [&_blockquote_p]:text-inherit [&_blockquote_footer]:mt-3 [&_blockquote_footer]:font-[family-name:var(--font-sans)] [&_blockquote_footer]:text-caption [&_blockquote_footer]:tracking-normal [&_blockquote_footer]:text-ink-tertiary [&_code]:rounded-[var(--radius-sm)] [&_code]:bg-surface-quiet [&_code]:px-1 [&_code]:py-px [&_code]:text-caption [&_code]:text-ink-secondary [&_pre]:overflow-x-auto [&_pre]:rounded-[var(--radius)] [&_pre]:bg-surface-quiet [&_pre]:p-6 [&_pre]:text-caption [&_pre]:text-ink-secondary [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_hr]:my-[var(--space-8)] [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-hair-strong [&_img]:block [&_img]:h-auto [&_img]:w-full [&_img]:rounded-[var(--radius)] [&_figure]:my-[var(--space-8)] [&_figcaption]:mt-3 [&_figcaption]:text-caption [&_figcaption]:text-ink-tertiary [&_dt]:font-[var(--font-weight-medium)] [&_dt]:text-foreground [&_dd]:mt-1 [&_dd+dt]:mt-3 [&_:is(time,data)]:tabular-nums",
      "groups": [
       {
        "name": "size",
@@ -673,11 +673,27 @@
          "note": null
         }
        ]
+      },
+      {
+       "name": "quote",
+       "options": [
+        {
+         "name": "pull",
+         "classes": "[&_blockquote]:font-[family-name:var(--font-serif)] [&_blockquote]:tracking-[var(--tracking-serif)] [&_blockquote]:text-2xl [&_blockquote]:text-foreground [&_blockquote]:my-[var(--space-8)]",
+         "note": "Chapter 13: the serif at the h3 step, primary ink, 48 above and below."
+        },
+        {
+         "name": "passage",
+         "classes": "[&_blockquote]:text-ink-tertiary [&_blockquote]:shadow-[inset_0.125rem_0_0_currentColor] [&_blockquote]:ps-5",
+         "note": "Sans at the body step, tertiary ink, a 2px rule in that ink at the inline start."
+        }
+       ]
       }
      ],
      "defaults": {
       "size": "default",
-      "measure": true
+      "measure": true,
+      "quote": "pull"
      },
      "compound": [],
      "unresolved": [],
@@ -1420,7 +1436,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "dayCellVariants",
-     "line": 96,
+     "line": 109,
      "base": "flex min-w-0 flex-col gap-[var(--space-1h)] overflow-hidden rounded-[var(--radius)] px-[var(--space-2h)] py-2 text-start transition-colors duration-[var(--duration-colour)] ease-kwapso",
      "groups": [
       {
@@ -1466,7 +1482,7 @@
     {
      "file": "components/calendar-view/calendar-view.tsx",
      "name": "eventChipVariants",
-     "line": 140,
+     "line": 153,
      "base": "block w-full truncate rounded-pill px-2 text-badge leading-[1.6] font-[var(--font-weight-medium)] text-start",
      "groups": [
       {
@@ -1474,8 +1490,8 @@
        "options": [
         {
          "name": "quiet",
-         "classes": "bg-surface-quiet text-ink-secondary",
-         "note": "The default, and the reason: see the Badge ruling in the header."
+         "classes": "bg-surface-panel text-ink-secondary",
+         "note": "The default, and the reason: see the Badge ruling in the header. THE FILL IS `--surface-panel`, NOT `--surface-quiet` — client, 2026-09-09, over a screenshot of a month grid: \"on calendar, the color of the events should be the beige! #F7F2EB\". That hex IS `--surface-panel` in light (`--kw-soft-paper`), so this is her naming a token rather than asking for a new colour, and it is taken by name so the dark palette follows without a second decision. WHY IT WAS THE OTHER ONE. `--surface-quiet` is the step this kit reaches for when a chip must read as a chip against anything — #E2DDD4, a full step darker. On a month grid it is too much: a day cell holds three to five of these, so the strongest thing in the cell became the containers rather than the words in them, which is what her screenshot shows. MEASURED against the day cell's own `--card`, because a chip that cannot be told from the cell is not a chip: 1.103 light, 1.111 dark, over the boundary law's 1.05 invisibility gate in both palettes. The step it replaces measured 1.339 / 1.324, so this is quieter on purpose and still a shape."
         },
         {
          "name": "brand",
@@ -4551,7 +4567,7 @@
     {
      "file": "components/image/image.tsx",
      "name": "imageVariants",
-     "line": 60,
+     "line": 72,
      "base": "relative isolate block w-full overflow-hidden rounded-[var(--radius)] bg-surface-quiet",
      "groups": [
       {
@@ -4560,12 +4576,12 @@
         {
          "name": "cover",
          "classes": "",
-         "note": "Fills the box, trimming the overflow. The default for a well."
+         "note": "Fills the box and trims the overflow. THE DEFAULT, and RULES.md §4.4 — a picture is the same shape as the box that holds it, and a logo losing its ends is the ruling rather than a defect."
         },
         {
          "name": "contain",
          "classes": "",
-         "note": "Fits inside the box, letterboxed on the quiet ground."
+         "note": "Fits inside the box, letterboxed on the quiet ground. OPT-IN ONLY, for the picture whose whole point is that you see all of it — a document page, a diagram, an uploaded file being previewed before it is accepted. Never a default, and never a mark."
         }
        ]
       }
@@ -5250,6 +5266,33 @@
      "type": "PermissionMatrixProps",
      "variantsFrom": [],
      "props": [
+      {
+       "name": "orientation",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "modules-as-rows",
+        "roles-as-rows"
+       ],
+       "note": "WHICH WAY ROUND THE GRID IS DRAWN. `\"modules-as-rows\"` is CH27.12's own — collections down the side, roles across the top — and is the default, so every grid drawn before this prop existed is unchanged to the pixel. `\"roles-as-rows\"` turns it: roles down the side, collections across the top. THE DATA DOES NOT MOVE. `held`, `rights` and `locked` stay on `PermissionModule`, because whether a collection has a delete door is a fact about the collection and the drawing turning is not a fact about anything. This exists because a caller that transposed by hand — passing its roles as `modules` — could not pass `rights` at all, and fifteen of its eighty-eight boxes went on pretending to be switches. The whole argument, including the shape that was refused, is in the file header."
+      },
+      {
+       "name": "stickyNames",
+       "optional": true,
+       "kind": "boolean",
+       "note": "PIN THE NAME COLUMN so it survives a sideways scroll. Off by default. A grid with more columns than its container overflows and scrolls in its own box — which is correct, and is why the page never scrolls sideways — and the column that says WHICH row this is goes with it. Scrolled to the end the reader sees bands of `S C E D` with nothing naming them. It is `TableCell sticky` doing the work and every hard part of it is argued in `table.tsx`; this is the prop that turns it on for the heading and the name cell of every row, at either orientation. OFF BY DEFAULT BECAUSE A PIN NEEDS AN OPAQUE PAPER and the wrong one is visible at rest: a pinned column that guessed would paint a pale band down the side of every grid that never scrolls. Say `stickyGround` with it."
+      },
+      {
+       "name": "stickyGround",
+       "optional": true,
+       "kind": "enum",
+       "values": [
+        "page",
+        "panel",
+        "card"
+       ],
+       "note": "WHICH PAPER THE GRID IS STANDING ON, for the pinned column to paint. Only read when `stickyNames` is on. A pinned cell must be opaque or the scrolled cells read through it, and it must be the SAME paper as the ground or it is a band rather than a continuation — 1.000 against that ground is the correct measurement here and the wrong one everywhere else in this kit. This component cannot see what it was dropped on, so the caller names it: `\"page\"` for `--background`, `\"panel\"` for `--surface-panel`, `\"card\"` for `--card`. Defaulted to `\"page\"`, which is `TableHeader sticky`'s own default and its own reason."
+      },
       {
        "name": "disabled",
        "optional": true,
@@ -7517,13 +7560,27 @@
      "file": "components/table/table.tsx",
      "type": "TableHeadProps",
      "variantsFrom": [],
-     "props": []
+     "props": [
+      {
+       "name": "sticky",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Pin this heading to the inline start of the scroll container, so the column that names the rows survives a sideways scroll. Off by default: a pinned column only means anything in a table that overflows, and it paints an opaque paper this file cannot choose. THE PAPER IS THE CALL SITE'S, exactly as it is for `TableHeader sticky`. It takes `--background`; a table on a card passes `className=\"bg-card\"` and one on a panel `className=\"bg-surface-panel\"`. A pinned cell that names the paper it is standing on measures 1.000 against it, and that is the correct number — it is a continuation of the ground, not a panel over it. See the file header. Pass it on the matching `TableCell` of every row, or the heading pins and the values do not."
+      }
+     ]
     },
     {
      "file": "components/table/table.tsx",
      "type": "TableCellProps",
      "variantsFrom": [],
-     "props": []
+     "props": [
+      {
+       "name": "sticky",
+       "optional": true,
+       "kind": "boolean",
+       "note": "Pin this value to the inline start of the scroll container — the name column of a table that scrolls sideways. Off by default, and the paper is the call site's: it takes `--background` and a table on a card or a panel passes `className=\"bg-card\"` / `\"bg-surface-panel\"`. The whole argument, including why 1.000 against that ground is the right number here and the wrong one everywhere else, is in the file header. The cell REPLAYS the row's hover, selected and disabled washes, because an opaque fill of its own would otherwise cover them and leave a dead band down the side of a lit row. Nothing else about the cell changes: it is the same `px-3`, the same middle alignment, and the first cell is still the kit's name column."
+      }
+     ]
     },
     {
      "file": "components/table/table.tsx",
@@ -9250,6 +9307,17 @@
     "inverse",
     "info",
     "status"
+   ]
+  },
+  {
+   "component": "dialog",
+   "kind": "group-missing-in-source",
+   "group": "presentation",
+   "manifest": [
+    "overlay",
+    "responsive",
+    "sheet",
+    "fullscreen"
    ]
   },
   {

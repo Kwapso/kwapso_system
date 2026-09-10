@@ -366,6 +366,8 @@ const DIRECT_READDIR: Record<string, string> = {
     "roster read, and it defines a worker exactly as public-surface.test.ts does — a directory with a wrangler.jsonc — because the question it asks is 'does ANY config pin an engine the code does not name', and enumerating them is the whole point: the failure it guards is somebody adding a THIRD config, not somebody forgetting the second",
   "workers/tenancy/test/activity-trail.test.ts":
     "roster read: the per-worker src/ roots plus shared/workers, handed to sourceFiles — the whole surface that can write to the activity table, because the writers are spread across three workers and the point of the census is that no worker is an exception",
+  "web/test/named-paths.test.ts":
+    "roster read, and the roster IS the law: R58 asks whether a path this repo NAMES resolves, so the set of names it will accept has to be the repository's own top-level folders read off disk. A hand-typed list is the exact fault that was fixed on 9 Sep 2026 — the old pattern's folder list had fallen behind the tree and `db/`, `tools/`, `types/` and `documents/` were invisible to it. It lists the root and never descends; every file it then READS goes through sourceFiles",
   "web/test/backup-covers-r2.test.ts":
     "roster read: the workers with a wrangler.jsonc, to build the src/ roots it then hands to sourceFiles and to find each one's r2_buckets",
 }

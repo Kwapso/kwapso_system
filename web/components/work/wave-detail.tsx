@@ -207,7 +207,7 @@ export function WaveDetailScreen({
   )
 
   const overviewItems = [
-    { label: t("Client"), value: wave.accountName || "—" },
+    { label: t("Account"), value: wave.accountName || "—" },
     {
       label: t("What the package is for"),
       value: wave.goal ? <RichText html={wave.goal} /> : "—",
@@ -438,16 +438,16 @@ export function WaveDetailScreen({
                     }
                   />
 
-                {sprints.length === 0 ? (
-                  // No `sprints` import target at all — a wave's sprints are
-                  // planned or moved in, never bulk-loaded.
+                {/* R62 — ONE REGISTER, BOTH ZEROS, the add button the only
+                    difference. No `sprints` import target at all — a wave's
+                    sprints are planned or moved in, never bulk-loaded. */}
+                {shownSprints.length === 0 ? (
                   <CollectionEmptyState
+                    filtered={sprints.length > 0}
                     title={t("No sprints in this wave yet.")}
                     description={t("The wave is sold first; the sprints inside it are planned afterwards.")}
                     onCreate={canCreate ? () => setPlanOpen(true) : undefined}
                   />
-                ) : shownSprints.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {shownSprints.map((s) => (

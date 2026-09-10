@@ -185,17 +185,20 @@ export function ModulesPanel({ teamId, appId }: { teamId: string; appId: string 
         actions={canCreate && <AddButton onClick={() => setAddOpen(true)} label={t("Add module")} />}
       />
 
-      {modules.length === 0 ? (
-        // No `app_modules` import target — a module names a section of a
-        // system somebody already knows, not a list somebody holds in a
-        // spreadsheet.
+      {/* R62 — ONE REGISTER, BOTH ZEROS. Client, 2026-09-09: "the empty
+          because of filters hosul look the same as empty collection but the add
+          button." This was a three-way chain drawing the full register at rest
+          and a bare grey line when the search narrowed it to nothing; it is one
+          call now, and `filtered` withdraws the create action itself.
+          No `app_modules` import target — a module names a section of a system
+          somebody already knows, not a list somebody holds in a spreadsheet. */}
+      {shownModules.length === 0 ? (
         <CollectionEmptyState
+          filtered={modules.length > 0}
           title={t("No modules yet.")}
           description={t("Add the sections this app is divided into, so tickets can say which one they are about.")}
           onCreate={canCreate ? () => setAddOpen(true) : undefined}
         />
-      ) : shownModules.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("Nothing here matches that.")}</p>
       ) : (
         <ul className="space-y-2">
           {shownModules.map((m) => (
