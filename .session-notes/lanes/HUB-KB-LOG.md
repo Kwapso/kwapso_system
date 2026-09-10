@@ -69,3 +69,136 @@ iterations and three expensive ones beats ten expensive ones. `FREE_NEURONS_PER_
 is 10,000, so heavy one-off work spread across days rides the free allowance —
 which also means a naive neuron total OVERSTATES the bill, and the meter must
 subtract the free tier per day rather than multiply the total.
+
+## Tick 2 — 10 Sep 2026, ~19:25
+
+The hub's chat was cleared by accident between ticks. Nothing was lost, and that
+is the whole argument for this file: every decision below was recoverable from
+disk, the worktrees and the commit bodies. A hub whose state lives in a
+transcript is a hub that dies with the transcript.
+
+**kb_B2 reported (report 1).** `fix/kb-grain` pushed, check green, $0 spent.
+Delivered `LINK_TYPES` + `contextLineFor` in `source-readers.ts` and
+`chunkChat`/`chunkMail`/`chunkSheetTab` in `knowledge-text.ts`, test-first.
+
+**MY FAILURE, recorded rather than smoothed over.** kb_B2 asked before starting
+whether `knowledge-shape.ts` was really its file. I answered that question in
+Tick 1 above — it is the knowledge MAP feature, not a grain file — and never
+relayed the answer to the lane. It sat blocked on a question I had already
+resolved, and said so in its report. Writing a correction in my own log is not
+the same act as sending it. Relay, then log.
+
+**Three findings from checking the report rather than accepting it:**
+
+1. kb_B2 reported `.plans/KB-AUDIT.md` "doesn't exist anywhere in the repo", and
+   kb_B1 reported the same gap earlier. It is FALSE as of now, verified four ways:
+   `ls-tree fix/kb-grain` returns blob c1f0ed34 (identical to main's),
+   `merge-base --is-ancestor 50584950 fix/kb-grain` is YES, the lane's own diff
+   shows `.plans/KB-AUDIT.md | 337 ++++`, and the file is in its worktree. Both
+   lanes looked before the canon-move commits arrived and neither re-checked
+   after rebasing. Two lanes built without the audit. Any lane reporting a
+   missing canon file gets re-verified from the hub before I believe it.
+
+2. **§2 has five Build items and only four are built.** Context line, chat runs,
+   mail-message pieces and sheet-tab headers all landed. "Relevancy date =
+   happened-at for frozen things, last-change for living things" is on NEITHER
+   branch — grepped `relevancyDate|relevancy_date|happenedAt|happened_at` across
+   `fix/kb-grain` and `fix/kb-gate`, zero hits on both. Unclaimed, not
+   misfiled. **Assigned to kb_B2** under the B1/B2 seam: it is a property of what
+   the material IS. Not cosmetic — KB-AUDIT §4.5 says the recency trigger the
+   code itself names has already been met, so a missing relevancy date is a live
+   retrieval fault.
+
+3. The real grain seam is confirmed by reading it: `google-read.ts:282` joins a
+   whole thread into `sender: text` lines in one blob. KB-AUDIT §4.9 describes
+   the same line independently ("one thread is one ~348-char blob, speakers
+   inline"). Two oracles, one seam. `chunkChat` replaces it.
+
+**Added to the ship list (not a lane's to close):** the YouTube `timedtext` and
+Loom/Tella oEmbed response shapes are unverified against a live account — no
+network egress in the lane sandboxes. A real-link smoke test on staging is a
+gate item before any of this ships. This is the same shape as the real PDF that
+found the subsetted-font gap in the reader these readers extend.
+
+**Not merged.** B1 (`edf1fdb6`) and B2 (`1b64985a`) are committed and green but
+both lanes are still live in their worktrees; merging under a working lane is
+how a rebase fight starts. kb_E is merged (525b10ea) and still working.
+
+## Tick 3 — 10 Sep 2026, ~19:35
+
+**THE NEAR-MISS. The grounded exam was in no git object anywhere.**
+
+`.plans/kb-exam-draft.md` was untracked — not on main, not on a branch, not in
+any commit's history. `git ls-files --error-unmatch` returned "did not match any
+file(s) known to git". Committed as `.plans/KB-EXAM-TRANSCRIPTS.md` (83 rows) on
+`docs/the-grounded-exam-was-never-committed`, 81743ce7.
+
+THE TWO EXAM FILES ARE NAMED BACKWARDS FROM THEIR CONTENTS:
+
+  KB-EXAM.md (87 rows, tracked, canon, what kb-exam.mjs loads) — its own header:
+  "Drafted by reading 84 CALENDAR EVENTS (titles, dates, attendees)."
+
+  kb-exam-draft.md (83 rows, untracked until now) — its own header: "Only meetings
+  whose transcript or Gemini notes exist on staging with 15 or more pieces were
+  used (71 sources)". Every row names its source AND that source's piece count.
+
+The file called "draft" is the grounded rewrite. The one called canon is the earlier
+calendar pass. The owner settled it today unprompted: the new questions "only come
+from scripts, whereas for the old exam prompt, some came from transcripts and some
+did not" — exactly what the two headers say about themselves.
+
+ee29a9c7's commit body instructed the next reader to DELETE the stray file, and
+`kb-exam.mjs:69` wires it as a fallback BEHIND the weaker file. Both were sound
+given the names and wrong given the contents. I relayed nothing to contradict
+either. A filename was trusted over a header, which is the same class of error as
+Tick 1's `knowledge-shape.ts` — inferring content from a name.
+
+**Not resolved, assigned to kb_E: MEASURE THE OVERLAP FIRST.** The owner wants the
+new rows used "along with the old ones" — a union. O1-O8 are verbatim in both files
+and an unknown number of E/M/H rows are the same question differently sourced. A
+naive concatenation gives 170 rows with duplicate ids and double-counts the
+mandatory eight. Number first, union second, baseline re-pinned once.
+
+**kb_E's struck/tool split verified against the file, not accepted:** 7 count-tagged
+rows in KB-EXAM.md, 7 `tool` rows; 7 + 6 = the 13 the old `struck` held; 87 + 1
+derived = 88. Nothing lost or invented.
+
+**Budget discrepancy resolved (kb_E was right to flag, not act).** Both my
+statements were true of different things: EXECUTION of the full-loop runs is kb_E's,
+THE BUDGET IS THE HUB'S. Each run authorised singly, spend quoted from
+`ai-spend.mjs` after each. A lane holding a standing $3 balance against the owner's
+cap is how a cap gets discovered breached rather than enforced.
+
+**kb_A reported done (542c89f7, migration 0073). Both its findings verified:**
+
+1. CREATE TRIGGER is incompatible with this repo's migration executor. Read
+   `d1-rest.ts:593`: `splitStatements` handles string literals and `--` comments
+   and has NO BEGIN/END awareness, so a trigger body shatters at its inner `;`.
+   The asymmetry is what makes it dangerous — a `node:sqlite` `exec()` test passes
+   while the real path fails. `SEARCH.md:99-107` is the ONLY `CREATE TRIGGER` in
+   the repo and line 127 states a rule ("never write the FTS table from app code")
+   for a pattern never once built. Lane G's to fix, not kb_A's.
+2. `DELETE FROM <fts>` is a silent no-op on an already-empty external-content
+   table; `'delete-all'` + `'integrity-check'` is right.
+
+**Settled kb_A's index question from B1's source instead of relaying it.**
+`identityKey()` returns `${originTable} ${originRowId}` with origins google_drive /
+google_gmail / google_calendar / google_chat / upload / record-table. Namespaced,
+so the GLOBAL unique index is safe. No amend. Told kb_A to stand down.
+
+**Two gaps I found in kb_A's migration and sent back:** `knowledge_sightings`
+(source_id, seen_where, seen_by_user_id, seen_at) has no column for B1's
+`goneAt` — and a sighting that cannot record that it ENDED cannot express B1's
+`liveSightings`/`stillLive` at all. And `relevancy_date` is a column nobody
+populates; the write side is kb_B2's §2 item.
+
+**Known limit, now tracked:** the unique index will not dedupe MAIL across
+colleagues. Gmail's message id is mailbox-scoped and the cross-mailbox identity is
+the RFC-822 header, which the app does not read. B1 wrote this down honestly. It
+lands on the owner's tracker item "one meeting arriving three ways becomes one
+source": transcript and calendar arms merge, the mail arm does not yet.
+
+**The loop is running again** (self-paced; the owner re-supplied the prompt after
+the hub's chat was cleared). Its three exit conditions: BUILD-5 complete, the
+46-item tracker complete, spend under $5. The tracker artifact still says $10 in
+two places and is STALE against the owner's $5 ruling.
