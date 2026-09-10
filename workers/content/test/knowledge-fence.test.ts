@@ -41,7 +41,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
-import { teamVisibleRecomputeSql } from "../src/lib/knowledge"
+import { execKnowledgeScript, teamVisibleRecomputeSql } from "../src/lib/knowledge"
 
 const db = () => holder.db as DatabaseSync
 let vectorIndex = fakeVectorize()
@@ -322,5 +322,128 @@ describe("the corpus-wide rot-check — the hub's own merge condition", () => {
     expect(freshTeamVisible("R2")).toBe(0)
     expect(freshTeamVisible("R3")).toBe(1)
     expect(freshTeamVisible("R4")).toBe(0)
+  })
+})
+
+// ── THE RECOMPUTE GUARD — proven against SYNTHETIC scripts, on purpose ──────
+//
+// Nothing writes a real knowledge_sightings row yet (the fold-writer is a
+// separate, unbuilt pass), so there is no genuine call site to test this
+// against. That is not a reason to leave it unproven — it is why the proof
+// has to be synthetic: a script string built by hand, in the exact shapes a
+// future writer might produce, checked against the guard the same way D1
+// itself would see it. `execKnowledgeScript` inspects the RESOLVED STRING,
+// never the source that built it, so a synthetic string is exactly as valid
+// a test subject as a real caller's would be.
+
+describe("execKnowledgeScript — the guard a doc comment could never be", () => {
+  it("passes a script that never touches knowledge_sightings straight through", async () => {
+    await expect(
+      execKnowledgeScript({} as never, "db", "UPDATE knowledge_sources SET title = 'x' WHERE id = 'S1';")
+    ).resolves.toBeUndefined()
+  })
+
+  it("refuses a sighting INSERT with no recompute at all", async () => {
+    await expect(
+      execKnowledgeScript(
+        {} as never,
+        "db",
+        "INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at) VALUES ('sg1','S1','x','U1','team','2026-01-01','2026-01-01');"
+      )
+    ).rejects.toMatchObject({ code: "sighting_not_recomputed" })
+  })
+
+  it("refuses an UPDATE that retires a sighting (gone_at) with no recompute", async () => {
+    await expect(
+      execKnowledgeScript({} as never, "db", "UPDATE knowledge_sightings SET gone_at = '2026-02-01' WHERE id = 'sg1';")
+    ).rejects.toMatchObject({ code: "sighting_not_recomputed" })
+  })
+
+  it("refuses an UPDATE that moves a shelf (private<->team) with no recompute", async () => {
+    await expect(
+      execKnowledgeScript({} as never, "db", "UPDATE knowledge_sightings SET shelf = 'team' WHERE id = 'sg1';")
+    ).rejects.toMatchObject({ code: "sighting_not_recomputed" })
+  })
+
+  it("lets an ORDINARY sighting write through untouched — no shelf, no gone_at", async () => {
+    // seen_at is not one of the two columns that can make team_visible stale,
+    // so this is not this guard's business.
+    await expect(
+      execKnowledgeScript({} as never, "db", "UPDATE knowledge_sightings SET seen_at = '2026-02-01' WHERE id = 'sg1';")
+    ).resolves.toBeUndefined()
+  })
+
+  it("passes the write, correctly spliced, exactly as the header's worked example shows", async () => {
+    seedSource("S1", null, 0)
+    const script = `
+      INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at)
+        VALUES ('sg1','S1','x','U1','team','2026-01-01','2026-01-01');
+      ${teamVisibleRecomputeSql("S1")}
+    `
+    await expect(execKnowledgeScript({} as never, "db", script)).resolves.toBeUndefined()
+  })
+
+  it("REFUSES the recompute placed BEFORE the write — the self-inflicted staleness the header names", async () => {
+    const script = `
+      ${teamVisibleRecomputeSql("S1")}
+      INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at)
+        VALUES ('sg1','S1','x','U1','team','2026-01-01','2026-01-01');
+    `
+    await expect(execKnowledgeScript({} as never, "db", script)).rejects.toMatchObject({
+      code: "sighting_recompute_misordered",
+    })
+  })
+
+  it("passes the array-join shape this file's OWN two d1ExecScript callers actually use", async () => {
+    // The shape a static source census would have had to trace and could not:
+    // statements pushed across a loop, joined at the end. The guard does not
+    // care, because it reads the string AFTER the join.
+    const statements: string[] = []
+    statements.push("UPDATE knowledge_chunks SET compartment = 'agency' WHERE id = 'c1';")
+    statements.push(
+      "UPDATE knowledge_sightings SET shelf = 'private' WHERE id = 'sg1';"
+    )
+    statements.push(teamVisibleRecomputeSql("S1"))
+    await expect(execKnowledgeScript({} as never, "db", statements.join("\n"))).resolves.toBeUndefined()
+  })
+
+  it("refuses the array-join shape too, when the recompute is missing", async () => {
+    const statements = [
+      "UPDATE knowledge_chunks SET compartment = 'agency' WHERE id = 'c1';",
+      "UPDATE knowledge_sightings SET shelf = 'private' WHERE id = 'sg1';",
+    ]
+    await expect(execKnowledgeScript({} as never, "db", statements.join("\n"))).rejects.toMatchObject({
+      code: "sighting_not_recomputed",
+    })
+  })
+
+  it("recomputes for MULTIPLE sources correctly when both precede their own recompute", async () => {
+    seedSource("S1", null, 0)
+    seedSource("S2", null, 0)
+    const script = [
+      "INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at) VALUES ('sg1','S1','x','U1','private','2026-01-01','2026-01-01');",
+      teamVisibleRecomputeSql("S1"),
+      "INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at) VALUES ('sg2','S2','x','U2','team','2026-01-01','2026-01-01');",
+      teamVisibleRecomputeSql("S2"),
+    ].join("\n")
+    await expect(execKnowledgeScript({} as never, "db", script)).resolves.toBeUndefined()
+  })
+
+  it("REFUSES two writes back to back with only the LAST one recomputed", async () => {
+    // The case "a recompute exists somewhere after this write" cannot tell
+    // apart from a correct script: two writes, then one recompute at the very
+    // end, satisfies "some recompute follows write1" without write1's OWN
+    // interval — the gap BEFORE write2 — ever holding one. Only checking each
+    // write's own interval, not "anywhere onward", catches this.
+    seedSource("S1", null, 0)
+    seedSource("S2", null, 0)
+    const script = [
+      "INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at) VALUES ('sg1','S1','x','U1','private','2026-01-01','2026-01-01');",
+      "INSERT INTO knowledge_sightings (id, source_id, seen_where, seen_by_user_id, shelf, seen_at, created_at) VALUES ('sg2','S2','x','U2','team','2026-01-01','2026-01-01');",
+      teamVisibleRecomputeSql("S2"),
+    ].join("\n")
+    await expect(execKnowledgeScript({} as never, "db", script)).rejects.toMatchObject({
+      code: "sighting_recompute_misordered",
+    })
   })
 })
