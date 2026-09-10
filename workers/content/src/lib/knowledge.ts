@@ -1422,7 +1422,9 @@ export async function indexSource(
   sourceId: string,
   opts: { force?: boolean; slices?: number } = {}
 ): Promise<IndexProgress> {
-  const rows = await d1Query<SourceRow & { content_hash: string | null; embed_attempts: number }>(
+  const rows = await d1Query<
+    SourceRow & { content_hash: string | null; embed_attempts: number; generated_only: number }
+  >(
     cfg,
     guard.databaseId,
     // `file_url` rides along because `indexableText` needs it: a file with no
@@ -1430,7 +1432,8 @@ export async function indexSource(
     // with no body" is the difference between a note somebody left blank and a
     // document we could not read.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
-            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, deactivated_at, created_at
+            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only,
+            deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1447,7 +1450,13 @@ export async function indexSource(
 
   const text = indexableText(source)
   const hash = contentHash(text)
-  const chunks = chunkText(text)
+  // A CARD IS EVERY WORD THE APP WROTE FOR THIS ROW, so it is never cut into
+  // pieces and there is nothing to quote. It keeps its record vector below, so
+  // the router can still route to it — findable, never quoted (KB-AUDIT.md
+  // §4.3). The reader decided this per ROW at ingest, because every mirror kind
+  // can also carry words a person typed and only the reader can tell.
+  const card = source.generated_only === 1
+  const chunks = card ? [] : chunkText(text)
   const total = Math.min(chunks.length, MAX_CHUNKS_PER_SOURCE)
   // NOT SILENT. A mirrored row bigger than the indexer's ceiling keeps the part
   // that fits — making an existing record unfindable would be a worse answer
@@ -1480,7 +1489,10 @@ export async function indexSource(
       [hash, total, overflow, sourceId]
     )
   }
-  if (!total || from >= total) return { total, indexed: from, done: true }
+  // A CARD FALLS THROUGH. Everything below is a no-op for it except the record
+  // vector, and returning here would make it invisible rather than unquotable —
+  // the opposite of the intent, and identical on a green build.
+  if (!card && (!total || from >= total)) return { total, indexed: from, done: true }
 
   const labels = labelsFor(source)
   const now = new Date().toISOString()
@@ -1561,6 +1573,13 @@ export async function indexSource(
   // no vectors — blanking the hash is what makes the next sweep pick it up again
   // instead of skipping it forever as "unchanged". Self-healing without a repair
   // door anybody has to remember.
+  // ...AND IT MUST NOT FIRE ON A CARD. A card has no embedded chunks by design,
+  // which this self-heal reads as failure — so without the guard the sweep
+  // blanks every card's hash, re-reads and re-writes all of them on every tick,
+  // for ever, and counts a failed attempt each time. Silent, indistinguishable
+  // from ordinary sweep activity, and it spends against a cap the owner has
+  // already cut once.
+  if (!card) {
   const embedded = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
@@ -1588,6 +1607,7 @@ export async function indexSource(
     await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET embed_attempts = 0 WHERE id = ?", [
       sourceId,
     ])
+  }
 
   return { total, indexed: from, done: from >= total }
 }

@@ -815,6 +815,13 @@ export function googleIngestKinds(
               // is a fact read off the item, not a match made against it.
               eventId: item.externalId || null,
               eventIdFrom: item.externalId ? "origin" : null,
+              // AN ENTRY WITH NO DESCRIPTION IS THE APP'S OWN SENTENCE — "Met on
+              // 3 Sep." and nothing else. Findable, never quoted: KB-AUDIT.md
+              // §4.3 measured `event` at forty characters a chunk, the shortest
+              // in the base, which is exactly what makes it beat real documents
+              // on name-shaped questions. An agenda somebody typed is material
+              // and keeps its pieces.
+              generatedOnly: !item.text,
               title: item.title,
               body: [`Met on ${(at || "an unknown date").slice(0, 10)}.`, item.text]
                 .filter(Boolean)
