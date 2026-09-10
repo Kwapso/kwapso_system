@@ -1,0 +1,17 @@
+{
+  "skill": "error_log_review",
+  "version": 1,
+  "scoredAt": "2026-09-07",
+  "commit": "44569f3d4b51c5e097ace2ce6d20fad4d737f2a7",
+  "branch": "fix/error-log-95",
+  "score": 96,
+  "capped": false,
+  "store": { "present": true, "kind": "table", "name": "error_logs" },
+  "criteria": { "reach": 98, "store": 94, "boot": 92, "outbound": 93,
+                "frontend": 100, "background": 97, "row": 93, "parity": 100,
+                "safety": 97, "alerting": 100 },
+  "blindSpots": ["no browser screen for the store (owner's ruling)",
+                 "data-ops, mcp and the two gateways are not health-probed: no cron worker binds them",
+                 "10 library recorder call sites carry no trace id"],
+  "verdict": "every failure path that produced a row on staging now names its cause, its caller and its click"
+}

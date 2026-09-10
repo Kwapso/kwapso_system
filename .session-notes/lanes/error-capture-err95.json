@@ -1,0 +1,21 @@
+{
+  "skill": "error_log_review",
+  "version": 1,
+  "scoredAt": "2026-09-07",
+  "commit": "b10afda9254695131eb30eab07dec758644f952b",
+  "branch": "fix/errors-spend-95",
+  "score": 95,
+  "raw": 95.17,
+  "capped": false,
+  "store": { "present": true, "kind": "table", "name": "error_logs" },
+  "criteria": { "reach": 99, "store": 94, "boot": 93, "outbound": 100,
+                "frontend": 100, "background": 90, "row": 81, "parity": 97,
+                "safety": 97, "alerting": 100 },
+  "blindSpots": [
+    "no errors screen — listing and resolving are terminal-only (x-admin-key doors no browser can hold)",
+    "cron_heartbeats (db/core/0029) is NOT applied to staging, so nothing watches any schedule today",
+    "team_id / user_id / request_id are on ~10% of live rows; the fix is wired at all 48 call sites and has never been deployed",
+    "data-ops and mcp answer a health door no cron worker binds — a binding would be a deploy cycle"
+  ],
+  "verdict": "every failure path in the workers now reaches the store; what is left is a store nobody can read without a shell, and a fix for row completeness that has never run"
+}

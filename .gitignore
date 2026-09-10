@@ -75,6 +75,11 @@ out/
 # pattern ignores the CONTENTS and re-admits the one subfolder.
 .session-notes/*
 !.session-notes/lanes/
+# A lane's SCREENSHOTS are evidence, not knowledge. They live inside the project
+# because every folder must (the owner's rule), and out of git because the lane's
+# own REPORT already says what each one shows — five megabytes of finished-lane
+# PNGs would sit in the history for ever to save re-reading a paragraph.
+.session-notes/lanes/shots/
 
 # The pulled Glide rows are real customer data — the catalogue is tracked, the
 # data never is. Re-pull with `node scripts/glide-pull.mjs`.

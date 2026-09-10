@@ -7,9 +7,19 @@ conclusions. Your goal is one review score reaching **95 or above, measured fres
 
 ## Setup — do this first, exactly
 1. `cd /Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa && git fetch origin main`
-2. `git worktree add /Users/alaap_kanchwala_apple/kwapso-lanes/<LANE> -b <BRANCH> origin/main`
-   — the folder MUST be under `~/kwapso-lanes/`. **NEVER create a folder on the owner's Desktop.**
-3. `cd /Users/alaap_kanchwala_apple/kwapso-lanes/<LANE> && npm ci --silent` (or `npm install`).
+2. `git worktree add .worktrees/<LANE> -b <BRANCH> origin/main`
+   — the folder MUST be `.worktrees/` **INSIDE the project**. It is git-ignored.
+   **NEVER create a folder anywhere else.** The owner's rule, in his own words
+   (8 Sep 2026): "any and all folders you make will be within your parent folder,
+   which is Kwapso_cpaa on the desktop. Anything else that you try to create
+   elsewhere will be deleted. If that's stopping your work, too bad."
+   This step used to say `~/kwapso-lanes/<LANE>` and told you never to create a
+   folder on the Desktop — the exact opposite of the rule, and it survived the
+   move of the lane records into the project because a document is not a check.
+   R58 catches a path that no longer OPENS; `~/kwapso-lanes/` opened fine and was
+   still wrong, which is the gap between "this path resolves" and "this path is
+   allowed".
+3. `cd .worktrees/<LANE> && npm ci --silent` (or `npm install`).
 4. Read `CLAUDE.md`, `RULES.md` (the Laws R1–R52) and the review report your brief names.
 5. `npm run build` once in the worktree if your brief says a splash/export test matters — a
    worktree gate is 9 tests thinner than the primary checkout (two suites skip on git-ignored
