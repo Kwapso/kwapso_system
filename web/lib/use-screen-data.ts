@@ -131,7 +131,15 @@ export function useScreenData({
   const metaQ = useCached(enabled && module === "team" ? `team-meta:${teamId}` : null, () =>
     tenancy.teamMeta()
   )
-  // Tickets backs its list, the breadcrumb label and the ticket thread. R14: the
+  // Tickets backs its list and the ticket thread — NOT the breadcrumb label, and
+  // this sentence said it did until 10 Sep 2026. `crumbs.ts`'s `RECORD_FACE` gives
+  // `tickets` no `list` key at all, deliberately and with its own reason on the
+  // line ("tickets are 1,820 rows behind a paged door, so the by-id read is the
+  // honest path rather than the exception"), and `namedByList` returns "" for any
+  // module without one. So a ticket's crumb has NEVER come from this cache.
+  // Two comments in two files disagreed about one behaviour and the one with a
+  // mechanism behind it was right; `round_trip_review` found it while checking a
+  // claim the planner had made twice. R14: the
   // list is a PAGE, so My/All is a SERVER scope with its own cache — filtering a
   // loaded page client-side would disagree with the exact badge above it (R16).
   // The All cache is still the one the live registry patches row-by-row.
