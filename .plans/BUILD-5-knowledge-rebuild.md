@@ -43,9 +43,15 @@ what we build. (Ahead / level / behind = against Glean, Dropbox Dash, NotebookLM
   needs a CHUNK-level key (lane C). Two blocks, each needing a different key:
   email+email 668 chunk pairs (182 of 436 live mails), document+meeting 582 chunk
   pairs (20 documents, 15 meetings). Of the mail block, a source content hash folds
-  the larger part and the RFC-822 header is required for the rest — the exact split
-  is being re-derived (B1's report 2 gave 125/84 against a population of 182, which
-  does not add up and is not yet settled). Title+date is the WEAKER key (reaches
+  the larger part and the RFC-822 header is required for the rest. SETTLED 10 Sep,
+  with populations: 436 live email sources; 182 of them share exact chunk text with
+  another; a source-level content hash catches **125 (69%)** and misses **57 (31%)**.
+  The earlier 125/84 did not add up because both figures were `COUNT(DISTINCT
+  source_id)` over overlapping sets — one mail can share text with an equal-hash twin
+  AND a different-hash twin at once, so it was counted twice; 125 + 84 = 209 > 182 was
+  exactly that overlap. **And the figure that sizes the prize is 66 rows removed across
+  59 hash groups, not 125** — a fold keeps one per group. So: the hash is worth
+  building, and the RFC-822 header is a real second build for the remaining 31%. Title+date is the WEAKER key (reaches
   112 where the hash reaches 125): if only one is built, build the hash. And
   `event_id` does NOT express the meeting fold though it looks as though it should
   — coverage is event 66/66, meeting 47/122, email 30/436, **document 0** — because
