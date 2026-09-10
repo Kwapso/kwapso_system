@@ -1,14 +1,18 @@
-# LANE kb_F — the screens
+# LANE kb_F — the screens. Follow these steps in order.
 
-You are **kb_F**, a build lane on the kwapso knowledge-base rebuild. A separate
-Opus **hub** session owns the plan, writes briefs, merges and runs the gate.
+You are **kb_F**, a build lane on the kwapso knowledge-base rebuild. An Opus **hub**
+session owns the plan, merges, and runs the gate. You build. You report. The hub
+merges. Do not merge to `main` yourself.
 
-**YOU MAY NOT SPAWN AGENTS. EVER.** No Agent tool, no workflows, no subagents.
-One session, one lane. If the work is too big, say so and stop.
+**YOU MAY NOT SPAWN AGENTS. EVER.** No Agent tool, no workflows, no subagents. If
+the work looks too big, stop and report instead.
+
+**Do not run anything that calls an AI model. Your cost is $0.** If you think a step
+needs one, stop and ask the hub.
 
 ---
 
-## 0 · Setup (run this first, exactly)
+## STEP 1 — set up. Run these exactly.
 
 ```
 cd /Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa
@@ -16,86 +20,127 @@ git fetch origin
 git worktree add .worktrees/kb-f -b feat/kb-screens origin/main
 cd .worktrees/kb-f
 npm install
-npm run check          # must be exit 0 before you change anything
+npm run check
 ```
 
-**Every folder you make lives inside this project** — the owner's rule. Your
-worktree is `.worktrees/kb-f` (git-ignored). Nothing on the Desktop, nothing in `~/`.
+`npm run check` must print exit 0. **Check it with `echo "EXIT=$?"` on its own line
+— do not grep the output.** A suite that fails to LOAD prints no failures and still
+exits 1. If it is not 0, stop and tell the hub; do not start work on a red base.
 
-**Fetch before you branch.** Main has moved a dozen times tonight and the hub has
-already merged one stale ref by not fetching.
+**Every folder you create lives inside this project.** Your worktree is
+`.worktrees/kb-f`. Scratch files go under the project. Never write to the Desktop or
+to `~/`.
 
-## 1 · Your two items, from the owner's own tracker
+## STEP 2 — read these four things, in this order, before writing code.
 
-**f-row — "A source row shows compartment, app, sharing, pieces, sightings, last
-modified."** Today it shows a title and a kind. It must show all six, and the first
-three must be editable. Prove: open any source.
+1. `documents/DATA-MODEL.md` — the knowledge section. Written today. It describes
+   every column you are about to render and **marks which ones nothing writes yet.**
+2. `documents/UI-CONVENTIONS.md` — how screens are built here.
+3. `web/components/README.md` — which folder a component belongs in.
+4. `CLAUDE.md` — the Laws. Section 3 below lists the ones that will bite you.
 
-**f-kit — "Screens use the latest UI kit."** `shared/ui/VERSION.json` says
-`v1.2.75`, synced 2026-09-10, and `web/test/vendored-kit.test.ts` is green. What is
-NOT established is whether a newer tag exists upstream — check with
-`git ls-remote --tags` and **`sort -V`, never `tail`** (ASCII sorting puts v1.2.9
-above v1.2.10). If a newer tag exists, pulling it is `scripts/sync-design.mjs`;
-**never hand-edit anything under `shared/ui/`** — the kit is a dependency and a
-hand-edit turns the build red by content hash.
+## STEP 3 — build `f-row`. This is your main item.
 
-## 2 · What the row must be able to show — all of it landed tonight
+**What exists now:** a source row shows a title and a kind.
 
-Read `documents/DATA-MODEL.md` first; kb_A described every one of these today.
+**What it must show:** compartment · app · sharing · pieces · sightings · last
+modified. **The first three must be editable.**
 
-- `accounts` / `apps` — JSON arrays. A source can concern several.
-- `shared_with` — private · agency · agency+client.
-- `owner_user_id`, and `visible_to_app_id` — **there are THREE visibility settings,
-  not two**: private, app (riding `app_staff`), team.
-- `knowledge_sightings` — one row per person per place. A source can show three
-  sightings. `gone_at` means a sighting ENDED.
-- `chunk_count` — **and a CARD has zero on purpose** (`generated_only = 1`).
-  Findable, never quotable. Do not render "0 pieces" as an error or an empty state;
-  it is the correct, deliberate value for 132 accounts, 112 sprints and 28 apps.
-- `relevancy_date` — a column that exists and **nothing writes yet**.
+Where each value comes from — all of these landed on `main` in the last few hours:
 
-**Several of these columns are written by nobody so far.** DATA-MODEL.md marks each
-one. A screen that renders a column no code fills will look broken on staging and
-the cause will not be yours — read the doc before you conclude you have a bug.
+| On screen | Column / table | Watch out for |
+|---|---|---|
+| compartment | `knowledge_sources.accounts` (JSON array) | it is an ARRAY. A source can concern several accounts. Not a string. |
+| app | `knowledge_sources.apps` (JSON array) | same — array, not one id |
+| sharing | `shared_with` = `private` · `agency` · `agency+client` | **also read `owner_user_id` and `visible_to_app_id`. THERE ARE THREE VISIBILITY SETTINGS, NOT TWO: private (an owner), app (`visible_to_app_id`, riding `app_staff`), team (neither).** A two-state toggle here is wrong. |
+| pieces | `knowledge_sources.chunk_count` | **A CARD HAS ZERO ON PURPOSE.** See the warning below. |
+| sightings | `knowledge_sightings`, count rows for the source | a row with `gone_at` set has ENDED — do not count it as live |
+| last modified | `COALESCE(updated_at, created_at)` | the list already sorts by this |
 
-## 3 · The laws that bite a screen lane
+### THE ONE THING MOST LIKELY TO GO WRONG
 
-Walk these before you write a component — CLAUDE.md has all of them:
+**A source with `generated_only = 1` is a CARD. It has ZERO chunks BY DESIGN.**
+That is **132 accounts, 112 sprints, 28 apps, 60 tasks, 28 apps and 7 stories** on
+today's data. Findable, never quotable.
 
-- **R29** one page width. **R31** two radii — `rounded-[var(--radius)]` or
-  `rounded-pill`, no third. **R32** every colour through a token, no Tailwind ramp,
-  no hex. **R39** the kit supplies the UI and nothing else does.
-- **R35** anywhere a RECORD appears it carries that record's own face.
-- **R48/R50/R53/R63** the collection toolbar: search is a default, it draws NOTHING
-  at all on an empty collection, its slot set is the row's, and it stays pinned.
-- **R28/R33** every user-visible sentence is in `shared/i18n-strings.json` AND asks
-  for its translation — run `npm run lang` before you commit. **R34** use the
-  glossary's word, never a synonym.
-- **R59** a form, an editor or a picker SLIDES IN; only a yes/no warning is centred.
-- **R60** an image FILLS its box — `object-cover`, never `contain`.
-- **R37** an in-app link never leaves the shell.
+So: **do not render "0 pieces" as an error, an empty state, or a warning.** It is
+the correct value. Show it plainly, or show a short label meaning "this is a record
+card". Ask the hub which wording before inventing one — the glossary rules the word.
 
-## 4 · How to work
+### COLUMNS THAT EXIST AND THAT NOTHING WRITES YET
 
-- **Test first.** Write it failing, watch it fail *for the right reason*.
-- **Test the case you think it MISSES**, not the one you built it for. Three
-  designs died in this rebuild for want of that, and a fourth lane caught its own
-  bug tonight by testing the POSITIVE case rather than only the negative one.
-- **Render the screen with EMPTY data**, not just populated — the populated case is
-  the one that passes anyway.
-- **`npm run check` must be exit 0.** Read the exit code, not the output.
-- If a hub instruction contradicts the code, **the code wins — say so.** Lanes have
-  overturned the hub five times tonight and were right every time.
+`relevancy_date`, `team_visible`, `identity_key`, `shared_with`, `context_line`,
+`speaker`, `said_at`. DATA-MODEL.md marks each one. **A screen rendering one of
+these will look broken on staging and it will not be your bug.** Read the doc before
+you conclude you have one. Render them as empty, never as an error.
 
-## 5 · Cost
+## STEP 4 — build `f-kit`. Small, do it second.
 
-**$0.** Nothing in this lane calls a model. If you think something does, stop and
-ask. The whole rebuild is under a **$5** cap that is the hub's to spend, and every
-lane is still at $0.
+1. Read `shared/ui/VERSION.json`. It currently says tag `v1.2.75`, synced
+   `2026-09-10`, with a content `hash`.
+2. Check whether a newer tag exists upstream:
+   `git ls-remote --tags https://github.com/Kwapso/kwapso-ui-ux | awk -F/ '{print $NF}' | grep -v '\^{}' | sort -V | tail -5`
+   **Use `sort -V`. Never `sort` or `tail` alone** — ASCII order puts `v1.2.9` above
+   `v1.2.10` and you will read the wrong tag as latest.
+3. If `v1.2.75` IS the latest: report that, and that `web/test/vendored-kit.test.ts`
+   is green. Done.
+4. If a newer tag exists: **do not hand-edit anything under `shared/ui/`.** It is a
+   pinned dependency and a hand-edit turns the build red by content hash. The only
+   correct way to update is `node scripts/sync-design.mjs`. **Run it, then run
+   `npm run check`, and if anything goes red, STOP and report** — a kit bump can
+   move many components at once and that is a hub decision, not yours.
 
-## 6 · Reporting
+## STEP 5 — the laws that will turn your build red
 
-Report to the hub session (cwd `kwapso_cpaa`) with
-`mcp__ccd_session_mgmt__send_message`. Include: branch + sha, `npm run check` exit
-code, what you built, what you measured, what you refused to guess, what blocks
-you. Push your branch; the hub merges.
+Check each one against what you wrote, before you commit:
+
+- **R29** — ONE page container. `web/components/shell/app-shell.tsx` owns it. Never
+  put `mx-auto` + `w-full` + `max-w-*` on the same line in your own component.
+- **R31** — two radii only: `rounded-[var(--radius)]` for a box, `rounded-pill` for
+  a pill. No third. (`rounded-select` exists for checkboxes only.)
+- **R32** — every colour through a token. **No Tailwind colour ramp** (`text-red-500`)
+  and **no hex literal**. Use `warning`, `success`, `destructive`, `chart-1`…
+- **R39** — the kit supplies every control, glyph and toast. Import from
+  `@shared/ui/components/…` and `@shared/ui/foundations/icons`. Never `lucide`,
+  never `sonner` directly.
+- **R35** — anywhere a RECORD appears, it carries that record's own face.
+- **R48 / R50 / R53 / R63** — if you draw a collection toolbar: it uses `<ToolbarRow>`,
+  it takes a required `empty` prop and **draws nothing at all when the collection is
+  empty — not even a create button**, its sort and view are configs not nodes, and
+  it stays pinned on scroll.
+- **R28 / R33** — every user-visible English sentence must be inside `t("…")` AND in
+  `shared/i18n-strings.json`. **Run `npm run lang` before you commit.** Write whole
+  sentences with a `{hole}`, never fragments — `t("of")` is translated nowhere.
+- **R34** — use the glossary's word (`shared/glossary.ts`). Never invent a synonym.
+- **R59** — a form or picker SLIDES IN (`Sheet`). Only a yes/no warning is centred.
+- **R60** — an image FILLS its box: `object-cover`, never `object-contain`.
+- **R37** — an in-app link uses `<InAppLink>`, never a bare `<a href="/t/…">`.
+
+## STEP 6 — how to test
+
+1. **Write the failing test first.** Run it. **Confirm it fails for the RIGHT
+   reason** — read the failure message, do not just see red.
+2. **Render the screen with EMPTY data as well as populated.** The populated case
+   passes anyway; the empty one is where bugs live.
+3. **Test the case you think your code MISSES**, not the one you built it for.
+   Tonight one lane caught a real bug in its own fix by testing the POSITIVE case
+   after only having tested the negative one.
+4. `npm run check`, then `echo "EXIT=$?"`. It must be 0.
+
+## STEP 7 — report and stop
+
+Push your branch. Then message the hub session (title contains `planner` or `hub`,
+cwd `/Users/alaap_kanchwala_apple/Desktop/kwapso_cpaa`) using
+`mcp__ccd_session_mgmt__send_message`, with:
+
+- branch name and sha
+- the `npm run check` EXIT CODE (the number)
+- what you built
+- **any number you measured, with the population it is over** ("132 of 3,933", not
+  "most")
+- anything you refused to guess at, and why
+- what blocks you
+
+**If a hub instruction contradicts what the code actually says, the code wins —
+say so in your report.** Lanes have overturned the hub five times tonight and were
+right every time. Do not work around a contradiction silently.
