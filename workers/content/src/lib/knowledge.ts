@@ -1692,6 +1692,13 @@ export async function indexSource(
         // re-index (which content or force already trigger on every write this
         // module makes) carries the new value down onto every chunk and
         // posting it owns.
+        //
+        // `source.owner_user_id` RIDES ALONG UNCHANGED TOO, and `labelsFor`'s
+        // own header (below) is the one place that says what it MUST be once a
+        // fold merges more than one private sighter — read it before writing
+        // that merge. A stale single value copied here would exclude a
+        // legitimate colleague from this very candidate pool with no
+        // downstream fence able to rescue it.
         statements.push(
           `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, team_visible, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
              ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, text = excluded.text, embedding = excluded.embedding
@@ -1857,7 +1864,34 @@ export async function indexOneSource(
  * built in ONE place so a chunk and its record's summary can never disagree
  * about whose material they are. Every key is present on every vector, because
  * Vectorize has no "is null": an absent key is a hole in every filter, so
- * "nothing here" has a spelling of its own. */
+ * "nothing here" has a spelling of its own.
+ *
+ * ── WHAT `owner` MUST BE, ONCE A SOURCE HAS MORE THAN ONE PRIVATE SIGHTER ──
+ *
+ * `source.owner_user_id ?? TEAM_SHELF` is correct only because `owner_user_id`
+ * is trusted, by construction, to name AT MOST ONE PERSON — or nobody, which is
+ * NULL and reads here as team-wide. The moment a fold merges two or more
+ * DISTINCT PRIVATE sightings into one source (the calendar fold's own shape —
+ * measured on staging, every one of its 27 multi-sighted events is private,
+ * seen by more than one person, no team sighting), no single value can name
+ * them all, and the whoever writes that merge MUST set `owner_user_id = NULL`
+ * on the source, DELIBERATELY, rather than leave it at whatever the last
+ * ingest reader to run happened to write.
+ *
+ * GET THIS WRONG AND NOTHING DOWNSTREAM CAN RESCUE IT. `ownerClause`
+ * (knowledge.ts, above) decides the real answer from live sightings and cannot
+ * be widened by a stale `owner_user_id` — but it only ever sees a source
+ * Vectorize's own ANN search already returned as a CANDIDATE. A chunk labelled
+ * `owner: <one stale person's id>` is excluded from every OTHER sighted
+ * colleague's search at THIS layer, before `ownerClause` is ever consulted —
+ * a false refusal with no correct read-back to appeal to, because a vector
+ * Vectorize never returns as a candidate never reaches it. `NULL` is the only
+ * honest value once one column can no longer name the truth: over-inclusive at
+ * the narrowing stage (R26's own bargain — a wrong label costs a relevant
+ * passage its ranking slot, never a caller an answer they should never have
+ * had), and correctly decided, for real, at the read-back through
+ * `ownerClause`. This is not written here as documentation of a decision
+ * already made — the fold-merge writer that must make it does not exist yet. */
 function labelsFor(source: {
   kind: string
   compartment: string
