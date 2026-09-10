@@ -20,7 +20,7 @@ conclusions. Your goal is one review score reaching **95 or above, measured fres
    still wrong, which is the gap between "this path resolves" and "this path is
    allowed".
 3. `cd .worktrees/<LANE> && npm ci --silent` (or `npm install`).
-4. Read `CLAUDE.md`, `RULES.md` (the Laws R1–R52) and the review report your brief names.
+4. Read `CLAUDE.md`, `RULES.md` (the Laws R1–R58) and the review report your brief names.
 5. `npm run build` once in the worktree if your brief says a splash/export test matters — a
    worktree gate is 9 tests thinner than the primary checkout (two suites skip on git-ignored
    artefacts: `glide/normalised.json` and `web/out`). Totals match; only passed/skipped moves.
@@ -48,13 +48,14 @@ disagrees with the source, census the source and say so.
   Staging is `--env staging`. **Never deploy production.** Deploy staging only if your brief says
   so; otherwise measure with `scripts/speed-bench.mjs` / Node-run worker code against staging data.
 - **Never read secrets from files.** Keychain at point of use, piped, never echoed.
-- **Do not touch `shared/ui/`** (hash-pinned kit; a hand edit turns the build red). It is at
-  v1.2.63. Adopt what the kit draws; never argue with it downstream.
+- **Do not touch `shared/ui/`** (hash-pinned kit; a hand edit turns the build red). Its version
+  is the `tag` in `shared/ui/VERSION.json` — read it there rather than from this sentence, which
+  is how the last one went stale. Adopt what the kit draws; never argue with it downstream.
 - **Stick with Aurora's UI/UX.** Do not change UI, UX or business logic beyond what your brief
   authorises. Voice: warm, plain, sentence case, no jargon, no emoji, glossary words only.
 - **Stay lean**: least code, reuse the seams (`d1-rest`, `requireRight`, `validate`,
   `publishChange`, `FormShell`, the recipe engine, the tool catalog). Too much code is a defect.
-- **Laws R1–R52 are machine-checked.** Walk them before you build (CLAUDE.md's planning ritual).
+- **Laws R1–R58 are machine-checked.** Walk them before you build (CLAUDE.md's planning ritual).
   A new invariant gets a test FIRST (red), then the fix (green). "Mutation-proved": revert your
   fix, run the test, see red, restore.
 - **Deactivate, never delete.** Audit block on every write.
@@ -77,7 +78,8 @@ disagrees with the source, census the source and say so.
 2. Re-measure your review on your branch tip, following the SKILL.md. Report the criteria table
    with arithmetic, the commit hash, and what each moved criterion cost.
 3. `git push -u origin <BRANCH>`. Do NOT open a PR (no gh); the planner merges.
-4. Write your report to `/Users/alaap_kanchwala_apple/kwapso-lanes/REPORT-<LANE>.md`: commit,
+4. Write your report to `.session-notes/lanes/REPORT-<LANE>.md` — inside the project, like every
+   other folder (step 2), and beside the twenty-two reports already there: commit,
    score before → after with the table, every file touched and why, every claim with the
    command that proves it, what you could NOT move and the honest reason, and anything you
    changed in UI/UX/business logic (the owner must be told). Then return that report as your
