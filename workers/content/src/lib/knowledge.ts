@@ -1433,16 +1433,22 @@ export async function indexSource(
   opts: { force?: boolean; slices?: number } = {}
 ): Promise<IndexProgress> {
   const rows = await d1Query<
-    SourceRow & { content_hash: string | null; embed_attempts: number; generated_only: number }
+    SourceRow & {
+      content_hash: string | null
+      embed_attempts: number
+      generated_only: number
+      shared_with: string
+    }
   >(
     cfg,
     guard.databaseId,
     // `file_url` rides along because `indexableText` needs it: a file with no
     // body indexes to nothing, and the difference between "no body" and "a file
     // with no body" is the difference between a note somebody left blank and a
-    // document we could not read.
+    // document we could not read. `shared_with` (0073) rides along for the
+    // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
-            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only,
+            owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only, shared_with,
             deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
@@ -1721,6 +1727,7 @@ function labelsFor(source: {
   record_date: string | null
   created_at: string
   owner_user_id: string | null
+  shared_with: string
 }): VectorLabels {
   const when = Date.parse(source.record_date ?? source.created_at)
   return {
@@ -1733,6 +1740,7 @@ function labelsFor(source: {
     ticket: source.ticket_id ?? NONE,
     sprint: source.sprint_id ?? NONE,
     date: Number.isFinite(when) ? Math.floor(when / 1000) : 0,
+    shared: source.shared_with,
   }
 }
 

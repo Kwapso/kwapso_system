@@ -281,14 +281,15 @@ npx wrangler vectorize create kwapso-knowledge --dimensions=1024 --metric=cosine
 npx wrangler vectorize create kwapso-knowledge-staging --dimensions=1024 --metric=cosine
 
 for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
-  # The nine labels the router narrows by. They mirror METADATA_INDEXES (beside
+  # The TEN labels the router narrows by — all ten Vectorize allows, and the
+  # label budget is now SPENT (BUILD-5-knowledge-rebuild.md §3: no eleventh
+  # slot, ever, on this index). They mirror METADATA_INDEXES (beside
   # VectorLabels) in workers/content/src/lib/knowledge-vectors.ts, and since
   # 26 Aug 2026 a check keeps the two in step —
-  # workers/content/test/vector-indexes-mirror.test.ts reads THIS block and
-  # fails the build if they disagree, because Vectorize cannot add a metadata
-  # index after the fact: getting it wrong here means rebuilding the index and
-  # re-embedding everything. A new label still means editing both, and the
-  # tenth slot of ten is deliberately left free.
+  # workers/content/test/vector-indexes-mirror.test.ts reads THIS block,
+  # pins the count at exactly ten, and fails the build if they disagree,
+  # because Vectorize cannot add a metadata index after the fact: getting it
+  # wrong here means rebuilding the index and re-embedding everything.
   npx wrangler vectorize create-metadata-index $INDEX --property-name=level      --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=compartment --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=owner      --type=string
@@ -298,23 +299,23 @@ for INDEX in kwapso-knowledge kwapso-knowledge-staging; do
   npx wrangler vectorize create-metadata-index $INDEX --property-name=ticket     --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=sprint     --type=string
   npx wrangler vectorize create-metadata-index $INDEX --property-name=date       --type=number
+  npx wrangler vectorize create-metadata-index $INDEX --property-name=shared     --type=string
 done
 ```
 
-**The tenth slot has a plan, not yet code.** BUILD-5-knowledge-rebuild.md §3
-calls for the tenth and last free label to be `knowledge_sources.shared_with`
-(0073) — 'private' / 'agency' / 'agency_client', so a compartment search can
-narrow by who a source is shared with the same way it already narrows by
-`compartment` and `owner`, and says the label budget is then SPENT (no
-eleventh slot, ever, on this index). As of 10 Sep 2026 that is still a plan:
-`VectorLabels` and `METADATA_INDEXES` (`workers/content/src/lib/knowledge-vectors.ts`)
-carry nine keys, not ten, `shared_with` is on no vector, and
-`vector-indexes-mirror.test.ts` mirrors whatever the code says today — it
-does not assert ten, and it does not know the tenth is meant to be
-`shared_with` specifically, because nothing has told it to yet. Wiring it in
-is Lane C's, at the same time as `shared_with`'s own read/write path; this
-paragraph exists so the next environment stood up before that lands is built
-against nine on purpose, not by an oversight nobody wrote down.
+**The tenth slot is `shared`, wired.** `knowledge_sources.shared_with` (0073)
+— 'private' / 'agency' / 'agency_client' — rides every vector as `shared`
+(`labelsFor`, `workers/content/src/lib/knowledge.ts`), so a compartment
+search can one day narrow by who a source is shared with the same way it
+already narrows by `compartment` and `owner`. Narrowing-only, exactly like
+`owner`/`compartment` before it (R26: the index narrows, the database
+decides) — no door reads it yet, because the client-portal answer door is
+BUILD-5 §5, decided-for-later; it is wired now because adding it after
+today would mean rebuilding the index and re-embedding everything, the same
+cost as any metadata index added late. `vector-indexes-mirror.test.ts` pins
+the count at exactly ten and names `shared` in it, so the ceiling this used
+to be (`toBeLessThanOrEqual(10)`, which could never fail) cannot silently
+stay at nine again.
 
 The binding is `KNOWLEDGE_INDEX` on the content worker and it is OPTIONAL: without
 it the knowledge base answers from its word index alone rather than refusing every
