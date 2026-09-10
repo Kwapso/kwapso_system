@@ -5171,6 +5171,126 @@ CREATE VIRTUAL TABLE knowledge_chunks_fts USING fts5(
 INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks;
 `,
   },
+  {
+    // FINDABLE, BUT NOT QUOTABLE (KB-AUDIT.md §4.3 — templated record mirrors
+    // eating answer slots; a person/account/contact stub winning a passage
+    // slot over somebody's actual words). Three designs were tried and
+    // failed before this column, worth recording because the failures are
+    // what prove a column is the right shape rather than a convenience:
+    //
+    //   1. A CENSUS ("every live source of this kind produces exactly one
+    //      short chunk") measured 2,589 of 3,933 sources, 1,309 of them
+    //      tickets — a short ticket is not a stub, so length alone cannot
+    //      tell the two apart.
+    //   2. A KIND-LEVEL FLAG ("declare person/account/contact as card-only
+    //      kinds") turned out false on inspection: every kind the audit
+    //      named has a reader that folds in real free text a person wrote
+    //      (person: headline/strengths/weaknesses; account: about plus its
+    //      apps/sprints/tickets by name; task: detail and logged-time
+    //      notes). The audit's stubs were rows where those fields happened
+    //      to be EMPTY, not a property of the kind. Only \`dropdown\` and
+    //      \`portal_login\` fold no free text at all — 22 of 3,933 live
+    //      sources — so a kind-level flag would read as "the audit's
+    //      complaint is fixed" while leaving it exactly where it was.
+    //   3. So: card-ness is a property of the ROW, decided by the READER,
+    //      at the moment it builds the body — the only moment "did this row
+    //      say anything beyond the sentence the app generated for it" is
+    //      still a fact anybody holds. Once the two halves are joined into
+    //      one body string they are indistinguishable, and nothing
+    //      downstream (chunking, embedding, a later re-read of the row) can
+    //      recover which case a given source was. THAT is why this cannot
+    //      be derived later, by a census or by anything else — it has to be
+    //      recorded at ingest or not at all.
+    //
+    // DEFAULT 0 is the safe direction, not a guess: a wrong 0 (a real stub
+    // marked quotable) costs one weak answer slot — the pre-existing bug,
+    // unchanged. A wrong 1 (real material marked generated-only) SILENTLY
+    // stops a person's own words from ever being quoted, which is worse and
+    // invisible. So every row that predates this column, and every kind's
+    // reader until it is taught to set the flag, reads as quotable — the
+    // behaviour this base already has today, not a new restriction imposed
+    // by a column nobody has wired up yet.
+    //
+    // Plain INTEGER NOT NULL DEFAULT 0, no CHECK: this schema's own 0/1
+    // boolean convention throughout (role_permissions.can_read, 0007;
+    // dropdown_values.is_default, 0001), never constrained beyond the type.
+    version: "0074_findable_but_not_quotable",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN generated_only INTEGER NOT NULL DEFAULT 0;
+`,
+  },
+  {
+    // THE FENCE THE FOLD CANNOT SHIP WITHOUT (kb_B1's analysis, hub tick 8).
+    //
+    // Retrieval's compartment fence reads \`owner_user_id\` straight off
+    // \`knowledge_chunks\`/\`knowledge_terms\` today: NULL means the team's, a
+    // value means one person's — a single column answering a question about
+    // ONE person's sight of a source. 0073 folded the multi-person duplicate
+    // so two people's DIFFERENT answers about the same source both have
+    // somewhere to live (\`knowledge_sightings\`, one row per person, each
+    // with its own \`shelf\`) — which is exactly what makes a single
+    // \`owner_user_id\` column on the chunk unable to answer for a folded
+    // source any more: whichever sighting last touched it would silently
+    // decide the OTHER person's visibility too.
+    //
+    // \`team_visible\` is the team half of \`readableBy\`'s two conditions
+    // (knowledge-identity.ts, fix/kb-gate) — true when SOME live sighting
+    // (\`gone_at IS NULL\`) sits on the 'team' shelf — denormalised onto the
+    // chunk and its terms for the same reason \`compartment\`/\`owner_user_id\`
+    // already are: retrieval's first stage has to be a single-table read.
+    //
+    // ── WHAT THIS MIGRATION DOES AND DOES NOT DO ───────────────────────────
+    //
+    // It adds the column and backfills it from the ONLY fact available at
+    // this moment — every existing row's own \`owner_user_id\`, because no
+    // source has been folded yet and \`knowledge_sightings\` holds nothing to
+    // read instead. That backfill is proved to preserve the exact population
+    // \`owner_user_id IS NULL\` already returns (see the migration test) —
+    // nothing gains or loses team visibility AT THE MIGRATION BOUNDARY.
+    //
+    // It does NOT keep the flag correct AFTER a fold, and cannot: the moment
+    // a source gains a second sighting, or a sighting's \`shelf\`/\`gone_at\`
+    // changes, \`team_visible\` is a claim about a fact that just moved. That
+    // recompute is the write path's job (kb_B1's — the read/write side this
+    // migration was commissioned beside), and it is a REQUIREMENT ON THAT
+    // CODE rather than something SQL here can enforce: every write that
+    // touches a sighting's \`shelf\` or \`gone_at\` must recompute
+    // \`team_visible\` for every chunk/term of that sighting's source in the
+    // SAME statement or transaction, never a follow-up write that can be
+    // skipped or fail independently. (Same reason this is not a trigger as
+    // every other denormalised-copy column in this file is not one — see
+    // 0073's \`knowledge_chunks_fts\` header for why a trigger cannot even be
+    // expressed through this repo's own migration executor. Here the
+    // reason is sharper still: the source of truth for a recompute is
+    // ANOTHER table's SET of rows, which a single-row \`BEGIN...END\` trigger
+    // body cannot aggregate over even where triggers work at all.) A test
+    // that recomputes \`team_visible\` from \`knowledge_sightings\` across a
+    // whole corpus and asserts equality is what keeps that promise honest —
+    // kb_B1's, not this file's, because it has to run against the sightings
+    // the write path actually produced.
+    //
+    // ── THE DEFAULT IS THE OPPOSITE DIRECTION FROM 0074's, ON PURPOSE ──────
+    //
+    // 0074's \`generated_only\` defaults to 0 (quotable) because a forgotten
+    // flag there should not silently withhold a person's own words. Here a
+    // forgotten flag should not silently WIDEN who can read something, so
+    // the safe default flips: 0 (NOT team-visible, private) is the direction
+    // that costs a missed answer rather than an over-shared one for any row
+    // written by code that has not yet been taught to set this column.
+    version: "0075_the_fence_the_fold_cannot_ship_without",
+    sql: `
+ALTER TABLE knowledge_chunks ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE knowledge_terms ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+
+UPDATE knowledge_chunks
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+
+UPDATE knowledge_terms
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
