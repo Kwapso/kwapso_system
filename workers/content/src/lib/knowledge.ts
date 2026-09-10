@@ -1659,12 +1659,15 @@ async function clearIndex(
       chunkVectorId(sourceId, fromSeq + i)
     ),
   ])
-  await d1Query(
-    cfg,
-    guard.databaseId,
-    "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ? AND seq >= ?)",
-    [sourceId, fromSeq]
-  )
+  // `knowledge_terms`'s own delete USED TO SIT HERE. Retired (tracker item
+  // `a-fts`) once `lexicalArm`'s move to `knowledge_chunks_fts` left it with
+  // no reader anywhere in the app, the MCP surface or `scripts/` — verified
+  // off disk, not assumed: zero `SELECT … FROM knowledge_terms` outside a
+  // diagnostic COUNT(*) in wipe-knowledge.mjs. Step 1 of 2 (hub ruling,
+  // 10 Sep 2026): stop writing first, fully reversible, the table and its
+  // rows are untouched. Dropping the table is step 2 and waits until this
+  // has run live through a real rebuild with nothing missing it.
+  //
   // KEEPING `knowledge_chunks_fts` IN STEP — the same keyed 'delete' the
   // migration's own test demonstrates, reading the rows' CURRENT text WHILE
   // they still exist, immediately before the statement that removes them.
@@ -1911,12 +1914,13 @@ export async function indexSource(
     for (let start = 0; start < piece.length; start += CHUNK_WRITE_BATCH) {
       const batch = piece.slice(start, start + CHUNK_WRITE_BATCH)
       const ids = batch.map((_, offset) => chunkVectorId(sourceId, from + start + offset))
-      // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE. A chunk keeps its id when
-      // its text changes, so its old words would otherwise stay in the inverted
-      // index pointing at a piece that no longer contains them. On a first write
-      // this matches nothing; it is one statement per twenty chunks either way.
+      // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE, in the FTS5 index — a chunk
+      // keeps its id when its text changes, so its old words would otherwise
+      // stay behind pointing at a piece that no longer contains them.
+      // `knowledge_terms`'s own delete USED TO SIT HERE too; retired alongside
+      // `clearIndex`'s (see that function's comment for the full reasoning and
+      // the verification this rests on).
       const statements: string[] = [
-        `DELETE FROM knowledge_terms WHERE chunk_id IN (${ids.map(sqlString).join(", ")});`,
         // KEEPING `knowledge_chunks_fts` (0073) IN STEP — application code's job,
         // because a trigger cannot survive this repo's migration executor (see
         // the migration's own header). External-content FTS5's 'delete' command
@@ -1967,11 +1971,6 @@ export async function indexSource(
         statements.push(
           `INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id = ${sqlString(chunkId)};`
         )
-        for (const [term, weight] of tokenise(chunk))
-          statements.push(
-            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, team_visible, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${weight})
-               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, weight = excluded.weight;`
-          )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
       })
       await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
@@ -3223,15 +3222,21 @@ async function logRefusal(
   question: string,
   compartments: string[],
   reason: string,
-  shortlist: { id: string; score: number }[]
+  shortlist: { id: string; score: number }[],
+  /** THE RAW COSINE OF THE NEAREST VECTOR NEIGHBOUR, before any floor —
+   * KB-AUDIT.md §3's own number: "you will see the 0.44-0.49 band
+   * immediately." `null` when there is nothing to report one for (no vector
+   * store, an unembeddable question, or literally no neighbours), which is a
+   * different fact from a low score and must stay distinguishable from one. */
+  top1Score: number | null
 ): Promise<void> {
   const write = (async () => {
     try {
       await d1Query(
         cfg,
         guard.databaseId,
-        `INSERT INTO knowledge_refusals (id, question, compartments, reason, shortlist, asked_by_user_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO knowledge_refusals (id, question, compartments, reason, shortlist, top1_score, asked_by_user_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ulid(),
           question,
@@ -3242,6 +3247,7 @@ async function logRefusal(
               .slice(0, REFUSAL_SHORTLIST_CAP)
               .map((s) => ({ id: s.id, score: Math.round(s.score * 1000) / 1000 }))
           ),
+          top1Score === null ? null : Math.round(top1Score * 1000) / 1000,
           guard.userId,
           new Date().toISOString(),
         ]
@@ -3328,6 +3334,13 @@ export async function retrieve(
           ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
         })
       : []
+  // THE RAW NEAREST-NEIGHBOUR SCORE, BEFORE ANY FLOOR — kept for the refusal
+  // log alone (KB-AUDIT.md §3: "log every refusal with its top-1 score"),
+  // never for ranking or for the floor decision itself, both of which read
+  // `vector` below. `searchVectors` returns matches ordered best-first
+  // (Vectorize's own contract), so this is genuinely the nearest neighbour and
+  // not an arbitrary row.
+  const top1Score = hits[0]?.score ?? null
   // NOT EVERY NEAREST NEIGHBOUR IS EVIDENCE. There is always a closest thing;
   // below the floor it is merely the least unlike, and letting it through is how
   // a knowledge base answers a question about parental leave out of a note about
@@ -3419,7 +3432,7 @@ export async function retrieve(
     // No fused candidates at all — the shortlist worth logging is empty, and
     // that emptiness is itself the fact: nothing narrowed by compartment or
     // touched by any arm, not "something close that fell short".
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [])
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
     return knowledgeAnswer({
       question,
       compartments: route.compartments,
@@ -3581,7 +3594,7 @@ export async function retrieve(
   // genuinely holds nothing" apart from "something was close" — logged with
   // the FUSED candidates rather than the (empty, by construction) `passages`.
   if (!decided.found)
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused)
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
   if (!input.compose || !decided.found) return decided
   const written = await input.compose(decided.passages, decided.citations)
   // Nothing written (the model was unreachable, or said nothing) is not an error:

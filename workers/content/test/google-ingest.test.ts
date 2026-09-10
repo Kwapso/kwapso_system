@@ -353,13 +353,17 @@ describe("the shelf is the fence", () => {
       .all(mine.id) as { o: string | null }[]
     expect(chunks.length, "the private file must have been chunked at all").toBeGreaterThan(0)
     for (const c of chunks) expect(c.o).toBe(IDS.staffUser)
-    const terms = db()
-      .prepare(
-        `SELECT DISTINCT owner_user_id AS o FROM knowledge_terms
-          WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ?)`
-      )
-      .all(mine.id) as { o: string | null }[]
-    for (const t of terms) expect(t.o, "stage one of the search reads the fence off the postings").toBe(IDS.staffUser)
+    // STAGE ONE OF THE LEXICAL ARM USED TO BE `knowledge_terms`, fenced by its
+    // OWN denormalised `owner_user_id` copy — this block asserted that copy
+    // travelled down correctly. `lexicalArm`'s move to `knowledge_chunks_fts`
+    // (BM25, tracker item `a-fts`) removed that copy along with the table's
+    // last writer: FTS5's external-content table carries no metadata columns
+    // at all, so the fence is read the same way every OTHER arm's is — a JOIN
+    // to `knowledge_chunks` at query time (`fastOwnerClause`, lib/knowledge.ts),
+    // which the assertion above already proves carries the right value. There
+    // is no longer a second copy for a second block to check; asserting on
+    // `knowledge_terms` here would iterate zero rows and pass for saying
+    // nothing, which is worse than deleting the assertion outright.
   })
 
   it("moving a folder to the team's shelf re-indexes it, even though its text never changed", async () => {

@@ -241,18 +241,29 @@ describe("a source a person writes is answerable straight away", () => {
       title: "How we handle a dispatch outage",
       body: "When the dispatch screen logs people out, restart the session service and tell the client within the hour.",
     })
-    // Chunked, tokenised and embedded in the same call — the owner asked for
-    // instant syncing, and "instant" is what makes a note worth typing.
+    // Chunked and embedded in the same call — the owner asked for instant
+    // syncing, and "instant" is what makes a note worth typing.
     const chunks = db().prepare("SELECT COUNT(*) n FROM knowledge_chunks WHERE source_id = ?").get(id) as {
       n: number
     }
     expect(chunks.n).toBeGreaterThan(0)
-    const terms = db()
+    // FTS5 (0073), NOT `knowledge_terms` — the lexical arm's own index, kept in
+    // step by `indexSource` itself (see its comment). `knowledge_terms` is
+    // written by nothing any more (tracker item `a-fts`, step 1: retired 10 Sep
+    // 2026, verified off disk that nothing anywhere reads it before the writes
+    // stopped) — asserted here as a real negative rather than left silent, so a
+    // write that creeps back in fails loudly rather than quietly reviving a
+    // dead table.
+    const fts = db()
       .prepare(
-        "SELECT COUNT(*) n FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ?)"
+        `SELECT COUNT(*) n FROM knowledge_chunks_fts f
+           JOIN knowledge_chunks c ON c.rowid = f.rowid
+          WHERE c.source_id = ?`
       )
       .get(id) as { n: number }
-    expect(terms.n).toBeGreaterThan(0)
+    expect(fts.n).toBeGreaterThan(0)
+    const terms = db().prepare("SELECT COUNT(*) n FROM knowledge_terms").get() as { n: number }
+    expect(terms.n, "knowledge_terms must stay empty — nothing writes to it any more").toBe(0)
 
     const answer = await ask(IDS.staffUser, "what do we do when the dispatch screen logs people out?")
     expect(answer.found).toBe(true)
@@ -410,14 +421,28 @@ describe("R23 — a question the team's material cannot answer is refused, not a
     const after = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
     expect(after.n, "no row was written for a real refusal").toBe(before.n + 1)
     const row = db()
-      .prepare("SELECT question, reason, shortlist, asked_by_user_id FROM knowledge_refusals ORDER BY created_at DESC LIMIT 1")
-      .get() as { question: string; reason: string; shortlist: string; asked_by_user_id: string }
+      .prepare(
+        "SELECT question, reason, shortlist, top1_score, asked_by_user_id FROM knowledge_refusals ORDER BY created_at DESC LIMIT 1"
+      )
+      .get() as {
+      question: string
+      reason: string
+      shortlist: string
+      top1_score: number | null
+      asked_by_user_id: string
+    }
     expect(row.question).toBe("What is the capital of France?")
     expect(row.reason.length).toBeGreaterThan(0)
     expect(row.asked_by_user_id).toBe(IDS.staffUser)
     // The shortlist is always valid JSON — an array, whether or not there was
     // anything in it to log.
     expect(Array.isArray(JSON.parse(row.shortlist))).toBe(true)
+    // KB-AUDIT.md §3's own instrument: the raw top-1 cosine, captured even
+    // though this question was refused before it ever reached the floor
+    // decision — there IS a nearest neighbour (the base holds two real
+    // sources), it is just not close enough, and that number is the whole
+    // point of this column.
+    expect(row.top1_score, "the raw top-1 score must be captured, not just the fused shortlist").not.toBeNull()
   })
 
   it("an answer that DOES find something writes no refusal row", async () => {

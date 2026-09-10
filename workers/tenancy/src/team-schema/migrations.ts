@@ -5551,6 +5551,18 @@ DROP TABLE IF EXISTS account_rates;
     // decided before the fetch. No SQL below changed; only the version string
     // and its place in the ledger did.
     //
+    // `top1_score` IS A SEPARATE FACT FROM `shortlist`, and both are needed for
+    // the reason KB-AUDIT.md §3 names: "log every refusal with its top-1
+    // score. You will see the 0.44-0.49 band immediately." `shortlist` carries
+    // the FUSED ranking's ids — a mix of vector, lexical, name and recency
+    // votes, whose scale means nothing on its own. `top1_score` is the raw
+    // cosine of the single nearest vector neighbour, BEFORE any floor is
+    // applied, which is the exact number a paraphrase's refusal turns on
+    // (KB-AUDIT.md §3's measured band). Nullable: a question with no vector
+    // store, an unembeddable question, or a search that found literally
+    // nothing has no such number to report, and that absence is itself worth
+    // keeping distinct from "the top score was 0".
+    //
     // NO READ DOOR YET, ON PURPOSE. This migration is the write side only —
     // the same order 0073 shipped `knowledge_names` in, empty, before anything
     // read it. A GROWING collection (R14): whoever builds the read door pages
@@ -5565,6 +5577,7 @@ CREATE TABLE knowledge_refusals (
   compartments TEXT NOT NULL,
   reason TEXT NOT NULL,
   shortlist TEXT NOT NULL,
+  top1_score REAL,
   asked_by_user_id TEXT NOT NULL,
   created_at TEXT NOT NULL
 );

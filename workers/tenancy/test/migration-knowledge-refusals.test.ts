@@ -30,11 +30,32 @@ describe("0079 — knowledge_refusals remembers what a refusal saw", () => {
     expect(() => migrated()).not.toThrow()
   })
 
-  it("creates the table with a question, a reason, a shortlist and who asked", () => {
+  it("creates the table with a question, a reason, a shortlist, the top-1 score and who asked", () => {
     const db = migrated()
     const cols = columns(db, "knowledge_refusals")
-    for (const c of ["id", "question", "compartments", "reason", "shortlist", "asked_by_user_id", "created_at"])
+    for (const c of [
+      "id",
+      "question",
+      "compartments",
+      "reason",
+      "shortlist",
+      "top1_score",
+      "asked_by_user_id",
+      "created_at",
+    ])
       expect(cols.has(c), `knowledge_refusals.${c} is missing`).toBe(true)
+  })
+
+  it("top1_score is nullable — a question with nothing to report a score for still logs", () => {
+    const db = migrated()
+    db.exec(
+      `INSERT INTO knowledge_refusals (id, question, compartments, reason, shortlist, top1_score, asked_by_user_id, created_at)
+         VALUES ('R2', 'what is the capital of France?', '[]', 'The question named no client, so I searched the whole knowledge base.', '[]', NULL, 'U1', '2026-09-10');`
+    )
+    const row = db.prepare("SELECT top1_score FROM knowledge_refusals WHERE id = 'R2'").get() as {
+      top1_score: number | null
+    }
+    expect(row.top1_score).toBeNull()
   })
 
   it("holds the shortlist as real, readable JSON — the whole point of the table", () => {
