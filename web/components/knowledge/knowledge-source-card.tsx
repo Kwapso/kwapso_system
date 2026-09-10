@@ -94,12 +94,19 @@ function piecesLabel(source: KnowledgeSource, t: Translate): string {
   return t("{count} pieces", { count: String(source.chunkCount) })
 }
 
-/** How many people can currently see it. Named directly ("people", never the
- * schema's own "sighting") for the same R34 reason `piecesLabel` is — the
- * glossary has no entry for it, so it stays out of copy. */
-function sightingsLabel(source: KnowledgeSource, t: Translate): string {
-  if (source.sightingsCount === 1) return t("1 person has seen this")
-  return t("{count} people have seen this", { count: String(source.sightingsCount) })
+/** HOW IT REACHED US — the true fact behind the count, in the hub's own
+ * words, never the schema's own term for it ("sighting" was ruled out
+ * entirely, not merely undefined: it names an internal modelling concept no
+ * person needs, unlike "passage", which named a real product idea and is now
+ * a glossary term). Returns `null` at zero — the true state of every row
+ * today, since nothing writes a sighting yet — because a zero here is a fact
+ * about this BUILD, not about the material, and a card that says so reads as
+ * broken on every row in the base. `null` means the line is not drawn at
+ * all, not drawn empty. */
+function sightingsLine(source: KnowledgeSource, t: Translate): string | null {
+  if (source.sightingsCount === 0) return null
+  if (source.sightingsCount === 1) return t("Reached us through one person")
+  return t("Reached us through {count} people", { count: String(source.sightingsCount) })
 }
 
 export function KnowledgeSourceCard({
@@ -121,6 +128,7 @@ export function KnowledgeSourceCard({
   canEdit: boolean
 }) {
   const { t, lang } = useLanguage()
+  const sightings = sightingsLine(source, t)
   return (
     <Card
       variant="raised"
@@ -172,7 +180,7 @@ export function KnowledgeSourceCard({
         <p className="text-muted-foreground">{sharingLabel(source, t)}</p>
         <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
           <span>{piecesLabel(source, t)}</span>
-          <span>{sightingsLabel(source, t)}</span>
+          {sightings && <span>{sightings}</span>}
           <span>
             {source.updatedAt || source.createdAt
               ? t("Last edited {when}", {

@@ -173,7 +173,10 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
     expect(screen.getByText("Not filed under an app")).toBeTruthy()
   })
 
-  it("says how many people, never the schema's own word for it — including zero, which every team holds today", () => {
+  // ZERO IS THE TRUE STATE OF EVERY ROW TODAY (nothing writes a sighting
+  // yet), and it is a fact about this BUILD, not about the material — so the
+  // line is not drawn at all, never "0" and never the schema's own word.
+  it("draws no line at all when the count is zero — the true state of every row today", () => {
     render(
       <KnowledgeSourceCard
         source={makeSource({ sightingsCount: 0 })}
@@ -183,11 +186,11 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
         canEdit={false}
       />
     )
-    expect(screen.getByText("0 people have seen this")).toBeTruthy()
+    expect(screen.queryByText(/reached us/i)).toBeNull()
     expect(screen.queryByText(/sighting/i)).toBeNull()
   })
 
-  it("uses the singular for exactly one person", () => {
+  it("uses the singular for exactly one person, and never the schema's word for it", () => {
     render(
       <KnowledgeSourceCard
         source={makeSource({ sightingsCount: 1 })}
@@ -197,7 +200,21 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
         canEdit={false}
       />
     )
-    expect(screen.getByText("1 person has seen this")).toBeTruthy()
+    expect(screen.getByText("Reached us through one person")).toBeTruthy()
+    expect(screen.queryByText(/sighting/i)).toBeNull()
+  })
+
+  it("uses the plural once more than one person has brought it in", () => {
+    render(
+      <KnowledgeSourceCard
+        source={makeSource({ sightingsCount: 3 })}
+        accountNames={new Map()}
+        onOpen={noop}
+        onEditFiling={noop}
+        canEdit={false}
+      />
+    )
+    expect(screen.getByText("Reached us through 3 people")).toBeTruthy()
   })
 
   it.each([
