@@ -525,3 +525,52 @@ the ambiguity instead of resolving it silently — which is the only reason this
 catchable before an exam run.
 
 **Standing: no model call authorised anywhere. Every lane at $0.**
+
+## Tick 10 — 10 Sep 2026, ~21:30
+
+**BUILD-5 §0 STILL SAID $10.** The owner cut the cap to $5 on 10 Sep and only THIS
+LOG had caught up — so the plan's opening ruling, the paragraph every lane reads
+first, carried twice the room he allowed, for the whole session. Fixed on main,
+and §0 now also states what "measured on our workers only" MEANS, since the
+obvious instrument cannot separate our spend from rest-o's agent on the same
+model. Found by accident while checking something else, which is the only reason
+it was found at all.
+
+**kb_B2's mail regroup is mechanically done and holding a red build** — 7 failing
+assertions in `google-ingest.test.ts`, all one cause: `externalId` became the
+thread id and the fixtures assume per-message identity. It did not commit, and
+handed the sequencing to kb_B1 as an identity question.
+
+**RULING: THERE IS NO TRANSITION TO SEQUENCE. THE PLAN ALREADY PURGES.** Both
+lanes were sizing this against the 20 Aug chat transition (textVersion bump +
+cursor rewind + re-key). BUILD-5 §0: *"All derived data is purged and everything
+is re-pulled, re-synced and re-indexed."* The 436 message-keyed email sources are
+DELETED and re-pulled under thread identity — no rewind, no re-key, no
+compatibility window. So the seven reds are FIXTURE UPDATES that B2 owns, not a
+migration to hand B1. Two lanes were solving a problem the plan had already
+decided not to have; neither had re-read §0.
+
+**kb_B2's `google-api.ts` finding is real and BIGGER THAN IT REPORTED IT.**
+Confirmed at :1390 — `knownPlaceholder()` returns `threadId: ""` while the real
+path at :1424 has `str(data.threadId)`. B2 called it free to fix. It is not. The
+placeholder's own comment states the invariant: *"nothing downstream may ever read
+it: a placeholder's sortAt sorts before any real cursor."* **That holds only while
+a source is a MESSAGE.** Under thread-as-source, a new message in an old thread
+CHANGES THE TEXT OF AN EXISTING SOURCE, so every message of a touched thread must
+be read — and "we know this id, skip it" stops being an optimisation and becomes a
+silent truncation assembling a thread's body from its new messages only.
+
+Passing `threadId` through is necessary and NOT sufficient: the skip's premise
+needs re-deciding under the new unit. Given to kb_B1 (identity), **with the
+arithmetic demanded BEFORE the decision** — that skip is recent, deliberate spend
+work (7a0d928c, 8c3848fe: "stop paying for what it already knows"), re-reading
+whole threads costs more than re-reading new messages, and the cap is $5. Eating
+the cost is an acceptable answer; not pricing it is not. This is precisely the
+failure this log's cost section was written about.
+
+**Pattern worth naming across ticks 8-10: three separate times today a lane has
+been about to solve a problem that a document already answered** — the audit
+kb_B1 and kb_B2 both believed was missing, the purge ruling above, and the $10
+cap. In each case the document was right there and stale-looking or assumed-read.
+A hub that only answers the questions asked will keep missing these; the answer is
+to re-read the plan against each report rather than against memory.
