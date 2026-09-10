@@ -103,8 +103,9 @@ overflow, and not part of the numbered forty-two: [`docs-audit/`](docs-audit/)
 (a decisions record from a verification pass), [`design/`](design/) (the design-system
 commission brief and the gap decisions it produced), and [`interfacelessness/`](interfacelessness/)
 (one support script for the `interfacelessness_review` skill, not a document at all).
-None of these are referenced from CONTRIBUTING.md's walkthrough; open them directly
-when you need the specific record they hold.
+None of these is reached from the numbered map above or from
+[CONTRIBUTING.md](documents/CONTRIBUTING.md)'s walkthrough; open them directly when
+you need the specific record they hold.
 
 **Making your FIRST change?** [CONTRIBUTING.md](documents/CONTRIBUTING.md) is the path
 through all of this once, in the order the work happens: clone → the planning
