@@ -37,7 +37,7 @@ import worker from "../src/index"
 import { fakeVectorize } from "./fake-vectorize"
 import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
-import { diversify } from "../src/lib/knowledge"
+import { diversify, rebuildNameIndex } from "../src/lib/knowledge"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
 
@@ -401,6 +401,13 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
       title: "How we run a rollout",
       body: "Every rollout starts with a dry run and a written sign-off from the client.",
     })
+    // `accountNamedIn` reads `knowledge_names` (0073), not `accounts` directly —
+    // in production the sync door keeps it in step (`postKnowledgeSync`); here
+    // it is built once, directly, the same way `diversify` is exercised as a
+    // plain function elsewhere in this suite. `cfg`/`guard` are both ignored by
+    // the mocked D1 door (see d1-sqlite.ts) — only `databaseId` would matter
+    // against the real door, and this harness has one shared database.
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
   })
 
   it("a question naming a client searches that client and the agency, and says so", async () => {
@@ -472,6 +479,72 @@ describe("the compartment is derived, and it is the reasoning that ships", () =>
     // LIKE matched — every word of the account's own name has to appear.
     const answer = await ask(IDS.staffUser, "what does our marine insurance cover?")
     expect(answer.compartments).toEqual([])
+  })
+})
+
+// KB-AUDIT.md §4.2 — THE ROUTER HIJACKED BY ORDINARY WORDS. 26 of 134 staging
+// accounts have a single-token name that is also an ordinary English word
+// ("VU Solutions" → "solutions", "re-green" → "green"), and the old router
+// (a raw scan of `accounts`) matched on that one token alone: a question
+// about "solutions" in general silently narrowed to whichever account
+// happened to be named that. `accountNamedIn` now requires a single-token
+// name to be RARE across the corpus (`isRareTerm`) before it may narrow —
+// exercised here directly rather than through the fake embedding model,
+// because the fault is in ROUTING, not ranking.
+describe("the account router is not hijacked by a name that is also an ordinary word (§4.2)", () => {
+  const HIJACKER = "A_HIJACK"
+  const RARE_NAMED = "A_RARE"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${HIJACKER}', 'entity', 'VU Solutions', NULL, '2026-01-01'),
+         ('${RARE_NAMED}', 'entity', 'Paddlebase', NULL, '2026-01-01');`
+    )
+    // A DUMMY SOURCE, purely as knowledge_chunks' FK target — this test is
+    // about the ROUTER, so the chunks below are filler text, never asked
+    // about and never expected to be cited.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    // MAKE "solutions" COMMON — over EXACT_TERM_MAX_CHUNKS (100) chunks say
+    // it, the same shape as the audit's own real corpus, where "solutions"
+    // is an everyday word said across hundreds of chunks that have nothing
+    // to do with the VU Solutions account.
+    const rows: string[] = []
+    for (let i = 0; i < 120; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_FILL_${i}', 'S_FILLER', 'agency', ${i}, 'we discussed several possible solutions for this problem', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_FILLER';"
+    )
+  })
+
+  it("does not narrow to an account whose name is a single, ordinary, common word", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what solutions have we proposed for data import?")
+    // THE BUG (KB-AUDIT.md §4.2's own transcript) is the COMPARTMENT narrowing —
+    // "I searched VU Solutions's material and the agency's own" — which hides
+    // every OTHER client's material behind an account nobody named. It is not
+    // this: a separate, floored vector search over record SUMMARIES may still
+    // mention "VU Solutions" in the advisory sentence once it is genuinely
+    // indexed and genuinely similar (its own name shares the word "solutions"
+    // with the question) — that is `deriveRoute`'s "covers" feature working as
+    // documented, and it never narrows anything on its own (see its header).
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+    expect(answer.reason).not.toContain("I searched VU Solutions's material")
+  })
+
+  it("still narrows to a single-token name that is genuinely rare in the corpus", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the Paddlebase migration?")
+    expect(answer.compartments).toEqual([`account:${RARE_NAMED}`, "agency"])
+    expect(answer.reason).toContain("Paddlebase")
   })
 })
 

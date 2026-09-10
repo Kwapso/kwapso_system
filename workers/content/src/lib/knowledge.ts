@@ -1279,6 +1279,16 @@ async function clearIndex(
     "DELETE FROM knowledge_terms WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ? AND seq >= ?)",
     [sourceId, fromSeq]
   )
+  // KEEPING `knowledge_chunks_fts` IN STEP — the same keyed 'delete' the
+  // migration's own test demonstrates, reading the rows' CURRENT text WHILE
+  // they still exist, immediately before the statement that removes them.
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO knowledge_chunks_fts (knowledge_chunks_fts, rowid, text)
+       SELECT 'delete', rowid, text FROM knowledge_chunks WHERE source_id = ? AND seq >= ?`,
+    [sourceId, fromSeq]
+  )
   await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_chunks WHERE source_id = ? AND seq >= ?", [
     sourceId,
     fromSeq,
@@ -1500,6 +1510,14 @@ export async function indexSource(
       // this matches nothing; it is one statement per twenty chunks either way.
       const statements: string[] = [
         `DELETE FROM knowledge_terms WHERE chunk_id IN (${ids.map(sqlString).join(", ")});`,
+        // KEEPING `knowledge_chunks_fts` (0073) IN STEP — application code's job,
+        // because a trigger cannot survive this repo's migration executor (see
+        // the migration's own header). External-content FTS5's 'delete' command
+        // needs the OLD text to remove the right postings, so it is read back
+        // with a plain SELECT, BEFORE the chunk rows below overwrite it. On a
+        // first write this matches no row and deletes nothing, which is correct.
+        `INSERT INTO knowledge_chunks_fts (knowledge_chunks_fts, rowid, text)
+           SELECT 'delete', rowid, text FROM knowledge_chunks WHERE id IN (${ids.map(sqlString).join(", ")});`,
       ]
       batch.forEach((chunk, offset) => {
         const seq = from + start + offset
@@ -1519,6 +1537,12 @@ export async function indexSource(
           `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
              ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, text = excluded.text, embedding = excluded.embedding
              WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id;`
+        )
+        // THE FRESH POSTING — read back AFTER the row above has written the new
+        // text, same rowid (an UPDATE never changes SQLite's own rowid, only a
+        // DELETE+INSERT would), new words.
+        statements.push(
+          `INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id = ${sqlString(chunkId)};`
         )
         for (const [term, weight] of tokenise(chunk))
           statements.push(
@@ -1839,11 +1863,37 @@ async function sourceTitles(
   return new Map(rows.map((r) => [r.id, r.title]))
 }
 
-/** The account a question names, or null. Two passes on purpose: SQL NARROWS
- * (one LIKE per question word, so the read is bounded by the team's own account
- * list), then code CONFIRMS — every word of the account's own name has to appear
- * in the question. Without the second pass a three-letter word inside a longer
- * name would file a question under a client it never mentioned. */
+/** IS THIS TOKEN RARE ENOUGH TO MEAN SOMETHING ON ITS OWN — the same question
+ * `EXACT_TERM_MAX_CHUNKS` already answers for the lexical arm's rare-token
+ * bypass, asked here for `accountNamedIn` instead of inventing a second
+ * number for the same idea. UNFENCED (whole-team chunk count over FTS5),
+ * because this runs BEFORE the compartment is known — narrowing to a
+ * compartment is the very question this function exists to answer. */
+async function isRareTerm(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    "SELECT COUNT(*) AS n FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?",
+    [`"${term}"`]
+  )
+  return (rows[0]?.n ?? 0) <= EXACT_TERM_MAX_CHUNKS
+}
+
+/** The account a question names, or null. Reads `knowledge_names` (0073)
+ * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
+ *
+ * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
+ * "DEMO" → "demo" — 26 of 134 staging accounts have a single-token name, and
+ * the token is often an ordinary English word, so "what solutions have we
+ * proposed for data import?" used to silently narrow to VU Solutions. TWO
+ * WAYS a candidate may still win: its name is ≥2 tokens, every one of them
+ * present in the question (two specific words appearing together is not a
+ * coincidence the way one common word is); or it is a single token that is
+ * RARE across the corpus (`isRareTerm`) — "Paddlebase" and "Asekurans" are
+ * still one token each, and still have to resolve. An ALIAS (the account's own
+ * `code`, e.g. BERG) bypasses both: a code is chosen to be a short,
+ * unambiguous handle on purpose, so an exact match is evidence on its own,
+ * exactly as it was before this function moved off `accounts.code`. */
 async function accountNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1851,25 +1901,124 @@ async function accountNamedIn(
 ): Promise<{ id: string; name: string } | null> {
   const terms = questionTerms(question, 8)
   if (!terms.length) return null
-  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`).concat(terms.map(() => "LOWER(code) = ?"))
-  const params = [...terms.map((t) => `%${likeLiteral(t)}%`), ...terms]
-  const candidates = await d1Query<{ id: string; name: string; code: string | null }>(
+  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
+  const params = terms.map((t) => `%${likeLiteral(t)}%`)
+  const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: a question can only ever pull back a handful of candidates,
-    // however many accounts happen to contain one of its words.
-    `SELECT id, name, code FROM accounts
-      WHERE deactivated_at IS NULL AND (${clauses.join(" OR ")})
+    // however many indexed names happen to contain one of its (at most 8) words.
+    `SELECT ref_id, name, alias_of FROM knowledge_names
+      WHERE kind = 'account' AND (${clauses.join(" OR ")})
       ORDER BY LENGTH(name) DESC LIMIT 10`,
     params
   )
   const asked = new Set(terms)
   for (const c of candidates) {
-    if (c.code && asked.has(c.code.toLowerCase())) return { id: c.id, name: c.name }
+    // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
+    // no token-count/rarity gate. `alias_of` carries the canonical name back.
+    if (c.alias_of) {
+      if (asked.has(c.name.toLowerCase())) return { id: c.ref_id, name: c.alias_of }
+      continue
+    }
     const nameTerms = [...tokenise(c.name).keys()]
-    if (nameTerms.length && nameTerms.every((t) => asked.has(t))) return { id: c.id, name: c.name }
+    if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
+    if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
+      return { id: c.ref_id, name: c.name }
   }
   return null
+}
+
+/** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountNamedIn` reads.
+ *
+ * READ STRAIGHT OFF `accounts` AND `apps`, not off `knowledge_sources`. The
+ * first draft of this function derived names from the SWEPT mirror instead —
+ * simpler, one shape for every kind — and it broke the one thing this table
+ * exists to fix: an account that exists but has nothing indexed about it yet
+ * (a brand-new client, or a team the sweep has not reached) would have NO
+ * candidate row at all, so a question naming it correctly would route as
+ * "named no client" — the exact silent failure KB-AUDIT.md §4.2 is about,
+ * moved rather than fixed. `accounts` and `apps` are foundational tables that
+ * exist the moment a record does, independent of indexing, which is what
+ * `accountNamedIn`'s ORIGINAL implementation relied on by reading them
+ * directly; this keeps that guarantee.
+ *
+ * `contact`/`person` kinds are left to grow this table later (the migration's
+ * own comment names them as in scope) — `nameArm` already has a working,
+ * independently-tested route to colleagues (`knowledge_sources kind='person'`
+ * directly), so nothing in this build regresses by their absence here.
+ *
+ * ALIASES ARE DELIBERATELY THIN: an account's own `code` (BERG, HOGO) is the
+ * only one generated, because it is DATA the app already holds, not a guess.
+ * Misspelling/nickname GENERATION — 0073's own migration comment says that is
+ * "Lane C's job, not this table's" — needs a model call this build has not
+ * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
+ * rule is ask first). A canonical name with no alias is still fully usable:
+ * `accountNamedIn`'s multi-token and rare-single-token rules both read it
+ * alone, and a client whose accepted name IS a single ordinary word (the
+ * audit's own "green"/"solutions" cases) still resolves once it clears the
+ * rarity floor — no alias required for either path.
+ *
+ * A FULL REBUILD, NOT AN UPSERT. The population is a few hundred rows at
+ * most (every live account and app this team holds), so deleting and
+ * reinserting is simpler than an upsert keyed on `(kind, ref_id, name)` —
+ * which cannot express a RENAME, because the old name is part of the key an
+ * upsert would leave behind as an orphan row. */
+export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
+  const accounts = await d1Query<{ id: string; name: string; code: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14 hard cap: bounded by how many accounts this team holds — an
+    // agency's own client roster, not a growing log.
+    "SELECT id, name, code FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+  )
+  const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
+    cfg,
+    guard.databaseId,
+    "SELECT id, name, account_id FROM apps WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+  )
+
+  type NameRow = {
+    id: string
+    kind: string
+    ref_id: string
+    name: string
+    alias_of: string | null
+    compartment: string
+  }
+  const rows: NameRow[] = []
+  for (const a of accounts) {
+    if (!a.name) continue
+    const compartment = accountCompartment(a.id)
+    rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.name, alias_of: null, compartment })
+    if (a.code)
+      rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.code.toLowerCase(), alias_of: a.name, compartment })
+  }
+  for (const app of apps) {
+    if (!app.name) continue
+    rows.push({
+      id: ulid(),
+      kind: "app",
+      ref_id: app.id,
+      name: app.name,
+      alias_of: null,
+      compartment: app.account_id ? accountCompartment(app.account_id) : AGENCY_COMPARTMENT,
+    })
+  }
+
+  const now = new Date().toISOString()
+  await d1Query(cfg, guard.databaseId, "DELETE FROM knowledge_names")
+  const REBUILD_BATCH = 200
+  for (let i = 0; i < rows.length; i += REBUILD_BATCH) {
+    const batch = rows.slice(i, i + REBUILD_BATCH)
+    const statements = batch.map(
+      (r) =>
+        `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at) VALUES (${sqlString(r.id)}, ${sqlString(r.kind)}, ${sqlString(r.ref_id)}, ${sqlString(r.name)}, ${sqlString(r.alias_of)}, ${sqlString(r.compartment)}, ${sqlString(now)})
+           ON CONFLICT (kind, ref_id, name) DO NOTHING;`
+    )
+    await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
+  }
+  return { written: rows.length }
 }
 
 /* -------------------------------- retrieval ------------------------------- */
@@ -2218,14 +2367,55 @@ async function nameArm(
   return rows.map((r) => ({ chunk_id: r.chunk_id, lex: 1, exact: 1 }))
 }
 
-/** THE LEXICAL ARM. One keyed read over the inverted index, fenced by the reader
- * and narrowed by the compartment.
+/** THE LEXICAL ARM. FTS5's own BM25 over `knowledge_chunks_fts` (0073) — one
+ * keyed read, fenced by the reader and narrowed by the compartment.
  *
- * It used to be stage ONE, and everything else only saw what it handed on. Now
- * it runs beside the vector arm, gated and quiet, and neither can cap the other.
- * It is still here, and it must stay: a reference code, an error string, an
- * invoice number are things a person types EXACTLY, and an embedding is
- * indifferent to exactly. */
+ * REPLACES `knowledge_terms` (KB-AUDIT.md §4.4): that table's scorer was a raw
+ * term-frequency SUM with no IDF and no length normalisation — a chunk saying
+ * "invoice" five times outscored one that said it once in a five-word note
+ * regardless of how common "invoice" is across the corpus — and the audit's
+ * "hybrid search costs nine points of recall" finding was measured against
+ * that scorer, not against BM25. FTS5's `bm25()` is a real BM25 (term
+ * frequency, inverse document frequency, document-length normalisation), so
+ * this is now the arm that measurement should have been run against. See
+ * `retrieve`'s header for the re-measured RRF weights.
+ *
+ * SAME SHAPE AS BEFORE, ON PURPOSE. `termFloor`'s proportional floor and the
+ * exact-token bypass (`exactTerms`, `EXACT_TERM_MAX_CHUNKS`) are UNCHANGED;
+ * only the source of a chunk's term coverage and its relevance number moved.
+ * `fuse` never reads `.lex`'s VALUE, only the ARRAY POSITION this function
+ * hands back, so nothing downstream had to change to accept a bm25 number in
+ * place of a weight sum.
+ *
+ * ONE TERM, ONE BRANCH. FTS5 has no "how many of these N terms does this row
+ * contain" primitive the way a `GROUP BY chunk_id` over a term-postings table
+ * did, so `scoped` is a UNION ALL of one `MATCH` per term. Each term is
+ * double-quoted in its MATCH string so a token that happens to collide with an
+ * FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal search rather
+ * than a syntax error — `tokenise()` already drops the ordinary stopwords that
+ * would otherwise raise this, but a quoted term costs nothing and closes the
+ * case a future stopword list forgets.
+ *
+ * THE FENCE IS APPLIED ONCE, on the union's output, not once per branch —
+ * per-branch fencing would multiply the fence's own parameters by up to 24
+ * terms and blow the budget below for nothing: every branch shares the same
+ * owner and compartment.
+ *
+ * THE PARAMETER BUDGET, same discipline as the ceiling this arm used to
+ * document. Worst case is MAX_QUESTION_TERMS (24) terms, every one of them
+ * digit-bearing (all 24 "rare"): the branches bind 2 params each (48), the
+ * fence binds one owner id plus a handful of compartments, the rare-term
+ * filter binds at most 24 more, and the combined MATCH for `bm25()` binds 1 —
+ * about 76 against D1's ceiling of 100. Higher than the old arm's 53 because
+ * this one binds two params per term-branch instead of one, and still well
+ * inside the ceiling MAX_QUESTION_TERMS was chosen to respect.
+ *
+ * bm25() IS ASCENDING — SQLite's convention is a MORE NEGATIVE number for a
+ * BETTER match (measured against this exact table: a chunk repeating both
+ * query terms scored more negative than one containing them once each), the
+ * opposite of the old `SUM(weight)`. That is why the final `ORDER BY` reads
+ * `ASC` where the old one read `DESC`; the array POSITION `fuse` reads is
+ * unchanged — the exact bypass still leads, relevance still breaks the tie. */
 async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -2240,74 +2430,72 @@ async function lexicalArm(
   role: LexicalRole
 ): Promise<CandidateRow[]> {
   if (!terms.length) return []
-  const owner = ownerClause(guard)
-  const where = [`term IN (${terms.map(() => "?").join(", ")})`, owner.sql]
-  const params: (string | number)[] = [...terms, ...owner.params]
+  const owner = ownerClause(guard, "k.owner_user_id")
+  const fenceWhere = [owner.sql]
+  const fenceParams: (string | number)[] = [...owner.params]
   if (compartments.length) {
-    where.push(`compartment IN (${compartments.map(() => "?").join(", ")})`)
-    params.push(...compartments)
+    fenceWhere.push(`k.compartment IN (${compartments.map(() => "?").join(", ")})`)
+    fenceParams.push(...compartments)
   }
+
+  // ONE UNION-ALL BRANCH PER TERM. `?` for the term's own label (read back as
+  // `scoped.term`) and `?` for the MATCH query, quoted — see the header.
+  const branches = terms
+    .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
+    .join(" UNION ALL ")
+  const branchParams: string[] = []
+  for (const t of terms) branchParams.push(t, `"${t}"`)
+
   // THE ONE CLAUSE THAT LETS AN EXACT TERM PAST THE PROPORTIONAL FLOOR, and it
   // is absent — statement for statement, parameter for parameter — from a
   // question that has no exact term in it. The floor's measured behaviour on
   // every other question is therefore untouched by this, which is the whole of
   // what the no-exact-term case is promised.
-  //
-  // The exact tokens are bound AFTER the WHERE's, because SQLite numbers `?` by
-  // where it appears in the text and `rare` is written after the scoped read.
   const rare = exact.filter((t) => terms.includes(t))
-  const bypass = rare.length
-    ? `OR SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END) > 0`
-    : ""
-  if (rare.length) params.push(...rare)
+  // THE COMBINED QUERY, for `bm25()` alone — every branch's row set is by
+  // construction a subset of what this OR-of-all-terms query matches, so the
+  // join below can never drop a row `scoped` found.
+  const combinedMatch = terms.map((t) => `"${t}"`).join(" OR ")
+
   const rows = await d1Query<CandidateRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: the lexical arm returns at most LEXICAL_TOP_K rows, whatever
-    // the compartment holds. The statement binds at most 24 terms + 1 owner + a
-    // handful of compartments + at most those same 24 terms again for the exact
-    // list — 53 or so against D1's ceiling of 100, and the term list is capped at
-    // MAX_QUESTION_TERMS precisely so this arithmetic stays true.
+    // R14 hard cap: LIMIT ${LEXICAL_TOP_K} at the statement, same as before.
     //
-    // `COUNT(*)` counts the DISTINCT terms of the question this chunk contains;
-    // the primary key is (term, chunk_id), so a row per term is a term. That is
-    // the number the floor is expressed in — SUM(weight) says how loudly a chunk
-    // matched, and only this says how MUCH of the question it answered.
-    //
-    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK, and that is the
-    // second half of the same bug. Filtering afterwards meant the LIMIT chose the
-    // ten LOUDEST chunks first and the floor then threw most of them away — so a
-    // chunk holding every word of the question could be cut before the floor ever
-    // saw it, by ten chunks that repeated one word. Deciding eligibility in the
-    // statement makes the ten a page of chunks that already qualify. The number
-    // is derived from the question's own term count and is an integer, so it is
-    // interpolated like every other server-owned value (CONVENTIONS).
-    //
-    // THE EXACT TOKEN LEADS THE ORDER, and without that the weight below buys
-    // nothing. `lex` is the SUM of term weights, so a chunk echoing a dozen of
-    // the question's ordinary words ("could", "somebody", "currently", "week")
-    // outranks the one chunk that holds the reference, which matched a single
-    // term. Fusion is by RANK, so losing the order loses the fight before the
-    // weight is ever applied — which is what a test with six chatty near-misses
-    // around one short handover note showed the moment it was written. On a
-    // question with no rare exact token `exact` is the literal 0 for every row,
-    // so this is `ORDER BY lex DESC` exactly as it was measured.
+    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK — the same reason
+    // as before: filtering afterwards would let the LIMIT choose loudest first
+    // and throw the floor's own candidates away before it ever saw them.
+    // `termFloor(...)` is a derived integer, interpolated like every other
+    // server-owned value (CONVENTIONS), never bound.
     `WITH scoped AS (
-       SELECT chunk_id, term, weight FROM knowledge_terms WHERE ${where.join(" AND ")}
+       SELECT u.row_id, u.term FROM (${branches}) u
+       JOIN knowledge_chunks k ON k.rowid = u.row_id
+       WHERE ${fenceWhere.join(" AND ")}
      )${
        rare.length
-         ? `, rare AS (
+         ? `, rareTerms AS (
        SELECT term FROM scoped WHERE term IN (${rare.map(() => "?").join(", ")})
         GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
      )`
          : ""
-     }
-     SELECT chunk_id, SUM(weight) AS lex, ${
-       rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rare) THEN 1 ELSE 0 END)" : "0"
-     } AS exact FROM scoped
-      GROUP BY chunk_id HAVING COUNT(*) >= ${termFloor(terms.length, role)} ${bypass}
-      ORDER BY exact DESC, lex DESC LIMIT ${LEXICAL_TOP_K}`,
-    params
+     },
+     counted AS (
+       SELECT row_id, COUNT(*) AS hits,
+         ${rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
+       FROM scoped GROUP BY row_id
+        HAVING hits >= ${termFloor(terms.length, role)} ${rare.length ? "OR exact > 0" : ""}
+     ),
+     ranked AS (
+       SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
+       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
+     )
+     SELECT k.id AS chunk_id, ranked.rel AS lex, counted.exact AS exact
+       FROM counted
+       JOIN ranked ON ranked.row_id = counted.row_id
+       JOIN knowledge_chunks k ON k.rowid = counted.row_id
+      ORDER BY counted.exact DESC, ranked.rel ASC
+      LIMIT ${LEXICAL_TOP_K}`,
+    [...branchParams, ...fenceParams, ...(rare.length ? rare : []), combinedMatch]
   )
   return rows
 }
