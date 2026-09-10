@@ -83,6 +83,16 @@ const ROOT = join(HERE, "..", "..")
 
 /** A path our own words name on purpose, knowing it is not there. */
 const GONE_ON_PURPOSE: Record<string, string> = {
+  // ── THE INTERNAL RATES, retired whole on 2026-09-10 at the client's ruling
+  // ("kill the whole internal rates thing … for now i iwanna wipe it clean").
+  // Three files went, and each is still NAMED somewhere precisely because it is
+  // gone — which is the shape this list exists for.
+  "workers/tenancy/src/lib/internal-money.ts":
+    "the file R24 was built around: the agency's own two cost cards and the margin, in ONE file nothing a client login could reach imported. RULES.md's R24 row, CLAUDE.md, the registry's law text, the retirement record in rules.test.ts, money.test.ts's retired margin block, BUILD-A-MODULE.md and team migration 0031's annotation all name it, and every one of those sentences is ABOUT its deletion — the law's structural half cannot be explained without naming the thing that was structural",
+  "web/components/money/internal-rate-card.tsx":
+    "the internal rate card screen, which also carried the role rate card. CONTROL-SWAP-LANES.md's lane manifest is a snapshot of the files that lane was handed and is left as counted, and a lane report in .session-notes/lanes/ measures its first-run copy — both are records of a moment, and rewriting a snapshot to match today is how a snapshot stops being evidence",
+  "web/components/money/margin-panel.tsx":
+    "the \"what this account leaves us\" figure on a client's Rates tab, the margin's only consumer, which could not survive the loss of its input. Named in a lane report that measured its empty-state copy — the same snapshot argument as the card above",
   "web/components/team/role-detail.tsx":
     "the per-role screen the client deleted on 2026-09-09 (\"I want to see the roles much differently… all the roles together\"). Every role's sheet is one grid on Settings › Team now (roles-matrix.tsx), and half a dozen comments — module-content.tsx's `roles` branch, the roles matrix's own header, web/lib/pages.ts, R36's screen clause in rules.test.ts — name this path precisely BECAUSE it is gone, which is what makes each of those sentences readable",
   "web/lib/use-live-refetch.ts":

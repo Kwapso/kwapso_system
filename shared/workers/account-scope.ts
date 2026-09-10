@@ -488,13 +488,17 @@ const SCOPE_STAMPED_RESOURCES = [
   "stories",
   "sprints",
   "deliverables",
-  // A step edit or a rate change moves the client's own Impact screen, and a
-  // ping the fence cannot check is a ping a client never hears (fail-closed) —
-  // so both resources joined the stamped set on 26 Aug 2026 and every one of
-  // their publishers stamps the account, held by the census in
+  // A step edit moves the client's own Impact screen, and a ping the fence
+  // cannot check is a ping a client never hears (fail-closed) — so `processes`
+  // joined the stamped set on 26 Aug 2026 and every one of its publishers stamps
+  // the account, held by the census in
   // workers/tenancy/test/stamped-publishers.test.ts.
+  //
+  // `account_rates` JOINED ON THE SAME DAY AND LEFT ON 10 SEP 2026, when the
+  // client retired the rate card ("the whole account rates also killed it"). Its
+  // publishers went with the doors, so a line for it here would be a fence over
+  // a resource nothing publishes.
   "processes",
-  "account_rates",
 ] as const
 
 /** The fence, for a LIVE CHANGE PING (`{resource, id, scope}` on a team's channel).

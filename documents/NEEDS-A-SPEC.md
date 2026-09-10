@@ -71,7 +71,7 @@ The ones with no specimen at all, in the order a person meets them:
 9. **Import wizard** — upload → agent plan → review → run → per-row report.
 10. **Paged find** — search + facets + sort + "Load more" + the exact-count pill, and the rule that the heading's count stands down under a counted tab.
 11. **App tiles** — a wall of app cards grouped by stage.
-12. **Arithmetic panels** — the margin and savings blocks, where every number shows its makeup.
+12. **Arithmetic panels** — the savings blocks, where every number shows its makeup. The margin block was one of these until it was removed on 10 Sep 2026.
 13. **Timer bar** — a running work timer in the header of every agency screen.
 14. **Triage strip** — a duty banner above the ticket list, plus a gated queue tab.
 

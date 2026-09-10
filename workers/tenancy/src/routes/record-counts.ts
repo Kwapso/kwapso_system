@@ -40,7 +40,6 @@ import { queryText } from "@shared/workers/validate"
 import { answerRecordCounts, type RecordCounter } from "@shared/workers/record-counts"
 import { countApps, countAppModules, countProcesses } from "../lib/processes"
 import { countWaves } from "../lib/waves"
-import { countAccountRates } from "../lib/rates"
 import type { Env } from "../env"
 
 /** One figure, by the sidecar name the badge reads. The registry says WHICH of
@@ -50,7 +49,12 @@ import type { Env } from "../env"
 const COUNTERS: Record<string, RecordCounter> = {
   "apps-account": (cfg, guard, scope, id) => countApps(cfg, guard, scope, { accountId: id }),
   "waves-account": (cfg, guard, scope, id) => countWaves(cfg, guard, scope, id),
-  "account-rates": (cfg, guard, scope, id) => countAccountRates(cfg, guard, scope, id),
+  // `"account-rates"` stood here, calling `countAccountRates` — the badge on a
+  // client's Rates tab. The client retired the rate card on 10 Sep 2026 ("the
+  // whole account rates also killed it"), so the tab, the counter and the
+  // registry line all went together: a counter with no line in
+  // `shared/record-counts.ts` is one nothing can ask for, and a line with no
+  // counter answers `null` and reads exactly like a missing permission.
   "processes-app": (cfg, guard, scope, id) => countProcesses(cfg, guard, scope, { appId: id }),
   "modules-app": (cfg, guard, scope, id) => countAppModules(cfg, guard, scope, { appId: id }),
 }

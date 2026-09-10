@@ -124,7 +124,7 @@ export const KNOWLEDGE_FIRST_RULE = [
   "Never answer a question about THIS team out of your own memory — look it up. There are two ways to look something up and choosing well is most of doing this job properly.",
   "ask_knowledge is your DEFAULT, and you should reach for it first. It searches everything the team knows at once: its documents, notes and meeting transcripts, AND a mirror of the app's own records — tickets, accounts, contacts, systems, process maps, sprints, stories, meetings, to-dos and tasks — kept in step every fifteen minutes. Each source it cites also carries `liveStatus`, that record read from the database as you ask. So for any question ABOUT something — what it says, what was agreed on it, what has happened to it, where it stands, \"tell me about X\", \"catch me up on Y\", \"what's the latest on Z\" — one ask_knowledge call gives you both the story and what is true today, and it is far quicker than hunting through lists.",
   "Go to a live read instead when the question needs the one thing retrieval cannot give you: a COUNT, a whole LIST, a SORT, a FILTER. \"How many\", \"which ones\", \"all of them\", \"newest first\", \"in July\", \"per client\". Retrieval reads a sample, so a number that comes out of it is a guess; those questions get a real read every time. Go live too when you are about to change something, and whenever an answer needs to be exhaustive rather than well-sourced.",
-  "query_records is the live read, and it is ONE tool for every module: tickets, stories, sprints, work_logs, tasks, todos, meetings, accounts, apps, app_modules, processes, deliverables, waves, knowledge_sources, roles, dropdown_values and account_rates. Call describe_module first on any module you have not queried in this conversation and use the field names it gives you — a guessed field name is refused, not ignored. It also lists the client names in use, so check the spelling there before filtering by one. The modules answer to the other names this app uses for the same thing, so \"help\" reaches tickets; and if a call is ever refused for a name, the refusal says what to use instead — read it and try again in the same turn rather than offering to do the work. Then say what you want in filters rather than reading rows and counting them yourself: a date range is one filter with the \"between\" operator, three clients named in one question is one filter with \"contains\" and a list of their names, and \"how many per client\" or \"per month\" is groupBy, which comes back as counts. Two calls should answer almost anything. When the question is about the MOST RECENT or the LATEST or the OLDEST of something, say which date you mean and pass `sort` — a read with no order given comes back in the module's own default, which for tickets is newest-by-CREATION and is a different record from newest-by-UPDATE; the answer tells you which order it used, so check it before you name a record. And when an answer comes back with `unmatched`, name those values in your reply beside the number — if somebody asks about three clients and one of them does not exist here, the honest sentence is the count AND which of the three it does not cover; repeating their three names next to a total for two is a correct number wrapped in a false statement. The same applies to a record you cannot find: if you looked one up by its reference and `unmatched` names it, say the reference matched nothing — and try the other handle before you say it does not exist, because a record has an `id` and a `ref` and they are not interchangeable. Paging through hundreds of rows to count them by hand is the wrong answer to a question the door can answer in one.",
+  "query_records is the live read, and it is ONE tool for every module: tickets, stories, sprints, work_logs, tasks, todos, meetings, accounts, apps, app_modules, processes, deliverables, waves, knowledge_sources, roles and dropdown_values. Call describe_module first on any module you have not queried in this conversation and use the field names it gives you — a guessed field name is refused, not ignored. It also lists the client names in use, so check the spelling there before filtering by one. The modules answer to the other names this app uses for the same thing, so \"help\" reaches tickets; and if a call is ever refused for a name, the refusal says what to use instead — read it and try again in the same turn rather than offering to do the work. Then say what you want in filters rather than reading rows and counting them yourself: a date range is one filter with the \"between\" operator, three clients named in one question is one filter with \"contains\" and a list of their names, and \"how many per client\" or \"per month\" is groupBy, which comes back as counts. Two calls should answer almost anything. When the question is about the MOST RECENT or the LATEST or the OLDEST of something, say which date you mean and pass `sort` — a read with no order given comes back in the module's own default, which for tickets is newest-by-CREATION and is a different record from newest-by-UPDATE; the answer tells you which order it used, so check it before you name a record. And when an answer comes back with `unmatched`, name those values in your reply beside the number — if somebody asks about three clients and one of them does not exist here, the honest sentence is the count AND which of the three it does not cover; repeating their three names next to a total for two is a correct number wrapped in a false statement. The same applies to a record you cannot find: if you looked one up by its reference and `unmatched` names it, say the reference matched nothing — and try the other handle before you say it does not exist, because a record has an `id` and a `ref` and they are not interchangeable. Paging through hundreds of rows to count them by hand is the wrong answer to a question the door can answer in one.",
   "When the question is about what ONE THING SAYS — this document, that call, whether one covers the other — do not survey, READ. Find it once, then read it WHOLE by id: `list_knowledge_sources` with `id` returns that source's own words, and `get_meeting_transcript` returns everything said in a meeting. Two reads give you both sides of a comparison, in full, and a whole transcript is a normal thing to be handed. Listing the same collection again with different wording returns material you have already seen, and you have a limited number of steps to spend — so spend them on reading the thing, not on finding it twice.",
   "Never guess, never invent data, and never tell the user you can't check — pick the door, call the tool, then answer plainly from what comes back.",
 ].join(" ")
@@ -947,32 +947,35 @@ function toolNamesIn(context: ChatMessage[] | undefined): string[] {
 
 /** REFUSED BECAUSE OF WHAT THIS TURN ALREADY KNOWS — or null to make the call.
  *
- * R24 keeps the agency's own cost out of the client's app by making it a fact
- * about the import graph. This is the same sentence pointed the other way: a
- * conversation holding an internal number may not write to a door the client's
- * own browser opens. See shared/workers/money-taint.ts for both derivations and
- * for what this deliberately does not cover.
+ * R24 used to keep the agency's own cost out of the client's app by making it a
+ * fact about the import graph. That half of the law was retired on 10 Sep 2026
+ * with the internal rates it was about; THIS half survived it, because it never
+ * depended on the import graph. A conversation holding a figure the client's own
+ * screen may withhold may not write to a door that client's browser opens. See
+ * shared/workers/money-taint.ts for the derivations, for the one door left on
+ * the list, and for the two candidates for widening it that were refused.
  *
  * A REFUSAL RATHER THAN A CONFIRM PANEL, and rather than a smaller version of
  * the call. There is no smaller version — the model composes the prose, so
- * "write the reply but without the margin in it" is a promise, not a control —
+ * "write the reply but without the figure in it" is a promise, not a control —
  * and a panel would put the decision in front of a person on ordinary work,
  * which the owner considered and turned down. `chipRefusal`'s reasoning, on a
  * different fact.
  *
- * READS ARE NEVER OUTBOUND, so an agency admin asking about a margin and then
- * reading anything at all is untouched; only a WRITE to the portal's own surface
- * in the SAME turn is refused, which is the shape the injected instruction has
- * to take. */
+ * READS ARE NEVER OUTBOUND, so an agency admin asking what an app gives back and
+ * then reading anything at all is untouched; only a WRITE to the portal's own
+ * surface in the SAME turn is refused, which is the shape the injected
+ * instruction has to take. */
 function moneyTaintRefusal(tool: AgentTool, context: ChatMessage[] | undefined): string | null {
   if (!refusesOutboundMoney(tool, toolNamesIn(context))) return null
   return (
-    "Not run, and not because of a permission. This turn has already read one of the agency's own " +
-    "internal figures — what our own hours cost, what a role's hour is worth, or a margin — and this " +
-    "door writes somewhere the client themselves can read. Those two things may not happen in the " +
-    "same turn. Do not repeat any internal figure anywhere. Tell the person plainly that you did not " +
-    "write it, and that if they want something written there they can ask for that on its own, in a " +
-    "new message, without the money question in it."
+    "Not run, and not because of a permission. This turn has already read a money figure this " +
+    "client's own screen may withhold — what one of their apps gives back, priced in full rather " +
+    "than behind their price-visibility switch — and this door writes somewhere the client " +
+    "themselves can read. Those two things may not happen in the same turn. Do not repeat the " +
+    "figure anywhere. Tell the person plainly that you did not write it, and that if they want " +
+    "something written there they can ask for that on its own, in a new message, without the money " +
+    "question in it."
   )
 }
 
@@ -1017,8 +1020,8 @@ const HELD_BACK_BY_CHIPS =
  * comes back; so an action that would ask for approval cannot be held open
  * across a turn this one has already refused a client-readable write in. */
 const HELD_BACK_BY_MONEY =
-  "Not run. Another step in this turn was refused because this conversation has read one of the " +
-  "agency's own internal figures and that step wrote somewhere the client can read. An action " +
+  "Not run. Another step in this turn was refused because this conversation has read a money " +
+  "figure the client's own screen may withhold and that step wrote somewhere the client can read. An action " +
   "that asks for approval cannot be held open across that. Say what was refused and why; if they " +
   "still want this one, they can ask for it on its own, in a new message."
 
@@ -1055,7 +1058,7 @@ async function runToolCall(ctx: StepCtx, tc: ToolCall): Promise<{ message: ChatM
   if (refused) return refuseStep(ctx, tc, summary, refused)
   // R24 OUTBOUND, IN THE SAME POSITION AND FOR THE SAME REASON — see
   // `moneyTaintRefusal`. Ahead of the repeat cache and ahead of the door: a
-  // client-readable write made after this turn read an internal figure is not
+  // client-readable write made after this turn read a withheld figure is not
   // attempted, so there is no answer of the door's to recall and no row for it to
   // have written. Both loops come through here, so the refusal cannot depend on
   // which one ran the call.
@@ -1598,7 +1601,7 @@ async function runPlanLoop(
     // CONFIRMS never reaches it: this branch ends the turn, stores the proposal
     // server-side, and `confirmAndRun` executes it later — from a request that
     // remembers nothing about the turn that proposed it. So a
-    // `reply_help_ticket` carrying a margin, @mentioning somebody so that it
+    // `reply_help_ticket` carrying that figure, @mentioning somebody so that it
     // confirms, would have been PROPOSED here and then written on approval,
     // straight past a control that had already decided against it. Refuse before
     // you defer.
@@ -1822,7 +1825,7 @@ export async function confirmAndRun(
   // reads it as each call finishes (R24 outbound — see `moneyTaintRefusal`). One
   // proposal can hold a money READ and a client-readable WRITE together: a turn
   // that needs confirming stores ALL of its calls, not just the dangerous subset,
-  // so `read_margin` beside a `reply_help_ticket` arrives here as one approved
+  // so `get_app_impact` beside a `reply_help_ticket` arrives here as one approved
   // batch, and the refusal that decided against it in the proposing turn was
   // never asked — the read had not run yet when that turn ended.
   const toolMsgs: ChatMessage[] = []

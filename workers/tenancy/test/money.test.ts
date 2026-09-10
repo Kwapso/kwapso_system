@@ -1,21 +1,38 @@
-// THE MONEY — the margin's arithmetic, the version cut's idempotence, and the
-// two facts this build borrows from the work engine.
+// THE MONEY — the version cut's idempotence, the two facts this build borrows
+// from the work engine, and the saving a client reads.
+//
+// A FOURTH BLOCK STOOD AT THE TOP OF THIS FILE and was RETIRED on 10 Sep 2026:
+// four cases over `margin()`, the pure arithmetic in
+// `workers/tenancy/src/lib/internal-money.ts` — revenue minus logged seconds
+// times our internal rates minus tool costs, in lines a person could check. It
+// was retired rather than re-pointed for the only honest reason available: the
+// client killed the whole internal rates feature ("kill the whole internal rates
+// thing … for now i iwanna wipe it clean"), the file was deleted, and there is
+// no other function in this base that does that subtraction. A pure-arithmetic
+// test has nothing to re-point AT — you cannot give `margin()` a different
+// fixture, because `margin()` is gone.
+//
+// WHAT DID NOT GO WITH IT is the reason the block below it survives. The work
+// engine's two borrowed facts are still read by a live door — `routes/
+// processes.ts` calls `workEngineFacts` for the value screen — so those cases go
+// on measuring something, and the `listSavings` block at the foot of the file
+// never touched an internal rate at all.
 //
 // Three things are proved here, and each one is a place a plausible
 // implementation goes quietly wrong:
 //
-//   1. THE MARGIN ADDS UP, and it says so in lines a person can check. A margin
-//      is the one number in this app nobody outside the agency can sanity-check,
-//      which is exactly why its own suite has to.
-//   2. A VERSION IS CUT ONCE PER SPRINT. The automatic cut is fired by something
+//   1. A VERSION IS CUT ONCE PER SPRINT. The automatic cut is fired by something
 //      that can fire twice — a double click, a retried job, a replayed hook — and
 //      "the same thing happened twice" here is an INSERT, so the predicate cannot
 //      ride a WHERE. It rides a partial unique index instead (R17), and this
 //      proves the database is what refuses rather than a check a race slips past.
-//   3. WHEN THE WORK ENGINE IS NOT HERE YET, the door says so instead of
-//      presenting revenue-minus-nothing as a margin. The two lanes are being
-//      built at the same time, and a team database is migrated one team at a time,
-//      so "that table is not here yet" is a real state and not a hypothetical.
+//   2. WHEN THE WORK ENGINE IS NOT HERE YET, the door says so instead of
+//      presenting a confident zero. The two lanes were built at the same time,
+//      and a team database is migrated one team at a time, so "that table is not
+//      here yet" is a real state and not a hypothetical.
+//   3. THE SAVING A CLIENT READS, end to end against a real database: the
+//      latest version subtracted from the baseline, and a regression that stays
+//      in the total whether or not somebody explained it.
 
 import { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -28,7 +45,6 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   return { ...actual, ...d1Impl(() => holder.db as DatabaseSync) }
 })
 
-import { margin } from "../src/lib/internal-money"
 import { cutVersion, listProcessVersions, listProcessSteps, listSavings } from "../src/lib/processes"
 import { workEngineFacts } from "../src/lib/work-engine"
 import { buildSpineDb, IDS } from "./spine-harness"
@@ -43,68 +59,6 @@ beforeEach(() => {
   holder.db = buildSpineDb()
 })
 
-describe("the margin is revenue minus our own time minus tool costs — in lines", () => {
-  it("applies the right rate per kind of work and totals what it shows", () => {
-    const result = margin({
-      revenueCents: 1_000_000, // 10,000.00 sold
-      loggedSeconds: [
-        { label: "Development", seconds: 36_000 }, // 10 hours
-        { label: "Design", seconds: 18_000 }, // 5 hours
-      ],
-      internalRates: [
-        { label: "Development", centsPerHour: 4500 },
-        { label: "Design", centsPerHour: 3000 },
-      ],
-      defaultCentsPerHour: 4000,
-      toolCostCents: 42_000,
-    })
-    expect(result.lines.map((l) => l.costCents)).toEqual([45_000, 15_000])
-    expect(result.timeCostCents).toBe(60_000)
-    expect(result.marginCents).toBe(1_000_000 - 60_000 - 42_000)
-    // The lines a person can check add up to the total they are checking.
-    expect(result.lines.reduce((n, l) => n + l.costCents, 0)).toBe(result.timeCostCents)
-    expect(result.revenueCents - result.timeCostCents - result.toolCostCents).toBe(result.marginCents)
-    expect(result.marginPercent).toBe(89.8)
-  })
-
-  it("time with no matching rate falls back to the default one, and says which", () => {
-    const result = margin({
-      revenueCents: 100_000,
-      loggedSeconds: [{ label: "Our time", seconds: 7200 }],
-      internalRates: [{ label: "Development", centsPerHour: 4500 }],
-      defaultCentsPerHour: 4000,
-      toolCostCents: 0,
-    })
-    expect(result.lines).toEqual([{ label: "Our time", seconds: 7200, centsPerHour: 4000, costCents: 8000 }])
-  })
-
-  // "∞%" on zero revenue is the kind of number that makes somebody stop
-  // believing the rest of the screen.
-  it("a percentage of nothing is null, never infinity", () => {
-    const result = margin({
-      revenueCents: 0,
-      loggedSeconds: [{ label: "Our time", seconds: 3600 }],
-      internalRates: [],
-      defaultCentsPerHour: 5000,
-      toolCostCents: 0,
-    })
-    expect(result.marginCents).toBe(-5000)
-    expect(result.marginPercent).toBeNull()
-  })
-
-  it("a margin with no logged time SAYS the time is missing rather than looking healthy", () => {
-    const result = margin(
-      { revenueCents: 500_000, loggedSeconds: [{ label: "Our time", seconds: 0 }], internalRates: [], defaultCentsPerHour: 4000, toolCostCents: 1000 },
-      false
-    )
-    // 499,000 of "margin" with nothing subtracted for our own work is not a
-    // margin, and the flag is how the screen knows to say so.
-    expect(result.marginCents).toBe(499_000)
-    expect(result.loggedTimeAvailable).toBe(false)
-    expect(result.lines).toEqual([])
-  })
-})
-
 describe("the two facts we borrow from the work engine", () => {
   // THE WORK ENGINE HAS LANDED (12 Aug 2026), so these cases changed shape. They
   // used to create a FAKE `sprints` table per case, because the real one did not
@@ -116,12 +70,12 @@ describe("the two facts we borrow from the work engine", () => {
   it("answers 'not here yet' rather than a confident zero when a table is absent", async () => {
     // A team database is migrated one at a time by an ops route, so "this one has
     // not rolled that migration yet" is a real production state — reproduced here
-    // by taking a table away rather than by never having written it. A margin
+    // by taking a table away rather than by never having written it. A caller
     // that read the price and silently subtracted nothing would report a
-    // beautiful 100%, which is the failure this build exists to prevent.
+    // beautiful 100%, which is the failure this flag exists to prevent.
     db().exec(`DROP TABLE work_logs`)
     const facts = await workEngineFacts(cfg, guard, IDS.victimAccount)
-    expect(facts.ready, "both work-engine tables must be present before a margin is claimed").toBe(false)
+    expect(facts.ready, "both work-engine tables must be present before the figure is claimed").toBe(false)
     expect(facts.soldCents).toBe(0)
     expect(facts.loggedSeconds).toBe(0)
   })

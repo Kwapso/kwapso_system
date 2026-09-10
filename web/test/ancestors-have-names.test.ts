@@ -66,7 +66,6 @@ const NO_RECORD_BEHIND_IT: Record<string, string> = {
   import: "the CSV importer — a workflow, not a collection. Nothing under it has an id.",
   brand: "brand assets open in a panel on the section itself rather than at an address of their own.",
   purposes: "meeting purposes are edited in place on their section, like dropdown values.",
-  "internal-rates": "our own cost card — one settled list on a tab, with no per-row screen.",
 }
 
 /** Lists loaded across the WHOLE TEAM AREA rather than on their own section, and

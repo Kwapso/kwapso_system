@@ -90,6 +90,11 @@ afterEach(cleanup)
 beforeEach(() => {
   door.apps = []
   door.links = []
+  // THE DRAFT IS SESSION STATE AND IT OUTLIVES A RENDER. Two cases below seed
+  // one to reach "a create with a client already chosen" (see `seedDraft`), and
+  // a draft left behind would silently give the NEXT case a client it never
+  // picked — which is the shape of a test that passes for the wrong reason.
+  sessionStorage.clear()
 })
 
 /** Write the ticket's own words. The description is a RICH-TEXT field now, so it
@@ -606,11 +611,14 @@ describe("a ticket has a title", () => {
     expect(submitButton().disabled).toBe(true)
   })
 
-  it("leaves the three fields she NAMED optional, because she ruled about one", () => {
-    // Client, App and "Raised by" appear in her sentence and nowhere in the
+  it("leaves the fields she NAMED optional, because she ruled about one", () => {
+    // Client and App appear in her 2026-09-09 sentence and nowhere in the
     // refusal. A ticket the agency raises about its own housekeeping has no
     // client, no system and nobody outside who asked — required there would make
     // it unraisable, which is what each field's own config has always said.
+    // "Raised by" was in that sentence too and was ruled about a day later; it
+    // is still not a refusal HERE, because with no client there is nobody to
+    // name, which is the condition `contactRequired` carries.
     render(
       <HelpFormDialog
         open
@@ -668,10 +676,141 @@ describe("who raised it", () => {
     // This is now the FALLBACK case rather than the only case — see below.
     expect(mark?.textContent).toBe("M")
 
-    // "NOT SAID" IS NOT A PERSON, so it wears no face — a round grey "N" would
-    // draw a colleague nobody has.
-    const notSaid = within(row).getByRole("button", { name: "Not said" })
-    expect(notSaid.querySelector(".bg-muted")).toBeNull()
+    // AND THE ROW IS ALL PEOPLE — client, 2026-09-10: "raised by not said
+    // should not exist." The escape hatch used to sit at the end of this row
+    // wearing `shape: "round"` and deliberately no face; it is gone, and this
+    // line is what keeps it gone. Read as an ABSENCE off the row rather than off
+    // the options array, because the option object is not what she was looking
+    // at.
+    expect(within(row).queryByRole("button", { name: "Not said" })).toBeNull()
+    // TWO CHIPS, NOT THREE. A count, so a rename of the escape hatch could not
+    // slip past the assertion above by calling itself something else.
+    expect(within(row).getAllByRole("button")).toHaveLength(2)
+  })
+
+  /* ── "ALWAYS DEFAULT MAIN CONTACT PERSON" — the client, 2026-09-10 ─────────
+     The second half of the same sentence, and the half that makes the first
+     liveable: with no way to say "nobody", the field has to answer itself.
+     `account_links.is_main_stakeholder` is that answer — one flag per company,
+     already sorted first by `listAccountLinks` and already badged "Main contact"
+     on three screens.
+
+     A CREATE, WHICH IS WHAT SHE SAID ("when creating ticket"), and the reason
+     these cases seed a draft instead of passing `initial`: `initial` IS edit
+     mode, and on an edit the default deliberately stands down (the case below).
+     A saved draft holding a chosen client is the ordinary create state — pick a
+     client, navigate away, come back — and it is the only way to reach "a create
+     with an account" without driving the account popover. */
+  const seedDraft = (values: Record<string, unknown>) =>
+    sessionStorage.setItem("kwapso:draft:t", JSON.stringify(values))
+
+  it("lights the account's main contact before anybody touches the row", async () => {
+    door.links = [
+      { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Otto Berg", relationship: null, isMainStakeholder: false, active: true },
+      { id: "l2", accountId: "acct-bergman", personAccountId: "p2", personName: "Marta Nilsson", relationship: null, isMainStakeholder: true, active: true },
+    ]
+    seedDraft({ accountId: "acct-bergman" })
+    const onSubmit = vi.fn(async (_input: { raisedByContactId?: string }) => {})
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={onSubmit}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        draftKey="t"
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("Raised by")
+      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
+      return r
+    })
+    // THE MAIN CONTACT IS THE ONE LIT, and Otto — first in the list here on
+    // purpose — is not. "Take the first row" would have passed a weaker version
+    // of this case, because the door sorts the main contact first.
+    expect(
+      within(row).getByRole("button", { name: /Marta Nilsson/ }).getAttribute("aria-pressed")
+    ).toBe("true")
+    expect(
+      within(row).getByRole("button", { name: /Otto Berg/ }).getAttribute("aria-pressed")
+    ).toBe("false")
+    // …AND IT IS WHAT GETS SENT. A default nobody touched still has to reach the
+    // door, or it is a highlight rather than an answer.
+    write("<p>The export is empty</p>")
+    name("Tuesday export is empty")
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ raisedByContactId: "p2" })
+  })
+
+  it("names nobody when the client has contacts and no main one, and asks", async () => {
+    // NO INVENTED FALLBACK. The door sorts the main contact first, so "take the
+    // first row" looks like a default and is an arbitrary person the moment no
+    // flag is set — a ticket naming a human who never asked is worse than one
+    // naming nobody. So the row stays empty and the form ASKS, which is the one
+    // case the new requirement actually bites in.
+    door.links = [
+      { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Otto Berg", relationship: null, isMainStakeholder: false, active: true },
+    ]
+    seedDraft({ accountId: "acct-bergman" })
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={async () => {}}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        draftKey="t"
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("Raised by")
+      expect(within(r).getByRole("button", { name: /Otto Berg/ })).toBeTruthy()
+      return r
+    })
+    expect(within(row).getByRole("button", { name: /Otto Berg/ }).getAttribute("aria-pressed")).toBe("false")
+    write("<p>The export is empty</p>")
+    name("Tuesday export is empty")
+    expect(submitButton().disabled).toBe(true)
+    fireEvent.click(within(row).getByRole("button", { name: /Otto Berg/ }))
+    expect(submitButton().disabled).toBe(false)
+  })
+
+  it("leaves a ticket that predates the rule exactly as it found it", async () => {
+    // `contactGrandfathered`, the shape `titleGrandfathered` and
+    // `typeGrandfathered` already carry. Opening an imported ticket to fix a
+    // typo must not attach its client's main contact to somebody else's
+    // two-year-old request — so on an EDIT of a row with no raised-by the
+    // default stands down, the field is not demanded, and Submit works.
+    door.links = [
+      { id: "l1", accountId: "acct-bergman", personAccountId: "p1", personName: "Marta Nilsson", relationship: null, isMainStakeholder: true, active: true },
+    ]
+    const onSubmit = vi.fn(async (_input: { raisedByContactId?: string }) => {})
+    render(
+      <HelpFormDialog
+        open
+        onOpenChange={() => {}}
+        onSubmit={onSubmit}
+        helpTypeOptions={[]}
+        teamId="team-1"
+        initial={{ description: "<p>x</p>", titleEn: "Old thing", accountId: "acct-bergman" }}
+      />
+    )
+    const row = await waitFor(() => {
+      const r = chipRow("Raised by")
+      expect(within(r).getByRole("button", { name: /Marta Nilsson/ })).toBeTruthy()
+      return r
+    })
+    expect(
+      within(row).getByRole("button", { name: /Marta Nilsson/ }).getAttribute("aria-pressed")
+    ).toBe("false")
+    expect(submitButton().disabled).toBe(false)
+    fireEvent.click(submitButton())
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    // `undefined`, which the door's `optionalText` leaves as the stored null it
+    // found. Nothing is invented and nothing is cleared.
+    expect(onSubmit.mock.calls[0][0].raisedByContactId).toBeUndefined()
   })
 
   /* ── "ADD AVATAR IN ROUND" (client, 2026-09-09), THE OTHER HALF ────────────

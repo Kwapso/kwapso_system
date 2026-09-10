@@ -5,7 +5,7 @@
 // exactly right, and it is what the feed shows. Read by a QUERY it is 157
 // distinct free-text literals across 139 call sites, no two modules agreeing on
 // a word — so "show me every archive last quarter" is a LIKE over prose, and the
-// answer silently misses `retired`, `withdrawn`, `taken down`, `switched off`
+// answer silently misses `withdrawn`, `taken down`, `switched off`
 // and `binned`, every one of which is the same event wearing a different coat.
 //
 // So the row carries BOTH: `type` keeps the sentence, and `verb` says which of
@@ -104,6 +104,11 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   moved: "edited",
   configured: "edited",
   renamed: "edited",
+  // A dropdown value gained or lost its protection ("Dropdown value protected",
+  // "Dropdown value no longer protected"). BOTH sentences end on this word, so
+  // one entry here replaced the two `VERB_BY_PHRASE` lines the old wording
+  // needed — the value stays in use either way, so neither is an archive.
+  protected: "edited",
   replaced: "edited",
   reordered: "edited",
   narrowed: "edited",
@@ -127,7 +132,14 @@ export const VERB_BY_LAST_WORD: Record<string, ActivityVerb> = {
   // ── archived ──────────────────────────────────────────────────────────────
   archived: "archived",
   deactivated: "archived",
-  retired: "archived",
+  // `retired: "archived"` was here, for the activity line "Ana retired the rate
+  // for Development". Nothing writes that sentence any more: the client retired
+  // the account rate card on 10 Sep 2026 ("the whole account rates also killed
+  // it") and `setAccountRateActive` — the last writer of the word — went with
+  // it. The rotting-entry rule this table is held to took the line out, the same
+  // way it took `validated` out three days earlier: a word that classifies
+  // nothing the app says is a record of what the app used to say, consulted on
+  // every read.
   removed: "archived",
   revoked: "archived",
   withdrawn: "archived",
@@ -169,10 +181,12 @@ export const VERB_BY_PHRASE: Record<string, ActivityVerb> = {
   // Ends on the adverb "back". An unsend: the message existed and no longer
   // does, which is this app's archive shape in somebody else's system.
   "message taken back": "archived",
-  // Ends on the noun "default". The mark moves; the value stays in use either
-  // way, so neither of these is an archive.
-  "dropdown value made a default": "edited",
-  "dropdown value no longer a default": "edited",
+  // "dropdown value made a default" / "…no longer a default" STOOD HERE until
+  // 2026-09-10. They needed a phrase line because both ended on the NOUN
+  // "default"; the client's rename ("find an accurate word for what Default
+  // means") made both end on "protected" instead, which is a participle the
+  // last-word map above now carries. Two hand-written rulings became one derived
+  // word, which is the direction this table is meant to move in.
   // Ends on the adverb "off". A module switched off is out of use and can be
   // switched back on — the archive shape, said in the app's own words.
   "module switched off": "archived",

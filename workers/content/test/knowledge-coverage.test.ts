@@ -27,7 +27,7 @@
 //      steps; a thin record says what it IS rather than padding.
 //   3. THE LINK BACK — every passage that mirrors a record carries the path to
 //      it, and every path names a page this app really has.
-//   4. THE FENCES DID NOT MOVE — no internal money reaches the index (R24), and a
+//   4. THE FENCES DID NOT MOVE — no switch-gated figure reaches the index, and a
 //      text-builder change really does force a re-walk instead of being skipped.
 
 import type { DatabaseSync } from "node:sqlite"
@@ -51,7 +51,7 @@ import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import { KNOWLEDGE_KINDS } from "../src/lib/knowledge"
 import { SOURCE_CHIPS } from "@shared/knowledge-chips"
 import { stripComments } from "@shared/rules/source-scan"
-import { PORTAL_VISIBLE_READS } from "@shared/rules/registry"
+import { TEAM_MIGRATIONS } from "../../tenancy/src/team-schema"
 import type { KnowledgeAnswer } from "@shared/types"
 
 const ROOT = join(__dirname, "..", "..", "..")
@@ -579,50 +579,79 @@ describe("a passage links to the record it came out of", () => {
 })
 
 describe("the fences did not move", () => {
-  it("R24 — no internal money table is anywhere in the sweep", () => {
-    // R24 IS ABOUT THE PORTAL, AND THIS IS THE SAME RULE ONE STEP EARLIER. The
-    // index is ACCOUNT-WIDE: a margin embedded into it is a margin sitting in
-    // material that a client-facing knowledge surface would search the moment one
-    // is built. So the same set of tables the law forbids the portal to name is
-    // forbidden to the sweep, derived the same way and from the same file —
-    // otherwise a fourth internal table would have to be remembered in two places.
-    const internal = stripComments(
-      readFileSync(join(ROOT, "workers", "tenancy", "src", "lib", "internal-money.ts"), "utf8")
-    )
-    const reads = [...new Set([...internal.matchAll(/(?:FROM|INTO|UPDATE)\s+([a-z_]+)/g)].map((m) => m[1]))]
-    // The subtraction R24 makes, for R24's own reason: the margin reads `apps` for
-    // what a system costs us to run, and `apps` is not an internal table — a
-    // client's own value screen names their apps by design. What survives is
-    // exactly "a table only the agency's own side ever touches".
-    const clientReadable = new Set<string>()
-    for (const file of Object.keys(PORTAL_VISIBLE_READS))
-      for (const m of stripComments(readFileSync(join(ROOT, file), "utf8")).matchAll(
-        /(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_]+)/g
-      ))
-        clientReadable.add(m[1])
-    const internalTables = reads.filter((t) => !clientReadable.has(t))
+  it("no figure whose visibility is a per-account SWITCH is anywhere in the sweep", () => {
+    // THE INDEX IS ACCOUNT-WIDE AND A PASSAGE CARRIES NO SWITCH. That is the
+    // whole sentence. Whether a client may see what they are charged, or what
+    // their apps are worth, is decided per ACCOUNT by their price-visibility
+    // switch — and a passage embedded into a shared index has no way to carry
+    // that decision with it, so a figure that rides one is a figure shown to
+    // everybody who may ask the knowledge base a question.
+    //
+    // THIS CLAUSE HAS BEEN RE-POINTED TWICE IN ONE DAY, and it got stronger both
+    // times — which is worth reading before touching it, because the two moves
+    // are the same move.
+    //
+    //   · UNTIL 10 SEP 2026 it derived its forbidden set from
+    //     `internal-money.ts` — the agency's own cost cards, R24's subject — and
+    //     carried `account_rates` and `sold_price_cents` beside it as two
+    //     HAND-PINNED extras, "one step short of R24's line".
+    //   · THE INTERNAL RATES WERE RETIRED, that file went, and the derivation
+    //     moved to `lib/rates.ts`: `account_rates` stopped being a line somebody
+    //     maintained and became a table the walk found.
+    //   · AN HOUR LATER THE CLIENT RETIRED THE RATE CARD TOO — "the whole
+    //     account rates also killed it" — so `lib/rates.ts` went the way
+    //     `internal-money.ts` had, and a derivation off a deleted file is a
+    //     clause with an empty forbidden set, which passes over nothing.
+    //
+    // SO THE ORACLE IS NOW THE TEAM SCHEMA ITSELF, which is where
+    // `workers/tenancy/test/query-fence.test.ts` landed on the same day for the
+    // same reason: a file that reads money can be deleted, and the DATABASE'S
+    // OWN SHAPE cannot. Every column the schema declares whose name carries
+    // `cents` is a money column, and none of them may appear in the sweep. It is
+    // a COLUMN census rather than a table one on purpose — `sprints` and
+    // `client_roles` are read by the sweep for the work and the people, so the
+    // tables are legitimate and only the figures on them are not. The old
+    // hand-pinned `sold_price_cents` line is now one of the names the walk finds
+    // rather than a line somebody has to keep writing.
+    const schema = TEAM_MIGRATIONS.map((m) => m.sql).join("\n")
+    const moneyColumns = [
+      ...new Set(
+        [...schema.matchAll(/\b([a-z_]*cents(?:_[a-z_]+)?)\b\s+INTEGER/g)]
+          .map((m) => m[1])
+          .filter((c) => c !== "cents")
+      ),
+    ]
+    // A BLIND SCAN REPORTS ALL-CLEAR EXACTLY LIKE A PASSING ONE. Both of the
+    // named columns are asserted, not just a length: `sold_price_cents` is what
+    // a client bought and `cents_per_hour` is what their own people cost them,
+    // and each is declared by a different migration, so one of them going
+    // missing is a real change somebody has to notice.
     expect(
-      internalTables,
-      "the internal-table derivation subtracted everything — internal_rates must survive it"
-    ).toContain("internal_rates")
+      moneyColumns,
+      "the money-column derivation went blind — sold_price_cents is declared by the work engine's migration"
+    ).toContain("sold_price_cents")
+    expect(
+      moneyColumns,
+      "the money-column derivation went blind — cents_per_hour is declared on client_roles"
+    ).toContain("cents_per_hour")
+    expect(moneyColumns.length, "the money-column scan found almost nothing").toBeGreaterThan(2)
 
     const sweep = stripComments(readFileSync(INGEST_FILE, "utf8"))
-    for (const table of internalTables)
+    for (const column of moneyColumns)
       expect(
-        new RegExp(`\\b${table}\\b`).test(sweep),
-        `the sweep names "${table}" — what our own hour costs cannot be embedded into an account-wide index (R24)`
+        new RegExp(`\\b${column}\\b`).test(sweep),
+        `the sweep names "${column}" — a figure whose visibility is a per-account switch cannot ride a passage into an account-wide index`
       ).toBe(false)
 
-    // ONE STEP SHORT OF R24'S LINE, and left out for a reason of its own: what a
-    // client IS CHARGED (the account rate card, and a sprint's sold price) is
-    // shown to them only when their per-account price-visibility switch is on. A
-    // passage carries no switch, so those two figures stay on the screens that can
-    // gate them.
-    for (const gated of ["account_rates", "sold_price_cents"])
-      expect(
-        new RegExp(`\\b${gated}\\b`).test(sweep),
-        `the sweep names "${gated}" — a figure whose visibility is a per-account switch cannot ride a passage`
-      ).toBe(false)
+    // AND THE TABLE THAT WAS ALL MONEY. `account_rates` was the last one and it
+    // is dropped by team migration 0074, so this is a RETIREMENT PIN rather than
+    // a derivation: it says the name is gone and fails if it comes back into the
+    // sweep, which is what the column census above cannot say about a table
+    // whose columns it no longer finds.
+    expect(
+      /\baccount_rates\b/.test(sweep),
+      "the sweep names \"account_rates\", a table that no longer exists"
+    ).toBe(false)
   })
 
   it("R26 — every vector the sweep writes is namespaced to the team", async () => {
@@ -947,7 +976,19 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
   // which is why the version stays at 3, nothing is re-indexed, and only the
   // digest is re-pinned.
   person: { version: 3, digest: "011e338664d69945" },
-  dropdown: { version: 1, digest: "ce030ed2555c6595" },
+  // v2 (10 Sep 2026): THE READER WAS SAYING SOMETHING FALSE, and this is the
+  // bump that reaches the rows already filed. It used to take
+  // `MAX(CASE WHEN is_default = 1 … THEN value END)` and write "<X> is picked
+  // for them unless they change it." Nothing in this app pre-selects a value
+  // from that flag — its one behavioural read anywhere is the refusal in
+  // `setSelectableActive` — and because every seeded row and every migration
+  // back-fill sets it, `MAX()` returned the alphabetically last live value, so
+  // the sentence named an arbitrary word AND claimed a behaviour that does not
+  // exist. It now states the true fact, which is a COUNT: how many of the list's
+  // choices are protected, and that protection is not a pre-selection. Every
+  // dropdown source already in the base says the old words, which is exactly the
+  // case the version mechanism exists for, so this one really must move.
+  dropdown: { version: 2, digest: "389770fef4ffa5d0" },
   portal_login: { version: 1, digest: "d759a60ff2f459f0" },
 }
 

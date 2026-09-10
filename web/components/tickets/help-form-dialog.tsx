@@ -3,16 +3,23 @@
 // Ticket form dialog — raise a NEW ticket, or EDIT one (when `initial` is present).
 //
 // WHAT THIS FORM DEMANDS, in one place, because "which fields are required?" is a
-// question people keep having to read 1,000 lines to answer. FOUR:
+// question people keep having to read 1,000 lines to answer. FIVE:
 //   Description  — always (`descField`).
 //   Title        — since 2026-09-09, her ruling; grandfathered on an imported
 //                  ticket that arrived without one (`titleGrandfathered`).
 //   Type         — since 2026-09-07, her ruling; stands down for a team with no
 //                  ticket types and for a ticket that arrived without one.
 //   Module       — once an app with modules is chosen, and never otherwise.
-// AND THREE IT DOES NOT: Client, App and "Raised by" are optional, each for a
-// reason written at its own config. She named all three on 2026-09-09 while
-// ruling about Title; being named in a sentence is not being ruled about.
+//   Raised by    — since 2026-09-10, her ruling ("not said should not exist");
+//                  once the chosen client HAS contacts on file, and never
+//                  otherwise, and grandfathered on a ticket that arrived without
+//                  one (`contactGrandfathered`). It answers itself with the
+//                  account's main contact, so in practice it only ever asks when
+//                  no main contact is flagged (`mainContactId`).
+// AND TWO IT DOES NOT: Client and App are optional, each for a reason written at
+// its own config. She named those two and "Raised by" on 2026-09-09 while ruling
+// about Title; being named in a sentence is not being ruled about — and the
+// sentence that DID rule about "Raised by" came a day later.
 //
 // Type, App
 // and "Raised by" are all LINES OF CHIPS, not dropdowns (the client, 2026-09-07)
@@ -209,12 +216,28 @@ const moduleField = (required: boolean) => ({
   required,
   helpText: "Which part of the app it is about, like Settings or Documents. Choose the app first.",
 })
-const contactField = {
+// THE PERSON WHO ASKED IS NOT OPTIONAL ANY MORE — client, 2026-09-10: "when
+// creating ticket, raised by not said should not exist. always default main
+// contact person." Two halves of one sentence, and the second is what makes the
+// first liveable: the escape hatch goes, and the account's own MAIN CONTACT
+// (`account_links.is_main_stakeholder`, which `listAccountLinks` already sorts
+// first and both front doors already badge "Main contact") answers the field
+// before anybody touches it.
+//
+// REQUIRED ONCE THERE IS SOMEBODY TO NAME, exactly the shape `moduleField` one
+// field up already carries and for the same honest reason. Two real states have
+// no possible answer: an agency ticket with no client at all ("Ours, no
+// account", which this form offers on purpose), and a client whose contacts
+// nobody has written down yet. Demanding a name there would be a door with no
+// handle — it would make a ticket unraisable to enforce a field that has no
+// options. So the demand is `contactOptions.length > 0`, and it tightens by
+// itself as the contact lists fill in.
+const contactField = (required: boolean) => ({
   ...defaultFieldConfig,
   label: "Raised by",
-  required: false,
+  required,
   helpText: "The person at that account who asked. Not always whoever types it in.",
-}
+})
 
 // "NOTHING CHOSEN", as a value a control can actually hold. Radix Select can't
 // hold an empty string, and the draft this form saves has to round-trip the
@@ -783,14 +806,17 @@ export function HelpFormDialog({
      it — and it is said here so the next reader of this block knows the field
      can be null for a reason other than "no photograph".
 
-     "NOT SAID" GETS NO FACE, and that is the one deliberate asymmetry in the
-     row. It is an escape hatch, not a person, and a round grey "N" would draw a
-     colleague nobody has. It keeps `shape: "round"` so its box, if it ever gets
-     one, is the row's own; it has no `face`, so it has none. */
+     THE ROW IS ALL PEOPLE NOW, AND THAT IS THE CHANGE OF 2026-09-10. It used to
+     end in a "Not said" chip — an escape hatch, not a person, drawn with
+     `shape: "round"` and deliberately no `face` so it would not show a round
+     grey "N" for a colleague nobody has. The client removed the answer, not the
+     drawing: "raised by not said should not exist. always default main contact
+     person." So every chip in this row is now a real contact with a real face,
+     the asymmetry is gone with the option, and the question of what to do when
+     nobody has been named moved to `mainContactId` below. */
   const contactChoices = (detailQ.data?.links ?? []).filter((l) => l.active)
   /** The chips, and the TWO empty states this field has that the type row does
-   * not — which is why "Not said" is appended only when there is somebody to
-   * say it instead of.
+   * not — which is why the row is empty rather than short when either bites.
    *
    * NOBODY CHOSEN YET is the first, and the field is no longer HIDDEN for it.
    * It used to disappear until a client was picked, on the reasoning that a
@@ -815,39 +841,80 @@ export function HelpFormDialog({
    * and so does its SECOND empty state below.
    *
    * A CLIENT WITH NO CONTACTS is the second, and it gets the sentence rather
-   * than a lone "Not said" chip: one black chip on an otherwise empty line looks
-   * like a row that failed to load its options, which is precisely the reading
-   * `RecordPicker`'s own empty-row note exists to prevent. */
+   * than an empty line: a row with no chips at all looks like a row that failed
+   * to load its options, which is precisely the reading `RecordPicker`'s own
+   * empty-row note exists to prevent. */
   const contactOptions =
     !chosenAccountId || contactChoices.length === 0
       ? []
-      : [
-          ...contactChoices.map((l) => ({
-            value: l.personAccountId,
-            label: l.personName,
-            hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
-            // THE ROUND AVATAR (client, 2026-09-09), now with a real face in it.
-            // Four fields and each answers a different question: `picture` is
-            // WHO — the photograph off their own account row, which `RecordMark`
-            // prefers over everything else; `shape` is the BOX (a person is a
-            // circle); `face` is whether a box is drawn AT ALL, which is what
-            // keeps the letter tile for the many contacts who have no
-            // photograph; and the initial inside it is `RecordMark`'s own last
-            // resort rather than anything decided here. All four argued above.
-            picture: l.personLogoUrl,
-            shape: "round" as const,
-            face: true,
-          })),
-          // "Not said" is the same escape hatch "No app" is one field up, in
-          // the same place for the same reason: the row commits on the click,
-          // so naming the wrong person has to be undoable without closing the
-          // form. The TYPE row used to have one too and no longer does — see
-          // `typeField`; the difference is not that this row's mechanics are
-          // different but that "nobody said who asked" is a real and common
-          // answer about a ticket, where "this is none of the four kinds" is
-          // not.
-          { value: NONE, label: t("Not said"), shape: "round" as const },
-        ]
+      : // A PLAIN MAP, NOT A SPREAD INTO AN ARRAY LITERAL. This was a literal
+        // while the escape hatch was appended to the end of it; with "Not said"
+        // gone there is one term left, and `[...xs.map(…)]` is a second array
+        // built for nothing — oxlint's `no-useless-spread`, and it is right.
+        contactChoices.map((l) => ({
+          value: l.personAccountId,
+          label: l.personName,
+          hint: l.isMainStakeholder ? t("Main contact") : (l.relationship ?? undefined),
+          // THE ROUND AVATAR (client, 2026-09-09), now with a real face in it.
+          // Four fields and each answers a different question: `picture` is
+          // WHO — the photograph off their own account row, which `RecordMark`
+          // prefers over everything else; `shape` is the BOX (a person is a
+          // circle); `face` is whether a box is drawn AT ALL, which is what
+          // keeps the letter tile for the many contacts who have no
+          // photograph; and the initial inside it is `RecordMark`'s own last
+          // resort rather than anything decided here. All four argued above.
+          picture: l.personLogoUrl,
+          shape: "round" as const,
+          face: true,
+        }))
+
+  /** WHO IT DEFAULTS TO, AND WHY IT IS DERIVED RATHER THAN WRITTEN INTO STATE.
+   *
+   * CLIENT, 2026-09-10: "always default main contact person." The main contact
+   * is `account_links.is_main_stakeholder` — one flag, one row per company,
+   * already sorted first by `listAccountLinks` and already badged "Main contact"
+   * on the account screen, the contact screen and the client portal. It reaches
+   * this form on `AccountLink.isMainStakeholder`, which the chip above is
+   * ALREADY reading for its hint, so nothing new is asked of any door.
+   *
+   * IT IS AN EXPRESSION, NOT AN EFFECT, and that is the whole of how this
+   * default stays out of the ticket's data. An effect would `setValues` — into
+   * a per-session DRAFT (`useFormDraft`) that outlives the dialog — the moment
+   * the contact list arrived, so merely OPENING an old ticket's form would have
+   * written a name into it, which is the failure this had to avoid. Derived, the
+   * form holds `NONE` until somebody picks, and the default only ever becomes a
+   * fact at the moment they press Submit.
+   *
+   * NO INVENTED FALLBACK WHEN NOBODY IS FLAGGED. `listAccountLinks` sorts the
+   * main contact first, so "take the first row" would look like a default and
+   * would in fact be an arbitrary person the moment no flag is set — and a
+   * ticket that names a human who never asked for anything is worse than a
+   * ticket that names nobody. So the field simply stays empty, and (see
+   * `contactRequired`) it is then the one case where this form asks somebody to
+   * choose.
+   *
+   * AND NOT ON A TICKET THAT PREDATES THE RULE. `titleGrandfathered` and
+   * `typeGrandfathered` above make the same argument about the same shape: it
+   * reads `initial` — the ticket AS OPENED — so it cannot leak into a create,
+   * and 'this row has no raised-by' is a fact about a row that was written
+   * before the field was demanded. Without it, opening an imported ticket to fix
+   * a typo would silently attach its client's main contact to somebody else's
+   * two-year-old request. The exemption dies with the row it was written for:
+   * once a name is saved, the next open is an ordinary required edit. */
+  const contactGrandfathered = isEdit && !initial?.raisedByContactId
+  const mainContactId = contactGrandfathered
+    ? null
+    : (contactChoices.find((l) => l.isMainStakeholder)?.personAccountId ?? null)
+  /** The value the row actually shows and the value `submit` actually sends —
+   * what somebody picked, else the main contact, else nothing. */
+  const raisedByValue =
+    values.raisedByContactId !== NONE ? values.raisedByContactId : (mainContactId ?? NONE)
+  /** Demanded once there is somebody to name — see `contactField`. A ticket with
+   * no client, or a client with no contacts on file, has no possible answer and
+   * is not asked for one. */
+  const contactRequired = !contactGrandfathered && contactOptions.length > 0
+  const contactMissing = contactRequired && raisedByValue === NONE
+  const contactConfig = contactField(contactRequired)
 
   /** ONE FILE AT A TIME, and a failure here never fails the ticket.
    *
@@ -893,8 +960,13 @@ export function HelpFormDialog({
             : values.accountId,
         appId: fixedApp ? fixedApp.id : values.appId === NONE ? undefined : values.appId,
         moduleId: values.moduleId === NONE ? undefined : values.moduleId,
-        raisedByContactId:
-          values.raisedByContactId === NONE ? undefined : values.raisedByContactId,
+        // WHAT THE ROW SHOWS IS WHAT GETS SENT — `raisedByValue`, which is what
+        // somebody picked, else the account's main contact, else nothing. The
+        // default is applied HERE and never written into the draft, so an old
+        // ticket opened and closed again is byte-identical to the one that was
+        // opened (see `mainContactId`). `undefined` means "don't set one": the
+        // door's `optionalText` leaves the stored value alone.
+        raisedByContactId: raisedByValue === NONE ? undefined : raisedByValue,
       })
       // THE FILES, ONCE THERE IS SOMETHING TO HANG THEM ON. `helpId` on an edit,
       // the id the create door just handed back otherwise.
@@ -941,11 +1013,20 @@ export function HelpFormDialog({
         // boolean, so the button and the label can never disagree about what is
         // still outstanding.
         //
-        // FOUR TERMS, FOUR REQUIRED FIELDS, AND THAT IS THE WHOLE LIST. Client,
-        // App and "Raised by" are not here and were not asked for: her sentence
-        // of 2026-09-09 NAMED them and ruled about Title alone.
+        // FIVE TERMS NOW. `contactMissing` joined on 2026-09-10 — the client
+        // removed "Not said" from the Raised by row ("always default main
+        // contact person"), and a row with no way to say "nobody" is a row that
+        // has to be answered. It is a CONDITIONAL demand, like `moduleMissing`
+        // beside it: it is false whenever there is nobody to name (no client, or
+        // a client with no contacts on file) and false on a ticket that predates
+        // the rule, so it never makes an existing ticket unsaveable. Client and
+        // App remain unasked for.
         disabled:
-          !richTextValue(values.description) || titleMissing || typeMissing || moduleMissing,
+          !richTextValue(values.description) ||
+          titleMissing ||
+          typeMissing ||
+          moduleMissing ||
+          contactMissing,
       }}
     >
       {/* THE ORDER IS THE CLIENT'S, 2026-09-07, and it is her own list of seven
@@ -1288,15 +1369,18 @@ export function HelpFormDialog({
           the server refuses. Removing the search box removes a convenience, never
           a limit. The options themselves, the no-cap decision and the two empty
           states are worked out above. */}
-      <Field config={contactField} htmlFor="help-contact" className={fieldSpacing}>
+      <Field config={contactConfig} htmlFor="help-contact" className={fieldSpacing}>
         <RecordPicker
           id="help-contact"
           layout="row"
           // Same wall, same answer as the type row above: a group of chips is
           // not a labelable control, so the name a screen reader reads comes
           // from the field's own config rather than from the `<label for>`.
-          ariaLabel={t(contactField.label)}
-          value={values.raisedByContactId || NONE}
+          ariaLabel={t(contactConfig.label)}
+          // THE DEFAULT IS VISIBLE, WHICH IS THE POINT OF IT. `raisedByValue`
+          // resolves the main contact for the row as well as for `submit`, so
+          // the chip somebody would be agreeing to is the one already lit.
+          value={raisedByValue}
           onChange={(raisedByContactId) => setValues((v) => ({ ...v, raisedByContactId }))}
           options={contactOptions}
           searchPlaceholder={t("Search contacts…")}

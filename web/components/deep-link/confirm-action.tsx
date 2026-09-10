@@ -6,7 +6,7 @@
 // `query.confirm` off the `ScreenQuery` itself, which quietly made it a
 // deep-link-only component: the ONLY way to open this warning was to be on a
 // team-area screen with `?confirm=` in the address. That is precisely how the
-// member acts came to have no door on Settings › Team (`team/member-panel.tsx`
+// member acts came to have no door on Settings › Team (`team/member-screen.tsx`
 // carries the whole account of the regression). The act is now a prop, so the
 // two callers say the same sentence two ways — the engine host passes the
 // `?confirm` it parsed, the Team tab passes the act it is about to run — and

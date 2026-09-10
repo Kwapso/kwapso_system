@@ -290,24 +290,32 @@ export async function setSelectableActive(
   const row = rows[0]
   if (!row) throw new GuardError(404, "not_found", "That dropdown value doesn't exist.")
 
-  // A DEFAULT VALUE CANNOT BE SWITCHED OFF WHILE IT IS STILL A DEFAULT. The
+  // A PROTECTED VALUE CANNOT BE SWITCHED OFF WHILE IT IS STILL PROTECTED. The
   // built-in vocabularies ship with `is_default = 1` and everything a person adds
   // is born 0, so the app has always KNOWN which words are its own furniture and
   // has never defended them: one click could retire "Bug" and take the tab, the
   // mark and the picker entry with it.
   //
+  // THIS REFUSAL IS THE FLAG'S ONLY BEHAVIOURAL READ IN THE WHOLE APP, which is
+  // why the word a person reads changed on 2026-09-10 (client: "find an accurate
+  // word for what Default means … Find a good word and rename it"). No picker,
+  // no dialog and no resolver has ever pre-selected a value from `is_default`, so
+  // "Default" named a behaviour that does not exist. The column, the door field
+  // and this error CODE keep their names — an identifier rename is a migration
+  // and a door change for nothing. `shared/glossary.ts` carries the word.
+  //
   // The guard is deliberately a TWO-STEP rather than an outright refusal — take
-  // the default mark off, then switch it off — because "you may never remove this"
+  // the protection off, then switch it off — because "you may never remove this"
   // is a rule the owner of a team should be able to overrule about their own
   // vocabulary. It stops the accident, not the intention. Renaming is untouched:
-  // a default value may be called whatever the team calls it (`updateSelectable`
+  // a protected value may be called whatever the team calls it (`updateSelectable`
   // carries its records with it), which is the same freedom the locked Admin role
   // has over its own title.
   if (!active && row.is_default === 1)
     throw new GuardError(
       409,
       "default_value",
-      `"${row.value}" is one of the defaults, so it can't be switched off. Take the default mark off it first if you really want it gone.`
+      `"${row.value}" is protected, so it can't be switched off. Take the protection off it first if you really want it gone.`
     )
 
   // R17: current-status predicate → a repeat moves zero rows → no activity row,
@@ -332,7 +340,7 @@ export async function setSelectableActive(
   return true
 }
 
-/** Mark a value as one of the team's defaults, or take that mark off.
+/** Protect a value so it can't be switched off, or take that protection off.
  *
  * `is_default` is not new — it has been on `selectable_data` since the table was
  * written, set to 1 by every seeded vocabulary and 0 by `createSelectable`. What
@@ -344,8 +352,14 @@ export async function setSelectableActive(
  * role — a flag on the row, a refusal that reads it, and no hard-coded list of
  * protected names anywhere.
  *
- * R17: the current-state predicate rides the UPDATE, so marking a default value
- * as default again moves zero rows and writes no history. */
+ * THE ARGUMENT IS STILL `isDefault`, AND THAT IS DELIBERATE. The word a person
+ * reads is "Protected" (client, 2026-09-10); the column, this parameter and the
+ * door's body field are unchanged, because renaming them is a migration and a
+ * door change that buys a reader nothing. It is the same ruling CLAUDE.md
+ * records for `help`/Tickets: the human-facing word moves, the identifier stays.
+ *
+ * R17: the current-state predicate rides the UPDATE, so protecting a value that
+ * is already protected moves zero rows and writes no history. */
 export async function setSelectableDefault(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -372,8 +386,12 @@ export async function setSelectableDefault(
   if (!changed[0]) return false
 
   await logActivity(cfg, guard.databaseId, actor, {
-    type: isDefault ? "Dropdown value made a default" : "Dropdown value no longer a default",
-    description: `${actor.name} ${isDefault ? "made" : "stopped treating"} the "${row.value}" ${row.type} value ${isDefault ? "one of the defaults" : "as one of the defaults"}`,
+    // BOTH SENTENCES END ON "protected", so `activityVerb` classifies them off
+    // its own last-word map (`edited` — the protection moves, the value stays in
+    // use either way) and the two hand-written `VERB_BY_PHRASE` lines these
+    // replaced are gone. See shared/workers/activity-verbs.ts.
+    type: isDefault ? "Dropdown value protected" : "Dropdown value no longer protected",
+    description: `${actor.name} ${isDefault ? "protected" : "took the protection off"} the "${row.value}" ${row.type} value`,
     relatedTable: "selectable_data",
     relatedRowId: id,
   })

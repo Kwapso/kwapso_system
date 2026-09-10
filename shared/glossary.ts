@@ -94,6 +94,31 @@ export const GLOSSARY = {
   // screen itself moved into Settings as its own tab — the key stays (nothing
   // reads the object key as a word), only the term a person reads changes.
   dropdownValues: { term: "Choices", def: "The options behind your team's dropdowns, like Ticket types and Sprint types." },
+  // "DEFAULT" WAS THE WRONG WORD, AND THE CLIENT SAID SO (2026-09-10): "find an
+  // accurate word for what Default means. I don't think Default represents
+  // an… Find a good word and rename it."
+  //
+  // THE FLAG NEVER PRE-SELECTED ANYTHING. `selectable_data.is_default` has
+  // exactly one behavioural read in the whole app — `setSelectableActive`
+  // (workers/tenancy/src/lib/selectable.ts) refuses to switch the row off while
+  // it is set. No picker, no dialog and no resolver has ever read it to choose
+  // a value for somebody, so "Default" promised a behaviour the app does not
+  // have, on 100% of the shipped vocabulary: every seeded row and every
+  // migration back-fill writes 1, and only the two create doors write 0.
+  //
+  // WHY NOT "BUILT-IN", which was the first suggestion. It says where the row
+  // CAME FROM, and that is only true today — "Protect it" is offered on every
+  // value a person can edit, so the first team to protect a word of their own
+  // would be reading a badge that lies about their own row. The word has to
+  // name what the flag DOES, because that is the half that is always true.
+  // "Locked" over-claims for the same kind of reason: a protected value can
+  // still be renamed, and the protection comes off in one click.
+  //
+  // THE COLUMN AND THE API FIELD KEEP THEIR NAME. `is_default` / `isDefault`
+  // are a migration and a door change for zero benefit, and the same ruling
+  // CLAUDE.md records for `help`/Tickets applies: the human-facing word moves,
+  // the identifier stays.
+  protectedChoice: { term: "Protected", def: "A choice that can't be switched off. The ones we set up for you start protected; take the protection off first if you want one gone." },
   importCsv: { term: "Import", def: "Bring rows in from a spreadsheet (CSV) instead of typing them one by one." },
   exportCsv: { term: "Export", def: "Download what you can see as a spreadsheet (CSV) file." },
   sampleFile: { term: "Sample file", def: "A downloadable example that shows what a good import file looks like." },
@@ -129,9 +154,9 @@ export const GLOSSARY = {
   // kind", "Brand asset category") are values in `selectable_data.type` in every
   // team database, and renaming one orphans its rows from the values filed under
   // it. Same ruling as CLAUDE.md's `help`/Tickets: the human-facing word moves,
-  // the identifier stays. "Kind of work" also stays — a rate is priced per
-  // CATEGORY OF LABOUR, which is a different thing from a record's type, and it
-  // is `rateCard`'s own wording below.
+  // the identifier stays. ("Kind of work" was kept for the same reason — a rate
+  // was priced per CATEGORY OF LABOUR, a different thing from a record's type —
+  // and the phrase left the app with the rate card on 10 Sep 2026.)
   recordType: { term: "Type", def: "What sort of thing a record is. Most types are your team's own list, so you can add one we haven't thought of." },
 
   // PROCESS MAPS, VERSIONS AND THE MONEY (SCOPE ch.02 — ported, never invented).
@@ -160,15 +185,23 @@ export const GLOSSARY = {
   savings: { term: "Saving", def: "Time a step no longer takes: the baseline minus the latest version, times how often it runs." },
   regression: { term: "Regression", def: "A step that now takes longer than the baseline. We show it, and we say why." },
   agreedEstimate: { term: "Agreed estimate", def: "A time we agreed with you rather than measured. The estimates are agreed; the subtraction is arithmetic." },
-  rateCard: { term: "Rate card", def: "What an account is charged per hour, by kind of work." },
   // THE HEADLINE NUMBER OF THE WHOLE PRODUCT, and until 19 Aug 2026 it had no
   // entry — a tab on two screens, a section of the client portal and two machine
   // tools, all naming a concept the dictionary had never defined. It is the same
   // arithmetic `saving` describes, summed and shown: a saving is one step getting
   // faster, impact is what all of them come to.
   impact: { term: "Impact", def: "What the work has given back, summed: the hours a client no longer spends, and what those hours are worth." },
-  internalRate: { term: "Internal rate", def: "What an hour of our own work costs us. Ours alone, it never leaves the agency." },
-  margin: { term: "Margin", def: "What is left of revenue after our own time and tool costs. Ours alone, never shown to a client." },
+  // THREE MONEY WORDS STOOD HERE and all three left on 10 Sep 2026, in two
+  // rulings an hour apart. INTERNAL RATE ("what an hour of our own work costs
+  // us") and MARGIN ("what is left of revenue after our own time and tool
+  // costs") went with the internal-rates feature; RATE CARD ("what an account is
+  // charged per hour, by kind of work") went with the client's second ruling,
+  // "the whole account rates also killed it". A glossary entry for a concept no
+  // screen says any more is a dictionary of a product that used to exist.
+  //
+  // THE MONEY WORDS THAT SURVIVE are below and beside: `impact` (what the work
+  // gave back, and what those hours are worth), `toolCost` (what an app costs US
+  // to run) and `priceVisibility` (the switch). None of them is a card.
   toolCost: { term: "Tool cost", def: "What an app costs us to keep running each month, hosting and the services behind it." },
   priceVisibility: { term: "Price visibility", def: "The switch on an account that decides whether they see what they bought. Impact is shown either way." },
   // WHAT WE HAND OVER on an app. ONE word now, not two: the KIND entry that used

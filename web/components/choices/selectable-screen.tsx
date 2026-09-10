@@ -33,7 +33,9 @@ import { PencilSimple, X, Check, UploadSimple, Download, Power, Shield, ShieldSl
 import type { SortOption } from "@shared/web/screen-engine/config"
 import type { SelectableValue } from "@shared/types"
 import { ApiFailure, tenancy } from "@/lib/api"
-import { RecordActionsMenu } from "@/components/records/record-chrome"
+import { NEUTRAL_TYPE_COLOUR } from "@/lib/type-colours"
+import { RecordActionsMenu, type RecordAction } from "@/components/records/record-chrome"
+import { Swatch } from "@/components/records/record-picker"
 import { SelectableFormDialog } from "@/components/choices/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
 import { primeCache, useCached } from "@shared/web/store"
@@ -50,7 +52,7 @@ import { CollectionHeading } from "@/components/records/collection-heading"
  * and leaves what's inside each one exactly where it was. Two different
  * questions, and this is the whole vocabulary — a value has no date, no
  * count, nothing else this screen could sort by (SelectableValue carries a
- * word, a type, a default flag and an active flag, and none of the other
+ * word, a type, a protection flag and an active flag, and none of the other
  * three reads as an ORDER). */
 const VALUE_SORTS: SortOption[] = [
   { value: "value", label: "Value" },
@@ -74,7 +76,235 @@ interface RowContext {
   saveRename: (id: string) => void
   setDefault: (v: SelectableValue, next: boolean) => void
   setActive: (v: SelectableValue, next: boolean) => void
+  /** Present only where this mounting's group has a PALETTE — see
+   * `SelectableScope.colour`. It decides two things and they are the same
+   * decision: the group draws as a wall of chips rather than a list of rows,
+   * and its mark is not offered for editing, because on a coloured group the
+   * colour IS the mark and nothing in the app reads the glyph. */
+  colour?: (value: string) => string
   t: ReturnType<typeof useT>
+}
+
+/** WHAT A READER MAY DO TO ONE VALUE — built once, so the list row and the chip
+ * can never come to offer different acts on the same word.
+ *
+ * It was written inline in `ValueRow` until the chip wall arrived on
+ * 2026-09-10. Two copies of this array is the drift `RecordActionsMenu`'s own
+ * header argues against one level up: the confirm on Deactivate, the swap
+ * between "Protect it" and "Stop protecting it", and the rule that Deactivate
+ * stands down on a protected value are three behaviours, and the second copy is
+ * where one of them stops being true. */
+function valueActions(v: SelectableValue, ctx: RowContext): RecordAction[] {
+  const { canEdit, canDelete, setEditingId, setEditValue, setEditMark, setDefault, setActive, t } = ctx
+  return [
+    ...(v.active && canEdit
+      ? [
+          {
+            key: "rename",
+            label: t("Rename"),
+            icon: <PencilSimple className="size-3.5" />,
+            onSelect: () => {
+              setEditingId(v.id)
+              setEditValue(v.value)
+              // CARRIED EVEN WHERE IT IS NOT SHOWN. On a coloured group the
+              // mark input is not drawn (see `RowContext.colour`), and the
+              // rename door takes the mark as an argument — so seeding this
+              // from the row is what keeps a rename from silently CLEARING a
+              // glyph the reader was never shown and never chose to remove.
+              // Clearing the emoji that are already in the data is a migration
+              // and a decision of the client's, not a side effect of typing a
+              // new word.
+              setEditMark(v.mark ?? "")
+            },
+          },
+        ]
+      : []),
+    // PROTECTED, NOT "DEFAULT" — the client's ruling, 2026-09-10 ("find an
+    // accurate word for what Default means … Find a good word and rename it").
+    // The flag never pre-selected anything: its one behavioural read in the
+    // whole app is the refusal in `setSelectableActive`, so what it does is
+    // stop the value being switched off. `shared/glossary.ts` carries the word
+    // and the reasoning; the column and the door field are still `is_default` /
+    // `isDefault` on purpose. The two glyphs were already `Shield` /
+    // `ShieldSlash`, which is the picture the new word was hiding behind.
+    ...(canEdit
+      ? [
+          v.isDefault
+            ? {
+                key: "undefault",
+                label: t("Stop protecting it"),
+                icon: <ShieldSlash className="size-3.5" />,
+                onSelect: () => void setDefault(v, false),
+              }
+            : {
+                key: "default",
+                label: t("Protect it"),
+                icon: <Shield className="size-3.5" />,
+                onSelect: () => void setDefault(v, true),
+              },
+        ]
+      : []),
+    // DEACTIVATE STANDS DOWN ON A PROTECTED VALUE rather than offering itself
+    // and failing at the door. The door refuses it either way (that is the real
+    // defence, and it holds for the agent and MCP too); this is so a person is
+    // never offered a button that cannot work. Take the protection off and it
+    // comes back.
+    ...(canDelete && !v.isDefault
+      ? [
+          v.active
+            ? {
+                key: "deactivate",
+                label: t("Deactivate"),
+                icon: <Power className="size-3.5" />,
+                destructive: true,
+                onSelect: () => void setActive(v, false),
+              }
+            : {
+                key: "activate",
+                label: t("Activate"),
+                icon: <Power className="size-3.5" />,
+                onSelect: () => void setActive(v, true),
+              },
+        ]
+      : []),
+  ]
+}
+
+/** THE INLINE RENAME, shared by the row and the chip for `valueActions`' own
+ * reason: one editor, one save button, one loading state.
+ *
+ * THE MARK INPUT IS ABSENT ON A COLOURED GROUP. Client, 2026-09-07: *"for type,
+ * kill the emojis. this is legacy. in current system we use colors"*, and
+ * 2026-09-10: *"also kill emojis!!!"*. `web/lib/type-marks.ts` already deleted
+ * the READ for ticket types — `MARK_GROUP` has no `ticket` key and the union is
+ * closed, so no screen can look one up — which left this editor as the last
+ * place in the app that drew a ticket type's glyph, and it drew it in the one
+ * position that invites somebody to type another. */
+function ValueEditor({ v, ctx }: { v: SelectableValue; ctx: RowContext }) {
+  const { editValue, editMark, savingId, setEditingId, setEditValue, setEditMark, saveRename, colour, t } = ctx
+  return (
+    <>
+      {!colour && (
+        <Input
+          value={editMark}
+          onChange={(e) => setEditMark(e.target.value)}
+          // "MARK", NOT "EMOJI" — client, 2026-09-10: *"also kill emojis!!!"*,
+          // and the label was contradicting the door as well as the ruling.
+          // `optionalMark` (`shared/workers/validate.ts`) has refused a
+          // pictograph on this exact field since 2026-08-31 with the sentence
+          // "Mark should be a short word or initial, not an emoji" — so a
+          // control labelled Emoji, asking for one, was a 400 waiting to
+          // happen. The tickets and process sides renamed it then; these three
+          // Choices screens were the half that was missed.
+          aria-label={t("Mark")}
+          placeholder={t("Mark")}
+          maxLength={4}
+          className="h-8 w-16 shrink-0 text-center"
+        />
+      )}
+      <Input
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        aria-label={t("Option")}
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
+        className="h-8"
+      />
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => void saveRename(v.id)}
+        loading={savingId === v.id}
+        loadingLabel={null}
+        aria-label={t("Save")}
+      >
+        <Check className="size-4" />
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => setEditingId(null)}
+        aria-label={t("Cancel")}
+      >
+        <X className="size-4" />
+      </Button>
+    </>
+  )
+}
+
+/** ONE VALUE AS A CHIP — the shape a ticket type already wears everywhere else
+ * in the app.
+ *
+ * THE CLIENT, 2026-09-10: *"on ticket type, show it like chips with their
+ * color, not a list."* The chip is not invented here: `Badge variant="secondary"
+ * size="pill"` with a `Swatch` inside it is exactly what the ticket table's Type
+ * cell, the triage card and the type picker draw, on her own earlier ruling
+ * (*"Type with the colors, same as we have with the chips"*). This screen — the
+ * one place the words are SET — was the last that drew them as grey rows with a
+ * pictograph in front.
+ *
+ * THE CHIP IS THE PRESS TARGET, and the menu behind it is the row's own
+ * (`RecordActionsMenu`'s `trigger` slot carries the argument). A reader with no
+ * rights gets the chip and no menu rather than a chip that opens an empty one,
+ * which is the same rule that component already applies to the three dots.
+ *
+ * A BARE `<button>`, for `members-gallery.tsx`'s reason one screen along: every
+ * kit `Button` size fixes a height and this target is a badge, not a control.
+ * The kit's focus rule is global (tokens.css §8 rings every `:focus-visible` at
+ * the control's own radius), so it is rung for free and defines nothing.
+ *
+ * INACTIVE READS AS DIMMED, the same `opacity-60` the list row uses, so the two
+ * renderings say "switched off" with one vocabulary. `Protected` and `Inactive`
+ * ride the chip's accessible NAME rather than a second badge inside it: a badge
+ * nested in a badge is two lozenges for one word, and the state is a fact about
+ * the chip rather than a thing beside it. */
+function ValueChip({ v, ctx }: { v: SelectableValue; ctx: RowContext }) {
+  const { colour, editingId, t } = ctx
+  if (editingId === v.id)
+    return (
+      <span className="flex items-center gap-2">
+        <ValueEditor v={v} ctx={ctx} />
+      </span>
+    )
+  const states = [v.isDefault ? t("Protected") : null, v.active ? null : t("Inactive")].filter(Boolean)
+  const chip = (
+    <Badge variant="secondary" size="pill" className={v.active ? undefined : "opacity-60"}>
+      <Swatch colour={colour?.(v.value) ?? NEUTRAL_TYPE_COLOUR} />
+      {v.value}
+    </Badge>
+  )
+  const actions = valueActions(v, ctx)
+  if (actions.length === 0) return chip
+  return (
+    <RecordActionsMenu
+      actions={actions}
+      trigger={
+        <button
+          type="button"
+          className="cursor-pointer"
+          aria-label={[v.value, ...states].join(" — ")}
+        >
+          {chip}
+        </button>
+      }
+    />
+  )
+}
+
+/** ONE GROUP AS A WALL OF CHIPS — the coloured groups' answer to `GroupValues`
+ * below, and deliberately NOT virtualized: a palette is a handful of words (the
+ * base seeds four ticket types) and `useVirtualRows` measures one uniform ROW
+ * height, which a wrapping wall does not have. */
+function ChipWall({ items, ctx }: { items: SelectableValue[]; ctx: RowContext }) {
+  return (
+    <ul className="flex flex-wrap items-center gap-2">
+      {items.map((item) => (
+        <li key={item.id}>
+          <ValueChip v={item} ctx={ctx} />
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 function ValueRow({
@@ -96,10 +326,7 @@ function ValueRow({
   posinset?: number
   setsize?: number
 }) {
-  const {
-    teamId, onOpen, canEdit, canDelete, editingId, editValue, editMark, savingId,
-    setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive, t,
-  } = ctx
+  const { teamId, onOpen, editingId, t } = ctx
   return (
     <li
       ref={rowRef}
@@ -108,42 +335,7 @@ function ValueRow({
       className={`flex items-center gap-2 px-3 py-2 ${v.active ? "" : "opacity-60"}`}
     >
       {editingId === v.id ? (
-        <>
-          <Input
-            value={editMark}
-            onChange={(e) => setEditMark(e.target.value)}
-            aria-label={t("Emoji")}
-            placeholder={t("Emoji")}
-            maxLength={4}
-            className="h-8 w-16 shrink-0 text-center"
-          />
-          <Input
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            aria-label={t("Option")}
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            className="h-8"
-          />
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => void saveRename(v.id)}
-            loading={savingId === v.id}
-            loadingLabel={null}
-            aria-label={t("Save")}
-          >
-            <Check className="size-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setEditingId(null)}
-            aria-label={t("Cancel")}
-          >
-            <X className="size-4" />
-          </Button>
-        </>
+        <ValueEditor v={v} ctx={ctx} />
       ) : (
         <>
           {/* THE TYPE MARK, where it is SET (CHECKLIST 11.8). It
@@ -184,13 +376,16 @@ function ValueRow({
               {t("Inactive")}
             </Badge>
           )}
-          {/* ONE OF THE DEFAULTS — a word the app shipped with, and
-              the reason the Deactivate action is not on this row.
-              `is_default` has been on every seeded value since the
-              table was written and was read by nothing at all. */}
+          {/* PROTECTED — the reason the Deactivate action is not on
+              this row, said as the thing it actually is. It read
+              "Default" until 2026-09-10, which promised a
+              pre-selection nothing in the app has ever made:
+              `is_default` is on every seeded value and its only
+              behavioural read anywhere is the refusal in
+              `setSelectableActive`. */}
           {v.isDefault && (
             <Badge variant="secondary" className="shrink-0">
-              {t("Default")}
+              {t("Protected")}
             </Badge>
           )}
           {/* THE TWO ACTIONS, IN THE ROW'S OWN MENU (B2). The row
@@ -199,67 +394,9 @@ function ValueRow({
               which is N4's other worked example. Facts on the
               line, the state as a badge at the end of it, the
               actions in the trailing slot — and never interleaved.
-              H 5 → 3. */}
-          <RecordActionsMenu
-            tone="row"
-            actions={[
-              ...(v.active && canEdit
-                ? [
-                    {
-                      key: "rename",
-                      label: t("Rename"),
-                      icon: <PencilSimple className="size-3.5" />,
-                      onSelect: () => {
-                        setEditingId(v.id)
-                        setEditValue(v.value)
-                        setEditMark(v.mark ?? "")
-                      },
-                    },
-                  ]
-                : []),
-              ...(canEdit
-                ? [
-                    v.isDefault
-                      ? {
-                          key: "undefault",
-                          label: t("Stop treating as a default"),
-                          icon: <ShieldSlash className="size-3.5" />,
-                          onSelect: () => void setDefault(v, false),
-                        }
-                      : {
-                          key: "default",
-                          label: t("Make it a default"),
-                          icon: <Shield className="size-3.5" />,
-                          onSelect: () => void setDefault(v, true),
-                        },
-                  ]
-                : []),
-              // DEACTIVATE STANDS DOWN ON A DEFAULT rather than
-              // offering itself and failing at the door. The door
-              // refuses it either way (that is the real defence,
-              // and it holds for the agent and MCP too); this is
-              // so a person is never offered a button that cannot
-              // work. Take the default mark off and it comes back.
-              ...(canDelete && !v.isDefault
-                ? [
-                    v.active
-                      ? {
-                          key: "deactivate",
-                          label: t("Deactivate"),
-                          icon: <Power className="size-3.5" />,
-                          destructive: true,
-                          onSelect: () => void setActive(v, false),
-                        }
-                      : {
-                          key: "activate",
-                          label: t("Activate"),
-                          icon: <Power className="size-3.5" />,
-                          onSelect: () => void setActive(v, true),
-                        },
-                  ]
-                : []),
-            ]}
-          />
+              H 5 → 3. The items themselves are `valueActions`
+              above, shared with the chip wall. */}
+          <RecordActionsMenu tone="row" actions={valueActions(v, ctx)} />
         </>
       )}
     </li>
@@ -332,8 +469,8 @@ function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext
  * IT IS A NARROWING OF THIS SCREEN, NOT A SECOND SCREEN, and that is the whole
  * point of the prop. `module-settings-screen.tsx` could have drawn its own list
  * of ticket types in an afternoon; it would then have had its own rename, its
- * own deactivate confirm, its own emoji field and its own idea of what a
- * default is — four behaviours to keep in step with this file for ever, and a
+ * own deactivate confirm, its own mark field and its own idea of what
+ * protecting a value means — four behaviours to keep in step with this file for ever, and a
  * value that reads one way on Settings › Choices and another on Settings ›
  * Tickets. Every write below still goes through the same four `tenancy.*`
  * doors and primes the same `selectable:<teamId>` key, so an edit made here is
@@ -366,14 +503,34 @@ export interface SelectableScope {
    * exist: creatable, saveable, and backing nothing. Renaming the five is the
    * whole of what this section is for.
    *
-   * It is ALSO how this page keeps one brand fill. The kit rules one mango per
-   * view and `AddButton` is a mango; two vocabulary sections stacked on one
-   * page would draw two. Settings › Team answers the same question by demoting
-   * the second button (`RolesMatrix`'s quiet "New role"), and the client ruled
-   * on that exception herself — "No exceptions to the rules. It was my
-   * mistake." Here the honest answer is stronger than a demotion: the second
-   * section has nothing to create, so it draws no button at all. */
+   * It WAS ALSO how the Tickets settings page kept one brand fill: the kit
+   * rules one mango per view and `AddButton` is a mango, and two vocabulary
+   * sections stacked on one page would have drawn two — the second, Ticket
+   * statuses, drew none because it had nothing to create. THAT SECTION IS GONE
+   * (client, 2026-09-10: *"remove ticket status, this cannot be adjusted from
+   * the app"*), so the page has one section and one mango for a simpler reason
+   * than the one this paragraph used to give. The flag stays, unchanged and
+   * still declared per section, because the argument above it — a `"labels"`
+   * group cannot honestly grow a row — is a fact about the vocabulary rather
+   * than a fact about that one page, and it is what the next `"labels"` group
+   * offered a settings section will need. Settings › Team answers the
+   * one-mango question the other way, by demoting the second button
+   * (`RolesMatrix`'s quiet "New role"), and the client ruled on that exception
+   * herself — "No exceptions to the rules. It was my mistake." */
   create: boolean
+  /** THE COLOUR EACH WORD IS KNOWN BY — present only where this group HAS a
+   * palette, and the whole of what turns the section from a list into a wall of
+   * chips (`ChipWall` above).
+   *
+   * Client, 2026-09-10: *"on ticket type, show it like chips with their color,
+   * not a list."* A FUNCTION rather than a column because a value's colour is
+   * not stored — `selectable_data` has four meaningful columns and none is a
+   * colour, and `web/lib/type-colours.ts` is the one place a ticket type's is
+   * decided. Handing the resolver down keeps that true: this editor draws
+   * whatever colour it is given and knows nothing about ticket types, so the
+   * second group that gains a palette hands its own rather than teaching this
+   * file a second map. */
+  colour?: (value: string) => string
 }
 
 export function SelectableScreen({
@@ -513,13 +670,15 @@ export function SelectableScreen({
     }
   }
 
-  /** Mark a value as one of the team's defaults, or take the mark off. The mark
-   * is what stops `setActive` retiring a word the app shipped with. */
+  /** Protect a value, or take the protection off. The protection is what stops
+   * `setActive` retiring a word the team's records already lean on. The door
+   * field is still `isDefault` — the word a person reads moved on 2026-09-10,
+   * the identifier did not (`shared/glossary.ts` says why). */
   async function setDefault(v: SelectableValue, next: boolean) {
     try {
       const { values: rows } = await tenancy.setSelectableDefault(v.id, next)
       primeCache(`selectable:${teamId}`, rows)
-      toast.success(next ? t("Marked as a default.") : t("No longer a default."))
+      toast.success(next ? t("Protected.") : t("No longer protected."))
     } catch (err) {
       toast.error(err instanceof ApiFailure ? err.message : t("Couldn't change that."))
     }
@@ -575,7 +734,8 @@ export function SelectableScreen({
   // fourteen — every group reads the SAME state and handlers, never its own.
   const rowCtx: RowContext = {
     teamId, onOpen, canEdit, canDelete, editingId, editValue, editMark, savingId,
-    setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive, t,
+    setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive,
+    colour: scope?.colour, t,
   }
 
   return (
@@ -728,7 +888,18 @@ export function SelectableScreen({
             {grouped.map((g) => (
               <div key={g.type} className="flex flex-col gap-2">
                 <h2 className="text-sm font-medium">{g.type}</h2>
-                <GroupValues items={g.items} ctx={rowCtx} />
+                {/* A WALL OR A LADDER, decided by whether this mounting's group
+                    has a palette (`SelectableScope.colour`) and by nothing
+                    else. Client, 2026-09-10, on Ticket types: *"show it like
+                    chips with their color, not a list."* Every other group
+                    keeps the row it has always had — a Country and a Department
+                    have no colour to carry and a wall of grey lozenges would be
+                    a list wearing a costume. */}
+                {rowCtx.colour ? (
+                  <ChipWall items={g.items} ctx={rowCtx} />
+                ) : (
+                  <GroupValues items={g.items} ctx={rowCtx} />
+                )}
               </div>
             ))}
           </div>

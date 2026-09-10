@@ -379,11 +379,18 @@ const APP_STAGE_NAMES = APP_STAGES.map((s) => s.name)
  * permission module its own list door gates on, so this door grants exactly
  * nothing new; it is the same rows, asked a better question.
  *
- * NOT here, and deliberately: `internal_rates` and `internal_role_rates` — what
- * our own hour costs (R24). They are absent rather than forbidden, which is the
- * whole design: there is no switch to invert. `account_rates` IS here (what a
- * client is CHARGED, on the `commercials` right) because it is the agency's
- * ordinary commercial record and the door refuses client logins outright.
+ * NOT here, and deliberately: the three rate cards this base used to carry.
+ * `internal_rates` and `internal_role_rates` — what our own hour cost (R24) —
+ * were absent rather than forbidden, which was the whole design: there is no
+ * switch to invert. `account_rates`, what a client was CHARGED, WAS here on the
+ * `commercials` right, because it was the agency's ordinary commercial record on
+ * a door that refuses client logins outright. All three were retired on
+ * 10 Sep 2026 and the entry went with the table.
+ *
+ * MONEY IS STILL ASKABLE HERE, which is the part that matters for the fence
+ * suite: `sprints` carries `soldPriceCents`, what a block of work was sold for.
+ * The generic door must go on answering about prices, or "fenced" stops being
+ * distinguishable from "money is scary".
  */
 export const QUERY_MODULES: Record<string, QueryModule> = {
   tickets: {
@@ -887,23 +894,6 @@ export const QUERY_MODULES: Record<string, QueryModule> = {
       { name: "value", column: "value", type: "text" },
       { name: "isDefault", column: "is_default", type: "boolean" },
       { name: "description", column: "description", type: "text", bulky: true },
-      CREATED,
-      UPDATED,
-      DEACTIVATED,
-    ],
-  },
-  account_rates: {
-    table: "account_rates",
-    module: "commercials",
-    summary: "What a client is CHARGED for an hour. Never what our own hour costs.",
-    labelColumn: "label",
-    defaultSort: "label",
-    fields: [
-      ID,
-      { name: "label", column: "label", type: "text" },
-      { name: "centsPerHour", column: "cents_per_hour", type: "number" },
-      { name: "currency", column: "currency", type: "text" },
-      ACCOUNT,
       CREATED,
       UPDATED,
       DEACTIVATED,

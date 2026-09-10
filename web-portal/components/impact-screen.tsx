@@ -26,8 +26,13 @@
 // 3. PRICES ARE ABSENT UNLESS THEY WERE SENT. The per-account switch is decided
 //    at the door: when it is off, the `prices` key is not in the response at
 //    all. This screen has no flag of its own to get wrong — it renders what it
-//    was given. And what it can never be given, under any setting, is the
-//    agency's own margin or internal rates (R24).
+//    was given.
+//
+//    WHAT IT CAN BE GIVEN NARROWED TWICE ON 10 SEP 2026. It was never the
+//    agency's own margin or internal rates; the client then retired those
+//    outright, and an hour later retired the ACCOUNT RATE CARD too ("the whole
+//    account rates also killed it"). So the block that was "what you agreed per
+//    hour, and what you have bought" is now the second half alone.
 
 import * as React from "react"
 import dynamic from "next/dynamic"
@@ -265,30 +270,18 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
       {data.prices && (
         <section className="flex flex-col gap-4">
           <h2 className="text-lg font-medium">{t("What you bought")}</h2>
+          {/* A RATE-CARD PANEL SAT UNDER THIS LINE until 10 Sep 2026 — one row
+              per kind of work, the label and what it cost an hour. The card was
+              retired whole, and the currency this line is said in came off its
+              first row, so the door now sends the ACCOUNT's own currency beside
+              the total rather than borrowing one from a table that has gone. */}
           {data.prices.soldCents !== null && (
             <p className="text-sm">
               {t("Agreed so far:")}{" "}
               <span className="font-medium">
-                {moneyText(data.prices.soldCents, data.prices.rates[0]?.currency ?? null)}
+                {moneyText(data.prices.soldCents, data.prices.currency)}
               </span>
             </p>
-          )}
-          {data.prices.rates.length > 0 && (
-            <div className="rounded-[var(--radius)] bg-surface-panel">
-              {data.prices.rates.map((r) => (
-                <div
-                  key={r.label}
-                  // A row rule inside one panel — the same inset hairline
-                  // `StepLine` above uses, and for the same reason (kit §2.7).
-                  className="flex items-baseline justify-between gap-2 p-3 shadow-[var(--hairline-under)] last:shadow-none"
-                >
-                  <span className="text-sm">{r.label}</span>
-                  <span className="text-muted-foreground text-sm">
-                    {moneyText(r.centsPerHour, r.currency)} {t("an hour")}
-                  </span>
-                </div>
-              ))}
-            </div>
           )}
         </section>
       )}

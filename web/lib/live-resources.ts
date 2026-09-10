@@ -849,32 +849,13 @@ export function rolePermsAllKey(teamId: string): string {
   return `role-perms-all:${teamId}`
 }
 
-/** One account's rate card, and the margin computed on it. Both keyed by the
- * ACCOUNT: a card is read on its account's screen, and a margin is about one
- * account. */
-export function ratesKey(accountId: string): string {
-  return `rates:${accountId}`
-}
-export function marginKey(accountId: string): string {
-  return `margin:${accountId}`
-}
-/** The agency's own cost card — team-wide, because an internal rate is a fact
- * about us and not about any client. */
-/** What an hour of each ROLE costs (8.13) — one small settled list, team-wide,
- * read whole on the internal rates screen. */
-export function roleRatesKey(teamId: string): string {
-  return `role-rates:${teamId}`
-}
-
 /** What ONE app has given back — hours and money. Its own key per app, because
  * it is read on that app's record and nowhere else. */
 export function appMoneyKey(appId: string): string {
   return `app-money:${appId}`
 }
 
-export function internalRatesKey(teamId: string): string {
-  return `internal-rates:${teamId}`
-}
+
 
 /** The accounts list's cache key (the paged customers list). */
 export function accountsKey(teamId: string): string {
@@ -1902,8 +1883,9 @@ export const TEAM_RESOURCES: Record<
     deps: (_t, id) => [`activity:record:staff_certificates:${id}`],
   },
   // WHAT WE HANDED OVER — and the ping carries the APP it sits on, not the
-  // deliverable's own id. The same shape `account_rates`, `account_links` and
-  // `portal_users` already have, for the same reason: a deliverable has no list
+  // deliverable's own id. The same shape `account_links` and `portal_users`
+  // already have (and `account_rates` had, until the rate card was retired on
+  // 10 Sep 2026), for the same reason: a deliverable has no list
   // and no screen of its own, it is only ever read on the app it belongs to, so
   // the APP is the one row a listener can act on. A ping naming the deliverable
   // would name a row nothing holds, and the app it hangs off is on that row —
@@ -1919,17 +1901,6 @@ export const TEAM_RESOURCES: Record<
     // …and the relationship map's picture of anything standing beside this
     // row (R15). The ping cannot name those keys — see RECORD_MAP_PREFIX.
     slicePrefix: RECORD_MAP_PREFIX,
-  },
-  account_rates: {
-    key: (t) => accountsKey(t),
-    idField: "id",
-    fetchOne: (id) => tenancy.accountRow(id),
-    fetchList: (t) => listFetch.accounts(t),
-    // The ping carries the ACCOUNT, so the record's own counts key is nameable
-    // directly — but it goes through the same derivation as everything else, so
-    // there is one answer to "which badges does this resource move" rather than
-    // one general one and one special case (R15).
-    deps: (_t, id) => [ratesKey(id), marginKey(id), accountKey(id), ...recordCountDeps("account_rates")],
   },
   // APPS — row-level live now that they have a list and a record screen of their
   // own. Like the staff profiles above, an app has no by-id read door (it is
@@ -2001,20 +1972,13 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   team: (t) => [`team-meta:${t}`],
   // Per-team screen-recipe overrides (was a deaf publisher before R15).
   screens: (t) => [`screens:${t}`],
-  // The agency's own cost card is TEAM-wide (an internal rate belongs to the
-  // agency, not to any account), so a coarse drop is the whole of it. The MARGIN
-  // caches it feeds are keyed per account and cannot be enumerated from here —
-  // the margin panel closes that itself by re-reading when the rate card it also
-  // shows changes underneath it (see margin-panel.tsx).
-  internal_rates: (t) => [internalRatesKey(t)],
-  // The ROLE rate card, beside it and for the same reason: it is one small
-  // settled list read whole on one screen, so a coarse drop is the whole of the
-  // answer. The per-app money it feeds is keyed by app and cannot be enumerated
-  // from here — that panel re-reads when the card it is computed from changes,
-  // exactly as the margin panel does.
-  role_rates: (t) => [roleRatesKey(t)],
+  // `internal_rates` and `role_rates` had two coarse team-wide entries here, for
+  // the agency's own two cost cards. Both retired 10 Sep 2026 — no worker
+  // publishes either resource any more, and an invalidation for a resource
+  // nothing publishes is a listener waiting on silence.
+  //
   // THE CLIENT'S OWN ORGANISATION — departments, roles and tools. A coarse drop
-  // for the same reason as the two rate cards above: each is a small, bounded,
+  // for the reason those two rate cards had: each is a small, bounded,
   // settled list (R14 hard cap, and a company has a handful of each), read whole
   // on the client's own record. There is nothing here that a row-level patch
   // would save that re-reading the list does not.

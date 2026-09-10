@@ -35,8 +35,7 @@ import { StoryDetailScreen } from "@/components/work/story-detail"
 import { TaskDetailScreen } from "@/components/work/task-detail"
 import { MeetingDetailScreen } from "@/components/meetings/meeting-detail"
 import { ImportScreen } from "@/components/screens/import-screen"
-import { InternalRateCardScreen } from "@/components/money/internal-rate-card"
-import { StaffPanel } from "@/components/team/staff-panel"
+import { MemberScreen } from "@/components/team/member-screen"
 import { SelectableScreen } from "@/components/choices/selectable-screen"
 import { SelectableDetailScreen } from "@/components/choices/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
@@ -65,7 +64,6 @@ import {
   withTabCounts,
 } from "@/lib/screens"
 import type { TeamRole } from "@shared/types"
-import { personName } from "@/lib/identity"
 import { renderCollection } from "@/components/deep-link/collection-content"
 
 type ScreenData = ReturnType<typeof useScreenData>
@@ -227,6 +225,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     activityKey,
     activityFetchPage,
     inviteAuditQ,
+    // THE TEAM'S ROLES — the member profile's role picker. Read across the
+    // whole team area anyway, so this costs nothing.
+    roles,
     rights,
     onAction,
     onIntent,
@@ -328,12 +329,9 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     if (!permKey) return <NotFound />
     if (!can(permKey, "read")) return <NoAccess />
 
-    // WHAT OUR OWN HOUR COSTS US. A team-wide screen with no record level: the
-    // card IS the collection, so it is handled here rather than falling through
-    // to the list/detail split below. Its twin — what an ACCOUNT is charged —
-    // is a tab on the account's own record and a different file entirely, which
-    // is the shape Law R24 is about (internal-rate-card.tsx says why).
-    if (module === "internal-rates") return <InternalRateCardScreen teamId={teamId as string} />
+    // "internal-rates" WAS ROUTED HERE — a team-wide card with no record level.
+    // Retired 10 Sep 2026. What an ACCOUNT is charged is a tab on the account's
+    // own record and has always been a different file.
 
     // THE TEAM OVERVIEW, WHICH NO LONGER EXISTS -----------------------------
     //
@@ -385,22 +383,26 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
       // You can't change your own role or remove yourself here.
       if (member.isYou) recipe = withoutActions(recipe, ["members.changeRole", "members.remove"])
       const data = shapeMemberDetail(member, activityQ.data ?? [], lang)
+      // THE ONE SCREEN A CARD ON SETTINGS › TEAM OPENS — client, 2026-09-10:
+      // "when clickingon card in team, open full screen the profile (we wil ad
+      // more to this)". The head, the overview and the footer are still this
+      // recipe's, rendered by the engine; what `MemberScreen` adds is the two
+      // acts taken against their own doors and the room the sentence promises.
+      // R64 (`sections-have-a-door`) is why the acts live in that file rather
+      // than in the host's generic dispatcher — its header carries the whole
+      // argument, and `SECTION_HOSTED_ELSEWHERE` names it.
       return (
-        <div className="flex flex-col gap-4">
-          <ScreenRenderer
-            recipe={recipe}
-            data={data}
-            rights={rights}
-            onAction={onAction}
-            onIntent={onIntent}
-            activityAction={scopeRail}
-          />
-          {/* THE PERSON BEHIND THE MEMBER ROW — the owner's ruling, literally:
-              a profile and the certificates somebody holds go on their own page.
-              Gated on `staff_profiles`, so a role without that read right sees
-              nothing here and the member page is unchanged. */}
-          <StaffPanel teamId={teamId as string} userId={member.userId} memberName={personName(member)} />
-        </div>
+        <MemberScreen
+          teamId={teamId as string}
+          member={member}
+          roles={roles}
+          recipe={recipe}
+          data={data}
+          rights={rights}
+          onIntent={onIntent}
+          activityAction={scopeRail}
+          onRemoved={() => onIntent({ kind: "close" })}
+        />
       )
     }
     if (module === "invites") {

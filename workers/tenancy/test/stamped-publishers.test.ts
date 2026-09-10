@@ -11,6 +11,13 @@
 // fifteen would have shipped green. So the census is derived, not remembered:
 // every `publishChange` whose resource literal is in the stamped set must pass
 // a sixth argument, read straight off the workers' source.
+//
+// `account_rates` LEFT THE STAMPED SET ON 10 SEP 2026 with the rate card itself
+// ("the whole account rates also killed it"). Nothing about this census changed,
+// which is the property worth noticing: the stamped set is read off
+// shared/workers/account-scope.ts at run time and the publish sites are read off
+// disk, so a resource leaving is a resource with no sites left to judge rather
+// than a line anybody had to remember to delete here.
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"

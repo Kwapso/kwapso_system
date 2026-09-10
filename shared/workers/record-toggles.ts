@@ -1,4 +1,4 @@
-// SWITCH A RECORD OFF, OR BACK ON — the twenty-one doors that are one act.
+// SWITCH A RECORD OFF, OR BACK ON — the doors that are one act.
 //
 // WHAT THIS REPLACED. The catalogue used to carry twenty-one tools whose whole
 // difference was the noun in the path: `set_account_active`, `set_role_active`,
@@ -231,33 +231,15 @@ export const RECORD_TOGGLES: Record<string, RecordToggle> = {
     summary:
       "Switch a tool off, or bring it back. Nothing is deleted — its price history is what an old map reads to cost itself.",
   },
-  // MONEY. Both rate cards asked both ways before the collapse and still do:
-  // what a client was charged last year, and what our own hour costs, are two
-  // records nobody should be able to switch off without being asked.
-  account_rate: {
-    binding: "TENANCY",
-    path: "/api/tenancy/rates/active",
-    idField: "id",
-    gate: "commercials:delete",
-    noun: "rate",
-    on: "Activate",
-    off: "Deactivate",
-    confirm: "always",
-    summary:
-      "Deactivate a rate (`active: false`) or bring it back (`active: true`). Never deleted, what an account was charged last year has to stay true.",
-  },
-  internal_rate: {
-    binding: "TENANCY",
-    path: "/api/tenancy/internal-rates/active",
-    idField: "id",
-    gate: "commercials:delete",
-    noun: "internal rate",
-    on: "Activate",
-    off: "Deactivate",
-    confirm: "always",
-    summary:
-      "Deactivate one of our own cost lines (`active: false`) or bring it back. Never deleted.",
-  },
+  // MONEY. THERE ARE NO MONEY RECORDS ON THIS TABLE ANY MORE, and the absence is
+  // written down rather than left as a gap. Two entries stood here — the agency's
+  // own `internal_rate` and the client-facing `account_rate` — both `confirm:
+  // "always"`, because what a client was charged last year and what our own hour
+  // cost are two records nobody should be able to switch off without being asked.
+  // The client retired both on 10 Sep 2026, an hour apart ("kill the whole
+  // internal rates thing"; "the whole account rates also killed it"), and each
+  // entry went with the door it pointed at. That is a change to a PUBLISHED
+  // external contract (MCP.md): `set_record_active` names two fewer records.
   meeting: {
     binding: "CONTENT",
     path: "/api/content/meetings/active",

@@ -234,17 +234,16 @@ export const TOOL_GATES: Record<string, string> = {
   connect_processes: "processes:edit",
   disconnect_processes: "processes:edit",
   comment_on_process: "processes:create",
-  // The money. Both rate cards live under one module because they are one
-  // decision-maker's job — and they live in two TABLES and two FILES because they
-  // are two audiences (R24).
-  create_account_rate: "commercials:create",
-  update_account_rate: "commercials:edit",
-  set_account_rate_active: "commercials:delete",
-  create_internal_rate: "commercials:create",
-  update_internal_rate: "commercials:edit",
-  // One tool for add / re-price / retire, so one gate: setting a price IS an
-  // edit of the card whichever of the three it turns out to be.
-  set_role_rate: "commercials:edit",
+  // THE MONEY, AND THERE IS NO WRITE LEFT ON IT. Three rate cards sat under this
+  // one module because they were one decision-maker's job, in three tables and
+  // two files because they were two audiences. All three were retired on 10 Sep
+  // 2026 in two rulings an hour apart: what a kind of our own work cost us and
+  // what an hour of one of our roles was worth went first (`create_internal_rate`,
+  // `update_internal_rate`, `set_internal_rate_active`, `set_role_rate`), and
+  // what a CLIENT was charged went second (`create_account_rate`,
+  // `update_account_rate`, `set_account_rate_active`). `commercials` now gates
+  // exactly one door and it is a read, which is why `MODULE_OFFERED_RIGHTS`
+  // offers only `read` on it — see shared/team-modules.ts.
   // Reading a transcript writes the words onto the meeting and time against it,
   // so it is an edit of the meeting — and `google:read` besides, which the door
   // asks for itself because it reaches the caller's own Drive.
@@ -252,7 +251,6 @@ export const TOOL_GATES: Record<string, string> = {
   // It MAKES meetings, so it is a create — and `google:read` besides, which the
   // door asks for itself.
   sync_calendar_series: "meetings:create",
-  set_internal_rate_active: "commercials:delete",
   // GOOGLE. Every write through somebody's own connection is `google:edit` —
   // "change something in the world you connected" — because `create` on this
   // module means CONNECT AN ACCOUNT, which is the switch an owner grants
@@ -315,17 +313,25 @@ export const GATELESS_WRITES: Record<string, string> = {
  * "access"; the other half is the ACCOUNT FENCE below. */
 const PRIVILEGE_MODULES = ["member_roles", "team_members", "portal_users"]
 
-/** The MODULE whose rows are RATE CARDS — what a client is charged, what our own
- * hour costs us, and what an hour of a role is worth. `commercials` is the whole
- * of it: a tool PRICE inside a process map is `processes`, deliberately, because
- * that is a fact about one client's setup rather than a card the whole book is
- * costed from.
+/** The MODULE whose rows are a RATE CARD — what a client is charged per hour.
+ * `commercials` is the whole of it: a tool PRICE inside a process map is
+ * `processes`, deliberately, because that is a fact about one client's setup
+ * rather than a card the whole book is costed from.
  *
  * Named beside PRIVILEGE_MODULES because it answers the same question one step
  * along: a privilege write decides who may act, a money write decides what an
  * hour is worth, and both are wrong quietly. A mis-set rate does not fail — it
- * re-prices every margin, every app's saving and every invoice computed after
- * it, and the first person to notice is looking at a number, not an error. */
+ * re-prices every app's saving and every invoice computed after it, and the
+ * first person to notice is looking at a number, not an error.
+ *
+ * IT MATCHES NOTHING TODAY, AND THAT IS SAID RATHER THAN HIDDEN. All three rate
+ * cards were retired on 10 Sep 2026, so `commercials` carries no write tool at
+ * all and `isMoneyWrite` currently answers false to every tool in the catalogue.
+ * The module name is KEPT rather than the function deleted, because the
+ * derivation is what would judge whatever writes money next — and
+ * `workers/data-ops/test/agent.test.ts` pins the emptiness explicitly, so a
+ * commercials write appearing tomorrow turns the build red and somebody decides
+ * about its confirm on purpose rather than by omission. */
 const MONEY_MODULES = ["commercials"]
 
 /** A path or a field name, as a bag of lowercase words. */
@@ -433,8 +439,10 @@ export function isPrivilegeWrite(tool: {
  * card, added after the other two, with nothing to catch that it had been added
  * differently. `record-toggles.ts` states the principle in prose one file away
  * ("two records nobody should be able to switch off without being asked") and
- * applies it to two of the three cards. This is that sentence, read by
- * something.
+ * applied it to two of the three cards. This is that sentence, read by
+ * something. ALL THREE CARDS WERE RETIRED ON 10 SEP 2026 and the derivation is
+ * what survives them: it judges whatever writes money next, and until something
+ * does it answers false to everything — pinned as such, not left to chance.
  *
  * There is no path-regex fallback here on purpose. `isPrivilegeWrite` needs one
  * because a privilege write on an unmapped path is a security hole; a money

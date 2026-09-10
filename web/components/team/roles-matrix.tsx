@@ -18,15 +18,30 @@
 // So a role no longer opens a page. The matrix IS the overview, a cell is where
 // a right is changed, and nothing on this tab navigates.
 //
-// ── THE GRID TURNS, AND THE PROPS SAY THEIR OWN NOUNS AGAIN ──────────────────
+// ── THE GRID TURNED, AND THEN TURNED BACK — CLIENT, 2026-09-10 ───────────────
 //
-// The kit's `PermissionMatrix` draws "collections down the side, roles across
-// the top" by default (CH27.12). The approved design is the other way round:
-// ROLES down the side, the 22 team modules across — four rows and twenty-two
-// columns. That is what the client asked for and what she approved, and it is
-// the shape that answers her actual question: a role reads as one horizontal
-// band you can compare against the band above it, and Admin's solid row against
-// the Client role's near-empty one is the sight she asked for.
+//   "i am thinking for the rolws, would it not make more sense taht the roles
+//    are the cokumns and the permissions the rows? better use of space"
+//
+// She is right, and the arithmetic is the argument. Roles down the side put the
+// 22 team modules ACROSS: 22 columns of four boxes is 88 cells wide, which no
+// window holds, so every read of the grid was a horizontal scroll and the whole
+// point of a matrix — seeing it at once — was gone. Turned, it is 22 rows of
+// four ROLES: 16 boxes across, which fits, with the length going down the page
+// where a page already scrolls.
+//
+// SO THE ORIENTATION PROP IS DELETED RATHER THAN CHANGED. `modules-as-rows` is
+// the kit's own default (CH27.12, "collections down the side, roles across the
+// top"), so what she asked for is what this component draws when nothing tells
+// it otherwise. The line that came out is the whole change of axis.
+//
+// WHAT THE 2026-09-09 SHAPE WAS FOR, so the next reader knows it was weighed
+// and not forgotten: roles-as-rows made a role read as one horizontal BAND you
+// could compare against the band above it — "All the roles together, I want to
+// have an overview" — and Admin's solid row against a narrow role's near-empty
+// one was the sight she asked for. Turned, that comparison is a COLUMN instead
+// of a row, which is the same comparison read the other way and now actually
+// visible without scrolling to it.
 //
 // UNTIL v1.2.75 THAT SHAPE WAS BOUGHT BY LYING TO THE PROPS. This file handed
 // its ROLES to `modules` and its MODULES to `roles`, because the two props were
@@ -38,19 +53,19 @@
 // switches that decide nothing. That is R36's exact defect, surviving one axis
 // rotation.
 //
-// `orientation="roles-as-rows"` is the kit's answer and it retires the
-// transpose outright. The props now carry their own nouns:
+// The kit's `orientation` prop is what retired the transpose outright, and the
+// props have carried their own nouns since:
 //
 //     kit `modules`      ← the 22 team modules (shared/team-modules.ts)
 //     kit `roles`        ← this team's roles
 //     kit `capabilities` ← the four rights, S · C · E · D
 //
-// and the DRAWING still turns, because the orientation turns it. Nothing about
-// the data moves with it: `held`, `rights` and `locked` are facts about the
-// COLLECTION at either orientation, which is precisely why the kit refused the
-// other candidate fix (`rights` on `PermissionRole`) — that one would have
-// invented a product rule nobody has ruled. Its whole argument is in the kit
-// file's header.
+// and that is exactly why the 2026-09-10 flip is a one-line deletion rather
+// than a rewrite. Nothing about the data moves with the drawing: `held`,
+// `rights` and `locked` are facts about the COLLECTION at either orientation,
+// which is precisely why the kit refused the other candidate fix (`rights` on
+// `PermissionRole`) — that one would have invented a product rule nobody has
+// ruled. Its whole argument is in the kit file's header.
 //
 // ── WHAT THAT CLOSED, AND WHAT WAS DELETED TO CLOSE IT ───────────────────────
 //
@@ -77,17 +92,33 @@
 // (`setRolePermissions`) and has all along; this was a legibility defect and it
 // is the legibility that is fixed.
 //
-// ── AND THE ROLE'S NAME STOPS SCROLLING AWAY ─────────────────────────────────
+// ── AND THE NAME COLUMN STAYS PINNED, THOUGH IT PINS A DIFFERENT NAME NOW ────
 //
-// Twenty-two columns overflow. The grid scrolls in its own box, correctly — the
-// page never scrolls sideways — and until v1.2.75 the row's NAME went with it,
-// so a reader scrolled to the end saw bands of `S C E D` and could not tell
-// Admin from Guest. `stickyNames` pins the name column; `stickyGround` names the
-// paper it must paint to stay opaque, and it is `"panel"` because `TeamPanel`
-// paints `bg-surface-panel` at exactly the width this wide grid exists at (the
-// narrow render below 45rem is a stack of cards and never scrolls sideways).
-// Guessing that ground wrong is visible AT REST as a pale band down the side,
-// which is why the kit made it a required companion rather than a default.
+// `stickyNames` and `stickyGround` were added for the old axis, where 22 module
+// columns overflowed every window and a reader scrolled to the end saw bands of
+// `S C E D` with no idea whose. They are KEPT rather than deleted with the
+// orientation, because the property they buy is about scrolling and not about
+// which axis is which: the kit's own width floor counts COLUMNS, so four roles
+// no longer overflow — and a team with a dozen roles will, and then the module
+// each row is about is exactly the thing that must not scroll away.
+//
+// `stickyGround="panel"` is unchanged and still correct: it is the paper
+// `TeamPanel` actually paints at the width this wide grid exists at (the narrow
+// render below 45rem is a stack of cards and never scrolls sideways). Guessing
+// that ground wrong is visible AT REST as a pale band down the side, which is
+// why the kit made it a required companion rather than a default.
+//
+// ── WHAT ELSE THE FLIP TOUCHED, AND IT IS ONE THING ──────────────────────────
+//
+// THE LOCK'S MARK NAMES THE OTHER AXIS, and the other axis is now the ROLES.
+// `lockMarkFor` in the kit reads `plain(label, id)` — a string label as-is,
+// anything else falling back to the id — and this file's role label is a BUTTON
+// NODE (the press target that opens the role's panel). Under roles-as-rows the
+// mark named MODULES, whose labels are plain strings, so it read correctly by
+// accident; turned, it would have printed a ULID on every one of the 22 rows,
+// once per locked role. `formatLockedLabel` below rebuilds the title from the
+// id, which is the same repair `formatCellLabel` has always made one prop down
+// and for exactly the same reason. Nothing else in the call changed.
 //
 // ── ONE MANGO ON THIS TAB, AND IT IS NOT HERE ────────────────────────────────
 //
@@ -299,8 +330,8 @@ export function RolesMatrix({
   // viewer may edit roles at all; the Admin row is locked row-by-row above.
   const canSave = sheets != null && sheets.length > 0 && sheets[0].perms.canEdit
 
-  // THE MODULES, WHICH ARE THE KIT'S `modules` AGAIN AND ARE DRAWN ACROSS THE
-  // TOP. They come off the first sheet: every role's sheet carries the same
+  // THE MODULES, WHICH ARE THE KIT'S `modules` AND ARE THE ROWS since
+  // 2026-09-10. They come off the first sheet: every role's sheet carries the same
   // module list in the same order, because the server builds it from the one
   // shared TEAM_MODULES (shared/team-modules.ts). Taking it from a sheet rather
   // than importing the catalogue keeps the labels the door's own, which is where
@@ -332,14 +363,16 @@ export function RolesMatrix({
         }))
       : []
 
-  // THE ROLES, WHICH ARE THE ROWS UNDER `orientation="roles-as-rows"`. Nothing
-  // but identity and a name: `held`, `rights` and `locked` are the collection's
-  // facts and live on the module rows above, at either orientation.
+  // THE ROLES, WHICH ARE THE COLUMNS since 2026-09-10 (client: "the roles are
+  // the cokumns and the permissions the rows"). Nothing but identity and a
+  // name: `held`, `rights` and `locked` are the collection's facts and live on
+  // the module rows above, at either orientation — which is why turning the
+  // grid moved no data at all.
   const roleRows =
     sheets && draft
       ? sheets.map(({ role }) => ({
           id: role.id,
-          // THE ROW HEAD IS THE ROLE, AND PRESSING IT OPENS THE ROLE'S PANEL. A
+          // THE COLUMN HEAD IS THE ROLE, AND PRESSING IT OPENS THE ROLE'S PANEL. A
           // `PermissionRole.label` is a `React.ReactNode`, which is what makes
           // this possible without forking anything. The client's own preview
           // draws the shape: the role's name with a quiet meta line under it.
@@ -510,17 +543,29 @@ export function RolesMatrix({
             // rather than by the handover. See this file's header.
             modules={moduleColumns}
             roles={roleRows}
-            orientation="roles-as-rows"
+            // NO `orientation`, AND THAT IS THE CHANGE OF AXIS — client,
+            // 2026-09-10: "would it not make more sense taht the roles are the
+            // cokumns and the permissions the rows? better use of space". The
+            // kit's default is `modules-as-rows`, which IS collections down the
+            // side and roles across the top, so what she asked for is what this
+            // component draws when nothing overrides it. A line was deleted
+            // rather than a value changed; see this file's header for the
+            // arithmetic (88 cells across became 16) and for what the old shape
+            // was for.
             capabilities={caps}
             // The two axis headings. `moduleLabel` is the collections' word
-            // wherever they are, so under this orientation it names the columns
-            // across the top; `roleLabel` names the first column.
+            // wherever they are, and at this orientation the collections ARE
+            // the first column, so it is the heading a reader sees; `roleLabel`
+            // is the word for the top axis, where each role also carries its
+            // own name. Both are passed at either orientation because which one
+            // gets drawn is the kit's business, not this screen's.
             moduleLabel={t("Module")}
             roleLabel={t("Role")}
-            // THE NAME COLUMN IS PINNED, because twenty-two columns overflow and
-            // a role's band is unreadable once its name has scrolled off.
-            // `stickyGround` is the paper `TeamPanel` actually paints at the
-            // width this wide grid exists at — see this file's header.
+            // THE NAME COLUMN STAYS PINNED. Four roles no longer overflow (the
+            // kit's width floor counts COLUMNS), but a dozen will — and then
+            // the module each row is about is the thing that must not scroll
+            // away. `stickyGround` is the paper `TeamPanel` actually paints at
+            // the width this wide grid exists at — see this file's header.
             stickyNames
             stickyGround="panel"
             label={t("Roles and what each one may do")}
@@ -563,6 +608,23 @@ export function RolesMatrix({
                 notOffered.length === 0 ? "" : ` · ${notOffered.join(", ")}: ${notOfferedWord}`
               }`
             }}
+            // THE LOCK'S MARK NAMES THE OTHER AXIS, AND THE OTHER AXIS IS NOW
+            // THE ROLES — so it arrives as ULIDs for exactly the reason
+            // `formatCellLabel` above already deals with: a role's label is the
+            // button node, and the kit reads a name with `plain(label, id)`.
+            // Under the old orientation the mark named MODULES, whose labels
+            // are plain strings, so it read correctly by accident. Rebuilt from
+            // the same lookup, and the phrase is the kit's own default shape
+            // with the punctuation written here because word order differs
+            // between languages.
+            formatLockedLabel={(lockedLabel, roleIds) =>
+              `${lockedLabel}: ${roleIds
+                .map(
+                  (roleId) =>
+                    sheets?.find((sheet) => sheet.role.id === roleId)?.role.title ?? roleId
+                )
+                .join(", ")}`
+            }
             heldLabel={t("Granted")}
             notHeldLabel={t("Not granted")}
             // THE LEGEND'S THIRD REGISTER, which only exists now that `rights`

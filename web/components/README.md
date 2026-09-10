@@ -29,11 +29,12 @@ turns the build red.
 | `choices/` | The dropdown values an owner manages, and the screens that edit them. |
 | `knowledge/` | The knowledge base: its documents, its uploads, and each person's Google connections. |
 | `meetings/` | Meetings and the screens that list and open one. |
-| `money/` | The rate cards and the margin. What a client is charged, what our own hour costs, and what a role costs. |
 | `process/` | Process maps: the steps, the flowchart, and the screens that draft and review one. |
 | `team/` | The team itself: members, roles, invites, staff profiles, access tokens and the team's own details. |
 | `tickets/` | Tickets, their threads, their triage queue and the replies that answer them. |
 | `work/` | The work engine: stories, sprints, waves, tasks, to-dos and work logs. |
+
+There was a `money/` folder here until 10 Sep 2026 — the three rate cards, the margin panel and the one form dialog they shared. The client retired all of them in two rulings an hour apart ("kill the whole internal rates thing"; "the whole account rates also killed it"), and the folder went with the last file in it. There is no money SCREEN anywhere in this app now: what an app gives back, priced, is read on that app's own record (`apps/app-money-panel.tsx`), and what a client's own people and software cost THEM lives with the process maps (`accounts/client-org-panel.tsx`).
 
 ## The kind folders
 

@@ -30,7 +30,6 @@ import type { Actor } from "@shared/workers/activity"
 import type { D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { getAccountRow, pricesVisibleFor } from "../lib/accounts"
-import { listAccountRates } from "../lib/rates"
 import { workEngineFacts } from "../lib/work-engine"
 import { GuardError } from "@shared/workers/gating"
 import { ownedMediaKey, reclaimMedia, storeImageDataUrl, teamMediaKey } from "@shared/workers/image"
@@ -781,10 +780,18 @@ export async function postProcessComment(request: Request, env: Env): Promise<Re
  *     A screen cannot render a field it never received, which is the same reason
  *     the margin lives in a file the portal cannot import (R24).
  *
- * What "prices" means is deliberately narrow: the rate card they agreed, and the
- * total of what has been sold to them. It is never a margin, never an internal
- * rate, and never what an app costs us to run — those are three different
- * questions with the same answer, which is no.
+ * What "prices" means is deliberately narrow, and it NARROWED FURTHER on
+ * 10 Sep 2026. It used to be two things — the rate card they agreed, and the
+ * total of what has been sold to them. The client retired the rate card ("the
+ * whole account rates also killed it"), so it is now the SOLD TOTAL alone. It is
+ * still never a margin, never an internal rate, and never what an app costs us
+ * to run — those were three different questions with the same answer, which is
+ * no, and two of the three no longer exist to ask.
+ *
+ * SO THE SWITCH STILL DECIDES SOMETHING, and this door is where it decides it:
+ * `commercials_visible` is what stands between a client and `prices.soldCents`,
+ * the sum of what they have bought. Losing the rate card halved what the switch
+ * governs; it did not empty it.
  *
  * `accountId` narrows for staff; for a client login the fence has already
  * decided, and naming somebody else's account is a 404. */
@@ -805,22 +812,27 @@ export async function getImpact(request: Request, env: Env): Promise<Response> {
   if (!accountId) return json(view)
   if (!(await pricesVisibleFor(cfg, guard, scope, accountId))) return json(view)
 
-  const [card, sold] = await Promise.all([
-    listAccountRates(cfg, guard, scope, accountId),
+  // THE ACCOUNT'S OWN CURRENCY, read through the same fence as everything else
+  // here. It is one field and it is not decoration: until 10 Sep 2026 the total
+  // below was labelled with the currency on the FIRST LINE OF THE RATE CARD, and
+  // the card is gone. An unlabelled money figure on a client's screen is the
+  // shape of a number nobody can act on.
+  const [account, sold] = await Promise.all([
+    getAccountRow(cfg, guard, scope, accountId),
     workEngineFacts(cfg, guard, accountId),
   ])
   return json({
+    // A `rates` KEY SAT BESIDE THIS until 10 Sep 2026 — the account rate card
+    // projected for a client: the live lines only, the label and the rate, no
+    // audit block and no id. The card was retired at the client's own ruling and
+    // the projection went with it, because a projection of nothing is a key that
+    // is always empty and reads on screen as "we have agreed no prices with you".
     ...view,
     prices: {
-      // The card as a client reads it: the live lines, the label and the rate.
-      // No audit block, no retired rows, no id — this is a projection, not the
-      // rate-card door (which refuses a client login outright).
-      rates: card.rows
-        .filter((r) => r.active)
-        .map((r) => ({ label: r.label, centsPerHour: r.centsPerHour, currency: r.currency })),
       // What has been sold to them. `null` while the work engine's tables are not
       // in this database yet — an absent number rather than a confident zero.
       soldCents: sold.ready ? sold.soldCents : null,
+      currency: account.currency,
     },
   })
 }

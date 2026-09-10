@@ -576,6 +576,57 @@ const RETIRED_IN_THE_CANON: Record<string, { since: string; phrases: RegExp[] }>
     since: "2026-09-07, the client's ruling: kill all old activity tabs",
     phrases: [/overview \s*\+\s*activity/i, /\bactivity tabs?\b/i, /<ActivityPanel>/i],
   },
+  // THE INTERNAL RATES, 2026-09-10. The canon described a THREE-card money model
+  // for a month and the client cut it to one, so a document that still says
+  // "what our own hour costs" in the present tense is telling the next agent to
+  // build against a table that is not there.
+  //
+  // THE PHRASES ARE NARROW ON PURPOSE, and the narrowness is the whole of
+  // whether this line is usable. A bare /margin/ matches `--margin--m` in
+  // UI-RULEBOOK, "four times the margin it had" in ARCHITECTURE, "Resend Pro
+  // marginal" in COSTS and a dozen CSS notes — a rule that fires on a dozen true
+  // sentences is a rule the next person deletes. So: the two table names, which
+  // can mean nothing else; the phrase "internal rate", which was only ever this
+  // feature; and "margin" ONLY where it is qualified as money.
+  "the internal rate cards and the margin": {
+    since:
+      "2026-09-10, the client's ruling: \"kill the whole internal rates thing. will develop this in the future much much more but for now i iwanna wipe it clean\". Both tables dropped by team migration 0073, the two screens and lib/internal-money.ts deleted, six agent tools and seven doors removed, and R24's structural inbound half retired with them",
+    phrases: [
+      /\binternal_role_rates\b/,
+      /\binternal_rates\b/,
+      /\binternal rate/i,
+      /\brole rate card\b/i,
+      /\bmargin (?:panel|door|math|arithmetic|screens?)\b/i,
+      /\bthe margin (?:is|and|computed|never)\b/i,
+    ],
+  },
+  // THE ACCOUNT RATE CARD, 2026-09-10, an hour after the internal rates and by
+  // the same person. The line above is its sibling and the two are deliberately
+  // separate entries rather than one widened one: they were retired by two
+  // different rulings, they dropped two different tables in two different
+  // migrations, and a document can be current about one and stale about the
+  // other — which is exactly what happened to four passages between the two
+  // rulings.
+  //
+  // NARROW FOR THE SAME REASON, and it is a sharper problem here: "rate card" on
+  // its own is a phrase COSTS.md uses five times about Cloudflare's and
+  // Anthropic's published prices, which is a real and unrelated meaning. So the
+  // phrases are the table name, the tool names, the QUALIFIED phrase "account
+  // rate card", and the screen it was drawn on — none of which can mean anything
+  // else in this repo.
+  "the account rate card": {
+    since:
+      "2026-09-10, the client's ruling: \"The whole account rates also killed it\", an hour after she retired the internal rates. Table dropped by team migration 0074, lib/rates.ts and web/components/money/ deleted, four doors and three agent/MCP tools removed, `set_record_active` lost its `account_rate` record, and the Rates tab on a client's record went with the card it drew",
+    phrases: [
+      /\baccount_rates\b/,
+      /\baccount rate cards?\b/i,
+      /\blist_account_rates\b/,
+      /\bcreate_account_rate\b/,
+      /\bupdate_account_rate\b/,
+      /\bset_account_rate_active\b/,
+      /\bRates tab\b/,
+    ],
+  },
 }
 
 /** Words that make a mention HISTORY rather than a claim. Generous on purpose:

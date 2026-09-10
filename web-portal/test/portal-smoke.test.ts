@@ -183,12 +183,20 @@ describe("the client portal's staging smoke", () => {
       "the smoke no longer greps the whole response body for the withdrawn file URL"
     ).toBe(true)
 
-    // Bug two: R24. The doors are DERIVED from internal-money.ts's own exports,
-    // the same walk the rule test makes — so the smoke must still be reading
-    // that file rather than a list somebody typed.
+    // Bug two: R24. The doors are DERIVED — the smoke must still be READING the
+    // oracle rather than carrying a list somebody typed. The oracle moved on
+    // 10 Sep 2026 with the internal rates: it was `internal-money.ts`'s own
+    // exports, and it is now `MONEY_READERS` in money-taint.ts, which is the
+    // same pin the rule test rot-checks the derived doors against. Both halves
+    // are asserted, because reading the file and finding the array are two
+    // different ways for this to go quietly blind.
     expect(
-      SMOKE.includes("workers/tenancy/src/lib/internal-money.ts"),
-      "the smoke no longer derives the internal-money doors from their own file"
+      SMOKE.includes("shared/workers/money-taint.ts"),
+      "the smoke no longer reads the money-reader oracle off disk"
+    ).toBe(true)
+    expect(
+      SMOKE.includes("MONEY_READERS"),
+      "the smoke reads money-taint.ts but no longer parses MONEY_READERS out of it"
     ).toBe(true)
   })
 })

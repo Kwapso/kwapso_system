@@ -237,18 +237,30 @@ function portalDoors() {
   return doors
 }
 
-/** THE DOORS THAT READ THE AGENCY'S OWN COST (R24), derived exactly as
- * `web/test/rules.test.ts` derives them: the exported names of
- * `internal-money.ts`, then every tenancy route whose handler calls one. Add a
- * door tomorrow that reads a margin and it is asked the question tomorrow.
+/** THE DOORS THAT HAND BACK A FIGURE A CLIENT'S OWN SCREEN MAY WITHHOLD (R24),
+ * derived exactly as `web/test/rules.test.ts` derives them: the names in
+ * `MONEY_READERS`, then every tenancy route whose handler calls one. Add a door
+ * tomorrow on one of those readers and it is asked the question tomorrow.
+ *
+ * THE ORACLE MOVED ON 10 SEP 2026 and this is the same move the rule test made,
+ * for the same reason. It used to be the exported names of
+ * `workers/tenancy/src/lib/internal-money.ts` — a whole file, every export of
+ * which was money. The client retired the internal rates, that file was deleted,
+ * and the one function that survived it (`appMoneyBack`) moved into
+ * `lib/processes.ts`, which has forty exports and is mostly not money. So the
+ * list is read off `MONEY_READERS` in `shared/workers/money-taint.ts` — the same
+ * pin the rule test rot-checks — parsed off DISK rather than imported, because
+ * this file runs under plain node with no build step.
  *
  * The rule test proves this about the SOURCE. This proves it about what is
  * actually DEPLOYED, at both hostnames, which is a different sentence — a
  * gateway can be red-green correct in the repo and stale in the account. */
 function internalMoneyDoors() {
-  const internal = stripComments(read("workers/tenancy/src/lib/internal-money.ts"))
-  const exported = [...internal.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
-  if (exported.length < 4) stop("the internal-money scan found no exports", "it has gone blind")
+  const taint = stripComments(read("shared/workers/money-taint.ts"))
+  const list = /export const MONEY_READERS[^=]*=\s*\[([^\]]*)\]/.exec(taint)
+  if (!list) stop("MONEY_READERS not found", "did shared/workers/money-taint.ts move?")
+  const exported = [...list[1].matchAll(/"(\w+)"/g)].map((m) => m[1])
+  if (exported.length < 1) stop("MONEY_READERS is empty", "the walk below would derive no doors")
 
   const dir = `${REPO}workers/tenancy/src/routes`
   const fns = new Map()
@@ -264,7 +276,7 @@ function internalMoneyDoors() {
     )
     .map(([, door]) => door)
   // A BLIND CHECK REPORTS "ALL CLEAR" EXACTLY LIKE A PASSING ONE.
-  if (doors.length < 4) stop("no internal-money door was derived", "the walk has gone blind")
+  if (doors.length < 1) stop("no internal-money door was derived", "the walk has gone blind")
   return doors
 }
 
@@ -296,10 +308,10 @@ const FED_BY = {
   stories: "GET /api/content/portal/delivery",
   sprints: "GET /api/content/portal/delivery",
   process_comments: "GET /api/tenancy/impact",
-  // A step edit or a rate change moves the Impact figures — both resources
-  // joined the stamped set on 26 Aug 2026 and refill from the same computed read.
+  // A step edit moves the Impact figures. `processes` joined the stamped set on
+  // 26 Aug 2026 and refills from the same computed read; `account_rates` joined
+  // beside it and left on 10 Sep 2026 with the rate card itself.
   processes: "GET /api/tenancy/impact",
-  account_rates: "GET /api/tenancy/impact",
   deliverables: "GET /api/content/portal/deliverables",
 }
 

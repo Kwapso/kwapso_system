@@ -1,48 +1,79 @@
 // THE QUERY DOOR'S FENCE — what a generic reader may name, and what it may not.
 //
-// R24 says the agency's own cost lives in one file and nothing a client can
-// reach imports it. A GENERIC query door is the one shape that could undo that
-// without importing anything at all: hand a model a table name and it will
-// eventually name the interesting one. So this suite exists to prove the
-// sentence the design rests on —
+// A GENERIC QUERY DOOR is the one shape that can undo a fence without importing
+// anything at all: hand a model a table name and it will eventually name the
+// interesting one. So this suite exists to prove the sentence the design rests
+// on —
 //
-//   THE MODULE MAP IS AN ALLOW-LIST. `internal_rates` IS NOT IN IT.
+//   THE MODULE MAP IS AN ALLOW-LIST. THE SECRETS ARE NOT IN IT.
 //
 // and to prove it the only way worth proving anything: BEHAVIOURALLY, against
 // the real schema, through the real route table, as a caller who holds EVERY
-// right in the team INCLUDING `commercials`. Permission is not what stops them
-// here — nothing about their role stops them — so if a row comes back, the
-// allow-list has failed, and that is the only thing being measured.
+// right in the team. Permission is not what stops them here — nothing about
+// their role stops them — so if a row comes back, the allow-list has failed, and
+// that is the only thing being measured.
+//
+// ── WHAT THE SECRET USED TO BE, AND WHY IT MOVED ─────────────────────────────
+//
+// Until 10 Sep 2026 the fixture here was an INTERNAL RATE — what an hour of our
+// own work cost us — because Law R24 said that figure could never reach a
+// client's side and this was the door that could most plausibly have leaked it.
+// The client retired the whole feature ("kill the whole internal rates thing …
+// for now i iwanna wipe it clean"), the tables were dropped by team migration
+// 0073, and R24's structural half was retired with them.
+//
+// THE PROPERTY BEING MEASURED IS THE MECHANISM, NOT THE NUMBER, so this suite
+// did not go with the law. It moved to the sharpest secret this base still
+// holds: a GOOGLE REFRESH TOKEN. `google_connections.refresh_token` is a
+// standing grant to one person's mailbox and Drive, minted only by that person
+// standing at Google's own consent screen — and MCP.md §3 already says the
+// sentence this suite now enforces, about a different surface: "the blast radius
+// of a leaked one must not include a mailbox". A rate that leaks is a number
+// somebody should not have seen; a token that leaks is an account somebody else
+// can now read. The fixture got stronger when the law it was written for died.
 //
 // ── WHAT MAKES THIS A CHECK RATHER THAN A CLAIM ──────────────────────────────
 //
 // Three things, and the first two matter more than the assertions:
 //
 //   1. THE SECRET IS REALLY THERE. Every refusal below is paired with a read
-//      straight off the database proving the internal rate row EXISTS and
-//      carries the number being hunted for. "No rows came back" is worthless if
-//      there were no rows; that is how a fence test reports all-clear on an
-//      empty table for a year.
-//   2. THE POSITIVE CONTROL. The same caller, the same door, asks for the
-//      ACCOUNT rate card — what a client is CHARGED, a different table and a
-//      different file for exactly this reason — and gets it. A door that
-//      refuses everybody is not a fence, it is a broken door, and it would pass
-//      a refusal-only suite perfectly.
-//   3. MUTATION-TESTED BY HAND, and recorded here so the next reader does not
-//      have to take it on trust. On 29 Aug 2026 `internal_rates` was added to
-//      QUERY_MODULES as a temporary edit; this suite went red on the first four
-//      assertions below, naming the leaked label and the leaked number. The
-//      entry was removed and it went green again. A check that passes with its
-//      subject deleted is not a check.
+//      straight off the database proving the connection row EXISTS and carries
+//      the token being hunted for. "No rows came back" is worthless if there
+//      were no rows; that is how a fence test reports all-clear on an empty
+//      table for a year.
+//   2. THE POSITIVE CONTROL. The same caller, the same door, asks for money and
+//      gets it. A door that refuses everybody is not a fence, it is a broken
+//      door, and it would pass a refusal-only suite perfectly. It is
+//      deliberately still MONEY: the generic door must go on answering about
+//      prices, so a reader can tell "fenced" from "money is scary".
+//
+//      WHICH MONEY MOVED ON 10 SEP 2026, AND THE PROPERTY DID NOT. It was the
+//      ACCOUNT RATE CARD — what a client is CHARGED — until the client retired
+//      it that afternoon ("the whole account rates also killed it"), which took
+//      the table, the module and the `commercials` alias with it. It is now a
+//      SPRINT'S SOLD PRICE (`sprints.soldPriceCents`), what a block of work was
+//      sold to a client for: still money, still a figure whose visibility is a
+//      per-account switch on the client's own side, and still answered here to a
+//      staff caller who holds the right. The control did not weaken — it moved
+//      to the money that is left.
+//   3. MUTATION-TESTED BY HAND, twice, and recorded here so the next reader does
+//      not have to take it on trust. On 29 Aug 2026 `internal_rates` was added
+//      to QUERY_MODULES as a temporary edit; the suite went red on the first
+//      four assertions, naming the leaked label and the leaked number, and went
+//      green again when the entry came out. The same mutation was run against
+//      the new fixture on 10 Sep 2026 — `google_connections` added to
+//      QUERY_MODULES with `refresh_token` among its declared fields — with the
+//      same result. A check that passes with its subject deleted is not a check.
 //
 // ── AND THE FORBIDDEN SET IS DERIVED ─────────────────────────────────────────
 //
-// Not hand-typed: the tables are read out of `internal-money.ts` itself, the
-// same oracle R24's own check uses. Add a table to that file tomorrow and it is
-// judged here today.
+// Not hand-typed, and the ORACLE GOT STRONGER in the move. It used to be one
+// lib file's SQL, read for the tables it touched. It is now the TEAM SCHEMA
+// ITSELF: every secret-bearing column in `TEAM_MIGRATIONS`, found by the shape
+// of its name, and the tables that declare them. A column added to the schema
+// tomorrow is judged here today, and the oracle is the database's own shape
+// rather than any one reader of it.
 
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -57,45 +88,49 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
 import { TEAM_MODULES } from "@shared/team-modules"
 import { canonicalModule, MODULE_ALIASES, QUERY_MODULES } from "@shared/workers/query-grammar"
 import { DOORS, handlerBody } from "../../mcp/test/door-census"
+import { TEAM_MIGRATIONS } from "../src/team-schema"
 import worker from "../src/index"
 import { buildSpineDb, IDS, makeEnv } from "./spine-harness"
 
-/** What our own hour costs, in this team's database. The label and the number
- * are the two things that must never come out of the query door. */
-const SECRET_LABEL = "Development (our cost)"
-const SECRET_CENTS = 4207
+/** A STANDING GRANT TO SOMEBODY'S MAILBOX, in this team's database. The address
+ * and the token are the two things that must never come out of the query door.
+ * A token is not a number a person could have guessed: if this string appears in
+ * a response, it came from the row. */
+const SECRET_EMAIL = "alex.morales@kwapso.app"
+const SECRET_TOKEN = "1//0gREFRESH-do-not-leak-4207"
 
-/** What the CLIENT is charged — a different table, a different file, and the
+/** What a block of work was SOLD for — a different table, still money, and the
  * positive control that proves the door is not simply broken. */
-const CHARGED_LABEL = "Development (charged)"
+const SOLD_SPRINT = "Discovery sprint (sold)"
+const SOLD_CENTS = 1_350_000
 
 const db = () => holder.db as DatabaseSync
 
 beforeEach(() => {
   holder.db = buildSpineDb()
-  // `commercials` ON TOP OF the harness's everything-on-the-spine role. It is
-  // the right that decides whether a person may see money at all, and the whole
-  // point of this suite is that holding it is not enough: the internal card is
-  // unreachable because it was never declared queryable, not because the caller
-  // lacks a permission. Granting it here is what makes the refusals below mean
-  // something — without it they would be ordinary 403s proving nothing.
+  // `commercials` AND `google` ON TOP OF the harness's everything-on-the-spine
+  // role. `google` is the right that decides whether a person may touch
+  // connections at all, and the whole point of this suite is that holding it is
+  // not enough: the connection table is unreachable because it was never
+  // declared queryable, not because the caller lacks a permission. Granting both
+  // is what makes the refusals below mean something — without them they would be
+  // ordinary 403s proving nothing.
   db().exec(`
     INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
-      VALUES ('${IDS.adminRole}_commercials', '${IDS.adminRole}', 'commercials', 1, 1, 1, 1);
+      VALUES ('${IDS.adminRole}_commercials', '${IDS.adminRole}', 'commercials', 1, 1, 1, 1),
+             ('${IDS.adminRole}_google', '${IDS.adminRole}', 'google', 1, 1, 1, 1);
   `)
-  // The agency's own cost card, and a role rate beside it.
+  // Somebody's Google grant, and the money beside it.
   db().exec(`
-    INSERT INTO internal_rates (id, label, cents_per_hour, currency, created_at)
-      VALUES ('IR1', '${SECRET_LABEL}', ${SECRET_CENTS}, 'EUR', '2026-01-01');
-    INSERT INTO internal_role_rates (id, role_name, cents_per_hour, created_at)
-      VALUES ('IRR1', 'Admin', ${SECRET_CENTS}, '2026-01-01');
-    INSERT INTO account_rates (id, account_id, label, cents_per_hour, currency, created_at)
-      VALUES ('AR1', '${IDS.victimAccount}', '${CHARGED_LABEL}', 9900, 'EUR', '2026-01-01');
+    INSERT INTO google_connections (id, user_id, service, google_email, scopes, refresh_token, created_at)
+      VALUES ('GC1', '${IDS.staffUser}', 'gmail', '${SECRET_EMAIL}', 'gmail.readonly', '${SECRET_TOKEN}', '2026-01-01');
+    INSERT INTO sprints (id, account_id, name, sold_price_cents, currency, created_at)
+      VALUES ('SP1', '${IDS.victimAccount}', '${SOLD_SPRINT}', ${SOLD_CENTS}, 'EUR', '2026-01-01');
   `)
 })
 
-/** A query, as the staff ADMIN — every right in the team, `commercials`
- * included. The one thing that can refuse them is the allow-list. */
+/** A query, as the staff ADMIN — every right in the team. The one thing that can
+ * refuse them is the allow-list. */
 async function query(qs: string): Promise<{ status: number; text: string }> {
   const request = new Request(`https://tenancy/api/tenancy/query${qs}`, {
     headers: { Cookie: "session=x" },
@@ -105,34 +140,29 @@ async function query(qs: string): Promise<{ status: number; text: string }> {
 }
 
 describe("the secret is really in the database (or every assertion below is empty)", () => {
-  it("the internal rate card holds the label and the number being hunted for", () => {
-    const row = db().prepare("SELECT label, cents_per_hour FROM internal_rates WHERE id = 'IR1'").get() as {
-      label: string
-      cents_per_hour: number
-    }
-    expect(row.label).toBe(SECRET_LABEL)
-    expect(row.cents_per_hour).toBe(SECRET_CENTS)
-    expect(
-      db().prepare("SELECT COUNT(*) AS n FROM internal_role_rates").get(),
-      "the role cost card must hold a row too"
-    ).toEqual({ n: 1 })
+  it("the connection row holds the address and the token being hunted for", () => {
+    const row = db()
+      .prepare("SELECT google_email, refresh_token FROM google_connections WHERE id = 'GC1'")
+      .get() as { google_email: string; refresh_token: string }
+    expect(row.google_email).toBe(SECRET_EMAIL)
+    expect(row.refresh_token).toBe(SECRET_TOKEN)
   })
 })
 
-describe("R24: no query names the agency's own cost, by any handle", () => {
+describe("no query names somebody's Google grant, by any handle", () => {
   /** Every way a caller could try to reach it: the table itself, the module that
-   * gates it, the file's other table, the prototype trick that has bitten this
+   * gates it, the obvious near-misses, the prototype trick that has bitten this
    * codebase four times, and a name assembled to look like SQL. */
   const HANDLES = [
-    "internal_rates",
-    "internal_role_rates",
-    "internal-rates",
-    "internalRates",
-    "rates",
+    "google_connections",
+    "google",
+    "google-connections",
+    "googleConnections",
+    "connections",
     "__proto__",
     "constructor",
-    "accounts; SELECT * FROM internal_rates",
-    "internal_rates--",
+    "accounts; SELECT * FROM google_connections",
+    "google_connections--",
   ]
 
   for (const handle of HANDLES)
@@ -141,88 +171,105 @@ describe("R24: no query names the agency's own cost, by any handle", () => {
       // THE LEAK FIRST, then the status. Asserted in this order deliberately: a
       // status check that fires first hides the only failure anybody cares
       // about, and when this suite was mutation-tested the message that had to
-      // name the leaked label was the one that never ran.
-      expect(text, "the agency's own cost came back out of the query door").not.toContain(SECRET_LABEL)
-      expect(text, "the agency's own hourly cost came back out of the query door").not.toContain(
-        String(SECRET_CENTS)
-      )
+      // name the leaked token was the one that never ran.
+      expect(text, "the refresh token came back out of the query door").not.toContain(SECRET_TOKEN)
+      expect(text, "the connected mailbox came back out of the query door").not.toContain(SECRET_EMAIL)
       expect(status, "a module that is not in the allow-list is a clean 400").toBe(400)
       // …and the refusal names what COULD have been asked for, so the next
       // attempt is an allowed one rather than another guess.
       expect(text).toContain("tickets")
     })
 
-  it("`commercials` reaches the CHARGE card and says which one it gave you", async () => {
-    // WHERE THE LINE IS, stated as a test rather than left to reading. Since
-    // aliases arrived, `commercials` — the RIGHT that gates money — resolves to
-    // `account_rates`, what a client is CHARGED. That is correct and it is not a
-    // hole: the alias lands on a module the allow-list already declared, and the
-    // agency's own cost is not in that list to be landed on. What would be wrong
-    // is answering silently, so the reply names the module it actually gave.
-    const { status, text } = await query("?module=commercials")
+  it("an alias reaches its module and says which one it gave you", async () => {
+    // WHERE THE LINE IS, stated as a test rather than left to reading. An alias
+    // is a second map a request value is looked up in, so the property worth
+    // holding is that it lands on a module the allow-list ALREADY declared and
+    // says so out loud — answering silently is what would let a caller use the
+    // wrong name for the rest of a conversation.
+    //
+    // IT USED TO BE `commercials` → `account_rates`, the RIGHT that gates money
+    // resolving to what a client is CHARGED. The client retired that card on
+    // 10 Sep 2026, the module left the grammar, and — because MODULE_ALIASES is
+    // DERIVED from the grammar rather than typed — the alias vanished with it,
+    // which is the mechanism working. So the case moved to `help` → `tickets`,
+    // the alias the whole feature was built for on 29 Aug 2026: the permission
+    // module, the table, the API path and every MCP tool name say `help`, and
+    // this map alone calls it `tickets`.
+    const { status, text } = await query("?module=help")
     expect(status).toBe(200)
     const body = JSON.parse(text) as Record<string, unknown>
-    expect(body.module, "the caller is told WHICH money they were given").toBe("account_rates")
-    expect(body.askedAs).toBe("commercials")
-    expect(text).toContain(CHARGED_LABEL)
-    expect(text, "and not one word about our own cost").not.toContain(SECRET_LABEL)
-    expect(text).not.toContain(String(SECRET_CENTS))
+    expect(body.module, "the caller is told WHICH module they were given").toBe("tickets")
+    expect(body.askedAs).toBe("help")
+    expect(text, "and not one word about anybody's mailbox").not.toContain(SECRET_TOKEN)
+    // …and the retired one resolves to nothing at all, by any spelling.
+    for (const gone of ["account_rates", "commercials", "accountRates"])
+      expect(canonicalModule(gone), `"${gone}" was retired on 10 Sep 2026`).toBeUndefined()
   })
 
   it("a FIELD name cannot reach another table either", async () => {
     // The second surface a grammar offers: the module is allowed, the field is
     // the smuggling attempt. Every column comes from the module's declared
     // fields, so this is a 400 with no statement built at all.
-    for (const field of ["cents_per_hour", "internal_rates.cents_per_hour", "id FROM internal_rates --"]) {
+    for (const field of ["refresh_token", "google_connections.refresh_token", "id FROM google_connections --"]) {
       const where = encodeURIComponent(JSON.stringify([{ field, op: "eq", value: "x" }]))
-      const { status, text } = await query(`?module=account_rates&where=${where}`)
-      expect(status, `"${field}" is not a field on account_rates`).toBe(400)
-      expect(text).not.toContain(String(SECRET_CENTS))
+      const { status, text } = await query(`?module=sprints&where=${where}`)
+      expect(status, `"${field}" is not a field on sprints`).toBe(400)
+      expect(text).not.toContain(SECRET_TOKEN)
     }
   })
 
   it("neither can a sort, a group, a projection or a cursor", async () => {
     const attempts = [
-      "?module=account_rates&sort=cents_per_hour%20FROM%20internal_rates",
-      `?module=account_rates&groupBy=${encodeURIComponent(JSON.stringify(["internal_rates"]))}`,
-      `?module=account_rates&fields=${encodeURIComponent(JSON.stringify(["internal_rates.label"]))}`,
-      "?module=account_rates&cursor=' UNION SELECT label FROM internal_rates --",
+      "?module=sprints&sort=refresh_token%20FROM%20google_connections",
+      `?module=sprints&groupBy=${encodeURIComponent(JSON.stringify(["google_connections"]))}`,
+      `?module=sprints&fields=${encodeURIComponent(JSON.stringify(["google_connections.refresh_token"]))}`,
+      "?module=sprints&cursor=' UNION SELECT refresh_token FROM google_connections --",
     ]
     for (const qs of attempts) {
       const { status, text } = await query(qs)
       expect(status, `${qs} must be refused`).toBe(400)
-      expect(text).not.toContain(SECRET_LABEL)
-      expect(text).not.toContain(String(SECRET_CENTS))
+      expect(text).not.toContain(SECRET_TOKEN)
+      expect(text).not.toContain(SECRET_EMAIL)
     }
   })
 
-  it("THE POSITIVE CONTROL: the same caller reads what a client is CHARGED", async () => {
-    // Different table, different file, and on the machine surface on purpose —
-    // R24 is about our own cost, not about all money. If this ever fails, the
-    // suite above is proving nothing: a door that refuses everything is not a
-    // fence.
-    const { status, text } = await query("?module=account_rates")
+  it("THE POSITIVE CONTROL: the same caller reads what a client was SOLD", async () => {
+    // Different table, on the machine surface on purpose — this law is about a
+    // table nobody declared, not about all money. If this ever fails, the suite
+    // above is proving nothing: a door that refuses everything is not a fence.
+    //
+    // THE FIGURE IS ASSERTED BY ITS OWN FIELD NAME, not merely found in the
+    // body. Mutation-tested on 10 Sep 2026 and this is what the mutation taught:
+    // renaming the money field in the grammar left the NUMBER in the response
+    // under a different key, so a `toContain(String(cents))` check stayed green
+    // over a door that had stopped projecting `soldPriceCents` at all. A control
+    // that can be satisfied by a coincidence in a string is not a control.
+    const { status, text } = await query("?module=sprints")
     expect(status).toBe(200)
-    expect(text).toContain(CHARGED_LABEL)
-    expect(JSON.parse(text).total).toBe(1)
-    // …and it still says nothing about our own cost.
-    expect(text).not.toContain(SECRET_LABEL)
+    expect(text).toContain(SOLD_SPRINT)
+    const body = JSON.parse(text) as { total: number; records: Record<string, unknown>[] }
+    expect(body.total).toBe(1)
+    expect(
+      body.records[0]?.soldPriceCents,
+      "the positive control must return the PRICE, under its own name — the generic door has to go on answering about money, or 'fenced' stops being distinguishable from 'money is scary'"
+    ).toBe(SOLD_CENTS)
+    expect(text).not.toContain(SECRET_TOKEN)
   })
 
   it("describe_module will not describe it either", async () => {
-    const request = new Request("https://tenancy/api/tenancy/query/describe?module=internal_rates", {
+    const request = new Request("https://tenancy/api/tenancy/query/describe?module=google_connections", {
       headers: { Cookie: "session=x" },
     })
     const res = await worker.fetch(request, makeEnv(() => holder.db as DatabaseSync, IDS.staffUser))
     expect(res.status).toBe(400)
     const text = await res.text()
-    expect(text).not.toContain("cents_per_hour")
+    expect(text).not.toContain("refresh_token")
     // The catalogue a caller CAN see must not name it either.
     const list = await worker.fetch(
       new Request("https://tenancy/api/tenancy/query/describe", { headers: { Cookie: "session=x" } }),
       makeEnv(() => holder.db as DatabaseSync, IDS.staffUser)
     )
-    expect(await list.text()).not.toContain("internal")
+    expect(await list.text()).not.toContain("google_connections")
   })
 })
 
@@ -242,91 +289,81 @@ describe("an alias widens what a caller may SAY, never what they may READ", () =
     for (const alias of Object.keys(MODULE_ALIASES))
       if (alias.includes("_") || queryable.has(alias))
         expect(
-          !alias.startsWith("internal"),
-          `"${alias}" is an alias naming the agency's own money (R24)`
+          !alias.startsWith("google"),
+          `"${alias}" is an alias naming somebody's Google grant`
         ).toBe(true)
     // …said the other way round, which is the assertion that actually bites:
-    // the internal tables resolve to nothing, by every route into the lookup.
-    for (const name of ["internal_rates", "internal_role_rates", "internalRates", "internal-rates"])
+    // the secret table resolves to nothing, by every route into the lookup.
+    for (const name of ["google_connections", "googleConnections", "google-connections", "google"])
       expect(canonicalModule(name), `"${name}" must resolve to no module at all`).toBeUndefined()
   })
 
   it("and the door still refuses them, through the alias path", async () => {
     // The behavioural half, because the two above are about the map and this is
     // about the door: a caller holding every right still gets nothing.
-    for (const handle of ["internal_rates", "internal_role_rates", "INTERNAL_RATES", "internal-rates"]) {
+    for (const handle of ["google_connections", "GOOGLE_CONNECTIONS", "google-connections", "google"]) {
       const { status, text } = await query(`?module=${encodeURIComponent(handle)}`)
-      expect(text, "the agency's own cost came back through an alias").not.toContain(SECRET_LABEL)
-      expect(text).not.toContain(String(SECRET_CENTS))
+      expect(text, "the refresh token came back through an alias").not.toContain(SECRET_TOKEN)
+      expect(text).not.toContain(SECRET_EMAIL)
       expect(status).toBe(400)
     }
   })
 })
 
-describe("the allow-list is derived-clean against the internal-money file itself", () => {
-  /** The tables `internal-money.ts` touches, read off that file — the same
-   * oracle R24's own check reads. Nothing hand-typed, so a table added there
-   * tomorrow is judged here today. */
-  const internalSrc = readFileSync(
-    join(__dirname, "..", "src", "lib", "internal-money.ts"),
-    "utf8"
-  )
-  const touched = [
-    ...new Set([...internalSrc.matchAll(/(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_]+)/g)].map((m) => m[1])),
+describe("the allow-list is derived-clean against the team schema itself", () => {
+  /** EVERY SECRET-BEARING COLUMN THE SCHEMA DECLARES, read off `TEAM_MIGRATIONS`
+   * — the database's own shape, which is a stronger oracle than any one file
+   * that reads it. A secret here is a stored credential: something that grants
+   * ACCESS rather than merely discloses a fact, so the shape of the name is the
+   * test (`*_token`, `*_secret`), and both `CREATE TABLE` bodies and later
+   * `ALTER TABLE … ADD COLUMN` are read, because either can introduce one.
+   *
+   * Deliberately narrower than "anything sensitive": this is the set where a
+   * leak is not an embarrassment but a foothold, and a rule with a fuzzy edge is
+   * a rule somebody argues their way past. */
+  const schema = TEAM_MIGRATIONS.map((m) => m.sql).join("\n")
+  const secretColumns = [
+    ...new Set([...schema.matchAll(/\b([a-z_]*(?:_token|_secret))\b\s+TEXT/g)].map((m) => m[1])),
   ]
 
-  /** The one table `internal-money.ts` reads that is NOT the agency's own cost.
-   * The margin reads `apps` for what a system costs us to run, and an app is a
-   * client's own record — their value screen names it by design. Pinned with its
-   * reason and rot-checked below, so the exemption cannot grow silently. */
-  const SHARED_WITH_THE_ORDINARY_APP: Record<string, string> = {
-    apps: "the margin reads an app's monthly tool cost, but an app is the client's own record and its query module exposes the app's own columns — not that one",
-  }
+  /** Which TABLE each of those columns is declared on, read off the CREATE
+   * statements they sit inside. */
+  const tablesWithASecret = new Set<string>()
+  for (const m of schema.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?([a-z_]+)\s*\(([\s\S]*?)\n\);/g))
+    if (secretColumns.some((c) => new RegExp(`\\b${c}\\b`).test(m[2]))) tablesWithASecret.add(m[1])
 
-  it("the derivation found the file (a blind scan reports all-clear like a passing one)", () => {
-    expect(touched, "internal_rates is the table this law is about — did it move?").toContain(
-      "internal_rates"
-    )
-    expect(touched.length).toBeGreaterThan(2)
+  it("the derivation found real columns and real tables (a blind scan reports all-clear like a passing one)", () => {
+    expect(
+      secretColumns,
+      "refresh_token is the column this suite is about — did the schema scan stop matching?"
+    ).toContain("refresh_token")
+    expect(secretColumns.length, "the secret-column scan went blind").toBeGreaterThan(1)
+    expect(
+      [...tablesWithASecret],
+      "google_connections is the table this suite is about — did the CREATE scan stop matching?"
+    ).toContain("google_connections")
   })
 
-  it("no table the internal-money file touches is queryable, except the pinned one", () => {
+  it("no table holding a stored credential is queryable", () => {
     const queryable = new Set(Object.values(QUERY_MODULES).map((m) => m.table))
-    const leaked = touched.filter(
-      (t) => queryable.has(t) && !(t in SHARED_WITH_THE_ORDINARY_APP)
-    )
+    const leaked = [...tablesWithASecret].filter((t) => queryable.has(t))
     expect(
       leaked,
-      `the query door's allow-list names a table the agency's own money file reads (R24): ${leaked.join(", ")}. It is an ALLOW-list — take the entry out, do not add a guard.`
+      `the query door's allow-list names a table holding a stored credential: ${leaked.join(", ")}. It is an ALLOW-list — take the entry out, do not add a guard.`
     ).toEqual([])
   })
 
-  it("every pinned exemption is still queryable and still touched (no rotting lines)", () => {
-    const queryable = new Set(Object.values(QUERY_MODULES).map((m) => m.table))
-    for (const [table, why] of Object.entries(SHARED_WITH_THE_ORDINARY_APP)) {
-      expect(touched, `${table} is pinned here but the money file no longer reads it`).toContain(table)
-      expect(queryable.has(table), `${table} is pinned here but is no longer queryable`).toBe(true)
-      expect(why.length, `${table} needs a reason someone can disagree with`).toBeGreaterThan(40)
-    }
-  })
-
-  it("no module's declared fields name a money column that isn't the client's own price", () => {
-    // The finer half: `internal_rates` being absent is not enough if some other
-    // module quietly exposes the same number under another name. Every declared
-    // column is checked against the columns the internal file actually reads.
-    const internalCols = new Set(
-      [...internalSrc.matchAll(/\b(cents_per_hour|margin_cents|tool_cost_cents_per_month)\b/g)].map(
-        (m) => m[1]
-      )
-    )
-    expect(internalCols.size, "the column derivation went blind").toBeGreaterThan(1)
+  it("and no module's declared fields name a stored credential under any table", () => {
+    // The finer half: the TABLE being absent is not enough if some other module
+    // quietly exposes the same column. Every declared column is checked against
+    // the schema's own secret set, so a module that gained a `refresh_token`
+    // field on a table that IS queryable is caught even though the table is not.
     for (const [name, mod] of Object.entries(QUERY_MODULES))
       for (const f of mod.fields)
-        if (internalCols.has(f.column))
-          expect(
-            mod.table,
-            `${name}.${f.name} exposes "${f.column}", a column the internal money file reads — only the ACCOUNT rate card (what a client is charged) may`
-          ).toBe("account_rates")
+        expect(
+          secretColumns.includes(f.column),
+          `${name}.${f.name} exposes "${f.column}", a stored credential — no module may declare one`
+        ).toBe(false)
   })
 })
 

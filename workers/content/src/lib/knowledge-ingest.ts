@@ -1703,9 +1703,37 @@ export const INGEST_KINDS: IngestKind[] = [
     // the list, so the cursor is dropped at the end of the table and every
     // vocabulary is rebuilt on a rolling cycle.
     kind: "dropdown",
+    // THE ASSISTANT WAS BEING TOLD A FALSEHOOD, IN WRITING, ON EVERY LIST, and
+    // it was fixed on 2026-09-10. This reader used to compute
+    // `MAX(CASE WHEN is_default = 1 … THEN value END)` and file the sentence
+    // "<X> is picked for them unless they change it." NOTHING IN THIS APP HAS
+    // EVER PRE-SELECTED A VALUE FROM `is_default` — its one behavioural read
+    // anywhere is the refusal in `setSelectableActive`
+    // (workers/tenancy/src/lib/selectable.ts), which stops a flagged value being
+    // switched off. And because every seeded row and every migration back-fill
+    // writes 1, `MAX()` was not even naming a chosen row: it returned the
+    // alphabetically LAST live value in the list. So the corpus was telling the
+    // assistant that "Request is picked for them unless they change it" about a
+    // ticket type nobody has ever pre-picked, and a person asking "what type do
+    // new tickets get?" would have been answered confidently and wrongly.
+    //
+    // What is true is a COUNT, not a name, so that is what it says now. Naming
+    // the protected values instead was tried and dropped: with the whole shipped
+    // vocabulary protected the list would repeat `value_list` verbatim one
+    // paragraph below itself, which is the dilution this kind's own header
+    // argues against.
+    //
+    // THIS COMMENT SITS BELOW `kind:` ON PURPOSE. The digest that pins each
+    // reader to its `textVersion` slices the table at every `kind:` marker, so a
+    // note written ABOVE one lands in the PREVIOUS kind's slice and asks for an
+    // unrelated re-pin — which is what it did on the first attempt at this
+    // change, reporting that the `person` reader had moved.
     table: "selectable_data",
     label: "dropdown lists",
-    textVersion: 1,
+    // v2: the false pre-selection sentence above, replaced. Every dropdown
+    // source already filed says the old words, so the bump is what walks the
+    // cursor back over them.
+    textVersion: 2,
     rollup: true,
     // One source per LIST, so the thing mirrored is the distinct `type`.
     oneSourcePer: "type",
@@ -1722,7 +1750,7 @@ export const INGEST_KINDS: IngestKind[] = [
         sort_at: string
         live: number
         value_list: string | null
-        default_value: string | null
+        guarded: number
       }>(
         cfg,
         guard.databaseId,
@@ -1732,7 +1760,7 @@ export const INGEST_KINDS: IngestKind[] = [
                 MAX(COALESCE(updated_at, created_at)) AS sort_at,
                 SUM(CASE WHEN deactivated_at IS NULL THEN 1 ELSE 0 END) AS live,
                 GROUP_CONCAT(CASE WHEN deactivated_at IS NULL THEN value END, ', ') AS value_list,
-                MAX(CASE WHEN is_default = 1 AND deactivated_at IS NULL THEN value END) AS default_value
+                SUM(CASE WHEN is_default = 1 AND deactivated_at IS NULL THEN 1 ELSE 0 END) AS guarded
            FROM selectable_data
           GROUP BY type${keyset}
           ORDER BY sort_at, type LIMIT ${limit}`
@@ -1744,13 +1772,21 @@ export const INGEST_KINDS: IngestKind[] = [
         summary: buildSummary({
           noun: "list of choices this team keeps",
           title: r.type,
-          notes: [`${r.live} in use.`, r.default_value ? `${r.default_value} is the default.` : null],
+          notes: [`${r.live} in use.`, Number(r.guarded) > 0 ? `${r.guarded} protected.` : null],
           detail: r.value_list ?? "",
         }),
         body: [
           `${r.type} is one of the lists this team keeps its own words in: when somebody fills in a form and picks a ${r.type.toLowerCase()}, these are the choices they are offered.`,
           r.value_list ? `The choices in use are: ${r.value_list}.` : "There are no choices in this list yet.",
-          r.default_value ? `${r.default_value} is picked for them unless they change it.` : "",
+          // WHAT PROTECTION IS, SAID BOTH WAYS ROUND. The negative half is not
+          // padding: the word this flag used to be called was "Default", so an
+          // assistant reading an older answer, an older ticket or its own memory
+          // of this corpus can still reach for "the one that is picked
+          // automatically". There is no such thing here, and the only place to
+          // say so is the passage itself.
+          Number(r.guarded) === 0
+            ? ""
+            : `${Number(r.guarded) === Number(r.live) ? "Every choice in this list is protected" : `${r.guarded} of these choices are protected`}: a protected choice can't be switched off until somebody takes its protection off first. It is not a pre-selection — no form here picks a choice for anybody, so a person filling one in chooses from all of them equally.`,
         ]
           .filter(Boolean)
           .join("\n\n"),

@@ -67,10 +67,41 @@ const BEFORE: Record<string, "always" | "off" | "never"> = {
   staff_certificate: "off",
 }
 
+/** A RECORD THE CAPTURE NAMES THAT THE APP NO LONGER HAS — retired since 29 Aug
+ * 2026, with the reason, so the matrix above can stay the historical record it
+ * says it is rather than being quietly edited to match today.
+ *
+ * SUBTRACTED, NOT DELETED, and that is the point of the shape: `BEFORE` is
+ * evidence of what twenty-one tools ANSWERED, and evidence you rewrite when it
+ * stops matching is not evidence. Rot-checked below in both directions, so this
+ * list can only shrink and a name that comes back has to leave it. */
+const RETIRED_SINCE_THE_CAPTURE: Record<string, string> = {
+  internal_rate:
+    "the agency's own cost card, retired whole on 10 Sep 2026 at the client's ruling — \"kill the whole internal rates thing. will develop this in the future much much more but for now i iwanna wipe it clean\". The table, the doors and the six tools went with it, so `set_record_active` has one fewer record it can name. That is a change to a PUBLISHED external contract (MCP.md) and it is the ruling's, not a tidy-up's: the door it pointed at does not exist any more.",
+  account_rate:
+    "what a CLIENT is charged, retired ONE HOUR LATER the same day at the same person's second ruling: \"The whole account rates also killed it.\" The line above said `account_rate` was untouched; it was true for an hour. Its table (`account_rates`, dropped by team migration 0074), its four doors and its three named tools went with it, so this is a SECOND change to the same published contract — `set_record_active` now names two fewer records than the capture did. THE TWO LINES TOGETHER ARE THE POINT OF THIS SHAPE: the matrix above is evidence of what twenty-one tools answered, and it is still exactly that, because neither ruling was allowed to edit it.",
+}
+
 describe("the collapse covers exactly what it replaced", () => {
-  it("twenty-one records, and the captured matrix names every one of them", () => {
-    expect(Object.keys(RECORD_TOGGLES)).toHaveLength(21)
-    expect(Object.keys(BEFORE).sort()).toEqual(Object.keys(RECORD_TOGGLES).sort())
+  it("the captured matrix names every record the app still has, and only those", () => {
+    // The capture minus what has been retired since must be exactly today's set.
+    // Both directions: a record that lost its door and stayed in the matrix is a
+    // test asserting a door that is gone, and a record ADDED with no line here is
+    // one the confirm matrix below never judged.
+    const stillHere = Object.keys(BEFORE).filter((r) => !(r in RETIRED_SINCE_THE_CAPTURE))
+    expect(stillHere.sort()).toEqual(Object.keys(RECORD_TOGGLES).sort())
+    expect(Object.keys(RECORD_TOGGLES).length, "the toggle family has gone empty — a blind census").toBeGreaterThan(15)
+  })
+
+  it("every retirement names a record the capture really held, and one the app really lost", () => {
+    for (const [record, why] of Object.entries(RETIRED_SINCE_THE_CAPTURE)) {
+      expect(BEFORE[record], `${record} is pinned as retired but the capture never held it`).toBeDefined()
+      expect(
+        Object.prototype.hasOwnProperty.call(RECORD_TOGGLES, record),
+        `${record} is pinned as retired but is back in RECORD_TOGGLES — delete the line`
+      ).toBe(false)
+      expect(why.length, `${record} needs a reason somebody can disagree with`).toBeGreaterThan(40)
+    }
   })
 
   it("the one tool declares every door in the family", () => {
@@ -100,7 +131,7 @@ describe("every door is REACHABLE — run the router, do not read the list", () 
     // exist about an account they never named — and the same call carrying a
     // valid ACCOUNT id would have archived that account, having been asked to
     // archive something else. `record` is an enum now, so `checkArgTypes`
-    // answers first, with a 400 that names the twenty-one kinds.
+    // answers first, with a 400 that names every kind the family still has.
     for (const nonsense of ["", "ticket", "__proto__", "constructor", "internal_rate_card", "../../admin"])
       expect(
         () => checkArgTypes(tool().schema as Record<string, unknown>, { record: nonsense, id: "x", active: true }),
@@ -143,8 +174,11 @@ describe("every door still receives the body it reads", () => {
   })
 })
 
-describe("THE CONFIRM MATRIX IS UNCHANGED — both directions, all twenty-one", () => {
-  for (const [record, was] of Object.entries(BEFORE)) {
+describe("THE CONFIRM MATRIX IS UNCHANGED — both directions, every record still here", () => {
+  // The capture minus the retirements: a record whose door no longer exists has
+  // no confirm behaviour to be unchanged, and asking `requiresConfirm` about one
+  // would be this suite agreeing with a narrower version of itself.
+  for (const [record, was] of Object.entries(BEFORE).filter(([r]) => !(r in RETIRED_SINCE_THE_CAPTURE))) {
     it(`"${record}" asks exactly when it used to`, () => {
       const offAsks = was !== "never"
       const onAsks = was === "always"
@@ -185,10 +219,16 @@ describe("THE CONFIRM MATRIX IS UNCHANGED — both directions, all twenty-one", 
   })
 })
 
-describe("the MCP surface kept its twenty-one names, and their gates", () => {
+describe("the MCP surface kept every name it still has a door for, and their gates", () => {
   for (const record of Object.keys(RECORD_TOGGLES))
     it(`still publishes set_${record}_active`, () => {
       const t = getMcpTool(`set_${record}_active`)
+      // AN EXTERNAL CONTRACT MAY NOT BE RENAMED. It can still be RETIRED, and
+      // one was: `set_internal_rate_active` went with the client's 10 Sep 2026
+      // ruling on the internal rates, because the door behind it stopped
+      // existing. That is the loop above narrowing honestly rather than this
+      // sentence softening — the name is gone from RECORD_TOGGLES and the
+      // reason is written down in RETIRED_SINCE_THE_CAPTURE.
       expect(t, `set_${record}_active is an external contract — it may not be renamed`).toBeDefined()
       expect(t!.path).toBe(RECORD_TOGGLES[record].path)
       expect(t!.method).toBe("POST")

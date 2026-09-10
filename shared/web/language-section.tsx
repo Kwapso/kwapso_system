@@ -1,6 +1,20 @@
 "use client"
 
-// THE SWITCHER — one control, shown in the agency app's Settings.
+// THE SWITCHER — one control, shown in Settings, in the Appearance tab under
+// Size, Appearance and Background.
+//
+// IT SPENT THREE WEEKS ON THE PROFILE PAGE (17 Aug – 10 Sep 2026), on the
+// reading that a reading language is about a PERSON and Settings is about the
+// APP. The client ended that: *"language shoudl be in settings somewhere, not in
+// my porfile"* (2026-09-10). She is right, and the giveaway is that the three
+// display choices it now sits beside — how big the app is, light or dark, the
+// sidebar's colour — are exactly as personal and never left. The line is
+// identity against display, not person against app. Your name, your email
+// address and your history stayed on the profile page, where a tester looking
+// for "change my name" can still find them.
+//
+// The portal has no settings screen by design, so its own switcher is the
+// compact `language-menu.tsx` in the header. That one did not move.
 //
 // ONE DROPDOWN, NOT TWENTY-NINE BUTTONS. It began as a button per language,
 // wrapping, on the argument that a dropdown hides every choice but the current
@@ -56,7 +70,10 @@ const BRAND = { brand: brand.name }
 export function LanguageSection({
   /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
   save,
-  /** Heading style differs slightly between the two Settings screens. */
+  /** Override the section wrapper. There is ONE call site — the Appearance tab
+   * in `web/components/screens/settings-screen.tsx` — and it passes nothing, so
+   * the default below is what ships. Kept because the wrapper is the only thing
+   * a host could reasonably need to change. */
   className,
 }: {
   save: (lang: Language) => Promise<unknown>
@@ -100,7 +117,14 @@ export function LanguageSection({
 
   return (
     <section className={className ?? "motion-panel-in flex flex-col gap-4"}>
-      <h2 className="text-muted-foreground text-micro uppercase">
+      {/* The Appearance tab's own heading, not the profile page's. `Size`,
+        * `Appearance` and `Background` above this are `text-lg font-medium`
+        * (scale-section.tsx, theme-section.tsx, spine-section.tsx); a fourth
+        * card in a muted micro-caps eyebrow would read as a different KIND of
+        * thing sitting under the same tab. The uppercase eyebrow it wore until
+        * 2026-09-10 was matching its old neighbours on the profile page, which
+        * is the same reasoning pointed at a different screen. */}
+      <h2 className="text-lg font-medium">
         {t("Language")}
       </h2>
       <div className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">

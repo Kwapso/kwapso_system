@@ -71,18 +71,7 @@
 //   POST /api/tenancy/processes/comments   -> comment on a map (clients too)
 //   GET  /api/tenancy/impact               -> savings, App -> Process -> Step
 //   GET  /api/tenancy/record-counts        -> one record's child totals, before a tab is clicked
-//   GET  /api/tenancy/rates                -> an account's rate card (?accountId)
-//   POST /api/tenancy/rates                -> add a rate
-//   POST /api/tenancy/rates/update         -> edit a rate
-//   POST /api/tenancy/rates/active         -> retire / restore a rate
-//   GET  /api/tenancy/role-rates           -> what an hour of each ROLE costs (internal)
-//   POST /api/tenancy/role-rates           -> set or retire a role's rate (internal)
-//   GET  /api/tenancy/app-money            -> one app's hours and what they're worth (internal)
-//   GET  /api/tenancy/internal-rates       -> what our own hour costs (internal)
-//   POST /api/tenancy/internal-rates       -> add an internal rate
-//   POST /api/tenancy/internal-rates/update-> edit an internal rate
-//   POST /api/tenancy/internal-rates/active-> retire / restore an internal rate
-//   GET  /api/tenancy/margin               -> revenue - our time - tool costs (internal)
+//   GET  /api/tenancy/app-money            -> one app's hours and what they're worth (agency-only)
 //   GET  /api/tenancy/activity             -> activity feed (?scope=team|user|role&id=)
 //   POST /api/tenancy/activity/note        -> add a note to one record's history ({table, id, note})
 //   GET  /api/tenancy/query                -> ask a module a question (?module=&where=&groupBy=&countOnly=&cursor=)
@@ -245,20 +234,7 @@ import {
   postUpdateClientRole,
   postUpdateTool,
 } from "./routes/client-org"
-import {
-  getAccountRates,
-  getInternalRates,
-  getAppMoney,
-  getMargin,
-  getRoleRates,
-  postSetRoleRate,
-  postAccountRateActive,
-  postCreateAccountRate,
-  postCreateInternalRate,
-  postInternalRateActive,
-  postUpdateAccountRate,
-  postUpdateInternalRate,
-} from "./routes/money"
+import { getAppMoney } from "./routes/money"
 import { getRecordCounts } from "./routes/record-counts"
 import { adminCreateTeam, dbSizes, migrateTeams, moveModule } from "./routes/admin"
 
@@ -419,25 +395,16 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   // crosses three modules, so it is gated per COLLECTION rather than at the door
   // (R18) and refused to a client login outright. See routes/record-counts.ts.
   "GET /api/tenancy/record-counts": { handler: getRecordCounts, kind: "read" },
-  // THE MONEY. Every door here refuses a client login — the account rate card
-  // included, because a client is shown what they bought through the value door's
-  // projection, never by knocking on the card itself. `margin` is the figure SCOPE
-  // says a client must never see under any flag: it is refused here, absent from
-  // the portal gateway's table, and unreachable from portal code by R24.
-  "GET /api/tenancy/rates": { handler: getAccountRates, kind: "read" },
-  "POST /api/tenancy/rates": { handler: postCreateAccountRate, kind: "mutation" },
-  "POST /api/tenancy/rates/update": { handler: postUpdateAccountRate, kind: "mutation" },
-  "POST /api/tenancy/rates/active": { handler: postAccountRateActive, kind: "mutation" },
-  "GET /api/tenancy/internal-rates": { handler: getInternalRates, kind: "read" },
-  "POST /api/tenancy/internal-rates": { handler: postCreateInternalRate, kind: "mutation" },
-  "POST /api/tenancy/internal-rates/update": { handler: postUpdateInternalRate, kind: "mutation" },
-  "POST /api/tenancy/internal-rates/active": { handler: postInternalRateActive, kind: "mutation" },
-  "GET /api/tenancy/margin": { handler: getMargin, kind: "read" },
-  // WHAT A ROLE'S HOUR COSTS, and what one app gave back (CHECKLIST 8.13). Both
-  // internal: the money is computed from the role rate card, so neither is on
-  // the portal gateway's surface and both refuse a client login (R24).
-  "GET /api/tenancy/role-rates": { handler: getRoleRates, kind: "read" },
-  "POST /api/tenancy/role-rates": { handler: postSetRoleRate, kind: "mutation" },
+  // THE MONEY, and it is now ONE door. It refuses a client login, like the
+  // eleven that stood here before it. Seven went on 10 Sep 2026 — the agency's
+  // own two cost cards and the margin computed from them ("kill the whole
+  // internal rates thing") — and the ACCOUNT RATE CARD's four went the same day
+  // at the client's second ruling ("the whole account rates also killed it").
+  // RULES.md records what went with each.
+  //
+  // WHAT ONE APP GAVE BACK (CHECKLIST 8.13). Agency-only, and the visibility
+  // SWITCH is why: it hands over the same subtraction the client's own value
+  // door makes, with none of the prices that door withholds.
   "GET /api/tenancy/app-money": { handler: getAppMoney, kind: "read" },
   // admin/* are ops-only (roll migrations, relocate a module's DB) — they touch
   // no client-visible app row, so they broadcast nothing.

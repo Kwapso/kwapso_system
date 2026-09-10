@@ -1507,7 +1507,6 @@ export const SEED: Catalogue = {
   "Edit this role": { de: "Diese Rolle bearbeiten", es: "Editar este rol", ca: "Editar aquest rol"},
   "Edit this sprint": { de: "Diesen Sprint bearbeiten", es: "Editar este sprint", ca: "Editar aquest sprint"},
   "Edit this ticket": { de: "Dieses Ticket bearbeiten", es: "Editar este ticket", ca: "Editar aquest ticket"},
-  "Emoji": { de: "Emoji", es: "Emoji", ca: "Emoji"},
   "Entries": { de: "Einträge", es: "Entradas", ca: "Entrades"},
   "Every entry here is the same kind of work.": { de: "Jeder Eintrag hier ist dieselbe Art von Arbeit.", es: "Cada entrada aquí es el mismo tipo de trabajo.", ca: "Cada entrada d'aquí és el mateix tipus de feina."},
   "Every ticket a client raises shows here while it is being worked on.": { de: "Jedes Ticket, das ein Kunde stellt, wird hier angezeigt, während es bearbeitet wird.", es: "Cada ticket que un cliente plantea aparece aquí mientras se está trabajando en él.", ca: "Tot ticket que presenta un client es mostra aquí mentre s'hi està treballant."},
@@ -1797,7 +1796,6 @@ export const SEED: Catalogue = {
   "Couldn't take that off.": { de: "Das konnte nicht entfernt werden.", es: "No se pudo quitar eso.", ca: "No s'ha pogut treure això."},
   "Deactivate profile": { de: "Profil deaktivieren", es: "Desactivar perfil", ca: "Desactiva el perfil"},
   "Deactivate the": { de: "Deaktivieren:", es: "Desactivar el", ca: "Desactiva el"},
-  "Default": { de: "Standard", es: "Predeterminado", ca: "Predeterminat"},
   "Disconnect your Google account?": { de: "Google-Konto trennen?", es: "¿Desconectar tu cuenta de Google?", ca: "Vols desconnectar el teu compte de Google?"},
   "Does \"{step}\" still happen?": { de: "Findet „{step}“ noch statt?", es: "¿«{step}» sigue ocurriendo?", ca: "«{step}» encara passa?"},
   "Drive, Gmail, Calendar and Chat in one approval. Google keeps one approval per app, so connecting them one at a time switches the others off.": { de: "Drive, Gmail, Kalender und Chat in einer Freigabe. Google speichert pro App nur eine Freigabe – wer sie einzeln verbindet, schaltet die anderen ab.", es: "Drive, Gmail, Calendar y Chat en una sola autorización. Google guarda una autorización por aplicación, así que conectarlos de uno en uno desactiva los demás.", ca: "Drive, Gmail, Calendar i Chat en una sola autorització. Google desa una autorització per aplicació, així que connectar-los d'un en un desactiva els altres."},
@@ -1811,15 +1809,18 @@ export const SEED: Catalogue = {
   "It stops being offered when somebody files a ticket. Every ticket already filed against it keeps it, and nothing is deleted.": { de: "Es wird beim Erstellen eines Tickets nicht mehr angeboten. Jedes bereits dazu erstellte Ticket behält es, und nichts wird gelöscht.", es: "Dejará de ofrecerse al crear un ticket. Todos los tickets ya creados lo conservan y no se borra nada.", ca: "Deixarà d'oferir-se en crear un tiquet. Tots els tiquets ja creats el conserven i no s'esborra res."},
   "Last used {when}": { de: "Zuletzt verwendet {when}", es: "Usado por última vez {when}", ca: "Usat per última vegada {when}"},
   "Main": { de: "Haupt", es: "Principal", ca: "Principal"},
-  "Make it a default": { de: "Als Standard festlegen", es: "Hacerlo predeterminado", ca: "Fes-lo predeterminat"},
   "Map": { de: "Karte", es: "Mapa", ca: "Mapa"},
-  "Marked as a default.": { de: "Als Standard markiert.", es: "Marcado como predeterminado.", ca: "Marcat com a predeterminat."},
   "Module": { de: "Modul", es: "Módulo", ca: "Mòdul"},
   "Modules": { de: "Module", es: "Módulos", ca: "Mòduls"},
   "Needs {gaps} before it can be triaged": { de: "Benötigt {gaps}, bevor es triagiert werden kann", es: "Necesita {gaps} antes de poder triarse", ca: "Necessita {gaps} abans de poder-se triar"},
   "No accounts match": { de: "Keine Kunden passen", es: "No hay cuentas que coincidan", ca: "Cap compte coincideix"},
   "No invites waiting for you.": { de: "Keine Einladungen, die auf Sie warten.", es: "No tienes invitaciones pendientes.", ca: "No tens invitacions pendents."},
-  "No longer a default.": { de: "Nicht mehr Standard.", es: "Ya no es predeterminado.", ca: "Ja no és predeterminat."},
+  // THE CHOICES SCREEN'S PROTECTION VOCABULARY (client, 2026-09-10 — "find an
+  // accurate word for what Default means … Find a good word and rename it").
+  // These five replaced six entries that all said Standard / predeterminado /
+  // predeterminat, which translated the promise the English word was wrongly
+  // making: nothing here is pre-selected, the flag refuses a deactivation.
+  "No longer protected.": { de: "Nicht mehr geschützt.", es: "Ya no está protegido.", ca: "Ja no està protegit."},
   "No meetings match": { de: "Keine Besprechungen passen", es: "No hay reuniones que coincidan", ca: "Cap reunió coincideix"},
   "No module": { de: "Kein Modul", es: "Sin módulo", ca: "Cap mòdul"},
   "No modules yet. Add the sections this app is divided into, so tickets can say which one they are about.": { de: "Noch keine Module. Fügen Sie die Bereiche hinzu, in die diese App gegliedert ist, damit Tickets den Bereich nennen können.", es: "Aún no hay módulos. Añade las secciones en que se divide esta aplicación para que los tickets puedan indicarlas.", ca: "Encara no hi ha mòduls. Afegeix les seccions en què es divideix aquesta aplicació perquè els tiquets les puguin indicar."},
@@ -1852,7 +1853,10 @@ export const SEED: Catalogue = {
   "Somebody": { de: "Jemand", es: "Alguien", ca: "Algú"},
   "Something broke in {label}.": { de: "In {label} ist etwas schiefgegangen.", es: "Algo ha fallado en {label}.", ca: "Alguna cosa ha fallat a {label}."},
   "Something broke.": { de: "Etwas ist schiefgegangen.", es: "Algo ha fallado.", ca: "Alguna cosa ha fallat."},
-  "Stop treating as a default": { de: "Nicht mehr als Standard behandeln", es: "Dejar de tratarlo como predeterminado", ca: "Deixa de tractar-lo com a predeterminat"},
+  "Protect it": { de: "Schützen", es: "Protegerlo", ca: "Protegeix-lo"},
+  "Protected": { de: "Geschützt", es: "Protegido", ca: "Protegit"},
+  "Protected.": { de: "Geschützt.", es: "Protegido.", ca: "Protegit."},
+  "Stop protecting it": { de: "Schutz aufheben", es: "Dejar de protegerlo", ca: "Deixa de protegir-lo"},
   "Switch it off": { de: "Ausschalten", es: "Desactivarlo", ca: "Desactiva'l"},
   "Switch off": { de: "Ausschalten", es: "Desactivar", ca: "Desactivar"},
   "Switch off this module?": { de: "Dieses Modul ausschalten?", es: "¿Desactivar este módulo?", ca: "Vols desactivar aquest mòdul?"},
@@ -2713,11 +2717,6 @@ export const SEED: Catalogue = {
     de: "Eine Karte steht hinter dieser Zahl.",
     es: "Un mapa está detrás de esta cifra.",
     ca: "Un mapa està darrere d’aquest número.",
-  },
-  "One of the defaults": {
-    de: "Einer der Standardwerte",
-    es: "Uno de los valores predeterminados",
-    ca: "Un dels valors predeterminats",
   },
   "Only the calendars you name": {
     de: "Nur die Kalender, die Sie benennen",
@@ -3898,7 +3897,22 @@ export const SEED: Catalogue = {
   "Editable on the Choices screen.": { de: "Bearbeitbar auf der Seite „Optionen“.", es: "Editable en la pantalla de Opciones.", ca: "Editable a la pantalla d'Opcions."},
   "Every way of working this changes, or tick that it changes none.": { de: "Jede Arbeitsweise, die sich dadurch ändert, oder anhaken, dass sich keine ändert.", es: "Cada forma de trabajar que esto cambia, o marca que no cambia ninguna.", ca: "Cada manera de treballar que això canvia, o marca que no en canvia cap."},
   "On unless you say otherwise.": { de: "Aktiv, sofern Sie nichts anderes sagen.", es: "Activado, a menos que digas lo contrario.", ca: "Activat, llevat que diguis el contrari."},
-  "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.": { de: "Ein Emoji, das neben diesem Wort erscheint, überall wo der Typ auftaucht. Leer lassen für eine einfache Bezeichnung.", es: "Un emoji que aparece junto a esta palabra, allí donde aparezca el tipo. Déjalo vacío para una etiqueta sencilla.", ca: "Un emoji que apareix al costat d'aquesta paraula, allà on aparegui el tipus. Deixa-ho buit per a una etiqueta senzilla."},
+  // THE SAME SENTENCE WITH THE EMOJI TAKEN OUT OF IT — client, 2026-09-10
+  // (*"also kill emojis!!!"*). The English key moved from "One emoji shown
+  // beside this word…" to the line below when `selectable-form-dialog.tsx`
+  // stopped asking for a pictograph the write door has refused since
+  // `optionalMark` shipped; the three translations are the old ones with the
+  // same substitution made, so the wording a German reader knows is unchanged
+  // apart from the thing being asked for.
+  "A short word or initial shown beside this option, wherever the type appears. Leave it empty for a plain label.": { de: "Ein kurzes Wort oder eine Initiale, die neben dieser Option erscheint, überall wo der Typ auftaucht. Leer lassen für eine einfache Bezeichnung.", es: "Una palabra corta o una inicial que aparece junto a esta opción, allí donde aparezca el tipo. Déjalo vacío para una etiqueta sencilla.", ca: "Una paraula curta o una inicial que apareix al costat d'aquesta opció, allà on aparegui el tipus. Deixa-ho buit per a una etiqueta senzilla."},
+  // "MARK" AS A NOUN, WHICH IS WHAT THE FIELD IS. The generated catalogue
+  // answers it with the VERB in two of the three — `Markieren` is "to mark" and
+  // `Marcar` is "to mark" — which was survivable while one screen said it and
+  // is not now that four do (the three Choices screens took the word on
+  // 2026-09-10). `Kürzel` is the German for exactly this: a short code standing
+  // for a longer name. Seeded here rather than corrected in
+  // `shared/i18n-catalogue.ts`, which is generated and says so at the top.
+  "Mark": { de: "Kürzel", es: "Distintivo", ca: "Distintiu"},
   "One rate per kind of work.": { de: "Ein Satz pro Art der Arbeit.", es: "Una tarifa por tipo de trabajo.", ca: "Una tarifa per tipus de treball."},
   "One. A step done in two systems has a handoff in the middle of it, and that is two steps.": { de: "Eines. Ein Schritt, der in zwei Systemen ausgeführt wird, hat mittendrin eine Übergabe, und das sind zwei Schritte.", es: "Uno. Un paso realizado en dos sistemas tiene un traspaso en medio, y eso son dos pasos.", ca: "Un. Un pas fet en dos sistemes té un traspàs enmig, i això són dos passos."},
   "Only one rate can be the fallback.": { de: "Nur ein Satz kann der Standardsatz sein.", es: "Solo una tarifa puede ser la predeterminada.", ca: "Només una tarifa pot ser la predeterminada."},
@@ -4336,11 +4350,17 @@ export const SEED: Catalogue = {
    * this app's mouth. Seeded in all three rather than left to the generator so
    * TRANSLATION_CEILING stays at 0/0/0 (R44 — the pin falls and never rises). */
   "Ticket settings": { de: "Ticket-Einstellungen", es: "Ajustes de tickets", ca: "Configuració dels tickets" },
-  "The words and rules this team's tickets run on.": { de: "Die Wörter und Regeln, nach denen die Tickets dieses Teams laufen.", es: "Las palabras y reglas con las que funcionan los tickets de este equipo.", ca: "Les paraules i regles amb què funcionen els tickets d'aquest equip." },
+  /* THREE ENTRIES LEFT THIS BLOCK ON 2026-09-10, with the English they
+   * translated. The page SUBTITLE went on the client's *"in ticket settings
+   * (or any other module) no subtitle"*, and the whole Ticket statuses
+   * SECTION went on her *"remove ticket status, this cannot be adjusted from
+   * the app"* — she is right, nothing in either front door has ever read a
+   * `Ticket status` row for a stage's word. A translation for a sentence the
+   * app no longer says is the rot R28's own orphan clause names: nothing
+   * breaks today, and it becomes a record of what the app USED to say while
+   * being carried on every build. */
   "Ticket types": { de: "Ticket-Typen", es: "Tipos de ticket", ca: "Tipus de ticket" },
   "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.": { de: "Die Arten, als die ein Ticket eröffnet werden kann. Jede ist ein Reiter in der Ticketliste und ein Filter daneben.", es: "Los tipos con los que se puede abrir un ticket. Cada uno es una pestaña en la lista de tickets y un filtro al lado.", ca: "Els tipus amb què es pot obrir un ticket. Cadascun és una pestanya a la llista de tickets i un filtre al costat." },
-  "Ticket statuses": { de: "Ticket-Status", es: "Estados de ticket", ca: "Estats de ticket" },
-  "The words for the stages a ticket moves through. The stages themselves are fixed; what you set here is what each one is called.": { de: "Die Wörter für die Phasen, die ein Ticket durchläuft. Die Phasen selbst sind fest; hier legen Sie fest, wie jede heißt.", es: "Las palabras para las etapas por las que pasa un ticket. Las etapas en sí son fijas; aquí defines cómo se llama cada una.", ca: "Les paraules per a les etapes per les quals passa un ticket. Les etapes en si són fixes; aquí defineixes com es diu cadascuna." },
 
   /* ── The Modules tab's one sentence (client, 2026-09-09) ──────────────────
    * The index on Settings › Modules — *"a tab that says 'Module' or 'Business
@@ -4357,4 +4377,21 @@ export const SEED: Catalogue = {
    * word here. Seeded in all three so TRANSLATION_CEILING stays at 0/0/0
    * (R44 — the pin falls and never rises). */
   "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed.": { de: "Die Module, an denen es etwas einzustellen gibt. Jede Zeile öffnet dieselbe Seite wie das Zahnrad auf der eigenen Seite des Moduls; ein Modul ohne Einstellungen steht nicht in der Liste.", es: "Los módulos con algo que configurar. Cada fila abre la misma página que el engranaje en la pantalla del propio módulo, y un módulo sin nada que configurar no aparece en la lista.", ca: "Els mòduls amb alguna cosa a configurar. Cada fila obre la mateixa pàgina que l'engranatge a la pantalla del mòdul mateix, i un mòdul sense res a configurar no apareix a la llista." },
+  /* ── WHAT THE MEMBERS WALL LEAVES OUT (client, 2026-09-10) ────────────────
+   * *"we should not see cliets in team, no? thats for staff"*. Settings › Team
+   * now shows the agency's own staff, and this is the line that keeps the
+   * subtraction from being silent — how many client logins are not on the wall,
+   * and the screen that owns them. BOTH grammatical numbers are whole sentences
+   * with a hole in them (R28): a count glued to a translated noun is the one
+   * shape a translator cannot reorder, and German, Spanish and Catalan all want
+   * a different verb here.
+   *
+   * THE VOCABULARY IS THE SEED'S OWN. "Mandant" is this agency's word for a
+   * client, lifted from their legacy data at the top of this file, and
+   * "Portalzugang" / "Acceso al portal" / "Accés al portal" is the glossary's
+   * `portalAccess` exactly as it is seeded above — never "Portal login", which
+   * GLOSSARY_SYNONYMS bans by name. Seeded in all three so TRANSLATION_CEILING
+   * stays at 0/0/0 (R44 — the pin falls and never rises). */
+  "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.": { de: "{count} Mandanten-Login wird hier nicht angezeigt. Team zeigt Ihre eigenen Mitarbeitenden; der Portalzugang eines Mandanten steht auf dessen Kontakt.", es: "{count} inicio de sesión de cliente no se muestra aquí. Equipo es tu propio personal; el acceso al portal de un cliente está en su contacto.", ca: "{count} inici de sessió de client no es mostra aquí. Equip és el teu propi personal; l'accés al portal d'un client és al seu contacte." },
+  "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.": { de: "{count} Mandanten-Logins werden hier nicht angezeigt. Team zeigt Ihre eigenen Mitarbeitenden; der Portalzugang eines Mandanten steht auf dessen Kontakt.", es: "{count} inicios de sesión de cliente no se muestran aquí. Equipo es tu propio personal; el acceso al portal de un cliente está en su contacto.", ca: "{count} inicis de sessió de client no es mostren aquí. Equip és el teu propi personal; l'accés al portal d'un client és al seu contacte." },
 }

@@ -246,25 +246,36 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
         </div>
       )}
 
+      {/* ONE BOX, WHATEVER THIS SECTION IS SAYING (R67) — the same change its
+       * neighbour on this tab took the same day (web/components/team/
+       * access-tokens.tsx has the client's ruling and the measured tones). The
+       * connected services stood on soft paper and the error, the skeleton and
+       * the "not set up here" line stood on the page, so the section changed
+       * SHAPE as well as content between states. */}
+      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
       {q.error ? (
-        <ShapeStateBody
-          shape="recordChrome"
-          state="error"
-          copy={{ errorTitle: t("Couldn't load your Google connections.") }}
-          action={
-            <Button variant="secondary" onClick={() => q.refresh()}>
-              {t("Try again")}
-            </Button>
-          }
-        />
+        <div className="p-4">
+          <ShapeStateBody
+            shape="recordChrome"
+            state="error"
+            copy={{ errorTitle: t("Couldn't load your Google connections.") }}
+            action={
+              <Button variant="secondary" onClick={() => q.refresh()}>
+                {t("Try again")}
+              </Button>
+            }
+          />
+        </div>
       ) : q.data === undefined ? (
-        <Skeleton variant="list" lines={4} />
+        <div className="p-4">
+          <Skeleton variant="list" lines={4} />
+        </div>
       ) : !q.data.ready ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-muted-foreground p-4 text-sm">
           {t("Google connections aren't set up on this environment yet.")}
         </p>
       ) : (
-        <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+        <div className="flex flex-col">
           {GOOGLE_SERVICES.map((service) => {
             const live = liveFor(service)
             const named = sources.filter((s) => s.service === service)
@@ -510,6 +521,7 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
           })}
         </div>
       )}
+      </div>
 
       {/* THE ONE SWEEP THAT CANNOT RUN ITSELF. Offered only when there is a live
        * connection to read through and the caller may add to the knowledge base

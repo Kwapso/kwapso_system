@@ -1090,10 +1090,12 @@ class is a Tailwind `rem` step, **text and spacing move together from one number
 is precisely what the iPhone's setting does. No component takes a size prop and no
 component needs one.
 
-Where it lives: `web/components/screens/settings-screen.tsx`, beside `LanguageSection`
-at line 128; and in the portal header beside `ModeToggle`
-(`web-portal/components/portal-shell.tsx:154-155`), because the portal has no settings
-screen by design.
+Where it lives: `web/components/screens/settings-screen.tsx`, in the Appearance tab —
+where, since the client's ruling of 2026-09-10 (*"language shoudl be in settings
+somewhere, not in my porfile"*), `LanguageSection` sits beside it again as the fourth
+card, under `ScaleSection`, `ThemeSection` and `SpineSection`. In the portal it is in the
+header beside `ModeToggle` (`web-portal/components/portal-shell.tsx`), because the portal
+has no settings screen by design.
 
 Evidence: (inferred) from the owner's brief. The mechanism is forced by
 `web-portal/app/globals.css:25-34`, which already changes the whole portal's size by
@@ -1452,9 +1454,11 @@ A band fails when its units are co-located rather than related. Two live example
   says "Showing X of Y" on the same band as a search box and a status Select. The count is
   a *result*, the search and the select are *causes*. Three units, one band, two different
   questions.
-- **Internal rates** (`web/components/money/internal-rate-card.tsx:138`) puts the label, the
-  rate, "Used when unnamed", "Retired", Edit and Retire on one row: two facts, two states
-  and two actions, in one left-to-right sweep.
+- **Internal rates**, a card that was removed on 10 Sep 2026 with the internal rate
+  tables, put the label, the rate, "Used when unnamed", "Retired", Edit and Retire on
+  one row: two facts, two states and two actions, in one left-to-right sweep. The
+  example stays because the mistake is a shape, not a file, and the next card built
+  in a hurry will make it again.
 
 The repair is always the same shape: split the band by the question it answers. Facts on
 one line, state as a badge at the end of that line, actions in the trailing slot or the
@@ -1534,10 +1538,12 @@ and it is countable:
 > of two or more fields**. Nothing else does.
 
 A heading, a paragraph, a single stat, a single action, a callout, an audit footer: bare on
-the page, separated by `gap-6`. Today the app draws **130 border classes across 58 files**,
-plus 6 `divide-y`. The heaviest are `web/components/screens/import-screen.tsx` (9),
+the page, separated by `gap-6`. When this census was taken the app drew **130 border classes
+across 58 files**, plus 6 `divide-y`. The heaviest were `web/components/screens/import-screen.tsx` (9),
 `web/components/process/process-detail.tsx` (8), `web-portal/components/impact-screen.tsx` (7),
-`web/components/shell/app-shell.tsx` (6) and `web/components/money/internal-rate-card.tsx` (5).
+`web/components/shell/app-shell.tsx` (6) and the internal rate card (5) — that last file was
+removed on 10 Sep 2026 with the internal rates, so the two totals above are five classes and
+one file high until somebody re-runs the count.
 Import's review phase draws a bordered card per step inside a bordered plan inside a
 bordered screen, and that is the twisted feeling arriving as geometry.
 
@@ -1590,12 +1596,18 @@ instead:
 
 | Screen | File | Cap | S at 1440 |
 |---|---|---|---|
-| Home | `web/components/screens/home-screen.tsx:32` | `max-w-2xl` (672) | 60% |
-| Settings | `web/components/screens/settings-screen.tsx:89` | `max-w-2xl` | 60% |
-| Profile | `web/components/screens/profile-screen.tsx:58` | `max-w-2xl` | 60% |
-| Invitations | `web/components/screens/invitations-screen.tsx:13` | `max-w-2xl` | 60% |
-| Kwapso | `web/components/screens/kwapso-screen.tsx:65` | `max-w-3xl` (768) | 69% |
-| The shell's own loading skeleton | `web/components/shell/app-shell.tsx:489` | `max-w-2xl` | 60% |
+| Home | `web/components/screens/home-screen.tsx` | `max-w-2xl` (672) | 60% |
+| Settings | `web/components/screens/settings-screen.tsx` | `max-w-2xl` | 60% |
+| Profile | `web/components/screens/profile-screen.tsx` | `max-w-2xl` | 60% |
+| Invitations | `web/components/screens/invitations-screen.tsx` | `max-w-2xl` | 60% |
+| Kwapso | `web/components/screens/kwapso-screen.tsx` | `max-w-3xl` (768) | 69% |
+| The shell's own loading skeleton | `web/components/shell/app-shell.tsx` | `max-w-2xl` | 60% |
+
+**That census is the BEFORE, and it has been acted on: not one of those six caps is on
+disk any more.** The table stays as the evidence the rule was argued from; the line
+numbers it used to carry are gone from it, because a line number is a pointer at a cap
+that no longer exists there and every one of them had already drifted. Read the file
+column as "this screen used to cap itself", not as somewhere to go and look.
 
 The last one is worth its own sentence: the skeleton is 672px wide and the content that
 replaces it is 1120px, so **every cold load of the agency app visibly snaps sideways.**
@@ -1651,11 +1663,16 @@ questions in order.
 wraps to a second line at 1440px is a dropdown.** Wrapping is the control telling you it
 has outgrown its shape.
 
-**This rule predicts the live case.** `shared/web/language-section.tsx:72` renders one
-`Button` per entry in `LANGUAGES`, and `shared/i18n.ts:71-104` holds **29** of them. It
-sets a value, the options are mutually exclusive, there are 29, and they wrap to roughly
-six rows inside the 672px Profile column. Both tests say **dropdown**, and it is the single
-worst band in either front door (H=29, against a budget of 4).
+**This rule predicted the live case, and the live case has since been fixed.** When it was
+written, `shared/web/language-section.tsx` rendered one `Button` per entry in `LANGUAGES`,
+and `shared/i18n.ts` holds **29** of them. It sets a value, the options are mutually
+exclusive, there are 29, and they wrapped to roughly six rows inside the 672px column the
+switcher then sat in. Both tests said **dropdown**, and it was the single worst band in
+either front door (H=29, against a budget of 4). It is the library `Select` today, and
+`web/test/language-switcher.test.tsx` holds it there — a `Button` import back in that file
+turns the build red. The section itself now lives in Settings › Appearance, not on the
+profile page (client, 2026-09-10: *"language shoudl be in settings somewhere, not in my
+porfile"*).
 
 **The objection in that file's own header comment is real, and the rule answers it.** It
 says a dropdown "makes somebody who cannot read the current language hunt for the control
@@ -1856,7 +1873,7 @@ ruling before they are implemented. The last two are settled, and the row says h
 | [F3](#f3-the-separator-becomes-the-action-bars-top-edge) | `shared/web/form-shell.tsx:43-53`, an 11-line comment defending `pt-6` as "the ONE value that governs it everywhere" | The comment documents the exact bug being fixed. Replace the value with a structure that cannot have the bug, and replace the comment with one sentence saying so. |
 | [N5](#n5-the-surface-step-is-measured-not-assumed) | [C2](#c2-cards-have-no-border-no-shadow-and-no-hover-animation) and "Do not do" #5, both of which said a card has no border | **SETTLED 18 Aug 2026 by measurement, not by preference.** The light theme's page-to-card step is ΔL\* 3.22, below the threshold at which two flat surfaces read as separate; the dark theme's is 10.32. A borderless card is therefore invisible in light mode, which is exactly the difference the owner reported between the two themes. The card keeps its hairline; the no-shadow rule is untouched. Delete this row and restore C2 the day a theme change raises the light step past ΔL\* 8. |
 | [C2](#c2-cards-have-no-border-no-shadow-and-no-hover-animation) — the hover clause | `Card`'s base class, which used to carry `hover-lift`, and `hover-lift-none`, which used to turn it off | **SETTLED 25 Aug 2026 BY THE DEFAULT MOVING, not by a preference changing.** C2's "no hover animation" was a rule about an inherited default: every card lifted, so the rule was to switch it off, and the opt-out was the mechanism. The kwapso kit ships a still card and an `interactive` prop, so the default is already what C2 wanted and the opt-out no longer exists. A card that lifts now does so because a call site asked, which is the case C2 never legislated. Delete this row if a future kit makes lift the default again. |
-| [N10](#n10-the-control-follows-the-option-count) | `shared/web/language-section.tsx:5-11`, whose header comment argues AGAINST a dropdown | The comment's objection is about a dropdown showing a language CODE, and it is right about that. N10 answers it with a named exception rather than by overruling it: the trigger shows the flag and the language's own name for itself, and the menu is searchable. The portal already ships that control. |
+| [N10](#n10-the-control-follows-the-option-count) | `shared/web/language-section.tsx`, whose header comment argued AGAINST a dropdown at the time (it records the reversal now) | The comment's objection is about a dropdown showing a language CODE, and it is right about that. N10 answers it with a named exception rather than by overruling it: the trigger shows the flag and the language's own name for itself, and the menu is searchable. The portal already ships that control. |
 
 One more, not a conflict but worth a decision: [T1](#t1-one-heading-scale-per-front-door)
 moves 26 headings from `font-semibold` to `font-medium` because the brand ships no 600

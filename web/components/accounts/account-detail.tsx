@@ -1,19 +1,21 @@
 "use client"
 
 // Account detail — one COMPANY at /accounts/<id>, as a tabbed record:
-// Overview / its work / Rates / Knowledge. Its history is not the last tab any
+// Overview / its work / Knowledge. A RATES TAB stood between them until
+// 10 Sep 2026 — what this client was charged per hour — and went at the client's
+// own ruling ("the whole account rates also killed it"). Its history is not the last tab any
 // more — it is reached from the ink footer's Latest activity column, on the
 // client's 2026-09-06 ruling; web/components/records/activity-panel.tsx carries the
 // ruling and the argument.
 // Host-composed, because most of those tabs are collections with their own
-// actions — link a person, add an app, deactivate a rate — and no engine block draws
+// actions — link a person, add an app, ask for an input — and no engine block draws
 // those. Those list bodies live next door in account-detail-panels.tsx; this file
 // owns the record itself — its data, its rights, its tabs and counts, its
 // dialogs, and the one confirm they all share.
 //
 // A PERSON GETS A DIFFERENT SCREEN. Companies and people are one table (SCOPE
-// ch.03) and were, until now, one screen — which drew a human being with sprints,
-// a rate card and a Contacts tab of their own. This file reads the record and
+// ch.03) and were, until now, one screen — which drew a human being with sprints
+// and a Contacts tab of their own. This file reads the record and
 // hands an individual straight to contact-detail.tsx: one door, one read, two
 // screens. What splits is the SCREEN and the PERMISSION, never the table.
 //
@@ -66,13 +68,10 @@ import { ClientOrgPanel } from "@/components/accounts/client-org-panel"
 import { PencilSimple, Power } from "@shared/ui/foundations/icons"
 import { Badge } from "@shared/ui/components/badge/badge"
 
-import type { AccountDetail, AccountRate, AppRow } from "@shared/types"
-import { SAVINGS_CAPTION, savedHours, type SavingsView } from "@shared/workers/savings"
+import type { AccountDetail, AppRow } from "@shared/types"
+import { type SavingsView } from "@shared/workers/savings"
 import { RecordCover, RecordMark } from "@shared/web/record-mark"
-import { moneyText } from "@shared/web/money"
 import { AccountFormDialog, type AccountFormValues } from "@/components/accounts/account-form-dialog"
-import { AccountRateCard } from "@/components/money/account-rate-card"
-import { MarginPanel } from "@/components/money/margin-panel"
 import { ContactsPanel, type PanelActions } from "@/components/accounts/account-detail-panels"
 import {
   ContactCreateDialog,
@@ -106,7 +105,6 @@ import {
   accountsKey,
   appsKey,
   listFetch,
-  ratesKey,
   sprintsKey,
   todosKey,
   totalKey,
@@ -114,7 +112,7 @@ import {
 import { softNavigate } from "@/lib/nav"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
-import { invalidate, primeCache, useCached, useCachedValue } from "@shared/web/store"
+import { invalidate, useCached, useCachedValue } from "@shared/web/store"
 import { WaveCollection } from "@/components/work/waves-screen"
 import { useRecordActivity } from "@/lib/use-record-activity"
 import { useRecordCounts } from "@/lib/use-record-counts"
@@ -210,23 +208,16 @@ export function AccountDetailScreen({
   const canSeeTodos = can("todos", "read")
   const canAskTodo = can("todos", "create")
   const canCancelTodo = can("todos", "delete")
-  // WHAT THIS CLIENT IS CHARGED. A second module on the same record, like the
-  // logins above: reading a phone number and seeing a price are different sized
-  // decisions, so `commercials` is its own gate and the tab simply is not there
-  // for a role without it. (The agency's OWN cost card is a different screen in
-  // a different file — R24; see internal-rate-card.tsx.)
-  const canSeeRates = can("commercials", "read")
-  // The client's own rate card — read only to turn the hours above into money,
-  // and only for a role that may see prices at all. It is the same cache the
-  // Rates tab fills, so opening that tab costs nothing afterwards.
-  const ratesQ = useCached<AccountRate[]>(
-    can("commercials", "read") ? ratesKey(accountId) : null,
-    () =>
-      tenancy.accountRates(accountId).then((r) => {
-        primeCache(totalKey("account-rates", accountId), r.total)
-        return r.rates
-      })
-  )
+  // A RATES TAB STOOD HERE, gated on `commercials:read` — what this client was
+  // charged per hour, by kind of work — with the rate card itself as its only
+  // panel. The client retired it on 10 Sep 2026: "the whole account rates also
+  // killed it". The margin panel that used to sit under the card had gone an
+  // hour earlier with the internal rates, so the tab lost its last body and the
+  // tab went with it rather than being left drawing nothing.
+  //
+  // The read that fed it lived here too, because the Overview needed the
+  // headline rate to price the hours — see the note where `moneyBack` used to be
+  // computed, below.
 
   // THE BADGES, BEFORE THE CLICK. One bounded read of every child total on this
   // record, primed into the same sidecars below — so a tab with work behind it
@@ -245,7 +236,6 @@ export function AccountDetailScreen({
   // through the same badge door as every other tab (R16).
   const wavesTotal = useCachedValue<number | null>(totalKey("waves-account", accountId))
   const todosTotal = useCachedValue<number | null>(totalKey("todos-account", accountId))
-  const ratesTotal = useCachedValue<number | null>(totalKey("account-rates", accountId))
 
   // The one deep-linkable tab. `?tab=organisation` is what the step form's
   // "add or edit their roles and tools" link carries — the management surface
@@ -431,18 +421,24 @@ export function AccountDetailScreen({
     )
 
 
-  // WHAT THE HOURS ARE WORTH, at this client's own agreed rate. `null` when
-  // there is no rate card yet (or the role may not see one), which is the honest
-  // answer: an hours figure without a price beside it is still true, and a price
-  // invented from a default rate is the kind of number that costs the whole
-  // screen its credit. The FIRST live rate is the client's headline rate — the
-  // rate card itself is the breakdown, one tab along.
-  const headlineRate = (ratesQ.data ?? []).find((r) => r.active) ?? null
-  const savedSeconds = valueQ.data?.savedSecondsPerMonth ?? 0
-  const moneyBack =
-    headlineRate && savedSeconds > 0
-      ? moneyText(Math.round(savedHours(savedSeconds) * headlineRate.centsPerHour), headlineRate.currency)
-      : null
+  // WHAT THE HOURS WERE WORTH stood here until 10 Sep 2026: the drill-down's own
+  // saved hours multiplied by the FIRST live line of this client's rate card,
+  // rendered as a "Money given back, every month" panel on the Impact tab.
+  //
+  // IT COULD NOT SURVIVE THE LOSS OF ITS INPUT. The client retired the rate card
+  // ("the whole account rates also killed it"), and there is no other number in
+  // this base that answers the same question — what WE would charge for the
+  // hours we gave back.
+  //
+  // IT WAS NOT RE-POINTED, AND THE REFUSAL IS THE POINT. `SavingsView` already
+  // carries `savedCentsPerMonth`, the same hours priced at the CLIENT'S OWN role
+  // rate frozen onto each step, and swapping one in for the other would have kept
+  // the panel alive under the same heading while silently changing what the
+  // number MEANS — from "what this is worth to us" to "what it used to cost
+  // them". This app has been bitten by exactly that once (lib/processes.ts
+  // records the day two arithmetics disagreed on the owner's own screen:
+  // €2,766.35 on the map, 0.00 one tab over). Showing the client-side figure here
+  // is a product decision and it is hers, not this lane's.
 
   const where = [account.street, account.postalCode, account.city, account.country]
     .filter(Boolean)
@@ -549,19 +545,6 @@ export function AccountDetailScreen({
               label: t("Inputs"),
               icon: CONCEPT_ICON.todos,
               badge: formatCount(todosTotal),
-              badgeVariant: "" as const,
-            },
-          ]
-        : []),
-      ...(canSeeRates
-        ? [
-            {
-              value: "rates",
-              label: t("Rates"),
-              icon: CONCEPT_ICON["internal-rates"],
-              // R8/R16: the tab reveals a collection, so it carries that
-              // collection's exact server total through the one seam.
-              badge: formatCount(ratesTotal),
               badgeVariant: "" as const,
             },
           ]
@@ -767,21 +750,11 @@ export function AccountDetailScreen({
           if (tabItem.value === "impact")
             return (
               <div className="flex flex-col gap-4">
+                {/* A MONEY PANEL SAT UNDER THIS until 10 Sep 2026 — the same
+                    hours multiplied by this client's agreed rate, with R25's
+                    caption beside it. It went with the rate card it multiplied
+                    by; see the note where `moneyBack` was computed, above. */}
                 <ImpactPanel view={valueQ.data} />
-                {/* THE SAME HOURS, IN MONEY. Not a second calculation — it is the
-                    drill-down's own total multiplied by what this client agreed
-                    to pay for an hour of the work, which is why it is only shown
-                    when there IS a rate card to multiply by. The caption comes
-                    with it (R25) for exactly the reason it comes with the hours:
-                    a figure a client cannot account for is worse than no figure
-                    at all. */}
-                {moneyBack && (
-                  <div className="rounded-[var(--radius)] bg-surface-panel p-4">
-                    <p className="text-muted-foreground text-sm">{t("Money given back, every month")}</p>
-                    <p className="text-2xl font-medium tabular-nums">{moneyBack}</p>
-                    <p className="text-muted-foreground mt-2 text-xs">{SAVINGS_CAPTION}</p>
-                  </div>
-                )}
               </div>
             )
 
@@ -849,35 +822,6 @@ export function AccountDetailScreen({
                   .filter(Boolean)
                   .join(", ")}
               />
-            )
-
-          // WHAT WE CHARGE THEM. The door answers about ONE account, so the rows
-          // and the badge above are the same narrowed question — never a page of
-          // every account's prices filtered in the browser.
-          //
-          // AND WHAT WE KEEP, under it. The margin door has computed revenue
-          // minus our time minus tool costs since the money went in, and until
-          // now nothing rendered it — an answer with no question attached. It
-          // belongs here rather than on a page of its own: "what do we charge
-          // them" and "what does that leave us" are one thought.
-          //
-          // Both are inside `commercials: read`, which is the same gate the two
-          // doors open with — and the margin door additionally refuses a portal
-          // caller outright, so this tab cannot leak our own cost even to a
-          // client who reached the agency origin (R24).
-          if (tabItem.value === "rates")
-            return (
-              <div className="flex flex-col gap-6">
-                <AccountRateCard
-                  accountId={accountId}
-                  accountName={account.name}
-                  canCreate={can("commercials", "create")}
-                  canEdit={can("commercials", "edit")}
-                  canDeactivate={can("commercials", "delete")}
-                  actions={actions}
-                />
-                <MarginPanel teamId={teamId} accountId={accountId} accountName={account.name} />
-              </div>
             )
 
           // EVERY TAB ABOVE HAS ITS OWN BRANCH, so this is unreachable — kept

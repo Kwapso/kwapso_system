@@ -77,9 +77,13 @@ const SHAPER_ROOTS = [
  *
  * The money/hours half has no offender today and is here as the tripwire: the
  * day somebody puts `moneyText(row.cents)` in a sortable column, "€1,240.00"
- * sorts below "€90.00" and this test says so before a person has to notice it. */
+ * sorts below "€90.00" and this test says so before a person has to notice it.
+ *
+ * `rateText` was named here too and left on 10 Sep 2026 with the rate cards it
+ * formatted — a name in this list that resolves to no function is a tripwire
+ * wired to nothing, and `moneyText` covers the identical failure. */
 const FORMATTER =
-  /\b(formatDate|formatDateTime|formatDayMonth|formatMonth|formatTime|formatRelative|moneyText|rateText|hoursText|minutesText)\s*\(/
+  /\b(formatDate|formatDateTime|formatDayMonth|formatMonth|formatTime|formatRelative|moneyText|hoursText|minutesText)\s*\(/
 
 /** `someKey: <something that calls a formatter>` — a row property built from a
  * formatted value. Anchored to the property name so the key can be read off it,

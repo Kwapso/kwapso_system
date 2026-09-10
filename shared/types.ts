@@ -1502,31 +1502,25 @@ export type KnowledgeAnswer = {
 }
 
 // ── Process maps, versions and the money (SCOPE ch.02 · .plans/BUILD-3) ───────
-// App → Process → Step, and the two rate cards. The one rule these shapes carry
-// on their face: an INTERNAL number (what our own hour costs, what an app costs
-// us to run, what a margin is) is a separate type from anything the client side
-// can ask for — never an optional field on a shared one. See R24.
+// App → Process → Step, and what a map is worth. THERE WERE THREE RATE CARDS
+// HERE and on 10 Sep 2026 there were none. `InternalRate` (what a kind of our
+// own work cost us) and `RoleRate` (what an hour of one of our roles was worth)
+// went first — "kill the whole internal rates thing … for now i iwanna wipe it
+// clean" — and `AccountRate` (what a CLIENT was charged, by kind of work) went
+// an hour later, at the same person's second ruling: "the whole account rates
+// also killed it".
+//
+// Each was its own type rather than a `kind` field on one, so that no wrong
+// filter could turn one into the other. That care is worth recording even though
+// all three are gone: the reason there was never a `Rate` type with an audience
+// on it is the reason removing one of them did not risk the others.
+//
+// WHAT IS LEFT IS NOT A CARD. An hourly figure still exists in this base — on a
+// CLIENT'S OWN ROLE (`client_roles.cents_per_hour`, what their staff cost THEM,
+// frozen onto each step of a map when it was drawn) — and a sprint still carries
+// what it was sold for. Neither is a card the book is costed from; both are
+// facts about one client's own world.
 
-/** WHAT AN HOUR OF A ROLE COSTS (CHECKLIST 8.13). The third rate card, and the
- * second INTERNAL one: `AccountRate` is what a client is charged, `InternalRate`
- * is what a kind of our own work costs us, and this is what an hour of a KIND OF
- * PERSON is worth — the number Aurora's savings model multiplies hours by.
- *
- * Its own type rather than a flag on `InternalRate`, for the reason those two are
- * already two types: one shape with a discriminator is one wrong filter away
- * from showing a client a number about us. */
-export type RoleRate = {
-  id: string
-  /** the role, in the team's own words. Free text: the person who does a
-   * client's invoicing is THEIR bookkeeper, not one of our logins. */
-  roleName: string
-  centsPerHour: number
-  active: boolean
-  createdAt: string
-  createdByName: string | null
-  updatedAt: string | null
-  editedByName: string | null
-}
 
 /** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
  * The money is the ONE savings seam's own arithmetic (shared/workers/savings):
@@ -1870,39 +1864,6 @@ export type ProcessComment = {
   createdByName: string | null
 }
 
-/** What an account is CHARGED per hour, by kind of work. A client may be shown
- * this when their price visibility is switched on. */
-export type AccountRate = {
-  id: string
-  accountId: string
-  label: string
-  centsPerHour: number
-  currency: string | null
-  active: boolean
-  createdAt?: string | null
-  createdByName?: string | null
-  updatedAt?: string | null
-  editedByName?: string | null
-}
-
-/** What an hour of OUR work costs US. A separate type from AccountRate on
- * purpose: the two are the same shape and opposite audiences, and one type with
- * a `kind` field is one wrong filter away from the figure SCOPE says a client
- * must never see. No shape the client side can ask for carries one of these. */
-export type InternalRate = {
-  id: string
-  label: string
-  centsPerHour: number
-  currency: string | null
-  /** the rate a margin applies to an hour of logged time whose kind of work the
-   * work log does not yet name. At most one, enforced by a partial unique index. */
-  isDefault: boolean
-  active: boolean
-  createdAt?: string | null
-  createdByName?: string | null
-  updatedAt?: string | null
-  editedByName?: string | null
-}
 
 /* ─────────────────────────── the work engine ─────────────────────────────── */
 // A ticket is what an account ASKS FOR; a story is one piece of work WE DO about
@@ -1983,9 +1944,11 @@ export type Story = {
   editedByName: string | null
 }
 
-/** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price, which
- * is the revenue half of the margin (workers/tenancy/src/lib/internal-money.ts
- * reads it and never writes it). Whole cents, like every money column here. */
+/** A BLOCK OF DELIVERY WORK SOLD TO ONE ACCOUNT. It carries the flat price. It
+ * used to be the revenue half of the agency's margin, which was retired with the
+ * internal rates on 10 Sep 2026; what reads it now is the client's own value
+ * screen, behind their account's price-visibility switch. Whole cents, like every
+ * money column here. */
 export type Sprint = {
   id: string
   ref: string | null

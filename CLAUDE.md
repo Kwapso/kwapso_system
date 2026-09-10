@@ -35,16 +35,24 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
 - **Agent/MCP body-field parity (R22)**. R19's sentence about the other half of the request. A tool on a WRITE door exposes and forwards every field that door reads off the **body**, derived from the door's own `body.<field>` reads and proved by RUNNING the tool's `buildBody`, not by reading it. R19 inspected only the query string, so four write tools offered a narrower contract than their door accepted for six weeks under a green build. (`agent-body-parity`)
 - **An answer from the knowledge base carries its sources (R23).** Retrieval never writes prose, it hands back the passages and the sources they came from, and the assistant composes the reply with those in front of it. `found`, `passages` and `citations` are ONE decision in ONE seam (`knowledgeAnswer`): no citation means no passage and a sentence the assistant must say instead of inventing one. No door assembles that response by hand, the same shape as R14's `pagedJson`. The compartment searched, and the REASONING that chose it, ride the same object. (`cited-answers`)
 
-- **An internal number cannot reach the client's side (R24).** What our own hour costs
-  (`internal_rates`) and the margin computed from it live in ONE file,
-  `workers/tenancy/src/lib/internal-money.ts`, and the check DERIVES the doors that call
-  into it from that file's own exports: none of them is on the portal gateway's surface,
-  every one opens with `refusePortalCaller`, and nothing in `web-portal/` names the
-  internal table or those doors. SCOPE's ruling has no exceptions clause, so the defence
-  is not a condition somebody can invert: a condition can be inverted and a permission can
-  be granted, an import cannot be forgotten. The ACCOUNT rate card (what a client *is
-  charged*) is a separate table and a separate file for the same reason.
-  (`internal-money-never-in-portal`)
+- **A conversation that has read a WITHHELD figure may not then write where the
+  client reads (R24).** Per turn, refused at the step, before the door is called.
+  `GET /api/tenancy/app-money` hands over what one app gives back priced in FULL,
+  where the client's own value door nulls those prices on any app whose account
+  has price visibility switched off — so it is still a number a particular client
+  may be forbidden to see, and a ticket reply is how it would leave. Both door
+  sets are derived, and MCP refuses the money door outright because one
+  `tools/call` has no turn to taint.
+  **THE INBOUND HALF OF THIS LAW WAS RETIRED ON 10 SEP 2026.** R24 was written
+  about `internal_rates` — what our own hour cost us, and the margin computed
+  from it, in ONE file nothing a client login could reach imported. The client
+  killed the whole feature ("kill the whole internal rates thing … for now i
+  iwanna wipe it clean"), and it was retired rather than re-pointed because
+  nothing structurally fenced is left: every surviving money surface is shown to
+  a client deliberately, behind their account's price-visibility switch, and this
+  law's doctrine is "not conditional". RULES.md's R24 row carries the full
+  account, including which suites were re-pointed and which were retired.
+  (`money-taint-outbound`)
 - **The vector index NARROWS; the team's database DECIDES (R26).** The knowledge
   base searches ONE account-wide Vectorize index, so two properties that used to
   be free are bought back explicitly. Tenancy is a PARTITION, every call passes
@@ -113,9 +121,12 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   loading skeleton, under a green build, because a width is invisible to every other
   check here. (`one-page-width`. UI-RULEBOOK N8)
 - **Two radii, one named exception, and no third box (R31).** A rectangular
-  surface is `rounded-[var(--radius)]`, a pill is `rounded-pill`, and a sheet that meets the
-  bottom of the screen is `rounded-t-[var(--radius)]` — five spellings of one value were five
-  decisions where there is one. Bare `rounded` is 4px and is deliberately outside
+  surface is `rounded-[var(--radius)]`, a pill is `rounded-pill`, and one EDGE of the first is
+  `rounded-t-[var(--radius)]` — five spellings of one value were five
+  decisions where there is one. The law constrains the VALUE and never the position; the prose
+  keeps the list of positions that draw one, and it names two: a sheet that meets the bottom of
+  the screen, and (2026-09-10) the top band of a pinned toolbar, which carries its container's
+  own top corners with it once the container's real top edge has scrolled away (R63 part 4). Bare `rounded` is 4px and is deliberately outside
   the rule. **The exception is `rounded-select` (6px), on the mark of a selection
   control**, because at `rounded-[var(--radius)]` a checkbox is a lozenge and at
   `rounded-pill` it is a radio button; the design kit rules exactly this and
@@ -169,7 +180,11 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   FILE and never a line of copy, so for a year "use those words in UI copy;
   never invent a synonym" was enforced by nobody — and the app shipped green
   calling one thing "Permissions" on the Roles screen and "access rights" on two
-  others, plus "teammate", "cost card" and "Portal login". So every user-visible
+  others, plus "teammate", "cost card" (for the internal rates, since removed —
+  the deny-list line was re-pointed at the account rate card, and then deleted
+  when that was retired too on 10 Sep 2026: a banned synonym needs a glossary
+  term to compete with, and there is no rate card left in this product) and
+  "Portal login". So every user-visible
   English sentence (`shared/i18n-strings.json`, which R28 makes exactly that set)
   is read for a known synonym, from a NARROW deny-list that is data
   (`GLOSSARY_SYNONYMS`) with reasoned, rot-checked exemptions. Narrow on purpose:
@@ -268,9 +283,13 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   global core database. The first draft asked only "is it reachable at all" and
   came back 21 of 22 green, which is why the failure was invisible: a tool
   answers when the model knows to call it, and a vague question reaches the
-  corpus. The money settles the shape — internal rates and the margin are
-  reachable by tool on the R24-fenced doors and must never sit in a corpus that
-  has one gate and cannot fence per module. (`assistant-coverage`)
+  corpus. The money settles the shape — what a
+  client's apps give back, priced, is reachable by tool on a door that refuses a
+  client login, and must never sit in a corpus that has one gate and cannot fence
+  per module, because whether a client may see a price is a per-ACCOUNT switch a
+  passage cannot carry. (The example has narrowed twice in one day: it was the
+  internal rates and the margin, which were removed on 10 Sep 2026, then what a
+  client is charged, which was removed an hour later.) (`assistant-coverage`)
 - **The toolbar, search included, is a default — never a per-screen choice
   (R48).** Every collection/data-view screen shows a search box UNLESS a
   named, reasoned entry says otherwise. Every `BASE_RECIPES` entry with a
@@ -373,6 +392,38 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   noise. Written while the index holds ONE row, which is the cheapest moment
   to satisfy it and the last moment at which it is still free.
   (`module-settings-two-doors`)
+- **A pictograph is not a word, and not a mark either (R66).** The client's
+  ruling, said three times — *"i said no emojis. why are there still emojis?
+  kill them!"* (2026-08-31), *"for type, kill the emojis. this is legacy. in
+  current system we use colors"* (2026-09-07), *"also kill emojis!!!"*
+  (2026-09-10) — and until the third the whole defence was ONE write door
+  (`optionalMark`) on ONE kind of field. No emoji in the words a person reads or
+  in the data behind them. WHAT COUNTS AS ONE IS THE DOOR'S OWN ANSWER,
+  IMPORTED: the check CALLS `optionalMark` rather than carrying a codepoint
+  table, so law and door cannot drift, and the typographic dingbats this app and
+  the pinned kit legitimately draw (a close ✕, a department's ★) are not caught.
+  Four targets, four oracles: `shared/i18n-strings.json` (which R28 makes
+  exactly the set of user-visible English sentences, so the copy half is covered
+  without a walk of its own), the two translation files, the VOCABULARY DATA
+  (the team seed and the migration ledger that back-fill `selectable_data`, plus
+  the shared tables whose rows carry a `mark` — the half a copy census cannot
+  see, because a mark is data), and `shared/i18n.ts`, the one file that renders
+  a pictograph on purpose. Earned because the August ruling WAS answered and
+  could not land: every one of the eight back-fill statements in migrations 0034
+  and 0044 is guarded `AND mark IS NULL`, so not one of them could ever have
+  replaced a pictograph — they filled the empty marks and stepped over exactly
+  the rows the ruling was about. Source COMMENTS are deliberately out: 28 of the
+  32 in this repo are the client's own words quoted beside the change they
+  caused. **The exemption is a CLASS, not a list** — her fourth ruling,
+  2026-09-10: *"Keep emojis for countries and languages only."* A pictograph
+  passes when it is a FLAG (Unicode: a pair of Regional_Indicator characters)
+  naming a region ICU's own table recognises (`Intl.DisplayNames`), and the
+  language half is asserted off `LANGUAGES` itself, because there is no language
+  pictograph — a language is drawn by the flag of a country that speaks it. A
+  lone regional indicator, a pair naming no country and every other glyph are
+  still refused, and `optionalMark` was NOT widened, so the write door still
+  refuses a flag too. `EMOJI_OK` survives, empty, for a pictograph that is the
+  content and is not a flag. (`no-emoji-in-copy`)
 - **The collection toolbar stays on top, and the pin is the row's (R63).**
   The client's ruling, 2026-09-10: *"on scroll down, i also want the toolbar
   to be on top all time visible. everywhere."* R48 made the search box a
@@ -391,7 +442,13 @@ The laws live in **[RULES.md](RULES.md)** (the human law-book) and are pinned to
   furniture no taller than itself pins nowhere (32px of range on the tickets
   Dashboard, against 3,011 on Accounts) — the pin moves out to the box; and
   two pinned toolbars on one collection land in the same band, so a
-  container that already holds a pin stands the nested one down.
+  container that already holds a pin stands the nested one down. The
+  CONTAINER'S own top band pins with the row (`--pinned-lead`) and keeps
+  its ROUNDED TOP CORNERS (`--pinned-inset-x` reaches the container's
+  border box, `--pinned-behind` fills the corner notch with what is behind
+  the container, captured on the container's PARENT because the container
+  itself already overwrote it) — her second and third sentences the same
+  day, the last of them "when pin, i still want it round".
   (`pinned-toolbar`)
 - **A section on the team area's strip has a door, or names the screen
   that took its place (R64).** R40 asks whether a stored FILE reaches a
@@ -423,7 +480,7 @@ A law cannot be added without its check (`registry-integrity`). When you add a r
 Answer these seven, in order, *before* you write code. It's the thinking that keeps a change in-rule and lean, the antidote to the failure mode that bit us (a change that looked fine but broke an unstated invariant, or rebuilt a seam that already existed).
 
 1. **Say it in one glossary sentence.** What changes, in [the glossary's](shared/glossary.ts) words. Never a synonym. No word for it yet? That's a glossary decision first (Law R6).
-2. **Which Laws bite?** Walk R1–R64: a bespoke toolbar (`<ToolbarRow>`) → its gap to the content below it is the row's own baked-in margin, never a per-screen wrapper (R49), and it draws NOTHING AT ALL — search, filters, sort, view or its own create button — while the collection it narrows holds zero rows, through the row's own required `empty` prop rather than a per-slot gate a caller can forget (R50) — and the collection BELOW it draws its two zeros through ONE register, `CollectionEmptyState` (agency) or `PortalEmpty` (portal) with `filtered`, so an empty RESULT is the same body as an empty COLLECTION minus the add button, and the subtraction happens inside the component rather than at the call site (R62), and its sort and view controls are CONFIGS the row builds rather than nodes a call site can hand to the wrong slot — with a `sort` on every call site or a reasoned `TOOLBAR_SORT_EXEMPT` line (R53), and it STAYS ON TOP while the rows scroll under it — `PINNED_TOOLBAR`, which the row already wears, so the only two things a screen can get wrong are boxing the row in furniture no taller than itself (sticky is bounded by its containing block, and a row that pins nowhere looks exactly like one that works) and leaving the gap below it as a flex `gap` rather than padding inside the pinned box (R63); it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read, or real keyset paging if it GROWS (R14), and an exact, once-only count through the one seam (R16), and any screen showing ONE of its records reads that record BY ID rather than finding it in the loaded page (R38); shows a RECORD anywhere — a picker option, a collection row, a row nested inside another record's screen — it carries that record's own face (R35); it draws ANYTHING → the control, the glyph and the toast come from the kit and no other package (R39); it STORES A FILE → the field it lands on is claimed in `STORED_FILES` and rendered by a real screen, an `href`/`src`/`picture` and never a form value (R40); it lets somebody PICK a file before the record exists → the create call site hands the new id back, or the file is dropped in silence (R41); a screen → ONE page width, and the pin deleted by the commit that fixes it (R29), `rounded-[var(--radius)]` or `rounded-pill` and no third radius (R31), and every colour through a token and never a Tailwind ramp or a hex (R32); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), a description whose every backticked identifier names something real (R27), the confirm rule, and — if it adds a tool to one machine surface only — a named reason on the other, or the missing tool wired (R43); calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26); it READS A FILE INTO the knowledge base → both doors ask the one reader table, or refuse honestly and say so (R42); it draws a screen from the vendored kit's `compositions/` → that exact composition is either adopted for real or has a reasoned, rot-checked exemption on file, never left undecided (R45); it uses any of the kit's `components/` or `foundations/` → that exact part is either REACHED for real — directly, through another adopted part, or through a CSS `@import` a JS-only census cannot see — or has a reasoned, rot-checked exemption on file (R46); **it sends a person an email → that send is classified in the census, and if it names a record it carries a button to it, at the recipient's OWN front door (R30)**; **says a single word to a person → that sentence is in the catalogue (R28), which means running `node scripts/i18n-extract.mjs` before you commit, AND the place it is said asks for its translation (R33): `t("…")` at the position, or a field config rendered through `shared/web/field.tsx`, AND it uses the glossary's word rather than a synonym for it (R34), AND — if you also TRANSLATE it — the ceiling in `TRANSLATION_CEILING` moves down with the count and never up (R44)**. it reads a cache key → that component asks that door ONCE (R56): the store dedupes a repeated KEY so a second read of one buys nothing, and two different keys on one door is a real second request that needs a reasoned `TWO_READS_ONE_DOOR` line; it adds a COMPONENT → it joins a module or kind folder that `web/components/README.md` describes, and never the top level (R57); it NAMES a path — in a document, in a comment, in a string — → that path opens, or a reasoned `GONE_ON_PURPOSE` line says it is named because it is gone (R58). it draws a MODAL → a form, an editor or a picker slides in (the kit's `Sheet`, which becomes the bottom sheet below 45rem), and only a yes/no warning is a centred overlay, which is an `AlertDialog`; a bare `<Dialog>` needs a reasoned `CENTRED_DIALOG_OK` line and may not collect anything (R59). it draws an IMAGE → it fills its box, `object-cover` and never `object-contain` (nor a `fit="contain"` handed to the kit's `Image`), with a reasoned `OBJECT_FIT_OK` line the only way out (R60); it gives a module its own SETTINGS → one entry in `MODULE_SETTINGS` and one `<ModuleSettingsGear segment="…">` on that module's own screen, and nothing else: the Modules tab's row is derived from the same table and the gate is asked once, in `visibleModuleSettings` (R61); it takes a section OFF the "This team" list — the app's one entrance to the team area — → a `SECTION_HOSTED_ELSEWHERE` line names the reachable screen that carries its material, and that screen really makes the door call each of the section's acts dispatches (R64). Name them now, not in review. Name them now, not in review.
+2. **Which Laws bite?** Walk R1–R67: a bespoke toolbar (`<ToolbarRow>`) → its gap to the content below it is the row's own baked-in margin, never a per-screen wrapper (R49), and it draws NOTHING AT ALL — search, filters, sort, view or its own create button — while the collection it narrows holds zero rows, through the row's own required `empty` prop rather than a per-slot gate a caller can forget (R50) — and the collection BELOW it draws its two zeros through ONE register, `CollectionEmptyState` (agency) or `PortalEmpty` (portal) with `filtered`, so an empty RESULT is the same body as an empty COLLECTION minus the add button, and the subtraction happens inside the component rather than at the call site (R62), and its sort and view controls are CONFIGS the row builds rather than nodes a call site can hand to the wrong slot — with a `sort` on every call site or a reasoned `TOOLBAR_SORT_EXEMPT` line (R53), and it STAYS ON TOP while the rows scroll under it — `PINNED_TOOLBAR`, which the row already wears, so the only two things a screen can get wrong are boxing the row in furniture no taller than itself (sticky is bounded by its containing block, and a row that pins nowhere looks exactly like one that works) and leaving the gap below it as a flex `gap` rather than padding inside the pinned box (R63); it reads a request body → every field through the validation seam, positionally (R20); a client login could reach it at the agency origin → it decides about portal callers at the door (R21); it mutates → gate (R10) + publish (R1) + a reachable listener (R15); renders a form → FormShell (R4) + draft (R7); a collection → tabs (R2/R3/R8), a bounded read, or real keyset paging if it GROWS (R14), and an exact, once-only count through the one seam (R16), and any screen showing ONE of its records reads that record BY ID rather than finding it in the loaded page (R38); shows a RECORD anywhere — a picker option, a collection row, a row nested inside another record's screen — it carries that record's own face (R35); it draws ANYTHING → the control, the glyph and the toast come from the kit and no other package (R39); it STORES A FILE → the field it lands on is claimed in `STORED_FILES` and rendered by a real screen, an `href`/`src`/`picture` and never a form value (R40); it lets somebody PICK a file before the record exists → the create call site hands the new id back, or the file is dropped in silence (R41); a screen → ONE page width, and the pin deleted by the commit that fixes it (R29), `rounded-[var(--radius)]` or `rounded-pill` and no third radius (R31), and every colour through a token and never a Tailwind ramp or a hex (R32); a deactivate/reactivate or status move → the idempotent predicate + zero-row silence (R17); writes activity → its relatedTable resolves through the gate map (R18); a new module → an import TargetDef or a reasoned exemption (R13); touches the agent/MCP → capability parity (R9), every door filter exposed + forwarded (R19), every BODY field too (R22), a description whose every backticked identifier names something real (R27), the confirm rule, and — if it adds a tool to one machine surface only — a named reason on the other, or the missing tool wired (R43); calls an external service → a fetch timeout (R11); runs on a cron → record failures (R12); answers from the knowledge base → the one answer seam, citations and all (R23), and its search is namespaced and its words come from D1 (R26); it READS A FILE INTO the knowledge base → both doors ask the one reader table, or refuse honestly and say so (R42); it draws a screen from the vendored kit's `compositions/` → that exact composition is either adopted for real or has a reasoned, rot-checked exemption on file, never left undecided (R45); it uses any of the kit's `components/` or `foundations/` → that exact part is either REACHED for real — directly, through another adopted part, or through a CSS `@import` a JS-only census cannot see — or has a reasoned, rot-checked exemption on file (R46); **it sends a person an email → that send is classified in the census, and if it names a record it carries a button to it, at the recipient's OWN front door (R30)**; **says a single word to a person → that sentence is in the catalogue (R28), which means running `node scripts/i18n-extract.mjs` before you commit, AND the place it is said asks for its translation (R33): `t("…")` at the position, or a field config rendered through `shared/web/field.tsx`, AND it uses the glossary's word rather than a synonym for it (R34), AND — if you also TRANSLATE it — the ceiling in `TRANSLATION_CEILING` moves down with the count and never up (R44)**. **AND it says that sentence in WORDS: no emoji, in the copy or in the data a screen draws — and if your module SEEDS a vocabulary, the `mark` on every seeded row is a short word or an initial, because `optionalMark` guards the door and R66 guards the seed and the migration ledger, which the door cannot see (R66)**. it reads a cache key → that component asks that door ONCE (R56): the store dedupes a repeated KEY so a second read of one buys nothing, and two different keys on one door is a real second request that needs a reasoned `TWO_READS_ONE_DOOR` line; it adds a COMPONENT → it joins a module or kind folder that `web/components/README.md` describes, and never the top level (R57); it NAMES a path — in a document, in a comment, in a string — → that path opens, or a reasoned `GONE_ON_PURPOSE` line says it is named because it is gone (R58). it draws a MODAL → a form, an editor or a picker slides in (the kit's `Sheet`, which becomes the bottom sheet below 45rem), and only a yes/no warning is a centred overlay, which is an `AlertDialog`; a bare `<Dialog>` needs a reasoned `CENTRED_DIALOG_OK` line and may not collect anything (R59). it draws an IMAGE → it fills its box, `object-cover` and never `object-contain` (nor a `fit="contain"` handed to the kit's `Image`), with a reasoned `OBJECT_FIT_OK` line the only way out (R60); it gives a module its own SETTINGS → one entry in `MODULE_SETTINGS` and one `<ModuleSettingsGear segment="…">` on that module's own screen, and nothing else: the Modules tab's row is derived from the same table and the gate is asked once, in `visibleModuleSettings` (R61); it takes a section OFF the "This team" list — the app's one entrance to the team area — → a `SECTION_HOSTED_ELSEWHERE` line names the reachable screen that carries its material, and that screen really makes the door call each of the section's acts dispatches (R64). Name them now, not in review. Name them now, not in review.
 3. **Which seams do I reuse, not rebuild?** The data door (`shared/workers/d1-rest`), gating (`requireRight`), validation (`shared/workers/validate`), `publishChange`, `FormShell`, the recipe engine, the tool catalog. If you're writing what a seam already does, stop.
 4. **What's the smallest shape?** A route on an existing worker (not a new worker); a column (not a table); a recipe (not a bespoke screen); a flag (not a code path). "Too much code is a defect."
 5. **What could break?** Name the failure path *before* the happy path: tenant isolation, ≥1 admin, a unique pending invite, a never-negative balance, a concurrent write, a partial failure, a hung fetch. Validate at the boundary; make retryable writes idempotent.
@@ -432,7 +489,7 @@ Answer these seven, in order, *before* you write code. It's the thinking that ke
 
 ## Build style, how code here is written
 
-- **Workers (8):** six private brains, auth; tenancy (teams, members, Member roles + permissions, invites, the screen-recipe store, **the customer spine**, accounts, contact links, portal logins, **process maps** and **the money**: the three rate cards + margin — what a client is charged, what our own hour costs, and the per-role cost card); realtime; content (tickets + **the WORK ENGINE**, stories, sprints, work logs, to-dos, tasks, triage and meetings, + **the knowledge base**, with a 15-minute sweep and a morning digest, + the per-person Google connections + the agency's own housekeeping); data-ops (import + AI agent); mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`), under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
+- **Workers (8):** six private brains, auth; tenancy (teams, members, Member roles + permissions, invites, the screen-recipe store, **the customer spine**, accounts, contact links, portal logins, **process maps** and **the money**: ONE read door, `GET /api/tenancy/app-money`, what an app gives back priced off the client's own role rates. All three rate cards were removed on 10 Sep 2026 in two rulings an hour apart. The agency's own two went first, and so did the margin computed from them, since retired: "kill the whole internal rates thing". Then the account rate card, what a client was charged, was removed an hour later: "the whole account rates also killed it"); realtime; content (tickets + **the WORK ENGINE**, stories, sprints, work logs, to-dos, tasks, triage and meetings, + **the knowledge base**, with a 15-minute sweep and a morning digest, + the per-person Google connections + the agency's own housekeeping); data-ops (import + AI agent); mcp (the external machine surface: personal access tokens → team-pinned sessions → MCP tools over the same gated doors; reached only through the agency gateway at `/mcp` + `/api/mcp/*`), under **two public doors**: `gateway` (the agency app, `web/`, routes `/api/*` by prefix) and `portal-gateway` (the client portal, `web-portal/`, forwards a named allow-list only). **Only those two are public**; every other worker sets `workers_dev:false` + `preview_urls:false`, so no public route can reach `/internal/*`, the agent, or the act-as-user surface. Per-team D1 databases reached over the REST door (`CF_D1_TOKEN`); the global core DB via the native `env.DB` binding. Shared worker code lives in `shared/workers/` (gating, http, validate, …).
 - **Worker handler shape:** a declarative `ROUTES` table (each route tagged read / mutation / housekeeping) → gate with `requireRight` from `shared/workers/gating` → team-DB CRUD via `d1Query` / `d1ExecScript` + `sqlString` + `ulid` → `publishChange` → return. Throw `GuardError(status, code, msg)`; the central catch maps it to a response.
 - **Deactivate, never delete** (data + audit survive). Keep an audit block (actor + timestamp) on every write.
 - **Permissions are the spine.** The AI agent **acts AS the signed-in user through the same gated endpoints** and never exceeds their rights. There is no separate agent role.

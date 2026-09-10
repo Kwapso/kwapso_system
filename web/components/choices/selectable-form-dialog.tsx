@@ -26,15 +26,30 @@ import { useT } from "@shared/web/language"
 
 const groupField = { ...defaultFieldConfig, label: "Group", required: true }
 const optionField = { ...defaultFieldConfig, label: "Value", required: true }
-/** THE TYPE MARK (CHECKLIST 11.8, UI-RULEBOOK G2). One glyph, set HERE rather
+/** THE TYPE MARK (CHECKLIST 11.8, UI-RULEBOOK G2). One mark, set HERE rather
  * than written into a component, which is the fourth condition UI-CONVENTIONS §5
  * puts on a type mark. Optional on purpose: most groups are plain labels, and a
- * missing glyph costs nothing because the word is always beside it. */
+ * missing mark costs nothing because the word is always beside it.
+ *
+ * IT ASKED FOR AN EMOJI UNTIL 2026-09-10, and the label was arguing with the
+ * door as well as with the client. `optionalMark` (`shared/workers/validate.ts`)
+ * has refused a pictograph on this exact field since 2026-08-31 — her ruling,
+ * *"i said no emojis. why are there still emojis? kill them!"* — with the
+ * sentence "Mark should be a short word or initial, not an emoji." So a field
+ * headed "Emoji", whose help text asked for one, was a 400 waiting to happen:
+ * the tickets and process sides took the new word that day
+ * (`internal-record-dialog.tsx`'s `moduleFields`) and these three Choices
+ * screens were the half nobody changed. Her 2026-09-10 *"also kill emojis!!!"*
+ * is the same ruling arriving a third time.
+ *
+ * THE WORDS ARE THE ONES ALREADY IN USE, not new ones: "Mark" and "A short word
+ * or initial" are what the internal record dialog says, so the app describes one
+ * field one way. */
 const markField = {
   ...defaultFieldConfig,
-  label: "Emoji",
+  label: "Mark",
   required: false,
-  helpText: "One emoji shown beside this word, wherever the type appears. Leave it empty for a plain label.",
+  helpText: "A short word or initial shown beside this option, wherever the type appears. Leave it empty for a plain label.",
 }
 
 export function SelectableFormDialog({
@@ -119,7 +134,11 @@ export function SelectableFormDialog({
           id="selectable-mark"
           value={values.mark}
           onChange={(e) => setValues((v) => ({ ...v, mark: e.target.value }))}
-          placeholder={t("e.g. a question mark")}
+          // "e.g. a question mark" WAS AN INSTRUCTION TO TYPE AN EMOJI — it
+          // named the pictograph, not a code, and the value beside it is
+          // "Question". Replaced with the sentence the internal record dialog
+          // already uses for the same field, so the two say one thing.
+          placeholder={t("A short word or initial")}
           disabled={busy}
         />
       </Field>

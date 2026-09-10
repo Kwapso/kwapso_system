@@ -12,8 +12,20 @@
 //     (screens/profile-screen.tsx, reached from the profile menu). Everything
 //     here is about the APP; those are about a PERSON, and a tester looking for
 //     "change my name" should not have to guess which of three tabs holds it.
+//     That still holds for your name, your email address and your history, and
+//     that page is still where they live.
 //   • THE TEAMS LIST is hidden rather than removed — shared/product.ts explains
 //     at length why nothing underneath it was touched.
+//
+// AND ONE OF THE TWO CAME BACK ON 2026-09-10. The client, in her own words:
+// *"language shoudl be in settings somewhere, not in my porfile"*. The language
+// you read kwapso in went out with the profile in August on the reading that it
+// is "about a PERSON" — but so are the app's size, its light or dark, and the
+// sidebar's colour, and all three of those have been sitting in Appearance the
+// whole time. The line that holds is not person-vs-app, it is IDENTITY (your
+// name, your email address, what you have done) against DISPLAY (how the app
+// looks to you and which words it says), and language was on the wrong side of
+// it. It is the fourth card in the Appearance tab now; nothing else moved.
 //
 // A FIFTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a fifth section.
 // The client, the same day she asked for the gear on each module's own screen:
@@ -62,8 +74,10 @@
 // FIVE TABS, in the order `tabsConfig` below declares them — which is the ONLY
 // place that order lives. This list is the description, never the definition:
 //
-//   1. Appearance     — unchanged: Mode, Sidebar and Scale, exactly as they
-//                        were on the flat page.
+//   1. Appearance     — Mode, Sidebar and Scale, exactly as they were on the
+//                        flat page, plus Language since 2026-09-10 (see the
+//                        ruling above): four choices about how the app looks
+//                        and reads to one person.
 //   2. Team           — the team's PEOPLE and their RIGHTS, in two containers
 //                        on one page: the members gallery
 //                        (web/components/team/members-gallery.tsx) and the
@@ -75,12 +89,16 @@
 //                        containers… not taken anywhere else" (client,
 //                        2026-09-09).
 //                        THIS TAB IS THE ONLY DOOR to member management. It
-//                        carries every act on a person — change role, remove,
-//                        and revoke a pending invite — because the team area's
-//                        own Members/Invites screens are linked to by nothing
-//                        (R64 · `sections-have-a-door`;
-//                        web/components/team/member-panel.tsx has the account
-//                        of the regression that earned the law). "This team"
+//                        carries every act on a person — change role and remove
+//                        on the member's own full-screen profile, which a card
+//                        on the gallery links to
+//                        (web/components/team/member-screen.tsx), and revoke a
+//                        pending invite on the toolbar's Invites list — because
+//                        the team area's own Members/Invites screens are linked
+//                        to by nothing else
+//                        (R64 · `sections-have-a-door`; that file has the
+//                        account of the regression that earned the law).
+//                        "This team"
 //                        below the two containers is what is LEFT of the team
 //                        area after that: `adminSections`, derived, and today
 //                        exactly one row — Internal rates. It is not a door to
@@ -125,7 +143,11 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Headline } from "@shared/ui/components/typography/typography"
+import { Icon } from "@shared/web/screen-engine/icon"
+import { InAppLink } from "@/components/shell/in-app-link"
 import { List } from "@shared/web/list-compat"
 import { CaretRight } from "@shared/ui/foundations/icons"
 
@@ -134,7 +156,7 @@ import { GoogleConnectionsSection } from "@/components/knowledge/google-connecti
 import { InvitationsPanel, useReceivedInvites } from "@/components/team/invitations"
 import { letterMark } from "@/lib/identity"
 import { softNavigate } from "@/lib/nav"
-import { TEAM_SECTIONS } from "@/lib/pages"
+import { CONCEPT_ICON, TEAM_SECTIONS } from "@/lib/pages"
 import { usePermissions } from "@/lib/perms"
 import { auth } from "@/lib/api"
 import { TEAM_SCREENS_HIDDEN } from "@shared/product"
@@ -142,6 +164,7 @@ import type { ActiveTeam } from "@/lib/use-active-team"
 import { ThemeSection } from "@shared/web/theme-section"
 import { ScaleSection } from "@shared/web/scale-section"
 import { SpineSection } from "@shared/web/spine-section"
+import { LanguageSection } from "@shared/web/language-section"
 import { useLanguage } from "@shared/web/language"
 import { useRemembered } from "@shared/web/remembered"
 
@@ -153,6 +176,18 @@ import { moduleSettingsIndex } from "@/components/screens/module-settings-screen
 import { RolesMatrix } from "@/components/team/roles-matrix"
 import { useScreenData } from "@/lib/use-screen-data"
 import { SelectableScreen } from "@/components/choices/selectable-screen"
+
+/** THE NARROWEST A MODULE CARD MAY BE before the Modules wall drops a column.
+ *
+ * The members gallery next door measures its own (`MIN_CARD`) against a round
+ * mark and two centred lines; this cell is a glyph, a name, and a line that
+ * LISTS the page's sections, which is a phrase rather than a name. 16rem is the
+ * kit's smaller figure (210px, the one that survives a phone) with room for
+ * that line to sit on one row at the common case rather than truncating on the
+ * first card. Its own constant rather than the gallery's, because the two are
+ * measuring different cells and a shared number would tie them together by
+ * accident. */
+const MIN_MODULE_CARD = "16rem"
 
 export function SettingsScreen({
   active,
@@ -317,6 +352,25 @@ export function SettingsScreen({
                     await active.refresh()
                   }}
                 />
+
+                {/* THE LANGUAGE YOU READ KWAPSO IN — the fourth choice a person
+                    makes about how this app looks to them, and the client's own
+                    ruling on 2026-09-10: *"language shoudl be in settings
+                    somewhere, not in my porfile"*. Size, light or dark, the
+                    sidebar's colour and the words themselves are one kind of
+                    thing — each is per-person, each follows you between devices
+                    off your own row, and none of them changes what anybody else
+                    sees — so they belong on one panel rather than one here and
+                    one on a page you reach from the profile menu.
+
+                    LAST, because it is the choice made once and then forgotten,
+                    while the three above it are the ones somebody comes back to.
+                    It brings its own container (`bg-surface-panel`) where the
+                    three above draw option cards, which is the shape a Select
+                    needs; the portal keeps its own compact twin in the header
+                    (`shared/web/language-menu.tsx`), because the portal has no
+                    settings screen at all. */}
+                <LanguageSection save={(lang) => auth.setLanguage(lang)} />
               </div>
             )
           }
@@ -351,12 +405,13 @@ export function SettingsScreen({
                     onRetryMembers={() => membersQ.refresh()}
                     roles={roles}
                     canInvite={can("team_members", "create")}
-                    // THE THREE ACTS THE TAB WAS MISSING (2026-09-10, R64).
-                    // Every one of them is the person's own `team_members`
-                    // right and NOT `commercials:read`, which is what the only
-                    // remaining door into the team area happened to be gated on
-                    // — member-panel.tsx has the whole account.
-                    canEditMembers={can("team_members", "edit")}
+                    // REVOKING A PENDING INVITE, which is the one act still on
+                    // this container (2026-09-10). It is the person's own
+                    // `team_members` right and NOT `commercials:read`, which is
+                    // what the only remaining door into the team area happened
+                    // to be gated on — web/components/team/member-screen.tsx
+                    // has the whole account of that regression, and carries the
+                    // other two acts on the member's own profile now.
                     canRemoveMembers={can("team_members", "delete")}
                   />
                 )}
@@ -478,43 +533,98 @@ export function SettingsScreen({
                   )}
                 </p>
 
-                {/* THE SAME LIST TREATMENT "This team" TAKES one tab to the
-                    left — `surface="none"` on the named panel ground, the kit's
-                    one rectangular radius, a caret to say the row goes
-                    somewhere. Two indexes on one screen that looked different
-                    would be two ideas; they are one.
+                {/* A WALL OF CARDS, EACH WITH ITS MODULE'S ICON — client,
+                    2026-09-10: *"the settings / modules i want in the same
+                    component kinda grid like team members, each with its
+                    icon."* It was the same `<List>` "This team" draws one tab
+                    to the left, and she has now named a different shape for
+                    this one.
 
-                    A ROW IS A CLICK AND NOT AN ANCHOR, which the gear IS
-                    (`InAppLink`, so it can be middle-clicked and copied). That
-                    is a real difference and it is the list component's, not a
-                    decision taken here: the kit's `List` exposes `onRowSelect`
-                    and has no href for a row. Written down rather than quietly
-                    accepted — the fix is an href on the kit's row, upstream, and
-                    it would improve every list in the app at once. */}
-                <List
-                  surface="none"
-                  className="rounded-[var(--radius)] bg-surface-panel"
-                  onItemClick={(item) => softNavigate(`/settings/${item.id}`)}
-                  items={modules.map(({ page, sections }) => ({
-                    id: page.segment,
-                    // THE PAGE'S OWN NAME, so all three doors say the same
-                    // words: this row, the gear's tooltip and accessible name,
-                    // and the `<h1>` you land on. A row whose label is the
-                    // module and whose destination is titled something else is
-                    // the smallest possible way to make one page feel like two.
-                    title: t(page.title),
-                    // WHAT IS ACTUALLY CONFIGURABLE THERE, in the words the
-                    // page's own section headings use — "Ticket types · Ticket
-                    // statuses" rather than a repeat of the module's name. Off
-                    // the FILTERED sections, so the line never advertises a
-                    // block this reader will not be shown. The separator is
-                    // punctuation and not a sentence, so it is not a catalogue
-                    // string; each name is one, and each is already translated
-                    // where MODULE_SETTINGS declares it.
-                    subtitle: sections.map((s) => t(s.title)).join(" · "),
-                    trailing: <CaretRight className="text-muted-foreground size-4" />,
-                  }))}
-                />
+                    THE SAME COMPONENT, LITERALLY. `CardGrid` is the kit part
+                    the members gallery is built on
+                    (`web/components/team/members-gallery.tsx`), reached the
+                    same way — `fluid`, so the wall chooses its own column
+                    count from the cell width rather than stranding a lone card
+                    on the fixed three-column ladder. That file's own note
+                    carries the argument; this is the second caller, not a
+                    second grid.
+
+                    `MIN_MODULE_CARD` IS WIDER THAN A MEMBER'S. A member's cell
+                    is a round mark and two centred lines; this one carries a
+                    subtitle that lists the page's sections ("Ticket types"),
+                    which is a phrase rather than a name. 16rem is the kit's
+                    smaller figure (210px) plus room for that line to sit on
+                    one row at the common case.
+
+                    A REAL ANCHOR, WHICH THE ROW WAS NOT. This used to be a
+                    `List` with `onItemClick`, and the comment here said so at
+                    length: the kit's row has no href, so the index could not be
+                    middle-clicked or copied while the gear pointing at the same
+                    page could. Owning the cell means owning that too —
+                    `InAppLink` (R37) is what the gear already uses, so both
+                    doors onto one page are now the same kind of door.
+
+                    THE ICON IS DERIVED AND NOT DECLARED. `CONCEPT_ICON` is the
+                    app's one icon vocabulary, keyed by concept, and a settings
+                    segment IS a module key — so the card wears the glyph the
+                    nav rail and every tab already use for that module, without
+                    this panel or `MODULE_SETTINGS` naming one. A segment the
+                    vocabulary has never heard of falls back to the gear, which
+                    is what a settings page is; R61 (ii) is untouched because
+                    nothing here spells a segment. */}
+                <CardGrid
+                  fluid
+                  minItemWidth={MIN_MODULE_CARD}
+                  label={t("Modules")}
+                >
+                  {modules.map(({ page, sections }) => (
+                    <Card key={page.segment} variant="raised">
+                      <InAppLink href={`/settings/${page.segment}`} className="block">
+                        <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                          <Icon
+                            name={
+                              CONCEPT_ICON[page.segment as keyof typeof CONCEPT_ICON] ??
+                              CONCEPT_ICON.settings
+                            }
+                            className="text-muted-foreground size-6"
+                          />
+                          {/* THE PAGE'S OWN NAME, so all three doors say the
+                              same words: this card, the gear's tooltip and
+                              accessible name, and the `<h1>` you land on. A
+                              card whose label is the module and whose
+                              destination is titled something else is the
+                              smallest possible way to make one page feel like
+                              two.
+
+                              THE KIT'S OWN TITLE PART, not a `<span>` — R65
+                              (`chip-above-title`). The law is about where a
+                              chip sits relative to the title, and a title
+                              hand-rolled into a span has no position a census
+                              can read, so every card that stands for a record
+                              names itself through `CardTitle`. `text-sm`
+                              because the kit's step is chapter 13's 18/500 for
+                              a full card and this is a cell on a wall — the
+                              class carries the wall's own step, exactly as it
+                              did when this was a span, and nothing about the
+                              drawing changes. */}
+                          <CardTitle className="text-sm">{t(page.title)}</CardTitle>
+                          {/* WHAT IS ACTUALLY CONFIGURABLE THERE, in the words
+                              the page's own section headings use — "Ticket
+                              types" rather than a repeat of the module's name.
+                              Off the FILTERED sections, so the line never
+                              advertises a block this reader will not be shown.
+                              The separator is punctuation and not a sentence,
+                              so it is not a catalogue string; each name is one,
+                              and each is already translated where
+                              MODULE_SETTINGS declares it. */}
+                          <span className="text-muted-foreground w-full truncate text-xs">
+                            {sections.map((s) => t(s.title)).join(" · ")}
+                          </span>
+                        </CardContent>
+                      </InAppLink>
+                    </Card>
+                  ))}
+                </CardGrid>
               </div>
             )
           }

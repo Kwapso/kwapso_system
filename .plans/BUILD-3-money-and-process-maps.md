@@ -13,7 +13,7 @@ engine lane has not landed it yet, build your side and say so.
 
 ## 0 · The rules
 
-- `CLAUDE.md` holds the Laws of the Base, **R1–R64**, machine-checked.
+- `CLAUDE.md` holds the Laws of the Base, **R1–R67**, machine-checked.
 - **`npm run check` must exit 0**, captured unpiped: `npm run check > /tmp/x.log 2>&1; echo $?`. A piped run reports the pipe's status and has read green over a failing build in this repo.
 - **Every test proven to bite**: break the thing, watch it go RED, restore, quote the red output. Watch the specific trap this codebase keeps hitting: `expect(indexOf(x)).toBeLessThan(indexOf(y))` passes LOUDEST when `x` is absent, because `indexOf` returns −1. Assert presence first — `workers/tenancy/test/grant-ceiling.test.ts` has the helper that does it right.
 - **`@kwapso/ui` is a separate repo.** Never edit it from here.
@@ -70,9 +70,18 @@ them.
 - **Flat prices live on the sprint row**: `sold_price` + currency. A **blueprint
   is a priced planning sprint**, not a fourth sprint type.
 - **Support and hourly pricing come straight from the work logs.**
-- **Margin = revenue − (logged seconds × internal rates) − tool costs.**
-- **Account rate cards and internal rate cards never mix.** Two different things
-  that both look like "a rate"; keep them apart in the schema, not just in the UI.
+- ~~**Margin = revenue − (logged seconds × internal rates) − tool costs.**~~
+  WITHDRAWN 10 Sep 2026 with the internal rates it subtracts: *"kill the whole
+  internal rates thing. will develop this in the future much much more but for
+  now i iwanna wipe it clean."*
+- ~~**Account rate cards and internal rate cards never mix.** Two different
+  things that both look like "a rate"; keep them apart in the schema, not just
+  in the UI.~~ BOTH KINDS ARE GONE — the internal cards that morning, the account
+  rate card an hour later (*"the whole account rates also killed it"*). The rule
+  is struck through rather than deleted because it is the reasoning the next
+  money feature has to answer to: they were the same SHAPE and opposite
+  AUDIENCES, and one table with a `kind` column would have put the two numbers a
+  single forgotten predicate apart.
 - **Engagement type is a LABEL, never an object** (SCOPE retired it as an entity;
   do not reintroduce it).
 - **There is no billing module.** Nothing here issues an invoice.

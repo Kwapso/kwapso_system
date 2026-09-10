@@ -16,8 +16,17 @@
 // like a live one. The kit shipped the fix as `PermissionModule.rights` on
 // 2026-09-07 — and it stayed unusable for two days, because `roles-matrix.tsx`
 // drew the client's approved shape by HAND-TRANSPOSING the kit's axes, which
-// put `rights` on the wrong one. Kit v1.2.75's `orientation="roles-as-rows"`
-// retires the transpose and the prop can finally be passed.
+// put `rights` on the wrong one. Kit v1.2.75's `orientation` prop retired the
+// transpose and the prop could finally be passed.
+//
+// THE AXIS TURNED BACK ON 2026-09-10 and none of this moved, which is the point
+// of having made it a prop. The client: *"would it not make more sense taht the
+// roles are the cokumns and the permissions the rows? better use of space"* —
+// which is `modules-as-rows`, the kit's own DEFAULT, so `roles-matrix.tsx`
+// passes no `orientation` at all now. What this file guards is unchanged and is
+// the thing that actually cost fifteen boxes: `modules` takes the modules and
+// `roles` takes the roles, at either orientation, because `rights` is a fact
+// about a COLLECTION and a hand-transpose is what makes it unstateable.
 //
 // So this file holds the half nothing held: that the grid a person looks at
 // draws fifteen boxes as un-decidable, and that the number is DERIVED from
@@ -96,7 +105,11 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
       <PermissionMatrix
         modules={modules}
         roles={[{ id: "r1", label: "Admin" }]}
-        orientation="roles-as-rows"
+        // NO `orientation`, exactly as the screen sends it since 2026-09-10 —
+        // the kit's default is `modules-as-rows`. The COUNT below is unchanged
+        // either way: the grid holds the same cells whichever axis is drawn
+        // down the side, and one role still contributes exactly one band's
+        // worth of them.
         onChange={() => {}}
       />
     )
@@ -158,15 +171,26 @@ describe("R36 · the roles grid draws no box that decides nothing", () => {
   // ── AND THE CALL SITE, so the render above cannot pass on props the app does
   //    not actually send. The test builds its own; these read the app's.
   describe("the screen sends what this suite renders", () => {
-    it("turns the grid with `orientation` rather than by transposing the props", () => {
+    it("names each axis with the kit's own prop rather than transposing them", () => {
       const src = source()
-      expect(src, "roles-matrix.tsx must turn the grid with the kit's own prop").
-        toContain('orientation="roles-as-rows"')
-      // THE RATCHET ON THE TRANSPOSE. `modules` takes the modules and `roles`
-      // takes the roles; swapping them back is the exact move that made `rights`
-      // unpassable and cost fifteen boxes for two days.
+      // THE RATCHET ON THE TRANSPOSE, and it is the whole of what this clause
+      // was ever for. `modules` takes the modules and `roles` takes the roles;
+      // swapping them back is the exact move that made `rights` unpassable and
+      // cost fifteen boxes for two days.
       expect(src).toContain("modules={moduleColumns}")
       expect(src).toContain("roles={roleRows}")
+      // AND THE AXIS IS THE KIT'S DEFAULT, which is what the client asked for
+      // on 2026-09-10 ("the roles are the cokumns and the permissions the
+      // rows"). Asserted as an ABSENCE because that is how the screen states
+      // it: `modules-as-rows` is the kit's default, so the honest way to draw
+      // it is to pass nothing, and a re-added `orientation` here would silently
+      // turn her grid back. Either spelling of the old axis is caught.
+      expect(
+        /orientation\s*=/.test(src),
+        "roles-matrix.tsx passes an `orientation` again — the client's 2026-09-10 " +
+          "ruling is the kit's DEFAULT axis (roles across the top), so the screen " +
+          "states it by passing nothing at all"
+      ).toBe(false)
     })
 
     /* THAT THE SCREEN PASSES `rights` AT ALL, and that the two honesty patches

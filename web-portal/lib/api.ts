@@ -93,12 +93,16 @@ export const portal = {
 /** WHAT THE WORK GAVE BACK, and — only for the accounts the agency has switched
  * price visibility on for — what it cost. `prices` is ABSENT when the switch is
  * off: the door does not send it, so no screen can render it, and there is no
- * flag on this side to get wrong. The one figure that is never here under any
- * setting is the agency's own margin (R24). */
+ * flag on this side to get wrong.
+ *
+ * IT CARRIED A `rates` ARRAY BESIDE `soldCents` until 10 Sep 2026 — the account
+ * rate card projected for a client. The client retired the card ("the whole
+ * account rates also killed it"), and `currency` replaced it here because the
+ * total's currency used to be read off the card's first row. */
 export type PortalImpact = SavingsView & {
   prices?: {
-    rates: { label: string; centsPerHour: number; currency: string | null }[]
     soldCents: number | null
+    currency: string | null
   }
 }
 

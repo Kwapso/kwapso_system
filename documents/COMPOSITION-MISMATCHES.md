@@ -105,7 +105,7 @@ build itself checks against):
 | `overlays/import.tsx` | `[!]` | Five-step manual-mapping wizard; this app's import is agentic, multi-table, FK-resolving. |
 | `overlays/quick-view.tsx` | `[ ]` | Permanent — every row's Enter/Space navigates straight to the record; no peek pattern anywhere. |
 | `screens/brand.tsx` | `[ ]` | A real, minor finding — no staff-facing design-token reference page exists; the Brand library is a different, client-asset concept. |
-| `screens/company-hub.tsx` | `[!]` | `account-detail.tsx` already does this job with a different anatomy (tabs, rate cards, companies-vs-people split). |
+| `screens/company-hub.tsx` | `[!]` | `account-detail.tsx` already does this job with a different anatomy (tabs, the companies-vs-people split). This row named the account rate card as one of that anatomy's parts until 10 Sep 2026, when the client retired all three rate cards; the mismatch is unchanged, the example is not. |
 | `screens/home.tsx` | `[!]` | Kit embeds a live ticket queue inline; this app's home shows figures plus link-out cards — a different product decision. |
 | `screens/invite-acceptance.tsx` | `[!]` | Assumes one pre-account invite screen; this app's real flow is a post-sign-in inbox of every pending invite. |
 | `screens/link-sent.tsx` | `[!]` | Built around a magic link on a possibly different device; this app sends a 6-digit code, same device, same form. |
@@ -1144,7 +1144,8 @@ asset-url fix landed. Committed `2eebb832`.
 - `progress`, `progress-dashboard` — `pulse.tsx`'s own locked law ("big
   NUMBER or CHART, nothing else") already cited for `stat-strip`, ruling
   out a third shape. No progress-bar/dashboard concept exists anywhere in
-  the app's savings/hours/margin screens.
+  the app's savings and hours screens (there was a margin screen too until
+  10 Sep 2026).
 - `notifications` — no bell/inbox concept anywhere in either front door
   (grepped both). This app's live-update model is realtime in-place sync,
   not a notification log. A real gap, but a new FEATURE, not a swap.

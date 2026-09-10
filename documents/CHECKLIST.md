@@ -20,7 +20,9 @@ Last updated 17 Aug 2026.
 `0025` drops the purged tables and folds the delivery programmes onto the sprint
 type; `0026` retires the duplicated dropdown values older teams carry; `0027`
 gives a task its admin fields; `0030` adds who is on an app and who the client's
-people are; `0031` adds the role rate card and the role on a process; `0032`
+people are; `0031` adds the role rate card and the role on a process — that rate
+card was removed again on 10 Sep 2026 (as were the other two, `0073` and
+`0074`), and the role was not; `0032`
 gives Meetings its transcript and its series. Every one runs against every
 existing team through `POST /api/tenancy/admin/migrate-teams`. A team created
 after these changes needs none of them: the schema builds the new tables and no
@@ -71,7 +73,7 @@ longer builds the purged ones.
 | 3.10 | "Make it a story" goes. A ticket never becomes a story | **DONE**, all three ways in (the button, the triage prompt, the tab's create action) |
 | 3.11 | The stray "co-op: check the account" hint text goes | **NOT FOUND**, the string does not exist anywhere in the source. It was logged from a screenshot; it needs the screenshot to identify |
 | 3.12 | App create screen loses the address field | **DONE**, the field goes, the column stays, and an edit carries the existing value through untouched |
-| 3.13 | App create screen loses "what it costs us a month" | **DONE**, same: the field goes, the column stays. It feeds the margin, so a form that stopped asking while still sending would have zeroed every app it edited |
+| 3.13 | App create screen loses "what it costs us a month" | **DONE**, same: the field goes, the column stays. It was what fed the margin, so a form that stopped asking while still sending would have zeroed every app it edited. The margin was removed on 10 Sep 2026 and the column now feeds nothing at all; it is still there, holding whatever was entered, waiting on the further work the client said she wants |
 | 3.14 | Processes stop being a top-level page | **DONE**, `placement: "contextual"`. Every screen, record and URL under it is unchanged; a map is reached from its app |
 | 3.15 | Story due date goes; inherited from the sprint | **DONE**, inherited from the sprint's end date, everywhere a story shows one. The column stays for the rows that already carry a date |
 | 3.16 | Profile and email move out of Settings onto a real profile page | **DONE**, `/profile` carries your name, your email, your reading language and your history. Settings keeps the app's own housekeeping, and stopped rendering itself twice |
@@ -361,7 +363,7 @@ Nobody asked for these. They are the faults the work walked into.
 | 24.1 | Half the app could not be reached on a phone or a tablet | **DONE**, you reported it. Ten sections, five slots on the bottom bar, and nothing catching the other five — the rail beside it is desktop-only, so Tasks, Work logs, Meetings, Apps and Sprints had no way in at all. The comment above that line promised a "More" entry that was never built |
 | 24.2 | The Gmail promise on the Settings screen had stopped being true | **DONE**, finding the transcripts needed a second, narrow fence over four Google robot senders, and the screen still said "only mail to or from someone on one of your accounts". It was invisible precisely because the first fence works: Google's own no-reply addresses are nobody's contact |
 | 24.3 | None of the four privacy sentences was translated | **DONE**, they sat in a data table as bare properties, so somebody reading in German was told in English what kwapso may read from their mailbox |
-| 24.4 | Every process map in the app was born with no role | **DONE**, the form has asked "who does it" since the rate card shipped and nothing behind it read the answer. No role, no rate, no price — which is why you saw hours and no money |
+| 24.4 | Every process map in the app was born with no role | **DONE**, the form has asked "who does it" since the rate card shipped and nothing behind it read the answer. No role, no rate, no price — which is why you saw hours and no money. That was written on 17 Aug 2026; the agency's own role rate card was removed on 10 Sep 2026, and the client's own role costs, which is what a saving multiplies, were not touched |
 | 24.5 | A story could store the literal word "Assignee" as the person doing it | **DONE**, it resolved the name from the activity feed and fell back to the label |
 | 24.6 | The calendar sweep would have reported success while never reaching tomorrow | **DONE**, caught in the lane's own review: one straddling window spent its whole page on the past |
 | 24.7 | The charting library put 114 KB on every route | **DONE**, the whole app is one shell, and lazy-loading the component alone does nothing because its config lives in the same module. Isolated behind one dynamic import per app: the agency shell is 4 KB over baseline and the client's impact screen is 100 KB lighter than before |

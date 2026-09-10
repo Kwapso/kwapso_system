@@ -4,7 +4,7 @@
 // footer's Latest activity column.
 //
 // WHY IT EXISTS. `selectable_data` has been writing activity rows since the day
-// it shipped — created, renamed, made a default, deactivated, reactivated, four
+// it shipped — created, renamed, protected, deactivated, reactivated, four
 // `logActivity` calls in workers/tenancy/src/lib/selectable.ts — and there was
 // nowhere to read them. The manager screen is a vocabulary: a flat list of words
 // under their group, with a rename box and a row menu. So every one of those
@@ -124,8 +124,16 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
     { label: t("Group"), value: value.type },
     { label: t("Option"), value: value.value },
     { label: t("Status"), value: value.active ? t("Active") : t("Inactive") },
-    { label: t("One of the defaults"), value: value.isDefault ? t("Yes") : t("No") },
-    { label: t("Emoji"), value: value.mark ?? "" },
+    // "PROTECTED", NOT "ONE OF THE DEFAULTS" — client ruling, 2026-09-10
+    // ("find an accurate word for what Default means … Find a good word and
+    // rename it"). Nothing in this app has ever pre-selected a value from
+    // `is_default`; its one behavioural read is the refusal in
+    // `setSelectableActive`. `shared/glossary.ts` carries the word.
+    { label: t("Protected"), value: value.isDefault ? t("Yes") : t("No") },
+    // "MARK", NOT "EMOJI" — client, 2026-09-10 (*"also kill emojis!!!"*), and
+    // the third of the three Choices screens that still said the old word while
+    // the write door refused one (`optionalMark`, shared/workers/validate.ts).
+    { label: t("Mark"), value: value.mark ?? "" },
     { label: t("German label"), value: value.nameDe ?? "" },
     { label: t("Description"), value: value.description ?? "" },
     {
@@ -173,7 +181,7 @@ export function SelectableDetailScreen({ teamId, valueId }: { teamId: string; va
       // kill everywhere. chips is the last component of headers!" `status`
       // mapped to `RecordChrome`'s `meta`, drawn directly under the chips
       // row (`data-record-region="header"`). Not lost: it's already a row
-      // in the Overview tab (`overviewItems`: "One of the defaults").
+      // in the Overview tab (`overviewItems`: "Protected").
       // D7 / CHECKLIST 11.3 — who made it and when, now the kit's own ink
       // footer's Record column. Read by the single-row door only, which is
       // why the list screen has never shown it and this screen can.

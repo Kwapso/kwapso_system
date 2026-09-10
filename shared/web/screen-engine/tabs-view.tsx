@@ -157,7 +157,8 @@ export const TAB_ICONS: Record<string, IconName> = {
   versions: "git-branch",
   waves: "waves",
   portal: "key",
-  rates: "money",
+  // `rates: "money"` stood here for the account rate card's tab, which the
+  // client retired on 10 Sep 2026 ("the whole account rates also killed it").
   maps: "git-fork",
   // the process record's own strip and its inner view switch
   steps: "git-commit",

@@ -87,7 +87,7 @@ function timeOn(recordTable: string): RecordChild {
  * record, so a caller naming a record names it once.
  *
  * `accounts` carries the union of what a COMPANY's screen shows (apps, sprints,
- * to-dos, the rate card) and what a PERSON's shows (to-dos, tickets, meetings):
+ * waves, to-dos) and what a PERSON's shows (to-dos, tickets, meetings):
  * one table underneath, two screens on top (account-detail.tsx hands an
  * individual to contact-detail.tsx), and one key for one table is what keeps
  * this a registry rather than a list of screens. The union is not the waste it
@@ -125,13 +125,11 @@ export const RECORD_CHILDREN: Record<string, RecordChild[]> = {
     // nobody reads costs one number in a payload.
     { key: "tickets-account", module: "help", resource: "help", door: "content" },
     { key: "meetings-account", module: "meetings", resource: "meetings", door: "content" },
-    // WHAT WE CHARGE THEM. Already primed by this screen's own rate read (the
-    // Overview needs the headline rate to price the hours), so this entry
-    // changes no badge on a warm screen — it is here so the registry is the
-    // WHOLE answer to "what hangs off an account" and the check over it needs no
-    // exception list. The alternative was one reasoned exemption for one number,
-    // which is more prose than the count costs.
-    { key: "account-rates", module: "commercials", resource: "account_rates", door: "tenancy" },
+    // WHAT WE CHARGE THEM stood here as `account-rates` until 10 Sep 2026, on the
+    // `commercials` module. The client retired the rate card ("the whole account
+    // rates also killed it"), the Rates tab it badged went with it, and a line
+    // here for a tab nothing draws would answer `null` for a permission nobody
+    // holds — which is the exact reading this registry exists to make impossible.
   ],
   apps: [
     { key: "sprints-app", module: "work", resource: "sprints", door: "content" },

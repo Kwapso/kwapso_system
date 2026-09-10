@@ -93,36 +93,75 @@
 // the roles matrix is a quiet button; the argument, and the client's reversal
 // that settled it, are written up in web/components/team/roles-matrix.tsx.
 //
-// ── NOTHING NAVIGATES. THE CARD OPENS A SLIDE-IN ───────────────────────────
+// ── A CARD IS A DOOR, AND IT OPENS A FULL SCREEN ───────────────────────────
 //
-// "Everything should be in different containers… not taken anywhere else"
-// (client, 2026-09-09). A card is not a LINK: the list this replaces opened
-// /t/<teamId>/members/<id> on a row press, which is the redirect she was
-// complaining about. It is still not a link. It is a press that opens the
-// MEMBER PANEL (web/components/team/member-panel.tsx) from the side — the same
-// gesture a role already has on the matrix two containers down, and her own
-// instruction for it: "when iclick in role, overview in slide in."
+//   "when clickingon card in team, open full screen the profile (we wil ad more
+//    to this)" (client, 2026-09-10)
 //
-// THIS PARAGRAPH USED TO SAY SOMETHING FALSE, AND IT COST THE APP THREE ACTS.
-// It read: "Changing somebody's role or removing them still lives on the
-// member's own record, reached from the team area's Members section." Nothing in
-// the app linked to that section. A census of every `softNavigate(...)` and
-// `href=` under web/ found ONE link into the team area anywhere — a member's
-// RECORD, from apps/stakeholders-panel.tsx — and the only other way in was the
-// "This team" list on this very tab, which renders one row (Internal rates,
-// gated on `commercials:read`). So a person with `team_members` rights and
-// without that one could change nobody's role, remove nobody and revoke
-// nothing, and the sentence above told the next reader it was fine.
+// THIS SUPERSEDES THE SLIDE-IN THAT SHIPPED THE DAY BEFORE. A card press used to
+// open `member-panel.tsx`, a `Sheet` carrying the person's four facts and their
+// two acts; that file is deleted. Her sentence names the reason a drawer was
+// wrong and it is the same one she gave for module settings — *"It cannot be a
+// slide-in because things can get quite complex here… I would rather it be full
+// screen"* — with "we will add more to this" saying it out loud: this is a PLACE
+// that grows, not a panel that gets wider.
 //
-// All three acts are on this tab now: role and remove in the member's panel,
-// revoke on the Invites list one slot along. R64 (`sections-have-a-door`) is the
-// law that stops the sentence and the app disagreeing again.
+// AND IT IS A REAL ANCHOR, NOT A PRESS (R37). `InAppLink` — so the profile can
+// be middle-clicked into a tab, its address copied, and read out by a screen
+// reader as the link it is, while a plain left click stays inside the one shell.
+// The address is `/t/<teamId>/members/<userId>`: the app's own (module, id)
+// grammar, the same sentence `/accounts/BERG` has always been, and nothing was
+// invented for it. `web/components/team/member-screen.tsx` carries the whole
+// argument about the address and what the two alternatives cost.
+//
+// THIS DOES NOT CONTRADICT "not taken anywhere else" (client, 2026-09-09). What
+// she took away then was a ROW that redirected you off the tab in place of
+// showing you anything; what she asked for now is a screen, by name, for a
+// record that has outgrown four lines in a drawer.
+//
+// WHERE THE ACTS LIVE NOW. Changing a role and removing somebody are on the
+// profile, which is the screen that hosts them; revoking a pending invitation is
+// on the Invites list one slot along, which is still here. R64
+// (`sections-have-a-door`) is the law that holds the three to a screen a person
+// can actually reach — it was earned by a version of this paragraph that named a
+// route nothing in the app linked to, and `SECTION_HOSTED_ELSEWHERE` names the
+// profile now.
+//
+// ── AND THE WALL IS OUR OWN STAFF ──────────────────────────────────────────
+//
+//   "we should not see cliets in team, no? thats for staff" (client, 2026-09-10)
+//
+// THE FACT IT FILTERS ON IS STRUCTURAL, NEVER A ROLE NAME. A client login is an
+// ordinary team member holding an ordinary role — grant → invite → accept is the
+// only way to make one that works — so there is nothing on the membership row to
+// read. What there IS is a `portal_users` row in the TEAM'S OWN database, and
+// that single row is what every gate, fence and audience decision in this
+// product already reduces to: `resolveAccountScope`
+// (shared/workers/account-scope.ts) is one SELECT on `portal_users.user_id` and
+// nothing else, and `refusePortalCaller` is that answer read once. The members
+// door resolves the same table into `TeamMember.isClient` (workers/tenancy/src/
+// lib/members.ts), by PRESENCE and not liveness — a revoked grant still means
+// "this login belongs to a client" — and this wall subtracts on that.
+//
+// A ROLE TITLE WOULD HAVE BEEN THE WRONG ANSWER AND A QUIET ONE. There is
+// exactly one `lower(title) = 'client'` in the whole repository and it is the
+// grant door's DEFAULT ROLE PICKER, not a test of anything; a team is free to
+// rename that role, to hold two of them, or to give a client login any role at
+// all. A name-based filter would go on returning a plausible list on the day
+// somebody renamed "Client" to "Kunde", and nobody would see it happen.
+//
+// AND THE COUNT SAYS WHAT IT DROPPED. A wall that silently omits people is worse
+// than one that explains itself, so the line under the toolbar names how many
+// client logins are not here and where they are instead: portal access is
+// granted and revoked on the CONTACT's own record
+// (web/components/accounts/contact-detail.tsx), gated on `portal_users`, which
+// is the screen that owns the question. Nothing is hidden, only re-homed.
 
 import * as React from "react"
 
 import { Button } from "@shared/ui/components/button/button"
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Card, CardContent } from "@shared/ui/components/card/card"
+import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Headline } from "@shared/ui/components/typography/typography"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
@@ -138,11 +177,10 @@ import { useT } from "@shared/web/language"
 import type { Invite, TeamMember, TeamRole } from "@shared/types"
 import { AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { ConfirmAction, type ConfirmKind } from "@/components/deep-link/confirm-action"
+import { InAppLink } from "@/components/shell/in-app-link"
 import { InviteDialog } from "@/components/team/invite-dialog"
-import { MemberPanel } from "@/components/team/member-panel"
-import { RolePickerDialog } from "@/components/team/role-picker-dialog"
 import { TeamPanel } from "@/components/team/team-panel"
-import { Prohibit } from "@shared/ui/foundations/icons"
+import { Envelope, Prohibit } from "@shared/ui/foundations/icons"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@shared/ui/components/tooltip/tooltip"
 import { List } from "@shared/web/list-compat"
 import { personInitials } from "@/lib/identity"
@@ -189,7 +227,6 @@ export function MembersGallery({
   onRetryMembers,
   roles,
   canInvite,
-  canEditMembers,
   canRemoveMembers,
 }: {
   teamId: string
@@ -203,10 +240,9 @@ export function MembersGallery({
   roles: TeamRole[]
   /** `team_members:create` — whether the mango `+` and Invites are drawn. */
   canInvite: boolean
-  /** `team_members:edit` — whether the member panel offers Change role. */
-  canEditMembers: boolean
-  /** `team_members:delete` — whether the member panel offers Remove, and
-   * whether a pending invite can be revoked from the Invites list. */
+  /** `team_members:delete` — whether a pending invite can be revoked from the
+   * Invites list. Changing a role and removing somebody are the profile's, and
+   * are gated there on the same rights this tab used to read here. */
   canRemoveMembers: boolean
 }) {
   const t = useT()
@@ -214,13 +250,13 @@ export function MembersGallery({
   const [facetValues, setFacetValues] = React.useState<Record<string, string>>({})
   const [inviteOpen, setInviteOpen] = React.useState(false)
   const [invitesOpen, setInvitesOpen] = React.useState(false)
-  // THE THREE ACTS THIS TAB NOW CARRIES, one piece of state each and none of
-  // them a URL. `openMember` is the panel; `roleFor` is the picker it hands
-  // over to; `confirm` is the warning both destructive acts share.
-  const [openMember, setOpenMember] = React.useState<TeamMember | null>(null)
-  const [roleFor, setRoleFor] = React.useState<TeamMember | null>(null)
+  // THE ONE ACT LEFT ON THIS CONTAINER, and one piece of state for it. Changing
+  // a role and removing somebody moved to the member's own full-screen profile
+  // on 2026-09-10 (see this file's header); what is still here is revoking a
+  // pending invitation, which belongs to the Invites list beside the wall and to
+  // no person's record, because an invitation is not a member yet.
   const [confirm, setConfirm] = React.useState<
-    { kind: ConfirmKind; member: TeamMember | null; inviteId: string | null } | null
+    { kind: ConfirmKind; inviteId: string } | null
   >(null)
 
   // WHO IS OFFERED THE INVITES BUTTON. `create` OR `delete`, not `create`
@@ -263,10 +299,20 @@ export function MembersGallery({
     },
   ]
 
+  // OUR OWN STAFF, AND THE NUMBER THIS SUBTRACTS — "we should not see cliets in
+  // team, no? thats for staff" (client, 2026-09-10). `isClient` is the members
+  // door's own resolution of a `portal_users` row in the team's database; this
+  // file's header carries why that fact and never a role TITLE is what a filter
+  // may stand on. Both halves are computed here because both are shown: the
+  // wall is `staff`, and `clientCount` is the sentence under the toolbar that
+  // stops the subtraction from being silent.
+  const staff = members.filter((m) => !m.isClient)
+  const clientCount = members.length - staff.length
+
   // SEARCHED FIRST, THEN NARROWED — the same order every collection screen in
   // the app applies, so the facet's own count describes what the search left.
   const q = query.trim().toLowerCase()
-  const matching = members.filter((m) => {
+  const matching = staff.filter((m) => {
     const role = facetValues.role
     if (role && m.roleTitle !== role) return false
     if (!q) return true
@@ -280,7 +326,7 @@ export function MembersGallery({
   const { pill: filterPill, panel: filterPanel } = useFilterBar({
     facets,
     values: facetValues,
-    data: members,
+    data: staff,
     onChange: (field, value) =>
       setFacetValues((prev) => {
         const next = { ...prev }
@@ -298,36 +344,15 @@ export function MembersGallery({
     toast.success(t("Invite sent."))
   }
 
-  // ── THE THREE ACTS ──────────────────────────────────────────────────────
+  // ── THE ONE ACT ─────────────────────────────────────────────────────────
   //
-  // EACH DOOR ANSWERS WITH THE WHOLE LIST, so the cache is PRIMED with what the
+  // THE DOOR ANSWERS WITH THE WHOLE LIST, so the cache is PRIMED with what the
   // write returned rather than dropped and re-read (CACHING.md's cache-first
-  // rule, and the same shape `use-screen-actions.ts` uses for these exact three
-  // doors on the team area's screens). `member_roles` is invalidated beside it
-  // because a role's member count moved, and the changed member's own activity
-  // feed gained a row.
+  // rule, and the same shape `use-screen-actions.ts` uses for this exact door).
   //
-  // NOTHING IS SWALLOWED. The doors refuse for real reasons a person needs to
-  // read — "A team must keep at least one admin.", "You can't remove yourself."
-  // — so the error is re-thrown to the caller, which is the surface that shows
-  // it: `RolePickerDialog` toasts its own, and `ConfirmAction`'s parent below
-  // toasts the confirm's.
-  async function changeRole(member: TeamMember, roleId: string) {
-    const { members: next } = await tenancy.setMemberRole(member.userId, roleId)
-    primeCache(`members:${teamId}`, next)
-    invalidate(`member_roles:${teamId}`)
-    invalidate(`activity:user:${member.userId}`)
-    toast.success(t("Role updated."))
-  }
-
-  async function removeMember(member: TeamMember) {
-    const { members: next } = await tenancy.removeMember(member.userId)
-    primeCache(`members:${teamId}`, next)
-    invalidate(`member_roles:${teamId}`)
-    invalidate(`activity:user:${member.userId}`)
-    toast.success(t("Member removed."))
-  }
-
+  // NOTHING IS SWALLOWED. The door refuses for real reasons a person needs to
+  // read, so the error is re-thrown to the caller — `ConfirmAction`'s parent
+  // below toasts it.
   async function revokeInvite(inviteId: string) {
     const { invites: next } = await tenancy.revokeInvite(inviteId)
     primeCache(`invites:${teamId}`, next)
@@ -367,9 +392,13 @@ export function MembersGallery({
             // R50 — the collection's RAW count, before any search or filter
             // narrows it, folded together with the loading state so an
             // unresolved read does not read as an empty team.
-            empty={!membersLoading && members.length === 0}
+            // R50 — and the count is the STAFF count, because the staff wall is
+            // the collection this row narrows. A team whose only members are
+            // client logins has an empty wall and gets no toolbar, which is the
+            // honest reading of both rules together.
+            empty={!membersLoading && staff.length === 0}
             search={
-              (membersLoading || members.length > 0) && (
+              (membersLoading || staff.length > 0) && (
                 <SearchInput
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -379,8 +408,8 @@ export function MembersGallery({
                 />
               )
             }
-            filters={(membersLoading || members.length > 0) && filterPill}
-            toolbarPanel={(membersLoading || members.length > 0) && filterPanel}
+            filters={(membersLoading || staff.length > 0) && filterPill}
+            toolbarPanel={(membersLoading || staff.length > 0) && filterPanel}
             actions={
               canSeeInvites && (
                 <>
@@ -390,8 +419,29 @@ export function MembersGallery({
                       renders NOTHING at zero, so a team with no invites out
                       gets a plain button rather than a "0" nobody needs.
                       `canSeeInvites` rather than `canInvite`: see the note on
-                      that constant for why revoking needs its own door. */}
-                  <Button variant="secondary" size="sm" onClick={() => setInvitesOpen(true)}>
+                      that constant for why revoking needs its own door.
+
+                      AN ICON, AND THE TOOLBAR'S OWN HEIGHT — "the invites needs
+                      an icon and make it the same size as other buttons in the
+                      toolabr! currenlty its too small" (client, 2026-09-10). It
+                      carried `size="sm"`, which is the kit's `--control-height-
+                      dense` (32) — the in-field, in-overlay step — while every
+                      other control on this row stands at `--control-height-
+                      button` (40): the mango `+` is `size="icon"`, and the
+                      search box and the filter pill are input-height. So the
+                      fix is a DELETION rather than a number: dropping `size`
+                      takes the kit's own standing default, which is the one the
+                      row is already built on.
+
+                      THE GLYPH IS THE APP'S OWN WORD FOR AN INVITE. `envelope`
+                      is what `CONCEPT_ICON.invites` (web/lib/pages.ts) has
+                      always said, and the kit draws Phosphor under Phosphor's
+                      own names, so it is `Envelope` — one concept, one icon, at
+                      the page, tab and button level (UI-CONVENTIONS §4). Before
+                      the label, `size-3.5`, exactly as CLAUDE.md's action-icon
+                      mapping puts every other one. */}
+                  <Button variant="secondary" onClick={() => setInvitesOpen(true)}>
+                    <Envelope className="size-3.5" />
                     {t("Invites")}
                     {invitesBadge !== "" && <Badge>{invitesBadge}</Badge>}
                   </Button>
@@ -399,7 +449,18 @@ export function MembersGallery({
                       this tab that makes something new, and a person who may
                       only revoke has nothing to add. */}
                   {canInvite && (
-                    <AddButton label={t("Invite someone")} onClick={() => setInviteOpen(true)} />
+                    <AddButton
+                      label={t("Invite someone")}
+                      onClick={() => setInviteOpen(true)}
+                      // R50 — the same answer the row above already carries. It
+                      // is stated here as well because this button is wrapped in
+                      // its own `{canInvite && …}` guard rather than sitting
+                      // bare in the `actions` slot, so the positional read that
+                      // recognises a toolbar action cannot see the slot from
+                      // here. The two can never disagree: both are the STAFF
+                      // count, which is the collection this row narrows.
+                      empty={!membersLoading && staff.length === 0}
+                    />
                   )}
                 </>
               )
@@ -467,7 +528,7 @@ export function MembersGallery({
                             size="icon"
                             aria-label={`${t("Revoke invite")} — ${i.email}`}
                             onClick={() =>
-                              setConfirm({ kind: "invites.revoke", member: null, inviteId: i.id })
+                              setConfirm({ kind: "invites.revoke", inviteId: i.id })
                             }
                           >
                             <Prohibit className="text-destructive size-4" />
@@ -480,6 +541,31 @@ export function MembersGallery({
                 />
               )}
             </div>
+          )}
+
+          {/* WHAT THIS WALL LEAVES OUT, SAID OUT LOUD — "we should not see cliets
+              in team, no? thats for staff" (client, 2026-09-10). A collection
+              that silently drops rows is worse than one that explains itself,
+              so the subtraction is a sentence rather than an absence: how many
+              client logins are not here, and the screen that owns them. Drawn
+              only when there ARE some, because a line about zero people is
+              noise on every team that has never granted portal access.
+
+              THE WHOLE SENTENCE WITH A HOLE IN IT (R28), in both grammatical
+              numbers — never a count glued to a translated noun, which is the
+              one shape a translator cannot reorder. */}
+          {clientCount > 0 && (
+            <p className="text-muted-foreground text-xs">
+              {clientCount === 1
+                ? t(
+                    "{count} client login is not shown here. Team is your own staff; a client's portal access is on their contact record.",
+                    { count: String(clientCount) }
+                  )
+                : t(
+                    "{count} client logins are not shown here. Team is your own staff; a client's portal access is on their contact record.",
+                    { count: String(clientCount) }
+                  )}
+            </p>
           )}
 
           {membersLoading && members.length === 0 ? (
@@ -498,28 +584,25 @@ export function MembersGallery({
               label={t("Members")}
               empty={matching.length === 0}
               emptyLabel={
-                members.length === 0
+                staff.length === 0
                   ? t("No members yet.")
                   : t("No members match what you're looking for.")
               }
             >
               {matching.map((m) => (
                 <Card key={m.userId} variant="raised">
-                  {/* THE WHOLE CELL IS THE PRESS TARGET, and it opens the
-                      member's panel — never a route. A BARE `<button>` for the
-                      same reason `roles-matrix.tsx`'s row head is one: every
-                      kit `Button` size fixes a height and `whitespace-nowrap`,
-                      and this target is a four-line stack. The kit's focus rule
-                      is global (tokens.css §8 rings every `:focus-visible` at
-                      the control's own radius), so a bare button is rung for
-                      free and defines nothing. `w-full` because a button is
-                      shrink-to-fit and the card's own inset is what should
-                      decide the width. */}
-                  <button
-                    type="button"
-                    onClick={() => setOpenMember(m)}
-                    aria-label={`${staffFullName(m)} — ${t("Overview")}`}
-                    className="w-full cursor-pointer text-start"
+                  {/* THE WHOLE CELL IS THE DOOR, AND IT IS A REAL ANCHOR (R37)
+                      — "when clickingon card in team, open full screen the
+                      profile" (client, 2026-09-10). It was a bare `<button>`
+                      opening a slide-in; a destination with an address is a
+                      link, so middle-click, copy-address and a screen reader's
+                      link list all work, and only the plain left click is
+                      intercepted into the one shell. `block` because an anchor
+                      is inline and the card's own inset is what should decide
+                      the width. */}
+                  <InAppLink
+                    href={`/t/${teamId}/members/${m.userId}`}
+                    className="block"
                   >
                   <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
                     {/* TWO LETTERS, THROUGH THE TWO SEAMS THAT ALREADY EXIST.
@@ -529,30 +612,68 @@ export function MembersGallery({
                         — R54's own note keeps it explicitly out of the
                         first-name rule, "an initial is a MARK, not a name".
                         `RecordMark`'s bare `name` fallback is ONE letter, which
-                        is right on a dense list row and wrong on a 48px round
-                        mark that is the biggest thing on the card, so the pair
-                        is handed over rather than a third helper invented. The
-                        picture still wins where a member has one, so the day
-                        this data grows a photograph the same slot carries it. */}
+                        is right on a dense list row and wrong on the biggest
+                        thing on the card, so the pair is handed over rather
+                        than a third helper invented. The picture still wins
+                        where a member has one, so the day this data grows a
+                        photograph the same slot carries it.
+
+                        `band`, NOT `tile` — "bigger images" (client,
+                        2026-09-10). It is the fourth of `RecordMark`'s four
+                        NAMED sizes (56, and 72 from `sm:` up) rather than a
+                        `size-*` class written here: that file's own header is
+                        explicit that a size handed in as a class name puts two
+                        Tailwind size rules on one box and is how a fifth and
+                        sixth size arrive without anybody deciding on one. The
+                        card's floor is 12rem and its inset is 32, so 72 sits
+                        inside 160 with room to spare. */}
                     <RecordMark
                       picture={m.imageUrl}
                       mark={personInitials(m.firstName, m.lastName)}
                       name={staffFullName(m)}
                       shape="round"
-                      size="tile"
+                      size="band"
                     />
                     {/* NAME AND SURNAME — her 2026-09-09 correction to the
                         first-name rule of 2026-09-07. Through the one naming
                         seam (R54), never `first + " " + last` here; the two
                         rulings and why they do not conflict are written up in
-                        shared/staff-name.ts on `staffFullName` itself. */}
-                    <span className="text-sm font-medium">{staffFullName(m)}</span>
-                    <Badge>{m.roleTitle}</Badge>
+                        shared/staff-name.ts on `staffFullName` itself.
+
+                        THE KIT'S OWN TITLE PART, not a `<span>` (R65). "Above"
+                        is a claim about position, and a title hand-rolled into
+                        a span has none a census can read — this card was the
+                        proof: a chip-position check over the old markup would
+                        have reported a perfectly ordered card while looking at
+                        nothing at all. `text-sm` carries the wall's own step,
+                        exactly as the span did; the kit's 18/500 is chapter
+                        13's figure for a full card, not for a cell. */}
+                    {/* THE CHIP AND THE NAME ARE ONE BLOCK, AND THE CHIP IS ON
+                        TOP OF IT (R65) — "chip on top of title" (client,
+                        2026-09-10, and the second time she has said it: the
+                        Kanban card got the same instruction on 2026-09-07). The
+                        role is what SORTS a wall of people, so it is read
+                        BEFORE the name it qualifies; under the name it is
+                        qualifying something already read.
+
+                        IMMEDIATELY above it, not at the top of the card. The
+                        kit's own kanban card carries the argument for why, in
+                        the words of the same ruling: above the title a chip is
+                        the title's OVERLINE, and an overline separated from
+                        its title by everything else in the stack stops
+                        introducing it. So the two share one box at `gap-1`
+                        while the card's own stack stays at `gap-2`, and the
+                        FACE still leads the card — which is what "bigger
+                        images" asked for in the same sentence. */}
+                    <span className="flex flex-col items-center gap-1">
+                      <Badge>{m.roleTitle}</Badge>
+                      <CardTitle className="text-sm">{staffFullName(m)}</CardTitle>
+                    </span>
                     <span className="text-muted-foreground w-full truncate text-xs">
                       {m.email}
                     </span>
                   </CardContent>
-                  </button>
+                  </InAppLink>
                 </Card>
               ))}
             </CardGrid>
@@ -568,70 +689,31 @@ export function MembersGallery({
         onSubmit={invite}
       />
 
-      {/* THE MEMBER'S OVERVIEW, AND THE ONLY PLACE THEIR TWO ACTS LIVE ON THIS
-          TAB. Opened by a card press above. It opens no door: the row it shows
-          is the one this gallery was handed (R56).
-
-          BOTH HANDOVERS CLOSE IT FIRST, exactly as `RolePanel`'s do — the picker
-          is itself a `Sheet` on the same z layer, and a warning about the very
-          person the drawer is showing would be two surfaces asking one
-          question. */}
-      <MemberPanel
-        member={openMember}
-        canChangeRole={canEditMembers}
-        canRemove={canRemoveMembers}
-        open={openMember !== null}
-        onOpenChange={(open) => !open && setOpenMember(null)}
-        onChangeRole={(m) => {
-          setOpenMember(null)
-          setRoleFor(m)
-        }}
-        onRemove={(m) => {
-          setOpenMember(null)
-          setConfirm({ kind: "members.remove", member: m, inviteId: null })
-        }}
-      />
-
-      {/* CHANGE ROLE — the app's existing picker, unchanged and unforked. It is
-          a `Sheet` (R59: a picker collects, so it slides in), it hides the role
-          the person already holds, and it toasts the door's own refusal — which
-          is how "A team must keep at least one admin." reaches the person who
-          tried to demote the last one. */}
-      <RolePickerDialog
-        open={roleFor !== null && canEditMembers}
-        onOpenChange={(open) => !open && setRoleFor(null)}
-        roles={activeRoles}
-        currentRoleId={roleFor?.roleId ?? null}
-        subjectName={roleFor ? staffFullName(roleFor) : null}
-        onPick={async (roleId) => {
-          if (roleFor) await changeRole(roleFor, roleId)
-        }}
-      />
-
-      {/* THE ONE WARNING BOTH DESTRUCTIVE ACTS SHARE (R59), and the app's
+      {/* THE ONE WARNING THIS CONTAINER STILL ASKS (R59) — and the app's
           existing one rather than a second copy: `ConfirmAction` has drawn this
-          exact `AlertDialog` for remove-member and revoke-invite since the team
-          area shipped. All that changed is that it takes the ACT as a prop
-          instead of reading it off the URL, so a screen with no URL of its own
-          can open it. */}
+          exact `AlertDialog` for revoke-invite since the team area shipped. It
+          takes the ACT as a prop instead of reading it off the URL, so a screen
+          with no URL of its own can open it.
+
+          `memberName` IS ALWAYS NULL HERE, and that is not an omission: it is
+          the prop `ConfirmAction` uses to name the person a remove-member
+          warning is about, and removing somebody moved to their own profile on
+          2026-09-10. An invitation names an EMAIL, which the component's own
+          revoke copy already says. */}
       <ConfirmAction
         kind={confirm?.kind}
         canRun={canRemoveMembers}
-        memberName={confirm?.member ?? null}
+        memberName={null}
         onCancel={() => setConfirm(null)}
         onConfirm={async () => {
           if (!confirm) return
           try {
-            if (confirm.kind === "members.remove" && confirm.member)
-              await removeMember(confirm.member)
-            else if (confirm.kind === "invites.revoke" && confirm.inviteId)
-              await revokeInvite(confirm.inviteId)
+            await revokeInvite(confirm.inviteId)
             setConfirm(null)
           } catch (err) {
-            // THE DOOR'S OWN SENTENCE, NEVER A GENERIC ONE. Its refusals are
-            // the things a person most needs to read here — the last admin, and
-            // removing yourself — and the warning stays OPEN so the row they
-            // were acting on is still in front of them.
+            // THE DOOR'S OWN SENTENCE, NEVER A GENERIC ONE, and the warning
+            // stays OPEN so the row they were acting on is still in front of
+            // them.
             if (!(err instanceof ApiFailure)) reportError("members-gallery:confirm", err)
             toast.error(
               err instanceof ApiFailure ? err.message : t("Something went wrong. Try again.")

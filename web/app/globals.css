@@ -174,10 +174,61 @@
     var(--space-3) + var(--space-3) + 0.125rem + (var(--text-sm) * var(--text-sm--line-height)) - 1px
   );
   --pinned-chrome-h: 0px;
+  /* HOW MUCH OF THE CONTAINER ABOVE THE TOOLBAR PINS WITH IT (R63, part 3).
+     The client, 2026-09-10: "when sticky toolbar, include also the top part of
+     the container above it! if not looks weird. so the spacing between tabs and
+     container should stay, as well as spacing between beginning container and
+     toolbar." Same shape as `--pinned-chrome-h` one line up and for the same
+     reason: the row cannot know what box it was dropped into, so the BOX
+     publishes the inset it spends and the row spends it back as padding inside
+     the pinned band (shared/web/pinned-chrome.ts). The default is zero, so a
+     toolbar that is nobody's inset child pins flush and needs no entry. */
+  --pinned-lead: 0px;
+  /* …AND THE SAME DISTANCE ON THE OTHER AXIS (R63, part 4). The client,
+     2026-09-10, on the square corners part 3 left behind: "When pin, I still
+     want it round. That's exactly what I asked for, so do whatever you have to
+     do." A pinned box that spans its container's CONTENT box has no corner to
+     round — the container's radius is on its BORDER box, one inset further out
+     — so the box spends this back as `px` and a negative `mx` and reaches it.
+     Its own property rather than the lead's: the lead is everything above the
+     toolbar INSIDE the container, and the two stop being one number the day
+     the kit's `band` slot is filled. Default zero, same as the lead's, for the
+     same reason. `--pinned-behind` has no default here on purpose — its
+     honest default is "the same tone as the front", which is the row's own
+     `var(--pinned-behind, var(--pinned-ground))` fallback and cannot be
+     written as a value at `:root` (it would freeze the PAGE's ground onto
+     every subtree that inherits it). */
+  --pinned-inset-x: 0px;
 }
 
 *:has(> .pinned-strip) {
   --pinned-chrome-h: calc(var(--tab-strip-h) + var(--tab-content-gap));
+}
+
+/* WHAT IS BEHIND A CONTAINER THAT INSETS A PINNED TOOLBAR (R63, part 4).
+   The other half of the corner, and the reason it needs a rule at all.
+
+   A rounded top corner on the pinned band is a NOTCH, and behind that notch
+   sits the container's own paper — the container runs far below the pin, only
+   its top edge has scrolled away — so a notch filled with nothing shows the
+   same tone as the band and the corner still reads square. What belongs there
+   is the ground BEHIND the container, which is exactly what the container's
+   real top corners show at rest.
+
+   AND THE CONTAINER CANNOT READ IT. `--pinned-ground` is published by the
+   ground class itself (below), so a container that paints has already
+   OVERWRITTEN that value for itself and everything inside it; resolving
+   `var(--pinned-ground)` on the container's own element gives the container's
+   paper, which is the tone we are trying to get away from. The last element
+   that still holds the outer value is the container's PARENT — so the capture
+   happens there, through the same `:has()` move the strip above uses, off a
+   marker class the container wears (`PINNED_INSET_MARK`,
+   shared/web/pinned-chrome.ts).
+
+   A container that paints nothing needs no mark: it never overwrote the
+   ground, so the row's own fallback is already right. */
+*:has(> .pinned-inset) {
+  --pinned-behind: var(--pinned-ground);
 }
 
 /* ONE PINNED TOOLBAR PER COLLECTION, AND IT IS THE OUTERMOST (R63).
@@ -190,6 +241,25 @@
    the one that narrows the collection, so it is the one that stays. */
 *:has(> [data-slot="toolbar-row-pin"]) [data-slot="collection-frame-toolbar"] {
   position: static;
+  /* AND THE LEAD GOES WITH THE PIN. `--pinned-lead` is the band of container
+     that pins ABOVE a toolbar, spent as `pt` and taken straight back as a
+     negative `mt` — a pair that is invisible while the box is sticky and is a
+     24px upward shove the moment it is not. A stood-down row is not pinned, so
+     it leads nothing. Zeroed HERE, on the toolbar's own element, because a
+     declaration on the element always outranks the value it would otherwise
+     inherit from the frame that published it. */
+  --pinned-lead: 0px;
+  /* AND SO DOES THE CORNER (R63, part 4). Same sentence, same element, same
+     reason. A stood-down row is not pinned, so it is not carrying its
+     container's top edge with it — and a `rounded-t` band painting the ground
+     from OUTSIDE the panel, in the middle of that panel, is a hole cut in the
+     paper rather than a corner. Zeroing the side inset keeps the box off the
+     panel's border box, and putting the IDENTITY back on `--pinned-behind`
+     (the same tone in front and behind) makes the `::before`'s corners show
+     the tone they are cut out of, which is no corner at all — exactly what
+     this row drew before part 4. */
+  --pinned-inset-x: 0px;
+  --pinned-behind: var(--pinned-ground);
 }
 
 /* ============================================================================

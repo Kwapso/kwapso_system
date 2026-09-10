@@ -116,10 +116,14 @@ export function ProfileMenu({
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {/* YOUR OWN PAGE, not Gear. Your name, your email address, the
-            language you read kwapso in and what you have done are about a
-            PERSON; Gear is about the app. They were one screen until 17 Aug
-            2026, and a tester looking for "change my name" had to guess. */}
+        {/* YOUR OWN PAGE, not Gear. Your name, your email address and what you
+            have done are who you ARE; Gear is how the app is set up. They were
+            one screen until 17 Aug 2026, and a tester looking for "change my
+            name" had to guess. The language you read kwapso in was on this page
+            too until 2026-09-10 — *"language shoudl be in settings somewhere,
+            not in my porfile"* (client) — and is now the fourth card in Gear's
+            Appearance tab, beside size, light or dark, and the sidebar's
+            colour. */}
         <DropdownMenuItem onSelect={() => softNavigate("/profile")} className="gap-2">
           <User className="size-4" />
           {t("Your profile")}

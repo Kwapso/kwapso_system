@@ -191,19 +191,54 @@ describe("a paged collection's sort names are the door's own", () => {
     ).toEqual([])
   })
 
-  it("no sort menu names an internal number (R24), and none builds SQL from a request", () => {
+  it("no sort menu names a switch-gated price, and none builds SQL from a request", () => {
     // AN ORDERING IS A FILTER'S COUSIN. It cannot show a caller a row the fence
     // excluded — the WHERE is untouched — but a POSITION can make a hidden value
     // inferable, one binary search at a time. So a menu may only name columns the
-    // row already carries to whoever asked, and never the two tables R24 keeps
-    // off the client's side entirely.
-    const forbidden = /internal_rates|role_rates|\bmargin\b/
+    // row already carries to whoever asked.
+    //
+    // WHAT IT NAMES CHANGED ON 10 SEP 2026, AND GOT SHARPER. It used to forbid
+    // `internal_rates`, `role_rates` and `margin` — the two tables R24 kept off
+    // the client's side entirely. The client retired that feature, so those three
+    // words match nothing anywhere and the clause would have gone on passing
+    // over an empty subject for ever, which is the exact failure this file's own
+    // header argues against.
+    //
+    // The re-point is to the property that survived, and it is the better one:
+    // the danger is not a number a client may NEVER see, it is a number whose
+    // visibility is DECIDED — by a per-account switch, a stakeholder fence, or a
+    // scope test on the row. `cents_per_hour` is what one of a client's OWN
+    // people costs them, `role_cents_per_hour` is that figure frozen onto a
+    // process step, and `sold_price_cents` is what a sprint was sold for — every
+    // one is withheld from somebody, and every one is exactly the sort of column
+    // somebody would reach for to order a list by. A binary search over a
+    // position is how a withheld number is read back.
+    //
+    // ONE OF THE THREE CHANGED SUBJECT LATER THE SAME DAY, and it is worth
+    // saying which: `cents_per_hour` was written here about the ACCOUNT RATE
+    // CARD, which the client retired an hour after the internal rates ("the
+    // whole account rates also killed it"). The COLUMN NAME did not go with it —
+    // `client_roles.cents_per_hour` still declares it, on the client's own side
+    // of the fence — so the clause kept a live subject by accident rather than
+    // by design. The tripwire below is what turns that accident into a check.
+    const forbidden = /\bcents_per_hour\b|\brole_cents_per_hour\b|\bsold_price_cents\b/
+    // A FORBIDDEN SET THAT NAMES NOTHING REAL PASSES OVER EVERY MENU FOR EVER,
+    // which is precisely how this clause's PREVIOUS subject (`internal_rates`,
+    // `role_rates`, `margin`) would have gone on reporting all-clear after the
+    // feature was deleted. So the names are proved against the team schema's own
+    // declarations before they are used to judge anything.
+    const schema = read(join(ROOT, "workers", "tenancy", "src", "team-schema", "migrations.ts"))
+    for (const column of ["cents_per_hour", "role_cents_per_hour", "sold_price_cents"])
+      expect(
+        new RegExp(`\\b${column}\\b\\s+INTEGER`).test(schema),
+        `"${column}" is not declared by the team schema any more — this clause is forbidding a word that names nothing, which is how a check goes quietly blind. Re-point it at the columns that ARE switch-governed today.`
+      ).toBe(true)
     for (const [, c] of PAGED_SCREENS) {
       const src = stripComments(read(join(ROOT, c.lib)))
       const at = src.search(/export const \w+_SORTS: SortMenu</)
       if (at === -1) continue
       const body = src.slice(at, src.indexOf("\n}", at))
-      expect(forbidden.test(body), `${c.lib}'s sort menu names an internal number (R24)`).toBe(false)
+      expect(forbidden.test(body), `${c.lib}'s sort menu names a price whose visibility is a per-account switch`).toBe(false)
       // …and the SQL in it is ours. A menu entry whose `expr` were assembled at
       // runtime would be the one way a request could reach a statement here, so
       // each is either a literal or a SCREAMING_CASE constant declared in this

@@ -124,14 +124,20 @@ async function listAndCount(cfg: Parameters<typeof listSelectable>[0], guard: Pa
   return { values, total }
 }
 
-/** POST /api/tenancy/selectable/default — mark a value as one of the team's
- * defaults, or take that mark off.
+/** POST /api/tenancy/selectable/default — protect a value so it can't be
+ * switched off, or take that protection off.
  *
- * The switch beside the refusal in `setSelectableActive`: a default value cannot
- * be switched off while it is still marked as one, so this is how a team takes
- * the protection off something it really does want gone. Gated on `edit` rather
- * than `delete` — marking a word as furniture is an edit to the vocabulary, and
- * `delete` is the right to REMOVE, which is exactly the thing this defends. */
+ * The switch beside the refusal in `setSelectableActive`: a protected value
+ * cannot be switched off while it is still protected, so this is how a team
+ * takes the protection off something it really does want gone. Gated on `edit`
+ * rather than `delete` — marking a word as furniture is an edit to the
+ * vocabulary, and `delete` is the right to REMOVE, which is exactly the thing
+ * this defends.
+ *
+ * THE PATH AND THE BODY FIELD STILL SAY `default`, and are meant to. The client
+ * renamed the WORD A PERSON READS on 2026-09-10; a URL and a body field are not
+ * read by a person, and moving them would break every caller for no reader's
+ * benefit (CLAUDE.md's `help`/Tickets ruling, applied again). */
 export async function postSetSelectableDefault(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<{ id?: string; isDefault?: boolean }>(request, env, "selectable_data", "edit")
   // R21 AT THE DOOR, ON THE WRITE HALF TOO — the same refusal the other three

@@ -49,8 +49,6 @@ const TOGGLE_TRACE: Record<string, string> = {
   app_module: "set_app_module_active",
   process: "set_process_active",
   wave: "set_wave_active",
-  account_rate: "set_account_rate_active",
-  internal_rate: "set_internal_rate_active",
   meeting: "set_meeting_active",
   knowledge_source: "set_knowledge_source_active",
   deliverable: "set_deliverable_active",
@@ -291,24 +289,12 @@ export function traceFor(
       return { path: `${seg(teamId, "processes")}/${str(input, "processId")}`, highlight: "main" }
 
     /* -------------------------------- the money ----------------------------- */
-    // Both rate cards are read on the account they belong to; the internal one is
-    // team-wide, so it lands on the team area where it is managed. Neither has a
-    // per-row URL — a card is a handful of lines read whole.
-    case "create_account_rate":
-      return { path: `${seg(teamId, "accounts")}/${str(input, "accountId")}`, highlight: "main" }
-    case "update_account_rate":
-    case "set_account_rate_active":
-      return { path: seg(teamId, "accounts"), highlight: "main" }
-    case "create_internal_rate":
-    case "update_internal_rate":
-    case "set_internal_rate_active":
-    // A ROLE'S price sits on the same card, on the same settings screen, for the
-    // same reason: it is a handful of lines read whole, with no per-row URL.
-    case "set_role_rate":
-      // The internal rate card's own section. It used to be spelled `/t/<team>`
-      // — the team overview, which carried the rates tab strip — and that screen
-      // was deleted on 2026-09-09, so the trace names the card's own segment.
-      return { path: seg(teamId, "internal-rates"), highlight: "main" }
+    // NOTHING LANDS HERE ANY MORE, and the empty section is the record. Seven
+    // cases stood in this position — three internal-rate ones and a role-rate
+    // one, landing on a team-wide card of our own, and the ACCOUNT rate card's
+    // three, landing on the account the card belonged to. The client retired all
+    // of them on 10 Sep 2026 in two rulings an hour apart, and a trace case for
+    // a tool that no longer exists is a destination nothing can ask for.
 
     /* ----------------------------- the work engine -------------------------- */
     // These all used to land on one Work page, because there was one — the

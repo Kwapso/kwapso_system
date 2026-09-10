@@ -103,7 +103,9 @@ function Group({
            own sibling branch drew. No act on either: who is on a system is set
            on the system's own form, so this panel has no add button for
            `filtered` to subtract — what it fixes here is the LOOK. */
-        <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
+        <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+          <CollectionEmptyState filtered={narrowed} title={empty} filteredTitle={empty} />
+        </div>
       ) : (
         <ul className="divide-border divide-y rounded-[var(--radius)] bg-surface-panel">
           {people.map((p) => (

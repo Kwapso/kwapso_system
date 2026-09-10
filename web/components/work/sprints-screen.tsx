@@ -613,7 +613,12 @@ export function SprintsScreen({
                 <p className="text-muted-foreground text-micro uppercase">
                   {group.word}
                 </p>
+                {/* R67 — the rows stand on soft paper, not on the page. The
+                    board's other two bodies (the All tab, drawn through the
+                    engine) already do; this hand-grouped one was the odd body
+                    out, which is exactly the aggregate the law exists to see. */}
                 <List
+                  className="rounded-[var(--radius)] bg-surface-panel"
                   surface="none"
                   items={group.sprints.map((s) => ({
                     id: s.id,

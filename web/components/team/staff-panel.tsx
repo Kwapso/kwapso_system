@@ -287,12 +287,18 @@ export function StaffPanel({
           ) : null}
         </h2>
         {mayAdd && (
+          // R50, ONE LAYER DOWN (client, 2026-09-10, over the same shape on
+          // Settings › Integrations: "with the plus and no tokens yet?? makes
+          // no sense, duplicated"). The `CollectionEmptyState` below already
+          // carries the one first-add, so this heading button stands down while
+          // the register is empty rather than offering the act twice.
           <AddButton
             label={t("Record one")}
             onClick={() => {
               setEditingCert(null)
               setCertOpen(true)
             }}
+            empty={certificates.length === 0}
           />
         )}
       </div>

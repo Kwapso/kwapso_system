@@ -180,13 +180,10 @@ export type TeamSection = {
     | "roles"
     | "invites"
     | "dropdowns"
-    // WHAT OUR OWN HOUR COSTS US — the agency's own cost card, as a tab on the
-    // team area beside the other admin sections. A TAB rather than a sidebar
-    // page because it is one small settled list somebody sets and leaves, not a
-    // destination anybody opens in a working day. Its twin — what an ACCOUNT is
-    // charged — is deliberately NOT here: that card lives on the account's own
-    // record, because the question is always about one client (R24 · SCOPE).
-    | "internal-rates"
+    // "internal-rates" WAS HERE — the agency's own cost card, a tab on the team
+    // area. Retired 10 Sep 2026 with the rest of the internal rates. What an
+    // ACCOUNT is charged was never here and still is not: that card lives on the
+    // account's own record, because the question is always about one client.
     | "accounts"
     | "contacts"
     | "tickets"
@@ -280,12 +277,14 @@ export const TEAM_SECTIONS: TeamSection[] = [
   // so nothing that already links here breaks; Settings' Choices tab is
   // simply the one place that link is offered now.
   { key: "dropdowns", title: "Choices", module: "selectable_data", segment: "dropdowns", placement: "contextual", countCacheKey: "selectable" },
-  // Internal rates — gated on `commercials`, so a role without that read right
-  // never sees the tab at all. The segment says `internal-rates` in full rather
-  // than `rates`: an ambiguous URL is how somebody eventually wires the wrong
-  // card to it, and the two cards are the one pair in this app where mixing them
-  // up is a rule broken rather than a bug (R24).
-  { key: "internal-rates", title: "Internal rates", module: "commercials", segment: "internal-rates", placement: "tab", countCacheKey: "internal_rates" },
+  // The Internal rates row stood here, gated on `commercials`, and was the last
+  // section this table offered that the "This team" list did not subtract. It
+  // went on 10 Sep 2026 with the card behind it, so that list now renders
+  // nothing — which the settings screen's own header anticipated in writing
+  // ("nothing on this tab depends on it continuing to exist"). The ACCOUNT rate
+  // card was never a section here either — it was a tab on the account's own
+  // record — and it went the same day, at the client's second ruling. What
+  // `commercials` gates now is one read: what an app gives back, priced.
   // Accounts — the companies and people the team works with (the customer spine,
   // SCOPE ch.03). A first-class SIDEBAR page: it's the day's work, not an admin
   // setting. Its count is an exact server total (R16) keyed off the same
@@ -461,10 +460,12 @@ export const CONCEPT_ICON = {
   roles: "shield-check",
   invites: "envelope",
   dropdowns: "list-bullets",
-  // The money, both halves. ONE icon, because a rate is a rate wherever it is
-  // read — the audiences differ, the concept does not (UI-CONVENTIONS §4: a
-  // concept gets one icon, reused at page, tab and button level).
-  "internal-rates": "money",
+  // THE MONEY had a key here — `rates`, drawn as `money` — reused at page, tab
+  // and button level (UI-CONVENTIONS §4) by the two rate cards and then by the
+  // one that outlived them. Both rulings of 10 Sep 2026 landed on it: the
+  // internal half went first, the ACCOUNT rate card an hour later, and with the
+  // Rates tab gone nothing in the app draws this concept. A vocabulary entry
+  // nothing spells is a word the app no longer says.
   // The customer spine's own vocabulary: an account, the people on it, and a login.
   accounts: "buildings",
   contacts: "address-book",

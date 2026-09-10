@@ -138,9 +138,29 @@ const TRIGGER_TONE = { header: "secondary", row: "ghost" } as const
 export function RecordActionsMenu({
   actions,
   tone = "header",
+  trigger,
 }: {
   actions: RecordAction[]
   tone?: keyof typeof TRIGGER_TONE
+  /** THE THING PRESSED, when the three dots are not it.
+   *
+   * ONE MENU, TWO TRIGGERS — added 2026-09-10 for the Ticket types wall on a
+   * module's settings page, where the client asked for *"chips with their
+   * color, not a list"*. A chip is 28px tall and this trigger is a 40px square,
+   * so a kebab beside every chip would be a column of buttons taller than the
+   * wall they annotate; the honest answer on a chip wall is that the CHIP is
+   * the press target, the way a member's whole card is on Settings › Team.
+   *
+   * IT IS A SLOT AND NOT A SECOND MENU, which is the point of putting it here:
+   * the items, their order, the destructive separator and every confirm behind
+   * them stay in this one component, so a chip and a row can never come to
+   * offer different acts on the same record. `asChild` hands the trigger's
+   * props to whatever is passed, so it must be a single element that accepts
+   * them — a `<button>`, not a fragment and not `InAppLink`.
+   *
+   * ABSENT IS THE THREE DOTS, which is every other call site in the app and is
+   * why this is optional rather than required. */
+  trigger?: React.ReactNode
 }) {
   const t = useT()
   const items = actions.filter(Boolean)
@@ -150,14 +170,16 @@ export function RecordActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant={TRIGGER_TONE[tone]}
-          size="icon"
-          className="shrink-0"
-          aria-label={t("More actions")}
-        >
-          <DotsThree className="size-4" />
-        </Button>
+        {trigger ?? (
+          <Button
+            variant={TRIGGER_TONE[tone]}
+            size="icon"
+            className="shrink-0"
+            aria-label={t("More actions")}
+          >
+            <DotsThree className="size-4" />
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         {ordinary.map((a) => (

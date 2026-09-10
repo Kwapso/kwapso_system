@@ -634,7 +634,7 @@ where they are, and the fan-out reaches 0…N-1, a superset of where they sit.
   devices land together and a reconnect returns to the same object.
 - **Subscriptions narrow the sends.** The socket URL carries `?sub=`, the DO keeps it
   on the attachment beside the fence, and a broadcast skips a socket that did not ask
-  for that resource. The client portal now asks for **twelve** resources (26 Aug 2026: `processes` and `account_rates` joined with the account stamp) instead of
+  for that resource. The client portal now asks for **eleven** resources. It was twelve: `processes` joined with the account stamp on 26 Aug 2026, and `account_rates` joined that day too and was removed again on 10 Sep 2026, when the card behind it was retired. Instead of
   everything (`PORTAL_SUBSCRIPTIONS.length`, counted 26 Aug 2026), derived from
   `PORTAL_LISTENERS` so the two cannot drift.
 - **The two filters fail in OPPOSITE directions, on purpose.** The fence decides what a

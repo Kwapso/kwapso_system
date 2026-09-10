@@ -1,16 +1,25 @@
-// THE BADGE DOOR, tenancy's half — the systems built for a client, the process
-// maps inside a system, and what that client is charged. Driven through the
-// SHIPPED route handler against a real SQLite database running the real team
-// migrations.
+// THE BADGE DOOR, tenancy's half — the systems built for a client, the packages
+// of work sold to them, and the maps inside a system. Driven through the SHIPPED
+// route handler against a real SQLite database running the real team migrations.
 //
 // The reasoning is written once, on content's half
 // (workers/content/test/record-counts.test.ts). What is worth locking HERE is
 // the same four things and one more that only this worker can get wrong:
 //
-//   THE RATE CARD IS BEHIND ITS OWN MODULE, and it is the one collection on a
-//   client's record whose count is a fact about money. `commercials` is not on
-//   the shared fixture's role, so the honest answer is `null` — and a `0` there
-//   would tell a developer, in a badge, that this client has no agreed prices.
+//   A COLLECTION IS BEHIND ITS OWN MODULE, so a role that may open a record and
+//   not one of its tabs is answered `null` rather than `0` — and a `0` would
+//   tell a developer, in a badge, that the collection is empty.
+//
+//   THE FIXTURE MOVED ON 10 SEP 2026. That case used to be the RATE CARD, on
+//   `commercials`, which the shared fixture's role has never held — the honest
+//   `null` meaning "this client's agreed prices are not yours to count". The
+//   client retired the rate card ("the whole account rates also killed it"), so
+//   the case moved to WAVES, on `work`. Every tenancy-owned collection is now on
+//   a module the fixture DOES hold, so the right is taken away explicitly rather
+//   than found already missing — the same `withoutRight` shape
+//   workers/tenancy/test/query-fence.test.ts uses one file along. That is a
+//   weaker accident and a stronger test: the revocation is deliberate and the
+//   assertion says which module it was.
 
 import type { DatabaseSync } from "node:sqlite"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -84,33 +93,41 @@ describe("the record-counts door (tenancy)", () => {
     expect((await counts(IDS.staffUser, "apps", "AP_FRESH"))["processes-app"]).toBe(0)
   })
 
-  // R18, and the reason this door has no single gate of its own. The shared
-  // fixture's role holds `processes` and has never held `commercials` — a role
-  // somebody built for other reasons, which is what makes the assertion worth
-  // anything.
-  it("hands back null — never zero — for the rate card a role may not see (R18)", async () => {
+  // R18, and the reason this door has no single gate of its own.
+  it("hands back null — never zero — for a collection a role may not see (R18)", async () => {
+    // THE ROW IS REALLY THERE, or the `null` below means nothing: a count that
+    // is withheld and a count that is genuinely absent look identical from the
+    // outside, which is the whole failure this case is about.
     db()
       .prepare(
-        `INSERT INTO account_rates (id, account_id, label, cents_per_hour, created_at, creator_id)
-         VALUES ('AR1', ?, 'Development', 9000, '2026-02-01', ?)`
+        `INSERT INTO waves (id, account_id, name, created_at, creator_id)
+         VALUES ('WV1', ?, 'Autumn package', '2026-02-01', ?)`
       )
       .run(IDS.victimAccount, IDS.staffUser)
+    expect(
+      (db().prepare("SELECT COUNT(*) AS n FROM waves WHERE account_id = ?").get(IDS.victimAccount) as { n: number }).n,
+      "the wave must exist before its badge can be withheld"
+    ).toBe(1)
+
+    // Take the right away — deliberately, from a role that holds it — and the
+    // badge must go blank rather than say zero.
+    db().prepare(`DELETE FROM role_permissions WHERE role_id = ? AND module = 'work'`).run(IDS.adminRole)
     const body = await counts(IDS.staffUser, "accounts", IDS.victimAccount)
-    expect(body["account-rates"]).toBeNull()
+    expect(body["waves-account"], "a collection this role may not read is null, never 0").toBeNull()
     // …and the apps figure beside it, on a module they DO hold, is a number. One
     // right per collection, never one standing in for three.
     expect(body["apps-account"]).toBe(1)
 
-    // Grant it, and the same call now says how many lines the card holds. The
+    // Give it back, and the same call now says how many packages there are. The
     // count is real rather than a placeholder — a `null` that never becomes a
     // number is a permission nobody can tell from a broken counter.
     db()
       .prepare(
         `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
-         VALUES ('R_COMM', ?, 'commercials', 1, 1, 1, 1)`
+         VALUES ('R_WORK', ?, 'work', 1, 1, 1, 1)`
       )
       .run(IDS.adminRole)
-    expect((await counts(IDS.staffUser, "accounts", IDS.victimAccount))["account-rates"]).toBe(1)
+    expect((await counts(IDS.staffUser, "accounts", IDS.victimAccount))["waves-account"]).toBe(1)
   })
 
   // The registry is the contract between three surfaces (this door, the screen,
@@ -119,12 +136,12 @@ describe("the record-counts door (tenancy)", () => {
   // built to end — so every line this worker owes is proved to produce a NUMBER
   // for a caller holding every right, derived from the registry itself.
   it("answers every collection the registry says this worker owes", async () => {
-    db()
-      .prepare(
-        `INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
-         VALUES ('R_COMM', ?, 'commercials', 1, 1, 1, 1)`
-      )
-      .run(IDS.adminRole)
+    // NO EXTRA GRANT IS NEEDED ANY MORE. This case used to open by granting
+    // `commercials` so the rate-card badge would answer a number; the card was
+    // retired on 10 Sep 2026 and every tenancy-owned collection now sits on a
+    // module the shared fixture's role already holds. If a future collection
+    // lands on a module it does not, this case fails with the key named — which
+    // is the right outcome, because the grant belongs beside the collection.
     const ids: Record<string, string> = {
       accounts: IDS.victimAccount,
       apps: IDS.victimApp,

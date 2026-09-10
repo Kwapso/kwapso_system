@@ -102,35 +102,94 @@ describe("agent tool catalog + confirm rule (destructive + privilege grants)", (
   // worth it: six of the seven `commercials` writes declared confirm:true and
   // `set_role_rate` — the third rate card, added after the other two — declared
   // false, with nothing to catch that it had been added differently.
-  it("confirms every write that sets a rate — derived from the catalog", () => {
+  //
+  // THE FLOOR FELL FROM FIVE TO TWO AND THEN TO ZERO, both on 10 Sep 2026, and a
+  // falling tripwire is the move that turns a check blind — so this case is
+  // RETIRED IN PLACE rather than deleted or quietly weakened, and what it
+  // measures now is the retirement itself.
+  //
+  // The client retired the internal rates first, taking four of the seven
+  // `commercials` writes with the doors behind them (`create_internal_rate`,
+  // `update_internal_rate`, `set_internal_rate_active` and `set_role_rate`, the
+  // very tool this case was written about). An hour later she retired the
+  // ACCOUNT rate card too — "the whole account rates also killed it" — and the
+  // remaining three went (`create_account_rate`, `update_account_rate`, and
+  // `set_account_rate_active`, which was `set_record_active`'s `account_rate`
+  // record and was judged by the toggle suite).
+  //
+  // SO `isMoneyWrite` ANSWERS FALSE TO EVERY TOOL IN THE CATALOGUE. A case that
+  // looped over an empty set and asserted a property of each member would PASS,
+  // finding nothing, for ever — which is the exact failure `shared/workers/
+  // tool-gates.ts` argues against one file away. Instead:
+  //
+  //   · THE EMPTINESS IS PINNED, exactly, so a `commercials` write appearing
+  //     tomorrow turns this red and somebody decides about its confirm on
+  //     purpose rather than by omission. That is a stronger guard than the old
+  //     `>= 2` floor, which could not have noticed a fifth tool being added
+  //     without one.
+  //   · THE PREDICATE IS STILL EXERCISED, on the two NAMED negative controls the
+  //     old case ended with. They are what stops `isMoneyWrite` from being
+  //     re-written to match everything while the set above stays empty.
+  //   · AND `commercials` STILL HAS A LIVE READ, asserted, so "the module was
+  //     deleted" and "the module has no writes" stay distinguishable.
+  it("no tool writes money any more — pinned, so the next one that does is decided on purpose", () => {
     const money = TOOL_CATALOG.filter((t) => isMoneyWrite(t))
-    expect(money.length, "the derivation must actually find the rate writes").toBeGreaterThanOrEqual(5)
-    for (const t of money) {
-      expect(
-        t.confirm,
-        `${t.name} writes a rate card (${TOOL_GATES[t.name]}) — it must DECLARE confirm: true, not a predicate and not false`
-      ).toBe(true)
-      expect(requiresConfirm(t, { active: true }), `${t.name} must confirm whatever its input`).toBe(true)
-      expect(requiresConfirm(t, { active: false }), `${t.name} must confirm whatever its input`).toBe(true)
-    }
-    // …and it must not sweep up a price that is NOT a rate card. A client tool's
-    // price is `processes`, deliberately — a fact about one client's setup, not
-    // a card the whole book is costed from. If that line ever moves, this fails
-    // and somebody decides on purpose.
+    expect(
+      money.map((t) => t.name),
+      "a `commercials` write is back in the catalogue. That is not a failure — it is this pin doing its job. " +
+        "Restore the confirm assertions this case carried until 10 Sep 2026 (git history), decide whether the " +
+        "new tool DECLARES confirm: true, and re-point the pin at it."
+    ).toEqual([])
+    // The module is still here and still read — `get_app_impact` is a read tool
+    // on the one door `commercials` still gates — so an empty write set above is
+    // "nothing writes money" and never "the module quietly went away and this
+    // pin is vacuous". Asserted off the CATALOGUE rather than off TOOL_GATES,
+    // which holds writes only (a read's gate lives on its door, and R36's census
+    // reads it there).
+    // …and the predicate must not sweep up a price that is NOT a rate card. A
+    // client tool's price is `processes`, deliberately — a fact about one
+    // client's setup, not a card the whole book is costed from. If that line ever
+    // moves, this fails and somebody decides on purpose.
+    expect(
+      getTool("get_app_impact")?.path,
+      "`commercials`'s one surviving door lost its tool — the pin above would then be measuring a module nothing reaches"
+    ).toBe("/api/tenancy/app-money")
+    expect(isMoneyWrite(getTool("get_app_impact")!), "a READ is never a money write").toBe(false)
     expect(isMoneyWrite(getTool("set_client_tool_price")!), "a tool price is processes, not commercials").toBe(false)
     expect(isMoneyWrite(getTool("update_team")!), "the derivation must not sweep up ordinary writes").toBe(false)
   })
 
   // The other half of the same slip, and the one that cost money rather than a
   // panel: a missing `centsPerHour` used to coerce to 0, which is a VALID rate.
-  // The call succeeded and priced the role at nothing.
-  it("a rate write with no number sends undefined, so the door can refuse it", () => {
-    const build = getTool("set_role_rate")!.buildBody!
-    expect(build({ roleName: "Bookkeeper", active: true }).centsPerHour).toBeUndefined()
-    expect(build({ roleName: "Bookkeeper", centsPerHour: 4500, active: true }).centsPerHour).toBe(4500)
-    // Zero is still sendable when it is MEANT — the fix must not make a free
-    // role unpriceable.
-    expect(build({ roleName: "Volunteer", centsPerHour: 0, active: true }).centsPerHour).toBe(0)
+  // The call succeeded and priced the work at nothing.
+  //
+  // IT WAS WRITTEN ABOUT `set_role_rate` and RE-POINTED TWICE ON 10 SEP 2026, as
+  // each rate card was retired under it — first onto the account rate card's two
+  // body writes, and then, when those went too, onto the two writes that still
+  // send an hourly figure: `create_client_role` and `update_client_role`.
+  //
+  // RE-POINTED RATHER THAN RETIRED, BOTH TIMES, because the fault is in the
+  // SHAPE of the builder and never in one tool. `centsPerHour` on a client role
+  // is what an hour of that client's OWN person costs THEM — a different
+  // audience from every card that has been retired, and the same failure
+  // available: a missing number coercing to 0 is a VALID rate, so the call
+  // succeeds and prices the work at nothing. It is also the figure `listSavings`
+  // freezes onto every step of a map, so a zero here silently makes a whole
+  // process's saving worth nothing while every screen keeps rendering.
+  //
+  // Both are checked, because the original slip was one builder being written
+  // differently from its neighbour and one of a pair is exactly the case that
+  // hides that.
+  it("an hourly-rate write with no number sends undefined, so the door can refuse it", () => {
+    for (const name of ["create_client_role", "update_client_role"]) {
+      const build = getTool(name)!.buildBody!
+      const base = { id: "01ROLE", accountId: "01ACC", name: "Dispatch clerk" }
+      expect(build({ ...base }).centsPerHour, `${name} must not coerce a missing rate to 0`).toBeUndefined()
+      expect(build({ ...base, centsPerHour: 4500 }).centsPerHour, `${name} sends a real rate`).toBe(4500)
+      // Zero is still sendable when it is MEANT — the fix must not make free
+      // work unpriceable.
+      expect(build({ ...base, centsPerHour: 0 }).centsPerHour, `${name} sends a deliberate zero`).toBe(0)
+    }
   })
 
   it("every OTHER constructive write still runs freely (the friction stays gone)", () => {

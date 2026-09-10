@@ -741,7 +741,6 @@ export function DeepLinkScreen() {
     member_roles: totals.member_roles,
     invites: totals.invites,
     selectable: totals.selectable,
-    internal_rates: totals.internal_rates,
     help: totals.help,
     accounts: totals.accounts,
     // Contacts' own sidebar badge — the SAME exact total the old

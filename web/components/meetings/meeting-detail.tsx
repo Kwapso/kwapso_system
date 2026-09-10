@@ -925,7 +925,9 @@ function CalendarPanel({
         {people.length === 0 ? (
           // The kit's register (27.21) rather than a bare line — owner ruling,
           // 2026-09-07. No act: the invitation is Google's, edited there.
-          <CollectionEmptyState title={t("Nobody else is on the invitation.")} />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState title={t("Nobody else is on the invitation.")} />
+          </div>
         ) : (
           <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
             {people.map((g) => {

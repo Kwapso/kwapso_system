@@ -368,7 +368,18 @@ describe("toolSpecs — fewer tools, never fewer than the door allows", () => {
     // portal caller; nothing here grants anything. Under the two-stage
     // catalogue what it costs a step is its NAME in the index, not its
     // definition.
-    const UNGATED_CEILING = 55
+    //
+    // 55 → 52 on 2026-09-10, AND THIS ONE FALLS, which is the direction this
+    // ceiling has never moved before. The client retired the internal rates, and
+    // three of the six tools that went were READS — `list_internal_rates`,
+    // `read_margin` and `list_role_rates`. Reads carry no `TOOL_GATES` line by
+    // design ("Reads carry no hint — they just need the module's read right"), so
+    // removing them necessarily moves this number DOWN by exactly three. The
+    // three writes that went with them (`create_internal_rate`,
+    // `update_internal_rate`, `set_role_rate`) were gated and so were never in
+    // this count. Nothing was granted and nothing was withheld: the ungated set
+    // is three names smaller because three tools stopped existing.
+    const UNGATED_CEILING = 52
     expect(
       ungated.map((t) => t.name).sort(),
       `${ungated.length} tools carry no declared gate (ceiling ${UNGATED_CEILING}), so every caller is sent all of them ` +
@@ -524,7 +535,24 @@ describe("a tool summary is one line, and its detail keeps what the line dropped
     // shape as UNGATED_CEILING above — it moves when somebody decides it
     // should, in a commit that says why, and never by accident.
     const detailed = SHARED_TOOLS.filter((t) => t.detail)
-    const DETAILED_TOOLS = 126
+    //
+    // 126 → 121 → 120 on 2026-09-10, in two steps for the client's two rulings,
+    // and the pin falls only because the TOOLS are gone rather than because prose
+    // was deleted from a tool that still exists — which is the fault it watches
+    // for.
+    //
+    //   · 126 → 121. Five of the six tools the internal-rates ruling removed
+    //     carried a `detail`: `list_internal_rates`, `create_internal_rate`,
+    //     `read_margin`, `list_role_rates` and `set_role_rate`
+    //     (`update_internal_rate` had only a summary).
+    //   · 121 → 120. "The whole account rates also killed it" took three more —
+    //     `list_account_rates`, `create_account_rate` and `update_account_rate` —
+    //     and exactly ONE of them carried a detail (`create_account_rate`, which
+    //     spelled out that `centsPerHour` is whole cents: 4,500 = 45.00).
+    //
+    // `get_app_impact` keeps its detail and had it rewritten in the first of the
+    // two commits, so it is still counted here.
+    const DETAILED_TOOLS = 120
     const DETAIL_CHARS_FLOOR = 67_000
     expect(
       detailed.map((t) => t.name),

@@ -38,7 +38,7 @@ import {
   type StepFigures,
 } from "@shared/workers/savings"
 import { ticketTypeKeptForMigrationExcludedSql } from "@shared/types"
-import type { AppModule, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
+import type { AppModule, AppMoneyBack, AppRow, ProcessComment, ProcessDetail, ProcessStep, ProcessSummary, ProcessVersion } from "@shared/types"
 import { GuardError, type MemberGuard } from "./permissions"
 
 /** Glue optional clauses into a WHERE, dropping the empty ones, so a scope clause
@@ -2899,6 +2899,66 @@ export async function listSavings(
   return savingsView(
     [...apps.values()].map((a) => ({ appId: a.appId, name: a.name, processes: [...a.processes.values()] }))
   )
+}
+
+/** WHAT ONE APP HAS GIVEN BACK — hours, and what those hours are worth (8.13).
+ *
+ * BOTH halves are `listSavings`' own arithmetic, unchanged and un-recomputed:
+ * the baseline minus the latest, step by step, priced by the CLIENT-role rate
+ * frozen onto each step when it was written. This function used to add a SECOND
+ * price — a role named on the process, looked up against the agency's own
+ * internal rate card — and on 25 Aug 2026 the two arithmetics disagreed on the
+ * owner's own screen: the map said €2,766.35 a month, this tab said 0.00 and
+ * "no role attached", because the map's roles live on its STEPS. One
+ * subtraction, one seam (R25's whole argument), so this carries the seam's money
+ * through untouched and adds only the per-process rollup shape the panel draws.
+ *
+ * IT LIVES HERE BECAUSE OF THAT 25 AUG DECOUPLING, and the move is the proof of
+ * it. Until 10 Sep 2026 it sat in `lib/internal-money.ts` beside the agency's own
+ * cost cards, and the file's header said nothing a client login can reach may
+ * import it. That file was deleted when the client retired the internal rates —
+ * "kill the whole internal rates thing … for now i iwanna wipe it clean" — and
+ * this function came here rather than going with it, because for the sixteen days
+ * before that it had already read nothing but `listSavings`, three lines up. Its
+ * door (`getAppMoney`) still refuses a portal caller: what a client may see of
+ * this is `GET /api/tenancy/impact`, the same subtraction with the prices their
+ * own visibility switch withholds.
+ *
+ * A PROCESS WITH NO PRICED STEP CONTRIBUTES NULL MONEY AND ITS FULL HOURS. The
+ * asymmetry is deliberate and honest: the time is a measurement, true whether
+ * or not anybody priced it; the money is an inference that needs a number
+ * nobody has given yet, and null says so where a zero would claim the work is
+ * free.
+ *
+ * R25 rides the object: the caption comes from `listSavings` and is passed on
+ * word for word, because the money is made of the same estimates the hours are.
+ */
+export async function appMoneyBack(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  appId: string
+): Promise<AppMoneyBack> {
+  const view = await listSavings(cfg, guard, scope, { appId })
+  const app = view.apps[0]
+  const lines = (app?.processes ?? []).map((p) => ({
+    processId: p.processId,
+    name: p.name,
+    savedSecondsPerMonth: p.savedSecondsPerMonth,
+    moneyCentsPerMonth: p.pricedSteps > 0 ? p.savedCentsPerMonth : null,
+    pricedSteps: p.pricedSteps,
+    totalSteps: p.totalSteps,
+  }))
+  return {
+    appId,
+    savedSecondsPerMonth: view.savedSecondsPerMonth,
+    moneyCentsPerMonth: lines.reduce((sum, l) => sum + (l.moneyCentsPerMonth ?? 0), 0),
+    /** how many of the lines could not be priced at all — the screen says so
+     * rather than quietly reporting a smaller number as if it were the whole. */
+    unpricedProcesses: lines.filter((l) => l.moneyCentsPerMonth == null).length,
+    lines,
+    caption: view.caption,
+  }
 }
 
 // ── shared internals ─────────────────────────────────────────────────────────

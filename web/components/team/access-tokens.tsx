@@ -139,32 +139,62 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
         <h2 className="text-muted-foreground text-micro uppercase">
           {t("Access tokens")}
         </h2>
-        <AddButton label={t("New token")} onClick={() => setCreateOpen(true)} />
+        {/* R50, ONE LAYER DOWN — client ruling, 2026-09-10, over a screenshot of
+         * this exact section: "in settings the acces tokens with the plus and no
+         * tokens yet?? makes no sense, duplicated. leave only the No tokens yet."
+         * The empty state below already carries the one first-add, so while the
+         * register is empty this heading draws nothing at all — the same sentence
+         * `<ToolbarRow>` has answered since 7 Sep, now asked of the button
+         * itself because a heading row built from a `<div>` and an `<h2>` is not
+         * a toolbar and was outside R50's two censuses by construction. */}
+        <AddButton
+          label={t("New token")}
+          onClick={() => setCreateOpen(true)}
+          empty={tokens.length === 0}
+        />
       </div>
       <p className="text-muted-foreground text-sm">
         {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you, capped by your role, in the team the token was made for.")}
       </p>
 
-      {tokensQ.error ? (
-        <ShapeStateBody
-          shape="recordChrome"
-          state="error"
-          copy={{ errorTitle: t("Couldn't load your tokens.") }}
-          action={
-            <Button variant="secondary" onClick={() => tokensQ.refresh()}>
-              {t("Try again")}
-            </Button>
-          }
-        />
-      ) : tokensQ.data === undefined ? (
-        <Skeleton variant="list" lines={2} />
-      ) : tokens.length === 0 ? (
-        // The kit's register (27.21) with the one act, rather than a bare
-        // line under a button in the header — owner ruling, 2026-09-07.
-        <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
-      ) : (
-        <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
-          {tokens.map((token) => (
+      {/* ONE BOX, WHATEVER THE SECTION IS SAYING — client ruling, 2026-09-10:
+       * "once again, nothing shoudl sit on the white, everything contained!"
+       * (and, on the Team tab the day before, "nothing on top of white
+       * background, its a rule!"). Three of this section's four bodies — the
+       * error, the skeleton and the zero — used to be drawn straight onto the
+       * page ground while only the ROWS stood on soft paper, so the section
+       * changed shape as well as content every time it changed state. The
+       * panel is the section's, not the list's: `--surface-panel` against the
+       * page's `--background`, measured at 1.103 light / 1.079 dark
+       * (web/components/team/team-panel.tsx has the numbers and the reasoning).
+       * The inset is on the STATES rather than on the box, because a row
+       * already carries its own `p-3` and a box inset would double it. R67. */}
+      <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+        {tokensQ.error ? (
+          <div className="p-4">
+            <ShapeStateBody
+              shape="recordChrome"
+              state="error"
+              copy={{ errorTitle: t("Couldn't load your tokens.") }}
+              action={
+                <Button variant="secondary" onClick={() => tokensQ.refresh()}>
+                  {t("Try again")}
+                </Button>
+              }
+            />
+          </div>
+        ) : tokensQ.data === undefined ? (
+          <div className="p-4">
+            <Skeleton variant="list" lines={2} />
+          </div>
+        ) : tokens.length === 0 ? (
+          // The kit's register (27.21) with the one act, rather than a bare
+          // line under a button in the header — owner ruling, 2026-09-07.
+          <div className="px-4">
+            <CollectionEmptyState title={t("No tokens yet.")} onCreate={() => setCreateOpen(true)} />
+          </div>
+        ) : (
+          tokens.map((token) => (
             <div
               key={token.id}
               // A row rule inside one panel, as an inset hairline rather than a
@@ -234,9 +264,9 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* Create — FormShell (Law R4), IN A SLIDE-IN (Law R59).
        *

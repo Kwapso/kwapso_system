@@ -32,7 +32,7 @@ resumable ledger, and the size + rate watch) ·
 | The assistant | `agent_threads` + `agent_messages` |
 | The customer spine | `accounts` + `account_links` + `portal_users` (+ `current_account_id`) |
 | The knowledge base | `knowledge_sources` + `_chunks` + `_terms` + `_ingest` (+ Vectorize) |
-| Process maps + the money | `apps` (+ `app_staff` + `app_stakeholders` + `app_modules`) + `processes` + `process_versions` + `process_steps` (+ `process_step_tools` + `process_step_revisions`) + `process_comments` · `process_links` · `process_drafts` · `account_rates` + `internal_rates` + `internal_role_rates` |
+| Process maps + the money | `apps` (+ `app_staff` + `app_stakeholders` + `app_modules`) + `processes` + `process_versions` + `process_steps` (+ `process_step_tools` + `process_step_revisions`) + `process_comments` · `process_links` · `process_drafts`. All three rate-card tables were removed on 10 Sep 2026: `internal_rates` was removed, `internal_role_rates` was removed, `account_rates` was removed |
 | The client's own organisation | `client_departments` · `client_roles` (+ `client_role_departments` + `client_role_people`) · `client_tools` + `client_tool_prices` |
 | What we hand over | `deliverables` |
 | The work engine | `stories` (+ `story_attachments` + `story_processes`) + `sprints` · `waves` · `work_logs` + `work_prefs` · `todos` + `tasks` · `triage_duty` · `meetings` |
@@ -1413,39 +1413,83 @@ one is a PERSON reviewing and confirming — always, no exception, which is also
 why the draft doors are deliberately off the machine surface (MCP.md's
 `TOOLLESS_DOORS` carries the reasoning).
 
-### account_rates + internal_rates + internal_role_rates. KEEP (BUILT 2026-08-11 + 2026-08-17, migrations `0013` + `0031_role_rate_card`). THE THREE RATE CARDS
+### account_rates. REMOVED (BUILT 2026-08-11, migration `0013`; DROPPED 2026-09-10, migration `0074`). THE LAST OF THE THREE RATE CARDS
 
-**Separate tables, never one with a `kind` column, and that is the security
-control.** One is what an ACCOUNT IS CHARGED per hour; the other two are OURS:
-what an hour of our own work costs us (`internal_rates`), and what an hour of a
-named ROLE is worth (`internal_role_rates`, migration `0031_role_rate_card` —
-`role_name` + `cents_per_hour` + the audit block, written by the one
-`set_role_rate` door, where the role name is the key so add, re-price and retire
-are one act). The role card is the number an app's money figure is computed
-from, and its own comment in `internal-money.ts` says the load-bearing part: it
-is a THIRD rate card and it belongs in that file, which is the whole of R24's
-defence. They are the same shape, a label and a rate, which is exactly the
-danger: one table would put both numbers a single forgotten predicate apart, and
-the wrong one of them is the one figure SCOPE says a client must never see under
-any flag, ever. A door that reads `account_rates` cannot return an internal rate,
-because the internal rate is not in the table it named. The same split runs
-through the code (`lib/rates.ts` vs `lib/internal-money.ts`) and is what **Law
-R24** checks: no door the client portal opens can reach the internal file. (R24,
-not R23. R23 is the knowledge base's citation law. This sentence named the wrong
-one, which pointed anybody tracing the guarantee at a law that has nothing to do
-with it.)
+**No rate card is left in this product. There were three that morning, and the
+separation between them was the security control.**
 
-`internal_rates.is_default` (at most one, by partial unique index) is the rate a
-margin applies to logged time whose kind of work is not yet named. Tool costs are
-a COLUMN on the app (`tool_cost_cents_per_month`) rather than a table: what a
-system costs us to keep running is one number about one system, and the margin is
-the only thing that reads it.
+- `account_rates` — what an ACCOUNT IS CHARGED per hour, by kind of work. One
+  live line per (account, kind of work), held by a partial unique index. Four
+  rows on staging when it went.
+- `internal_rates` — what an hour of our own work cost us.
+- `internal_role_rates` — what an hour of a named ROLE was worth, added by
+  migration `0031_role_rate_card` (2026-08-17): `role_name` + `cents_per_hour` +
+  the audit block, written by the one `set_role_rate` door, where the role name
+  was the key so add, re-price and retire were one act.
+
+**All three went on 10 Sep 2026, in two rulings an hour apart.** First the
+agency's own two were removed, and the margin computed from them was removed
+with them, along with the library they lived in, their doors and their tools.
+The ruling: "kill the whole internal rates thing. will develop this in the future
+much much more but for now i iwanna wipe it clean" (migration `0073`). Then the client-facing card: **"The whole account rates also killed
+it"** (migration `0074`, which drops this table). With it went `lib/rates.ts`,
+the four `/api/tenancy/rates*` doors, three agent/MCP tools, `set_record_active`'s
+`account_rate` record. The Rates tab on every client's record was removed too.
+So was the `prices.rates` projection on the client's own value door, and so was
+the "Money given back, every month" panel that multiplied saved hours by the
+card's first live line.
+
+**WHAT DID NOT GO, and this is the paragraph to read first.** The money on the
+SPRINT is untouched — `sprints.sold_price_cents`, what a block of work was
+actually sold for, which is where the real revenue has always lived. So is the
+CLIENT'S OWN side: `client_roles.cents_per_hour` and `client_tool_prices`, what
+their people and software cost THEM, which is what every saving is multiplied by.
+Retiring the rate card removed what we CHARGE per hour as a stored card; it
+removed nothing about what has been sold or what a process is worth.
+
+The doctrine is worth keeping on the page now that the tables are gone, because
+it is the reasoning the next money feature will have to answer to. All three
+cards were the same shape, a label and a rate, which was exactly the danger: one
+table with a `kind` column would have put the numbers a single forgotten
+predicate apart, and the wrong one of them was the one figure SCOPE said a client
+must never see under any flag, ever. A door that read the charged card was
+unable to return an internal rate, because the internal rate was not in the table
+it named. The same split ran through the code — one library for the charged card
+against a second that held the internal money and nothing else — and that is what
+**Law R24** checked: no door the client portal opened could reach the internal
+file. **R24's inbound half was retired with the internal tables on 10 Sep 2026.**
+Its whole doctrine was "structural, not conditional", and after that removal no
+money figure in the base was structurally fenced: every one that reaches a client
+reaches them because a CONDITION let it — the per-account price-visibility
+switch, the main-stakeholder fence on a step's role rate, or a scope test on an
+app's running cost. Retiring the account rate card an hour later did not change
+that doctrine; it did shrink what the switch governs, which is now exactly one
+figure (`prices.soldCents`, what a client has bought) rather than two. (R24, not
+R23. R23 is the knowledge base's citation law. This paragraph used to name the
+wrong one, which pointed anybody tracing the guarantee at a law that has nothing
+to do with it.)
+
+`internal_rates.is_default` (at most one, by partial unique index) was the rate
+the margin applied to logged time whose kind of work was not yet named; it went
+with its table. Tool costs are still a COLUMN on the app
+(`tool_cost_cents_per_month`) rather than a table: what a system costs us to keep
+running is one number about one system. **That column survived the removal and
+nothing reads it for money any more.** The margin was its only reader. It is
+deliberately left in place, holding whatever has been entered, because the
+client's ruling was "for now" and promised the idea will be developed much
+further — but until that work is specified it is a stored number with no
+consumer, and anybody costing an app should know that.
 
 ### client_departments + client_roles + client_role_departments + client_role_people + client_tools + client_tool_prices. KEEP (BUILT 2026-08-24, team migration `0052_the_client_organisation`). THE CLIENT'S OWN ORGANISATION
 
 Who does the work AT A CLIENT, what an hour of them costs, and what they run on
-— the other side of the money from the internal cards above, and the side a
-saving actually multiplies. Six tables, every one fenced by `account_id`:
+— and, since 10 Sep 2026, the ONLY hourly money left in this base. This paragraph
+has been re-pointed twice in one day: it named the internal cards as "the other
+side"; then it named the charged card when those went, and all three of those
+were dropped on 10 Sep 2026. **These six were not touched by either ruling**, and the reason is worth
+saying rather than assuming: they are what a client's own staff and software cost
+THEM, on their own record, and a saving is the subtraction of two of these
+numbers. Six tables, every one fenced by `account_id`:
 
 - **`client_departments`**, the named parts of their business.
 - **`client_roles`**, who does the work. `cents_per_hour` is what an hour of
@@ -1547,9 +1591,11 @@ was the single thing he named as most likely to make him abandon this.
   so the database refuses it rather than a check a race slips past.
 - **`discarded_at` is how a runaway timer is binned** without deleting anything.
   The row and the name of whoever binned it survive; every sum subtracts it.
-- **`kind` is nullable on purpose**, a work log will eventually name its kind of
-  work so the margin can group by it. Until then `lib/internal-money.ts` applies
-  the default internal rate and says so on screen.
+- **`kind` is nullable on purpose.** A work log was one day going to name its
+  kind of work; the margin was going to group by it, and until 10 Sep 2026 an
+  unnamed kind was charged at the default internal rate by the library that
+  held our own money. Both were removed that day, along with the internal rate
+  cards themselves, so `kind` stays on the table with nothing grouping by it.
 
 `work_prefs` is one row per person and today one column: whether starting a timer
 stops the ones they already have running. **Off by default**, a setting that
@@ -1557,8 +1603,9 @@ silently stopped your other work would be discovered by losing an hour.
 
 ### todos + tasks. KEEP (BUILT 2026-08-12, team migration `0016_todos_and_tasks`). THE OTHER TWO NOUNS
 
-**Two tables, not one with a `kind` column**, and the reason is the one that split
-the rate cards: they are the same SHAPE and opposite AUDIENCES. A **to-do**
+**Two tables, not one with a `kind` column**, and the reason is the one that
+split the rate cards back when there were three of them: they are the same SHAPE
+and opposite AUDIENCES. A **to-do**
 is aimed at the client and appears in their portal; a **task** is our own admin
 and must never leave the building. One table with a flag would put both a
 forgotten `WHERE` clause apart, and the wrong one of them is a list of the
@@ -1693,7 +1740,8 @@ every handler on all three modules opens with `refusePortalCaller`, and
 `workers/content/test/agency-internal.test.ts` proves three things off disk (none
 of the doors is on the portal gateway's surface, every one of them refuses, and
 no file in `web-portal/` names these tables, paths or fields). That is the same
-structural shape R24 uses for margin, applied to a different secret.
+structural shape R24 used for the margin until R24 was retired on 10 Sep 2026,
+applied here to a different secret.
 
 | Table | Module | From (Glide) | Rows | What it is |
 |---|---|---|---|---|
@@ -1776,7 +1824,8 @@ it later a door change rather than a data migration.
 `processes`: "Ana handed over the Payroll API reference" names a deliverable, and
 a role that may open the app but not its shelf must not read that sentence out of
 the feed either (R18). The live ping carries the **app's** id rather than the
-deliverable's, the shape `account_rates` and `account_links` already have — a
+deliverable's, the shape `account_links` already has. The retired account rate
+card had it too, until 10 Sep 2026 — a
 deliverable has no list and no screen of its own, so the app is the one row a
 listener can act on.
 
@@ -1970,7 +2019,9 @@ fact, not a record anybody curates.
   `help.account_id` (`0009_help_account`), the Tickets rename's data half
   (`0010_ticket_vocabulary`), and the ticket's work-engine columns + `ref_counters`
   (`0011_ticket_work_engine`). **And since (all per-team):** process maps + the two
-  rate cards (`0013_process_maps_and_money`), stories + sprints
+  rate cards (`0013_process_maps_and_money` — BOTH of those two, `internal_rates`
+  and `account_rates`, were dropped again on 10 Sep 2026 by `0073` and `0074`),
+  stories + sprints
   (`0014_stories_and_sprints`), work logs (`0015_work_logs`), to-dos + tasks
   (`0016_todos_and_tasks`), triage duty (`0017_triage_duty`), the agency's own
   housekeeping (`0018_agency_internal`), Google connections

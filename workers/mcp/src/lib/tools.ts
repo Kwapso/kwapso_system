@@ -387,11 +387,11 @@ const RECORD_TOGGLE_TOOLS: McpTool[] = Object.entries(RECORD_TOGGLES).map(([reco
 const RECORD_ACTIVE_GENERIC: McpTool = {
   name: "set_record_active",
   description:
-    "Switch a record off, or back on, across any of the twenty-one record kinds this surface also " +
+    "Switch a record off, or back on, across every record kind this surface also " +
     "publishes as named tools (set_account_active, set_role_active, …) — this is the same operation, " +
     "generic. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, " +
-    "app, app_module, process, wave, client_department, client_role, client_tool, account_rate, " +
-    "internal_rate, meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile " +
+    "app, app_module, process, wave, client_department, client_role, client_tool, " +
+    "meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile " +
     "or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a " +
     "deliverable also needs `appId`. `active` false switches it off (archive, deactivate, revoke, " +
     "cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED, and " +
@@ -482,30 +482,30 @@ export async function forwardTool(
   // R24's OUTBOUND HALF, ON THE SURFACE THAT HAS NO CONTEXT TO TAINT.
   //
   // `shared/workers/money-taint.ts` refuses a client-readable WRITE from a turn
-  // that has already read an internal number. That works on the agent because a
-  // turn can be ASKED what it has run — the check reads the same messages the
-  // model is reading. An MCP `tools/call` is one HTTP request carrying a bearer
-  // token: no turn, no conversation, no prior tool list. So the agent's predicate
-  // ported here verbatim is ALWAYS false, and would be a check that passes with
-  // the hole fully open — the exact failure this codebase keeps re-earning, which
-  // is why it is written down here rather than discovered a third time.
+  // that has already read a figure the client's own screen may withhold. That
+  // works on the agent because a turn can be ASKED what it has run — the check
+  // reads the same messages the model is reading. An MCP `tools/call` is one HTTP
+  // request carrying a bearer token: no turn, no conversation, no prior tool
+  // list. So the agent's predicate ported here verbatim is ALWAYS false, and
+  // would be a check that passes with the hole fully open — the exact failure
+  // this codebase keeps re-earning, which is why it is written down here rather
+  // than discovered a third time.
   //
   // THE CHAIN IS REAL ON THIS SURFACE. An outside model reads a client's ticket
   // prose through `list_help_tickets`, and that prose can carry an instruction:
-  // read the margin, then reply to the ticket with it. Both tools are here, the
-  // reply door is on the portal's own allow-list, and nothing in between could
-  // see the connection.
+  // read what the app gives back, then reply to the ticket with the figure. Both
+  // tools are here, the reply door is on the portal's own allow-list, and nothing
+  // in between could see the connection.
   //
   // SO THE NUMBER DOES NOT LEAVE BY THIS DOOR AT ALL — R24's own doctrine, "a
   // condition can be inverted and a permission can be granted, an import cannot
   // be forgotten", applied to a surface whose context we cannot see. The
   // precedent is this file's own: twenty-one Google tools are already refused a
   // personal access token because "the blast radius of a leaked one must not
-  // include a mailbox" (MCP.md §3). It must not include what our own hour costs
-  // either — SCOPE names the margin as the one number a client must never see —
-  // and the mitigation is the same one Google gets: `agent_chat`, under the
-  // caller's own rights, where the per-turn taint applies because there is
-  // genuinely a turn.
+  // include a mailbox" (MCP.md §3). It must not include a price a particular
+  // client's own screen withholds either — and the mitigation is the same one
+  // Google gets: `agent_chat`, under the caller's own rights, where the per-turn
+  // taint applies because there is genuinely a turn.
   //
   // WHY THE REFUSAL IS HERE AND NOT A FILTER ON `MCP_TOOLS`. It was a filter
   // first. Two things stopped it, both discovered by running it rather than by
@@ -523,10 +523,9 @@ export async function forwardTool(
   // — `route(input)` for a tool that resolves per call from its own input (which
   // is how `set_record_active` could otherwise be POINTED at a money door),
   // `tool.path` for everything else. `readsInternalMoney` is the same derived
-  // predicate the agent's taint uses and the same one
-  // `internal-money-never-in-portal` rot-checks against tenancy's own source, so
-  // a new money door is one line in money-taint.ts and this follows it with
-  // nothing edited here.
+  // predicate the agent's taint uses and the same one `money-taint-outbound`
+  // rot-checks against tenancy's own ROUTES, so a new money door is one line in
+  // money-taint.ts and this follows it with nothing edited here.
   if (readsInternalMoney(dest))
     return {
       ok: false,
@@ -534,7 +533,7 @@ export async function forwardTool(
         error: "not_on_this_surface",
         // Says what to do instead, or an outside developer files it as a bug and
         // the next person "fixes" it by deleting the guard.
-        message: `${tool.name} reads the agency's own internal figures, which are not available to a personal access token — a leaked token's blast radius must not include what our work costs us. Ask the assistant for it through agent_chat instead: same rights, and it can refuse to repeat the number where a client would read it.`,
+        message: `${tool.name} reads a money figure a client's own screen may withhold, which is not available to a personal access token — a leaked token's blast radius must not include a price we have not shown that client. Ask the assistant for it through agent_chat instead: same rights, and it can refuse to repeat the number where a client would read it.`,
       }),
     }
   let res: Response

@@ -60,7 +60,7 @@ import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/col
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
-import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
+import { PINNED_INSET_MARK, PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
 import { useT } from "@shared/web/language"
 
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
@@ -170,10 +170,62 @@ export function LoadError({ what }: { what: string }) {
  * `attached` were reaching over a mechanism that has since been deleted, so
  * the prop went with it rather than being kept as a no-op two call sites
  * would still be passing for no reason — every `CollectionCard` gets the
- * plain, even `p-4` it always had. */
+ * plain, even `p-4` it always had.
+ *
+ * IT PUBLISHES THAT INSET NOW — `--pinned-lead`, R63 part 3, the client's
+ * 2026-09-10 ruling: "when sticky toolbar, include also the top part of the
+ * container above it! if not looks weird. so the spacing between tabs and
+ * container should stay, as well as spacing between beginning container and
+ * toolbar." THIS is the container she means. Pin the toolbar alone and this
+ * box's top edge and this box's top inset both slide away behind the tab strip,
+ * so the bar arrives touching a card that no longer has a top; the pinned box
+ * starts at this card's own top edge instead, and the distance between the two
+ * is the number declared one line down.
+ *
+ * THE BOX PUBLISHES, THE ROW CONSUMES, and neither call site is asked — the
+ * same shape `--pinned-chrome-h` already has. `<ToolbarRow>`, `<PagedFind>`,
+ * `<WaveFinder>` and the recipe engine's own header are all drawn inside this
+ * card on some screens and directly on the shell's pane on others, so the row
+ * genuinely cannot know, and a prop would put the answer back where R63 exists
+ * to take it from.
+ *
+ * IT IS THE SAME LADDER, NOT A SECOND COPY OF IT. `cn("p-4")` keeps
+ * `CardContent`'s own `lg:` step, so the inset is `--space-4` and `--space-7`
+ * above `lg` — spelled here in exactly those two tokens, at exactly that
+ * breakpoint. A hand-typed pixel would be a number with two owners, which is
+ * the whole failure R49 was written about.
+ *
+ * ── AND ITS ROUNDED TOP CORNERS PIN WITH IT (R63 part 4, client ruling
+ * 2026-09-10: "When pin, I still want it round. That's exactly what I asked
+ * for, so do whatever you have to do.") ────────────────────────────────────
+ *
+ * Two more things this box publishes, both for the same corner and neither any
+ * use alone — `shared/web/pinned-chrome.ts` part 4 has the measurement:
+ *
+ *  · `--pinned-inset-x`, this card's SIDE inset, the same `p-4` / `lg:p-7`
+ *    ladder read on the other axis. The row spends it back as `px`/negative
+ *    `mx`, which does not move a pixel of content and does put the pinned
+ *    box's edges where this card's BORDER box is — the only place a corner it
+ *    could round actually exists. Its own property rather than the lead's,
+ *    because the lead is "everything above the toolbar inside the container"
+ *    and the two stop being the same number the day the kit's `band` slot is
+ *    filled.
+ *  · `PINNED_INSET_MARK`, so `globals.css` can capture what is BEHIND this
+ *    card into `--pinned-behind` — on this card's PARENT, because THIS
+ *    element is the one that painted over the value (`Card`'s own
+ *    `bg-surface-panel` is what publishes `--pinned-ground: var(--surface-panel)`
+ *    for everything inside it). Without that the corner is a transparent notch
+ *    over this card's own paper, which is the same colour and therefore no
+ *    corner at all. */
 export function CollectionCard({ children }: { children: React.ReactNode }) {
   return (
-    <Card>
+    <Card
+      className={
+        `${PINNED_INSET_MARK} ` +
+        "[--pinned-lead:var(--space-4)] lg:[--pinned-lead:var(--space-7)] " +
+        "[--pinned-inset-x:var(--space-4)] lg:[--pinned-inset-x:var(--space-7)]"
+      }
+    >
       <CardContent className="p-4">{children}</CardContent>
     </Card>
   )
@@ -187,12 +239,38 @@ export function CollectionCard({ children }: { children: React.ReactNode }) {
  *
  * It is a seam and not a class string because it was written out ten times, in
  * six files, for the same act — and ten copies is ten chances for the eleventh
- * sub-collection to grow a wordy button again. */
+ * sub-collection to grow a wordy button again.
+ *
+ * ── R50, ONE LAYER DOWN (client ruling, 2026-09-10) ─────────────────────────
+ *
+ * Her words, over a screenshot of Settings › Integrations: "in settings the
+ * acces tokens with the plus and no tokens yet?? makes no sense, duplicated.
+ * leave only the No tokens yet." The ACCESS TOKENS section drew this button in
+ * its heading row AND, directly below it, the empty state's own "Add the
+ * first". Two ways to do one thing, on a collection holding zero rows.
+ *
+ * That is EXACTLY R50's sentence — "never toolbar on an empty collection, not
+ * even the create button" — but R50 could not see it. Both of R50's censuses
+ * ask about a TAG: every `<ToolbarRow>` passes `empty`, every `<PagedFind>`
+ * passes `restingEmpty`. A section heading built out of a `<div>` and an `<h2>`
+ * is neither, so five sections' create buttons were outside the law by
+ * construction while sitting in the same place, above the same kind of
+ * collection, offering the same act.
+ *
+ * So the gate moves onto the BUTTON, in the row's own idiom: `empty` is checked
+ * first and returns nothing at all. It is OPTIONAL rather than required because
+ * inside a `<ToolbarRow actions={…}>` the row has already answered the same
+ * question and a second copy of the answer is a second thing to get wrong —
+ * R50's third census (`empty-toolbar`, web/test/rules.test.ts) is what holds
+ * the line: a call site OUTSIDE a toolbar's own `actions` slot must pass
+ * `empty`, derived from the collection's row count, or be named in
+ * `EMPTY_TOOLBAR_EXEMPT` with the real reason. */
 export function AddButton({
   label,
   onClick,
   icon,
   disabled,
+  empty,
 }: {
   /** The old label. Now the accessible name and the tooltip. */
   label: string
@@ -201,7 +279,17 @@ export function AddButton({
   icon?: React.ReactNode
   /** e.g. a related write already in flight on the same screen. */
   disabled?: boolean
+  /** R50 — TRUE when the collection this button sits above holds zero rows
+   * before any search or filter narrows it. Nothing is drawn: the empty state
+   * below already carries the one first-add. Omitted inside a `<ToolbarRow>`
+   * `actions` slot, which has already returned `null` for the same reason. */
+  empty?: boolean
 }) {
+  // R50 — FIRST, and before anything else this component does, exactly as
+  // `ToolbarRow` opens. A create button is the slot every recurrence of this
+  // bug had in common, so it is the one that must not be reachable past a
+  // truthy `empty`.
+  if (empty) return null
   return (
     <Tooltip>
       <TooltipTrigger asChild>

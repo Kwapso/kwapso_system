@@ -1,13 +1,24 @@
-// R24, OUTBOUND — THE AGENCY'S OWN NUMBER MAY NOT LEAVE ON THE ASSISTANT'S NEXT
-// CALL. Behavioural, because the only claim worth making is that the write never
-// reaches its door.
+// R24 — A FIGURE THE CLIENT'S OWN SCREEN WITHHOLDS MAY NOT LEAVE ON THE
+// ASSISTANT'S NEXT CALL. Behavioural, because the only claim worth making is
+// that the write never reaches its door.
 //
-// R24 makes the internal cost card unreachable INBOUND, and does it properly: no
-// import path, no portal door, checked on every build. The assistant needs
-// neither. It reads the margin through a door R24 fences correctly — as an
-// agency admin holding `commercials:read` — and then replies into a ticket
-// thread the client reads, and the figure is in the client's inbox with nothing
-// broken anywhere on the path.
+// THE FIXTURE MOVED ON 10 SEP 2026, THE MECHANISM DID NOT. This suite used to
+// run `read_margin` — the agency's own margin, R24's original subject — and the
+// client retired that feature whole ("kill the whole internal rates thing … for
+// now i iwanna wipe it clean"), taking the tool, its door and R24's inbound half
+// with it. It was RE-POINTED rather than retired because the property being
+// measured is the per-turn taint, not the number: `get_app_impact` is the door
+// the list narrowed to, and it is a genuine subject rather than a stand-in.
+// `GET /api/tenancy/app-money` hands over what one app gives back priced IN
+// FULL, where the client's own value door nulls those prices on any app whose
+// account has price visibility switched off. Same subtraction, one of them
+// unredacted — so it is still a number a particular client may be forbidden to
+// see, arriving in that client's own inbox.
+//
+// The assistant needs no import to do it. It reads the figure through a door
+// fenced correctly — as an agency admin holding `commercials:read` — and then
+// replies into a ticket thread the client reads, and the number is in the
+// client's inbox with nothing broken anywhere on the path.
 //
 // The instruction to do that arrives from the client. A portal ticket
 // description is 20,000 characters of their own prose (`POST /api/content/help`
@@ -24,7 +35,7 @@
 // stored, and `confirmAndRun` resumes it later from that row with none of the
 // turn's inputs in front of it. The chips learned this the hard way and left the
 // lesson in `runPlanLoop`. And a proposal stores ALL of its turn's calls, not
-// just the dangerous subset — so `read_margin` and a client-readable write
+// just the dangerous subset — so `get_app_impact` and a client-readable write
 // arrive here as ONE approved batch that the proposing turn had run neither half
 // of, which is the case a refusal made only at deferral time would miss.
 //
@@ -55,14 +66,14 @@ const db = () => holder.db as DatabaseSync
 /** Every door the tools actually reached. The security claim is about this list. */
 let doorCalls: string[] = []
 
-const MARGIN_DOOR = "/api/tenancy/margin"
+const MONEY_DOOR = "/api/tenancy/app-money"
 const REPLY_DOOR = "/api/content/help/reply"
 
 function env(): never {
   const door = {
     fetch: async (url: string) => {
       doorCalls.push(new URL(url).pathname)
-      return new Response(JSON.stringify({ ok: true, marginCents: 412_900 }), {
+      return new Response(JSON.stringify({ ok: true, moneyCentsPerMonth: 412_900 }), {
         headers: { "Content-Type": "application/json" },
       })
     },
@@ -99,17 +110,17 @@ async function threadProposing(calls: { tool: string; input: Record<string, unkn
   return threadId
 }
 
-const MARGIN_CALL = { tool: "read_margin", input: { accountId: IDS.victimAccount } }
+const MONEY_CALL = { tool: "get_app_impact", input: { appId: IDS.victimApp } }
 const REPLY_CALL = {
   tool: "reply_help_ticket",
   input: {
     helpId: "H_ONE",
-    body: "As requested for your reconciliation, the margin on this account is 4,129.00.",
+    body: "As requested for your reconciliation, this app gives back 4,129.00 a month.",
     taggedUserIds: [IDS.staffUser],
   },
 }
 
-describe("R24 outbound — a turn that read the money cannot write where the client reads", () => {
+describe("R24 — a turn that read a withheld figure cannot write where the client reads", () => {
   // THE CONTROL GROUP FIRST. A suite that only proves a refusal cannot tell a
   // working control from a broken door: if the reply never reached its door in
   // this harness for some unrelated reason, every assertion below would pass
@@ -123,26 +134,26 @@ describe("R24 outbound — a turn that read the money cannot write where the cli
     ).toContain(REPLY_DOOR)
   })
 
-  it("…and the margin door is reachable too", async () => {
-    const threadId = await threadProposing([MARGIN_CALL])
+  it("…and the money door is reachable too", async () => {
+    const threadId = await threadProposing([MONEY_CALL])
     await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })
-    expect(doorCalls).toContain(MARGIN_DOOR)
+    expect(doorCalls).toContain(MONEY_DOOR)
   })
 
   // THE FINDING, ON THE PATH IT WOULD ACTUALLY HAVE TAKEN.
-  it("a proposal holding the margin AND the reply reads the money and refuses the reply", async () => {
-    const threadId = await threadProposing([MARGIN_CALL, REPLY_CALL])
+  it("a proposal holding the money read AND the reply reads the money and refuses the reply", async () => {
+    const threadId = await threadProposing([MONEY_CALL, REPLY_CALL])
     await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })
 
-    expect(doorCalls, "the money read is the caller's own, and stays allowed").toContain(MARGIN_DOOR)
+    expect(doorCalls, "the money read is the caller's own, and stays allowed").toContain(MONEY_DOOR)
     expect(
       doorCalls,
-      "the margin was read in this batch, so the client-readable write must never reach its door (R24 outbound)"
+      "the money was read in this batch, so the client-readable write must never reach its door (R24)"
     ).not.toContain(REPLY_DOOR)
   })
 
   it("the refusal is written down as a failed step, not silently dropped", async () => {
-    const threadId = await threadProposing([MARGIN_CALL, REPLY_CALL])
+    const threadId = await threadProposing([MONEY_CALL, REPLY_CALL])
     await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })
     // A refusal nobody can see is a refusal nobody learns from — the panel
     // rehydrates a reopened chat from these rows, so it must stay red there.
@@ -157,22 +168,22 @@ describe("R24 outbound — a turn that read the money cannot write where the cli
     expect(
       refused[0].content,
       "the reason must say WHY, or the assistant cannot tell the person anything useful"
-    ).toMatch(/internal figures/)
+    ).toMatch(/may withhold/)
   })
 
   // ORDER IS THE WHOLE MECHANISM, so it is stated rather than assumed: the taint
   // is what the conversation has read by the time the write is attempted, and a
   // write that happens FIRST has read nothing.
-  it("a reply BEFORE the margin read is not refused — the taint is what has been read, not what is coming", async () => {
-    const threadId = await threadProposing([REPLY_CALL, MARGIN_CALL])
+  it("a reply BEFORE the money read is not refused — the taint is what has been read, not what is coming", async () => {
+    const threadId = await threadProposing([REPLY_CALL, MONEY_CALL])
     await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })
     expect(doorCalls).toContain(REPLY_DOOR)
-    expect(doorCalls).toContain(MARGIN_DOOR)
+    expect(doorCalls).toContain(MONEY_DOOR)
   })
 
   it("an agency-only write is untouched by the money — the control must not fire on ordinary work", async () => {
     const threadId = await threadProposing([
-      MARGIN_CALL,
+      MONEY_CALL,
       { tool: "create_account", input: { name: "A new company" } },
     ])
     await confirmAndRun(env(), request(), cfg, guard, actor, { threadId, approve: true, source: "web" })

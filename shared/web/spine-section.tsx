@@ -223,13 +223,23 @@ export function SpineSection({
       <p className="text-muted-foreground mt-1 text-sm">
         {t("Three looks for the whole app, not just the rail.")}
       </p>
-      <SpineChoice
-        className="mt-4"
-        value={chosen}
-        disabled={saving !== null}
-        onChange={(next) => void choose(next)}
-        badgeLabel={t("In use")}
-      />
+      {/* R67 — THE OPTION CARDS STAND ON SOFT PAPER, NOT ON THE PAGE.
+       * Client, 2026-09-10: "nothing shoudl sit on the white, everything
+       * contained!" This one is not merely a rule being applied — the kit's
+       * option card is `Card`'s DEFAULT variant (sheet paper), and in LIGHT
+       * `--card`, `--background` and `--surface-raised` are all #FFFEF9, so on
+       * the bare page these cards measured contrast 1.000 and were held up by
+       * their hairline alone. It is the identical pairing
+       * web/components/team/team-panel.tsx documents from the Team tab the day
+       * before. On `--surface-panel` they are 1.103 light / 1.111 dark. */}
+      <div className="mt-4 rounded-[var(--radius)] bg-surface-panel p-4">
+        <SpineChoice
+          value={chosen}
+          disabled={saving !== null}
+          onChange={(next) => void choose(next)}
+          badgeLabel={t("In use")}
+        />
+      </div>
     </section>
   )
 }

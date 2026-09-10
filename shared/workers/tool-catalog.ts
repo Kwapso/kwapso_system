@@ -803,20 +803,24 @@ export const SHARED_TOOLS: SharedTool[] = [
   {
     name: "set_dropdown_default",
     mcpName: "set_dropdown_value_default",
+    // THE TOOL NAME AND `isDefault` KEEP THEIR SPELLING; the PROSE moved to the
+    // word a person reads (client, 2026-09-10). The flag protects a value from
+    // being switched off and has never pre-selected anything, so the old
+    // description promised a behaviour the app does not have.
     summary:
-      "Mark a dropdown value as a team default, or take the mark off (`isDefault`). A default cannot be switched off until the mark comes off.",
+      "Protect a dropdown value so it can't be switched off, or take that protection off (`isDefault`). It never pre-selects the value for anybody.",
     detail:
-      "Mark a dropdown value (by `id`) as one of the team's defaults, or take that mark off, with `isDefault`. A default value cannot be switched off by `set_dropdown_value_active` until the mark is taken off — that is what the mark is for. Renaming a default is always allowed.",
+      "Protect a dropdown value (by `id`) so nobody can switch it off, or take that protection off, with `isDefault`. A protected value cannot be switched off by `set_dropdown_value_active` until the protection comes off — that is the whole of what the flag does; it does NOT pre-select the value on any form. Renaming a protected value is always allowed.",
     binding: "TENANCY", method: "POST", path: "/api/tenancy/selectable/default",
     schema: obj({ id: S, isDefault: B }, ["id", "isDefault"]),
     buildBody: (i) => ({ id: str(i, "id"), isDefault: i.isDefault === true }),
     agent: {
       write: true,
-      // Taking the mark OFF is the destructive half: it is the step that makes a
-      // built-in value removable, so it is the one worth asking about.
+      // Taking the protection OFF is the destructive half: it is the step that
+      // makes a built-in value removable, so it is the one worth asking about.
       confirm: (i) => i.isDefault !== true,
       summarize: (i) =>
-        `${i.isDefault === true ? "Make" : "Stop treating"} dropdown value ${str(i, "id")} ${i.isDefault === true ? "one of the defaults" : "as one of the defaults"}`,
+        `${i.isDefault === true ? "Protect" : "Take the protection off"} dropdown value ${str(i, "id")}`,
     },
   },
 
@@ -2599,149 +2603,31 @@ export const SHARED_TOOLS: SharedTool[] = [
   },
 
   /* ------------------------------- the money -------------------------------- */
-  // BOTH rate cards and the margin. Every door below refuses a client login, and
-  // the internal two are the figures SCOPE says a client must never see under any
-  // flag, ever — a machine caller reaches them only as a staff member whose role
-  // holds `commercials`, which no client role does (R24).
-  {
-    name: "list_account_rates",
-    summary:
-      "What one account is CHARGED per hour, by kind of work (`accountId`). This is the client-facing rate card, what they agreed, not what our own hour costs us.",
-    binding: "TENANCY", method: "GET", path: "/api/tenancy/rates",
-    schema: obj({ accountId: S }, ["accountId"]),
-    buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
-    agent: { write: false, summarize: (i) => `Read the rate card for ${accountLabel(i, "accountId")}` },
-  },
-  {
-    name: "create_account_rate",
-    summary:
-      "Add a line to an account's rate card: a kind of work and `centsPerHour` in whole cents. One live line per kind of work.",
-    detail:
-      "Add a line to an account's rate card: a kind of work and what it is charged per hour, in whole CENTS (4,500 = 45.00). One live line per kind of work per account.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates",
-    schema: obj({ accountId: S, label: S, centsPerHour: N, currency: S }, ["accountId", "label", "centsPerHour"]),
-    buildBody: (i) => ({
-      accountId: str(i, "accountId"),
-      label: str(i, "label"),
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
-      currency: opt(i, "currency"),
-    }),
-    agent: { write: true, confirm: true, summarize: (i) => `Set the rate for ${str(i, "label")}` },
-  },
-  {
-    name: "update_account_rate",
-    summary: "Edit one line of an account's rate card (by id). `centsPerHour` is whole cents.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/rates/update",
-    schema: obj({ id: S, label: S, centsPerHour: N, currency: S }, ["id", "label", "centsPerHour"]),
-    buildBody: (i) => ({
-      id: str(i, "id"),
-      label: str(i, "label"),
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
-      currency: sent(i, "currency"),
-    }),
-    agent: { write: true, confirm: true, summarize: (i) => `Change the rate for ${str(i, "label")}` },
-  },
-  {
-    name: "list_internal_rates",
-    summary:
-      "What an hour of OUR OWN work costs us. INTERNAL, never shown to a client. The one marked `isDefault` covers unnamed kinds of work.",
-    detail:
-      "What an hour of OUR OWN work costs us, by kind of work. INTERNAL: this is the agency's own cost, it is never shown to a client under any setting, and the one marked `isDefault` is the rate a margin applies to logged time whose kind of work is not yet named.",
-    binding: "TENANCY", method: "GET", path: "/api/tenancy/internal-rates",
-    schema: obj({}),
-    buildQuery: () => "",
-    agent: { write: false, summarize: () => "Read what our own hours cost" },
-  },
-  {
-    name: "create_internal_rate",
-    summary:
-      "Add what a kind of our own work costs per hour, in whole cents. `isDefault` true makes it the fallback; only one may be default.",
-    detail:
-      "Add what a kind of our own work costs per hour, in whole CENTS. `isDefault: true` makes it the rate a margin applies to time whose kind of work is unknown, there can be only one, and setting a second is refused.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates",
-    schema: obj({ label: S, centsPerHour: N, currency: S, isDefault: B }, ["label", "centsPerHour"]),
-    buildBody: (i) => ({
-      label: str(i, "label"),
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
-      currency: opt(i, "currency"),
-      isDefault: typeof i.isDefault === "boolean" ? i.isDefault : undefined,
-    }),
-    agent: { write: true, confirm: true, summarize: (i) => `Set our internal rate for ${str(i, "label")}` },
-  },
-  {
-    name: "update_internal_rate",
-    summary: "Edit one of our own cost lines (by id). `centsPerHour` is whole cents.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/internal-rates/update",
-    schema: obj({ id: S, label: S, centsPerHour: N, currency: S, isDefault: B }, ["id", "label", "centsPerHour"]),
-    buildBody: (i) => ({
-      id: str(i, "id"),
-      label: str(i, "label"),
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
-      currency: sent(i, "currency"),
-      isDefault: typeof i.isDefault === "boolean" ? i.isDefault : undefined,
-    }),
-    agent: { write: true, confirm: true, summarize: (i) => `Change our internal rate for ${str(i, "label")}` },
-  },
-  {
-    name: "read_margin",
-    summary:
-      "Revenue minus our own logged time minus tool costs, for one `accountId`. INTERNAL — never repeat it to a client in any form.",
-    detail:
-      "Revenue minus our own logged time minus tool costs, for one account (`accountId`), with every line it was built from. INTERNAL, never repeat this figure to a client, in any form; it is the one number SCOPE says they must never see. `loggedTimeAvailable: false` means the work engine's time records are not in this database yet, so the time half of the subtraction is missing and the number is not yet a margin.",
-    binding: "TENANCY", method: "GET", path: "/api/tenancy/margin",
-    schema: obj({ accountId: S }, ["accountId"]),
-    buildQuery: (i) => `?accountId=${encodeURIComponent(str(i, "accountId"))}`,
-    agent: { write: false, summarize: (i) => `Work out the margin on ${accountLabel(i, "accountId")}` },
-  },
-  {
-    name: "list_role_rates",
-    summary:
-      "What an hour of each ROLE is worth. INTERNAL, never quote one to a client. Each row carries `roleName`, `centsPerHour` and whether it is `active`.",
-    detail:
-      "What an hour of each ROLE is worth, the bookkeeper, the dispatcher, whoever actually does a process. INTERNAL: never quote one to a client. This is the third rate card and it answers a different question from the other two: `list_account_rates` is what a client is charged and `list_internal_rates` is what a kind of our own work costs us. Each row carries `roleName`, `centsPerHour` and whether it is still `active`.",
-    binding: "TENANCY", method: "GET", path: "/api/tenancy/role-rates",
-    schema: obj({}),
-    buildQuery: () => "",
-    agent: { write: false, summarize: () => "Read what an hour of each role is worth" },
-  },
-  {
-    name: "set_role_rate",
-    summary:
-      "Set what an hour of one role is worth, by `roleName`. `centsPerHour` is whole cents; `active` false switches it off. INTERNAL.",
-    detail:
-      "Set what an hour of one role is worth, by name. The ROLE is the key, so this one tool adds, re-prices and deactivates: `roleName` names it, `centsPerHour` is WHOLE CENTS an hour (45 euros is 4500), and `active: false` switches it off without deleting anything. Re-sending a price that has not changed moves nothing and writes no history. INTERNAL, this number feeds what an app is said to have given back, and it is never shown to a client.",
-    binding: "TENANCY", method: "POST", path: "/api/tenancy/role-rates",
-    schema: obj({ roleName: S, centsPerHour: N, active: B }, ["roleName", "centsPerHour", "active"]),
-    buildBody: (i) => ({
-      roleName: str(i, "roleName"),
-      // `undefined`, NOT 0, and the four sibling rate writes all said so first.
-      // `0` is a VALID rate — it is what "this role costs nothing" looks like —
-      // so coercing a missing number to it does not refuse the call, it prices
-      // the role at zero and returns success. Every margin and every app saving
-      // computed from that role afterwards is quietly wrong, and nothing is in
-      // an error state to find. Sent as `undefined` the door's own validator
-      // sees `Number(undefined)` → NaN → "A rate is a whole number of cents an
-      // hour" (money.ts `centsPerHour`), which is the true answer.
-      centsPerHour: typeof i.centsPerHour === "number" ? i.centsPerHour : undefined,
-      active: i.active !== false,
-    }),
-    agent: {
-      write: true,
-      // DECLARED true, and also DERIVED — `isMoneyWrite` would return true for
-      // this tool whatever this line said. Both, for the same reason the
-      // privilege writes carry both: the derivation is the guarantee, and the
-      // declaration is what makes the catalogue read honestly to somebody
-      // scanning it. agent.test.ts asserts they agree.
-      confirm: true,
-      summarize: (i) => `Price an hour of ${str(i, "roleName")}`,
-    },
-  },
+  // WHAT ONE APP GAVE BACK, and that is now the whole of it. The door below
+  // refuses a client login — a machine caller reaches it only as a staff member
+  // whose role holds `commercials`, which no client role does.
+  //
+  // NINE TOOLS STOOD HERE UNTIL 10 SEP 2026, retired in two rulings an hour
+  // apart. Six went first — `list_internal_rates`, `create_internal_rate`,
+  // `update_internal_rate`, `read_margin`, `list_role_rates` and `set_role_rate`,
+  // the agency's own two cost cards and the margin computed from them ("kill the
+  // whole internal rates thing … for now i iwanna wipe it clean"), and Law R24's
+  // structural half went with them. Then the ACCOUNT RATE CARD's three —
+  // `list_account_rates`, `create_account_rate` and `update_account_rate`, what
+  // a CLIENT was charged per hour by kind of work — at the second ruling: "the
+  // whole account rates also killed it". Their fourth act, deactivate, was
+  // `set_record_active`'s `account_rate` record and went with them
+  // (shared/workers/record-toggles.ts).
+  //
+  // SO `commercials` IS A READ-ONLY MODULE NOW. `MODULE_OFFERED_RIGHTS` in
+  // shared/team-modules.ts says so, because R36 fails on a box that decides
+  // nothing just as hard as on a door no role can open.
   {
     name: "get_app_impact",
     summary:
-      "What one app gives back a month: `savedSecondsPerMonth`, `moneyCentsPerMonth` and a line per process. Quote `caption`. The money half is INTERNAL.",
+      "What one app gives back a month: `savedSecondsPerMonth`, `moneyCentsPerMonth` and a line per process. Quote `caption`. AGENCY-ONLY.",
     detail:
-      "What ONE app has given back every month: `savedSecondsPerMonth` (the hours), `moneyCentsPerMonth` (those hours at the rate of the role that used to spend them) and one line per process in `lines`, each naming its `roleName` and `centsPerHour`. `unpricedProcesses` counts the processes that could not be priced because they name no role or the role has no live rate, their HOURS are still in the total and their money is not, and saying so is the point. Always quote `caption` with the figure. INTERNAL: the money half comes from the role rate card, so never repeat it to a client, the hours half on its own is what the client's own value screen shows.",
+      "What ONE app has given back every month: `savedSecondsPerMonth` (the hours), `moneyCentsPerMonth` (those hours at the rate of the CLIENT'S OWN role that used to spend them, frozen onto each step of the map) and one line per process in `lines`. `unpricedProcesses` counts the processes that could not be priced because no step on them carries a rate, their HOURS are still in the total and their money is not, and saying so is the point. Always quote `caption` with the figure. AGENCY-ONLY, and the visibility SWITCH is why: this door hands over the same subtraction the client's own value screen makes, with none of the prices that screen withholds on an account whose price visibility is off.",
     binding: "TENANCY", method: "GET", path: "/api/tenancy/app-money",
     schema: obj({ appId: S }, ["appId"]),
     buildQuery: (i) => `?appId=${encodeURIComponent(str(i, "appId"))}`,

@@ -152,13 +152,23 @@ export function ThemeSection({ className }: { className?: string }) {
       <p className="text-muted-foreground mt-1 text-sm">
         {t("Light, dark, or whatever this device is set to. It is remembered on this device.")}
       </p>
-      <AppearanceOptionGroup
-        className="mt-4"
-        options={options}
-        value={chosen}
-        onValueChange={choose}
-        badgeLabel={t("In use")}
-      />
+      {/* R67 — THE OPTION CARDS STAND ON SOFT PAPER, NOT ON THE PAGE.
+       * Client, 2026-09-10: "nothing shoudl sit on the white, everything
+       * contained!" This one is not merely a rule being applied — the kit's
+       * option card is `Card`'s DEFAULT variant (sheet paper), and in LIGHT
+       * `--card`, `--background` and `--surface-raised` are all #FFFEF9, so on
+       * the bare page these cards measured contrast 1.000 and were held up by
+       * their hairline alone. It is the identical pairing
+       * web/components/team/team-panel.tsx documents from the Team tab the day
+       * before. On `--surface-panel` they are 1.103 light / 1.111 dark. */}
+      <div className="mt-4 rounded-[var(--radius)] bg-surface-panel p-4">
+        <AppearanceOptionGroup
+          options={options}
+          value={chosen}
+          onValueChange={choose}
+          badgeLabel={t("In use")}
+        />
+      </div>
     </section>
   )
 }

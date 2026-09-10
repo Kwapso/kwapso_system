@@ -130,6 +130,7 @@ import { InAppLink } from "@/components/shell/in-app-link"
 import { NoAccess } from "@/components/deep-link/screen-bits"
 import { SelectableScreen } from "@/components/choices/selectable-screen"
 import type { Can, Right } from "@/lib/perms"
+import { ticketTypeColour } from "@/lib/type-colours"
 import { usePermissions } from "@/lib/perms"
 import type { ActiveTeam } from "@/lib/use-active-team"
 import { useT } from "@shared/web/language"
@@ -157,6 +158,27 @@ export type ModuleSettingsSection = {
   /** Whether this vocabulary can grow — `SelectableScope.create` carries the
    * whole argument, and it is a fact about the words rather than the reader. */
   create: boolean
+  /** THE COLOUR EACH WORD IS KNOWN BY, when this group has one — and the whole
+   * of what turns the section from a LIST into a WALL OF CHIPS.
+   *
+   * The client, 2026-09-10: *"on ticket type, show it like chips with their
+   * color, not a list."* A ticket type is already a coloured chip everywhere
+   * else in the app — the list's Type cell, the triage card, the type picker,
+   * every panel on the dashboard — and it was a stack of grey rows only on the
+   * one screen where the words are SET. Her ruling of 2026-09-07 is the same
+   * sentence read from the other end: *"for type, kill the emojis. this is
+   * legacy. in current system we use colors."*
+   *
+   * A FUNCTION AND NOT A COLUMN, because a value's colour is not stored:
+   * `selectable_data` has four meaningful columns and none of them is a colour
+   * (`web/lib/type-colours.ts` argues that out at length and is the ONE place a
+   * ticket type's colour is decided). Passing the resolver down is what keeps
+   * that true — the editor draws whatever colour it is handed and knows nothing
+   * about ticket types, and a second group that gains a palette hands its own.
+   *
+   * ABSENT MEANS A LIST, which is every other vocabulary: Sprint types and
+   * Story types have a MARK rather than a colour and their rows read as rows. */
+  colour?: (value: string) => string
 }
 
 export type ModuleSettingsPage = {
@@ -171,7 +193,25 @@ export type ModuleSettingsPage = {
    * short sentence per module is cheaper to translate and impossible to get
    * grammatically wrong. */
   title: string
-  description: string
+  /** NO SUBTITLE, AND THE FIELD IS GONE RATHER THAN UNREAD. The client,
+   * 2026-09-10: *"in ticket settings (or any other module) no subtitle."* It
+   * used to carry one sentence per page ("The words and rules this team's
+   * tickets run on.") drawn straight under the `<h1>`.
+   *
+   * IT IS A DELETION AND NOT A HIDDEN FIELD, because a column nothing renders
+   * is a sentence that gets translated into three languages on every build and
+   * read by nobody — R28 would have called the string an ORPHAN the moment the
+   * `<p>` went, which is the catalogue saying the same thing this comment does.
+   *
+   * AND IT PUTS THIS PAGE BACK IN STEP WITH EVERY OTHER MAIN SCREEN. Settings
+   * itself is a bare `<Headline as="h1">` with nothing under it
+   * (`settings-screen.tsx`), and so is every collection heading; a subtitle
+   * here was the one page in the app that explained itself twice, once in its
+   * title and once underneath. The SECTION descriptions below are a different
+   * thing and they stay: they say what a particular vocabulary DOES, which is
+   * not recoverable from its name.
+   *
+   * `sections` follows `title` directly. */
   sections: ModuleSettingsSection[]
 }
 
@@ -185,7 +225,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
   {
     segment: "tickets",
     title: "Ticket settings",
-    description: "The words and rules this team's tickets run on.",
     sections: [
       {
         key: "ticket-type",
@@ -199,20 +238,45 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         title: "Ticket types",
         description: "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.",
         create: true,
+        // THE COLOUR, WHICH IS WHAT MAKES THIS SECTION A WALL OF CHIPS — the
+        // one map the whole app reads a ticket type's colour from, handed in
+        // rather than re-derived (`ModuleSettingsSection.colour` above).
+        colour: ticketTypeColour,
       },
-      {
-        key: "ticket-status",
-        gate: { module: "selectable_data", right: "read" },
-        kind: "vocabulary",
-        types: ["Ticket status"],
-        title: "Ticket statuses",
-        // Says what can be changed AND what cannot, because the difference is
-        // invisible on screen: these rows look exactly like the ones above and
-        // behave differently. `VOCABULARY_HOMES["Ticket status"]` is `"labels"`
-        // — the code owns the stages, these rows own the words for them.
-        description: "The words for the stages a ticket moves through. The stages themselves are fixed; what you set here is what each one is called.",
-        create: false,
-      },
+      // TICKET STATUSES USED TO BE THE SECOND SECTION, AND THE CLIENT TOOK IT
+      // OFF ON 2026-09-10: *"remove ticket status, this cannot be adjusted from
+      // the app."* She is describing the shape exactly. The stages are
+      // `HELP_STATUSES` in `shared/types.ts` — six words the server validates
+      // every transition against — and the `Ticket status` rows carried only a
+      // display WORD for each, which is why the section had `create: false` and
+      // a description that spent two sentences explaining what could not be
+      // done on it.
+      //
+      // WHAT DECIDES THE WORD ON SCREEN NOW, which is the question removing an
+      // editor has to answer: the app's own copy, translated. `t("Triaged")`,
+      // `t("In progress")` and the rest are written at the screens that draw
+      // them (`tickets-collection.tsx`'s `COLUMN` table, `collection-filters.ts`'
+      // status facet), and they go through the catalogue like every other
+      // sentence. NOTHING has ever read a `Ticket status` row — the group is
+      // `"labels"` in `shared/selectable-homes.ts` and there is not one call
+      // site anywhere in `web/`, `web-portal/` or `workers/` that looks a
+      // stage's word up in it. So the rows were an editor over a vocabulary the
+      // app does not consult: rename "Resolved" to "Closed" and every screen
+      // still said Resolved. The section is gone because it was a control that
+      // did nothing, which is the same fault as a gear on a module with no
+      // settings.
+      //
+      // THE ROWS ARE NOT DELETED and this change does not touch data. They are
+      // still on Settings › Choices, which is the editor for the team's WHOLE
+      // vocabulary, and they are still seeded. Taking them out of the world is a
+      // migration and a decision about the other two `"labels"` groups beside
+      // them, which is hers to make and is written up in the report rather than
+      // taken here.
+      //
+      // STORY STATUS AND SPRINT STATUS ARE THE SAME SHAPE AND NEEDED NO EDIT:
+      // neither module has a settings page at all today, so there was no second
+      // section to remove. If Stories ever gains one, this note is the ruling it
+      // inherits — `"labels"` groups do not get an editor.
     ],
   },
 ]
@@ -280,7 +344,7 @@ export function moduleSettingsPage(segment: string): ModuleSettingsPage | undefi
  *     an icon — arguably more, because a row is labelled and looks like content.
  *
  *   • THE ROW CAN SAY WHAT IS ON THE PAGE. It carries the visible SECTIONS, not
- *     just the page, so the tab can print "Ticket types · Ticket statuses"
+ *     just the page, so the tab can print "Ticket types"
  *     underneath the name instead of a bare noun. An index whose rows are only
  *     nouns is a menu; one that says what is inside is scannable. And because
  *     the sections are the FILTERED ones, the subtitle never promises a block
@@ -328,10 +392,11 @@ export function ModuleSettingsScreen({
           display-m/56/500; `web/components/records/collection-heading.tsx`
           carries the client rulings behind that). This is a main screen: it is
           an address, it has a workspace tab, and it is not a record. */}
-      <div>
-        <Headline as="h1" size="display-m">{t(page.title)}</Headline>
-        <p className="text-muted-foreground mt-1 text-sm">{t(page.description)}</p>
-      </div>
+      {/* NO SUBTITLE UNDER IT — client, 2026-09-10: *"in ticket settings (or
+          any other module) no subtitle."* See `ModuleSettingsPage.title`'s own
+          note for why the FIELD went with the `<p>` rather than being left
+          unread. A bare `<h1>` is what Settings itself draws one screen up. */}
+      <Headline as="h1" size="display-m">{t(page.title)}</Headline>
 
       {/* THE SECTIONS, STACKED — the same arrangement Settings' own Appearance
           and Team panels use (`gap-8`), because this is the same kind of page
@@ -355,14 +420,21 @@ export function ModuleSettingsScreen({
             // into a record detail is the move the client stopped on Settings ›
             // Team ("Everything should be in different containers… not taken
             // anywhere else", 2026-09-09), and it applies here for the same
-            // reason. Renaming, the emoji, the default mark and deactivating
-            // are all inline on the row already.
+            // reason. Renaming, the mark, the default mark and deactivating are
+            // all reachable on the row (or, on a coloured group, on the chip)
+            // already. "The emoji" is what this line used to say, and the word
+            // went with the client's ruling of 2026-09-10 — a mark is a short
+            // word or an initial, and the door has refused a pictograph since
+            // `optionalMark` shipped (`shared/workers/validate.ts`).
             standalone={false}
             scope={{
               types: section.types,
               title: t(section.title),
               description: t(section.description),
               create: section.create,
+              // ABSENT ON A GROUP WITH NO PALETTE, which is what turns the
+              // section back into a list — see `ModuleSettingsSection.colour`.
+              colour: section.colour,
             }}
           />
           )

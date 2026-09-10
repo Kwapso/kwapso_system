@@ -1387,107 +1387,26 @@ step("Logged time")
 
 // ── 6c · the money, and the arithmetic checked out loud ──────────────────────
 //
-// THE ONE THING THE HISTORY COULD NOT SUPPLY. Glide's sprint has six columns and
-// none of them is a price; there was no rate card in the old app at all. So the
-// money side has real HOURS behind it and no real RATES — which would leave
-// every money screen empty and untestable, on the one part of the app where
-// "it computes the right number" is the whole feature.
+// THE RATE-CARD STEP IS GONE, AND WHAT IT USED TO SOLVE IS WORTH KEEPING ON
+// FILE. Glide's sprint has six columns and none of them is a price; there was no
+// rate card in the old app at all. So this seed used to invent one — two
+// PLACEHOLDER lines on the one company the portal tester stands in, with the
+// word "placeholder" in the LABEL rather than in a comment nobody reading the
+// screen would see — because otherwise every money screen was empty and
+// untestable on the one part of the app where "it computes the right number" is
+// the whole feature.
 //
-// So the rate cards are seeded with PLACEHOLDER figures, and the word is in the
-// label rather than in a comment nobody reading the screen will see. Two things
-// make that safe: this is staging, and price visibility is OFF unless somebody
-// switches it on per account (`commercials_visible`), so no client login can see
-// them even if one were pointed at this environment.
+// Three steps stood here across the day and all three went with their doors:
+// an internal placeholder rate and a "Checking the margin adds up" subtraction
+// (retired with the internal rates, 10 Sep 2026), and the CHARGED card itself,
+// retired an hour later — "the whole account rates also killed it".
 //
-// The point is not the numbers. It is that the subtraction is then CHECKED —
-// hours × rate, minus tools, equals the margin the door reports — so a change
-// that quietly breaks the arithmetic fails here rather than on an invoice.
-
-step("Rate cards")
-const PLACEHOLDER_INTERNAL = { label: "Our time (placeholder rate)", centsPerHour: 4500, isDefault: true }
-const PLACEHOLDER_CHARGED = [
-  { label: "Implementation (placeholder rate)", centsPerHour: 11000 },
-  { label: "Enhancement (placeholder rate)", centsPerHour: 9500 },
-]
-{
-  const mine = must(await api("/api/tenancy/internal-rates", {}, staff.cookie), "reading our own cost card")
-    .internalRates ?? []
-  if (!mine.some((r) => r.label === PLACEHOLDER_INTERNAL.label)) {
-    must(await post("/api/tenancy/internal-rates", PLACEHOLDER_INTERNAL, staff.cookie), "setting what our hour costs")
-    say("created", PLACEHOLDER_INTERNAL.label, "internal rates")
-  } else say("reused", PLACEHOLDER_INTERNAL.label, "internal rates")
-
-  // Charged rates go on ONE company — the one the portal tester stands in — so
-  // there is a populated rate card to look at without pricing twenty clients
-  // with numbers nobody agreed.
-  const priced = idFor.get(companies.find((c) => c.name === PORTAL_TESTERS[0].companies[0])?.glideId)
-  if (priced) {
-    const card = must(
-      await api(`/api/tenancy/rates?accountId=${encodeURIComponent(priced)}`, {}, staff.cookie),
-      "reading the account's rate card"
-    ).rates ?? []
-    for (const r of PLACEHOLDER_CHARGED) {
-      if (card.some((x) => x.label === r.label)) {
-        say("reused", r.label, "account rates")
-        continue
-      }
-      must(await post("/api/tenancy/rates", { accountId: priced, ...r }, staff.cookie), `pricing ${r.label}`)
-      say("created", r.label, "account rates")
-    }
-  }
-}
-
-step("Checking the margin adds up")
-{
-  // ASK ABOUT A COMPANY THAT ACTUALLY HAS HOURS ON IT. The rate card above went
-  // on the portal tester's company so the portal has prices to show, but which
-  // companies ended up with logged time depends on where this run's cut of the
-  // history landed. Asserting arithmetic against a company with no time is a row
-  // of green ticks about nothing — so the busiest one is found first, from the
-  // logs themselves.
-  const logs = await allPages("/api/content/work-logs", "logs", staff.cookie)
-  const seconds = new Map()
-  for (const l of logs) {
-    if (!l.accountId) continue
-    seconds.set(l.accountId, (seconds.get(l.accountId) ?? 0) + (l.seconds ?? 0))
-  }
-  const busiest = [...seconds].sort((x, y) => y[1] - x[1])[0]?.[0]
-  const priced = busiest ?? idFor.get(companies.find((c) => c.name === PORTAL_TESTERS[0].companies[0])?.glideId)
-  const m = must(
-    await api(`/api/tenancy/margin?accountId=${encodeURIComponent(priced)}`, {}, staff.cookie),
-    "reading the margin"
-  )
-  // Every line the door built the answer from, re-added here. If these agree,
-  // the number on the screen is the number the data says.
-  const linesAddUp = (m.lines ?? []).reduce((n, l) => n + l.costCents, 0)
-  check("the time lines add up to the time cost", linesAddUp === m.timeCostCents, `${linesAddUp} vs ${m.timeCostCents}`)
-  check(
-    "and the margin is revenue minus time minus tools",
-    m.marginCents === m.revenueCents - m.timeCostCents - m.toolCostCents,
-    JSON.stringify(m).slice(0, 220)
-  )
-  // Each line is hours × that line's rate, rounded once. A line whose cost does
-  // not follow from its own two numbers is the failure this is here to catch.
-  for (const l of m.lines ?? []) {
-    const expected = Math.round((l.seconds / 3600) * l.centsPerHour)
-    check(
-      `“${l.label}” costs its own hours × its own rate`,
-      l.costCents === expected,
-      `${l.costCents} vs ${expected} (${l.seconds}s at ${l.centsPerHour}/h)`
-    )
-  }
-  check(
-    "there is logged time behind the figure, so the checks above mean something",
-    (m.lines ?? []).some((l) => l.seconds > 0),
-    "no time logged against this company — the arithmetic checks pass trivially"
-  )
-  const named = companies.find((c) => idFor.get(c.glideId) === priced)?.name ?? priced
-  console.log(
-    `  margin on ${named}: sold ${m.revenueCents}c − time ${m.timeCostCents}c − tools ${m.toolCostCents}c = ${m.marginCents}c` +
-      (m.marginPercent === null ? " (no revenue to be a percentage of — Glide never priced a sprint)" : ` (${m.marginPercent}%)`)
-  )
-  if (!m.loggedTimeAvailable) console.log("  (the work engine's tables are not in this database — time is not counted)")
-}
+// WHAT THE MONEY SCREENS READ NOW NEEDS NO PLACEHOLDER, which is why nothing
+// replaces this step. The one figure left is what an app GIVES BACK, and it is
+// priced off the CLIENT'S OWN role rates frozen onto each step of a process map
+// — real numbers this seed already writes with the maps, agreed with the person
+// whose work they describe. A seed that posted to `/api/tenancy/rates` would
+// 404 on its first run.
 
 step("Why we meet")
 const purposeIdFor = new Map()
@@ -1737,14 +1656,29 @@ check(
 // agency's own working material; the portal gateway forwards none of them, and
 // each one refuses a client login at the door as well (R21) — which is the half
 // this checks, because the same person is served at the agency hostname too.
+//
+// The money door below needs an APP rather than an account, and it must be a
+// REAL one: `app-money` refuses a client login before it looks anything up, so a
+// made-up id would still produce a 403 and the check would pass for the wrong
+// reason. The positive sweep underneath asks the same door as staff and expects
+// a 200, which is what makes the id being real load-bearing rather than tidy.
+const moneyAppId = [...appIdFor.values()][0]
+check("there is a real app to ask the money door about", !!moneyAppId, "no app was seeded")
 for (const [what, path] of [
   ["the backlog", "/api/content/stories"],
   ["the sprint list", "/api/content/sprints"],
   ["everybody's logged time", "/api/content/work-logs"],
   ["our own internal admin", "/api/content/tasks"],
   ["the meetings list", "/api/content/meetings"],
-  ["what our own hour costs us", "/api/tenancy/internal-rates"],
-  ["what this account leaves us", `/api/tenancy/margin?accountId=${aHome}`],
+  // THE MONEY. There were three agency-only money doors on this list during the
+  // day and there is now one: the internal rate card and the margin went with
+  // the internal rates, and the account rate card went an hour later. What is
+  // left is `app-money` — what one app gives back, priced in full, which is the
+  // figure a client sees a REDACTED version of through their own value screen.
+  // It is the only door this list can carry and it must keep carrying one: a
+  // client-refusal sweep with no money door on it stops testing the fence that
+  // matters most.
+  ["what one app gives back, priced", `/api/tenancy/app-money?appId=${moneyAppId}`],
 ]) {
   const res = await api(path, {}, a.cookie)
   check(
@@ -1762,8 +1696,7 @@ for (const [what, path] of [
   ["logged time", "/api/content/work-logs"],
   ["our own admin", "/api/content/tasks"],
   ["the meetings list", "/api/content/meetings"],
-  ["our internal rate card", "/api/tenancy/internal-rates"],
-  ["the margin on a client", `/api/tenancy/margin?accountId=${aHome}`],
+  ["what one app gives back, priced", `/api/tenancy/app-money?appId=${moneyAppId}`],
 ]) {
   const res = await api(path, {}, staff.cookie)
   check(`but we can read ${what}`, res.status === 200, `got ${res.status}`)

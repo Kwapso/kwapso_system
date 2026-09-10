@@ -500,7 +500,7 @@ export function AppDetailScreen({
             {
               value: "impact",
               label: t("Impact"),
-              icon: CONCEPT_ICON["internal-rates"],
+              icon: CONCEPT_ICON.impact,
               badge: "",
               badgeVariant: "" as const,
             },

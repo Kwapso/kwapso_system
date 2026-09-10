@@ -1,20 +1,30 @@
 "use client"
 
-// YOUR OWN PAGE — who you are, how we reach you, what language you read kwapso
-// in, and what you have done.
+// YOUR OWN PAGE — who you are, how we reach you, and what you have done.
 //
-// WHY IT IS NOT A TAB ON SETTINGS ANY MORE. Everything on this screen is about a
-// PERSON; everything left on Settings is about the APP (the tokens a machine
-// holds, the Google account this deployment may act through, the invitations
-// waiting for you to accept). A tester looking for "change my name" opened
-// Settings, found a strip called Account / Teams / Access, and had to guess —
-// which is the owner's own note, and the reason this is a destination of its own
-// reached from the profile menu, where a person already looks for themselves.
+// WHY IT IS NOT A TAB ON SETTINGS ANY MORE. Who you are is not the same question
+// as how the app is set up: Settings holds the tokens a machine holds, the Google
+// account this deployment may act through, the invitations waiting for you to
+// accept. A tester looking for "change my name" opened Settings, found a strip
+// called Account / Teams / Access, and had to guess — which is the owner's own
+// note, and the reason this is a destination of its own reached from the profile
+// menu, where a person already looks for themselves. That reasoning is unchanged
+// and it is why your name, your email address and your history are here.
 //
-// It carries no team scope at all. A profile, an email address and a reading
-// language belong to the person and follow them into any team they are in, so
-// this screen renders directly in the shell beside /home and /settings rather
-// than under /t/<teamId>.
+// THE LANGUAGE LEFT AGAIN ON 2026-09-10, and only the language. The client:
+// *"language shoudl be in settings somewhere, not in my porfile"*. It came here
+// in August under a wider version of the sentence above — everything about a
+// PERSON on this page, everything about the APP on Settings — and that version
+// was too wide, because the app's size, its light or dark and the sidebar's
+// colour are every bit as personal and have never been anywhere but Settings ›
+// Appearance. Language is a DISPLAY choice, not an identity one, so it now sits
+// with the other three (screens/settings-screen.tsx, the Appearance tab). The
+// August move stands for everything else on this screen.
+//
+// It carries no team scope at all. A profile and an email address belong to the
+// person and follow them into any team they are in, so this screen renders
+// directly in the shell beside /home and /settings rather than under
+// /t/<teamId>.
 
 import * as React from "react"
 
@@ -29,7 +39,6 @@ import { EmailChangeDialog } from "@/components/team/email-change-dialog"
 import { ProfileDialog } from "@/components/team/profile-dialog"
 import { auth } from "@/lib/api"
 import { formatDateTime } from "@shared/web/format"
-import { LanguageSection } from "@shared/web/language-section"
 import { personName, personInitials } from "@/lib/identity"
 import { useCached } from "@shared/web/store"
 import type { ActiveTeam } from "@/lib/use-active-team"
@@ -84,16 +93,16 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
           />
         </section>
 
-        {/* Below the name, above the history: language is a setting somebody
-         * changes once and then forgets, but they have to be able to FIND it
-         * while reading a language they do not understand — so it sits high, and
-         * its own control shows the flags rather than hiding them. */}
-        <LanguageSection save={(lang) => auth.setLanguage(lang)} />
-
         <section className="motion-panel-in flex flex-col gap-4">
           <h2 className="text-muted-foreground text-micro uppercase">
             {t("Account activity")}
           </h2>
+          {/* ONE BOX, WHATEVER THIS SECTION IS SAYING (R67) — client, 2026-09-10:
+            * "nothing shoudl sit on the white, everything contained!" The feed,
+            * its skeleton and its error all stood directly on the page ground
+            * while the block above them sat on soft paper, so this section read
+            * as the one unfinished thing on the screen. */}
+          <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel p-4">
           {accountActivityQ.error ? (
             <ShapeStateBody
               shape="recordChrome"
@@ -118,6 +127,7 @@ export function ProfileScreen({ active }: { active: ActiveTeam }) {
               }))}
             />
           )}
+          </div>
         </section>
       </div>
 

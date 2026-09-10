@@ -787,9 +787,13 @@ again, which is the only property that matters here.
   reviewed identity gate). No ungated door ships, on either surface.
 - **R21 `client-reachable-doors`** — a door on the agency's own material refuses a
   client login AT THE DOOR. Enumerate by what a Client-role caller can REACH.
-- **R24 `internal-money-never-in-portal`** — if your module touches what our own
-  hour costs, it goes through `workers/tenancy/src/lib/internal-money.ts` and
-  nowhere near `web-portal/`.
+- **R24 `money-taint-outbound`** — if your module hands back a money figure a
+  client's own screen WITHHOLDS, add its reader to `MONEY_READERS`
+  (`shared/workers/money-taint.ts`) and re-pin `INTERNAL_MONEY_DOORS`. A turn
+  that has read one may then not write to a door the client's browser opens, and
+  MCP refuses the door outright. This law used to have a second, structural half
+  about the agency's own internal rates, which the client retired on 10 Sep
+  2026 — RULES.md's row says why it was retired rather than re-pointed.
 
 **The worker**
 
@@ -940,7 +944,41 @@ again, which is the only property that matters here.
   while offering none of its three acts, and the build stayed green. More
   generally: when you redesign a screen so that a row no longer navigates, the
   acts that lived on the record it used to open are now YOUR screen's to carry.
-  A slide-in (`Sheet`, R59) is how the rest of this app does it.
+  Give the record a real screen with a real address and put them there — the
+  member profile (`web/components/team/member-screen.tsx`, 2026-09-10) is the
+  worked example, and its header carries the argument for the address.
+- **R65 `chip-above-title`** — if your module draws a wall of cards, the chip
+  goes ABOVE the title. The client has ruled it twice ("in cards put chips above
+  title" on the Kanban card, "chip on top of title" on the member card), so it
+  is a law rather than a preference: a card is scanned top-down and the chip is
+  what SORTS it, which is no use read after the name it qualifies. What you owe
+  is two things and neither is a judgement call. Name the record through the
+  kit's own `<CardTitle>` (`@shared/ui/components/card/card`) — a title
+  hand-rolled into a `<span>` has no position a census can read, and the whole
+  law is a claim about position — and open every `<Badge>` in that card BEFORE
+  it in the source, which inside a `Card` is the same thing as above it
+  (`flex flex-col`, "a card is a column"). The census finds your card by
+  React's own rule rather than by a list: a `<Card>` with a `key=` is one of
+  many, drawn from a row; a `<Card>` without one is a panel and is not this
+  law's subject. The way out is a reasoned `CARD_CHIP_BELOW_OK` line, and it
+  is empty.
+- **R67 `sections-stand-on-paper`** — nothing your module draws sits on the bare
+  page ground. The client has ruled it twice ("nothing on top of white
+  background, its a rule!", then "once again, nothing shoudl sit on the white,
+  everything contained! (make this a law)"), and the unit is a `<section>` that
+  carries its own heading. Two shapes pass and you pick one: the section IS the
+  box (`rounded-[var(--radius)] bg-surface-panel`, the way
+  `web/components/team/team-panel.tsx` does it), or every BODY it draws stands in
+  one (heading outside, content on paper — what `CollectionFrame` gives you free
+  on any recipe collection). **The trap is the branch you are not looking at.**
+  Containment is checked per ternary arm, because the fault that earned this law
+  was a section whose ROWS stood on soft paper while its error, its skeleton and
+  its zero stood on the page — so it changed shape as well as content every time
+  it changed state, and no reader would have filed it as a bug. If your section
+  has four states, all four owe a surface. A heading, a sentence, a lone button
+  and an overlay are not content and are never asked. The way out is a reasoned,
+  rot-checked `UNCONTAINED_SECTION_OK` line, and today it holds the client
+  portal and nothing else.
 
 **The words** (the ones that catch every new module, every time)
 
@@ -953,6 +991,32 @@ again, which is the only property that matters here.
   `shared/web/field.tsx`. **R44 `translation-ceiling`** — a catalogued string is
   answered in every language, up to a ceiling that only falls.
 - **R34 `glossary-in-copy`** — the glossary's word, never a synonym for it.
+- **R66 `no-emoji-in-copy`** — no emoji, in the words or in the data. The client
+  has ruled three times ("i said no emojis. why are there still emojis? kill
+  them!", 2026-08-31; "for type, kill the emojis … in current system we use
+  colors", 2026-09-07; "also kill emojis!!!", 2026-09-10). Two halves and you
+  owe both. **The copy:** your sentences land in `shared/i18n-strings.json` via
+  R28, and a pictograph in one fails the build — write the word. **The data:**
+  if your module seeds a vocabulary, the `mark` on every seeded row is a short
+  word or an initial, never a glyph — `optionalMark`
+  (`shared/workers/validate.ts`) already refuses one at the write door, and this
+  law holds the same line on the seed and on the migration ledger, which the
+  door cannot see. What counts as an emoji is the DOOR's own answer, imported,
+  so typographic dingbats (a close ✕, a department's ★) are not caught. The trap
+  worth knowing: a back-fill written `SET mark = 'IS' WHERE … AND mark IS NULL`
+  cannot replace a pictograph, because a pictograph is not null — that is
+  exactly how the marks she was still looking at in September survived the
+  August ruling. **The one exemption is a CLASS, not a list** (her fourth
+  ruling, 2026-09-10: "keep emojis for countries and languages only") — a
+  pictograph passes when it is a FLAG, which Unicode defines as a pair of
+  Regional_Indicator characters, naming a region ICU's own table recognises
+  (`Intl.DisplayNames`). One predicate answers both halves, because there is no
+  language pictograph: a language is drawn by the flag of a country that speaks
+  it, and the check asserts that off `LANGUAGES` itself. A lone regional
+  indicator, a pair naming no country, and every other glyph are still refused —
+  and so is a flag AT THE WRITE DOOR, which was not widened. `EMOJI_OK` survives
+  as the reasoned way out for a pictograph that is the content and is not a
+  flag; it is empty.
 - **R54 `staff-names-are-first-names`** — the agency's own people are named by
   their FIRST NAME on screen, and nobody else is. If your module renders a
   person's name off a row — a `creatorName`, an `editorName`, an `actorName`, a

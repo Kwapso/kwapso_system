@@ -1,7 +1,25 @@
-// R24's OUTBOUND HALF, ON THE SURFACE THAT HAS NO CONTEXT TO TAINT.
+// R24 ON THE SURFACE THAT HAS NO CONTEXT TO TAINT.
+//
+// THE SUBJECT NARROWED ON 10 SEP 2026 AND THE FILE STAYED, which is worth
+// reading before the rest. This suite used to name `read_margin` and
+// `/api/tenancy/margin`: the agency's own cost card and the margin computed from
+// it, R24's original subject. The client retired that feature whole ("kill the
+// whole internal rates thing … for now i iwanna wipe it clean"), so five of the
+// six doors on `INTERNAL_MONEY_DOORS` stopped existing and R24's structural
+// inbound half was retired with them.
+//
+// WHAT IS LEFT IS `GET /api/tenancy/app-money`, and it is a real subject rather
+// than a stand-in: it hands over what one app gives back priced IN FULL, where
+// the client's own value door nulls those prices on any app whose account has
+// price visibility switched off. NOTHING WAS ADDED to the list in place of what
+// left — deliberately, and the account rate card is the case that says why. It
+// is the same shape of argument and it was refused, because refusing it would
+// newly withhold four PUBLISHED MCP tools, which is a product decision about an
+// external contract and not a security lane's to make. `money-taint.ts`'s own
+// header carries that reasoning at length.
 //
 // `shared/workers/money-taint.ts` closed the agent's half properly: if a TURN has
-// read an internal number, that turn may not then write through a door the
+// read a withheld figure, that turn may not then write through a door the
 // client's own browser opens. It works because the agent can be asked what it has
 // already run — the check reads the same messages the model is reading.
 //
@@ -22,11 +40,10 @@
 // agent-only for a sentence that transfers word for word (MCP.md §3, quoted in
 // agent-mcp-tool-parity.test.ts): "a personal access token is a secret that ends
 // up pasted into somebody's CI config, and the blast radius of a leaked one must
-// not include a mailbox." The agency's own cost card and its margin are the
-// second thing that blast radius must not include — SCOPE names the margin as the
-// one number a client must never see — and the mitigation is the same one Google
-// gets: reach it through `agent_chat`, under the same rights, where the per-turn
-// taint check genuinely applies.
+// not include a mailbox." A price we have not shown a particular client is the
+// second thing that blast radius must not include — and the mitigation is the
+// same one Google gets: reach it through `agent_chat`, under the same rights,
+// where the per-turn taint check genuinely applies.
 //
 // THE DEFENCE IS THE FORWARD PATH, not the catalogue. A filter on `MCP_TOOLS`
 // was written first and reverted: the twenty-one `set_*_active` names are
@@ -37,14 +54,15 @@
 // identically: the figure never leaves the building through MCP either way.
 //
 // It is asked of the DOOR the call will actually open, never of the tool name,
-// so it also covers `set_record_active` being POINTED at a money door per call —
-// the case no catalogue filter could have caught. `readsInternalMoney` is the
-// same derived predicate the agent's taint uses and the same one
-// `internal-money-never-in-portal` rot-checks against tenancy's own source.
+// so it also covers a generic tool being POINTED at a money door per call — the
+// case no catalogue filter could have caught. `readsInternalMoney` is the same
+// derived predicate the agent's taint uses and the same one
+// `money-taint-outbound` rot-checks against tenancy's own ROUTES.
 
 import { describe, expect, it } from "vitest"
 
 import { INTERNAL_MONEY_DOORS, readsInternalMoney } from "@shared/workers/money-taint"
+import { RECORD_TOGGLES } from "@shared/workers/record-toggles"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import { forwardTool, MCP_TOOLS } from "../src/lib/tools"
 
@@ -54,16 +72,31 @@ describe("the agency's own money is not on the machine surface", () => {
   // that passed. So: the door list must be real, and the catalogue must actually
   // contain tools on those doors — otherwise the rest of this file proves nothing.
   it("the derivation is alive (a blind census would pass every test below)", () => {
-    expect(INTERNAL_MONEY_DOORS.length, "INTERNAL_MONEY_DOORS is empty").toBeGreaterThanOrEqual(4)
-    expect(INTERNAL_MONEY_DOORS).toContain("/api/tenancy/margin")
+    // THE THRESHOLD FELL FROM FOUR TO ONE ON 10 SEP 2026, and a falling tripwire
+    // is exactly the move that turns a law blind, so it is argued rather than
+    // adjusted. The number was never the property: it was a proxy for "the
+    // census still finds the doors". What replaces it is a NAMED door and a
+    // NAMED tool below, which is strictly harder to satisfy vacuously than any
+    // count — a rename empties the set and the name says so, where a count of
+    // one is met by any door at all.
+    expect(INTERNAL_MONEY_DOORS.length, "INTERNAL_MONEY_DOORS is empty").toBeGreaterThanOrEqual(1)
+    expect(INTERNAL_MONEY_DOORS).toContain("/api/tenancy/app-money")
     const onMoneyDoors = SHARED_TOOLS.filter((t) => readsInternalMoney(t))
     expect(
       onMoneyDoors.length,
       "no shared tool sits on a money door — either the catalogue moved or readsInternalMoney stopped matching, and this whole file is measuring nothing"
-    ).toBeGreaterThanOrEqual(4)
-    // The one the finding was written about, by name, so a rename cannot quietly
-    // empty the set above while leaving the count intact.
-    expect(onMoneyDoors.map((t) => t.name)).toContain("read_margin")
+    ).toBeGreaterThanOrEqual(1)
+    // The tool this now stands on, by name, so a rename cannot quietly empty the
+    // set above while leaving the count intact.
+    expect(onMoneyDoors.map((t) => t.name)).toContain("get_app_impact")
+    // AND THE LOOP BELOW REALLY RUNS. `MCP_TOOLS` is a different projection from
+    // `SHARED_TOOLS`, and the per-tool refusals are generated from it — so a
+    // catalogue that carried the tool while the surface did not would leave the
+    // only behavioural assertions in this file generating zero tests.
+    expect(
+      MCP_TOOLS.filter((t) => readsInternalMoney(t)).map((t) => t.name),
+      "no money tool on the MCP surface — the refusal tests below would be an empty loop"
+    ).toContain("get_app_impact")
   })
 
   // A DOOR THAT FAILS THE TEST IF IT IS EVER OPENED. A refusal proved against a
@@ -100,15 +133,47 @@ describe("the agency's own money is not on the machine surface", () => {
     const generic = MCP_TOOLS.find((t) => t.name === "set_record_active")
     expect(generic, "the generic toggle is the per-call case this test exists for").toBeDefined()
     expect(readsInternalMoney(generic!), "…and it must NOT be a money tool by its own path").toBe(false)
-    const out = await forwardTool(
-      mustNotBeCalled(),
-      generic!,
-      { record: "internal_rate", id: "x", active: false },
-      "cookie",
-      "trace-test"
+    // THE RECORD THIS USED TO NAME WAS `internal_rate`, whose door was
+    // `/api/tenancy/internal-rates/active` — a money door the toggle could be
+    // pointed at. It was retired on 10 Sep 2026 with the rest of the internal
+    // rates. The case was then re-pointed at `account_rate`, whose door was
+    // `/api/tenancy/rates/active`; the client retired THAT an hour later ("the
+    // whole account rates also killed it"), so this file has now outlived both
+    // of the records it was written about.
+    //
+    // NO SURVIVING TOGGLE RESOLVES TO A MONEY DOOR, and there is no longer a
+    // money door with a toggle to resolve to: `app-money` is a read.
+    //
+    // SO THIS IS NOW A NEGATIVE CONTROL RATHER THAN A REFUSAL, and it is kept
+    // for the reason the refusal was written: what is being asserted is that the
+    // decision is made against `dest` — the door this call will actually open —
+    // and not against the tool's name. Proved by RUNNING the router over EVERY
+    // record the toggle still names, so the day a money door grows a toggle,
+    // this test says so by going red on its own terms.
+    //
+    // The single hand-named `dest` that stood here is gone with its record, and
+    // the census below is what was doing the work all along — it was already
+    // written to name any offender rather than to check one. What replaces the
+    // hand-named line is a TRIPWIRE on the census itself: a router that stopped
+    // resolving anything would make the empty result below meaningless.
+    const resolved = Object.keys(RECORD_TOGGLES).map((record) =>
+      generic!.route!({ record, id: "x", roleId: "x", active: false })
     )
-    expect(out.ok, "pointing the generic toggle at a money door must still refuse").toBe(false)
-    expect(JSON.parse(out.text).error).toBe("not_on_this_surface")
+    expect(
+      resolved.length,
+      "the toggle names no records at all — the census below would be empty for the wrong reason"
+    ).toBeGreaterThan(10)
+    expect(
+      resolved.every((d) => d.path.startsWith("/api/")),
+      "the toggle must resolve a real door from its own input, for every record it names"
+    ).toBe(true)
+    const pointable = Object.keys(RECORD_TOGGLES).filter((record) =>
+      readsInternalMoney(generic!.route!({ record, id: "x", roleId: "x", active: false }))
+    )
+    expect(
+      pointable,
+      `${pointable.join(", ")} resolves to a money door — the guard is asked of \`dest\`, so it WILL refuse this, but the test that proves it must name the record. Add it above.`
+    ).toEqual([])
   })
 
   it("the escape route named in that refusal is real and still on this surface", () => {

@@ -126,7 +126,7 @@ YOUR FILES — these 34 and no others:
   web/components/work/story-form-dialog.tsx         (2 label)
   web/components/records/record-picker.tsx             (1 button, 1 input)
   web/components/process/process-detail.tsx            (2 button)
-  web/components/money/internal-rate-card.tsx        (2 label)
+  removed 10 Sep 2026: web/components/money/internal-rate-card.tsx (2 label)
   web/components/accounts/contact-link-dialog.tsx       (2 label)
   …and: timer-bar, temp/auth-card, team-switcher, role-picker-dialog,
   record-table, profile-menu, profile-dialog, meeting-detail,

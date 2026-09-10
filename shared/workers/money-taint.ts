@@ -1,64 +1,124 @@
-// AN INTERNAL NUMBER CANNOT LEAVE THE ROOM IT WAS READ IN — R24's OUTBOUND HALF.
+// A WITHHELD NUMBER CANNOT LEAVE THE ROOM IT WAS READ IN — R24, WHAT IS LEFT OF IT.
 //
-// R24 closed the INBOUND direction and closed it properly: what our own hour
-// costs lives in one file, nothing a client login can reach imports it, and the
-// build goes red if a portal-reachable path ever does. That sentence is a fact
-// about the import graph.
+// ── WHAT THIS LAW USED TO BE, AND WHY HALF OF IT WENT ────────────────────────
 //
-// It says nothing at all about the other direction. The assistant reads the
-// margin through a door R24 fences correctly — as an agency admin, holding
-// `commercials:read`, exactly as designed — and then, in the same breath, writes
-// a reply into a ticket thread the client reads. No import was forgotten, no
-// condition inverted, no permission granted: every door on that path did its own
-// job. The figure still arrived at the client's inbox.
+// R24 had two halves. The INBOUND half was a fact about the import graph: what
+// our own hour cost (`internal_rates`) and the margin computed from it lived in
+// one file, nothing a client login could reach imported it, and the build went
+// red if anything ever did. It was structural on purpose — "a condition can be
+// inverted and a permission can be granted, an import cannot be forgotten".
 //
-// WHAT MADE IT REACHABLE. A client login raises a ticket through the portal
-// (`POST /api/content/help` is on the portal's own allow-list, and the seeded
-// Client role holds `help:create`) with up to 20,000 characters of their own
-// prose in the description. That prose is read by the model the next time
-// anybody here asks the assistant a question that touches tickets. So the
-// attacker writes the plan and we deliver it: read the margin, then reply with
-// it. `reply_help_ticket` is a write gated on `help:read`, the lowest bar in the
-// catalogue, and its confirm predicate fires only when the reply @mentions
+// The client retired that feature whole on 10 Sep 2026: "kill the whole internal
+// rates thing. will develop this in the future much much more but for now i
+// iwanna wipe it clean". The tables, the doors, the six tools and the file all
+// went, and the inbound half went with them, because after the removal there is
+// no structurally-fenced number left in this base to be about. Every money
+// figure that still reaches a client reaches them because a CONDITION let it
+// through, and a law whose whole doctrine is "not conditional" cannot be
+// re-pointed at one. RULES.md's R24 row records that retirement.
+//
+// ── AND THE SENTENCE ABOVE WAS CORRECTED AN HOUR LATER ───────────────────────
+//
+// It first enumerated what survives: "the account rate card, a sprint's sold
+// price, the savings priced off the client's own role rates". The client then
+// retired the ACCOUNT RATE CARD too — "the whole account rates also killed it" —
+// so the first item on that list stopped existing, `lib/rates.ts` went the way
+// `internal-money.ts` had, and team migration 0074 drops `account_rates`.
+//
+// The DOCTRINE was unaffected, which is exactly why the enumeration had to be
+// fixed rather than left: a law's stated reason that has quietly stopped being
+// true is the failure this file is otherwise written against. What the
+// conditions are, said once and precisely, so the next reader can check them:
+//
+//   · A SPRINT'S SOLD PRICE reaches a client through `GET /api/tenancy/impact`
+//     as `prices.soldCents`, behind `accounts.commercials_visible`. Since the
+//     rate card went, THIS IS THE ONLY FIGURE THAT SWITCH GOVERNS.
+//   · A STEP'S ROLE RATE (`process_steps.role_cents_per_hour`, what the CLIENT'S
+//     own person costs THEM) reaches a client on the same door, withheld on the
+//     ROW from a portal caller who is not that app's main stakeholder.
+//   · AN APP'S RUNNING COST (`apps.tool_cost_cents_per_month`, what it costs US)
+//     is nulled on the row for any portal scope, and for a staff caller without
+//     the right. That is the closest thing left to a structural fence and it is
+//     still a predicate on a row, not a fact about the import graph.
+//
+// ── AND WHY THIS HALF DID NOT GO ─────────────────────────────────────────────
+//
+// The OUTBOUND half never depended on the import graph, and it still has a real
+// subject: `GET /api/tenancy/app-money`.
+//
+// That door hands back what one app gives back a month — the hours, and those
+// hours priced by the client's own role rates frozen onto each step of the map.
+// It is the SAME subtraction the client's own value door makes, handed over
+// UNREDACTED: `GET /api/tenancy/impact` nulls the prices on any app whose
+// account has price visibility switched off, and this door does not. So a figure
+// that reaches this door is a figure a particular client may be forbidden to
+// see, and the switch that forbids it is per account.
+//
+// THE CHAIN IS UNCHANGED, only the number in it. A client login raises a ticket
+// through the portal (`POST /api/content/help` is on the portal's own allow-list
+// and the seeded Client role holds `help:create`) with up to 20,000 characters
+// of their own prose. That prose is read by the model the next time anybody here
+// asks the assistant a question that touches tickets. So the attacker writes the
+// plan and we deliver it: read what the app gives back, then reply with the
+// figure. `reply_help_ticket` is a write gated on `help:read`, the lowest bar in
+// the catalogue, and its confirm predicate fires only when the reply @mentions
 // somebody — so a reply with no mentions opens no panel at all, and
 // `notifyReplyAndMentions` emails the raiser a preview of the body.
 //
-// THE ONLY THING STANDING THERE TODAY IS A SENTENCE IN A TOOL DESCRIPTION —
-// "INTERNAL, never repeat this figure to a client, in any form". R24's own text
-// already says why that is not enough, about a different half of the same
-// problem: "a condition can be inverted and a permission can be granted, an
-// import cannot be forgotten." A prose instruction to a language model is the
+// The only thing that would otherwise stand there is a sentence in a tool
+// description. R24's own text already said why that is not enough, and the
+// sentence survives its own law: a prose instruction to a language model is the
 // least structural defence available, and it is being asked to hold against
 // prose written by the person it is protecting the number from.
 //
-// SO: IF A CONVERSATION HAS READ AN INTERNAL NUMBER, IT MAY NOT THEN WRITE TO A
+// SO: IF A CONVERSATION HAS READ A WITHHELD FIGURE, IT MAY NOT THEN WRITE TO A
 // DOOR THE CLIENT'S OWN BROWSER OPENS. Per turn, refused at the step, before the
 // door is called. Not a confirm panel — the owner considered and rejected making
 // staff click through one on ordinary work — and not a scan of the outgoing text
-// either, because "does this paragraph contain a margin" is a judgement and this
+// either, because "does this paragraph contain a price" is a judgement and this
 // has to be a fact.
 //
-// ── BOTH SETS ARE DERIVED, AND NEITHER IS A LIST OF TOOL NAMES ───────────────
+// ── THE DOOR LIST NARROWED; IT DID NOT MOVE ──────────────────────────────────
 //
-// A hand-written list of money tools would rot the day somebody adds one, which
-// is the failure this codebase has now made often enough to have a name for.
-// So:
+// This list held six paths and now holds one. Every one of the five that left
+// was a door that stopped existing, and NOTHING WAS ADDED. That matters more
+// than it looks: the two obvious candidates for widening it were both refused,
+// each by this file's own reasoning read back at it.
 //
-//   THE DOORS come from the two files that already decide them, and the CHECK
-//   re-derives both off disk and fails if either pin has drifted
-//   (`internal-money-never-in-portal`, web/test/rules.test.ts):
-//     • the money doors are the tenancy routes whose handlers call an export of
-//       workers/tenancy/src/lib/internal-money.ts — the same walk R24's first
-//       clause already makes, over the same file, so the two cannot disagree;
-//     • the client-readable doors are the non-GET entries of `PORTAL_DOORS` in
-//       workers/portal-gateway/src/index.ts — the allow-list is the definition
-//       of what a client's browser may call, so it is the oracle rather than
-//       anything invented here.
+//   • THE ACCOUNT RATE CARD (`/api/tenancy/rates`) was the same shape of
+//     argument and was REFUSED, hours before the client retired it: the card door
+//     handed over the audit block, the retired lines and the whole card, where
+//     the value door projected only the live ones behind the switch. It was left
+//     off because a staff member reading a client's rate card and then replying
+//     to that client's own ticket is ORDINARY WORK, and this file already says
+//     what happens to a control that fires on ordinary work: people route around
+//     it. The card is gone now, so the reasoning is kept for its SHAPE rather
+//     than its subject — the next candidate for this list will look exactly like
+//     it did.
+//   • WIDENING TO "ANY WRITE WHOSE ROW A CLIENT LATER READS" is still
+//     `PORTAL_VISIBLE_READS`' territory and still a bigger law than this one.
 //
-//   THE TOOLS are then derived from the doors AT RUNTIME, off the catalogue
-//   itself. A money tool added tomorrow on a door already on this list is
-//   covered the moment it exists, with nothing edited here. A brand new money
-//   DOOR is the only thing that needs a line, and the check demands it.
+// ── WHAT IS DERIVED, AND THE ONE THING THAT IS NOT ANY MORE ──────────────────
+//
+//   THE DOORS were derived from a FILE — the tenancy routes whose handlers
+//   called an export of `internal-money.ts`. That file is gone, and
+//   `appMoneyBack` moved to `lib/processes.ts`, which has forty exports and is
+//   mostly not money. So the oracle narrowed from a file to a NAMED SET OF
+//   FUNCTIONS, `MONEY_READERS` below. Say it plainly: that is weaker. A function
+//   added to this list is a decision somebody makes, where an import was a fact
+//   somebody could not forget. What is still derived — and still rot-checked on
+//   every build by `money-taint-outbound` in web/test/rules.test.ts — is the
+//   DOORS: the walk reads tenancy's own ROUTES table and every handler's own
+//   source, and the pin below must equal what it finds exactly.
+//
+//   THE CLIENT-READABLE DOORS are still the non-GET entries of `PORTAL_DOORS` in
+//   workers/portal-gateway/src/index.ts. The allow-list is the definition of what
+//   a client's browser may call, so it is the oracle rather than anything
+//   invented here.
+//
+//   THE TOOLS are still derived from the doors AT RUNTIME, off the catalogue
+//   itself. A second tool on `/api/tenancy/app-money` taints a conversation from
+//   the moment it is written, with nothing edited here.
 //
 // WHY THE DOOR PINS ARE COPIES AT ALL. The worker cannot read the tenancy lib or
 // the portal gateway at runtime — they are other workers' private source, in
@@ -73,8 +133,8 @@
 //
 //   • ACROSS TURNS. The taint is per-turn, which is the owner's decision and the
 //     right one: a thread-wide taint would refuse a ticket reply for the rest of
-//     a conversation's life because somebody asked about a margin once, and a
-//     control that fires on ordinary work is a control people route around.
+//     a conversation's life because somebody asked about an app's value once, and
+//     a control that fires on ordinary work is a control people route around.
 //     Tool RESULTS are not replayed across turns (`replayable` in agent.ts keeps
 //     user + assistant text only), so the figure does not survive on its own —
 //     but a model that said the number out loud in its own prose leaves that
@@ -82,9 +142,7 @@
 //     one-turn chain, which is the shape an injected instruction has to take.
 //   • A WRITE ON AN AGENCY-ONLY DOOR WHOSE ROW A CLIENT LATER READS. The oracle
 //     is the doors a client's browser opens, not a data-flow analysis of every
-//     table a portal GET can reach. Widening it means deriving "which writes land
-//     in a table a portal read returns", which is `PORTAL_VISIBLE_READS`'
-//     territory and a bigger law than this one.
+//     table a portal GET can reach.
 //     THE TWO THAT MATTER TODAY BOTH STOP AT A PANEL, WHICH IS WHY THIS IS AN
 //     EDGE AND NOT A SECOND HOLE — checked, not assumed, on 5 Sep 2026:
 //     `resolve_help_ticket` is `confirm: true` outright (it emails the client an
@@ -103,7 +161,7 @@
 // It was not covered at all when this file was written, and the omission was
 // invisible precisely because this section did not mention it: `refusesOutbound
 // Money` had two call sites, both in workers/data-ops, and ZERO in workers/mcp —
-// while `read_margin` and `reply_help_ticket` were both on the machine surface
+// while the money read and `reply_help_ticket` were both on the machine surface
 // and the injected-ticket chain ran end to end there with nothing in the way.
 //
 // THE AGENT'S FIX COULD NOT BE PORTED, and that is the part worth keeping. An
@@ -119,9 +177,9 @@
 // Money`, from this file — different sentence: not "not in this turn" but "not
 // on this surface at all". The precedent is that surface's own twenty-one Google
 // tools (MCP.md §3): a leaked personal access token's blast radius must not
-// include a mailbox, and it must not include what our own hour costs either. The
-// way through is `agent_chat`, which lands back on the agent, where there is a
-// turn and this file applies.
+// include a mailbox, and it must not include a price a client's own screen
+// withholds either. The way through is `agent_chat`, which lands back on the
+// agent, where there is a turn and this file applies.
 //
 // A CONSEQUENCE WORTH SAYING OUT LOUD: the two surfaces now defend the same
 // sentence with two different mechanisms, so a THIRD machine surface would
@@ -130,25 +188,35 @@
 
 import { SHARED_TOOLS } from "./tool-catalog"
 
-/** THE DOORS THAT HAND BACK WHAT OUR OWN WORK COSTS.
+/** THE FUNCTIONS THAT HAND BACK A FIGURE A CLIENT'S OWN SCREEN MAY WITHHOLD.
  *
- * Every tenancy route whose handler calls an export of
- * `workers/tenancy/src/lib/internal-money.ts` — the internal rate card, the role
- * rate card, the margin, and what an app is said to have given back (whose money
- * half is priced off the role card). Paths only: a WRITE here is on the list too,
- * because a caller who is setting an internal rate is a caller who already has
- * the number.
+ * The oracle the doors below are derived FROM, and the one thing in this file
+ * that is a decision rather than a fact — see the header. `appMoneyBack`
+ * (workers/tenancy/src/lib/processes.ts) rolls up `listSavings` and hands over
+ * every price on it; the client's own value door nulls the prices on any app
+ * whose account has price visibility switched off. Same arithmetic, one of them
+ * unredacted.
  *
- * DERIVED, NOT DECIDED. Re-derived off disk on every build from that file's own
- * exports and tenancy's own ROUTES table, and this pin must equal it exactly. */
-export const INTERNAL_MONEY_DOORS: readonly string[] = [
-  "/api/tenancy/internal-rates",
-  "/api/tenancy/internal-rates/update",
-  "/api/tenancy/internal-rates/active",
-  "/api/tenancy/margin",
-  "/api/tenancy/role-rates",
-  "/api/tenancy/app-money",
-]
+ * A NAME ADDED HERE MUST BE A READER OF A WITHHELD FIGURE, not merely of money.
+ * The account rate card was money and was deliberately NOT here; the header says
+ * why at length, and keeps saying it now that the card itself is gone, because
+ * the argument is about the SHAPE of a candidate rather than about that one. */
+export const MONEY_READERS: readonly string[] = ["appMoneyBack"]
+
+/** THE DOORS THAT HAND BACK ONE OF THOSE FIGURES.
+ *
+ * Every tenancy route whose handler calls one of `MONEY_READERS`. Paths only: a
+ * WRITE here would be on the list too, because a caller setting one of these is
+ * a caller who already has the number.
+ *
+ * DERIVED, NOT DECIDED. Re-derived off disk on every build from tenancy's own
+ * ROUTES table and each handler's own source, and this pin must equal it
+ * exactly. It held six paths until 10 Sep 2026; five of them were doors that
+ * stopped existing when the client retired the internal rates, and nothing was
+ * added in their place. The four `/api/tenancy/rates*` doors that went with the
+ * account rate card an hour later were never on this list — see the header for
+ * why they were refused before they were retired. */
+export const INTERNAL_MONEY_DOORS: readonly string[] = ["/api/tenancy/app-money"]
 
 /** THE DOORS A CLIENT'S OWN BROWSER OPENS AND WRITES THROUGH.
  *
@@ -194,7 +262,7 @@ export const CLIENT_READABLE_WRITE_DOORS: readonly string[] = [
  * importing the other. */
 export type DoorFacts = { method: string; path: string; write: boolean }
 
-/** Does this door hand back one of the agency's own figures? */
+/** Does this door hand back a figure the client's own screen may withhold? */
 export function readsInternalMoney(door: Pick<DoorFacts, "path">): boolean {
   return INTERNAL_MONEY_DOORS.includes(door.path)
 }
@@ -208,14 +276,14 @@ export function writesWhereClientsRead(door: DoorFacts): boolean {
 /** THE MONEY TOOLS, DERIVED FROM THE DOORS AT LOAD TIME.
  *
  * This is the half that cannot rot: the names are read off the shipped catalogue
- * rather than typed, so a second tool on `/api/tenancy/margin` taints a
+ * rather than typed, so a second tool on `/api/tenancy/app-money` taints a
  * conversation from the moment it is written. Only a brand-new money DOOR needs
  * a line above, and the build asks for it. */
 export const INTERNAL_MONEY_TOOLS: ReadonlySet<string> = new Set(
   SHARED_TOOLS.filter((t) => readsInternalMoney(t)).map((t) => t.name)
 )
 
-/** HAS AN INTERNAL NUMBER ENTERED THIS CONVERSATION? The argument is the tool
+/** HAS A WITHHELD FIGURE ENTERED THIS CONVERSATION? The argument is the tool
  * names the turn has already run — which is what the model has in front of it,
  * read off the same messages the model is reading.
  *

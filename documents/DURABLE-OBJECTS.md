@@ -231,9 +231,12 @@ fence so the two can never disagree. A client hears silence for the agency's
 members, roles, invites and articles, they have no screen in this app that
 reads any of them.
 
-**The stamped list grows one reviewed line at a time — nine today** (fact
-updated 26 Aug 2026: tickets were the first; `processes` and `account_rates`
-joined in `a9694fb` so the client's Impact screen could hear its own subject).
+**The stamped list grows one reviewed line at a time — eight today** (fact
+updated 26 Aug 2026 and again 10 Sep 2026: tickets were the first; `processes`
+joined in `a9694fb` so the client's Impact screen could hear its own subject. The
+retired account rate card joined in the same commit and was removed on
+10 Sep 2026 with the card itself — the list can shrink as well as grow, and it
+shrinks the same way, one reviewed line at a time).
 A ping carries a row id, and a *ticket* id tells the fence nothing about whose
 ticket it is, so such a ping additionally NAMES the account it belongs to
 (`ChangeEvent.scope`); `SCOPE_STAMPED_RESOURCES` is the reviewed list of

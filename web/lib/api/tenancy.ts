@@ -20,12 +20,10 @@ import type {
   AppModule,
   Account,
   AccountDetail,
-  AccountRate,
   ActiveContext,
   ActivityItem,
   AppMoneyBack,
   AppRow,
-  InternalRate,
   Invite,
   InviteAudit,
   PermissionValue,
@@ -34,7 +32,6 @@ import type {
   ProcessSummary,
   ReceivedInvite,
   RolePermissions,
-  RoleRate,
   SelectableValue,
   TeamMeta,
   TeamMember,
@@ -537,13 +534,11 @@ export const tenancy = {
   setAppActive: (id: string, active: boolean) =>
     api<{ ok: true }>("/api/tenancy/apps/active", post({ id, active })),
 
-  /** WHAT AN HOUR OF EACH ROLE IS WORTH, and what one app gives back (8.13).
-   * INTERNAL, both of them: the money is computed from the role rate card, the
-   * doors refuse a client login, and the portal gateway opens neither (R24). */
-  roleRates: () => api<{ roleRates: RoleRate[]; total: number }>("/api/tenancy/role-rates"),
-  /** One door for add, re-price and retire — the role name is the key. */
-  setRoleRate: (input: { roleName: string; centsPerHour: number; active: boolean }) =>
-    api<{ id: string }>("/api/tenancy/role-rates", post(input)),
+  /** WHAT ONE APP GIVES BACK (8.13) — the hours, and those hours priced by the
+   * client's own role rates frozen onto each step. Agency-only: the client's own
+   * value door withholds the prices on an app whose account has price visibility
+   * off, and this one does not. The ROLE rate card that used to sit beside it —
+   * what an hour of one of OUR roles was worth — was retired on 10 Sep 2026. */
   appMoney: (appId: string) => api<AppMoneyBack>(`/api/tenancy/app-money?appId=${enc(appId)}`),
 
   /** R14: a PAGE of process maps (a GROWING collection) — hand `cursor` back from
@@ -674,51 +669,16 @@ export const tenancy = {
   },
 
   /** HOW MANY OF EACH THING HANG OFF ONE RECORD — this worker's half (apps,
-   * process maps, the rate card). Asked when the record opens so its tabs are
-   * badged before anybody clicks one; the rows behind each tab stay lazy. */
+   * process maps, waves). Asked when the record opens so its tabs are badged
+   * before anybody clicks one; the rows behind each tab stay lazy. */
   recordCounts: (table: string, id: string) =>
     api<RecordCounts>(`/api/tenancy/record-counts?table=${enc(table)}&id=${enc(id)}`),
 
-  /* ---- the money (agency only — every door below refuses a client login) ---- */
-
-  /** What an account is CHARGED, by kind of work. */
-  accountRates: (accountId: string) =>
-    api<{ rates: AccountRate[]; total: number }>(`/api/tenancy/rates?accountId=${enc(accountId)}`),
-  createAccountRate: (input: Record<string, unknown>) =>
-    api<{ id: string }>("/api/tenancy/rates", post(input)),
-  updateAccountRate: (input: Record<string, unknown> & { id: string }) =>
-    api<{ ok: true }>("/api/tenancy/rates/update", post(input)),
-  setAccountRateActive: (id: string, active: boolean) =>
-    api<{ ok: true }>("/api/tenancy/rates/active", post({ id, active })),
-
-  /** What an hour of OUR work costs US. A separate door from the rate card above,
-   * on a separate table, in a separate file behind it — R24. */
-  internalRates: () =>
-    api<{ internalRates: InternalRate[]; total: number }>("/api/tenancy/internal-rates"),
-  createInternalRate: (input: Record<string, unknown>) =>
-    api<{ id: string }>("/api/tenancy/internal-rates", post(input)),
-  updateInternalRate: (input: Record<string, unknown> & { id: string }) =>
-    api<{ ok: true }>("/api/tenancy/internal-rates/update", post(input)),
-  setInternalRateActive: (id: string, active: boolean) =>
-    api<{ ok: true }>("/api/tenancy/internal-rates/active", post({ id, active })),
-
-  /** Revenue − our own time − tool costs, with every line it was built from. The
-   * one figure a client never sees, under any flag, ever (R24). */
-  margin: (accountId: string) => api<MarginView>(`/api/tenancy/margin?accountId=${enc(accountId)}`),
+  // THE MONEY BLOCK STOOD HERE — four calls onto the account rate card, agency
+  // only. The client retired the card on 10 Sep 2026 ("the whole account rates
+  // also killed it"). The one money read this app still makes is `appMoney`,
+  // above, beside the app it is about.
 }
 
-/** What the margin door hands back. Declared HERE rather than imported from the
- * worker: the shape is the wire contract, and the worker's own file is the one
- * thing the portal may never reach (R24), so the browser client must not be the
- * thing that imports it. */
-export type MarginView = {
-  revenueCents: number
-  timeCostCents: number
-  toolCostCents: number
-  marginCents: number
-  marginPercent: number | null
-  lines: { label: string; seconds: number; centsPerHour: number; costCents: number }[]
-  loggedTimeAvailable: boolean
-}
 
 /** Content worker — Learning + Tickets (team-DB content modules). */

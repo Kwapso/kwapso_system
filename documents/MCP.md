@@ -131,8 +131,10 @@ AI quota.
 Confirm the live list with `tools/list` (it's generated, so it's always current).
 Today it covers:
 
-- **Read** — 69 of the 195 tools answer on a GET (counted from the live catalogue,
-  8 Sep 2026), and 194 of the doors in the census below are reachable from here,
+- **Read** — 65 of the 184 tools answer on a GET (counted from the live catalogue,
+  10 Sep 2026, after the internal rates AND the account rate card were removed —
+  two rulings an hour apart, nine tools between them), and 183 of the doors in the
+  census below are reachable from here,
   grouped the way the app groups them. A few families below keep their everyday
   writes named beside their reads, because that is how the app itself groups them;
   the write families proper are under **Write**:
@@ -182,10 +184,13 @@ Today it covers:
     and it is not a process: a process is a way of working and belongs to the
     account's world, a module is a division of the software we built.
   - process maps and the money, `list_apps`, `list_processes`, `get_process`,
-    `list_process_comments`, `read_impact`, `list_account_rates`,
+    `list_process_comments`, `read_impact`,
     `list_story_attachments`, `add_story_link`, `update_story_attachment`,
-    `remove_story_attachment`,
-    `list_internal_rates`, `read_margin`, `list_role_rates`, `get_app_impact`
+    `remove_story_attachment`, `get_app_impact`. The list also
+    held `list_internal_rates`, `read_margin` and `list_role_rates` until they
+    were removed on 10 Sep 2026 with the internal rate tables they read, and
+    `list_account_rates` until an hour later, when the client retired the account
+    rate card too.
   - **the client's own organisation** — who does the work at a client, what an
     hour of them costs, and what they run on. `list_client_departments`,
     `create_client_department`, `update_client_department`,
@@ -245,7 +250,7 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **281 doors, 218 with a tool, 63 with a written reason**, the
+  red build. Today: **270 doors, 207 with a tool, 63 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
   the THREE doors of the direct upload (permission to PUT a file, which hands
@@ -409,18 +414,30 @@ Today it covers:
     Step, with the caption that says what the numbers are made of — the times are
     estimates the agency and the client agreed, the subtraction is arithmetic. A step
     that got SLOWER is included and counted; nothing filters one out.
-  - rates and margin, `create_account_rate`, `update_account_rate`,
-    `set_account_rate_active` (what a client is charged) and `create_internal_rate`,
-    `update_internal_rate`, `set_internal_rate_active` (what our own hour costs us) and
-    `set_role_rate` (what an hour of a ROLE is worth — one tool for add, re-price and
-    retire, because the role name is the key), all needing `commercials:*`.
-    **`read_margin`, `list_internal_rates`, `list_role_rates` and `get_app_impact` answer with
-    the agency's own figures**: a token acts as its owner, and no client login can hold
-    a token or be acted for at all, but if you are building a client-facing integration
-    on somebody's staff token, these two are the calls not to relay. Law **R24** makes
-    the same statement about the app's own client portal structurally — the file those
-    figures live in cannot be reached from any door the portal opens. (R24, not R23 —
-    R23 is the knowledge base's citation law.)
+  - **money: there are no money WRITES on this surface any more.** `commercials`
+    is a read-only right, and `get_app_impact` is the one tool on it.
+    **`get_app_impact` answers with the agency's own figures**: a token acts as its
+    owner, and no client login can hold a token or be acted for at all, but if you
+    are building a client-facing integration on somebody's staff token, that is a
+    call not to relay.
+    NINE tools stood here and went on 10 Sep 2026, in two rulings an hour apart,
+    and this is a change to a PUBLISHED contract rather than a tidy-up.
+    First: "kill the whole internal rates thing … for now i iwanna wipe it
+    clean". Three were what our own hour cost us — `create_internal_rate`,
+    `update_internal_rate` and `list_internal_rates`. Two were what an hour of a
+    ROLE was worth — `set_role_rate` and `list_role_rates`; the first was one
+    tool for add, re-price and retire, because the role name was the key.
+    The sixth was `read_margin`. Law **R24** — which said the same thing
+    structurally about the app's own client portal, that the file those figures
+    lived in could not be reached from any door the portal opened — was retired
+    with them. (R24, not R23 — R23 is the knowledge base's citation law.)
+    Then, an hour later: **"The whole account rates also killed it."** Three more
+    were removed. `list_account_rates` was removed. `create_account_rate` was
+    removed. `update_account_rate` was removed. Between them they were what a
+    CLIENT was charged per hour, by kind of work.
+    **`set_record_active` lost two record kinds across the two rulings**,
+    `internal_rate` and `account_rate`; a call naming either now gets the same
+    refusal as a name that never existed.
   - tickets, `create_help_ticket`, `update_help_ticket`, `set_help_status`,
     `triage_help_ticket`, `resolve_help_ticket`,
     `rank_help_ticket`, `archive_help_ticket`, `reply_help_ticket`,
@@ -457,8 +474,9 @@ Today it covers:
   - the work engine, stories and sprints, `create_story`, `update_story`,
     `set_story_status` (`work:create` / `work:edit`), `create_sprint`,
     `update_sprint` and `complete_sprint`. `update_sprint` is where a sprint's flat
-    PRICE is set or corrected — it is the revenue half of every margin, and until
-    that door existed it could be typed only in the moment the sprint was started.
+    PRICE is set or corrected — it was the revenue half of every margin until the
+    margin was retired on 10 Sep 2026, and until that door existed it could be typed
+    only in the moment the sprint was started.
     It will not move a sprint to another client or another app: the reference the
     client quotes was minted against the account, and the maps and figures
     published against the app were built where it stood, so re-pointing either

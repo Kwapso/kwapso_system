@@ -159,10 +159,19 @@ describe("the activity row says what kind of thing happened", () => {
   })
 
   it("classifies the same event the same way however it is spelt", () => {
-    // The five coats the review found on one event. If this ever fails, an
-    // archive has become findable under one word and invisible under another.
+    // The coats the review found on one event. If this ever fails, an archive
+    // has become findable under one word and invisible under another.
+    //
+    // ONE OF THE ORIGINAL SIX LEFT ON 10 SEP 2026: "Internal rate retired". Both
+    // writers of the word `retired` were rate cards, and the client retired both
+    // — the internal ones first, then the account rate card ("the whole account
+    // rates also killed it") — so `retired: "archived"` came out of
+    // VERB_BY_LAST_WORD under the rotting-entry rule the case below enforces.
+    // The fixture went with the word rather than being left asserting a
+    // classification for a sentence nothing writes: that is the same rule read
+    // from the other end, and keeping the line would have made this case the one
+    // thing holding a dead entry alive.
     for (const spelling of [
-      "Internal rate retired",
       "To-do withdrawn",
       "Staff profile taken down",
       "Module switched off",

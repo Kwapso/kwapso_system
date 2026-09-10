@@ -112,7 +112,7 @@ const AGENT_ONLY: AgentTool[] = [
   {
     name: "set_record_active",
     description:
-      "Switch a record off, or back on. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, app, app_module, process, wave, client_department, client_role, client_tool, account_rate, internal_rate, meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a deliverable also needs `appId`, the app whose shelf it sits on. `active` false switches it off (archive, deactivate, revoke, cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED: the row and everything hanging off it survive, so last year's figures stay true, and calling it twice changes nothing the second time. Each kind needs its own module's right, and switching one off asks the person first.",
+      "Switch a record off, or back on. `record` says WHICH KIND: account, contact_link, portal_access, role, dropdown_value, app, app_module, process, wave, client_department, client_role, client_tool, meeting, knowledge_source, deliverable, brand_asset, meeting_purpose, staff_profile or staff_certificate. `id` is that record's id — except a role, which takes `roleId` — and a deliverable also needs `appId`, the app whose shelf it sits on. `active` false switches it off (archive, deactivate, revoke, cancel, unlink, depending on the kind) and true brings it back. NOTHING IS EVER DELETED: the row and everything hanging off it survive, so last year's figures stay true, and calling it twice changes nothing the second time. Each kind needs its own module's right, and switching one off asks the person first.",
     binding: "TENANCY",
     path: "/api/tenancy/accounts/active",
     method: "POST",
@@ -825,7 +825,6 @@ export const REPLACED_BY_QUERY: Record<string, string> = {
   list_waves: "query_records on `waves` — accountId, and the ordering is the door's",
   list_deliverables: "query_records on `deliverables` — appId and id, plus visibleToClientAt, which this tool never exposed",
   list_dropdown_values: "query_records on `dropdown_values` — by id, by type, or the whole vocabulary",
-  list_account_rates: "query_records on `account_rates` — accountId, and it can now answer across clients rather than one at a time",
   list_roles: "query_records on `roles` — by id or the whole list, with the deactivated ones filterable rather than merely present",
 }
 

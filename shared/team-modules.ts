@@ -116,9 +116,11 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // sees their own company's maps and the value they got, so every door on it
   // carries the account fence.
   //
-  // `commercials` covers the two rate cards and the margin. It is AGENCY
-  // material, and no client login ever passes one of its doors — which is why
-  // it is a second module and not four more rights on the first.
+  // `commercials` covered the two rate cards and the margin, and then the client
+  // rate card too; all three were retired on 10 Sep 2026. What it covers now is
+  // WHAT AN APP GIVES BACK, PRICED — one read door, agency-only. It is AGENCY
+  // material, and no client login ever passes one of its doors, which is why it
+  // is a second module and not four more rights on the first.
   processes: "Processes",
   // WHAT WE HANDED OVER. A deliverable is one piece of material on an app — a
   // handover doc, an API reference, a recorded walkthrough, an SOP — and this
@@ -133,7 +135,10 @@ const MODULE_LABELS: Record<(typeof TEAM_MODULES)[number], string> = {
   // made, and the base's rule is that an unmade decision is a closed door
   // rather than an open one.
   deliverables: "Deliverables",
-  commercials: "Rates & margin",
+  // THE LABEL FOLLOWED THE MODULE. It read "Rates & margin" until 10 Sep 2026,
+  // and named three cards that no longer exist — a row on the permission sheet
+  // whose words describe a feature is a row that lies the day the feature goes.
+  commercials: "Money",
   // THE WORK ENGINE — what we DO, as opposed to what an account asks for. One
   // module covers stories, the sprints they sit in and the time logged against
   // them, because they are one record from a reader's point of view: a piece of
@@ -294,6 +299,16 @@ export const MODULE_OFFERED_RIGHTS: Record<string, readonly (typeof MODULE_RIGHT
   // A switch over a SIGHT, not over a record: "may this role see everyone's
   // tasks, or only their own". Creating and editing a task is `work`'s call.
   all_tasks: ["read"],
+  // READ-ONLY SINCE 10 SEP 2026, and it is the client's two rulings that made it
+  // so. `commercials` had three rate cards behind it and now has none: the
+  // agency's own two went with the internal rates ("kill the whole internal rates
+  // thing … for now i iwanna wipe it clean") and the account rate card went an
+  // hour later ("the whole account rates also killed it"). The ONE door left on
+  // this right is `GET /api/tenancy/app-money` — what one app gives back, priced
+  // — which reads and never writes. Leaving `create`, `edit` and `delete` on the
+  // sheet would be three boxes an owner ticks and believes they granted by, which
+  // is the whole of R36.
+  commercials: ["read"],
   // Read as "kwapso may send mail on this person's behalf". One decision.
   google_mail: ["create"],
 }

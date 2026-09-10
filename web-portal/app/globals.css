@@ -117,6 +117,27 @@
    ========================================================================= */
 :root {
   --pinned-chrome-h: 0px;
+  /* HOW MUCH OF THE CONTAINER ABOVE THE TOOLBAR PINS WITH IT (R63, part 3, the
+     client's 2026-09-10 "include also the top part of the container above it").
+     The agency door's collections sit in a card that insets its toolbar and
+     publishes that inset; the portal's two search rows are BLOCKS on a page
+     column with no inset above them at all, so this door declares the default
+     and publishes nothing over it — a pinned bar with a zero lead is exactly
+     the bar that shipped this morning. The declaration is here rather than
+     absent because `PINNED_TOOLBAR` is one class on two doors, and a property
+     one door never names is a property the next reader assumes is a bug. */
+  --pinned-lead: 0px;
+  /* …AND THE SAME ON THE OTHER AXIS (R63, part 4, the client's 2026-09-10
+     "When pin, I still want it round"). Identical reasoning to the line above,
+     one property along: the corner exists because a container INSETS the row,
+     and this door's rows are blocks on the page column that inset nothing. So
+     the default stands, the row's `px`/`mx` pair cancels to zero, the box
+     never leaves its own edges, and its `::before`'s corners are cut out of
+     the tone behind them — which on this door is the same tone in front,
+     because nothing publishes `--pinned-behind` here either. A flush, square
+     bar, exactly as before. Declared, not absent, for the reason one line up:
+     one class, two doors. */
+  --pinned-inset-x: 0px;
 }
 
 /* ONE PINNED TOOLBAR PER COLLECTION, AND IT IS THE OUTERMOST (R63).

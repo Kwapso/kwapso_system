@@ -410,11 +410,13 @@ export function ClientOrgPanel({
         {departments.length === 0 ? (
           // No import target — a department is a fact about the client's own
           // org chart, added one at a time as it comes up.
-          <CollectionEmptyState
-            title={t("No departments yet.")}
-            description={t("Add the parts of their company, so a role can say where it sits.")}
-            onCreate={canCreate ? () => setAddingDept(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              title={t("No departments yet.")}
+              description={t("Add the parts of their company, so a role can say where it sits.")}
+              onCreate={canCreate ? () => setAddingDept(true) : undefined}
+            />
+          </div>
         ) : shownDepartments.length === 0 ? (
           /* R62 — THE SAME REGISTER, MINUS THE ADD BUTTON. Client, 2026-09-09:
              "the empty because of filters hosul look the same as empty
@@ -423,11 +425,13 @@ export function ClientOrgPanel({
              narrowed them to nothing; they are one body now, and `filtered`
              withdraws the create action rather than the call site remembering
              to. */
-          <CollectionEmptyState
-            filtered
-            title={t("No departments yet.")}
-            onCreate={canCreate ? () => setAddingDept(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              filtered
+              title={t("No departments yet.")}
+              onCreate={canCreate ? () => setAddingDept(true) : undefined}
+            />
+          </div>
         ) : (
           <ul className="flex flex-col gap-2">
             {shownDepartments.map((d) => (
@@ -502,20 +506,24 @@ export function ClientOrgPanel({
           // No import target — a role's cost is set by hand, deliberately
           // (the file's own header: overwriting it from a sheet is exactly
           // what would break an older map's saving).
-          <CollectionEmptyState
-            title={t("No roles yet.")}
-            description={t(
-              "A role carries what an hour of it costs them, which is what turns a process map's minutes into money."
-            )}
-            onCreate={canCreate ? () => setAddingRole(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              title={t("No roles yet.")}
+              description={t(
+                "A role carries what an hour of it costs them, which is what turns a process map's minutes into money."
+              )}
+              onCreate={canCreate ? () => setAddingRole(true) : undefined}
+            />
+          </div>
         ) : shownRoles.length === 0 ? (
           /* R62 — as on Departments above. */
-          <CollectionEmptyState
-            filtered
-            title={t("No roles yet.")}
-            onCreate={canCreate ? () => setAddingRole(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              filtered
+              title={t("No roles yet.")}
+              onCreate={canCreate ? () => setAddingRole(true) : undefined}
+            />
+          </div>
         ) : (
           <ul className="flex flex-col gap-2">
             {shownRoles.map((r) => (
@@ -659,18 +667,22 @@ export function ClientOrgPanel({
         {tools.length === 0 ? (
           // No import target — a tool's price is set from its own dated form
           // (the file's own header explains why), never bulk-loaded.
-          <CollectionEmptyState
-            title={t("No tools yet.")}
-            description={t("Add what they run on, so a step that replaces one can subtract what it costs.")}
-            onCreate={canCreate ? () => setAddingTool(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              title={t("No tools yet.")}
+              description={t("Add what they run on, so a step that replaces one can subtract what it costs.")}
+              onCreate={canCreate ? () => setAddingTool(true) : undefined}
+            />
+          </div>
         ) : shownTools.length === 0 ? (
           /* R62 — as on Departments above. */
-          <CollectionEmptyState
-            filtered
-            title={t("No tools yet.")}
-            onCreate={canCreate ? () => setAddingTool(true) : undefined}
-          />
+          <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+            <CollectionEmptyState
+              filtered
+              title={t("No tools yet.")}
+              onCreate={canCreate ? () => setAddingTool(true) : undefined}
+            />
+          </div>
         ) : (
           <ul className="flex flex-col gap-2">
             {shownTools.map((x) => (

@@ -932,8 +932,17 @@ CREATE INDEX idx_process_comments_process ON process_comments (process_id, creat
 --
 -- Two tables cannot be confused by a forgotten predicate. A door that reads
 -- \`account_rates\` cannot accidentally return an internal rate, because the
--- internal rate is not in the table it named. The same reasoning splits the code
--- (lib/rates.ts vs lib/internal-money.ts) and is the law R24 checks.
+-- internal rate is not in the table it named. The same reasoning split the code
+-- (lib/rates.ts vs lib/internal-money.ts) and was the law R24 checks.
+--
+-- WHAT HAPPENED NEXT, annotated on 10 Sep 2026 rather than edited away, because
+-- this entry is the record of a moment. BOTH TABLES ARE GONE and both files with
+-- them. The client retired the internal rates first — "kill the whole internal
+-- rates thing … for now i iwanna wipe it clean" — and the ACCOUNT rate card an
+-- hour later: "the whole account rates also killed it". Migration 0073 drops
+-- \`internal_rates\` and \`internal_role_rates\`; 0074 drops \`account_rates\`.
+-- The reasoning above is kept because it was right and because the next person
+-- who wants one table with a \`kind\` column should read why there were two.
 CREATE TABLE account_rates (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts (id),
@@ -2312,6 +2321,16 @@ CREATE UNIQUE INDEX idx_app_stakeholders_main ON app_stakeholders (app_id) WHERE
     // rule's own sentence is why it lives beside the internal rate card rather
     // than beside the account one: a condition can be inverted, an import cannot
     // be forgotten.
+    //
+    // WHAT HAPPENED NEXT, added 10 Sep 2026 and left as an annotation rather
+    // than an edit, because this entry is a record of a moment and 0025 is the
+    // precedent for how a retired module is handled. This table was read by
+    // NOTHING from 25 Aug 2026, when `appMoneyBack` stopped pricing off it and
+    // began using the client's own role rates frozen onto each step. The client
+    // then retired the whole internal-rates feature on 10 Sep 2026 — "kill the
+    // whole internal rates thing … for now i iwanna wipe it clean" — so the file
+    // named above is gone, R24's structural half went with it, and migration
+    // 0073 drops both this table and `internal_rates`.
     //
     // \`role_name\` ON THE PROCESS, not on the step. The feedback's sentence is
     // "for each process, record which role does it" — one process is one kind of
@@ -4973,6 +4992,161 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     // team must come out in.
     version: "0072_the_app_and_the_wave_get_their_number",
     sql: appAndWaveNumberSql(),
+  },
+
+  {
+    // THE INTERNAL RATES GO, AND THE ROWS GO WITH THEM — the client's ruling,
+    // 10 Sep 2026, verbatim: "kill the whole internal rates thing. will develop
+    // this in the future much much more but for now i iwanna wipe it clean".
+    //
+    // ── THIS IS A DROP, AND THAT IS THE DECISION TO ARGUE WITH ─────────────
+    //
+    // The house rule is DEACTIVATE, NEVER DELETE, and it is in CLAUDE.md, so a
+    // drop needs its reasons said out loud rather than assumed from the word
+    // "wipe".
+    //
+    //   1. DEACTIVATE-NEVER-DELETE IS ABOUT A ROW IN A LIVING FEATURE. It keeps
+    //      last year's answer true: what an account WAS charged, who set it,
+    //      when it was retired. It presumes something can still read the row. By
+    //      the time this migration runs there is no reader left — no table type,
+    //      no lib, no door, no tool, no screen, no cache key, no query module.
+    //      A deactivated row in a table nothing can name is not audited, it is
+    //      orphaned, and it reads to the next person as a feature that half
+    //      exists.
+    //   2. THE AUDIT SURVIVES ANYWAY, and this is the load-bearing half. History
+    //      in this base does not live on the record, it lives in `activity` —
+    //      "Ana set the internal rate for Development", with the actor, the
+    //      timestamp and the before/after in the description. Those rows are
+    //      NOT touched here. What is dropped is the current-state table; what
+    //      the audit was always made of stays exactly where it was.
+    //   3. THERE IS PRECEDENT AND IT IS THE SAME SHAPE. 0025 dropped
+    //      `learning`, `learning_progress`, `marketing_posts` and `programs`
+    //      after the client retired those modules. This is NOT the first true
+    //      drop in this codebase, and it is the second one made for the same
+    //      reason by the same person.
+    //   4. THE MEASURED SIZE. Live staging, 10 Sep 2026: ONE internal rate row
+    //      ("Our time", 4500) and ONE role rate row ("Bookkeeper", 4500), across
+    //      sixteen team databases. The role card had been read by nothing since
+    //      25 Aug 2026, when `appMoneyBack` stopped pricing off it.
+    //
+    // IF THAT WEIGHING IS WRONG, THE CHEAP FIX IS TO NOT RUN THIS. Nothing else
+    // in the change depends on it: the code removal stands on its own, and the
+    // two tables simply sit there unread until somebody decides. She said "for
+    // now", and the tables are the only part of this that cannot be undone.
+    //
+    // ── IT IS NOT SAFE AGAINST AN OLD READER. SAID PLAINLY. ────────────────
+    //
+    // Every other migration in this ledger is additive or self-guarded, so the
+    // usual sentence — "safe to apply before the workers roll" — is the one
+    // sentence that is FALSE here. The tenancy worker that is live until the
+    // deploy finishes still serves `GET /api/tenancy/internal-rates`, `GET
+    // /api/tenancy/margin` and `GET /api/tenancy/role-rates`, and each of them
+    // runs a SELECT against a table this statement removes. Applied first, they
+    // do not return an empty card — they raise `no such table` and answer 500,
+    // for as long as the rolling deploy takes.
+    //
+    // SO THE ORDER IS PART OF THE MIGRATION, not a note beside it: DEPLOY THE
+    // TENANCY WORKER FIRST, THEN APPLY THIS. That is the reverse of the usual
+    // habit, and it is safe in the reverse direction for the reason the usual
+    // habit is not needed here — the NEW worker never names these tables at all,
+    // so it does not care whether they are still standing. There is no window in
+    // which new code needs old rows.
+    //
+    // `IF EXISTS` on both, because a database rebuilt from this ledger in the
+    // future must not fail on a table an earlier entry created and this one
+    // removes — and because a team that was never migrated past 0012 has no
+    // `internal_role_rates` to drop. The indexes go with their tables; SQLite
+    // drops them automatically, and naming them separately would be a statement
+    // that fails on the second run.
+    version: "0073_the_internal_rates_are_wiped_clean",
+    sql: `
+DROP TABLE IF EXISTS internal_rates;
+DROP TABLE IF EXISTS internal_role_rates;
+`,
+  },
+
+  {
+    // THE ACCOUNT RATE CARD GOES TOO — the client's second ruling of 10 Sep 2026,
+    // an hour after the first, verbatim: "The whole account rates also killed
+    // it."
+    //
+    // 0073 is its sibling and the two were written the same afternoon. Read that
+    // entry first: everything it argues about a DROP applies here word for word,
+    // and this note only says what is different.
+    //
+    // ── WHAT THIS TABLE WAS ────────────────────────────────────────────────
+    //
+    // \`account_rates\` is what a CLIENT IS CHARGED per hour, by kind of work —
+    // "Development, 45.00 an hour" — one live line per (account, kind of work),
+    // held by a partial unique index. It is the OTHER half of the pair migration
+    // 0012 created and argued for at length: two tables rather than one with a
+    // \`kind\` column, so that no forgotten WHERE clause could turn what we charge
+    // into what we cost. Both halves are now gone, an hour apart.
+    //
+    // ── THIS IS A DROP, FOR 0073's FOUR REASONS, AND THEY HOLD ─────────────
+    //
+    //   1. DEACTIVATE-NEVER-DELETE IS ABOUT A ROW IN A LIVING FEATURE. By the
+    //      time this runs there is no reader left: no type (\`AccountRate\` is
+    //      gone from shared/types.ts), no lib (lib/rates.ts deleted), no door
+    //      (the four \`/api/tenancy/rates*\` routes removed), no tool, no screen,
+    //      no tab, no cache key, no query-grammar module, no live listener on
+    //      either front door.
+    //   2. THE AUDIT SURVIVES ANYWAY, and it is the load-bearing half here too.
+    //      "Ana set a rate for Development", with the actor, the timestamp and
+    //      the before/after, is an \`activity\` row and \`activity\` IS NOT TOUCHED.
+    //      What is dropped is the current-state table. What a client was charged
+    //      last year — the thing deactivate-never-delete exists to keep true —
+    //      is in the history, where this base has always kept it.
+    //   3. PRECEDENT, TWICE NOW. 0025 dropped four tables when the client retired
+    //      those modules; 0073 dropped two this morning. This is the third, by
+    //      the same person, for the same reason.
+    //   4. THE MEASURED SIZE. Live staging, 10 Sep 2026: FOUR rows, across
+    //      sixteen team databases.
+    //
+    // ── THE ONE THING THAT IS DIFFERENT FROM 0073 ──────────────────────────
+    //
+    // 0073's tables had been read by nothing since 25 Aug 2026. THIS ONE WAS
+    // LIVE. Four doors served it this morning, a tab on every client's record
+    // drew it, and the client's own portal read a projection of it on the value
+    // screen. So the loss is real rather than notional, and it is worth naming
+    // what actually disappears from a person's day: the Rates tab, and the
+    // "Money given back, every month" panel on the Impact tab, which multiplied
+    // the saved hours by the first live line of this card and could not survive
+    // the loss of its input.
+    //
+    // IF THAT WEIGHING IS WRONG, THE CHEAP FIX IS TO NOT RUN THIS. Nothing else
+    // in the change depends on it: the code removal stands on its own and the
+    // table simply sits there unread until somebody decides. Four rows are four
+    // rows; the table is the only part of this that cannot be undone.
+    //
+    // ── IT IS NOT SAFE AGAINST AN OLD READER. SAID PLAINLY. ────────────────
+    //
+    // Exactly as 0073 is not, and for the same mechanism. The tenancy worker
+    // that is live until the deploy finishes still serves
+    // \`GET /api/tenancy/rates\`, its three writes, AND — the sharper one —
+    // \`GET /api/tenancy/impact\`, which is on the CLIENT PORTAL's own allow-list
+    // and calls \`listAccountRates\` for any account whose price visibility is on.
+    // Applied first, every one of those raises \`no such table\` and answers 500,
+    // for as long as the rolling deploy takes, and one of them is a client's own
+    // screen rather than a staff one.
+    //
+    // SO THE ORDER IS PART OF THE MIGRATION: DEPLOY THE TENANCY WORKER FIRST,
+    // THEN APPLY THIS. Safe in that direction for the reason the usual habit is
+    // not needed here — the NEW worker never names this table at all, so it does
+    // not care whether it is still standing. There is no window in which new code
+    // needs old rows.
+    //
+    // AND IF BOTH 0073 AND 0074 ARE APPLIED IN ONE PASS, that is one deploy of
+    // tenancy followed by one apply. They are not independent of each other in
+    // ORDER — both must come after the worker — only in subject.
+    //
+    // \`IF EXISTS\`, and the index is not named separately: SQLite drops a
+    // table's indexes with it, and naming \`idx_account_rates_label\` here would
+    // be a statement that fails on the second run of a rebuilt ledger.
+    version: "0074_the_account_rate_card_is_killed_too",
+    sql: `
+DROP TABLE IF EXISTS account_rates;
+`,
   },
 ]
 

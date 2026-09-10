@@ -127,13 +127,10 @@ export const MODULE_PERMISSION: Record<string, string> = {
   // these screens as well (the rate card on an account), because what a client is
   // charged is a bigger decision than how long a step takes.
   processes: "processes",
-  // …and `commercials` has ONE screen of its own: our own cost card. Both halves
-  // of the money gate on this single module, and they are reached in two
-  // different places on purpose — an ACCOUNT's rate card is a tab on that
-  // account's record (the question is always about one client), and OUR OWN cost
-  // card is this team-wide tab, which no client login can reach at any hostname
-  // (R24 · SCOPE, and workers/tenancy/src/lib/internal-money.ts says why).
-  "internal-rates": "commercials",
+  // `commercials` had ONE screen of its own here — our own cost card, a
+  // team-wide tab — and it was retired on 10 Sep 2026. The module is still live
+  // and still gates money: an ACCOUNT's rate card is a tab on that account's own
+  // record, because the question is always about one client.
   // THE WORK ENGINE, as four segments over two modules. Stories, sprints and
   // tasks all gate on `work` — they are one permission and three nouns. Apps
   // gate on `processes`
@@ -360,9 +357,26 @@ const ticketsListRecipe: ScreenRecipe = {
   binding: { module: "tickets" },
   gate: { module: "help", right: "read" },
   fields: [field("name", "Ticket"), field("detail", "Details")],
-  // THE TICKET'S KIND, as the glyph the team chose for it — the same ⚠️ / ❓ / 💭
-  // the tab strip above now carries, so the row and the tab agree without either
-  // writing a pictograph into a sentence (UI-CONVENTIONS §5).
+  // THE TICKET'S KIND, in the leading slot the row draws it in
+  // (UI-CONVENTIONS §5: a mark sits where an icon would, never inside a
+  // sentence).
+  //
+  // THIS COMMENT NAMED THREE PICTOGRAPHS AS CHARACTERS UNTIL 2026-09-10, and
+  // said the tab strip carried them. Neither half was true any more. The
+  // client retired the ticket type's glyph on 2026-09-07 — *"for type, kill
+  // the emojis. this is legacy. in current system we use colors"* — so
+  // `MARK_GROUP` (web/lib/type-marks.ts) has no `ticket` key, the union is
+  // closed, and no screen can look one up: the tickets collection draws
+  // `Swatch` + `ticketTypeColour` instead. This recipe is also no longer the
+  // path that screen takes (`tickets-collection.tsx` composes its own rows;
+  // `shapeHelpList`'s `marks` argument reaches it from nowhere in `web/`), so
+  // the slot resolves to no glyph at all. Left named rather than deleted
+  // because the recipe is still what a cold account's empty state is read
+  // from, and the column costs nothing when nothing feeds it. R66
+  // (`no-emoji-in-copy`) does not census source comments, deliberately — the
+  // pictographs elsewhere in this repo's comments are the client's own words
+  // quoted beside the change they caused. These three were not a quotation,
+  // they were an instruction to the next reader.
   leading: "mark",
   actions: [],
   // NO FACET HERE, and this one is a REMOVAL rather than a move. The stage a

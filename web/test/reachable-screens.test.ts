@@ -262,10 +262,16 @@ describe("the screens are reachable", () => {
      *   • A PATH ENDS WHERE ITS STRING DOES. A plain `includes` is a prefix test,
      *     so `/api/tenancy/rates` matched `/api/tenancy/rates/update` too, and the
      *     stem door read as pressed the moment any sibling was.
-     *   • A PATH IS NOT A DOOR. `/api/tenancy/rates` is TWO doors — a GET that
-     *     reads the card and a POST that adds to it — and the reading method is
-     *     called from a screen on every card that renders. So the write door read
-     *     as pressed by the read door's own caller.
+     *   • A PATH IS NOT A DOOR. `/api/tenancy/rates` WAS two doors — a GET that
+     *     read the account rate card and a POST that added to it — and the
+     *     reading method was called from a screen on every card that rendered. So
+     *     the write door read as pressed by the read door's own caller.
+     *
+     *     THOSE FOUR DOORS WERE RETIRED ON 10 SEP 2026 with the rate card itself
+     *     ("the whole account rates also killed it"). The example is kept because
+     *     it is the clearest one either fault ever had, and because both faults
+     *     are about the SHAPE of a path rather than about that feature — the next
+     *     stem-plus-suffix pair will read exactly the same way.
      *
      * What separates them is that the body SAYS it is a write — in any of the
      * THREE ways this api layer writes one: the shared `post()` helper
@@ -692,7 +698,7 @@ describe("the screens are reachable", () => {
 const NO_SCREEN_FIELD: Record<string, string> = {
   /* ── a gap: the capability shipped and the people the app is for cannot use it ── */
   commercialsVisible:
-    "A GAP, and the most expensive one on this list. `accounts.commercials_visible` decides whether a client sees what they were charged — the owner's own ruling, quoted in getImpact (workers/tenancy/src/routes/processes.ts): value for everyone, prices only for the accounts he switches on. `pricesVisibleFor` reads it inside the account fence and drops the whole `prices` key when it is off. The column defaults to 0 and NO screen on either front door offers the switch, so the answer is no for every account ever created unless somebody asks the assistant to flip it through `update_account`. Fixing it is a checkbox on the account form and a decision about WHICH right may tick it (accounts:edit is the door's gate today; commercials:read is the money gate) — a permission question, which is the owner's and not a review lane's. Delete this line the day the switch exists.",
+    "A GAP, and still the most expensive one on this list — though it governs HALF of what it did. `accounts.commercials_visible` decides what money a client sees on their own value screen: the owner's own ruling, quoted in getImpact (workers/tenancy/src/routes/processes.ts), is value for everyone and prices only for the accounts he switches on. `pricesVisibleFor` reads it inside the account fence and drops the whole `prices` key when it is off. WHAT IS IN THAT KEY NARROWED ON 10 SEP 2026: it held the account rate card projected for the client AND what they had bought, and the client retired the rate card that afternoon (\"the whole account rates also killed it\"), so the switch now governs exactly one figure — `prices.soldCents`, the sum of what has been sold to them, plus the currency it is said in. It still governs something real, which is why this line stays rather than joining the card. The column defaults to 0 and NO screen on either front door offers the switch, so the answer is no for every account ever created unless somebody asks the assistant to flip it through `update_account`: on staging, 0 of 134. Fixing it is a checkbox on the account form and a decision about WHICH right may tick it (accounts:edit is the door's gate today; commercials:read is the money gate) — a permission question, which is the owner's and not a review lane's. Delete this line the day the switch exists.",
   appRestriction:
     "A GAP. A portal login can be narrowed to named apps inside a client's world — `grant_portal_access` forwards it, the door validates every id against that account, and `accountScope` reads `app_restriction` back on every portal request — and the agency's own grant panel (contact-detail.tsx, through `tenancy.grantPortalAccess(accountId, personAccountId, notify)`) has no field for it. So the narrowing exists, is enforced, and can only be set by asking the assistant. Delete this line when the grant panel offers the list.",
   timezone:

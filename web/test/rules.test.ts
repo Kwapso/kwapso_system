@@ -14,10 +14,12 @@ import {
   ACCOUNT_SCOPED_MODULES,
   ACTIVITY_GATE_MAP,
   ACTIVITY_TABLE_EXEMPT,
+  CARD_CHIP_BELOW_OK,
   CENTRED_DIALOG_OK,
   CLIENT_REACHABLE_EXEMPT,
   COMPOSITION_EXEMPT,
   DEAF_EXEMPT,
+  EMOJI_OK,
   FORM_DIALOGS,
   GLOSSARY_SYNONYMS,
   GLOSSARY_SYNONYM_OK,
@@ -30,7 +32,6 @@ import {
   RECORD_TABS_SINGLE_PANEL,
   PALETTE_LITERAL_OK,
   SCREEN_WIDTH_EXEMPT,
-  PORTAL_VISIBLE_READS,
   RECORD_TAB_COUNT_EXCEPTIONS,
   RULES_REGISTRY,
   TWO_READS_ONE_DOOR,
@@ -48,11 +49,20 @@ import {
   KIT_COMPONENT_EXEMPT,
   SECTION_HOSTED_ELSEWHERE,
 } from "@shared/rules/registry"
+// R66 — the emoji predicate is the WRITE DOOR'S, imported rather than
+// re-implemented, so the law and the door can never come to disagree about a
+// glyph. See the `no-emoji-in-copy` block at the foot of this file.
+import { optionalMark, TEXT_LIMITS } from "@shared/workers/validate"
+// R66's exemption half: the app's own language table, so "a flag standing for a
+// language" is checked against the languages this app really speaks rather than
+// against a list of glyphs somebody typed into a law.
+import { LANGUAGES } from "@shared/i18n"
 import { SHARED_TOOLS } from "@shared/workers/tool-catalog"
 import {
   CLIENT_READABLE_WRITE_DOORS,
   INTERNAL_MONEY_DOORS,
   INTERNAL_MONEY_TOOLS,
+  MONEY_READERS,
   refusesOutboundMoney,
   writesWhereClientsRead,
 } from "@shared/workers/money-taint"
@@ -2420,222 +2430,103 @@ describe("RULES — the laws of the base", () => {
     ).toEqual([])
   })
 
-  // R24 — AN INTERNAL NUMBER CANNOT REACH THE CLIENT'S SIDE.
+  // R24's INBOUND HALF WAS RETIRED HERE ON 10 SEP 2026, AND THIS IS THE RECORD.
   //
-  // SCOPE's ruling is one of the few in this codebase with no exceptions clause
-  // at all: internal rates and margin never render in the portal under any flag,
-  // ever — "not behind a permission, not behind a feature toggle, not for an
-  // admin viewing the portal". The instruction that came with it was to make
-  // that STRUCTURALLY true rather than a condition someone can invert later, and
-  // this is what "structurally" means in a codebase: the figures live in ONE
-  // file, and nothing a client login can reach imports it.
+  // Four clauses stood in this position and they were correct: what an hour of
+  // our own work cost (`internal_rates`) and the margin computed from it lived
+  // in ONE file, the doors that called into it were derived from that file's own
+  // exports, none of them was on the portal gateway's surface, every one opened
+  // with `refusePortalCaller`, nothing in `web-portal/` named the table or those
+  // doors, and the two rate cards were held to two separate screens.
   //
-  // A condition can be inverted. A permission can be granted. A flag can be
-  // flipped by whoever writes next year's screen. An import cannot be forgotten,
-  // because it is not a decision anybody re-makes — it is either in the graph or
-  // it is not, and this reads the graph.
+  // The client retired the whole feature: "kill the whole internal rates thing.
+  // will develop this in the future much much more but for now i iwanna wipe it
+  // clean" (10 Sep 2026). The tables, the doors, the six tools, the two screens
+  // and `workers/tenancy/src/lib/internal-money.ts` all went.
   //
-  // Nothing here is hand-listed. The INTERNAL SURFACE is the exported names of
-  // internal-money.ts, read off that file. The INTERNAL DOORS are the tenancy
-  // routes whose handlers call one of them, read off the handler source. Add a
-  // door tomorrow that reads a margin and it is judged today.
-  it("internal-money-never-in-portal: no client-reachable path reaches the agency's own cost", () => {
-    const INTERNAL = join(ROOT, "workers", "tenancy", "src", "lib", "internal-money.ts")
-    const internalSrc = stripComments(read(INTERNAL))
-
-    // ── the internal surface, derived from the file itself ────────────────────
-    const exported = [...internalSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
-    const tables = [...new Set([...internalSrc.matchAll(/(?:FROM|INTO|UPDATE)\s+([a-z_]+)/g)].map((m) => m[1]))]
-    expect(exported.length, "the internal-money scan found no exports — it has gone blind").toBeGreaterThan(3)
-    expect(tables, "internal_rates is the table this law is about — did it move?").toContain("internal_rates")
-
-    // ── the internal doors, derived from the handlers that call into it ───────
-    const tenancyIndex = read(join(ROOT, "workers", "tenancy", "src", "index.ts"))
-    const routeFns = new Map<string, string>()
-    for (const { source } of sourceFiles(join(ROOT, "workers", "tenancy", "src", "routes"), { extensions: [".ts"] })) {
-      const starts = [...source.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
-      starts.forEach((m, i) => routeFns.set(m[1], source.slice(m.index, starts[i + 1]?.index ?? source.length)))
-    }
-    const routes = [...tenancyIndex.matchAll(/"([A-Z]+ \/[^"]+)":\s*\{\s*handler:\s*(\w+)/g)]
-    expect(routes.length, "tenancy's ROUTES did not parse").toBeGreaterThan(10)
-
-    const internalDoors = routes
-      .filter(([, , handler]) => {
-        const body = stripComments(routeFns.get(handler) ?? "")
-        return exported.some((fn) => new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body))
-      })
-      .map(([, door, handler]) => ({ door, handler }))
-    expect(
-      internalDoors.length,
-      "no door was derived as internal — the walk has gone blind, and a blind check reports 'all clear' exactly like a passing one"
-    ).toBeGreaterThan(3)
-
-    // ── 1. none of them is on the portal's surface ────────────────────────────
-    // THE ALLOW-LIST, THROUGH THE ONE READER (`portalDoorList`). This clause used
-    // to run `stripComments` over the whole gateway file, which is the wrong
-    // instrument for an allow-list twice over: a comment shaped like an entry can
-    // ADD a door (proved 27 Aug 2026 — removing `refusePortalCaller` from
-    // getBrandAssets stops being caught once the gateway carries the line
-    // `// Not forwarded yet: "GET /api/content/brand-assets": "read" …`), and a
-    // block-comment opener in prose or in a string can LOSE one. This clause is
-    // asserting ABSENCE, so a lost door is a lost assertion and nothing goes red.
-    // The reader's header carries the measurement and the canary.
-    const portalDoors = new Set(portalDoorList())
-    const published = internalDoors.filter((d) => portalDoors.has(d.door))
-    expect(
-      published.map((d) => d.door),
-      "the portal gateway opens a door that reads the agency's own cost — SCOPE says a client never sees this, under any flag (R24)"
-    ).toEqual([])
-
-    // ── 2. every one of them refuses a client login at the door ───────────────
-    // Belt and braces on purpose: the gateway's allow-list is the first answer
-    // and the door's own refusal is the one that survives somebody adding a line
-    // to the allow-list. That mistake has been made twice in this codebase.
-    const unrefused = internalDoors.filter(
-      (d) => !/refusePortalCaller\s*\(/.test(stripComments(routeFns.get(d.handler) ?? ""))
-    )
-    expect(
-      unrefused.map((d) => `${d.door} (${d.handler})`),
-      "a door that reads the agency's own cost must refuse a portal caller AT THE DOOR (R24 · R21)"
-    ).toEqual([])
-
-    // ── 3. the client's own front end names none of it ────────────────────────
-    //
-    // WHICH TABLES ARE "INTERNAL" IS ITSELF DERIVED, and it has to be: the margin
-    // reads `apps` for what a system costs us to run, and `apps` is not an
-    // internal table — a client's own value screen names their apps by design. So
-    // the forbidden set is the tables the internal file reads MINUS every table a
-    // file that ANSWERS A CLIENT reads (PORTAL_VISIBLE_READS, whose completeness
-    // is the portal-fence suite's job). What survives that subtraction is exactly
-    // "a table only the agency's own side ever touches", which is the thing this
-    // law is about. Hand-listing it would have been the fourth version of the
-    // mistake this codebase keeps making.
-    const clientReadable = new Set<string>()
-    for (const file of Object.keys(PORTAL_VISIBLE_READS))
-      for (const m of stripComments(read(join(ROOT, file))).matchAll(/(?:FROM|INTO|UPDATE|JOIN)\s+([a-z_]+)/g))
-        clientReadable.add(m[1])
-    const internalTables = tables.filter((t) => !clientReadable.has(t))
-    expect(
-      internalTables,
-      "the internal-table derivation subtracted everything — internal_rates must survive it"
-    ).toContain("internal_rates")
-
-    // The paths and the table are unambiguous strings; `marginCents` is the field
-    // a screen would have to read to render one. Comments are stripped first — a
-    // note explaining why the portal does NOT show a margin must not read as one.
-    const forbidden = [...internalTables, ...internalDoors.map((d) => d.door.split(" ")[1]), "marginCents"]
-    const portalFiles = sourceFiles(
-      ["lib", "components", "app"].map((d) => join(ROOT, "web-portal", d)),
-      { extensions: [".ts", ".tsx"], relativeTo: join(ROOT, "web-portal") }
-    )
-    expect(portalFiles.length, "the portal source walk found nothing").toBeGreaterThan(10)
-    const leaks: string[] = []
-    for (const f of portalFiles) {
-      const src = stripComments(f.source)
-      for (const needle of forbidden) if (src.includes(needle)) leaks.push(`${f.rel} names ${needle}`)
-    }
-    expect(
-      leaks,
-      `the client portal names the agency's own cost figures (R24): ${leaks.join(", ")}`
-    ).toEqual([])
-
-    // ── 4. …AND OUR OWN TWO RATE CARDS STAY TWO SCREENS ───────────────────────
-    //
-    // The three clauses above all watch the CLIENT's app. This one watches ours,
-    // and it closes the way this law would most plausibly be undone next: not by
-    // a leak, but by somebody noticing that "what an account is charged" and
-    // "what our own hour costs" are the same list with different numbers, and
-    // merging the two screens into one component with an `internal` flag on it.
-    //
-    // That is precisely the shape the law exists to forbid. lib/rates.ts says it
-    // about the worker in its own header — "keeping them in one file behind a
-    // flag would put the figure SCOPE says a client must NEVER see one forgotten
-    // predicate away from the one they may" — and the split held on the server
-    // for as long as neither half had a screen. Both have one now, so the same
-    // sentence has to hold on this side of the wire.
-    //
-    // BOTH DOOR SETS ARE DERIVED, symmetrically: the internal ones from the
-    // handlers that call into internal-money.ts (above), the account ones from
-    // the handlers that call into lib/rates.ts beside it. Then the api layer's
-    // own method bodies say which method posts to which, and the components say
-    // which methods they call. Nothing here is a list somebody maintains.
-    const ratesSrc = stripComments(read(join(ROOT, "workers", "tenancy", "src", "lib", "rates.ts")))
-    const accountExports = [...ratesSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
-    expect(accountExports.length, "the account-rates scan found no exports — it has gone blind").toBeGreaterThan(2)
-    const accountDoors = routes
-      .filter(([, , handler]) => {
-        const body = stripComments(routeFns.get(handler) ?? "")
-        return accountExports.some((fn) => new RegExp(`(?<![\\w.])${fn}\\s*\\(`).test(body))
-      })
-      .map(([, door]) => door.split(" ")[1])
-    expect(accountDoors.length, "no account-rate door was derived — the walk has gone blind").toBeGreaterThan(2)
-
-    // Which api method posts to which side. Same two-hop read the doors-have-
-    // controls check makes, for the same reason: a screen calls a METHOD, and
-    // the path only exists in that method's body.
-    const apiSrc = read(join(WEB, "lib", "api", "tenancy.ts"))
-    const apiMethods = [...apiSrc.matchAll(/^ {2}(\w+):\s*[(<]/gm)]
-    expect(apiMethods.length, "the tenancy api-method scan found almost nothing").toBeGreaterThan(20)
-    const sideOf = (paths: string[]) =>
-      apiMethods
-        .filter((m, i) => {
-          const body = apiSrc.slice(m.index as number, (apiMethods[i + 1]?.index as number) ?? apiSrc.length)
-          return paths.some((p) => body.includes(`"${p}"`) || body.includes(`\`${p}`))
-        })
-        .map((m) => m[1])
-    const internalMethods = sideOf(internalDoors.map((d) => d.door.split(" ")[1]))
-    const accountMethods = sideOf(accountDoors)
-    expect(internalMethods.length, "no api method reaches the internal doors — the map has gone blind").toBeGreaterThan(2)
-    expect(accountMethods.length, "no api method reaches the account doors — the map has gone blind").toBeGreaterThan(2)
-
-    const bothSides = componentFiles().filter((f) => {
-      const src = stripComments(read(f))
-      const calls = (names: string[]) => names.some((n) => new RegExp(`\\.${n}\\s*\\(`).test(src))
-      return calls(internalMethods) && calls(accountMethods)
-    })
-    expect(
-      bothSides,
-      `one screen reads BOTH rate cards (R24). What we charge a client and what our own hour costs are two audiences: keep them in two components, so the separation is an import somebody cannot forget rather than a condition somebody can invert — ${bothSides.join(", ")}`
-    ).toEqual([])
-  })
-
-  // R24, THE OUTBOUND HALF — A CONVERSATION THAT HAS READ THE MONEY MAY NOT
-  // THEN WRITE WHERE THE CLIENT READS.
+  // WHY THIS WAS RETIRED RATHER THAN RE-POINTED, which is the decision worth
+  // writing down. R24's doctrine is the whole of it — "a condition can be
+  // inverted and a permission can be granted, an import cannot be forgotten" —
+  // so the law only ever meant anything about a number that is STRUCTURALLY off
+  // the client's side. After the removal there is no such number left in this
+  // base. Every money surface that survives is shown to a client deliberately,
+  // behind their account's own price-visibility switch: the account rate card
+  // (projected by the value door), a sprint's sold price, and the savings priced
+  // off the client's own role rates.
   //
-  // The four clauses above are all about the import graph, and they are correct:
-  // nothing a client login can reach imports the file the money lives in. The
-  // assistant does not need an import. It reads the margin through a door R24
-  // fences properly — as an agency admin, holding `commercials:read`, exactly as
-  // designed — and then writes a reply into a ticket thread the client reads.
-  // Every door on that path did its own job and the number still arrived in the
-  // client's inbox, with no confirm panel anywhere: `reply_help_ticket` is gated
-  // on `help:read`, the lowest bar in the catalogue, and its confirm predicate
-  // fires only when the reply @mentions somebody.
+  // THAT ENUMERATION LASTED AN HOUR. The client then retired the account rate
+  // card as well ("the whole account rates also killed it"), so the first item
+  // stopped existing and the switch now governs exactly one figure — a sprint's
+  // sold price, as `prices.soldCents` — rather than two. THE DOCTRINE DID NOT
+  // MOVE, and that is the whole reason the correction was worth making rather
+  // than shrugging at: the sentence that justified retiring the inbound half is
+  // "no money figure here is structurally fenced", and it is still true. Every
+  // one that reaches a client reaches them because a CONDITION let it — the
+  // per-account switch, the main-stakeholder fence on a step's role rate, or a
+  // scope test on an app's running cost. The list of surfaces was never the
+  // argument; it was the evidence, and evidence that has stopped being true is
+  // exactly what a law's stated `why` must not carry.
   //
-  // And the instruction came from the client. A portal ticket description is
+  // Re-pointing R24 at any of them would have produced a law whose
+  // headline sentence its own subject contradicts, which is worse than no law:
+  // it reads green and means nothing. R15's retired half is the precedent, and
+  // its sentence applies word for word — "a law kept alive by a filter matching
+  // nothing buys confidence without paying for it".
+  //
+  // WHAT DID NOT GO IS BELOW. The OUTBOUND half never rested on the import
+  // graph, and it still has a real subject, so R24 narrowed to it rather than
+  // being deleted. RULES.md's R24 row carries the same account for a reader who
+  // never opens this file.
+
+  // R24 — A CONVERSATION THAT HAS READ A WITHHELD FIGURE MAY NOT THEN WRITE
+  // WHERE THE CLIENT READS. All that is left of the law, and the half that
+  // survived its own subject.
+  //
+  // The four retired clauses above were about the import graph. The assistant
+  // never needed one: it reads the figure through a door that is fenced exactly
+  // as designed — an agency admin holding `commercials:read` — and then writes a
+  // reply into a ticket thread the client reads. Every door on that path does
+  // its own job and the number still arrives in the client's inbox, with no
+  // confirm panel anywhere: `reply_help_ticket` is gated on `help:read`, the
+  // lowest bar in the catalogue, and its confirm predicate fires only when the
+  // reply @mentions somebody.
+  //
+  // And the instruction comes from the client. A portal ticket description is
   // 20,000 characters of their own prose, read by the model the next time
-  // anybody here asks a question that touches tickets. What stood between that
-  // paragraph and the write was one sentence in a tool description — "INTERNAL,
-  // never repeat this figure to a client" — which is the least structural
-  // defence available, and it was being asked to hold against prose written by
-  // the person it protects the number from. R24's own text already answers this,
-  // about a different half of the same problem: a condition can be inverted and
-  // a permission can be granted, an import cannot be forgotten.
+  // anybody here asks a question that touches tickets. What stands between that
+  // paragraph and the write, absent this, is one sentence in a tool description,
+  // which is the least structural defence available and is being asked to hold
+  // against prose written by the person it protects the number from.
+  //
+  // THE FIGURE IS NOW `get_app_impact`'s, not a margin's. `GET /api/tenancy/
+  // app-money` hands over what one app gives back priced IN FULL, where the
+  // client's own value door (`GET /api/tenancy/impact`) nulls the prices on any
+  // app whose account has price visibility switched off. Same subtraction, one
+  // of them unredacted — so it is still a number a particular client may be
+  // forbidden to see, and the door list NARROWED to it rather than moving.
   //
   // NOTHING HERE IS A LIST OF TOOL NAMES, which is the whole of why it is worth
-  // having. The money doors are re-derived off disk exactly as clause 1 derives
-  // them; the client-readable doors are the portal's own allow-list; and the
+  // having. The client-readable doors are the portal's own allow-list; and the
   // TOOLS are derived from the doors at runtime, off the shipped catalogue, so a
   // money tool added tomorrow on a door already on the list is covered the
   // moment it is written. The runtime pins are copies because a worker cannot
   // read another worker's private source, and this is what proves them equal.
-  it("internal-money-never-in-portal: a turn that read the agency's own cost cannot then write where the client reads (R24 outbound)", () => {
+  //
+  // ONE THING IS WEAKER THAN IT WAS, AND IS SAID RATHER THAN HIDDEN. The doors
+  // used to be derived from a FILE — the routes whose handlers called an export
+  // of `internal-money.ts`. That file is gone and `appMoneyBack` moved into
+  // `lib/processes.ts`, which has forty exports and is mostly not money, so the
+  // oracle narrowed to a NAMED SET OF FUNCTIONS (`MONEY_READERS`). A name on
+  // that list is a decision somebody makes where an import was a fact somebody
+  // could not forget. What is still DERIVED is the doors, off tenancy's own
+  // ROUTES and every handler's own source, and the pin must equal them exactly.
+  it("money-taint-outbound: a turn that read a withheld figure cannot then write where the client reads (R24)", () => {
     // ── i · the money doors, RE-DERIVED, and the pin must equal them ──────────
-    const internalSrc = stripComments(
-      read(join(ROOT, "workers", "tenancy", "src", "lib", "internal-money.ts"))
-    )
-    const exported = [...internalSrc.matchAll(/export\s+(?:async\s+)?function\s+(\w+)/g)].map((m) => m[1])
-    expect(exported.length, "the internal-money scan found no exports — it has gone blind").toBeGreaterThan(3)
+    expect(
+      MONEY_READERS.length,
+      "MONEY_READERS is empty — every derivation below is over an empty set, and a set relation against an empty set is empty"
+    ).toBeGreaterThan(0)
+    const exported = [...MONEY_READERS]
     const routeFns = new Map<string, string>()
     for (const { source } of sourceFiles(join(ROOT, "workers", "tenancy", "src", "routes"), { extensions: [".ts"] })) {
       const starts = [...source.matchAll(/(?:export\s+)?(?:async\s+)?function\s+(\w+)/g)]
@@ -2657,10 +2548,10 @@ describe("RULES — the laws of the base", () => {
     expect(
       derivedMoneyDoors.length,
       "no money door was derived — the walk has gone blind, and a blind check reports 'all clear' exactly like a passing one"
-    ).toBeGreaterThan(3)
+    ).toBeGreaterThan(0)
     expect(
       [...derivedMoneyDoors].sort(),
-      `INTERNAL_MONEY_DOORS (shared/workers/money-taint.ts) has drifted from the doors that actually call into internal-money.ts. The worker cannot read tenancy's source at runtime, so the pin carries the answer and this proves it — re-pin it (R24 outbound)`
+      `INTERNAL_MONEY_DOORS (shared/workers/money-taint.ts) has drifted from the doors whose handlers actually call one of MONEY_READERS. The worker cannot read tenancy's source at runtime, so the pin carries the answer and this proves it — re-pin it (R24)`
     ).toEqual([...INTERNAL_MONEY_DOORS].sort())
 
     // ── ii · the client-readable doors are the portal's own allow-list ────────
@@ -2686,7 +2577,7 @@ describe("RULES — the laws of the base", () => {
     expect(
       moneyToolsInCatalogue.length,
       "no tool in the catalogue sits on a money door — either the catalogue moved or this census is blind"
-    ).toBeGreaterThan(2)
+    ).toBeGreaterThan(0)
     expect(
       moneyToolsInCatalogue.map((t) => t.name).filter((n) => !INTERNAL_MONEY_TOOLS.has(n)),
       "a tool on a money door is not in INTERNAL_MONEY_TOOLS — the runtime derivation and the disk derivation disagree (R24 outbound)"
@@ -2704,10 +2595,11 @@ describe("RULES — the laws of the base", () => {
     // emails the raiser a preview of the body.
     expect(
       outbound.map((t) => t.path),
-      "the ticket reply door must be classified outbound — it is the door the margin left through (R24 outbound)"
+      "the ticket reply door must be classified outbound — it is the door the figure would leave through (R24)"
     ).toContain("/api/content/help/reply")
 
     const anyMoneyToolName = [...INTERNAL_MONEY_TOOLS][0]
+    expect(anyMoneyToolName, "no money tool at all — every refusal below would be vacuous").toBeDefined()
     for (const t of outbound) {
       const door = { method: t.method, path: t.path, write: t.agent.write }
       expect(
@@ -3359,6 +3251,22 @@ describe("RULES — the laws of the base", () => {
   //        use) passes an `empty` prop, or is named in `EMPTY_TOOLBAR_EXEMPT`.
   //   iii. Every `<PagedFind>` call site passes a `restingEmpty` prop, or is
   //        named in the same registry.
+  //   iv.  Every `<AddButton>` call site — the app's ONE create-button seam —
+  //        either sits inside a toolbar's own `actions`/`renderActions` slot
+  //        (where the row above has already answered the same question, and a
+  //        second copy of the answer is a second thing to get wrong) or passes
+  //        `empty` itself, derived from the collection's own row count.
+  //
+  // CLAUSE iv IS WHY THIS LAW GREW ON 2026-09-10. Clauses ii and iii ask about
+  // a TAG. A section heading built out of a `<div>` and an `<h2>` is neither
+  // tag, so a create button standing over a collection with zero rows was
+  // outside this law BY CONSTRUCTION — five sections drew one, and on Settings
+  // › Integrations it sat directly above the empty state's own "Add the first".
+  // The client, verbatim: "in settings the acces tokens with the plus and no
+  // tokens yet?? makes no sense, duplicated. leave only the No tokens yet."
+  // That is R50's own sentence one layer down, so the gate moved onto the
+  // BUTTON in the row's own idiom rather than this law being patched at one
+  // call site.
   //
   // `<SectionWithCreate>`'s own header create button is NOT censused the same
   // way: every current call site already passes `folderTabs` or `useKitPanel`,
@@ -3382,6 +3290,31 @@ describe("RULES — the laws of the base", () => {
       noSlotsGateAt === -1 || emptyGateAt < noSlotsGateAt,
       "R50 — ToolbarRow's `empty` check must run BEFORE the no-slots-truthy check, so a truthy `actions` alone can never keep the row alive on an empty collection"
     ).toBe(true)
+
+    // i(a2) · `AddButton`'s own central guard — the create button answers the
+    // same question before it draws anything, so a section heading that is not
+    // a toolbar is covered by the same mechanism rather than by a class of
+    // call site remembering. And `SectionWithCreate`'s header button, the one
+    // create affordance drawn inside this file rather than at a call site,
+    // keeps its `!empty` conjunct: it is the reason that component is not in
+    // clause iv's census, so an edit that dropped it would silently move a
+    // whole family of screens out of the law.
+    // BOUNDED TO ITS OWN BODY, and this is not fussiness: an unbounded slice
+    // from `AddButton` runs on through `ToolbarRow` further down the same file
+    // and finds THAT component's identical guard, so deleting AddButton's own
+    // left this assertion green. Caught by mutating it, which is the only way
+    // this class of mistake is ever caught.
+    const addButtonAt = screenBits.indexOf("export function AddButton(")
+    const afterAddButton = screenBits.indexOf("\nexport ", addButtonAt + 1)
+    const addButtonBody = screenBits.slice(addButtonAt, afterAddButton === -1 ? undefined : afterAddButton)
+    expect(
+      addButtonBody.indexOf("if (empty) return null"),
+      "R50 — AddButton must open with `if (empty) return null` (screen-bits.tsx) — the central guard a section heading leans on, since a heading is not a <ToolbarRow> and clauses ii/iii cannot see it"
+    ).toBeGreaterThan(-1)
+    expect(
+      screenBits,
+      "R50 — SectionWithCreate's `showCreateInHeader` must carry `&& !empty` (screen-bits.tsx): its header create button is drawn inside this file, so it is exempt from clause iv's census and that conjunct is the whole reason"
+    ).toMatch(/const showCreateInHeader = [^\n]*&& !empty/)
 
     // i(b) · `PagedFind`'s own central guard — `genuinelyEmpty` computed from
     // `restingEmpty` and gating the whole toolbar column, before `children`.
@@ -3465,6 +3398,56 @@ describe("RULES — the laws of the base", () => {
         }
       }
 
+      // iv · every real `<AddButton` TAG — screen-bits.tsx DECLARES it (and
+      // draws the one instance this law does not census, see i(a2)).
+      if (!f.rel.endsWith("deep-link/screen-bits.tsx")) {
+        let from = 0
+        for (;;) {
+          const at = src.indexOf("<AddButton", from)
+          if (at === -1) break
+          const tag = ownTag(src, at, "<AddButton")
+          // IS IT A TOOLBAR ACTION? Read POSITIONALLY, the way R20 reads a
+          // checked field: walk back to the innermost `{` this tag is open
+          // inside and look at the attribute name in front of it. A node handed
+          // to `actions={…}` / `renderActions={…}` is drawn by a row that has
+          // already returned null on an empty collection, so asking it to carry
+          // a second copy of the answer would be asking for two things to keep
+          // in step. Anything else — a heading row, a bare `<div>` — is on its
+          // own and must answer for itself.
+          let depth = 0
+          let inSlot = false
+          for (let i = at - 1; i >= 0 && !inSlot; i--) {
+            const ch = src[i]
+            if (ch === "}") depth++
+            else if (ch === "{") {
+              if (depth > 0) {
+                depth--
+                continue
+              }
+              // An unmatched `{` — one JSX expression this tag is open inside.
+              // If the attribute in front of it is the row's action slot we are
+              // done; otherwise KEEP CLIMBING, because a create button is
+              // routinely two or three expressions deep inside that slot
+              // (`actions={<>{canCreate && (<AddButton …/>)}</>}` is the shape
+              // five call sites use, and stopping at the innermost one called
+              // every one of them an offender).
+              if (/\b(actions|renderActions)\s*=\s*$/.test(src.slice(Math.max(0, i - 40), i)))
+                inSlot = true
+            }
+          }
+          const missing = !/\bempty\s*=/.test(tag)
+          const literal = propIsLiteral(tag, "empty")
+          if (!inSlot && (missing || literal)) {
+            if (f.rel in EMPTY_TOOLBAR_EXEMPT) exemptUsed.add(f.rel)
+            else
+              offenders.push(
+                `${f.rel}: an <AddButton> outside any toolbar \`actions\` slot with ${missing ? "no `empty` prop" : "a hardcoded `empty={true|false}` literal"}, and the file is not in EMPTY_TOOLBAR_EXEMPT`
+              )
+          }
+          from = at + tag.length
+        }
+      }
+
       // iii · every real `<PagedFind` TAG — paged-find.tsx DECLARES it.
       if (!f.rel.endsWith("components/records/paged-find.tsx")) {
         let from = 0
@@ -3487,7 +3470,7 @@ describe("RULES — the laws of the base", () => {
     }
     expect(
       offenders,
-      `R50 — every <ToolbarRow>/<PagedFind> call site answers "is this collection empty", or is named in EMPTY_TOOLBAR_EXEMPT:\n  ${offenders.join("\n  ")}`
+      `R50 — every <ToolbarRow>/<PagedFind>/<AddButton> call site answers "is this collection empty", or is named in EMPTY_TOOLBAR_EXEMPT:\n  ${offenders.join("\n  ")}`
     ).toEqual([])
 
     const stale = Object.keys(EMPTY_TOOLBAR_EXEMPT).filter((k) => !exemptUsed.has(k))
@@ -3781,14 +3764,25 @@ describe("RULES — the laws of the base", () => {
       "top-[var(--pinned-chrome-h,0px)]",
       "flex-col",
       "bg-[var(--pinned-ground)]",
+      // THE LEAD, AND IT IS A PAIR OR IT IS NOTHING (2026-09-10, the client's
+      // "include also the top part of the container above it"). The padding is
+      // the band of container that pins with the row; the negative margin is
+      // what takes it straight back at rest, so the row does not move by a
+      // pixel until it sticks. Ship the padding alone and every collection in
+      // the app gains a permanent 16px above its toolbar; ship the margin alone
+      // and every one of them LOSES 16px. Both are asserted for that reason.
+      "pt-[var(--pinned-lead,0px)]",
+      "mt-[calc(var(--pinned-lead,0px)*-1)]",
     ]) {
       expect(
         declared,
         `R63 — PINNED_TOOLBAR (shared/web/pinned-chrome.ts) must carry \`${piece}\`: ` +
           "`sticky` is the pin, `top-[var(--pinned-chrome-h,0px)]` is what it pins below, " +
           "the flex COLUMN is what keeps R49's trailing gap inside a box that paints, " +
-          "and `bg-[var(--pinned-ground)]` is that paint — a bar the rows scroll through is not a pinned bar, " +
-          "and one that paints the wrong tone reads as a hole punched in the card it stands on"
+          "`bg-[var(--pinned-ground)]` is that paint — a bar the rows scroll through is not a pinned bar, " +
+          "and one that paints the wrong tone reads as a hole punched in the card it stands on — " +
+          "and the `--pinned-lead` pair is the container's own top band pinning with the row, " +
+          "without which the card's top edge slides away and the bar reads as detached"
       ).toContain(piece)
     }
 
@@ -3945,6 +3939,280 @@ describe("RULES — the laws of the base", () => {
     expect(
       missing,
       `R63 — a toolbar pinned at the wrong offset is a toolbar sitting on the strip above it. Every declaration of --pinned-chrome-h must stay where the thing it measures is drawn:\n  ${missing.join("\n  ")}`
+    ).toEqual([])
+
+    // ── (v) THE CONTAINER'S OWN TOP BAND PINS WITH THE ROW ─────────────────
+    // Client, 2026-09-10, the same day and the second sentence: "when sticky
+    // toolbar, include also the top part of the container above it! if not
+    // looks weird. so the spacing between tabs and container should stay, as
+    // well as spacing between beginning container and toolbar."
+    //
+    // `--pinned-chrome-h` above answers the FIRST of her two distances (tabs →
+    // container; the strip already paints it and the box now pins its TOP
+    // there). `--pinned-lead` answers the SECOND: the container's own top
+    // inset, paid as padding inside the pinned box and taken straight back as a
+    // negative margin, so the row does not move at rest and the band above it
+    // paints on scroll. Same shape as (iv) — published by the box, consumed by
+    // the row, defaulting to zero — so it is censused the same way: one
+    // declaration per CONTAINER that insets a pinned toolbar, and nowhere else.
+    const leadMissing: string[] = []
+    const scoped = (rel: string, re: RegExp) => re.exec(stripComments(readFileSync(join(ROOT, rel), "utf8")))?.[0] ?? ""
+    const leadDeclarations: [string, string, string[], string][] = [
+      [
+        "web/app/globals.css",
+        // SCOPED TO THE `:root` BLOCK THAT ALREADY OWNS THE OFFSET. The token
+        // is spelled twice in this file on purpose (here, and zeroed on a
+        // stood-down row below), so a whole-file `includes` would pass on a
+        // file that had lost either one.
+        "the agency door declares the default zero beside --pinned-chrome-h's, so a toolbar that is nobody's inset child pins flush and needs no entry",
+        ["--pinned-lead: 0px"],
+        String.raw`:root \{[^}]*--pinned-chrome-h: 0px;[\s\S]*?\}`,
+      ],
+      [
+        "web-portal/app/globals.css",
+        "the client portal declares the same default: its two search rows are blocks on a page column with no inset above them, and a property one door never names is one the next reader assumes is a bug",
+        ["--pinned-lead: 0px"],
+        String.raw`:root \{[^}]*--pinned-chrome-h: 0px;[\s\S]*?\}`,
+      ],
+      [
+        "web/app/globals.css",
+        "a stood-down inner toolbar leads NOTHING — the pt/mt pair is invisible while sticky and is an upward shove the moment it is not, so the rule that makes it static zeroes the lead on the toolbar's own element, where an inherited value can never outrank it",
+        ["position: static", "--pinned-lead: 0px"],
+        String.raw`\*:has\(> \[data-slot="toolbar-row-pin"\]\) \[data-slot="collection-frame-toolbar"\] \{[\s\S]*?\n\}`,
+      ],
+      [
+        "web/components/deep-link/screen-bits.tsx",
+        "the app's own collection container publishes the inset it spends — the SAME ladder `cn(\"p-4\")` leaves on CardContent, --space-4 and --space-7 above lg, so the number cannot grow a second owner",
+        ["[--pinned-lead:var(--space-4)]", "lg:[--pinned-lead:var(--space-7)]"],
+        String.raw`export function CollectionCard[\s\S]*?\n\}`,
+      ],
+      [
+        "shared/web/pinned-chrome.ts",
+        "the kit's own collection panel is not this app's element, so the frame's className publishes the panel's own inset (collectionPanelVariants' `p-6 lg:p-[var(--space-7)]`) and the same pt/mt pair reaches the kit toolbar through the slot override",
+        [
+          "[--pinned-lead:var(--space-6)]",
+          "lg:[--pinned-lead:var(--space-7)]",
+          "mt-[calc(var(--pinned-lead,0px)*-1)]",
+          "pt-[var(--pinned-lead,0px)]",
+        ],
+        // `(?:\n\n|$)` because this is the LAST export in the seam: scoping to
+        // a blank line alone would match nothing and report the whole clause as
+        // a missing block rather than as a missing class.
+        String.raw`export const PINNED_TOOLBAR_IN_KIT_PANEL\s*=[\s\S]*?(?:\n\n|$)`,
+      ],
+    ]
+    for (const [rel, why, needles, scope] of leadDeclarations) {
+      const src = scoped(rel, new RegExp(scope))
+      if (!src) {
+        leadMissing.push(`${rel}: the block this clause reads (/${scope}/) is gone — ${why}`)
+        continue
+      }
+      for (const needle of needles)
+        if (!src.includes(needle)) leadMissing.push(`${rel}: \`${needle}\` — ${why}`)
+    }
+    expect(
+      leadMissing,
+      `R63 — the container's top band pins with the toolbar, and every declaration of --pinned-lead stays where the box that spends the inset is drawn:\n  ${leadMissing.join("\n  ")}`
+    ).toEqual([])
+
+    // …AND NOBODY ELSE PUBLISHES OR SPENDS IT. (iii)'s sentence about the other
+    // property: two files decide this number — the seam and the app's own
+    // collection container — and a third would be the per-screen decision this
+    // law exists to end. Rot-checked both ways, so a named file that stops
+    // declaring it is red too.
+    const LEAD_OWNERS = new Set(["shared/web/pinned-chrome.ts", "web/components/deep-link/screen-bits.tsx"])
+    const leadOffenders: string[] = []
+    const leadSeen = new Set<string>()
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal"), join(ROOT, "shared/web")], {
+      extensions: [".ts", ".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      const src = stripComments(f.source)
+      if (!/--pinned-lead/.test(src)) continue
+      leadSeen.add(f.rel)
+      if (!LEAD_OWNERS.has(f.rel))
+        leadOffenders.push(
+          `${f.rel}: names --pinned-lead — the band of container that pins with a toolbar is decided in shared/web/pinned-chrome.ts and published by the container (CollectionCard), never at a screen`
+        )
+    }
+    for (const owner of LEAD_OWNERS)
+      if (!leadSeen.has(owner))
+        leadOffenders.push(`${owner}: is named as an owner of --pinned-lead and no longer mentions it`)
+    expect(
+      leadOffenders,
+      `R63 — the lead is the seam's and the container's, never a screen's:\n  ${leadOffenders.join("\n  ")}`
+    ).toEqual([])
+
+    // ── (vi) …AND THE BAND KEEPS THE CONTAINER'S ROUNDED TOP CORNERS ───────
+    // Client, 2026-09-10, the THIRD sentence the same day and the one that
+    // followed her looking at clause (v): "When pin, I still want it round.
+    // That's exactly what I asked for, so do whatever you have to do."
+    //
+    // TWO FAULTS, AND EITHER ONE ALONE MAKES THE OTHER'S FIX A NO-OP — which
+    // is exactly why this clause asserts both halves of both, as (v) asserts
+    // its pt/mt as a pair. The pinned box sits INSIDE the container, so it
+    // spans the container's CONTENT box and never reaches the corner the
+    // container's radius is drawn on (its BORDER box, one inset further out);
+    // and a rounded corner is a transparent NOTCH with the container's own
+    // paper directly behind it, so filling nothing shows the same tone as the
+    // band in front and the corner still reads square.
+    //
+    //  · `--pinned-inset-x` is the container's SIDE inset, spent back as
+    //    `px`/negative `mx` so the box reaches the border box and the row does
+    //    not move a pixel — (v)'s pair on the other axis.
+    //  · `--pinned-behind` is what is BEHIND the container. The element paints
+    //    that across the whole band; a `::before` paints `--pinned-ground`
+    //    over it with `rounded-t-[var(--radius)]`, so the notch shows exactly
+    //    what the container's real top corners show at rest.
+    //  · AND THE FALLBACK IS THE IDENTITY, `var(--pinned-behind,
+    //    var(--pinned-ground))`. A toolbar that is nobody's inset child paints
+    //    one tone front and back, so its corners are cut out of the tone they
+    //    show and it pins flush and square exactly as it did before. That is
+    //    the only reason there is no second class and no branch, so a seam
+    //    that dropped the fallback and named the front ground directly would
+    //    LOOK correct on every screen with a container and be a hole punched
+    //    in the pane on every screen without one.
+    //
+    // R31 IS WIDENED, NOT BROKEN. `rounded-t-[var(--radius)]` is the law's own
+    // spelling of one value on one edge; `two-radii` constrains the VALUE and
+    // has never constrained the POSITION (its bracket branch admits any
+    // `rounded-(t|b|s|e)-[var(--radius…)]`). The law's PROSE named one
+    // position, a bottom sheet, and now names this one too — RULES.md and the
+    // registry both say so, with the reason.
+    const corner: string[] = []
+    for (const piece of [
+      // The x pair, asserted as a pair for (v)'s reason read sideways: the
+      // padding alone insets every collection's toolbar for ever, the margin
+      // alone drags every one of them out over its card's edge.
+      "px-[var(--pinned-inset-x,0px)]",
+      "mx-[calc(var(--pinned-inset-x,0px)*-1)]",
+      // The band paints what is BEHIND, with the identity as the fallback.
+      "bg-[var(--pinned-behind,var(--pinned-ground))]",
+      // …and the corner itself, painted over that band by a pseudo-element:
+      // out of flow (so the flex COLUMN clause (i) asserts is undisturbed),
+      // covering the whole padding box, under the content and over the band.
+      "before:absolute",
+      "before:inset-0",
+      "before:z-[-1]",
+      "before:rounded-t-[var(--radius)]",
+      "before:bg-[var(--pinned-ground)]",
+    ])
+      if (!declared.includes(piece))
+        corner.push(
+          `shared/web/pinned-chrome.ts::PINNED_TOOLBAR: \`${piece}\` — ` +
+            "the pinned band reaches the container's border box (the x pair), paints the ground BEHIND the container, " +
+            "and lays the container's own top corners over it with a rounded ::before. Any one of those missing and the corners are square again"
+        )
+
+    // THE SAME SHAPE THROUGH THE KIT'S SLOT NAME, where this app draws no
+    // toolbar at all. Without this half the recipe engine's collections keep
+    // square corners under a green build — the failure mode clause (ii-b) was
+    // added for, one property along.
+    const kitPin = scoped(
+      "shared/web/pinned-chrome.ts",
+      /export const PINNED_TOOLBAR_IN_KIT_PANEL\s*=[\s\S]*?(?:\n\n|$)/
+    )
+    for (const piece of [
+      // Published on the FRAME's root — which is outside the kit's panel and
+      // paints nothing, so the ground it inherits IS the ground behind the
+      // panel. The one publisher that needs no `:has()` rule.
+      "[--pinned-behind:var(--pinned-ground)]",
+      "[--pinned-inset-x:var(--space-6)]",
+      "lg:[--pinned-inset-x:var(--space-7)]",
+      // …and spent on the kit's own toolbar element.
+      "[&_[data-slot=collection-frame-toolbar]]:px-[var(--pinned-inset-x,0px)]",
+      "[&_[data-slot=collection-frame-toolbar]]:mx-[calc(var(--pinned-inset-x,0px)*-1)]",
+      "[&_[data-slot=collection-frame-toolbar]]:bg-[var(--pinned-behind,var(--pinned-ground))]",
+      "[&_[data-slot=collection-frame-toolbar]]:before:absolute",
+      "[&_[data-slot=collection-frame-toolbar]]:before:inset-0",
+      "[&_[data-slot=collection-frame-toolbar]]:before:z-[-1]",
+      "[&_[data-slot=collection-frame-toolbar]]:before:rounded-t-[var(--radius)]",
+      "[&_[data-slot=collection-frame-toolbar]]:before:bg-[var(--pinned-ground)]",
+    ])
+      if (!kitPin.includes(piece))
+        corner.push(
+          `shared/web/pinned-chrome.ts::PINNED_TOOLBAR_IN_KIT_PANEL: \`${piece}\` — ` +
+            "the kit draws that collection's toolbar and this app cannot edit the kit, so the corner travels on the frame's own class too"
+        )
+
+    // THE PUBLISHERS, one per container that insets a pinned toolbar — the
+    // same census as (v)'s and for the same reason, on the same two files.
+    const cornerDeclarations: [string, string, string[], RegExp][] = [
+      [
+        "web/components/deep-link/screen-bits.tsx",
+        "the app's own collection container publishes its SIDE inset off the same `cn(\"p-4\")` ladder the lead reads, and wears PINNED_INSET_MARK so globals.css can capture what is behind it — the card cannot read that itself, because the card is the element that painted over it",
+        [
+          "PINNED_INSET_MARK",
+          "[--pinned-inset-x:var(--space-4)]",
+          "lg:[--pinned-inset-x:var(--space-7)]",
+        ],
+        /export function CollectionCard[\s\S]*?\n\}/,
+      ],
+      [
+        "web/app/globals.css",
+        "the agency door declares the side inset's default zero beside the lead's, so a toolbar that is nobody's inset child spends nothing and keeps its own edges",
+        ["--pinned-inset-x: 0px"],
+        /:root \{[^}]*--pinned-chrome-h: 0px;[\s\S]*?\}/,
+      ],
+      [
+        "web-portal/app/globals.css",
+        "the client portal declares the same default: its rows are blocks on a page column that inset nothing, and a property one door never names is one the next reader assumes is a bug",
+        ["--pinned-inset-x: 0px"],
+        /:root \{[^}]*--pinned-chrome-h: 0px;[\s\S]*?\}/,
+      ],
+      [
+        "web/app/globals.css",
+        "the ground BEHIND a container is captured on the container's PARENT — the last element that still holds it — through the same `:has()` move the strip's own offset uses, off the marker the container wears",
+        ["--pinned-behind: var(--pinned-ground)"],
+        /\*:has\(> \.pinned-inset\) \{[\s\S]*?\n\}/,
+      ],
+      [
+        "web/app/globals.css",
+        "a stood-down inner toolbar is not pinned, so it carries no container edge with it: the side inset is zeroed and the IDENTITY is put back on --pinned-behind, on the toolbar's own element, or a rounded band of OUTSIDE ground reads as a hole cut in the middle of the panel",
+        ["--pinned-inset-x: 0px", "--pinned-behind: var(--pinned-ground)"],
+        /\*:has\(> \[data-slot="toolbar-row-pin"\]\) \[data-slot="collection-frame-toolbar"\] \{[\s\S]*?\n\}/,
+      ],
+    ]
+    for (const [rel, why, needles, scope] of cornerDeclarations) {
+      const src = scoped(rel, scope)
+      if (!src) {
+        corner.push(`${rel}: the block this clause reads (/${scope.source}/) is gone — ${why}`)
+        continue
+      }
+      for (const needle of needles)
+        if (!src.includes(needle)) corner.push(`${rel}: \`${needle}\` — ${why}`)
+    }
+
+    // …AND NOBODY ELSE PUBLISHES OR SPENDS EITHER OF THEM. (iii)'s sentence
+    // about the two properties this clause adds. The owners are (v)'s owners —
+    // the seam and the app's own collection container — because a corner
+    // decided at a screen is the per-screen decision this law exists to end.
+    // Rot-checked both ways, so a named file that stops declaring one is red
+    // too, and the MARK is censused with them: a container that publishes the
+    // inset and forgets the mark has an x-spanning band with a transparent
+    // notch, which is the exact bug clause (vi) is about.
+    const cornerSeen = new Map([...LEAD_OWNERS].map((rel) => [rel, 0]))
+    for (const f of sourceFiles([WEB, join(ROOT, "web-portal"), join(ROOT, "shared/web")], {
+      extensions: [".ts", ".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      const src = stripComments(f.source)
+      if (!/--pinned-inset-x|--pinned-behind|PINNED_INSET_MARK/.test(src)) continue
+      if (cornerSeen.has(f.rel)) cornerSeen.set(f.rel, cornerSeen.get(f.rel)! + 1)
+      else
+        corner.push(
+          `${f.rel}: names --pinned-inset-x / --pinned-behind / PINNED_INSET_MARK — the container's corners are decided in shared/web/pinned-chrome.ts and published by the container (CollectionCard), never at a screen`
+        )
+    }
+    for (const [rel, n] of cornerSeen)
+      if (n === 0)
+        corner.push(`${rel}: is named as an owner of the pinned band's corner and no longer mentions it`)
+
+    expect(
+      corner,
+      `R63 — "when pin, i still want it round": the pinned band reaches the container's border box and rounds its top corners against what is BEHIND the container:\n  ${corner.join("\n  ")}`
     ).toEqual([])
   })
 
@@ -4148,7 +4416,7 @@ describe("RULES — the laws of the base", () => {
       "records-carry-their-face", // R35: the three-chokepoint scan above
       "agent-body-parity", // R22: the request BODY half, beside R19 in the mcp suite
       "cited-answers", // R23: workers/content/test/cited-answers.test.ts
-      "internal-money-never-in-portal", // R24: the import-graph scan above
+      "money-taint-outbound", // R24: the per-turn taint above (its import-graph half was retired 10 Sep 2026)
       "savings-caption", // R25: the derived-screens scan above
       "vector-fence", // R26: workers/content/test/vector-fence.test.ts
       "described-contracts", // R27: workers/mcp/test/described-contracts.test.ts, beside R19/R22 on the same door census
@@ -4184,6 +4452,9 @@ describe("RULES — the laws of the base", () => {
       "module-settings-two-doors", // R61: the MODULE_SETTINGS ↔ gear-mount census below, plus the two clauses that keep the Modules index derived and the gate written once
       "one-zero-register", // R62: web/test/one-zero-register.test.tsx — the two registers' own subtraction guard (read AND rendered), the no-second-register census over both front doors, and the engine's `narrowed`/`narrowedOutside` clause
       "sections-have-a-door", // R64: the tab-section census below — TEAM_SECTIONS' own `placement: "tab"` rows against settings-screen's subtraction literal, with each subtracted section's acts derived from the recipes and proved by the door call its dispatcher makes
+      "chip-above-title", // R65: the record-card census below — every kit `<Card key=…>` under either front door, its title required to be the kit's own `<CardTitle>` and every `<Badge>` required to open before it
+      "sections-stand-on-paper", // R67: web/test/sections-stand-on-paper.test.ts — every titled <section> on either front door, its container derived off the kit's own surface tokens and asked of every BRANCH the section draws
+      "no-emoji-in-copy", // R66: the four-target pictograph census at the foot of this file — the catalogue (R28's own set), the two translation files, the vocabulary data (seed + migration ledger + the shared mark tables), and the one file that renders a flag on purpose; the predicate is `optionalMark`'s, imported from the write door
     "pinned-toolbar", // R63: the seam guard + the toolbar-owner census (R53's own list, plus the portal's door-searched rows) + the nobody-hand-rolls-the-offset scan + the four declarations of --pinned-chrome-h, above
     ])
     for (const r of RULES_REGISTRY) {
@@ -5506,5 +5777,496 @@ describe("R64 — a team-area section has a door, or names the screen that took 
       missing,
       `R64 — a section's host does not offer an act that section's own screen declares, so the act is reachable from nowhere: ${missing.join("; ")}. This is the exact 2026-09-09 failure — the gallery was named as the home of the members section while offering none of its acts. Wire the act into that screen; do not weaken this list`
     ).toEqual([])
+  })
+
+})
+
+describe("R65 — on a card that stands for a record, the chip sits above the title", () => {
+
+  // ── R65 · `chip-above-title` ────────────────────────────────────────────
+  //
+  // THE CLIENT'S RULING, 2026-09-10, on the member cards of Settings › Team:
+  //
+  //   "in team, adn generlaly in this component write the law, chip on top of
+  //    title & bigger images"
+  //
+  // and it is the SECOND time — "in cards put chips above title" was the same
+  // sentence about the Kanban card. Two identical rulings a fortnight apart, on
+  // two cards that were fixed in opposite directions under a green build, is
+  // this repo's own definition of a rule rather than a preference.
+  //
+  // WHICH CARDS. "A card that shows a record" has to be DERIVED, and the
+  // derivation is the whole design of this check. Three candidates were tried:
+  //
+  //   · "a `<Card>` that contains a `<Badge>`" — catches `staff-panel.tsx`'s
+  //     certificates panel (a Card wrapping a LIST, whose "Archived" chip
+  //     belongs to a row INSIDE it, not to the card) and the portal's ticket
+  //     header (a Card that IS one record and has no title at all — its
+  //     `RecordRef` is the heading). Both are panels, neither is a record card.
+  //   · "a `<Card>` inside a `.map(`" — the right idea, and unreadable off the
+  //     disk without balancing braces. A regex that gets that wrong fails OPEN.
+  //   · a hand-list — the thing her own words ("generlaly … write the law")
+  //     rule out.
+  //
+  // What is used instead is REACT'S OWN RULE: a card drawn one per row of a
+  // collection must carry a `key`, and a card that is a panel around a section
+  // must not. The partition comes from a constraint that predates this app and
+  // that no author here can quietly redefine, which is exactly the property a
+  // census wants from its oracle.
+  //
+  // CLAUSE (i) IS THE LOAD-BEARING HALF and it is the one that cost a change.
+  // `members-gallery.tsx` drew the member's name in a bare
+  // `<span className="text-sm font-medium">`, so a chip-POSITION census over
+  // that file would have reported a perfectly ordered card while reading
+  // nothing at all — "above" is a claim about position, and a hand-rolled title
+  // has none a census can see. Requiring the kit's own `<CardTitle>` is the
+  // same move R53 made taking the toolbar's slots off `React.ReactNode`.
+  //
+  // AND SOURCE ORDER IS VISUAL ORDER HERE, which is why reading the file is
+  // enough: the kit's `Card` cva opens `flex flex-col` with the comment "a card
+  // is a column: header, body, footer, in that order".
+  it("chip-above-title: a record card names itself through the kit's title, and every chip opens before it", () => {
+    const files = sourceFiles(
+      [join(ROOT, "web/components"), join(ROOT, "web-portal/components"), join(ROOT, "shared/web")],
+      { extensions: [".tsx"], relativeTo: ROOT, skipTests: true }
+    )
+
+    // THE KIT'S OWN CARD AND NOBODY ELSE'S. A file that never imports it cannot
+    // be drawing one, and an app-local component that happened to be called
+    // `Card` is not this law's subject.
+    const KIT_CARD = '@shared/ui/components/card/card'
+    const drawers = files.filter((f) => f.source.includes(KIT_CARD))
+    // TRIPWIRE 1 — THE WALK. Every clause below is a statement about a set, and
+    // a statement about an empty set is free: if the walk stopped reaching the
+    // components, or the kit moved its card, this law would report a perfectly
+    // ordered app while looking at no cards at all.
+    expect(
+      drawers.length,
+      `R65 — no file under web/components, web-portal/components or shared/web imports the kit's Card (${KIT_CARD}). Either the walk stopped reaching them or the kit's card moved; teach this law the new specifier rather than trusting a green run`
+    ).toBeGreaterThan(2)
+
+    /** Every `<Card …>…</Card>` element in one file, matched by DEPTH rather
+     * than by a lazy regex — a card nested inside a card would otherwise close
+     * the outer one at the inner one's tag, and the outer block would be read
+     * with half its children missing. `<Card\b` cannot match `<CardGrid` or
+     * `<CardContent`: "Card" followed by a word character is no boundary. */
+    function cardBlocks(src: string): { open: string; body: string }[] {
+      const out: { open: string; body: string }[] = []
+      const token = /<Card\b[^>]*>|<\/Card>/g
+      let m: RegExpExecArray | null
+      let depth = 0
+      let start = -1
+      let open = ''
+      while ((m = token.exec(src))) {
+        if (m[0] === '</Card>') {
+          depth -= 1
+          if (depth === 0 && start >= 0) out.push({ open, body: src.slice(start, m.index) })
+          continue
+        }
+        if (m[0].endsWith('/>')) continue // self-closing: no children, no title, no chip
+        if (depth === 0) {
+          start = m.index
+          open = m[0]
+        }
+        depth += 1
+      }
+      return out
+    }
+
+    // THE CENSUS — a record card is a kit `<Card>` carrying a `key=`.
+    const cards: { rel: string; open: string; body: string }[] = []
+    for (const f of drawers)
+      for (const block of cardBlocks(stripComments(f.source)))
+        if (/\bkey=/.test(block.open)) cards.push({ rel: f.rel, ...block })
+
+    // TRIPWIRE 2 — THE PARSE. A `key=` on a `<Card>` is how this app draws a
+    // wall of records, and there is at least one on Settings › Team. Zero means
+    // the matcher stopped matching, not that the app stopped drawing them.
+    expect(
+      cards.length,
+      `R65 — read no keyed <Card> anywhere under either front door. A card drawn per row of a collection carries React's own key, so zero means this census stopped parsing rather than that the app has no record cards`
+    ).toBeGreaterThan(0)
+
+    // ── i · A RECORD CARD NAMES ITS RECORD THROUGH THE KIT'S TITLE ──────────
+    const untitled = cards
+      .filter((c) => !c.body.includes('<CardTitle'))
+      .map((c) => `${c.rel} — ${c.open.replace(/\s+/g, ' ')}`)
+    expect(
+      untitled,
+      `R65 — a card that stands for a record draws no <CardTitle>, so it has no title for a chip to sit above and nothing here can read the order: ${untitled.join('; ')}. Use the kit's own CardTitle (@shared/ui/components/card/card) — a title hand-rolled into a <span> is exactly the evasion this clause exists to close`
+    ).toEqual([])
+
+    // ── ii · AND EVERY CHIP OPENS BEFORE IT ────────────────────────────────
+    const below: string[] = []
+    for (const c of cards) {
+      if (c.rel in CARD_CHIP_BELOW_OK) continue
+      const title = c.body.indexOf('<CardTitle')
+      if (title < 0) continue // clause (i) already said so
+      for (const m of c.body.matchAll(/<Badge\b/g))
+        if (m.index > title) {
+          below.push(`${c.rel} — ${c.open.replace(/\s+/g, ' ')}`)
+          break
+        }
+    }
+    expect(
+      below,
+      `R65 — a chip sits UNDER the title on a card that stands for a record: ${below.join('; ')}. The client's ruling, twice: "chip on top of title". Move the <Badge> above the <CardTitle> — source order is visual order inside a Card, whose own cva is "flex flex-col … a card is a column"`
+    ).toEqual([])
+
+    // ── iii · AND THE WAY OUT ROTS ─────────────────────────────────────────
+    // Both directions. A line for a file that no longer breaks the rule is a
+    // standing excuse nobody can check, and it can only ever be deleted.
+    const offending = new Set<string>()
+    for (const c of cards) {
+      const title = c.body.indexOf('<CardTitle')
+      if (title < 0) continue
+      for (const m of c.body.matchAll(/<Badge\b/g)) if (m.index > title) offending.add(c.rel)
+    }
+    for (const [rel, why] of Object.entries(CARD_CHIP_BELOW_OK)) {
+      expect(
+        offending.has(rel),
+        `R65 — CARD_CHIP_BELOW_OK names ${rel} and no record card in it puts a chip under its title any more. The exemption has stopped describing anything, so delete the line`
+      ).toBe(true)
+      expect(
+        why.length,
+        `R65 — the CARD_CHIP_BELOW_OK line for ${rel} needs to say why that chip is a footer fact about the record rather than the thing that sorts it, in a sentence somebody can go and check against the screen`
+      ).toBeGreaterThan(40)
+    }
+  })
+})
+
+/** R66 — A PICTOGRAPH IS NOT A WORD, AND NOT A MARK EITHER.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ * THE RULING, THREE TIMES
+ *
+ *   · 2026-08-31 — *"i said no emojis. why are there still emojis? kill them!"*
+ *   · 2026-09-07 — *"for type, kill the emojis. this is legacy. in current
+ *     system we use colors."*
+ *   · 2026-09-10 — *"also kill emojis!!!"*
+ *
+ * Three rulings, and until today the defence was ONE write door
+ * (`optionalMark`, `shared/workers/validate.ts`) on ONE kind of field. Nothing
+ * checked the app's own COPY, nothing checked the SEED that decides what a new
+ * team's vocabulary starts as, and nothing checked the TRANSLATIONS — so
+ * "kill them" was enforced against a person typing into one form and against
+ * nobody writing code.
+ *
+ * WHY IT KEPT COMING BACK, which is the part worth writing down. The 2026-08-31
+ * ruling was answered properly at the door and PARTLY in the data: team
+ * migrations `0034_ticket_and_story_vocabulary` and
+ * `0044_a_sprint_state_has_a_face` substituted two-letter codes for the seeded
+ * marks. Every one of those eight statements is guarded `AND mark IS NULL`.
+ * A row that already held a PICTOGRAPH is not null, so not one of them could
+ * ever have replaced one: the migrations filled the EMPTY marks and stepped
+ * over exactly the rows the ruling was about. That is why she was still looking
+ * at a warning sign beside "Issue" six weeks later, under a green build, with
+ * the door closed behind it and the seed clean. A fix that cannot reach the
+ * thing it was written for looks identical, in source, to one that did.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ * WHAT "AN EMOJI" MEANS HERE — THE DOOR'S OWN ANSWER, IMPORTED
+ *
+ * This check does not carry a codepoint table. It calls `optionalMark`, the
+ * function the write door already uses, and asks it. So the law and the door
+ * share ONE definition by construction and cannot come to disagree about a
+ * glyph — a new emoji release, a skin tone, a joined sequence and a flag are
+ * all handled here exactly as they are handled at the door, because it is the
+ * same call.
+ *
+ * IT ALSO DRAWS THE LINE IN THE RIGHT PLACE, and the line matters: the
+ * predicate is `Extended_Pictographic` / `Regional_Indicator` plus the three
+ * combiners, so ✕ (U+2715), ✎ (U+270E), ★ (U+2605) and ➤ (U+27A4) are NOT
+ * caught. Those are typographic dingbats — the kit's own close button is one,
+ * and `shared/departments.ts` draws four of them as department marks. A law
+ * that swept the whole 2600–27BF block would have called those emoji, failed on
+ * the pinned kit it cannot edit, and been switched off within a week.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ * WHAT IS CENSUSED, AND WHY IT IS THESE FILES
+ *
+ * FOUR TARGETS, each grounded in a different oracle so the check is never a
+ * parser agreeing with itself.
+ *
+ *   (i)   `shared/i18n-strings.json` — EXACTLY the set of user-visible English
+ *         sentences the two front doors say. It is not this law's claim that it
+ *         is exact; it is R28's, enforced by `catalogued-strings` off the front
+ *         doors' own import closure. So this clause covers every word a person
+ *         reads WITHOUT this file owning a walk of its own — and a pictograph
+ *         hard-coded into a new label tomorrow arrives here on the next
+ *         `npm run lang`, which both deploy scripts already refuse to skip.
+ *         The same composition R44 makes: stand on R28, ask the next question.
+ *
+ *   (ii)  `shared/i18n-catalogue.ts` and `shared/i18n-seed.ts` — the OTHER
+ *         three languages. A German sentence with a pictograph in it is the
+ *         same fault as an English one and would be invisible to (i).
+ *
+ *   (iii) THE VOCABULARY DATA — the files that decide what a team's dropdown
+ *         values START as, and therefore what is on screen before anybody has
+ *         typed anything: the team seed and the migration ledger that back-fill
+ *         `selectable_data`, plus the three shared tables whose rows carry a
+ *         `mark`. This is the half that actually bit, and the half a copy
+ *         census cannot see: a mark is DATA, not a sentence, so it is in no
+ *         catalogue and no `t(...)`.
+ *
+ *         WHOLE-FILE, INCLUDING COMMENTS, and that is deliberate rather than
+ *         lazy. The repo already has the convention: `optionalMark`'s own
+ *         header names the warning sign as `String.fromCharCode(0x26a0, 0xfe0f)`
+ *         "the same way UI-RULEBOOK.md names a glyph by its Unicode name so
+ *         none appear in the source as an actual character", and
+ *         `selectable-mark-no-emoji.test.ts` builds its fixture the same way.
+ *         Comment-stripping a TSX file is a parser agreeing with itself; "do
+ *         not paste one into these four files, name it by codepoint" is a rule
+ *         a person can follow and a machine can check exactly.
+ *
+ *   (iv)  `shared/i18n.ts` — the one file in the app that RENDERS a pictograph
+ *         on purpose, and the reason `EMOJI_OK` exists at all.
+ *
+ * WHAT IS DELIBERATELY NOT CENSUSED: source comments across `web/`,
+ * `web-portal/` and `workers/`. Twenty-eight of the thirty-two emoji in this
+ * repo's source are there, and every one is EVIDENCE — the client's own
+ * message quoted verbatim beside the change it caused, a Google Chat line
+ * measured on staging, a test fixture. Deleting those would destroy the record
+ * of why the rulings exist in order to satisfy a law about what a person reads,
+ * which is the wrong trade in both directions.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════
+ * THE EXEMPTION: A FLAG, AND NOTHING ELSE — WIDENED 2026-09-10
+ *
+ * The client's ruling, in full: *"Keep emojis for countries and languages
+ * only."* Until that day this law exempted ONE FILE, `shared/i18n.ts`, with a
+ * paragraph in `EMOJI_OK` explaining that the pictographs in it were the four
+ * language flags. That was true and it was not CHECKABLE: the entry excused
+ * every pictograph in the file, so a warning sign pasted into the same array
+ * would have passed, and the fifth language or the first country flag would
+ * have arrived somewhere else and gone red for no reason anybody could act on.
+ * A hand-list of four glyphs would have been worse again — it rots the moment a
+ * language is added, and this repo's own rot-checks would then either fire
+ * spuriously or go blind.
+ *
+ * SO THE EXEMPTION IS DERIVED, from two oracles and neither of them ours.
+ *
+ *   UNICODE says what shape a flag HAS. An emoji flag sequence is a PAIR of
+ *   Regional_Indicator characters; nothing else in the whole emoji set has that
+ *   shape, so "is this glyph a flag" is answered by the same standard
+ *   `optionalMark` already stands on rather than by a table here.
+ *
+ *   ICU says whether that pair names a real COUNTRY. The two regional
+ *   indicators are letters, and `Intl.DisplayNames({ type: "region", fallback:
+ *   "none" })` either resolves them to a country's name or answers `undefined`.
+ *   That is the platform's own region table — it moves with the world, not with
+ *   this file.
+ *
+ * ONE PREDICATE COVERS BOTH HALVES OF HER SENTENCE, and that is a fact about
+ * Unicode rather than a shortcut: there is no language pictograph. A language
+ * is drawn here by the flag of a country that speaks it — the United Kingdom
+ * for English, Andorra for Catalan, because Catalonia has no regional-indicator
+ * sequence of its own — so "a flag standing for a language" IS "a flag standing
+ * for a country", and the clause below ties the language half to `LANGUAGES`,
+ * the app's own table, so a fifth language reaching for a globe or a book goes
+ * red at the moment it is written.
+ *
+ * WHAT STILL GOES RED, which is the whole of the law's teeth: every pictograph
+ * that is not a country flag, in all four censused targets — an emoji mark on a
+ * ticket type included, which is the fault this law was written for. A LONE
+ * regional indicator is not a flag and is still refused, and so is a pair that
+ * names no country.
+ *
+ * THE WRITE DOOR IS NOT WIDENED WITH IT, deliberately. `optionalMark` still
+ * refuses every pictograph including a flag, so nobody can type a country flag
+ * into a value's `mark`. The ruling widens what this law PERMITS; opening the
+ * door is a product change nobody has asked for, no screen offers a flag mark
+ * today (the `Country` group's ten legacy labels carry no marks at all), and
+ * the asymmetry is safe in the only direction that matters — the door is
+ * stricter than the law, never looser.
+ *
+ * `EMOJI_OK` SURVIVES AND IS EMPTY, which is the goal. It is the reasoned way
+ * out for a pictograph that is neither a flag nor removable, it is rot-checked
+ * both ways so it can only shrink, and a line added to turn a red build green
+ * is the one use of it that is never correct. */
+describe("R66 — no emoji in the words a person reads, or the data behind them", () => {
+  /** The census, relative to the repo root. See the header for why each. */
+  const EMOJI_CENSUS = [
+    // (i) the copy
+    "shared/i18n-strings.json",
+    // (ii) the other three languages
+    "shared/i18n-catalogue.ts",
+    "shared/i18n-seed.ts",
+    // (iii) the vocabulary data
+    "workers/tenancy/src/team-schema/seed.ts",
+    "workers/tenancy/src/team-schema/migrations.ts",
+    "shared/app-stages.ts",
+    "shared/selectable-groups.ts",
+    "shared/departments.ts",
+    // (iv) the one file that renders a pictograph on purpose
+    "shared/i18n.ts",
+  ]
+
+  /** THE DOOR'S OWN ANSWER, one character at a time. `optionalMark` throws a
+   * `GuardError` whose message ends "not an emoji" for a pictograph and caps
+   * length separately, so a single character can only ever fail for the one
+   * reason this law is about. */
+  function isEmoji(ch: string): boolean {
+    try {
+      optionalMark(ch, "Mark", TEXT_LIMITS.tiny)
+      return false
+    } catch {
+      return true
+    }
+  }
+
+  /** A FLAG'S SHAPE, FROM UNICODE. An emoji flag sequence is a pair of
+   * Regional_Indicator characters and nothing else in the emoji set is. */
+  const FLAG_PAIR = /\p{Regional_Indicator}\p{Regional_Indicator}/gu
+
+  /** WHETHER A FLAG NAMES A COUNTRY, FROM ICU. `fallback: "none"` answers
+   * `undefined` for a pair that stands for no region, so this is the platform's
+   * own region table rather than a list of countries kept here. */
+  const REGIONS = new Intl.DisplayNames(["en"], { type: "region", fallback: "none" })
+
+  /** The country a flag sequence stands for, or `undefined`. The two regional
+   * indicators are the region's two letters, offset from U+1F1E6 = "A". */
+  function countryOf(flag: string): string | undefined {
+    const cps = [...flag]
+    if (cps.length !== 2) return undefined
+    return REGIONS.of(cps.map((c) => String.fromCharCode(c.codePointAt(0)! - 0x1f1e6 + 65)).join(""))
+  }
+
+  /** One line with every COUNTRY FLAG taken out of it, so what is left is every
+   * pictograph this law still refuses. A pair naming no country stays in, and so
+   * does a LONE regional indicator — neither of those is a flag. */
+  function withoutCountryFlags(line: string): string {
+    return line.replace(FLAG_PAIR, (m) => (countryOf(m) ? "" : m))
+  }
+
+  /** Every pictograph in one file that is not a country flag, with the line it
+   * is on and its codepoint — reported by NUMBER, never pasted, for the reason
+   * the header gives. */
+  function emojiIn(rel: string): string[] {
+    const src = readFileSync(join(ROOT, rel), "utf8")
+    const found: string[] = []
+    src.split("\n").forEach((line, i) => {
+      for (const ch of withoutCountryFlags(line))
+        if (isEmoji(ch))
+          found.push(`${rel}:${i + 1} U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`)
+    })
+    return found
+  }
+
+  it("every censused file opens — a law reading nothing passes for the wrong reason", () => {
+    for (const rel of EMOJI_CENSUS)
+      expect(
+        existsSync(join(ROOT, rel)),
+        `R66 — ${rel} is gone. It is one of the four oracles this law stands on (the copy, the translations, the vocabulary data, the one rendered pictograph); if it moved, teach this law the new path rather than dropping the line`
+      ).toBe(true)
+  })
+
+  it("the predicate is the write door's, and it really fires", () => {
+    // A CANARY, because the whole census is one call: if `optionalMark` ever
+    // stopped refusing a pictograph, every clause below would pass on every
+    // file and say nothing. The warning sign is the exact glyph that reached
+    // staging as the "Issue" ticket kind's mark, named by codepoint the way
+    // `optionalMark`'s own header and `selectable-mark-no-emoji.test.ts` name
+    // it — no emoji appears in this file as a character.
+    expect(isEmoji(String.fromCodePoint(0x26a0)), "R66 — the door no longer refuses a pictograph").toBe(true)
+    expect(isEmoji(String.fromCodePoint(0x1f4d8)), "R66 — the door no longer refuses a pictograph").toBe(true)
+    // …and it does NOT fire on a typographic dingbat, which is the other half
+    // of the line: the kit's close button is U+2715 and this app's department
+    // marks are U+27A4 / U+2605. A law that caught those would fail on the
+    // hash-pinned kit and be switched off.
+    expect(isEmoji(String.fromCodePoint(0x2715)), "R66 — the predicate widened onto dingbats").toBe(false)
+    expect(isEmoji(String.fromCodePoint(0x2605)), "R66 — the predicate widened onto dingbats").toBe(false)
+  })
+
+  // THE EXEMPTION'S OWN BLINDNESS TRIPWIRE. The flag clause is one `replace`
+  // over one lookup, so if either oracle stopped discriminating, every census
+  // below would go quiet and report success over whatever it was looking at.
+  it("the flag exemption is derived, and both of its oracles still discriminate", () => {
+    const flag = (a: string, b: string) =>
+      String.fromCodePoint(0x1f1e6 + a.charCodeAt(0) - 65, 0x1f1e6 + b.charCodeAt(0) - 65)
+
+    // UNICODE's half: a pair of regional indicators is a flag shape and a lone
+    // one is not, so a stray half-flag is still a pictograph this law refuses.
+    expect(withoutCountryFlags(flag("D", "E")), "R66 — a country flag is no longer recognised").toBe("")
+    expect(
+      withoutCountryFlags(String.fromCodePoint(0x1f1e9)),
+      "R66 — a LONE regional indicator is not a flag and must still be caught"
+    ).not.toBe("")
+
+    // ICU's half: a real region resolves and an unassigned pair does not, so
+    // "any two regional indicators" is not what this exemption says.
+    expect(countryOf(flag("A", "D")), "R66 — the region table no longer resolves a real country").toBeTypeOf(
+      "string"
+    )
+    expect(
+      countryOf(flag("Q", "Q")),
+      "R66 — the region table resolves an unassigned pair, so the exemption has widened onto any two regional indicators"
+    ).toBeUndefined()
+    expect(
+      withoutCountryFlags(flag("Q", "Q")),
+      "R66 — a flag standing for no country is not a country flag and must still be caught"
+    ).not.toBe("")
+
+    // …and a pictograph that is not a flag at all is untouched by the mask, which
+    // is the clause the whole law rests on. The warning sign is the exact glyph
+    // that reached staging as the "Issue" ticket kind's mark.
+    expect(
+      withoutCountryFlags(String.fromCodePoint(0x26a0)),
+      "R66 — the flag mask is eating ordinary pictographs"
+    ).not.toBe("")
+  })
+
+  // THE LANGUAGE HALF OF HER RULING, TIED TO THE APP'S OWN TABLE. "Countries and
+  // languages" is one predicate here because Unicode has no language pictograph:
+  // a language is drawn by the flag of a country that speaks it. Derived from
+  // `LANGUAGES`, so a fifth language reaching for a globe, a book or a letter
+  // goes red at the moment it is written rather than the moment somebody looks.
+  it("every language the app speaks is identified by a country flag, and by nothing else", () => {
+    expect(LANGUAGES.length, "R66 — the language table is empty, so this clause measures nothing").toBeGreaterThan(1)
+    for (const l of LANGUAGES) {
+      expect(
+        withoutCountryFlags(l.flag),
+        `R66 — ${l.english}'s mark in LANGUAGES (shared/i18n.ts) is not a country flag. The client's ruling keeps pictographs "for countries and languages only", and the only pictograph that stands for a language is the flag of a country that speaks it — Andorra stands in for Catalan for exactly that reason. Anything else is an emoji beside a word the menu already prints.`
+      ).toBe("")
+      expect(
+        countryOf(l.flag),
+        `R66 — ${l.english}'s flag names no country that ICU knows, so it is a regional-indicator pair rather than a flag`
+      ).toBeTypeOf("string")
+    }
+  })
+
+  it("no censused file holds a pictograph that is not a country flag, unless EMOJI_OK says why", () => {
+    for (const rel of EMOJI_CENSUS) {
+      const found = emojiIn(rel)
+      if (EMOJI_OK[rel]) continue
+      expect(
+        found,
+        `R66 — a pictograph in ${rel} that is not a country flag. The client has ruled four times ("i said no emojis. why are there still emojis? ` +
+          `kill them!", 2026-08-31; "for type, kill the emojis … we use colors", 2026-09-07; "also kill emojis!!!", 2026-09-10; and, the same day, ` +
+          `"keep emojis for countries and languages only" — which is why a flag is not on this list and nothing else is). ` +
+          `If this is COPY, write the word; if it is a MARK, write a short word or an initial (the write door already refuses the glyph — ` +
+          `shared/workers/validate.ts's optionalMark); if it is a COMMENT about an emoji, name it by codepoint with String.fromCodePoint the ` +
+          `way optionalMark's own header does. A new exemption is a reasoned line in EMOJI_OK, not a deletion of this expectation`
+      ).toEqual([])
+    }
+  })
+
+  it("EMOJI_OK holds only live, reasoned exemptions — the list can only shrink", () => {
+    for (const [rel, why] of Object.entries(EMOJI_OK)) {
+      expect(
+        EMOJI_CENSUS.includes(rel),
+        `R66 — EMOJI_OK names ${rel}, which this law does not census, so the line excuses nothing and hides nothing. Delete it, or add the file to EMOJI_CENSUS`
+      ).toBe(true)
+      expect(
+        emojiIn(rel).length,
+        `R66 — EMOJI_OK still excuses ${rel} and there is no pictograph left in it that this law would refuse. The exemption has outlived what it was for: delete the line in the same commit. (A country flag is exempt STRUCTURALLY since 2026-09-10 and never needs a line here — that is what emptied this list.)`
+      ).toBeGreaterThan(0)
+      // The sentence has to be one somebody can check against the screen, the
+      // same bar every other reasoned list in this registry is held to.
+      expect(
+        why.length,
+        `R66 — the EMOJI_OK line for ${rel} needs to say what the pictograph IS, where a person sees it, and why a word cannot do the job — in a sentence somebody can go and check`
+      ).toBeGreaterThan(80)
+    }
   })
 })
