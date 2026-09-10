@@ -123,14 +123,20 @@ export function HelpDetailScreen({
   // written for it. Nothing had ever called either.
   //
   // Page one first, so a ticket that IS loaded paints with no round trip
-  // (CACHING.md is cache-first), and the by-id read only when it is not — the
-  // same shape meeting-detail and knowledge-detail already use. The `:one:` key
-  // is registered in the live registry beside `help`, or a status change would
+  // (CACHING.md is cache-first) — but the by-id read never WAITS for the list
+  // to say so. It used to be gated on `ticketsQ.data !== undefined`, which
+  // means on a cold deep link to a ticket past the cursor the only read that
+  // could find it did not even START until an unrelated list request came
+  // back: two round trips in series for one record (round_trip_review,
+  // 2026-09-10). `!inPage` alone is the same test on whatever the list
+  // already has — true immediately on a cold render, since `inPage` is `null`
+  // before `ticketsQ` has answered — so the two reads now run together, the
+  // same shape knowledge-detail.tsx already uses. The `:one:` key is
+  // registered in the live registry beside `help`, or a status change would
   // patch the list and leave this screen showing yesterday.
   const inPage = ticketsQ.data?.find((t) => t.id === helpId) ?? null
-  const oneQ = useCached<HelpTicket | null>(
-    ticketsQ.data !== undefined && !inPage ? `help:one:${helpId}` : null,
-    () => content.helpOne(helpId)
+  const oneQ = useCached<HelpTicket | null>(!inPage ? `help:one:${helpId}` : null, () =>
+    content.helpOne(helpId)
   )
   const ticket = inPage ?? oneQ.data ?? null
 
@@ -524,10 +530,13 @@ export function HelpDetailScreen({
         }
       />
     )
-  // …AND NOT WHILE THE BY-ID READ IS STILL GOING. "That ticket no longer exists"
-  // is a claim, and a claim made before the only read that could disprove it has
-  // answered is a lie that happens to be quick.
-  if (ticketsQ.data === undefined || (!inPage && oneQ.data === undefined && !oneQ.error))
+  // NOT WHILE THE BY-ID READ IS STILL GOING. "That ticket no longer exists" is a
+  // claim, and a claim made before the only read that could disprove it has
+  // answered is a lie that happens to be quick. This used to also wait on
+  // `ticketsQ.data === undefined` — the list resolving — even once `oneQ` had
+  // already answered, which is exactly the round trip the comment above this
+  // block now avoids: waiting here for the list too would spend it back.
+  if (!inPage && oneQ.data === undefined && !oneQ.error)
     return <RecordScreen title={<Skeleton className="h-7 w-48" />} state="loading" />
   if (!ticket)
     return (

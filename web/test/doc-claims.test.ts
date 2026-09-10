@@ -101,8 +101,32 @@ function skillDocs(): string[] {
  * other forty-two. Nothing would have been red. So the two directories are read
  * together, and the count is asserted below rather than trusted — a canon that
  * shrinks to a handful is a bug in this file, not a tidy repository. */
+/** AN ARTEFACT IS NOT A DOCUMENT, AND THE REPO ALREADY SAYS WHICH IS WHICH.
+ * A skill that writes its report to the repo root (`lean-mean-report.md`,
+ * `story-review.md`, `interface-lessness-report.md`) leaves a `.md` file there that
+ * is git-ignored PRECISELY because it is machine output, not canon — `.gitignore`
+ * says so in its own words, and this reads that answer rather than guessing at one
+ * with a name pattern.
+ *
+ * Derived HERE, once, and applied to the walk itself. It used to be re-derived in
+ * two places lower down and applied to two assertions out of the nine that scan
+ * DOCS, so a stale audit report at the root — "seven workers", "R1–R19" — turned
+ * the build red on any machine that had merely RUN a review. Both of those
+ * sentences were true when the skill wrote them, which is the definition of an
+ * artefact and the reason the doc-map assertion excused one in the first place;
+ * the other seven scans never got the same sentence. Filtering the walk means the
+ * next scan added to this file inherits the answer instead of having to remember
+ * it. */
+const ARTEFACTS_AT_ROOT = new Set(
+  read(join(ROOT, ".gitignore"))
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("/") && l.endsWith(".md"))
+    .map((l) => l.slice(1))
+)
+
 const canonDocs = (): string[] => [
-  ...readdirSync(ROOT).filter((f) => f.endsWith(".md")),
+  ...readdirSync(ROOT).filter((f) => f.endsWith(".md") && !ARTEFACTS_AT_ROOT.has(f)),
   ...readdirSync(join(ROOT, "documents"))
     .filter((f) => f.endsWith(".md"))
     .map((f) => join("documents", f)),
@@ -221,6 +245,21 @@ describe("docs agree with the roster on disk", () => {
       canonDocs().filter((d) => d.startsWith("documents")).length,
       "documents/ holds the canon; if it is empty the walk is reading the wrong place"
     ).toBeGreaterThan(20)
+    // AND THE SAME QUESTION OF THE SUBTRACTION. ARTEFACTS_AT_ROOT is read out of
+    // .gitignore, so a rewrite that drops those lines — or moves them behind a
+    // pattern this reader does not parse — empties the set in silence, and every
+    // scan below quietly starts grading machine output as canon again. An empty
+    // exclusion list is indistinguishable from a repository with no artefacts,
+    // which is why it is asserted rather than assumed.
+    expect(
+      [...ARTEFACTS_AT_ROOT],
+      "no root .md is ignored any more — did .gitignore change shape? The skills still " +
+        "write their reports to the root, and this set is what keeps them out of the canon"
+    ).not.toEqual([])
+    expect(
+      canonDocs().filter((d) => ARTEFACTS_AT_ROOT.has(d)),
+      "the walk is handing back a file .gitignore calls an artefact"
+    ).toEqual([])
   })
 
   it("the roster itself is readable, and exactly two doors are public", () => {
@@ -467,21 +506,12 @@ describe("README.md states what is true now, not when it became true", () => {
     // The map claims to list them all, and AGENTS.md — the cross-tool filename an
     // agent opens by habit — was the one it never mentioned. A map with a hole in
     // it is worse than no map: a reader trusts it and stops looking.
-    // TRACKED documents only. A skill that writes its report to the repo root
-    // (lean-mean-report.md, interface-lessness-report.md) leaves a .md file that
-    // is git-ignored precisely because it is an ARTEFACT, not a document — and
-    // demanding README link to a file that is not in the repository would make
-    // the build red on a machine that had merely run an audit. So the ignore
-    // list is the definition of "is this ours": root-level entries in
-    // .gitignore, read from the file rather than hard-coded, so a new artefact
-    // is excused the moment somebody ignores it and never before.
-    const ignoredAtRoot = new Set(
-      read(join(ROOT, ".gitignore"))
-        .split("\n")
-        .map((l) => l.trim())
-        .filter((l) => l.startsWith("/") && l.endsWith(".md"))
-        .map((l) => l.slice(1))
-    )
+    // TRACKED documents only — `canonDocs()` has already dropped the root
+    // artefacts, using .gitignore as the repo's own answer to "is this ours"
+    // (see ARTEFACTS_AT_ROOT). Demanding README link to a file that is not in
+    // the repository would make the build red on a machine that had merely run
+    // an audit; that reasoning was written here first and now governs the walk
+    // itself, so every scan in this file gets it rather than this one alone.
     // The audit artefacts still land at the ROOT, which is why the ignore list is
     // read there — but the canon they had to be told apart from now lives in
     // `documents/`, and nothing in that folder is ever an artefact. Matching on the
@@ -490,7 +520,7 @@ describe("README.md states what is true now, not when it became true", () => {
     // reaches the reader, which is the whole property being checked.
     const canon = canonDocs()
       .map((f) => f.split(sep).pop() as string)
-      .filter((f) => f !== "README.md" && !ignoredAtRoot.has(f))
+      .filter((f) => f !== "README.md")
       .sort()
     // Same tripwire as above: a map that names nothing passes a scan over nothing.
     expect(canon.length, "the canon collapsed — see the tripwire above").toBeGreaterThan(30)
@@ -582,26 +612,18 @@ const NARRATES_THE_RETIREMENT: Record<string, string> = {
 
 describe("a ruling that changed the code changed the prose too", () => {
   const isPlan = (doc: string): boolean => doc.startsWith(".plans/")
-  // WHAT A SKILL LEAVES AT THE ROOT, derived from the ignore list rather than
-  // half-listed. `/-review[.]md$/` matched `story-review.md` and NOT
-  // `lean-mean-report.md` or `interface-lessness-report.md` — a predicate that
-  // is already a hand-list of two thirds of its own subject, which is the shape
-  // this whole file spent a day learning to distrust. The `.gitignore` root
-  // entries are the repo's own definition of "this is an artefact, not ours",
-  // and the doc-map assertion below already stands on exactly that reading.
-  const ignoredRoot = new Set(
-    read(join(ROOT, ".gitignore"))
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.startsWith("/") && l.endsWith(".md"))
-      .map((l) => l.slice(1))
-  )
-  const isArtefact = (doc: string): boolean => ignoredRoot.has(doc)
+  // WHAT A SKILL LEAVES AT THE ROOT is not in DOCS at all any more — see
+  // ARTEFACTS_AT_ROOT beside the walk. This block used to derive that set a
+  // second time and skip on it here; `/-review[.]md$/` before that matched
+  // `story-review.md` and NOT `lean-mean-report.md` or
+  // `interface-lessness-report.md`, a predicate already a hand-list of two
+  // thirds of its own subject, which is the shape this whole file spent a day
+  // learning to distrust.
 
   it("no document states a retired thing as if it were still there", () => {
     const offenders: string[] = []
     for (const doc of DOCS) {
-      if (isArtefact(doc) || HISTORY_DOCS[doc] || isPlan(doc)) continue
+      if (HISTORY_DOCS[doc] || isPlan(doc)) continue
       let lines: string[]
       try {
         lines = read(join(ROOT, doc)).split("\n")
