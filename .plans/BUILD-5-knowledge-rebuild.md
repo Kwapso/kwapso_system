@@ -15,7 +15,10 @@ Rebuild the knowledge module from scratch, inside the base. The base — permiss
 (R26), gating (R10), validation (R20), the laws in `shared/rules/registry.ts` and every
 seam test — is the CONTRACT the new code must satisfy; none of it is rewritten. All derived
 data is purged and everything is re-pulled, re-synced and re-indexed. Cloudflare AI spend
-during the build is capped at **$10**, measured on our workers only. Nothing ships to
+during the build is capped at **$5** — the owner cut it from $10 on 10 Sep 2026 — measured
+on our workers only, which means off the app's OWN rows and not off Cloudflare's
+account-wide neuron API, because this account also runs rest-o and hogo-matching and
+rest-o's agent uses the same kimi model as ours. Nothing ships to
 production until the new exam passes on staging and the owner has asked it his own
 questions by hand.
 
