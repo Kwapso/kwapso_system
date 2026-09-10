@@ -300,7 +300,16 @@ describe("docs agree with the roster on disk", () => {
       // and a noisy check gets switched off.
       for (const m of src.matchAll(/\bR1\s*[–-]\s*R(\d+)\b/g)) {
         if (Number(m[1]) === highest) continue
-        wrong.push(`${doc}: "${m[0].trim()}" — the registry declares ${ids.length} laws, up to R${highest}`)
+        // DISTINCT ids, not raw matches. `ids` counts every `id: "R<n>"` in the
+        // file, and `LAW_ID_ORIGIN` carries seven COLLISION RECORDS — R20 to R26,
+        // each naming a law `main` minted and one `feat/ui-ux` minted under the
+        // same number during the 8 Sep renumbering. So the message said "the
+        // registry declares 65 laws" while it declares 58, and the number a
+        // reader was being corrected WITH was itself wrong. The assertion was
+        // always right (`highest` is a Math.max); only the sentence lied.
+        wrong.push(
+          `${doc}: "${m[0].trim()}" — the registry declares ${new Set(ids).size} laws, up to R${highest}`
+        )
       }
     }
 
@@ -573,7 +582,21 @@ const NARRATES_THE_RETIREMENT: Record<string, string> = {
 
 describe("a ruling that changed the code changed the prose too", () => {
   const isPlan = (doc: string): boolean => doc.startsWith(".plans/")
-  const isArtefact = (doc: string): boolean => /-review[.]md$/.test(doc)
+  // WHAT A SKILL LEAVES AT THE ROOT, derived from the ignore list rather than
+  // half-listed. `/-review[.]md$/` matched `story-review.md` and NOT
+  // `lean-mean-report.md` or `interface-lessness-report.md` — a predicate that
+  // is already a hand-list of two thirds of its own subject, which is the shape
+  // this whole file spent a day learning to distrust. The `.gitignore` root
+  // entries are the repo's own definition of "this is an artefact, not ours",
+  // and the doc-map assertion below already stands on exactly that reading.
+  const ignoredRoot = new Set(
+    read(join(ROOT, ".gitignore"))
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("/") && l.endsWith(".md"))
+      .map((l) => l.slice(1))
+  )
+  const isArtefact = (doc: string): boolean => ignoredRoot.has(doc)
 
   it("no document states a retired thing as if it were still there", () => {
     const offenders: string[] = []
