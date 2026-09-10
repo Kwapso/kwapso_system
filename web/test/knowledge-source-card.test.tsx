@@ -79,7 +79,7 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
         canEdit={false}
       />
     )
-    expect(screen.getByText(/findable, but the assistant won't quote it/)).toBeTruthy()
+    expect(screen.getByText("Found in search — never quoted in an answer.")).toBeTruthy()
     expect(screen.queryByText("Not indexed yet")).toBeNull()
   })
 
@@ -98,7 +98,7 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
       />
     )
     expect(screen.getByText("Not indexed yet")).toBeTruthy()
-    expect(screen.queryByText(/won't quote it/)).toBeNull()
+    expect(screen.queryByText(/never quoted in an answer/)).toBeNull()
   })
 
   it("a source with real pieces shows the count", () => {
@@ -173,7 +173,7 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
     expect(screen.getByText("Not filed under an app")).toBeTruthy()
   })
 
-  it("sightings renders the true count, including zero — every team holds zero today", () => {
+  it("says how many people, never the schema's own word for it — including zero, which every team holds today", () => {
     render(
       <KnowledgeSourceCard
         source={makeSource({ sightingsCount: 0 })}
@@ -183,7 +183,21 @@ describe("KnowledgeSourceCard — the row the hub's brief asked for", () => {
         canEdit={false}
       />
     )
-    expect(screen.getByText("0 sightings")).toBeTruthy()
+    expect(screen.getByText("0 people have seen this")).toBeTruthy()
+    expect(screen.queryByText(/sighting/i)).toBeNull()
+  })
+
+  it("uses the singular for exactly one person", () => {
+    render(
+      <KnowledgeSourceCard
+        source={makeSource({ sightingsCount: 1 })}
+        accountNames={new Map()}
+        onOpen={noop}
+        onEditFiling={noop}
+        canEdit={false}
+      />
+    )
+    expect(screen.getByText("1 person has seen this")).toBeTruthy()
   })
 
   it.each([

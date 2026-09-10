@@ -473,10 +473,15 @@ type SourceRow = {
   /** 0074 — a source that produced nothing beyond the sentence the app wrote
    * for it: findable, never quotable. Written by the sweep per kind. */
   generated_only: number
-  /** ONE PERSON'S SIGHT OF ONE THING, live ones only (`gone_at IS NULL`) —
-   * a row with `gone_at` set has ended and does not count. Correlated
-   * subquery rather than a join: `knowledge_sightings` is keyed and indexed
-   * on `source_id`, so this is one indexed lookup per row, not a scan. */
+  /** HOW MANY DISTINCT PEOPLE currently see this, live ones only (`gone_at IS
+   * NULL`) — a row with `gone_at` set has ended and does not count. DISTINCT
+   * on `seen_by_user_id` rather than a bare row count: the unique index is
+   * `(source_id, seen_where, seen_by_user_id)`, so the same person can hold
+   * two live sightings of one source (a shared Drive folder AND a direct
+   * email share), and a screen saying "N people have seen this" is a claim
+   * about people, not about sighting rows. Correlated subquery rather than a
+   * join: `knowledge_sightings` is keyed and indexed on `source_id`, so this
+   * is one indexed lookup per row, not a scan. */
   sightings_count: number
 }
 
@@ -493,7 +498,7 @@ const LIST_COLS = `id, kind, origin_table, origin_row_id, compartment, account_i
   chunk_count, indexed_chunks, index_error,
   created_at, creator_name, editor_name, updated_at, deactivated_at,
   accounts, apps, shared_with, generated_only,
-  (SELECT COUNT(*) FROM knowledge_sightings WHERE source_id = knowledge_sources.id AND gone_at IS NULL) AS sightings_count`
+  (SELECT COUNT(DISTINCT seen_by_user_id) FROM knowledge_sightings WHERE source_id = knowledge_sources.id AND gone_at IS NULL) AS sightings_count`
 
 /** The columns ONE source carries. The body comes too — but only as far as a
  * person can read (see BODY_INLINE_CHARS), because a detail screen is a screen. */
