@@ -1439,9 +1439,11 @@ export type KnowledgeSource = {
    * for it: findable, never quotable. A source with `chunkCount === 0` AND
    * this true is a CARD, on purpose, not a broken or empty source. */
   generatedOnly: boolean
-  /** ONE PERSON'S SIGHT OF ONE THING — live sightings only (`gone_at` still
-   * null). Empty on every team as of 10 Sep 2026: nothing writes to
-   * `knowledge_sightings` yet, so this reads 0 rather than erroring. */
+  /** How many DISTINCT PEOPLE currently see this — live sightings only
+   * (`gone_at` still null), counted per person even though the same person
+   * can hold two live sightings of one source. Empty on every team as of
+   * 10 Sep 2026: nothing writes to `knowledge_sightings` yet, so this reads
+   * 0 rather than erroring. */
   sightingsCount: number
 }
 

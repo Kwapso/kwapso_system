@@ -26,10 +26,12 @@
 //
 // THE ONE THING MOST LIKELY TO LOOK BROKEN: a `generated_only` source with
 // zero pieces is a CARD, on purpose (findable, never quoted) — see
-// `piecesLabel` below. Its exact wording is a placeholder pending a glossary
-// decision (the hub's brief asked for one before shipping copy); it renders
-// as plain text, never as a warning or an error tone, so it does not read as
-// a bug while the words are still provisional.
+// `piecesLabel` below. Its wording ("Found in search — never quoted in an
+// answer.") is the hub's, chosen deliberately in ordinary English rather than
+// the schema's own word for it: the glossary defines neither "passage" nor
+// "sighting", so putting either on screen would have shipped undefined
+// product vocabulary past R34 (a check that reads the glossary file, never
+// the copy). It renders as plain text, never a warning or an error tone.
 
 import * as React from "react"
 
@@ -87,9 +89,17 @@ function appLabel(source: KnowledgeSource, t: Translate): string {
  * rather than a warning. */
 function piecesLabel(source: KnowledgeSource, t: Translate): string {
   if (source.chunkCount === 0 && source.generatedOnly)
-    return t("0 pieces — findable, but the assistant won't quote it")
+    return t("Found in search — never quoted in an answer.")
   if (source.chunkCount === 0) return t("Not indexed yet")
   return t("{count} pieces", { count: String(source.chunkCount) })
+}
+
+/** How many people can currently see it. Named directly ("people", never the
+ * schema's own "sighting") for the same R34 reason `piecesLabel` is — the
+ * glossary has no entry for it, so it stays out of copy. */
+function sightingsLabel(source: KnowledgeSource, t: Translate): string {
+  if (source.sightingsCount === 1) return t("1 person has seen this")
+  return t("{count} people have seen this", { count: String(source.sightingsCount) })
 }
 
 export function KnowledgeSourceCard({
@@ -162,7 +172,7 @@ export function KnowledgeSourceCard({
         <p className="text-muted-foreground">{sharingLabel(source, t)}</p>
         <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
           <span>{piecesLabel(source, t)}</span>
-          <span>{t("{count} sightings", { count: String(source.sightingsCount) })}</span>
+          <span>{sightingsLabel(source, t)}</span>
           <span>
             {source.updatedAt || source.createdAt
               ? t("Last edited {when}", {

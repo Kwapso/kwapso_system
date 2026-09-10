@@ -1254,14 +1254,22 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // and Catalan by a build lane forbidden from spending on a translation
   // model (`scripts/i18n-translate.mjs` calls one) and not confident enough
   // in its own Catalan to hand-translate a real product string. Two of the
-  // eleven — "0 pieces — findable, but the assistant won't quote it" and the
-  // sightings/pieces counts — are ALSO wording the hub's own brief flagged as
-  // provisional pending a glossary decision, so translating them now would
-  // mean translating them twice. Accepted debt, not a regression to chase:
-  // raise it back to 0 once a translation pass answers these eleven.
-  de: 11,
-  es: 11,
-  ca: 11,
+  // eleven were placeholder wording pending a glossary decision.
+  //
+  // RAISED 11 -> 12 in all three, same day, once the hub answered that
+  // decision: R6/R34 caught the placeholder using two undefined product
+  // words ("passage", "sighting") before it ever reached the glossary check,
+  // because that check reads shared/glossary.ts and never the copy, so an
+  // undefined term on screen would have shipped green. Swapped for the hub's
+  // own wording ("Found in search — never quoted in an answer.", "N people
+  // have seen this" / "1 person has seen this") — net +1 string (two removed,
+  // three added, one gaining a singular form) — and the ceiling moves with
+  // it, in this same change, same as R44 asks. Accepted debt, not a
+  // regression to chase: raise it back to 0 once a translation pass answers
+  // these twelve.
+  de: 12,
+  es: 12,
+  ca: 12,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
