@@ -3,7 +3,8 @@
   "total": 88,
   "byDisposition": {
     "keyed": 67,
-    "struck": 13,
+    "tool": 7,
+    "struck": 6,
     "refusal": 8
   },
   "byLevel": {
@@ -38,6 +39,48 @@
     "D9",
     "D10",
     "X8-notowner"
+  ],
+  "mandatory": [
+    {
+      "id": "O1",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O2",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O3",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O4",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O5",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O6",
+      "disposition": "keyed"
+    },
+    {
+      "id": "O7",
+      "disposition": "tool"
+    },
+    {
+      "id": "O8",
+      "disposition": "keyed"
+    },
+    {
+      "id": "X10",
+      "disposition": "tool"
+    },
+    {
+      "id": "X6",
+      "disposition": "refusal"
+    }
   ],
   "retrieval": null
 }

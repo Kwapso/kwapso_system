@@ -152,23 +152,40 @@ export function parseExam(markdown) {
 
 /* ----------------------------- classification --------------------------- */
 
-/** THE DEFAULT READ, off tags alone. */
+/** THE DEFAULT READ, off tags alone.
+ *
+ * `tool` is its own disposition, deliberately separate from `struck`. The
+ * hub named two count-tagged rows (O7, X10) "unstrikeable" — part of the
+ * ten canaries that must always pass — and a bucket called "struck" cannot
+ * also be called unstrikeable, whatever the reasoning under it. `tool` says
+ * plainly what is true of every count-tagged row: id-in-shortlist does not
+ * apply to it (there is no passage to shortlist — it is answered by a door
+ * call), it is never scored by THIS harness, and it is never dropped —
+ * the full-loop exam grades it against the tool call instead. */
 function classifyByTags(tags) {
   // The exam's own legend: "count needs a tool". KB-AUDIT.md §4.7 measured
   // exactly this failure mode live — counting and "which client has
   // most" questions answered confidently from two or three unrelated
-  // passages. So a `count` row is never graded by id-in-shortlist; it is
-  // struck here and belongs to the full-loop exam, which can check the
-  // tool call instead.
+  // passages.
   if (tags.includes("count"))
     return {
-      disposition: "struck",
+      disposition: "tool",
       reason:
-        'tagged `count` — the exam\'s legend defines count as "needs a tool"; resolved by an app/ticket/meeting-count/contact door, never a passage (KB-AUDIT §4.7: counting and aggregation are not retrieval problems). Scored by the full-loop exam against the tool call, not by id-in-shortlist.',
+        'tagged `count` — the exam\'s legend defines count as "needs a tool"; resolved by an app/ticket/meeting-count/contact door, never a passage (KB-AUDIT §4.7: counting and aggregation are not retrieval problems). Graded by the full-loop exam against the tool call, not by id-in-shortlist — never dropped.',
     }
   if (tags.includes("absent")) return { disposition: "refusal" }
   return { disposition: "keyed", sourceIds: null, needsKeyingAfterReindex: true }
 }
+
+/** THE TEN ROWS THE HUB NAMED UNSTRIKEABLE, verbatim: the owner's eight,
+ * plus the refusal canary (a question with an obviously nonexistent
+ * source) and the counting canary (KB-AUDIT §4.7's "failing invisibly"
+ * class). Two of the ten — O7 and X10 — are `tool` rows: mandatory, but
+ * graded by the full-loop exam rather than this harness, which is exactly
+ * why they need their own flag rather than living only inside `struck`'s
+ * reasons where "excluded" and "must always pass" would read as the same
+ * thing. `validateExam` fails if any of these ten ever stops existing. */
+export const MANDATORY_CANARIES = new Set(["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "X6", "X10"])
 
 /** THE CLOSED LIST OF EXCEPTIONS the tags alone get wrong — decided now,
  * before any retrieval has run against this exam, each with the reason a
@@ -229,7 +246,7 @@ const DERIVED_ROWS = [
 
 export function classify(row) {
   const decided = OVERRIDES[row.id] ?? classifyByTags(row.tags)
-  return { ...row, ...decided }
+  return { ...row, ...decided, mandatory: MANDATORY_CANARIES.has(row.id) }
 }
 
 export function loadExam(path = findExamFile()) {
@@ -253,9 +270,11 @@ export function validateExam({ rows }) {
     if (!KNOWN_LEVELS.has(row.level)) problems.push(`${row.id}: unknown level "${row.level}"`)
     if (!row.tags.length) problems.push(`${row.id}: no tags`)
     for (const t of row.tags) if (!KNOWN_TAGS.has(t)) problems.push(`${row.id}: unknown tag "${t}"`)
-    if (!["keyed", "refusal", "struck"].includes(row.disposition)) problems.push(`${row.id}: no disposition`)
-    if (row.disposition === "struck" && !row.reason) problems.push(`${row.id}: struck with no reason`)
+    if (!["keyed", "refusal", "tool", "struck"].includes(row.disposition)) problems.push(`${row.id}: no disposition`)
+    if ((row.disposition === "struck" || row.disposition === "tool") && !row.reason)
+      problems.push(`${row.id}: ${row.disposition} with no reason`)
   }
+  for (const id of MANDATORY_CANARIES) if (!seen.has(id)) problems.push(`mandatory canary ${id} is missing from the exam`)
   return problems
 }
 
@@ -269,7 +288,12 @@ export function validateExam({ rows }) {
  * that graded it anyway would report a number about a row nobody has
  * actually keyed. */
 export function grade(row, result) {
-  if (row.disposition === "struck") return { row, scored: false }
+  // Neither is scored HERE — `tool` because id-in-shortlist cannot judge a
+  // door call, `struck` because the row's own expectation is negative or
+  // disjunctive. Only `tool` is on the mandatory-canary list; `grade`
+  // itself does not special-case that, because "must always pass" is a
+  // fact about the full-loop exam's obligations, not about this function.
+  if (row.disposition === "struck" || row.disposition === "tool") return { row, scored: false }
   if (row.disposition === "refusal") return { row, scored: true, correct: result.found === false }
   if (!row.sourceIds || row.sourceIds.length === 0)
     throw new Error(`${row.id} is disposition "keyed" but has no sourceIds — run the keying pass before grading it`)
@@ -309,7 +333,12 @@ export function summarize(rows) {
       return acc
     }, {}),
     mustScore100: rows.filter((r) => r.disposition === "refusal").map((r) => r.id),
+    tool: rows.filter((r) => r.disposition === "tool").map((r) => ({ id: r.id, reason: r.reason })),
     struck: rows.filter((r) => r.disposition === "struck").map((r) => ({ id: r.id, reason: r.reason })),
+    mandatory: rows
+      .filter((r) => r.mandatory)
+      .map((r) => ({ id: r.id, disposition: r.disposition }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
   }
 }
 
@@ -326,8 +355,13 @@ export function formatReport(summary, examPath) {
     `  level         ${fmtCounts(summary.byLevel)}`,
     `  tag           ${fmtCounts(summary.byTag)}`,
     `  must score 100% (${summary.mustScore100.length}): ${summary.mustScore100.join(", ")}`,
-    `  struck, excluded from the score (${summary.struck.length}):`,
+    `  the ten mandatory canaries (${summary.mandatory.length}):`,
   ]
+  for (const m of summary.mandatory)
+    lines.push(`    ${m.id} — ${m.disposition}${m.disposition === "tool" ? "  (full-loop exam only — not scored here, never dropped)" : ""}`)
+  lines.push(`  tool, graded by the full-loop exam's tool call, not scored here (${summary.tool.length}):`)
+  for (const t of summary.tool) lines.push(`    ${t.id} — ${t.reason}`)
+  lines.push(`  struck, excluded from the score (${summary.struck.length}):`)
   for (const s of summary.struck) lines.push(`    ${s.id} — ${s.reason}`)
   return lines.join("\n")
 }
@@ -348,6 +382,7 @@ export function structuralBaseline(summary, examPath) {
     byLevel: summary.byLevel,
     byTag: summary.byTag,
     mustScore100: summary.mustScore100,
+    mandatory: summary.mandatory,
     retrieval: null,
   }
 }
@@ -364,7 +399,7 @@ export function writeBaseline(baseline) {
 /* ------------------------------------ CLI ------------------------------------ */
 
 function statusLine(s) {
-  return `${s.byDisposition.keyed ?? 0} keyed pending re-index, ${s.byDisposition.refusal ?? 0} refusal, ${s.byDisposition.struck ?? 0} struck`
+  return `${s.byDisposition.keyed ?? 0} keyed pending re-index, ${s.byDisposition.refusal ?? 0} refusal, ${s.byDisposition.tool ?? 0} tool, ${s.byDisposition.struck ?? 0} struck`
 }
 
 function main() {

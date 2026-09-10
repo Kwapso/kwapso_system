@@ -14,6 +14,7 @@ import {
   grade,
   KNOWN_TAGS,
   loadExam,
+  MANDATORY_CANARIES,
   OVERRIDES,
   parseExam,
   shortlistFromAnswer,
@@ -61,9 +62,9 @@ test("parseExam skips the header row and the separator row", () => {
   assert.ok(!rows.some((r) => /^-+$/.test(r.id)))
 })
 
-test("classify: count is struck regardless of the other tags", () => {
+test("classify: count is a tool row regardless of the other tags — never struck, since a hub-declared mandatory canary can carry it", () => {
   const row = classify({ id: "X10", tags: ["count", "route"], question: "" })
-  assert.equal(row.disposition, "struck")
+  assert.equal(row.disposition, "tool")
   assert.ok(row.reason.length > 0)
 })
 
@@ -91,6 +92,11 @@ test("classify: overrides win over the tag-based default", () => {
 
 test("grade: struck rows are never scored", () => {
   const row = { id: "X1", disposition: "struck", reason: "x" }
+  assert.deepEqual(grade(row, { found: true, shortlistIds: ["anything"] }), { row, scored: false })
+})
+
+test("grade: tool rows are never scored either — the full-loop exam grades them, not this harness", () => {
+  const row = { id: "X10", disposition: "tool", reason: "x" }
   assert.deepEqual(grade(row, { found: true, shortlistIds: ["anything"] }), { row, scored: false })
 })
 
@@ -132,13 +138,14 @@ test("validateExam catches a duplicate id, an unknown tag, and a struck row with
   assert.ok(problems.some((p) => p.includes("A3: struck with no reason")))
 })
 
-test("validateExam is clean on a well-formed set", () => {
+test("validateExam is clean on a well-formed set (mandatory-canary check aside — that only applies to the real exam's own ids)", () => {
   const rows = [
     { id: "A1", level: "E", tags: ["para"], disposition: "keyed" },
     { id: "A2", level: "X", tags: ["absent"], disposition: "refusal" },
-    { id: "A3", level: "X", tags: ["count"], disposition: "struck", reason: "needs a tool" },
+    { id: "A3", level: "X", tags: ["count"], disposition: "tool", reason: "needs a tool" },
   ]
-  assert.deepEqual(validateExam({ rows }), [])
+  const problems = validateExam({ rows }).filter((p) => !p.startsWith("mandatory canary"))
+  assert.deepEqual(problems, [])
 })
 
 /* ---------------- pinned against the real, committed exam file ---------------- */
@@ -152,13 +159,14 @@ test("the real KB-EXAM.md loads clean and every tag it uses is recognised", () =
   for (const row of rows) for (const t of row.tags) assert.ok(KNOWN_TAGS.has(t), `${row.id}: tag "${t}" is not in KNOWN_TAGS`)
 })
 
-test("the classification call over the real exam is pinned — 87 rows + 1 derived, 67 keyed / 8 refusal / 13 struck", () => {
+test("the classification call over the real exam is pinned — 87 rows + 1 derived, 67 keyed / 8 refusal / 7 tool / 6 struck", () => {
   const { rows } = loadExam()
   const summary = summarize(rows)
   assert.equal(summary.total, 88, "87 drafted rows + the derived X8-notowner row")
   assert.equal(summary.byDisposition.keyed, 67)
   assert.equal(summary.byDisposition.refusal, 8)
-  assert.equal(summary.byDisposition.struck, 13)
+  assert.equal(summary.byDisposition.tool, 7)
+  assert.equal(summary.byDisposition.struck, 6)
   // The eight rows the exam's own footer says must score 100%: the seven
   // absent-tagged rows plus the derived non-owner half of X8.
   assert.deepEqual(
@@ -167,8 +175,25 @@ test("the classification call over the real exam is pinned — 87 rows + 1 deriv
   )
 })
 
-test("every struck row names a reason a stranger could evaluate", () => {
+test("every struck or tool row names a reason a stranger could evaluate", () => {
   const { rows } = loadExam()
-  const struck = rows.filter((r) => r.disposition === "struck")
-  for (const row of struck) assert.ok(row.reason && row.reason.length > 20, `${row.id} needs a real reason, not a stub`)
+  const named = rows.filter((r) => r.disposition === "struck" || r.disposition === "tool")
+  for (const row of named) assert.ok(row.reason && row.reason.length > 20, `${row.id} needs a real reason, not a stub`)
+})
+
+test("the ten mandatory canaries the hub named exist, and only O7/X10 are graded elsewhere (tool)", () => {
+  const { rows } = loadExam()
+  const problems = validateExam({ rows })
+  assert.deepEqual(problems, [], "validateExam must fail loudly if a canary ever goes missing")
+  assert.equal(MANDATORY_CANARIES.size, 10)
+  const summary = summarize(rows)
+  assert.deepEqual(
+    summary.mandatory.map((m) => m.id),
+    ["O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "X10", "X6"]
+  )
+  const byDisposition = Object.fromEntries(summary.mandatory.map((m) => [m.id, m.disposition]))
+  for (const id of ["O1", "O2", "O3", "O4", "O5", "O6", "O8"]) assert.equal(byDisposition[id], "keyed", id)
+  assert.equal(byDisposition.X6, "refusal")
+  assert.equal(byDisposition.O7, "tool")
+  assert.equal(byDisposition.X10, "tool")
 })
