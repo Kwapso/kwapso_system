@@ -356,11 +356,6 @@ describe("freshnessOf — a property of what the kind IS, not how it is read", (
   it("classifies a one-time event as frozen: it happened, and does not change afterwards", () => {
     expect(freshnessOf("calendar")).toBe("frozen")
     expect(freshnessOf("meeting")).toBe("frozen")
-    // GMAIL, STILL, until it is thread-grouped (google-read.ts's
-    // `mailThreads`, held on kb_B1's identity call) — a single message never
-    // changes once sent. Moves to "living" in that same commit, same
-    // reasoning as chat's own frozen→living call.
-    expect(freshnessOf("gmail")).toBe("frozen")
   })
 
   it("classifies something that keeps changing as living", () => {
@@ -368,6 +363,11 @@ describe("freshnessOf — a property of what the kind IS, not how it is read", (
     expect(freshnessOf("drive")).toBe("living")
     expect(freshnessOf("ticket")).toBe("living")
     expect(freshnessOf("story")).toBe("living")
+    // GMAIL, SPECIFICALLY: living since the thread became the source
+    // (google-read.ts's `mailThreads`) — a single message never changes once
+    // sent, but the thread it belongs to keeps gaining replies exactly the
+    // way a chat conversation does.
+    expect(freshnessOf("gmail")).toBe("living")
     // PORTAL_LOGIN: living, not frozen — a login grant is deactivated,
     // reactivated and its app_restriction edited after it is made, and
     // knowledge-ingest.ts's own SELECT already computes a last-change value

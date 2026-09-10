@@ -846,7 +846,11 @@ const sweep = () => call(IDS.staffUser, "POST /api/content/knowledge/sync-google
 
 describe("Google material that has GONE stops being quoted", () => {
   const FILE = `${IDS.staffUser}:FILE_1`
-  const MAIL = `${IDS.staffUser}:MAIL_1`
+  // THE THREAD, not the message — see the identical note on the date test
+  // above. The mock's own "gone" signal (holder.unlisted/holder.binned)
+  // still keys on the message id, MAIL_1, because that is Google's own
+  // vocabulary for what went away; the SOURCE it retires is the thread.
+  const MAIL = `${IDS.staffUser}:TH_1`
   const EVENT = `${IDS.staffUser}:EVENT_1`
 
   it("a deleted document, a binned mail and a cancelled meeting are all retired", async () => {
@@ -856,7 +860,12 @@ describe("Google material that has GONE stops being quoted", () => {
     // He deletes the file, bins the mail and calls the meeting off. Google stops
     // listing them AND says positively what happened to each.
     for (const id of ["FOLDER_CLIENT", "MAIL_1", "EVENT_1"]) holder.unlisted.add(id)
-    for (const id of ["FILE_1", "MAIL_1", "EVENT_1"]) holder.binned.add(id)
+    // TH_1 ALONGSIDE MAIL_1: the retire pass asks googlePresence about the
+    // SOURCE's own id, which is the thread now (google-read.ts's
+    // `mailThreads`) — this mock answers generically by id regardless of
+    // service, so it has to be told the thread is gone, not just the message
+    // that was in it.
+    for (const id of ["FILE_1", "MAIL_1", "TH_1", "EVENT_1"]) holder.binned.add(id)
     await sweep()
 
     expect(live(FILE), "a deleted Drive file must stop answering").toBe(false)
@@ -1161,7 +1170,11 @@ describe("a Google source carries the date it is from", () => {
     await sweep()
     for (const [table, id] of [
       ["google_drive", `${IDS.staffUser}:FILE_1`],
-      ["google_gmail", `${IDS.staffUser}:MAIL_1`],
+      // THE THREAD, not the message — since google-read.ts's `mailThreads`
+      // (BUILD-5 §2: "mail thread = source, message = piece"), a gmail
+      // source's origin_row_id is Gmail's own threadId (the fixture's
+      // "TH_1"), not the message id it happened to be seen through.
+      ["google_gmail", `${IDS.staffUser}:TH_1`],
       ["google_calendar", `${IDS.staffUser}:EVENT_1`],
       ["google_chat", `${IDS.staffUser}:spaces/AAA/threads/T1`],
     ] as const)
@@ -1173,7 +1186,7 @@ describe("a Google source carries the date it is from", () => {
   // recency this unlocks would then rank on the day we happened to read it.
   it("and it is the record's own moment, not the moment we read it", async () => {
     await sweep()
-    const mail = dateOf("google_gmail", `${IDS.staffUser}:MAIL_1`)
+    const mail = dateOf("google_gmail", `${IDS.staffUser}:TH_1`)
     expect(mail, "the mail was sent on 4 August 2026 and says so").toContain("2026-08-04")
     const event = dateOf("google_calendar", `${IDS.staffUser}:EVENT_1`)
     expect(event, "the meeting was on 5 August 2026").toContain("2026-08-05")
@@ -1210,7 +1223,8 @@ describe("a Google source carries the date it is from", () => {
 // does nothing.
 describe("a second door onto something we already hold is folded", () => {
   const FILE = `${IDS.staffUser}:FILE_1`
-  const MAIL = `${IDS.staffUser}:MAIL_1`
+  // THE THREAD, not the message — see the note on the date test above.
+  const MAIL = `${IDS.staffUser}:TH_1`
 
   /** A meeting row, planted as the ORACLE the fold reads — never as a fixture the
    * sweep produces. `words` is the second agreement in both directions. */
