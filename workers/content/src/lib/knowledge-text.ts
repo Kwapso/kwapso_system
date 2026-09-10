@@ -303,14 +303,13 @@ export type Freshness = "frozen" | "living"
 const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
   // Google kinds — google-read.ts's own four.
   calendar: "frozen",
-  // STILL FROZEN HERE — a single Gmail message never changes once sent. This
-  // moves to "living" in the same commit as google-read.ts's `mailThreads`
-  // (BUILD-5 §2's mail regroup, currently held on kb_B1's identity call for
-  // what a thread's `externalId` becomes): once the SOURCE is the thread
-  // rather than the message, it keeps gaining replies exactly the way a
-  // chat conversation does, same reasoning as chat's own frozen→living call
-  // when IT was folded into one source per conversation.
-  gmail: "frozen",
+  // GMAIL MOVED FROM FROZEN TO LIVING the day it became thread-grouped
+  // (google-read.ts's `mailThreads`, BUILD-5 §2). A single message never
+  // changes once sent, which was the whole argument for "frozen" — but the
+  // SOURCE is the thread now, and a thread keeps gaining replies exactly the
+  // way a chat conversation does. Same reasoning as chat's own frozen→living
+  // call, made when it was folded into one source per conversation.
+  gmail: "living",
   chat: "living",
   drive: "living",
   // App-record kinds (knowledge-ingest.ts). A ONE-TIME EVENT stays frozen

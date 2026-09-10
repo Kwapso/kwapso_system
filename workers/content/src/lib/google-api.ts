@@ -1266,10 +1266,12 @@ export async function gmailSearch(
   contactQuery: string,
   search?: string,
   labelIds: string[] = [],
-  /** IDS THIS PERSON'S LANE HAS ALREADY FILED — see `knownPlaceholder` below for
-   * what skipping one actually costs (nothing) and why it is safe (a Gmail
-   * message cannot change after it is received). The caller decides when this
-   * is even worth building; an empty or absent set costs nothing extra here. */
+  /** IDS THIS PERSON'S LANE HAS ALREADY FILED. See the THREAD-SHAPED skip
+   * below for what skipping one now costs and why that changed: it used to be
+   * free because a source was a message; a source is a Gmail THREAD now
+   * (google-read.ts's `mailThreads`, BUILD-5 §2), so this can no longer skip
+   * message-by-message. The caller decides when building this set is worth
+   * it; an empty or absent set costs nothing extra here. */
   knownIds?: Set<string>
 ): Promise<MailMessage[]> {
   if (labelIds.length > 1) {
@@ -1281,7 +1283,12 @@ export async function gmailSearch(
     return out
   }
   const terms = [contactQuery, search ? `(${search})` : ""].filter(Boolean).join(" ")
-  const ids: string[] = []
+  // BOTH IDS, off the SAME list call — Gmail's `messages.list` already answers
+  // `{id, threadId}` per message, so reading `threadId` here costs nothing
+  // extra; the code before this change read `id` alone and threw the other
+  // half away, which is the whole reason the skip below used to need it and
+  // could not have it.
+  const listed: { id: string; threadId: string }[] = []
   let pageToken = ""
   // PAGED, newest first, up to the sweep's budget. One page was fifty messages
   // and no way to reach the fifty-first — which, once the contact fence came off
@@ -1305,8 +1312,9 @@ export async function gmailSearch(
       nextPageToken?: unknown
     }
     for (const m of Array.isArray(data.messages) ? data.messages : []) {
-      const id = str((m as Record<string, unknown>).id)
-      if (id) ids.push(id)
+      const rec = m as Record<string, unknown>
+      const id = str(rec.id)
+      if (id) listed.push({ id, threadId: str(rec.threadId) })
     }
     pageToken = str(data.nextPageToken)
     if (!pageToken) break
@@ -1339,28 +1347,61 @@ export async function gmailSearch(
   // it was reported for. The mail half was never the reported one, so it was
   // never looked at. `allSettled` + `isItemRefusal` is the same decision the
   // other three make, made here too, by name.
+  //
+  // ══════════════════════════════════════════════════════════════════════
+  // THE SKIP IS THREAD-SHAPED NOW, NOT MESSAGE-SHAPED — a deliberate re-cut
+  // of the spend work in 7a0d928c/8c3848fe ("the Gmail sweep stops paying for
+  // what it already knows"), not a reversal of its intent.
+  //
+  // A SOURCE IS A THREAD (google-read.ts's `mailThreads`, BUILD-5 §2), so a
+  // thread's TEXT is every one of its messages, reassembled. "Skip this
+  // message's header, we already have it" was safe when a message was its own
+  // untouched source; it is silent DATA LOSS now, because a thread with nine
+  // known messages and one new reply would reassemble from the new reply
+  // ALONE — the placeholder for each known message carries no body, by
+  // design (see `knownPlaceholder`), so nine messages' words vanish from a
+  // source that is being REBUILT, not merely left alone. Passing the real
+  // `threadId` through a placeholder fixes WHICH GROUP it joins; it does
+  // nothing for the text a placeholder was never going to carry.
+  //
+  // So the unit the skip decides on is the THREAD: every member of a thread
+  // with at least one NEW message is fetched for real, known or not: that is
+  // the only way to reassemble its body without a hole in it. A thread with
+  // NO new messages is still skipped entirely, at zero extra cost — "is any
+  // member new" is answerable from `threadId`, which this list call already
+  // carries, with no further call to Google. The saving lands exactly where
+  // it always did: on the threads nobody has touched, which on a real mailbox
+  // is nearly all of them, every tick. What changes is that a TOUCHED thread
+  // now costs what it always should have — every one of its messages, not
+  // one — because paying to re-read nine unread words is real spend and the
+  // alternative is a wrong answer built from one reply out of ten.
+  const byThread = new Map<string, { id: string; threadId: string }[]>()
+  for (const m of listed) {
+    const key = m.threadId || m.id
+    byThread.set(key, [...(byThread.get(key) ?? []), m])
+  }
+  const toFetch: string[] = []
   const out: MailMessage[] = []
+  for (const group of byThread.values()) {
+    const allKnown = knownIds ? group.every((m) => knownIds.has(m.id)) : false
+    if (allKnown) {
+      // THE WHOLE THREAD IS UNTOUCHED. A real `threadId` on every placeholder
+      // this time, so they still fold into their one group downstream rather
+      // than each scattering into a group of its own — the fault kb_B1 found
+      // in the empty-string version, which a REWIND (the state a textVersion
+      // bump creates) would have filed as one subjectless source made of
+      // unrelated conversations.
+      for (const m of group) out.push(knownPlaceholder(m.id, m.threadId))
+    } else {
+      // AT LEAST ONE MEMBER IS NEW — fetch every member, known or not, so the
+      // reassembled body is the whole thread and not a hole shaped like its
+      // already-known messages.
+      for (const m of group) toFetch.push(m.id)
+    }
+  }
   const BATCH = 10
-  // A KNOWN ID'S HEADER IS A CALL THAT TEACHES NOTHING. `slice()` in
-  // knowledge-google.ts pays for this read only to compare the message's date
-  // against the cursor and, on every steady-state tick, discard it — the same
-  // discard the cursor would make either way, just paid for first. Gmail
-  // messages are immutable once received (unlike a Drive file or a Calendar
-  // event, which is why this trick is gmail-only), so a known id can be
-  // answered from a PLACEHOLDER instead of a real fetch: its `date` is null,
-  // which `moment()` reads as the empty string — sorts before every real
-  // cursor, so `afterCursor` excludes it exactly as it would once the real
-  // date came back. The id itself is still returned, which is the part that
-  // must not be skipped: `slice()` records every returned id in `seen`
-  // regardless of what `wanted` keeps, and `retireVanished` reads `seen` as
-  // "Google still has this" — an id silently dropped here would read as a
-  // message that vanished and could retire mail that is still in the account.
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const settled = await Promise.allSettled(
-      ids.slice(i, i + BATCH).map((id) =>
-        knownIds?.has(id) ? Promise.resolve(knownPlaceholder(id)) : gmailMessage(token, id, false)
-      )
-    )
+  for (let i = 0; i < toFetch.length; i += BATCH) {
+    const settled = await Promise.allSettled(toFetch.slice(i, i + BATCH).map((id) => gmailMessage(token, id, false)))
     for (const [n, r] of settled.entries()) {
       if (r.status === "fulfilled") {
         out.push(r.value)
@@ -1373,21 +1414,27 @@ export async function gmailSearch(
       // sweep on past mail it never actually read.
       if (!isItemRefusal(r.reason)) throw r.reason
       const reason = r.reason instanceof Error ? r.reason.message : String(r.reason)
-      console.error(`gmail message ${ids[i + n]} skipped: ${reason}`)
+      console.error(`gmail message ${toFetch[i + n]} skipped: ${reason}`)
     }
   }
   return out
 }
 
-/** THE ANSWER FOR A KNOWN ID, with no call to Google at all. `date: null` is
- * the load-bearing field — see the note above the batch loop that builds this.
- * Everything else is empty because nothing downstream may ever read it: a
- * placeholder's `sortAt` sorts before any real cursor, so it is excluded from
- * `wanted` before its `subject` or `snippet` could matter to anyone. */
-function knownPlaceholder(id: string): MailMessage {
+/** THE ANSWER FOR A KNOWN MESSAGE IN A WHOLLY UNTOUCHED THREAD, with no call to
+ * Google at all. `date: null` is the load-bearing field — see the note above
+ * the skip that builds this. `threadId` IS the real one Gmail's list call
+ * already gave us (not `""`): a placeholder still has to join its own
+ * thread's group correctly, even though it carries no body — that grouping
+ * is `mailThreads`' (google-read.ts) job, downstream, and it can only do it
+ * with the id this function is trusted to pass through unchanged. Everything
+ * else stays empty because a message that reaches this function is, by
+ * construction, in a group where nothing new happened: its `sortAt` sorts
+ * before any real cursor, so it is excluded from `wanted` before its
+ * `subject` or `snippet` could matter to anyone. */
+function knownPlaceholder(id: string, threadId: string): MailMessage {
   return {
     id,
-    threadId: "",
+    threadId,
     from: "",
     to: "",
     subject: "",
@@ -2771,13 +2818,27 @@ export type GooglePresence = "gone" | "there" | "unknown"
  * all. */
 export type ProbableService = "drive" | "gmail" | "calendar"
 
+/** THE ONE INVARIANT EVERY PROBE BELOW MUST HOLD: ABSENT IS NOT GONE. A probe
+ * that reads "I could not confirm this" as "this has gone" retires live
+ * material and records it as housekeeping — and this codebase has now been
+ * bitten by that exact shape three times: the calendar probe's own doc
+ * comment names an event on a named secondary calendar reading as a 404 on
+ * `primary`; the gmail known-id skip's placeholder threw away a message's
+ * real thread id and grouped every known message from every thread under
+ * one bogus key; and the gmail probe below asked the MESSAGES endpoint with
+ * what became a THREAD id the moment google-read.ts's `mailThreads`
+ * (BUILD-5 §2) made a gmail source's identity a thread instead of a
+ * message — a 404 for asking the wrong endpoint about the right id, read as
+ * "gone" for a thread that was completely alive. THE PROBE MUST ASK ABOUT
+ * THE THING THE ID ACTUALLY NAMES, and when a service's identity shape
+ * changes again, the probe changes with it — this is a known recurring
+ * failure, not a one-off. */
+type PresenceProbe = { url: (id: string, calendarId: string) => string; goneWhen: (body: Record<string, unknown>) => boolean }
+
 /** Where each service is asked, and what its answer looks like when the thing is
  * in the bin rather than missing. Data rather than a switch, so the three read
  * as one decision and a fourth cannot be added without stating both halves. */
-const PRESENCE_PROBES: Record<
-  ProbableService,
-  { url: (id: string, calendarId: string) => string; goneWhen: (body: Record<string, unknown>) => boolean }
-> = {
+const PRESENCE_PROBES: Record<ProbableService, PresenceProbe> = {
   // Drive's bin is a flag on the file, not a different place: a trashed file is
   // still fetchable, still named, and still emphatically not something the owner
   // can see any more.
@@ -2786,14 +2847,30 @@ const PRESENCE_PROBES: Record<
       `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=trashed&supportsAllDrives=true`,
     goneWhen: (b) => b.trashed === true,
   },
-  // Gmail's bin is a LABEL, and a message keeps its id in it. `minimal` is the
-  // cheapest format that carries labels and carries no body — this asks whether
-  // a message exists, and reading its words to find that out would be paying for
-  // somebody's mail to check that it is still theirs.
+  // A GMAIL SOURCE'S ID IS A THREAD, not a message — google-read.ts's
+  // `mailThreads` (BUILD-5 §2: "mail thread = source, message = piece").
+  // `format=minimal` on the THREADS endpoint carries every member message's
+  // id and labels and no body, same reasoning as the old message probe: this
+  // asks whether the conversation still exists, and reading its words to
+  // find out would be paying for somebody's mail to check that it is still
+  // theirs. Gone only when EVERY member carries TRASH — a thread with one
+  // individually-deleted message and one live one is still a live thread,
+  // the same "member resolution" trap this probe must not fall into either.
+  // An empty or missing message list answers `false` (not gone): a
+  // malformed reply is not Google telling us the thread was deleted.
   gmail: {
     url: (id) =>
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=minimal`,
-    goneWhen: (b) => (Array.isArray(b.labelIds) ? b.labelIds : []).includes("TRASH"),
+      `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(id)}?format=minimal`,
+    goneWhen: (b) => {
+      const messages = Array.isArray(b.messages) ? b.messages : []
+      return (
+        messages.length > 0 &&
+        messages.every((m) => {
+          const labelIds = (m as Record<string, unknown>)?.labelIds
+          return Array.isArray(labelIds) && labelIds.includes("TRASH")
+        })
+      )
+    },
   },
   // A cancelled event is the one of the three that is not deleted at all: Google
   // keeps it and marks it off, which is exactly what `showDeleted` on the calendar

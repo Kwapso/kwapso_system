@@ -731,7 +731,15 @@ export function googleIngestKinds(
       table: "google_gmail",
       label: "mail with a client",
       windowed: true,
-      textVersion: 1,
+      // 2 SINCE 10 SEP 2026 — the unit changed from a message to a thread and
+      // the body changed with it (google-read.ts's `mailThreads`, BUILD-5
+      // §2), so every stored cursor has to rewind. Without the bump the
+      // sweep keeps the position it reached over the OLD per-message rows,
+      // finds almost every thread to be "before" it, and files almost
+      // nothing while reporting itself caught up — chat measured exactly
+      // this on 20 Aug 2026 (`read: 1, indexed: 1, caughtUp: true` against
+      // five spaces holding fifty messages each) when it made the same move.
+      textVersion: 2,
       read: (_cfg, _guard, cursor, limit) =>
         slice(
           "gmail",
