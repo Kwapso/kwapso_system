@@ -614,6 +614,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "sections-stand-on-paper",
     status: "enforced",
   },
+  {
+    id: "R69",
+    dimension: "arch",
+    law: "A SIGHTING IS NEVER WRITTEN THROUGH THE RAW PRIMITIVE. `knowledge_sightings` decides who may read a folded source, and `team_visible` is a denormalised copy of what its rows imply — so a write that changes a sighting's `shelf` or `gone_at` without recomputing that copy in the SAME script leaves a fence answering from a stale value. `execKnowledgeScript` enforces that at RUNTIME by inspecting the resolved script string and walking each write's own interval, but a writer that reaches for `d1ExecScript` directly never runs the guard at all — it cannot see what does not call it. So every file under `workers/*/src` that writes `knowledge_sightings` must go through the wrapper, and the ONE file allowed the raw primitive is DERIVED rather than listed: the file that EXPORTS `execKnowledgeScript` is the wrapper, and a wrapper must call the thing it wraps.",
+    why: "The runtime guard closes the case where somebody splices the recompute in the wrong order, and cannot close the case where somebody skips the wrapper — which is the easier mistake, because `d1ExecScript` is what every other module in this worker already uses. Twenty files in `workers/content/src` call it; reaching for the familiar one is the default, not the exception. Written the day a real writer existed: pinned against an empty set it would have been a check that passes because there is nothing to check, which is the failure this repo produced five separate times in one night — a ceiling derived from the code it checks, an equivalence whose empty case was trivially true on both sides, a loop over a collection that became empty, the right assertion on the wrong field, and a privilege path with no test at all.",
+    checkId: "guarded-sighting-writes",
+    status: "enforced",
+  },
 ]
 
 /** R66 — A PICTOGRAPH THAT IS THE CONTENT AND IS NOT A FLAG. Keyed by

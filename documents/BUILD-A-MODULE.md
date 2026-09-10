@@ -962,6 +962,12 @@ again, which is the only property that matters here.
   many, drawn from a row; a `<Card>` without one is a panel and is not this
   law's subject. The way out is a reasoned `CARD_CHIP_BELOW_OK` line, and it
   is empty.
+- **R69 `guarded-sighting-writes`** — if your module ever writes
+  `knowledge_sightings`, it goes through `execKnowledgeScript` and never
+  `d1ExecScript`. The raw primitive skips the runtime guard that keeps
+  `team_visible` in step with the sightings it is derived from, and a stale
+  copy of that value is a fence answering the wrong question. Most modules owe
+  this nothing — it binds only if you touch sightings.
 - **R67 `sections-stand-on-paper`** — nothing your module draws sits on the bare
   page ground. The client has ruled it twice ("nothing on top of white
   background, its a rule!", then "once again, nothing shoudl sit on the white,

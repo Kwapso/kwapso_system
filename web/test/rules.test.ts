@@ -4398,6 +4398,7 @@ describe("RULES — the laws of the base", () => {
       "no-handrolled-toggles",
       "forms-use-formshell",
       "generic-activity-path",
+      "guarded-sighting-writes", // R69: the sighting-writer scan below
       "glossary-wellformed",
       "forms-persist-drafts",
       "tab-counts-derived",
@@ -6269,4 +6270,56 @@ describe("R66 — no emoji in the words a person reads, or the data behind them"
       ).toBeGreaterThan(80)
     }
   })
+
+  /** R69 — A SIGHTING IS NEVER WRITTEN THROUGH THE RAW PRIMITIVE.
+   *
+   * `knowledge_sightings` decides who may read a folded source, and
+   * `team_visible` is a denormalised copy of what its rows imply. A write that
+   * changes a sighting's `shelf` or `gone_at` without recomputing that copy in
+   * the SAME script leaves the fence answering from a stale value.
+   * `execKnowledgeScript` enforces that at RUNTIME by inspecting the resolved
+   * script and walking each write's own interval — but it cannot see a writer
+   * that never calls it, and `d1ExecScript` is what twenty other files in this
+   * worker already use, so reaching for it is the DEFAULT rather than the
+   * exception.
+   *
+   * THE ONE EXEMPTION IS DERIVED, NOT LISTED: the file that EXPORTS
+   * `execKnowledgeScript` is the wrapper, and a wrapper must call the thing it
+   * wraps. Nobody maintains a list; move the wrapper and the exemption moves
+   * with it. */
+  it("R69 — a file that writes knowledge_sightings goes through execKnowledgeScript, never d1ExecScript", () => {
+    const WRITES = /(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+knowledge_sightings/i
+    const writers = workerSources().filter(([, src]) => WRITES.test(src))
+
+    // The census must not be empty — a check with nothing to check is a check
+    // that passes for the wrong reason. Two writers exist today.
+    expect(
+      writers.length,
+      "no file writes knowledge_sightings — this law now guards nothing and the census has gone vacuous"
+    ).toBeGreaterThan(0)
+
+    for (const [rel, src] of writers) {
+      // Derived exemption: this IS the wrapper.
+      const isTheWrapper = /export\s+async\s+function\s+execKnowledgeScript/.test(src)
+      if (isTheWrapper) {
+        // WORD-BOUNDED, not `includes`. A substring test passes against
+        // `d1ExecScriptRENAMED` — which is exactly how this assertion failed to
+        // fire when it was first mutation-tested. The check's own check.
+        expect(
+          /\bd1ExecScript\s*\(/.test(src),
+          `${rel} exports execKnowledgeScript but never CALLS d1ExecScript — a wrapper that wraps nothing`
+        ).toBe(true)
+        continue
+      }
+      expect(
+        /\bexecKnowledgeScript\s*\(/.test(src),
+        `${rel} writes knowledge_sightings without execKnowledgeScript — the runtime guard cannot see a writer that does not call it`
+      ).toBe(true)
+      expect(
+        /\bd1ExecScript\s*\(/.test(src),
+        `${rel} writes knowledge_sightings AND calls d1ExecScript directly — that path skips the guard entirely`
+      ).toBe(false)
+    }
+  })
+
 })
