@@ -985,6 +985,20 @@ again, which is the only property that matters here.
   and an overlay are not content and are never asked. The way out is a reasoned,
   rot-checked `UNCONTAINED_SECTION_OK` line, and today it holds the client
   portal and nothing else.
+- **R68 `one-identity-per-source`** — if your module's rows are read into the
+  knowledge base, an ordinary mirrored record (a ticket, an account, a row the
+  generic sweep already walks) needs nothing from you: `recordIdentity(table,
+  rowId)` (`workers/content/src/lib/knowledge-identity.ts`) is called for you,
+  once, and a record already has exactly one identity. This only bites if your
+  module reaches OUTSIDE the app for material — a new Google surface, a new
+  upload path, anything where the same real-world thing could be seen by more
+  than one person. There, `identity_key` must be the thing's OWN id (Google's
+  file/message/event id, or a content hash), never a string with the READER
+  baked in — the fault 0073 closed, where `<readerId>:<externalId>` turned one
+  shared folder into one row per person who could see it. Compute it with
+  `googleIdentity()`/`uploadIdentity()`/`identityKey()`, the one seam, or the
+  check that reads every write of `identity_key` in `workers/content/src/`
+  will find yours missing the import.
 
 **The words** (the ones that catch every new module, every time)
 

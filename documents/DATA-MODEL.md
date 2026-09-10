@@ -1129,14 +1129,30 @@ for. Correcting a turn means adding another one.
 
 ### knowledge_sources + knowledge_chunks + knowledge_terms + knowledge_ingest + knowledge_sightings + knowledge_names + knowledge_chunks_fts. KEEP (BUILT 2026-08-11, team migrations `0012_knowledge` + `0020_knowledge_vectors` + `0022_knowledge_files`; rebuilt 10 Sep 2026, `0073_the_knowledge_base_is_rebuilt` + `0074_cards_and_the_fence_land_together` + `0075_the_fence_the_fold_cannot_ship_without` + `0076_the_source_gets_its_own_team_visible`, .plans/BUILD-5-knowledge-rebuild.md). THE KNOWLEDGE BASE
 One knowledge base, many **compartments**, chosen for the reader rather than by
-them. Seven tables, one per job. **The three newest carry no live traffic yet**:
-0073–0076 laid the schema the rebuild's ingest/index/retrieval lanes build on,
-and as of 10 Sep 2026 nothing in the running app writes `identity_key`,
-`knowledge_sightings`, `knowledge_names`, `knowledge_chunks_fts`, `generated_only`
-or `team_visible` — the columns and tables exist, the one-time migration
-backfill gave them a correct starting value, and the write paths that keep
-them current are separate, in-progress lanes. Said here because a schema that
-exists and a capability that works are two different sentences, and this
+them. Seven tables, one per job. **This rebuild landed in pieces across several
+lanes moving at different speeds, and this section says exactly which parts
+are live as of 10 Sep 2026, because a schema doc that reads as a finished
+pipeline is how the next person budgets work that no longer exists — or
+misses work that already shipped.** LIVE: `generated_only` (the ingest sweep
+writes it, retrieval reads it, below); `team_visible` on all three tables it
+touches — source, chunks, terms (below); `knowledge_chunks_fts` (written on
+every chunk write, read as the actual BM25 scorer — it now REPLACES
+`knowledge_terms` for ranking, though `knowledge_terms` is still written
+alongside it); `knowledge_names` (rebuilt by its own sweep, read in place of
+`accountNamedIn`); and the FOLD itself — Google readers now build
+`origin_row_id` from the thing's own id, reader stripped, so the multi-person
+duplicate this whole rebuild exists to close is actually closed, on the
+ALREADY-EXISTING `origin_table`/`origin_row_id` pair (0012), see
+`knowledge_sources` below for why that is a different mechanism from the new
+`identity_key` column. NOT YET WIRED: `identity_key` itself (a forward-looking
+column nothing writes, see below for why the fold does not need it to work
+today) and `knowledge_sightings` — the one-time migration backfill gave
+`identity_key` its correct starting value (NULL), and the write paths that
+keep both current are separate, in-progress lanes. This paragraph will go
+stale FAST — it is a snapshot, not a promise, and whoever
+reads it after the next lane merges should re-grep before trusting it. Said
+at all because a schema that exists and a capability
+that works are two different sentences, and this
 document has been the one to conflate them before.
 
 - **`knowledge_sources`**, one row per piece of material the assistant may read.
@@ -1191,8 +1207,9 @@ document has been the one to conflate them before.
   "Notes:" mails that hold the minutes. Matching those on their title is the one
   thing this must never do; a wrong parent is worse than none, because the base
   then answers confidently from the wrong artefact. It is NOT on the vector: the
-  index carries nine metadata keys and this is not a tenth, so nothing about what
-  is searched changed with it (R26). `body_bytes` is how much material there really is, so a screen can say
+  index's ten metadata keys (the tenth, `shared`, spent on `shared_with` — see
+  BOOTSTRAP.md §3b) do not include it, so nothing about what is searched
+  changed with it (R26). `body_bytes` is how much material there really is, so a screen can say
   "the first part of 412 KB" rather than presenting an excerpt as the whole
   thing. `index_error` is why a source could not be indexed whole, in words,
   nothing here is ever silently trimmed. Deactivating means "stop reading this":
@@ -1202,7 +1219,7 @@ document has been the one to conflate them before.
   marked `retired` rather than filtering them out, which is what stopped an
   archived ticket answering questions forever.
 
-  **Six columns from the 10 Sep 2026 rebuild (0073, 0074, 0076).**
+  **Six columns from the 10 Sep 2026 rebuild (0073, 0074).**
   `identity_key` is ONE identity per real-world thing — Google's own file/
   message/event id, or a content hash for an upload — with the READER who
   saw it stripped out, so the same Drive folder shared with two colleagues
@@ -1233,19 +1250,69 @@ document has been the one to conflate them before.
   one string they are indistinguishable, and a census run later (measured:
   1,309 false-positive tickets) or a kind-level flag (measured: every kind
   the audit named has a reader that folds in real free text; only 22 of
-  3,933 sources fold none at all) both failed to recover it. `team_visible`
-  is the fence's TEAM half (below) — see `knowledge_chunks`.
+  3,933 sources fold none at all) both failed to recover it. **LIVE, unlike
+  the rest of this rebuild** (`workers/content/src/lib/knowledge-ingest.ts`
+  writes it per reader, `knowledge.ts` reads it at index time: a card gets
+  zero chunks — `chunkText` is never called on it — and keeps only its
+  record vector, so the router still finds it and nothing about it is ever
+  quotable).
 
-  **As of 10 Sep 2026 none of these six is written by the running app.** The
-  columns exist and the rebuild migrations gave every existing row a correct
-  starting value (0074/0076's backfill sets `team_visible` from the
-  `owner_user_id` this base already had; `generated_only` and `identity_key`
-  default to the behaviour that already existed). The ingest/index/retrieval
-  lanes that read and write them for real are separate, later work
-  (BUILD-5-knowledge-rebuild.md's Lanes B–D); `knowledge-identity.ts`
-  (`workers/content/src/lib/`) has the types and pure functions
-  (`identityKey`, `readableBy`, `stillLive`) these lanes build on, and holds
-  no database call of its own yet.
+  **`team_visible` (0076) is here too, and it is LIVE — the source is where
+  it is COMPUTED, not just another copy of it.** `knowledge_sightings` keys
+  to `source_id`, so the fence's team half has to be derived from the
+  sightings SET once, and the source row is where that single computation
+  naturally lands; `knowledge_chunks`/`knowledge_terms` (0075) then carry
+  their own denormalised copies of THIS value, for the same stage-one,
+  single-table-read reason `compartment`/`owner_user_id` already do. One
+  recompute (`workers/content/src/lib/knowledge.ts`) writes all three —
+  source, then every chunk and term the source owns — in one script, run
+  whenever a sighting's `shelf`/`gone_at` changes. This was nearly built as
+  two copies instead of three: a read-side census of the fence's six
+  source-level call sites (`knowledge.ts:644`, `:734`, `:1826`, `:2185`,
+  `:2535`, `knowledge-shape.ts:150`) showed they already share one seam and
+  could afford a live `EXISTS` against `knowledge_sightings` instead of a
+  stored column — a real argument, and the hub ruled on it twice before
+  landing here: two copies, then three again once the WRITE side was
+  actually built and needed exactly one place to compute from before
+  denormalising down. Read-side and write-side reasoning pointed the same
+  way from opposite ends, which is why three copies stood.
+  `workers/content/test/knowledge-fence.test.ts` proves the recompute can
+  actually SEE drift before trusting it to prevent one: a stale-high case, a
+  stale-low ("leaking") case, and a clean-corpus case once every source has
+  been recomputed.
+
+  **As of 10 Sep 2026, three of these six are LIVE.** `generated_only` and
+  `team_visible` — see them, above, where they stop being a plan.
+  `shared_with` too, one direction only:
+  its value rides onto every chunk's vector as the `shared` metadata label
+  (`workers/content/src/lib/knowledge.ts`), though no reader narrows by it
+  yet and every row still defaults to `'agency'`, so nothing has actually
+  changed what anybody can find — the wire is live, the switch at the other
+  end is not.
+
+  **The FOLD itself is now real, one layer down from where this document said
+  it wasn't a few hours ago — worth the correction in place, because it is
+  exactly the kind of thing a stale doc gets backwards.** `knowledge-google.ts`'s
+  Drive/Gmail/Calendar/Chat readers now call `googleIdentity()` and take its
+  `originRowId` — the thing's OWN id, reader stripped — for `origin_row_id`,
+  so two colleagues naming the same folder build the SAME `origin_table` +
+  `origin_row_id` pair and land on the ALREADY-EXISTING partial unique index
+  from 0012 (`idx_knowledge_sources_origin`), one row rather than two. That is
+  the actual bug 0073 was rebuilt to close, and it is closed. **What is still
+  NOT wired is the separate `identity_key` COLUMN this section and R68
+  describe** — a deliberate split, per `knowledge-google.ts`'s own comment: an
+  earlier draft wrote `identityKey()`'s composite `"table id"` string into
+  `origin_row_id` itself, which reads as correct (both come from the same
+  function) and is caught only by `origin_row_id` visibly carrying a table
+  name inside it. So the fold runs on the ORIGIN pair today; `identity_key`
+  remains a forward-looking column with nothing writing it, its own partial
+  unique index enforcing nothing yet because nothing is inserted under it.
+  `accounts`, `apps` and `relevancy_date` likewise default to the behaviour
+  that already existed (`'[]'` / no fold) until the ingest/index lanes reach
+  them (BUILD-5-knowledge-rebuild.md's Lanes B–D). `knowledge-identity.ts`
+  (`workers/content/src/lib/`) has the
+  types and pure functions (`identityKey`, `readableBy`, `stillLive`) that
+  work builds on, and holds no database call of its own yet.
 - **`knowledge_chunks`**, a readable piece of a source: what retrieval scores
   and what an answer cites. Its id is DERIVED (`<sourceId>:<seq>`, zero-padded),
   which is what lets a vector be overwritten or deleted without a lookup table
@@ -1270,12 +1337,13 @@ document has been the one to conflate them before.
   — three settings, not two (private/`owner_user_id`, app/`visible_to_app_id`,
   team) — and the app half is only ever decided by the read-back JOIN to
   `knowledge_sources`, the same R26 argument this file already makes about the
-  vector index: the flag narrows, the team's database decides. Keeping it
-  correct after a fold — recomputed on every write that touches a sighting's
-  `shelf`/`gone_at`, in the same statement or transaction, never a trigger (this
-  repo's migration executor cannot run one at all, and the source of truth here
-  is another table's SET of rows regardless) — is the write path's job, not yet
-  built as of 10 Sep 2026.
+  vector index: the flag narrows, the team's database decides. **LIVE as of
+  10 Sep 2026**: recomputed on every write that touches a sighting's
+  `shelf`/`gone_at`, in the same statement or transaction, never a trigger
+  (this repo's migration executor cannot run one at all, and the source of
+  truth here is another table's SET of rows regardless) — see
+  `knowledge_sources`, above, for where that computation actually happens
+  before this column gets its copy.
 - **`knowledge_terms`**, the inverted index. Was an ORDINARY indexed table
   rather than an FTS5 virtual one, and the original reason (2026-08-11) was
   the DELETE: a re-index removes a source's postings, which on a
@@ -1288,10 +1356,11 @@ document has been the one to conflate them before.
   below, gets the same keyed delete this table was built to have, kept in
   step by application code exactly like this one, behaving identically under
   `node:sqlite` and real D1 because nothing about it is trigger-synced. This
-  table has no IDF and no length normalisation (KB-AUDIT.md §4.4) — the
-  schema for its BM25 replacement exists; **as of 10 Sep 2026 this table is
-  still what retrieval actually reads**, wiring the new one in is later
-  work. `team_visible` (0075) is the owner half only, deliberately: no
+  table has no IDF and no length normalisation (KB-AUDIT.md §4.4). **As of
+  10 Sep 2026 this table is SUPERSEDED for ranking** — `knowledge_chunks_fts`,
+  below, is the arm retrieval actually scores with now — but it is still
+  WRITTEN alongside it, kept in step on every chunk write. `team_visible`
+  (0075) is the owner half only, deliberately: no
   app-tier column is denormalised here, the same asymmetry `owner_user_id`
   already has on this table, defended in `readerClause`'s own doc comment —
   a restricted chunk may reach the candidate pool through its terms and cost
@@ -1312,18 +1381,26 @@ document has been the one to conflate them before.
   sighting worth keeping (a shared Drive folder and a direct email share of
   the same file are different provenance), not a duplicate — which is why
   `seen_where` sits inside the key rather than beside it. As of 10 Sep 2026
-  this table is empty on every team; nothing writes to it yet.
+  this table is empty on every team; nothing writes to it yet — it is the
+  one piece of the rebuild's schema still ahead of its own wiring.
 - **`knowledge_names`** (0073). The account/app/contact/colleague ALIAS
-  INDEX, meant to replace `accountNamedIn`'s single-token account-name
-  matching (KB-AUDIT.md §4.2 — "VU Solutions" hijacking any question
-  containing the word "solutions"). `kind` + `ref_id` name the real entity;
-  `name` is one spelling of it (canonical, an alias, or a misspelling);
-  `alias_of` is NULL on the canonical name and the canonical name's own text
-  on every alias; `compartment` is the same fence every other knowledge table
-  carries, so a lookup can never leak which accounts exist across a fence it
-  has no right to see. UNIQUE on `(kind, ref_id, name)`. As of 10 Sep 2026
-  this table is empty; alias GENERATION is separate, later work.
-- **`knowledge_chunks_fts`** (0073). BM25 over chunk text, FTS5,
+  INDEX, **LIVE as of 10 Sep 2026**, replacing `accountNamedIn`'s
+  single-token account-name matching (KB-AUDIT.md §4.2 — "VU Solutions"
+  hijacking any question containing the word "solutions"). `kind` + `ref_id`
+  name the real entity; `name` is one spelling of it (canonical, an alias, or
+  a misspelling); `alias_of` is NULL on the canonical name and the canonical
+  name's own text on every alias; `compartment` is the same fence every
+  other knowledge table carries, so a lookup can never leak which accounts
+  exist across a fence it has no right to see. UNIQUE on `(kind, ref_id,
+  name)`. Rebuilt whole by its own sweep (`workers/content/src/lib/knowledge.ts`
+  — the table is emptied and repopulated rather than diffed), and read in
+  the same file wherever `accountNamedIn` used to be asked.
+- **`knowledge_chunks_fts`** (0073). BM25 over chunk text, **LIVE as of
+  10 Sep 2026 and now the arm retrieval actually scores with** — it REPLACES
+  `knowledge_terms` for ranking (KB-AUDIT.md §4.4: that table's scorer was a
+  raw term-frequency sum with no IDF and no length normalisation, so the
+  audit's "hybrid search costs recall" finding was measured against a scorer
+  that was never real BM25). FTS5,
   EXTERNAL-CONTENT mode (`content='knowledge_chunks', content_rowid='rowid'`
   — no text of its own, only postings keyed to the base table's rowid). NO
   TRIGGERS: `shared/workers/d1-rest.ts`'s migration executor
@@ -1341,9 +1418,7 @@ document has been the one to conflate them before.
   leaving stale postings a reused rowid can resurrect; reading the result back
   uses `'integrity-check'`, never a row count (an external-content table's own
   `SELECT` reads through `content_rowid` to the base table, so it reports
-  whatever THAT says regardless of the postings' real state). As of 10 Sep
-  2026 this table holds whatever existed at migration time and nothing since
-  — retrieval still reads `knowledge_terms`, above.
+  whatever THAT says regardless of the postings' real state).
 - **`knowledge_ingest`**, one row per source KIND: the cursor it reached, when it
   last ran, when it last SUCCEEDED, and what went wrong when it didn't (R12). The
   cursor is what makes ingestion resumable, a tick that dies halfway costs the
@@ -1399,7 +1474,7 @@ it as housekeeping, not as a leak:
 
 - After a reset you intend to keep clean, delete and recreate the index rather than
   trying to prune it: `npx wrangler vectorize delete kwapso-knowledge-staging`, then
-  re-run BOOTSTRAP §3b **including all nine metadata indexes** (they do not survive
+  re-run BOOTSTRAP §3b **including all ten metadata indexes** (they do not survive
   the delete, and Vectorize will not index metadata retrospectively).
 - A team deleted on its own leaves its namespace behind. There is no per-namespace
   delete today; the next full index rebuild is when it goes.
