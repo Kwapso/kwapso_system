@@ -614,6 +614,14 @@ export const RULES_REGISTRY: Rule[] = [
     checkId: "sections-stand-on-paper",
     status: "enforced",
   },
+  {
+    id: "R68",
+    dimension: "arch",
+    law: "ONE IDENTITY PER SOURCE. BUILD-5-knowledge-rebuild.md's fault, closed by 0073: a Google item's key used to be `<readerId>:<externalId>`, so the same Drive folder shared with two colleagues filed as two `knowledge_sources` rows, each chunked, embedded and stored separately. The fix is a single identity per real-world thing — Google's own file/message/event id, or a content hash for an upload, with the READER stripped out — computed by ONE seam, `identityKey()` (`workers/content/src/lib/knowledge-identity.ts`), and enforced by ONE database constraint. Two clauses, each grounded in a different oracle. (i) The constraint is real: read straight off 0073's own migration SQL for the literal `CREATE UNIQUE INDEX idx_knowledge_sources_identity ON knowledge_sources (identity_key) WHERE identity_key IS NOT NULL` — never trusted from a comment. (ii) The seam is the only writer: any file under `workers/content/src/` that writes `identity_key` — inside an INSERT's column list or an UPDATE's SET clause — must import `identityKey` from `knowledge-identity.ts`.",
+    why: "Written while clause (ii) has zero write sites to check — as of 10 Sep 2026 nothing in the ingest sweep writes `identity_key` yet, so the census finds nothing to violate. That is not a blind test: the census itself was proved by injecting a hand-rolled write (`INSERT INTO knowledge_sources (id, identity_key) VALUES ('S1', '<reader>:<id>')`, no import) into the source tree and watching it fail before being removed, and clause (i) alone already makes the law enforceable today — the schema promise does not wait on the seam being wired into a live write path. The write-detection regex is narrower than \"the string identity_key appears\" on purpose: an earlier draft matched identity_key followed by any of `,=)`, which is exactly right for INSERT/UPDATE but also matches an ordinary `SELECT identity_key, title FROM …` — a read, not a write — and would have wrongly demanded the seam of a file that only ever reads the column. The final regex matches identity_key specifically inside an INSERT's column-list parens or on the left of an UPDATE's SET assignment, verified against both the violating and the non-violating shapes before being trusted.",
+    checkId: "one-identity-per-source",
+    status: "enforced",
+  },
 ]
 
 /** R66 — A PICTOGRAPH THAT IS THE CONTENT AND IS NOT A FLAG. Keyed by

@@ -4456,6 +4456,7 @@ describe("RULES — the laws of the base", () => {
       "sections-stand-on-paper", // R67: web/test/sections-stand-on-paper.test.ts — every titled <section> on either front door, its container derived off the kit's own surface tokens and asked of every BRANCH the section draws
       "no-emoji-in-copy", // R66: the four-target pictograph census at the foot of this file — the catalogue (R28's own set), the two translation files, the vocabulary data (seed + migration ledger + the shared mark tables), and the one file that renders a flag on purpose; the predicate is `optionalMark`'s, imported from the write door
     "pinned-toolbar", // R63: the seam guard + the toolbar-owner census (R53's own list, plus the portal's door-searched rows) + the nobody-hand-rolls-the-offset scan + the four declarations of --pinned-chrome-h, above
+      "one-identity-per-source", // R68: workers/content/test/one-identity-per-source.test.ts — 0073's migration SQL for the partial unique index, plus a source census over workers/content/src for any identity_key write missing the identityKey() import
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
