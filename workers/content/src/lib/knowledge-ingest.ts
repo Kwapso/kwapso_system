@@ -2330,10 +2330,30 @@ const CATCH_UP_PER_KIND = 5
  * BEST-EFFORT, ALWAYS. A question must still be answerable when the catch-up
  * cannot run; the answer is then as current as the last sweep, which is the
  * failure the 15-minute cron already exists to bound. The failure is recorded on
- * the kind's own row by `sweepKind` (R12), so "it has been failing since
- * Tuesday" is readable rather than invisible. */
+ * the kind's own row by `sweepKind` (R12) — AND, since 2026-09-10, in `error_logs`
+ * too, the way the cron's own caller already does it (`content/index.ts`'s
+ * per-kind loop beside the 15-minute sweep). Before this, the kind's own row was
+ * the ONLY trace: a lane failing here runs in front of a live question, and
+ * nothing short of `wrangler tail` on a lucky guess could tell you which call
+ * had failed, or that it was failing at all.
+ *
+ * ONE ROW PER CALL, NOT PER KIND — the `embed-gave-up` precedent just above:
+ * this runs on every question asked, far more often than the 15-minute cron, so
+ * per-kind rows would spend the per-caller hourly ceiling (`error-log.ts`) on one
+ * broken connection. Bucketed on the asking user (`recordWorkerError`'s `who`),
+ * so one team's stuck lane cannot mute anybody else's crash. */
 export async function catchUp(env: Env, cfg: D1Rest, guard: MemberGuard): Promise<number> {
   const results = await sweepAll(env, cfg, guard, CATCH_UP_PER_KIND)
+  const failed = results.filter((r) => r.error)
+  if (failed.length)
+    await recordWorkerError(
+      env.DB,
+      "content",
+      `knowledge/catchup (${guard.teamId})`,
+      new Error(failed.map((r) => `${r.kind}: ${r.error}`).join("; ")),
+      undefined,
+      { teamId: guard.teamId, userId: guard.userId }
+    )
   return results.reduce((n, r) => n + r.indexed, 0)
 }
 
