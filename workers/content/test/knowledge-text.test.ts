@@ -355,8 +355,12 @@ describe("contextLinePrompt — the pure half of the context-line call", () => {
 describe("freshnessOf — a property of what the kind IS, not how it is read", () => {
   it("classifies a one-time event as frozen: it happened, and does not change afterwards", () => {
     expect(freshnessOf("calendar")).toBe("frozen")
-    expect(freshnessOf("gmail")).toBe("frozen")
     expect(freshnessOf("meeting")).toBe("frozen")
+    // GMAIL, STILL, until it is thread-grouped (google-read.ts's
+    // `mailThreads`, held on kb_B1's identity call) — a single message never
+    // changes once sent. Moves to "living" in that same commit, same
+    // reasoning as chat's own frozen→living call.
+    expect(freshnessOf("gmail")).toBe("frozen")
   })
 
   it("classifies something that keeps changing as living", () => {
@@ -364,6 +368,13 @@ describe("freshnessOf — a property of what the kind IS, not how it is read", (
     expect(freshnessOf("drive")).toBe("living")
     expect(freshnessOf("ticket")).toBe("living")
     expect(freshnessOf("story")).toBe("living")
+    // PORTAL_LOGIN: living, not frozen — a login grant is deactivated,
+    // reactivated and its app_restriction edited after it is made, and
+    // knowledge-ingest.ts's own SELECT already computes a last-change value
+    // for it (`COALESCE(pu.updated_at, pu.created_at) AS sort_at`) exactly
+    // like every other living kind, which a genuinely one-time event's query
+    // never bothers to.
+    expect(freshnessOf("portal_login")).toBe("living")
   })
 
   it("is unclassified rather than guessed for a kind nobody has decided about yet", () => {

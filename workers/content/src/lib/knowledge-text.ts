@@ -288,21 +288,28 @@ export function contextLinePrompt(input: { sourceTitle: string; piece: string })
 export type Freshness = "frozen" | "living"
 
 /** ONE KIND, ONE ANSWER. Google's four kinds are this file's own — google-read.ts
- * already picks the right raw field for each (`event.start`, `mail.date`,
- * the folded thread's newest message, `file.modifiedTime`), and this table is
- * what makes that a stated decision rather than four separate ones nobody
- * wrote down. The rest are the ingest sweep's app-record kinds
- * (knowledge-ingest.ts), most of which currently stamp `record_date` from
- * `created_at` alone — CORRECT for a kind that only ever happens once, and a
- * live bug for one that doesn't, per KB-AUDIT.md §4.5's own measurement. Wiring
- * `updated_at` (or whatever a kind's own last-change column is) is the
- * sweep's, not this file's; the classification is the fact this table states
- * so that wiring has an answer to consult rather than a guess to make per
- * kind. A kind not listed is unclassified rather than defaulted — `null`, not
- * a guess dressed as one. */
+ * already picks the right raw field for each (`event.start`, the thread's
+ * last message for both chat and gmail now that both are grouped by
+ * conversation, `file.modifiedTime`), and this table is what makes that a
+ * stated decision rather than four separate ones nobody wrote down. The rest
+ * are the ingest sweep's app-record kinds (knowledge-ingest.ts), most of
+ * which currently stamp `record_date` from `created_at` alone — CORRECT for
+ * a kind that only ever happens once, and a live bug for one that doesn't,
+ * per KB-AUDIT.md §4.5's own measurement. Wiring `updated_at` (or whatever a
+ * kind's own last-change column is) is the sweep's, not this file's; the
+ * classification is the fact this table states so that wiring has an answer
+ * to consult rather than a guess to make per kind. A kind not listed is
+ * unclassified rather than defaulted — `null`, not a guess dressed as one. */
 const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
   // Google kinds — google-read.ts's own four.
   calendar: "frozen",
+  // STILL FROZEN HERE — a single Gmail message never changes once sent. This
+  // moves to "living" in the same commit as google-read.ts's `mailThreads`
+  // (BUILD-5 §2's mail regroup, currently held on kb_B1's identity call for
+  // what a thread's `externalId` becomes): once the SOURCE is the thread
+  // rather than the message, it keeps gaining replies exactly the way a
+  // chat conversation does, same reasoning as chat's own frozen→living call
+  // when IT was folded into one source per conversation.
   gmail: "frozen",
   chat: "living",
   drive: "living",
@@ -312,7 +319,6 @@ const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
   // second event) — matching what the sweep already does for these two.
   meeting: "frozen",
   sprint: "frozen",
-  portal_login: "frozen",
   // Everything that is worked on, replied to, or moves through a status over
   // its life. A ticket answered yesterday is more relevant to "what's
   // happening with HOGO" than one opened a year ago and touched since —
@@ -326,7 +332,58 @@ const FRESHNESS_BY_KIND: Readonly<Record<string, Freshness>> = {
   todo: "living",
   task: "living",
   person: "living",
+  // PORTAL_LOGIN, CORRECTED FROM AN EARLIER DRAFT OF THIS TABLE THAT HAD IT
+  // FROZEN. A login grant is edited after it is made — deactivated,
+  // reactivated, its `app_restriction` changed — so "when was this granted"
+  // is the wrong question once any of that has happened. Caught by reading
+  // knowledge-ingest.ts's own SELECT rather than trusting the first
+  // classification: it computes `COALESCE(pu.updated_at, pu.created_at) AS
+  // sort_at` exactly like every other living kind below, which a one-time
+  // event's query never bothers to.
+  portal_login: "living",
 }
+
+/** THE CENSUS THE HUB ASKED FOR (read-only — knowledge-ingest.ts is not mine
+ * to edit): for every kind classified "living" above whose `recordDate:` I
+ * could find in knowledge-ingest.ts, whether that kind's own SELECT already
+ * carries a last-change value or would need a real schema/query change.
+ *
+ * THE ANSWER IS THE SAME FOR ALL TEN, AND IT MAKES THE FIX SMALLER THAN THE
+ * FINDING SUGGESTED. Every one of them ALREADY selects
+ * `COALESCE(x.updated_at, x.created_at) AS sort_at` — grep `AS sort_at` in
+ * that file and count 13, one per kind including the frozen ones — and
+ * already returns it as `sortAt: r.sort_at` on the very same row for cursor
+ * ordering. `recordDate:` just reads `.created_at` off that SAME row instead
+ * of `.sort_at` a few lines below it. So this is not "nine kinds need a new
+ * column read"; it is "nine (in fact ten) lines read the wrong field the
+ * query already computed."
+ *
+ * kind          | line (recordDate:)      | sort_at already selected?
+ * ------------- | ------------------------ | --------------------------------
+ * ticket        | 435 (`r.created_at`)     | yes — line 385, TICKET_SORT
+ * account       | 621 (`r.created_at`)     | yes — line 525
+ * contact       | 698 (`r.created_at`)     | yes — line 665
+ * app           | 789 (`r.created_at`)     | yes — line 746
+ * process       | 896 (`r.created_at`)     | yes — line 841
+ * story         | 1085 (`r.created_at`)    | yes — line 1034
+ * todo          | 1371 (`r.created_at`)    | yes — line 1328
+ * task          | 1458 (`r.created_at`)    | yes — line 1415
+ * portal_login  | 1843 (`r.created_at`)    | yes — line 1802
+ * person        | 1685 (`m.created_at`)    | yes — line 1514
+ *
+ * PERSON IS THE TENTH, AND IT IS WHY A GREP FOR ONE SPELLING UNDERCOUNTS.
+ * The hub's own census (`grep "recordDate: r.created_at"`) found nine — it
+ * is exact for that literal string, and person's `read` closure maps over
+ * `members.map((m) => …)`, so its identical bug reads `m.created_at`. Same
+ * fault, same fix, different receiver variable — worth restating the lesson
+ * this whole exchange has been about: a zero (or a nine) from a grep is a
+ * fact about the string, not yet a fact about the code.
+ *
+ * meeting/sprint/calendar/gmail/chat/drive are absent from this table on
+ * purpose — they are frozen (or, for gmail/chat, already read their OWN
+ * living value through a different field entirely: the folded thread's
+ * newest message), so `created_at`-alone or their own start-time field is
+ * already the right answer for them and there is nothing to fix. */
 
 /** Which half of `FRESHNESS_BY_KIND` a kind falls in, or `null` for one this
  * table has not decided about — the honest state a new kind starts in, never
