@@ -543,8 +543,11 @@ function toSource(r: SourceRow): KnowledgeSource {
  * lookup rather than a scan. See `fastOwnerClause` below for the one table
  * this reasoning does NOT apply to.
  *
- * THREE BRANCHES, MATCHING knowledge-identity.ts's `readableBy` EXACTLY — this
- * is that function, in SQL, over the rows this database actually holds:
+ * THREE BRANCHES, and only TWO of them have a counterpart in
+ * knowledge-identity.ts's TS model — SAID PLAINLY because an earlier version
+ * of this header claimed all three matched `readableBy` (now `sightingsAdmit`)
+ * "exactly", and that sentence was false the moment this function grew a
+ * branch the TS side was never given the column to build:
  *
  *   1. `team_visible = 1` — the STORED half of the answer (0075/0076),
  *      recomputed from live sightings by `recomputeTeamVisible` whenever one
@@ -552,6 +555,7 @@ function toSource(r: SourceRow): KnowledgeSource {
  *      sighting exist" inline is not an optimisation, it is the CONTRACT: this
  *      function and the flag must always agree, and the corpus-wide rot-check
  *      (knowledge-fence.test.ts) is what catches them drifting apart.
+ *      MATCHES `teamVisible(sightings)` in knowledge-identity.ts.
  *   2. A source with NO sightings at all answers exactly as it always did:
  *      `owner_user_id IS NULL` is the team's, `owner_user_id = me` is mine — a
  *      typed private note or an uploaded file, which never gets a sighting
@@ -562,10 +566,18 @@ function toSource(r: SourceRow): KnowledgeSource {
  *      that column can end up `NULL` even with no team sighting present), so
  *      an ungated `owner_user_id IS NULL` would read a merely-AMBIGUOUS source
  *      as team-readable — the exact widening this function exists to refuse.
+ *      NO TS COUNTERPART. `sightingsAdmit`/`teamVisible` take a `Sighting[]`
+ *      and never see `owner_user_id`, so neither one can decide this branch —
+ *      not a gap in the model, a question outside what it was ever handed.
+ *      Proven correct on its own, against the real door, in
+ *      knowledge-fence.test.ts ("a source with no sightings").
  *   3. EXISTS a LIVE sighting that is mine. The branch that answers for
  *      exactly the population this whole design exists to serve: several
  *      people's own sight of one thing, folded into one source, where no
  *      single column could ever have named all of them.
+ *      Together with branch 1, MATCHES `sightingsAdmit(sightings, me)` — but
+ *      only once a source HAS sightings; see branch 2 for the case it does
+ *      not, which sightingsAdmit was never asked about at all.
  *
  * ONE COLUMN CANNOT HOLD A SET is the whole of why this function exists. The
  * old single-line version — `owner_user_id IS NULL OR owner_user_id = me` —
