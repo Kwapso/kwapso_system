@@ -288,3 +288,43 @@ them would score an invented answer and a correct one identically.
 Union goes in a NEW file; neither source is overwritten, because both are now
 evidence of how their questions were derived and the derivation is what is under
 dispute. Baseline re-pinned ONCE, at the end. Still $0.
+
+## Tick 6 — 10 Sep 2026, ~20:05
+
+**kb_B2 report 2 — fixed the bug §4.9 measured.** `chatThreads` in `google-read.ts`
+no longer flattens a conversation into one blob; it is built from `chunkChat`, runs
+joined on a blank line so the downstream paragraph-cutter lands between runs rather
+than through somebody's turn. It checked `google-ingest.test.ts`'s existing exact-
+string assertions BEFORE changing the format instead of discovering them red.
+
+**The `TokenUsage` change is the meter requirement, delivered early.**
+`contextLineFor` now returns `{ line, usage }` in `shared/workers/credits.ts`'s own
+shape, imported not reinvented. Tick 1 put "ingestion spend recorded into the same
+log `ai-spend.mjs` reads" on lanes C and D, because the account-wide neuron API
+cannot separate our spend from rest-o's agent on the same kimi model. B2 delivered
+the shape at the one moment it was free — before anything is wired. Told it to say
+so in the commit body; it currently reads as a refactor.
+
+**MAIL REGROUP: APPROVED, AND IT GOES FIRST.** BUILD-5 §2 says "mail thread =
+source, message = piece" in as many words, so it is in scope; §4.9 not naming mail
+is the audit being narrower than the plan. B2 was right to ask rather than guess.
+
+The order is the non-obvious part, and it is the OPPOSITE of "wait for B1".
+Confirmed `google-read.ts:549` files `externalId: mail.id` — one source per
+MESSAGE — and B1's dedup key is a source-level hash "computed over the text the
+file reads as". So regrouping changes what a mail source IS, changes the hashed
+text, and **invalidates B1's whole mail measurement** (668 chunk pairs, 182 of 436
+mails, 125 sharing a hash — every figure is over message-shaped sources). Measuring
+a fold against a unit about to change means measuring twice and shipping whichever
+number was current. Regroup first; B1 re-measures after; if the number moves, that
+is a finding. A thread's full text may be a stronger fingerprint than a message's —
+plausibly, and to be measured rather than argued.
+
+**Guarded against an overclaim:** thread-grouping does NOT fix mail identity.
+Gmail thread ids are per-mailbox exactly as message ids are. It fixes GRAIN and may
+incidentally improve hash folding. The owner's tracker item "one meeting arriving
+three ways becomes one source" still has mail as the arm that does not merge.
+
+**Seam: B2 owns the grain, B1 owns what `externalId` becomes.** Told them to settle
+it directly and copy me, as A and B1 are already doing on the sightings columns. A
+disagreement about where the line falls comes to me; the line itself does not.
