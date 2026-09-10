@@ -536,13 +536,187 @@ function toSource(r: SourceRow): KnowledgeSource {
   }
 }
 
-/** THE PERSONAL FENCE, as SQL. A source with an owner is readable only by that
- * owner: it arrived through what THEY can see (their own connection, or a note
- * they marked private), so it is theirs to be answered from. Everything else is
- * the team's. Applied to every read on this module, including the search — a
- * fence with an exception is not a fence. */
-function ownerClause(guard: MemberGuard, column = "owner_user_id"): { sql: string; params: string[] } {
-  return { sql: `(${column} IS NULL OR ${column} = ?)`, params: [guard.userId] }
+/** THE PERSONAL FENCE, as SQL — LIVE against a source's own sightings, not a
+ * denormalised copy, because every read that reaches `knowledge_sources`
+ * through this function is R14-capped to a handful of rows and
+ * `idx_knowledge_sightings_source` (migration 0073) makes the join a keyed
+ * lookup rather than a scan. See `fastOwnerClause` below for the one table
+ * this reasoning does NOT apply to.
+ *
+ * THREE BRANCHES, and only TWO of them have a counterpart in
+ * knowledge-identity.ts's TS model — SAID PLAINLY because an earlier version
+ * of this header claimed all three matched `readableBy` (now `sightingsAdmit`)
+ * "exactly", and that sentence was false the moment this function grew a
+ * branch the TS side was never given the column to build:
+ *
+ *   1. `team_visible = 1` — the STORED half of the answer (0075/0076),
+ *      recomputed from live sightings by `recomputeTeamVisible` whenever one
+ *      changes. Reading it here rather than re-deriving "does a live team
+ *      sighting exist" inline is not an optimisation, it is the CONTRACT: this
+ *      function and the flag must always agree, and the corpus-wide rot-check
+ *      (knowledge-fence.test.ts) is what catches them drifting apart.
+ *      MATCHES `teamVisible(sightings)` in knowledge-identity.ts.
+ *   2. A source with NO sightings at all answers exactly as it always did:
+ *      `owner_user_id IS NULL` is the team's, `owner_user_id = me` is mine — a
+ *      typed private note or an uploaded file, which never gets a sighting
+ *      because nobody's Google connection produced it. GATED ON
+ *      `NOT EXISTS (any sighting for this source)`, and the gate is not
+ *      defensive dressing: once a source has sightings, `owner_user_id` is no
+ *      longer trustworthy on its own (see `fastOwnerClause` for the reason
+ *      that column can end up `NULL` even with no team sighting present), so
+ *      an ungated `owner_user_id IS NULL` would read a merely-AMBIGUOUS source
+ *      as team-readable — the exact widening this function exists to refuse.
+ *      NO TS COUNTERPART. `sightingsAdmit`/`teamVisible` take a `Sighting[]`
+ *      and never see `owner_user_id`, so neither one can decide this branch —
+ *      not a gap in the model, a question outside what it was ever handed.
+ *      Proven correct on its own, against the real door, in
+ *      knowledge-fence.test.ts ("a source with no sightings").
+ *   3. EXISTS a LIVE sighting that is mine. The branch that answers for
+ *      exactly the population this whole design exists to serve: several
+ *      people's own sight of one thing, folded into one source, where no
+ *      single column could ever have named all of them.
+ *      Together with branch 1, MATCHES `sightingsAdmit(sightings, me)` — but
+ *      only once a source HAS sightings; see branch 2 for the case it does
+ *      not, which sightingsAdmit was never asked about at all.
+ *
+ * ONE COLUMN CANNOT HOLD A SET is the whole of why this function exists. The
+ * old single-line version — `owner_user_id IS NULL OR owner_user_id = me` —
+ * read correctly for a source at most one person had ever seen. It cannot
+ * read correctly for the calendar fold, where measured on staging every one of
+ * 27 doubly-or-triply-sighted events is private, on the private shelf, seen by
+ * more than one person: `NULL` there would answer for everybody, and a single
+ * saved id would lock the others out. See scripts/measure-source-identity.mjs. */
+function ownerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
+  // ALWAYS QUALIFIED, never bare `id` — `knowledge_sightings` has an `id`
+  // column of its own (its primary key), and inside the correlated subqueries
+  // below an unprefixed `id` resolves to THAT column, not to the source this
+  // clause is about: the innermost matching table wins column-name scoping,
+  // so `sg.source_id = id` would silently compare a sighting's own id to its
+  // own source_id and never match, making every NOT EXISTS below vacuously
+  // true and the gate it exists to be a no-op. Caught by knowledge-fence.test.ts,
+  // not by inspection — the bug reads as correct SQL. `knowledge_sources.id` is
+  // safe unprefixed because it is the literal, unaliased table name every bare
+  // caller of this function actually queries.
+  const id = prefix ? `${prefix}id` : "knowledge_sources.id"
+  const owner = `${prefix}owner_user_id`
+  const teamVisible = `${prefix}team_visible`
+  return {
+    sql: `(
+      ${teamVisible} = 1
+      OR (
+        NOT EXISTS (SELECT 1 FROM knowledge_sightings sg WHERE sg.source_id = ${id})
+        AND (${owner} IS NULL OR ${owner} = ?)
+      )
+      OR EXISTS (
+        SELECT 1 FROM knowledge_sightings sg
+         WHERE sg.source_id = ${id} AND sg.gone_at IS NULL AND sg.seen_by_user_id = ?
+      )
+    )`,
+    params: [guard.userId, guard.userId],
+  }
+}
+
+/** THE FAST OWNER CHECK — for the ONE table `ownerClause` above deliberately
+ * does not reach: `knowledge_terms`, the lexical arm's stage one, read before
+ * any join and before the compartment or the app fence have narrowed anything.
+ * `knowledge_terms` carries no `source_id` at all (only `chunk_id`), so a
+ * sightings-aware check here would be a two-hop join through
+ * `knowledge_chunks` on every candidate read — exactly the cost the
+ * denormalised `team_visible` copy exists to avoid (0075's own migration
+ * comment; the header on knowledge_chunks/knowledge_terms in
+ * team-schema/migrations.ts makes the identical argument about `compartment`
+ * and the un-folded `owner_user_id`).
+ *
+ * `owner_user_id` alongside `team_visible` still narrows the common case (no
+ * sighting, or one) for free, exactly as it always has — that column's WRITE
+ * path belongs to each ingest reader (knowledge-ingest.ts, knowledge-google.ts)
+ * and is untouched by any of this. Once a source has more than one DISTINCT
+ * PRIVATE sighter, no single column can name them all, and the honest value
+ * for `owner_user_id` on its chunks and terms is `NULL` — read here as "narrow
+ * it in for everyone" rather than "nobody restricts it". THAT IS R26'S OWN
+ * BARGAIN, one layer down: a wrong label here costs a relevant passage its
+ * place in the ranking; it cannot cost a caller an answer they should never
+ * have had, because the read-back through `knowledge_sources` — `ownerClause`
+ * above, which DOES consult sightings — is what actually decides. */
+function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } {
+  return {
+    sql: `(team_visible = 1 OR owner_user_id IS NULL OR owner_user_id = ?)`,
+    params: [guard.userId],
+  }
+}
+
+/** THE WRITE SIDE OF `team_visible` — SQL TEXT, not a call.
+ *
+ * Every writer that changes what a source's sightings SAY (a new sighting, a
+ * shelf moved private→team, one retired) must recompute `team_visible` on the
+ * source and denormalise the same value onto every chunk and posting it owns,
+ * in the SAME statement or transaction as that write — never a follow-up call
+ * that can be skipped. This function is the exact condition the hub set
+ * before any of this could be trusted to store an answer (tick 8): the
+ * recompute must be atomic with the write that made it stale, or the gap
+ * between them is a window where the flag says one thing and the sightings
+ * say another, silently.
+ *
+ * SO IT RETURNS TEXT RATHER THAN EXECUTING ANYTHING. A separate async call is
+ * a separate network round trip a future writer's own `d1ExecScript` can be
+ * built without — awaited, forgotten, or raced against the very insert it was
+ * meant to follow. Splicing this into THAT SAME script makes "wrote a
+ * sighting without recomputing" impossible to construct rather than merely
+ * disciplined against; the string is unusable any other way, which is the
+ * point.
+ *
+ * THREE STATEMENTS, ONE COMPUTED VALUE, in SQL rather than round-tripped
+ * through this process — `EXISTS(...)` evaluates to SQLite's own 0 or 1, so
+ * the three UPDATEs share one true source of truth rather than three chances
+ * for a client-computed value to be stale by the time the third statement
+ * runs. `gone_at IS NULL` is a LIVE sighting; `shelf = 'team'` is the only
+ * shelf this flag ever models — see `ownerClause`'s own header for why the
+ * app tier can never ride this column.
+ *
+ * ── THE ONE THING A CALLER MUST GET RIGHT, SAID EXACTLY: SPLICE ORDER ──────
+ *
+ * `d1ExecScript` runs the statements in ONE script in the order they are
+ * written, and each later statement sees every earlier one's effect — that is
+ * the whole reason a script is atomic in the first place. This function's
+ * `EXISTS` subqueries read `knowledge_sightings` AS THE SCRIPT STANDS AT THE
+ * MOMENT THEY RUN. So:
+ *
+ *   THE STATEMENT(S) THAT INSERT, UPDATE OR RETIRE A SIGHTING FOR THIS SOURCE
+ *   MUST APPEAR EARLIER IN THE SAME SCRIPT STRING THAN THIS FUNCTION'S OUTPUT.
+ *
+ *       const script = `
+ *         INSERT INTO knowledge_sightings (...) VALUES (...);
+ *         ${teamVisibleRecomputeSql(sourceId)}
+ *       `
+ *       await d1ExecScript(cfg, guard.databaseId, script)
+ *
+ * GET THE ORDER BACKWARDS — recompute text placed BEFORE the sighting write —
+ * and the `EXISTS` runs against the sightings table as it stood a moment
+ * EARLIER, before the very write that was supposed to make it correct. That
+ * produces exactly the staleness this function exists to prevent, self
+ * inflicted, inside the one script that was supposed to be atomic against it.
+ * A stale-high result from this failure mode never leaks (it only narrows a
+ * caller in early, which R26 accepts); a stale-LOW one silently refuses
+ * material to everybody it should still answer for, the moment the ordering
+ * mistake happens to land on a source's LAST live sighting retiring.
+ *
+ * Multiple sighting writes for the SAME source in one script — a fold adding
+ * one sighter while retiring another — are fine in any order AMONG
+ * THEMSELVES, as long as all of them precede this function's text. A caller
+ * recomputing with no sighting write in the same script at all (a resync, a
+ * repair pass) may splice this anywhere; there is nothing to race against. */
+export function teamVisibleRecomputeSql(sourceId: string): string {
+  const id = sqlString(sourceId)
+  const teamSightingExists = `EXISTS (
+    SELECT 1 FROM knowledge_sightings
+     WHERE source_id = ${id} AND gone_at IS NULL AND shelf = 'team'
+  )`
+  return `
+UPDATE knowledge_sources SET team_visible = ${teamSightingExists} WHERE id = ${id};
+UPDATE knowledge_chunks SET team_visible = ${teamSightingExists} WHERE source_id = ${id};
+UPDATE knowledge_terms SET team_visible = ${teamSightingExists}
+  WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ${id});
+`
 }
 
 /** THE APP FENCE, as SQL — the middle setting the module was missing (12.3).
@@ -600,7 +774,7 @@ function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: stri
  * argument a third time. A fence written twice is a fence that will be amended
  * once. */
 export function readerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
-  const owner = ownerClause(guard, `${prefix}owner_user_id`)
+  const owner = ownerClause(guard, prefix)
   const app = appClause(guard, prefix)
   return { sql: `${owner.sql} AND ${app.sql}`, params: [...owner.params, ...app.params] }
 }
@@ -1438,6 +1612,7 @@ export async function indexSource(
       embed_attempts: number
       generated_only: number
       shared_with: string
+      team_visible: number
     }
   >(
     cfg,
@@ -1446,10 +1621,12 @@ export async function indexSource(
     // body indexes to nothing, and the difference between "no body" and "a file
     // with no body" is the difference between a note somebody left blank and a
     // document we could not read. `shared_with` (0073) rides along for the
-    // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts.
+    // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts. `team_visible`
+    // rides along so the chunk/term write below can denormalise it — see that
+    // write's own comment for why silently defaulting to 0 was a real gap.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
             owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only, shared_with,
-            deactivated_at, created_at
+            team_visible, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1551,10 +1728,26 @@ export async function indexSource(
         // overwrites, and the guard on the DO UPDATE means an IDENTICAL rewrite
         // moves zero rows and says nothing. `created_at` is deliberately not in
         // the SET list: a piece was first indexed when it was first indexed.
+        // TEAM_VISIBLE RIDES ALONG FROM THE SOURCE, the same way owner_user_id
+        // and compartment already do — WITHOUT this, a chunk written or
+        // rewritten after 0075/0076's one-time backfill takes the column's
+        // DEFAULT 0 for ever, silently, because nothing else in this statement
+        // ever sets it. Copying it here is what keeps the denormalised copy a
+        // copy: the moment a source's own team_visible changes, the next
+        // re-index (which content or force already trigger on every write this
+        // module makes) carries the new value down onto every chunk and
+        // posting it owns.
+        //
+        // `source.owner_user_id` RIDES ALONG UNCHANGED TOO, and `labelsFor`'s
+        // own header (below) is the one place that says what it MUST be once a
+        // fold merges more than one private sighter — read it before writing
+        // that merge. A stale single value copied here would exclude a
+        // legitimate colleague from this very candidate pool with no
+        // downstream fence able to rescue it.
         statements.push(
-          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
-             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, text = excluded.text, embedding = excluded.embedding
-             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id;`
+          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, team_visible, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
+             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, text = excluded.text, embedding = excluded.embedding
+             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id OR knowledge_chunks.team_visible IS NOT excluded.team_visible;`
         )
         // THE FRESH POSTING — read back AFTER the row above has written the new
         // text, same rowid (an UPDATE never changes SQLite's own rowid, only a
@@ -1564,8 +1757,8 @@ export async function indexSource(
         )
         for (const [term, weight] of tokenise(chunk))
           statements.push(
-            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${weight})
-               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, weight = excluded.weight;`
+            `INSERT INTO knowledge_terms (term, chunk_id, compartment, owner_user_id, team_visible, weight) VALUES (${sqlString(term)}, ${sqlString(chunkId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${weight})
+               ON CONFLICT (term, chunk_id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, weight = excluded.weight;`
           )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
       })
@@ -1716,7 +1909,34 @@ export async function indexOneSource(
  * built in ONE place so a chunk and its record's summary can never disagree
  * about whose material they are. Every key is present on every vector, because
  * Vectorize has no "is null": an absent key is a hole in every filter, so
- * "nothing here" has a spelling of its own. */
+ * "nothing here" has a spelling of its own.
+ *
+ * ── WHAT `owner` MUST BE, ONCE A SOURCE HAS MORE THAN ONE PRIVATE SIGHTER ──
+ *
+ * `source.owner_user_id ?? TEAM_SHELF` is correct only because `owner_user_id`
+ * is trusted, by construction, to name AT MOST ONE PERSON — or nobody, which is
+ * NULL and reads here as team-wide. The moment a fold merges two or more
+ * DISTINCT PRIVATE sightings into one source (the calendar fold's own shape —
+ * measured on staging, every one of its 27 multi-sighted events is private,
+ * seen by more than one person, no team sighting), no single value can name
+ * them all, and the whoever writes that merge MUST set `owner_user_id = NULL`
+ * on the source, DELIBERATELY, rather than leave it at whatever the last
+ * ingest reader to run happened to write.
+ *
+ * GET THIS WRONG AND NOTHING DOWNSTREAM CAN RESCUE IT. `ownerClause`
+ * (knowledge.ts, above) decides the real answer from live sightings and cannot
+ * be widened by a stale `owner_user_id` — but it only ever sees a source
+ * Vectorize's own ANN search already returned as a CANDIDATE. A chunk labelled
+ * `owner: <one stale person's id>` is excluded from every OTHER sighted
+ * colleague's search at THIS layer, before `ownerClause` is ever consulted —
+ * a false refusal with no correct read-back to appeal to, because a vector
+ * Vectorize never returns as a candidate never reaches it. `NULL` is the only
+ * honest value once one column can no longer name the truth: over-inclusive at
+ * the narrowing stage (R26's own bargain — a wrong label costs a relevant
+ * passage its ranking slot, never a caller an answer they should never have
+ * had), and correctly decided, for real, at the read-back through
+ * `ownerClause`. This is not written here as documentation of a decision
+ * already made — the fold-merge writer that must make it does not exist yet. */
 function labelsFor(source: {
   kind: string
   compartment: string
@@ -2477,7 +2697,25 @@ async function lexicalArm(
   role: LexicalRole
 ): Promise<CandidateRow[]> {
   if (!terms.length) return []
-  const owner = ownerClause(guard, "k.owner_user_id")
+  // THE FAST CHECK, DELIBERATELY, NOT A SIGHTINGS-AWARE ONE — and this table is
+  // NOT the reason `fastOwnerClause` exists (`knowledge_chunks`, unlike
+  // `knowledge_terms`, carries `source_id` and would cost only a one-hop join),
+  // so the choice needed its own reasoning rather than inheriting
+  // `fastOwnerClause`'s own doc comment by proximity.
+  //
+  // THIS IS STAGE ONE OF THE LEXICAL ARM, run over every candidate BM25 matches
+  // before `LIMIT LEXICAL_TOP_K` narrows it — not the tiny, R14-capped handful
+  // of rows `ownerClause`'s correlated EXISTS was priced for. A precise fence
+  // here buys nothing a wrong one could not also buy: whatever survives this
+  // narrowing still crosses the read-back join to `knowledge_sources`
+  // (`retrieve`'s `reader.sql`) before it can become an answer, and THAT join
+  // is sightings-aware. R26's own bargain, restated at a third table now: the
+  // index narrows, the team's database decides, and precision at the narrowing
+  // stage only ever costs a relevant passage its ranking slot — never a caller
+  // an answer they should never have had. See `ownerClause`'s header for the
+  // measured shape this protects (the calendar fold: 100% of it multi-private,
+  // no team sighting) — this arm reaches the same rows, just later.
+  const owner = fastOwnerClause(guard)
   const fenceWhere = [owner.sql]
   const fenceParams: (string | number)[] = [...owner.params]
   if (compartments.length) {

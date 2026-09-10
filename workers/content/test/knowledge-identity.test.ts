@@ -13,9 +13,9 @@ import {
   googleIdentity,
   identityKey,
   liveSightings,
-  readableBy,
   recordIdentity,
   sightedExternalId,
+  sightingsAdmit,
   stillLive,
   teamVisible,
   uploadIdentity,
@@ -103,9 +103,18 @@ function legacyReadable(rows: { ownerUserId: string | null }[], me: string): boo
 const sighting = (userId: string, shelf: "private" | "team"): Sighting => ({ userId, shelf })
 
 describe("the fence, once the rows are one row", () => {
-  it("is exactly the union of the rows it replaces", () => {
+  it("is exactly the union of the rows it replaces, whenever there ARE rows to unite", () => {
+    // NO `[]` CASE HERE, DELIBERATELY. An existing legacy source always had
+    // EXACTLY ONE row — there is no old-world shape that maps to "zero rows",
+    // so `legacyReadable([], me)` is not a modelled answer, it is `.some()` on
+    // an empty array reading as false by accident. A version of this test that
+    // included `[]` passed for years on that accident: both sides said "false"
+    // for a reason that had nothing to do with agreeing, and the coincidence is
+    // exactly what let `sightingsAdmit` ship without the caveat its own name
+    // now carries. The zero-sighting case is `ownerClause`'s SQL to answer, off
+    // `owner_user_id` alone, and it is proven correct on its own terms in
+    // knowledge-fence.test.ts — not here, and not by this function.
     const cases: Sighting[][] = [
-      [],
       [sighting(AURORA, "private")],
       [sighting(AURORA, "team")],
       [sighting(AURORA, "private"), sighting(ALEX, "private")],
@@ -115,21 +124,37 @@ describe("the fence, once the rows are one row", () => {
     for (const sightings of cases) {
       const legacy = sightings.map((s) => ({ ownerUserId: s.shelf === "team" ? null : s.userId }))
       for (const me of [AURORA, ALEX, "01J8ZZSTRANGER0000000000AA"])
-        expect(readableBy(sightings, me)).toBe(legacyReadable(legacy, me))
+        expect(sightingsAdmit(sightings, me)).toBe(legacyReadable(legacy, me))
     }
   })
 
   it("lets a colleague's private sight of a thing stay private", () => {
-    expect(readableBy([sighting(AURORA, "private")], ALEX)).toBe(false)
+    expect(sightingsAdmit([sighting(AURORA, "private")], ALEX)).toBe(false)
   })
 
   it("lets one person's team shelf answer for everybody, as it always did", () => {
-    expect(readableBy([sighting(AURORA, "private"), sighting(ALEX, "team")], "01J8ZZSTRANGER0000000000AA")).toBe(true)
+    expect(
+      sightingsAdmit([sighting(AURORA, "private"), sighting(ALEX, "team")], "01J8ZZSTRANGER0000000000AA")
+    ).toBe(true)
   })
 
   it("answers nobody once every sighting is gone", () => {
     const gone = [{ ...sighting(AURORA, "team"), goneAt: "2026-09-10T09:00:00.000Z" }]
-    expect(readableBy(gone, AURORA)).toBe(false)
+    expect(sightingsAdmit(gone, AURORA)).toBe(false)
+  })
+
+  it("has no opinion about a source with no sightings at all — that is NOT the same as refusing everyone", () => {
+    // The exact overclaim this rename exists to end. `sightingsAdmit([], me)`
+    // is `false`, and a reader who took that as "a never-sighted source
+    // answers nobody" would be wrong for the overwhelming majority of the
+    // base — every ticket, every account, every upload. This test exists so
+    // that sentence is written down as a WARNING rather than left to be
+    // inferred from a passing assertion.
+    for (const me of [AURORA, ALEX, "01J8ZZSTRANGER0000000000AA"])
+      expect(
+        sightingsAdmit([], me),
+        "this is NOT the source's real answer — see ownerClause's SQL for that"
+      ).toBe(false)
   })
 })
 
@@ -167,8 +192,11 @@ describe("a source lives while somebody can still see it", () => {
 // That is an optimisation over a permission decision, which is the most
 // expensive place to be approximately right — so the equality below is the
 // point of this block. `teamVisible(…) || <I have a live sighting>` must equal
-// `readableBy(…)` for every shape a source can be in, or the fast path is a
-// fence with a hole in it.
+// `sightingsAdmit(…)` for every shape SIGHTINGS can take, or the fast path is a
+// fence with a hole in it. Both sides of that equation are scoped to the
+// sightings a source HAS — neither one is the source's real, full answer for
+// the case it has none; that is `ownerClause`'s SQL alone, and this block
+// proves nothing about it.
 
 describe("teamVisible, and the fast path built on it", () => {
   const gone = (s: Sighting): Sighting => ({ ...s, goneAt: "2026-09-10T09:00:00.000Z" })
@@ -213,7 +241,7 @@ describe("teamVisible, and the fast path built on it", () => {
         expect(
           fast,
           `the fast path disagrees with the fence for ${JSON.stringify(sightings)} read by ${me}`
-        ).toBe(readableBy(sightings, me))
+        ).toBe(sightingsAdmit(sightings, me))
       }
   })
 })

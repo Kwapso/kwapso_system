@@ -30,7 +30,7 @@
 //
 // THAT IS NOT A WIDER FENCE, IT IS THE SAME ONE. Under the old shape a person
 // could read the thing when any one of its rows was readable to them, which for
-// "no owner, or me" is precisely the sentence above. `readableBy` is held to
+// "no owner, or me" is precisely the sentence above. `sightingsAdmit` is held to
 // that equivalence by a test that enumerates every combination of two people and
 // two shelves and compares the two rules row for row — because a merge that
 // quietly widened a fence would be the most expensive possible way to remove a
@@ -48,6 +48,21 @@
 // the readers and there is no old shape to migrate from. It stops being correct
 // the moment somebody folds without purging — then the migration direction has
 // to be proved, not assumed, and this comment is the warning that it never was.
+//
+// WHY THE FUNCTION IS CALLED `sightingsAdmit` AND NOT `readableBy` — earned by
+// getting this wrong once. The SQL fence this file's proof is pinned to
+// (`ownerClause`, knowledge.ts) is THREE branches: a live sighting of mine, a
+// live team sighting (`team_visible`), or — NO SIGHTINGS AT ALL, `owner_user_id`
+// decides alone. This file's TS model was ever only two of those: the two that
+// take SIGHTINGS as their input. A zero-sighting source has no sightings to
+// give it, so no function here can decide about one — and a name that promised
+// "may this person read this source" was a name daring the next reader to hand
+// it a bare source and trust the answer. `sightingsAdmit` promises exactly what
+// it decides: given a set of sightings, do they admit this reader. Whether a
+// SOURCE is readable, in full, is `ownerClause`'s question and its SQL alone —
+// this file's equivalence proof covers the case sightings exist, and the
+// zero-sighting case is proven correct separately, in
+// workers/content/test/knowledge-fence.test.ts, against the real door.
 //
 // AND THE MAIL, WHICH IS THE ONE THAT DOES NOT MERGE YET.
 //
@@ -158,10 +173,19 @@ export function liveSightings(sightings: Sighting[]): Sighting[] {
   return sightings.filter((s) => !s.goneAt)
 }
 
-/** MAY THIS PERSON BE ANSWERED FROM THIS THING? Some live sighting is on the
- * team's shelf, or one of them is theirs. See the header for why this is the
- * same fence the single owner column drew, and not a wider one. */
-export function readableBy(sightings: Sighting[], userId: string): boolean {
+/** DO THESE SIGHTINGS ADMIT THIS READER? Some live sighting is on the team's
+ * shelf, or one of them is theirs.
+ *
+ * NOT "may this person read this source" — that question also depends on
+ * `owner_user_id` for a source with no sightings at all (`ownerClause`'s SQL,
+ * knowledge.ts, its own middle branch), which this function is never handed
+ * and therefore cannot answer. `sightingsAdmit([], me)` is `false` for every
+ * `me`, which is NOT the same sentence as "a never-sighted source answers
+ * nobody" — that source's real answer lives in a column this function does
+ * not see. See the header for the equivalence this IS held to (the fence a
+ * single owner column drew, over the case sightings exist) and for why the
+ * zero-sighting case is proven elsewhere rather than here. */
+export function sightingsAdmit(sightings: Sighting[], userId: string): boolean {
   return liveSightings(sightings).some((s) => s.shelf === "team" || s.userId === userId)
 }
 
@@ -176,21 +200,28 @@ export function stillLive(sightings: Sighting[]): boolean {
 
 /** MAY ANYBODY BE ANSWERED FROM THIS, or only the people who saw it?
  *
- * The stored half of the fence. `readableBy` above is the whole truth and needs
- * the sightings in hand; retrieval cannot afford that, because the fence is
- * COPIED onto every chunk and every posting so that stage one is a single-table
- * read. So what gets stored beside a chunk is this ANSWER — and only this one,
- * because it is the half that does not name a person and therefore fits in a
- * column.
+ * The stored half of the fence — and ONLY of the sightings half, the same
+ * scope `sightingsAdmit` above carries and no wider; see that function's own
+ * doc for why "the whole truth" was the wrong sentence to promise here.
+ * Retrieval cannot afford to hold the sightings in hand for every read,
+ * because the fence is COPIED onto every chunk and every posting so that
+ * stage one is a single-table read. So what gets stored beside a chunk is
+ * this ANSWER — and only this one, because it is the half that does not name
+ * a person and therefore fits in a column.
  *
  * A chunk carrying it needs no sightings at all. A chunk without it needs the
  * one extra question, "do I have a live sighting of this", and nothing else:
  *
- *     readableBy(s, me)  ===  teamVisible(s) || <me has a live sighting in s>
+ *     sightingsAdmit(s, me)  ===  teamVisible(s) || <me has a live sighting in s>
  *
  * which is asserted over every shape two sightings can take, because an
  * optimisation that is approximately right about a permission is the most
- * expensive kind of nearly-correct there is.
+ * expensive kind of nearly-correct there is. Both sides of that equation
+ * agree on `s = []` too — both say `false` — but that is not evidence either
+ * one has the right answer for a never-sighted source; it is two functions
+ * sharing one blind spot. `ownerClause`'s SQL is what actually decides that
+ * case, from `owner_user_id` alone, and neither side of this equation is
+ * consulted for it.
  *
  * IT IS A DERIVED FACT, AND A COPY OF ONE IS EXACTLY WHAT WENT WRONG BEFORE.
  * `owner_user_id` was a stored answer too, and it broke the moment one row had
@@ -222,7 +253,21 @@ export function stillLive(sightings: Sighting[]): boolean {
  * carries its own answer. Delete it because "the flag already decided" and the
  * app fence is bypassed in silence — the fastest possible route to material
  * escaping the room it was limited to, written by somebody removing what reads
- * as a duplicate check. */
+ * as a duplicate check.
+ *
+ * AND A SOURCE WITH NO SIGHTINGS IS NOT A SOURCE NOBODY MAY READ. Most of the
+ * base has none and never will: a ticket, an account, a sprint is the team's,
+ * and nobody personally SAW it — a sighting is one person's own sight of
+ * material that arrived through their connection, which an app record never
+ * did. So this function answers about the sightings a source HAS, and a source
+ * with none keeps the value 0075/0076 backfilled from `owner_user_id`. The
+ * recompute fires when a sighting is written, moved or retired, and on nothing
+ * else.
+ *
+ * Getting that backwards is a whole-corpus outage rather than a leak: derive
+ * "no sightings" as "no team sighting" and every ticket in the base stops
+ * answering for everybody at once. It is the safe direction, which is exactly
+ * why it would ship. */
 export function teamVisible(sightings: Sighting[]): boolean {
   return liveSightings(sightings).some((s) => s.shelf === "team")
 }
