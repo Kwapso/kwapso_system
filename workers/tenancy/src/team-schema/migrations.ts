@@ -5291,6 +5291,66 @@ UPDATE knowledge_terms
  WHERE owner_user_id IS NULL;
 `,
   },
+  {
+    // THE SOURCE'S OWN team_visible — 0075 gave the fence's team half to
+    // \`knowledge_chunks\` and \`knowledge_terms\`, the two tables retrieval
+    // reads from, and missed the table the flag is actually COMPUTED against.
+    // \`knowledge_sightings\` is keyed to \`knowledge_sources\`, not to a chunk
+    // or a term, so kb_B1's write path needs a home on the SOURCE to stamp
+    // \`team_visible\` from the sightings SET before it can denormalise that
+    // same value down onto every chunk and term the source owns. Without this
+    // column the source itself never learns its own fence, and 0075's two
+    // copies would have nothing correct to be copies OF once a real fold runs.
+    //
+    // Not folded into 0075 because 0075 already merged (\`main\`) before this
+    // gap surfaced — the ledger is append-only, so the fix is a new entry,
+    // never an edit to a shipped one.
+    //
+    // **THREE THINGS THAT MUST STAY TRUE, each a conclusion somebody will
+    // otherwise reverse as an optimisation** (restated here because this is
+    // where a reader following \`knowledge_sources.team_visible\` will land,
+    // and 0075's own comment is now only half the story):
+    //
+    //   1. team_visible IS A NARROWING AID, NEVER THE AUTHORITATIVE ANSWER.
+    //      The real fence is \`readerClause = ownerClause AND appClause\`
+    //      (workers/content, knowledge.ts:602) — THREE settings, not two:
+    //      private (\`owner_user_id\`), APP (\`knowledge_sources.visible_to_app_id\`,
+    //      riding \`app_staff\`), and team. \`team_visible\` only ever models the
+    //      OWNER half. The authoritative check is still the read-back JOIN to
+    //      \`knowledge_sources\` that applies \`appClause\` (\`readerClause\`'s own
+    //      doc comment makes exactly this argument already, in R26's words:
+    //      the index — and now this flag — narrows, the team's database
+    //      decides) — an optimiser who trusts this flag alone and drops that
+    //      join silently bypasses the app fence.
+    //   2. \`knowledge_terms.team_visible\` (0075) is DELIBERATELY the owner
+    //      half only, with no app-tier column beside it, inheriting exactly
+    //      the asymmetry \`knowledge_terms.owner_user_id\` already has and
+    //      \`readerClause\`'s own comment defends: a restricted chunk may
+    //      reach the candidate pool through its terms and cost a relevant
+    //      passage its ranking slot, but it cannot reach an answer, because
+    //      the chunk-level join still applies the full fence before anything
+    //      is read back.
+    //   3. THIS DOES NOT FORECLOSE \`visible_to_app_id\`'s OWN FOLD PROBLEM,
+    //      still open: two sources merging, one app-restricted and one not,
+    //      is a second one-column-two-values fault the same shape as
+    //      \`owner_user_id\`'s, one column over — measurement in progress
+    //      (kb_B1). This column says nothing about how that merge resolves
+    //      and does not need to change once it is decided.
+    //
+    // Backfilled the same way 0075 backfilled the other two — from the only
+    // fact available before any fold has run, \`owner_user_id IS NULL\` —
+    // proved (migration test) to preserve exactly today's population.
+    // Default 0 for the same reason as every column in this pair: the safe
+    // direction costs a missed answer, never an over-shared one.
+    version: "0076_the_source_gets_its_own_team_visible",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN team_visible INTEGER NOT NULL DEFAULT 0;
+
+UPDATE knowledge_sources
+   SET team_visible = 1
+ WHERE owner_user_id IS NULL;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.
