@@ -29,21 +29,38 @@
 // ══════════════════════════════════════════════════════════════════════════════
 //
 // TWO FIELDS OFF EVERY ITEM DECIDE WHERE IT LANDS:
-//   • `shelf`     → `ownerUserId` on the row. 'private' means this material may
-//                   only ever answer its OWNER's question, which the knowledge
-//                   base already enforces on every read (its `ownerClause`).
-//                   'team' means nobody owns it and everyone who may read the
-//                   module may be answered from it.
+//   • `shelf`     → this reader's SIGHTING (`writeSightings`, below). 'private'
+//                   means only THEY may ever be answered from their sight of
+//                   it; 'team' means everyone who may read the module can. It
+//                   also seeds `ownerUserId` on the row the generic engine
+//                   upserts first — a transient, correct-for-one-reader value
+//                   that `writeSightings` overwrites moments later with what
+//                   the FULL sightings set actually says (see below).
 //   • `accountId` → the COMPARTMENT. The client's, or — when it is null — the
 //                   agency's own. Decided by the read that fetched the item (the
 //                   folder it came out of, the contact it was with), never by
 //                   matching a client's name in the text.
 //
-// ONE SOURCE PER PERSON PER ITEM. `origin_row_id` carries the reader's user id,
-// so a file two colleagues have both named lands as two rows. That is
-// deliberate: they are two people's SIGHT of it, and each carries its own shelf —
-// one of them may have filed it privately. Sharing one row would make the last
-// sweep to run decide who else can read somebody's document.
+// ONE SOURCE PER THING, MANY SIGHTINGS OF IT — kb_B1's identity gate, and the
+// reason this file changed shape. `origin_row_id` is the THING's own id now,
+// the same for every reader who sees it, so a file two colleagues have both
+// named lands as ONE source. Who saw it, and on which shelf, moved to
+// `knowledge_sightings` (one row per person per item) instead of being the
+// SOURCE itself.
+//
+// THIS PARAGRAPH USED TO ARGUE FOR THE OLD SHAPE, AND THE ARGUMENT WAS RIGHT —
+// it just answers a question sightings now answer differently. "Sharing one
+// row would make the last sweep to run decide who else can read somebody's
+// document" is still true of `owner_user_id` taken alone, which is exactly why
+// nothing here trusts it alone any more: `owner_user_id` on the SOURCE is
+// DERIVED, not assigned — NULL the moment two distinct sighters exist (nobody
+// left to overwrite, because no reader's upsert writes it directly once a
+// sighting exists), and recomputed from the WHOLE sightings set by
+// `teamVisibleRecomputeSql` every time one changes. The old reasoning did not
+// become wrong; it became the reason sightings exist rather than a second
+// owner column. `writeSightings` and `retireSighting`, below, are where that
+// happens — and `knowledge-identity.ts`'s own header has the full account of
+// what the old interpolation cost and why the fence moved with it.
 
 import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
