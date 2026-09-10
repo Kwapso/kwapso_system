@@ -109,13 +109,17 @@ export const TEAM_SHELF = "team"
  * to provision, which is the mistake this whole file exists to avoid. */
 export type VectorLevel = "record" | "chunk"
 
-/** What rides every vector. Nine keys, and Vectorize allows ten metadata indexes
- * per index — the tenth is deliberately spare, because the day something needs a
- * new facet is the day you cannot make room for it.
+/** What rides every vector. TEN keys — Vectorize allows exactly ten metadata
+ * indexes per index, and this spends the last one. BUILD-5-knowledge-rebuild.md
+ * §3: "the label budget is now spent" — nobody after this gets an eleventh
+ * without a full re-index (Vectorize will not index retrospectively, below).
  *
- * `shelf` is NOT one of them. It would be a tenth index for a synonym: "on the
- * team shelf" is `owner === TEAM_SHELF`, and spending the last slot on a second
- * spelling of a fact already indexed is how a schema runs out of room. */
+ * `shelf` is NOT one of the ten. It would be a synonym: "on the team shelf" is
+ * `owner === TEAM_SHELF`, and spending a slot on a second spelling of a fact
+ * already indexed is how a schema runs out of room before it needs to.
+ * `shared_with` IS a new fact — `owner`/`compartment` answer who on the AGENCY
+ * side may read something; `shared_with` (0073, `knowledge_sources`) answers
+ * whether the account's own portal login may, which nothing else here says. */
 export type VectorLabels = {
   /** "record" | "chunk" — which half of the two-stage search this vector is in. */
   level: VectorLevel
@@ -137,18 +141,31 @@ export type VectorLabels = {
    * an ISO string, because a range ("since Monday") is the only thing a date is
    * ever filtered by and Vectorize compares numbers, not date strings. */
   date: number
+  /** 'private' | 'agency' | 'agency_client' (`knowledge_sources.shared_with`,
+   * 0073) — copied onto the vector so a future client-portal answer door can
+   * narrow to `agency_client` WITHOUT a re-index; the read-back join to
+   * `knowledge_sources` is still what DECIDES (R26: the index narrows, the
+   * database decides), the same relationship `owner`/`compartment` already
+   * have to their own source-row fields. Not consumed by any reader yet —
+   * BUILD-5 §5 leaves the portal door itself for later — which is exactly why
+   * it has to be wired now, while every chunk is being written anyway: adding
+   * it after today means re-embedding everything, the same cost this file's
+   * own header describes for any metadata index. Named `shared`, not
+   * `sharedWith`, to match the terse single-word style of the other nine. */
+  shared: string
 }
 
 /** The metadata indexes this index must be created with, in the order BOOTSTRAP
  * creates them. Exported so the check CAN read them off this file rather than
  * off a wiki page: vector-indexes-mirror.test.ts compares this list against
  * BOOTSTRAP.md's own wrangler block, in order, and fails the build when they
- * part company — and so a tenth is a visible decision.
+ * part company — and so the tenth was a visible decision, not an accident.
  *
  * VECTORIZE WILL NOT INDEX RETROSPECTIVELY: "vectors upserted before a metadata
  * index was created won't have their metadata contained in that index". So the
- * order in BOOTSTRAP.md is create index → create all nine → then ingest, and a
- * field added later means a re-index of everything. */
+ * order in BOOTSTRAP.md is create index → create all ten → then ingest, and a
+ * field added later means a re-index of everything — which is why there is no
+ * eleventh: this was the last one anybody gets. */
 export const METADATA_INDEXES: { property: keyof VectorLabels; type: "string" | "number" }[] = [
   { property: "level", type: "string" },
   { property: "compartment", type: "string" },
@@ -159,6 +176,7 @@ export const METADATA_INDEXES: { property: keyof VectorLabels; type: "string" | 
   { property: "ticket", type: "string" },
   { property: "sprint", type: "string" },
   { property: "date", type: "number" },
+  { property: "shared", type: "string" },
 ]
 
 /** One vector on its way in. `values` is the raw embedding — full float32, not
