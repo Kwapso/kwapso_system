@@ -662,16 +662,28 @@ function ownerClause(guard: MemberGuard, prefix = ""): { sql: string; params: st
   }
 }
 
-/** THE FAST OWNER CHECK — for the ONE table `ownerClause` above deliberately
- * does not reach: `knowledge_terms`, the lexical arm's stage one, read before
- * any join and before the compartment or the app fence have narrowed anything.
- * `knowledge_terms` carries no `source_id` at all (only `chunk_id`), so a
- * sightings-aware check here would be a two-hop join through
- * `knowledge_chunks` on every candidate read — exactly the cost the
- * denormalised `team_visible` copy exists to avoid (0075's own migration
- * comment; the header on knowledge_chunks/knowledge_terms in
- * team-schema/migrations.ts makes the identical argument about `compartment`
- * and the un-folded `owner_user_id`).
+/** THE FAST OWNER CHECK — for `knowledge_chunks`, `lexicalArm`'s stage one,
+ * read before `LIMIT LEXICAL_TOP_K` narrows the BM25 match set down to
+ * anything a caller could afford to fence precisely.
+ *
+ * NOT BECAUSE THIS TABLE LACKS `source_id` — a stale version of this comment
+ * once said so, back when this ran against `knowledge_terms`, which genuinely
+ * has none. `knowledge_chunks` DOES carry `source_id`, so a sightings-aware
+ * check here would cost only a ONE-hop join, not two. That table stopped
+ * being what this fences the day `lexicalArm` moved to `knowledge_chunks_fts`
+ * — a correct decision (this function) is worth nothing if the reason beside
+ * it describes a table its own caller no longer touches, which is exactly the
+ * trap a reader falls into trusting a declaration-site comment over a
+ * call-site one.
+ *
+ * THE REAL REASON, TODAY: cost is still the right call, just for a different
+ * shape of it. This runs over every candidate BM25 matches, before the LIMIT
+ * — not the tiny, R14-capped handful of rows `ownerClause`'s correlated
+ * `EXISTS` was priced for — and precision at this stage buys nothing a
+ * cheaper check could not also buy, because whatever survives it still
+ * crosses the sightings-aware read-back at `retrieve`'s `reader.sql` before
+ * it can become an answer (verified by census, not assumed — see
+ * `lexicalArm`'s own call-site comment).
  *
  * `owner_user_id` alongside `team_visible` still narrows the common case (no
  * sighting, or one) for free, exactly as it always has — that column's WRITE
@@ -683,7 +695,14 @@ function ownerClause(guard: MemberGuard, prefix = ""): { sql: string; params: st
  * BARGAIN, one layer down: a wrong label here costs a relevant passage its
  * place in the ranking; it cannot cost a caller an answer they should never
  * have had, because the read-back through `knowledge_sources` — `ownerClause`
- * above, which DOES consult sightings — is what actually decides. */
+ * above, which DOES consult sightings — is what actually decides.
+ *
+ * EXPECT THIS FUNCTION TO NEUTER TO `(1=1)` AND EVERY TEST TO STAY GREEN. That
+ * is not missing coverage; it is what "narrows, never decides" predicts —
+ * this clause can be wrong in the permissive direction with no observable
+ * effect on any answer, by design, and a red test here would mean the
+ * architecture had quietly started trusting this function for something it
+ * was never built to guarantee. */
 function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } {
   return {
     sql: `(team_visible = 1 OR owner_user_id IS NULL OR owner_user_id = ?)`,
@@ -691,17 +710,27 @@ function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } 
   }
 }
 
-/** THE WRITE SIDE OF `team_visible` — SQL TEXT, not a call.
+/** THE WRITE SIDE OF `team_visible` AND `owner_user_id` — SQL TEXT, not a call.
  *
  * Every writer that changes what a source's sightings SAY (a new sighting, a
- * shelf moved private→team, one retired) must recompute `team_visible` on the
- * source and denormalise the same value onto every chunk and posting it owns,
- * in the SAME statement or transaction as that write — never a follow-up call
- * that can be skipped. This function is the exact condition the hub set
- * before any of this could be trusted to store an answer (tick 8): the
- * recompute must be atomic with the write that made it stale, or the gap
- * between them is a window where the flag says one thing and the sightings
- * say another, silently.
+ * shelf moved private→team, one retired) must recompute BOTH stored facts a
+ * fold leaves behind — `team_visible` (`teamVisible`, knowledge-identity.ts)
+ * and the single-owner case (`singleOwnerOf`, same file) — and denormalise
+ * both onto every chunk and posting the source owns, in the SAME statement or
+ * transaction as that write — never a follow-up call that can be skipped.
+ * This function is the exact condition the hub set before any of this could
+ * be trusted to store an answer (tick 8): the recompute must be atomic with
+ * the write that made it stale, or the gap between them is a window where the
+ * stored facts say one thing and the sightings say another, silently.
+ *
+ * WHY `owner_user_id` NEEDS THIS TOO, and did not from the start. Chunks and
+ * terms copy `owner_user_id` at INDEX time (`indexSource`), which only runs
+ * again when a source's TEXT changes — and a new sighting, a shelf move or a
+ * retirement changes none of it. Without this, the denormalised copies would
+ * go on citing whoever the LAST re-index saw, forever, the moment a second
+ * sighting arrived with no accompanying content change — silent, and
+ * invisible to every test that only ever changes text and sightings
+ * together.
  *
  * SO IT RETURNS TEXT RATHER THAN EXECUTING ANYTHING. A separate async call is
  * a separate network round trip a future writer's own `d1ExecScript` can be
@@ -711,13 +740,15 @@ function fastOwnerClause(guard: MemberGuard): { sql: string; params: string[] } 
  * disciplined against; the string is unusable any other way, which is the
  * point.
  *
- * THREE STATEMENTS, ONE COMPUTED VALUE, in SQL rather than round-tripped
- * through this process — `EXISTS(...)` evaluates to SQLite's own 0 or 1, so
- * the three UPDATEs share one true source of truth rather than three chances
- * for a client-computed value to be stale by the time the third statement
- * runs. `gone_at IS NULL` is a LIVE sighting; `shelf = 'team'` is the only
- * shelf this flag ever models — see `ownerClause`'s own header for why the
- * app tier can never ride this column.
+ * THREE STATEMENTS, TWO COMPUTED VALUES, in SQL rather than round-tripped
+ * through this process — `EXISTS(...)` and the owner subquery each evaluate
+ * once and are reused across all three UPDATEs, so they share one true source
+ * of truth rather than six chances for a client-computed value to be stale by
+ * the time the last statement runs. `gone_at IS NULL` is a LIVE sighting;
+ * `shelf = 'team'` is the only shelf `team_visible` ever models — see
+ * `ownerClause`'s own header for why the app tier can never ride this column.
+ * The owner subquery is `singleOwnerOf` in SQL: exactly one live sighting,
+ * and it is private, names that person; anything else is `NULL`.
  *
  * ── THE ONE THING A CALLER MUST GET RIGHT, SAID EXACTLY: SPLICE ORDER ──────
  *
@@ -757,12 +788,127 @@ export function teamVisibleRecomputeSql(sourceId: string): string {
     SELECT 1 FROM knowledge_sightings
      WHERE source_id = ${id} AND gone_at IS NULL AND shelf = 'team'
   )`
+  // `singleOwnerOf`, in SQL: COUNT = 1 makes MAX(shelf) and MAX(seen_by_user_id)
+  // that one row's own values (MAX of one value is that value), so the CASE
+  // reads exactly as "exactly one live sighting, and it is private".
+  const singleOwner = `(
+    SELECT CASE WHEN COUNT(*) = 1 AND MAX(shelf) = 'private' THEN MAX(seen_by_user_id) ELSE NULL END
+      FROM knowledge_sightings WHERE source_id = ${id} AND gone_at IS NULL
+  )`
   return `
-UPDATE knowledge_sources SET team_visible = ${teamSightingExists} WHERE id = ${id};
-UPDATE knowledge_chunks SET team_visible = ${teamSightingExists} WHERE source_id = ${id};
-UPDATE knowledge_terms SET team_visible = ${teamSightingExists}
+UPDATE knowledge_sources SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner} WHERE id = ${id};
+UPDATE knowledge_chunks SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner} WHERE source_id = ${id};
+UPDATE knowledge_terms SET team_visible = ${teamSightingExists}, owner_user_id = ${singleOwner}
   WHERE chunk_id IN (SELECT id FROM knowledge_chunks WHERE source_id = ${id});
 `
+}
+
+/** THE ONE FRAGMENT `teamVisibleRecomputeSql` COULD NEVER PRODUCE BY ACCIDENT —
+ * checked for rather than the whole string, so a future caller who changes
+ * whitespace or reorders the three UPDATEs is not mistaken for one who
+ * dropped the recompute entirely. */
+const RECOMPUTE_MARKER = "UPDATE knowledge_sources SET team_visible"
+
+/** DOES THIS SCRIPT WRITE A SIGHTING? An INSERT, or an UPDATE touching the two
+ * columns whose change is what makes `team_visible` stale — `shelf` (moved
+ * private→team or back) and `gone_at` (a sighting retired). A `SELECT`, or an
+ * `UPDATE` that never names either column, does not change what
+ * `teamVisibleRecomputeSql`'s `EXISTS` would find and is not this guard's
+ * business. */
+const SIGHTING_WRITE = /INSERT\s+INTO\s+knowledge_sightings\b|UPDATE\s+knowledge_sightings\s+SET\s+[^;]*\b(?:shelf|gone_at)\b/gi
+
+/** THE GATE `teamVisibleRecomputeSql`'s OWN HEADER PROMISED AND A DOC COMMENT
+ * COULD NEVER BE. kb_review's finding, named exactly: "the guarantee that a
+ * future writer actually splices `teamVisibleRecomputeSql` into its own
+ * transaction is enforced by NOTHING except a doc comment." Asked to "put
+ * that sentence in the code, not just in a report" a second time — this is
+ * what that looks like when a comment is not enough.
+ *
+ * WHY THIS INSPECTS THE RESOLVED STRING RATHER THAN CENSUSING SOURCE TEXT.
+ * The obvious shape — read every file off disk, as `shared/rules/registry.ts`
+ * already does for a dozen other laws, and trace which script a sighting
+ * write lands in — was the first design. It does not survive contact with
+ * this FILE's OWN two `d1ExecScript` callers: both build a script as
+ * `statements.join("\n")`, an ARRAY assembled across several `.push()` calls
+ * scattered through a loop, never one template literal a regex could read in
+ * one piece. A census that trusted the SHAPE of the source would be fooled by
+ * a refactor that changes nothing about correctness — the exact "correct
+ * decision, false justification" trap this whole night has been about, one
+ * layer earlier: a check that LOOKS like it proves atomicity and does not.
+ *
+ * So this inspects the ACTUAL, FULLY RESOLVED STRING, at the one place it is
+ * about to be sent to D1 — after every `${...}` has already run, however the
+ * caller assembled it. It does not care whether the script came from one
+ * template literal, an array `.join`, or something not yet invented; it cares
+ * what the string SAYS, which is the only thing D1 ever sees.
+ *
+ * ORDER IS CHECKED, PER WRITE, NOT JUST PRESENCE SOMEWHERE IN THE SCRIPT.
+ * `teamVisibleRecomputeSql`'s own header names the two failure directions
+ * separately, and this guard is what makes BOTH a thrown error rather than a
+ * silent write: the marker missing entirely (nobody called it), and the
+ * marker present but BEFORE the write it was meant to follow (the `EXISTS`
+ * then reads sightings a moment before the change that was supposed to make
+ * it correct — self-inflicted staleness inside the one script that was
+ * supposed to be atomic against it). EVERY write walks its own INTERVAL —
+ * after itself, before whatever write comes next or the end of the script —
+ * and needs a recompute marker somewhere inside it; "one recompute exists
+ * anywhere in the script" would let a batch of several writes hide behind a
+ * single one that happened to run last.
+ *
+ * WHAT THIS STILL CANNOT PROVE, SAID PLAINLY RATHER THAN LEFT IMPLIED. A
+ * recompute marker in a write's interval is not confirmed to be FOR THAT
+ * WRITE'S SOURCE — this scans text, not source ids, so a script batching two
+ * DIFFERENT sources' writes with only one of them actually recomputed could,
+ * in principle, satisfy both intervals if the timing lined up by chance. That
+ * gap is real and it is not this guard's to close: `teamVisibleRecomputeSql`
+ * takes exactly one source id, its own worked example is one write and one
+ * recompute, and the documented pattern is one source per script. A future
+ * writer that batches several sources into one script should call this
+ * function once PER SOURCE rather than lean on this guard to police a shape
+ * nothing has asked it to support.
+ *
+ * A HARD THROW, NOT A LOGGED WARNING. A stale `team_visible` is a permission
+ * bug waiting to be read by a future optimiser as "already decided" — see
+ * `ownerClause`'s own header for why that read is the leak. Refusing the
+ * write outright, before it reaches D1, is the same bargain R20 already makes
+ * for a malformed request body: bad input is a 400, never a corrupted row.
+ *
+ * THE COMPANION THIS DOES NOT REPLACE. This catches a script that reaches
+ * here malformed. It cannot catch a future writer who reaches for the raw
+ * `d1ExecScript` instead of this wrapper — that needs a STATIC census (every
+ * file under `workers/content/src/` that writes `knowledge_sightings` must
+ * call `execKnowledgeScript`, never `d1ExecScript` directly), which belongs
+ * in `shared/rules/registry.ts` beside this repo's other rot-checked laws.
+ * Today that census would find nothing to check, because nothing writes a
+ * sighting yet — which is exactly what makes it cheap to add now and
+ * impossible to get wrong later. */
+export async function execKnowledgeScript(cfg: D1Rest, databaseId: string, script: string): Promise<void> {
+  const writes = [...script.matchAll(SIGHTING_WRITE)]
+  const recomputeAt = [...script.matchAll(new RegExp(RECOMPUTE_MARKER, "g"))].map((m) => m.index ?? -1)
+  // EVERY WRITE NEEDS A RECOMPUTE IN THE INTERVAL AFTER IT AND BEFORE
+  // WHATEVER COMES NEXT — the next write, or the end of the script. Not "one
+  // recompute exists somewhere in the script", which a batch of several
+  // writes could satisfy with only the LAST one ever actually recomputed.
+  // Walking intervals is what makes the natural batch shape correct instead
+  // of merely lucky: write, recompute, write, recompute is exactly what a
+  // fold processing several sources in one script would produce, and each
+  // write's own interval must hold its own recompute. (This still cannot
+  // prove the recompute in a shared interval is for the SAME source id as
+  // that write — see the header for why, and why the documented one-source-
+  // per-script pattern is what makes that gap not matter today.)
+  for (let i = 0; i < writes.length; i++) {
+    const from = (writes[i].index ?? 0) + writes[i][0].length
+    const to = i + 1 < writes.length ? (writes[i + 1].index ?? Infinity) : Infinity
+    if (!recomputeAt.some((at) => at >= from && at < to))
+      throw new GuardError(
+        500,
+        recomputeAt.length ? "sighting_recompute_misordered" : "sighting_not_recomputed",
+        recomputeAt.length
+          ? "team_visible was recomputed BEFORE the sighting write it was meant to account for, in the same script — see teamVisibleRecomputeSql's splice-order header."
+          : "A script wrote a knowledge_sightings row without recomputing team_visible in the same script — see teamVisibleRecomputeSql."
+      )
+  }
+  return d1ExecScript(cfg, databaseId, script)
 }
 
 /** THE APP FENCE, as SQL — the middle setting the module was missing (12.3).
@@ -804,14 +950,18 @@ function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: stri
  * and the passage read-back that decides what an answer is made of.
  *
  * WHY THE LEXICAL ARM DOES NOT USE IT, said here because this is where somebody
- * will look for the inconsistency. `knowledge_terms` carries copies of the
- * chunk's `compartment` and `owner_user_id` so stage one is a single-table read,
- * and it carries no app. Rather than denormalise a third column onto two tables
- * and re-index the world to back-fill it, the app half is decided where R26 says
- * decisions are made: the index (and the word-match beside it) NARROWS, and the
- * team's database DECIDES. A restricted chunk can reach the candidate pool and
- * cost a relevant passage its place; it cannot reach an answer, because the
- * read-back below is a join to `knowledge_sources` and this clause is on it.
+ * will look for the inconsistency — and said of the table it actually runs
+ * against TODAY, `knowledge_chunks` (the FTS5 rewrite moved stage one off
+ * `knowledge_terms`; see `fastOwnerClause`'s own header for that history and
+ * why it stopped being the reason). `knowledge_chunks` carries copies of the
+ * source's `compartment` and `owner_user_id` so stage one is a single-table
+ * read, and it carries no app. Rather than denormalise a third column onto it
+ * and re-index the world to back-fill it, the app half is decided where R26
+ * says decisions are made: the index (and the word-match beside it) NARROWS,
+ * and the team's database DECIDES. A restricted chunk can reach the candidate
+ * pool and cost a relevant passage its place; it cannot reach an answer,
+ * because the read-back below is a join to `knowledge_sources` and this
+ * clause is on it.
  *
  * EXPORTED so the whole-corpus SHAPE (lib/knowledge-shape.ts) fences with THIS
  * clause rather than with a second copy of it. `sourcesWhere` above already made

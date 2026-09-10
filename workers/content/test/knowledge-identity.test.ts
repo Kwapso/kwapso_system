@@ -16,6 +16,7 @@ import {
   recordIdentity,
   sightedExternalId,
   sightingsAdmit,
+  singleOwnerOf,
   stillLive,
   teamVisible,
   uploadIdentity,
@@ -243,5 +244,34 @@ describe("teamVisible, and the fast path built on it", () => {
           `the fast path disagrees with the fence for ${JSON.stringify(sightings)} read by ${me}`
         ).toBe(sightingsAdmit(sightings, me))
       }
+  })
+})
+
+describe("singleOwnerOf — the other stored fact a fold leaves behind", () => {
+  it("is that person's id when exactly one live sighting exists and it is private", () => {
+    expect(singleOwnerOf([sighting(AURORA, "private")])).toBe(AURORA)
+  })
+
+  it("is NULL when the one sighting is on the team's shelf", () => {
+    expect(singleOwnerOf([sighting(AURORA, "team")])).toBeNull()
+  })
+
+  it("is NULL the moment a SECOND distinct sighter appears, whatever their shelf", () => {
+    expect(singleOwnerOf([sighting(AURORA, "private"), sighting(ALEX, "private")])).toBeNull()
+    expect(singleOwnerOf([sighting(AURORA, "private"), sighting(ALEX, "team")])).toBeNull()
+  })
+
+  it("is NULL when there are no live sightings at all — never a stale single owner", () => {
+    expect(singleOwnerOf([])).toBeNull()
+    const gone = [{ ...sighting(AURORA, "private"), goneAt: "2026-09-10T09:00:00.000Z" }]
+    expect(singleOwnerOf(gone)).toBeNull()
+  })
+
+  it("returns to a single owner once retirement leaves exactly one live private sighting", () => {
+    const mixed = [
+      { ...sighting(AURORA, "private"), goneAt: "2026-09-10T09:00:00.000Z" },
+      sighting(ALEX, "private"),
+    ]
+    expect(singleOwnerOf(mixed)).toBe(ALEX)
   })
 })

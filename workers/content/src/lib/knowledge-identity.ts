@@ -271,3 +271,26 @@ export function stillLive(sightings: Sighting[]): boolean {
 export function teamVisible(sightings: Sighting[]): boolean {
   return liveSightings(sightings).some((s) => s.shelf === "team")
 }
+
+/** THE OTHER STORED FACT A FOLD LEAVES BEHIND, once a thing is seen by more
+ * than one person. `owner_user_id` cannot hold a set — that is the entire
+ * premise this file opens with — so once a source's sightings stop naming
+ * exactly one private person, the honest value is `NULL`: over-inclusive at
+ * the chunk/term narrowing stage (`fastOwnerClause`'s own bargain), correctly
+ * decided at the read-back (`ownerClause`, which consults sightings directly
+ * and never trusts this column once any exist).
+ *
+ * EXACTLY ONE LIVE SIGHTING, AND IT IS PRIVATE → that person's id. Anything
+ * else — no sightings a fold ever WROTE for (the caller's business, not
+ * this function's), a live team sighting present, or more than one live
+ * sighting of any shelf — is `NULL`. The single-sighting-and-private case is
+ * kept precise rather than defaulting straight to `NULL` because it is the
+ * OVERWHELMINGLY common shape today (measured on staging: only the calendar
+ * fold has ever produced a second sighter) and precision there costs nothing
+ * — a stale-but-narrow `owner_user_id` for the one-reader case is exactly
+ * what this app has always written, and giving it up early would widen every
+ * ordinary Drive folder's candidate-pool footprint for no reason at all. */
+export function singleOwnerOf(sightings: Sighting[]): string | null {
+  const live = liveSightings(sightings)
+  return live.length === 1 && live[0].shelf === "private" ? live[0].userId : null
+}

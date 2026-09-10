@@ -185,7 +185,6 @@ import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import {
-  driveFileIdOf,
   eventNamedBy,
   GOOGLE_SOURCE_KINDS,
   googleStateKeys,
@@ -524,7 +523,7 @@ describe("what actually gets read", () => {
         `SELECT deactivated_at, deactivator_id, updated_at, body FROM knowledge_sources
            WHERE origin_row_id = ?`
       )
-      .get(`${IDS.staffUser}:spaces/AAA/threads/${id}`) as
+      .get(`spaces/AAA/threads/${id}`) as
       | { deactivated_at: string | null; deactivator_id: string | null; updated_at: string; body: string }
       | undefined
 
@@ -599,17 +598,45 @@ describe("what actually gets read", () => {
     expect(thread("TWICE")?.deactivated_at, "a second sweep does not re-retire it").toBe(first)
   })
 
-  it("two colleagues who named the same folder get a row each, so neither decides the other's shelf", async () => {
+  it("two colleagues who named the same folder get ONE source and a sighting each — the fold, proved end to end", async () => {
+    // THE RULING CHANGED AGAIN, this time by the identity gate (kb_B1). Until
+    // now this test's own title said "two colleagues... get a row each" and
+    // asserted exactly the duplication KB-AUDIT.md §4.1 measured (one meeting
+    // as six sources) — the fault this whole rebuild exists to remove. A file
+    // two people can both see is one thing, seen twice, and `rowId` no longer
+    // carries the reader, so both sweeps upsert onto the SAME row now.
     connect(OTHER_STAFF)
     db().exec(`UPDATE google_sources SET shelf = 'private' WHERE id = 'S_CLIENT_${OTHER_STAFF}';`)
     await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
     await call(OTHER_STAFF, "POST /api/content/knowledge/sync-google", {})
 
-    const both = sources().filter((s) => s.title === "Bergman dispatch rollout")
-    expect(both.length, "one file, two people's sight of it").toBe(2)
-    expect(both.map((s) => s.owner_user_id).sort(), "and two different answers about who may read it").toEqual(
-      [OTHER_STAFF, null].sort()
+    const rows = sources().filter((s) => s.title === "Bergman dispatch rollout")
+    expect(rows.length, "one thing, seen twice — not two things").toBe(1)
+    const source = rows[0]
+
+    const sightings = db()
+      .prepare(
+        "SELECT seen_by_user_id, shelf, gone_at FROM knowledge_sightings WHERE source_id = ? ORDER BY seen_by_user_id"
+      )
+      .all(source.id) as { seen_by_user_id: string; shelf: string; gone_at: string | null }[]
+    expect(sightings.map((s) => s.seen_by_user_id).sort(), "one sighting per person, not per row").toEqual(
+      [IDS.staffUser, OTHER_STAFF].sort()
     )
+    expect(sightings.every((s) => s.gone_at === null), "both are live").toBe(true)
+    expect(
+      new Set(sightings.map((s) => s.shelf)),
+      "each keeps their OWN shelf — neither decided the other's"
+    ).toEqual(new Set(["team", "private"]))
+
+    // ONE person's team sighting answers for everybody (readableBy's own
+    // union rule), so owner_user_id — which cannot hold two people — goes to
+    // NULL: not "team decided", not "OTHER_STAFF's alone", but "the sightings
+    // decide, and the read-back is where that happens now".
+    expect(source.owner_user_id, "no single column can name two sighters").toBeNull()
+    const [{ team_visible: teamVisible }] = db()
+      .prepare("SELECT team_visible FROM knowledge_sources WHERE id = ?")
+      .all(source.id) as { team_visible: number }[]
+    expect(teamVisible, "one of the two sightings is on the team's shelf").toBe(1)
   })
 })
 
@@ -845,13 +872,13 @@ const live = (originRowId: string) =>
 const sweep = () => call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
 
 describe("Google material that has GONE stops being quoted", () => {
-  const FILE = `${IDS.staffUser}:FILE_1`
+  const FILE = `FILE_1`
   // THE THREAD, not the message — see the identical note on the date test
   // above. The mock's own "gone" signal (holder.unlisted/holder.binned)
   // still keys on the message id, MAIL_1, because that is Google's own
   // vocabulary for what went away; the SOURCE it retires is the thread.
-  const MAIL = `${IDS.staffUser}:TH_1`
-  const EVENT = `${IDS.staffUser}:EVENT_1`
+  const MAIL = `TH_1`
+  const EVENT = `EVENT_1`
 
   it("a deleted document, a binned mail and a cancelled meeting are all retired", async () => {
     await sweep()
@@ -894,7 +921,7 @@ describe("Google material that has GONE stops being quoted", () => {
     // room, a thread is a conversation, and the conversation is what a citation
     // points at. The rule under test is unchanged: unsharing the SPACE must take
     // everything that came out of it with it.
-    const SPACE = `${IDS.staffUser}:spaces/AAA/threads/T1`
+    const SPACE = `spaces/AAA/threads/T1`
     expect(live(SPACE)).toBe(true)
 
     // A Chat source IS a space somebody named here, so the positive signal is a
@@ -940,7 +967,7 @@ describe("Google material that has GONE stops being quoted", () => {
 // `setSourceActive` stamps the actor's id, and both machine paths leave it null.
 describe("what the app retired comes back; what a person excluded does not", () => {
   const SPACE_SOURCE = `S_SPACE_${IDS.staffUser}`
-  const THREAD = `${IDS.staffUser}:spaces/AAA/threads/T1`
+  const THREAD = `spaces/AAA/threads/T1`
 
   /** Switch the named space off, sweep (which retires the conversation), then
    * share it again — the staging incident, at fixture scale. */
@@ -1026,19 +1053,19 @@ describe("an empty calendar entry for a day that has not come is not material", 
     ]
     await sweep()
     for (const id of ["REC_1", "REC_2", "REC_3"])
-      expect(live(`${IDS.staffUser}:${id}`), `${id} has not happened and says nothing`).toBe(false)
+      expect(live(`${id}`), `${id} has not happened and says nothing`).toBe(false)
   })
 
   it("but an entry somebody WROTE on is kept, whatever its date", async () => {
     holder.events = [entry("AGENDA_1", "Week recap", FUTURE, "Bring the Bergman numbers.")]
     await sweep()
-    expect(live(`${IDS.staffUser}:AGENDA_1`), "an agenda is words, and words are material").toBe(true)
+    expect(live(`AGENDA_1`), "an agenda is words, and words are material").toBe(true)
   })
 
   it("and a bare entry that HAS happened is kept — that is the record that it did", async () => {
     holder.events = [entry("PAST_1", "Week recap", PAST)]
     await sweep()
-    expect(live(`${IDS.staffUser}:PAST_1`), "when did we agree that? is what the calendar is for").toBe(true)
+    expect(live(`PAST_1`), "when did we agree that? is what the calendar is for").toBe(true)
   })
 
   // THE TWO FIXES MEET HERE. This retires rather than skips, so when the day
@@ -1047,11 +1074,11 @@ describe("an empty calendar entry for a day that has not come is not material", 
   it("and the day it finally happens, it comes back on its own", async () => {
     holder.events = [entry("SOON_1", "Week recap", FUTURE)]
     await sweep()
-    expect(live(`${IDS.staffUser}:SOON_1`)).toBe(false)
+    expect(live(`SOON_1`)).toBe(false)
     // The day arrives: the same entry, now in the past. Nothing else changes.
     holder.events = [entry("SOON_1", "Week recap", PAST)]
     await sweep()
-    expect(live(`${IDS.staffUser}:SOON_1`), "it happened — it is a record now").toBe(true)
+    expect(live(`SOON_1`), "it happened — it is a record now").toBe(true)
   })
 })
 
@@ -1071,7 +1098,7 @@ describe("an empty calendar entry for a day that has not come is not material", 
 // It matters that the row SURVIVES rather than being retired: it is the test set
 // for the PDF extraction work, and a retired row is one nobody can re-fill.
 describe("a Drive file that stops being readable collapses instead of lingering", () => {
-  const FILE = `${IDS.staffUser}:FILE_1`
+  const FILE = `FILE_1`
   const chunksOf = (originRowId: string) =>
     (
       db()
@@ -1169,14 +1196,14 @@ describe("a Google source carries the date it is from", () => {
   it("every kind — a document, a mail, an entry and a conversation", async () => {
     await sweep()
     for (const [table, id] of [
-      ["google_drive", `${IDS.staffUser}:FILE_1`],
+      ["google_drive", `FILE_1`],
       // THE THREAD, not the message — since google-read.ts's `mailThreads`
       // (BUILD-5 §2: "mail thread = source, message = piece"), a gmail
       // source's origin_row_id is Gmail's own threadId (the fixture's
       // "TH_1"), not the message id it happened to be seen through.
-      ["google_gmail", `${IDS.staffUser}:TH_1`],
-      ["google_calendar", `${IDS.staffUser}:EVENT_1`],
-      ["google_chat", `${IDS.staffUser}:spaces/AAA/threads/T1`],
+      ["google_gmail", `TH_1`],
+      ["google_calendar", `EVENT_1`],
+      ["google_chat", `spaces/AAA/threads/T1`],
     ] as const)
       expect(dateOf(table, id), `${table} must carry a date`).toBeTruthy()
   })
@@ -1186,9 +1213,9 @@ describe("a Google source carries the date it is from", () => {
   // recency this unlocks would then rank on the day we happened to read it.
   it("and it is the record's own moment, not the moment we read it", async () => {
     await sweep()
-    const mail = dateOf("google_gmail", `${IDS.staffUser}:TH_1`)
+    const mail = dateOf("google_gmail", `TH_1`)
     expect(mail, "the mail was sent on 4 August 2026 and says so").toContain("2026-08-04")
-    const event = dateOf("google_calendar", `${IDS.staffUser}:EVENT_1`)
+    const event = dateOf("google_calendar", `EVENT_1`)
     expect(event, "the meeting was on 5 August 2026").toContain("2026-08-05")
   })
 
@@ -1199,7 +1226,7 @@ describe("a Google source carries the date it is from", () => {
       { id: "NO_WHEN", summary: "Undated", description: "", start: "", end: "", url: "", attendees: [] },
     ]
     await sweep()
-    expect(dateOf("google_calendar", `${IDS.staffUser}:NO_WHEN`)).toBeNull()
+    expect(dateOf("google_calendar", `NO_WHEN`)).toBeNull()
   })
 })
 
@@ -1222,9 +1249,9 @@ describe("a Google source carries the date it is from", () => {
 // a rule that folds too much deletes material and a rule that folds too little
 // does nothing.
 describe("a second door onto something we already hold is folded", () => {
-  const FILE = `${IDS.staffUser}:FILE_1`
+  const FILE = `FILE_1`
   // THE THREAD, not the message — see the note on the date test above.
-  const MAIL = `${IDS.staffUser}:TH_1`
+  const MAIL = `TH_1`
 
   /** A meeting row, planted as the ORACLE the fold reads — never as a fixture the
    * sweep produces. `words` is the second agreement in both directions. */
@@ -1267,7 +1294,7 @@ describe("a second door onto something we already hold is folded", () => {
   // (`superseded_transcript_ids`) precisely so this fold — which already knows
   // how to retire the WINNER's own duplicate by id — retires the losers too,
   // rather than leaving each one an unrelated-looking `document` source.
-  const FILE_2 = `${IDS.staffUser}:FILE_2`
+  const FILE_2 = `FILE_2`
 
   it("a runner-up the meeting's own hunt already rejected is folded too", async () => {
     meeting("M_RUNNERUP", "Bergman dispatch rollout", { fileId: "FILE_1", words: true, supersededIds: ["FILE_2"] })
@@ -1327,9 +1354,7 @@ describe("what the fold reads out of a title", () => {
     expect(eventNamedBy("")).toBeNull()
   })
 
-  it("reads the Drive file id out of one person's sight of it", () => {
-    expect(driveFileIdOf("01KZTW:1X6Gy9dur2Qk")).toBe("1X6Gy9dur2Qk")
-    expect(driveFileIdOf("no-colon-here")).toBeNull()
-    expect(driveFileIdOf("01KZTW:")).toBeNull()
-  })
+  // driveFileIdOf is GONE (kb_B1's identity gate): origin_row_id for a drive
+  // row is the file id directly now, so there is nothing left to parse — see
+  // `folded`'s own comment where the ID join used to need it.
 })
