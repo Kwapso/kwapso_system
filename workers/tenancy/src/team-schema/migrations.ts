@@ -5525,6 +5525,52 @@ DROP TABLE IF EXISTS internal_role_rates;
 DROP TABLE IF EXISTS account_rates;
 `,
   },
+
+  {
+    // THE REFUSAL LOG (BUILD-5-knowledge-rebuild.md §5-6, "a refusal log with
+    // its shortlist"; KB-AUDIT.md §7's own closing argument — "the retrieval
+    // finds the right documents far more often than the answers suggest… that
+    // is a DECISION LAYER problem sitting on top of a working retrieval
+    // layer"). Every earlier fix in this rebuild was found by someone reading
+    // raw scores off a probe script by hand; this is the base keeping that
+    // evidence itself, on every question it refuses, so the next "why did it
+    // say no to that" does not need a person to reproduce the question first.
+    //
+    // `shortlist` IS THE POINT, not `question`/`reason` beside it — a refusal
+    // with NOTHING in it (the base genuinely holds nothing) and a refusal with
+    // real candidates that fell just short of the floor are two different
+    // facts, and only the shortlist tells them apart. JSON, capped at a
+    // handful of rows by the write side (`lib/knowledge.ts`), never a second
+    // copy of the passages themselves — ids and scores are enough to look a
+    // candidate up, and this table is not where the words live.
+    //
+    // RENUMBERED 0077 -> 0079, 10 Sep 2026: this lane's 0077 was decided and
+    // pushed in the same window as a concurrent, non-lane session's own
+    // 0077/0078 (the internal-rates and account-rate-card drops above) —
+    // fetched, collided, renumbered on rebase rather than trusting a number
+    // decided before the fetch. No SQL below changed; only the version string
+    // and its place in the ledger did.
+    //
+    // NO READ DOOR YET, ON PURPOSE. This migration is the write side only —
+    // the same order 0073 shipped `knowledge_names` in, empty, before anything
+    // read it. A GROWING collection (R14): whoever builds the read door pages
+    // it, the same way every other collection here does; writing that door
+    // before anything needs one is exactly the code this base's own prime
+    // directive calls a defect.
+    version: "0079_a_refusal_remembers_what_it_saw",
+    sql: `
+CREATE TABLE knowledge_refusals (
+  id TEXT PRIMARY KEY,
+  question TEXT NOT NULL,
+  compartments TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  shortlist TEXT NOT NULL,
+  asked_by_user_id TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX idx_knowledge_refusals_created ON knowledge_refusals (created_at);
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

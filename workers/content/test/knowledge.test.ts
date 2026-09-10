@@ -397,6 +397,35 @@ describe("R23 — a question the team's material cannot answer is refused, not a
     expect(answer.found).toBe(true)
     expect(titles(answer)).toContain("Capital expenditure sign-off")
   })
+
+  // BUILD-5 §5-6, 0077: a refusal remembers what it saw. Proved here rather
+  // than left to the migration test alone, because "the table exists and can
+  // hold a row" and "retrieve() actually writes one" are different claims —
+  // the same gap `stripTrailingSourceList` (knowledge-compose.ts) was earlier
+  // named as: a predicate nobody calls is not a guard.
+  it("a refusal writes a row to knowledge_refusals, with the question and the reason it carried", async () => {
+    const before = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    const answer = await ask(IDS.staffUser, "What is the capital of France?", undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(false)
+    const after = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    expect(after.n, "no row was written for a real refusal").toBe(before.n + 1)
+    const row = db()
+      .prepare("SELECT question, reason, shortlist, asked_by_user_id FROM knowledge_refusals ORDER BY created_at DESC LIMIT 1")
+      .get() as { question: string; reason: string; shortlist: string; asked_by_user_id: string }
+    expect(row.question).toBe("What is the capital of France?")
+    expect(row.reason.length).toBeGreaterThan(0)
+    expect(row.asked_by_user_id).toBe(IDS.staffUser)
+    // The shortlist is always valid JSON — an array, whether or not there was
+    // anything in it to log.
+    expect(Array.isArray(JSON.parse(row.shortlist))).toBe(true)
+  })
+
+  it("an answer that DOES find something writes no refusal row", async () => {
+    const before = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    await ask(IDS.staffUser, "capital expenditure?", undefined, NOTHING_CLOSE_ENOUGH)
+    const after = db().prepare("SELECT COUNT(*) AS n FROM knowledge_refusals").get() as { n: number }
+    expect(after.n).toBe(before.n)
+  })
 })
 
 // BUILD-5-knowledge-rebuild.md §5-6, KB-AUDIT.md §3's own case: "the retrieval

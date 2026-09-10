@@ -3203,6 +3203,60 @@ function fuse(
     .sort((a, b) => b.score - a.score)
 }
 
+/** How many of the fused candidates a refusal keeps — enough to see whether
+ * anything was CLOSE, never the whole pool. This table is a diagnostic, not a
+ * second copy of the ranking. */
+const REFUSAL_SHORTLIST_CAP = 10
+
+/** THE REFUSAL LOG (0077, BUILD-5 §5-6). NEVER THROWS: a failure here is
+ * recorded (ERROR-HANDLING.md's one seam) and swallowed inside `write()`,
+ * because a refusal that could not be LOGGED must still be returned to the
+ * person who asked — the diagnostic is a courtesy to whoever investigates
+ * later, not part of the answer contract. Deferred where a deferrer is set up
+ * (`env.DEFER`, the same per-request seam `publishChange` already rides — a
+ * person asking a question neither knows nor should wait for this) and
+ * awaited plainly where one is not (a cron, a test, a lib called directly). */
+async function logRefusal(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  question: string,
+  compartments: string[],
+  reason: string,
+  shortlist: { id: string; score: number }[]
+): Promise<void> {
+  const write = (async () => {
+    try {
+      await d1Query(
+        cfg,
+        guard.databaseId,
+        `INSERT INTO knowledge_refusals (id, question, compartments, reason, shortlist, asked_by_user_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          ulid(),
+          question,
+          JSON.stringify(compartments),
+          reason,
+          JSON.stringify(
+            shortlist
+              .slice(0, REFUSAL_SHORTLIST_CAP)
+              .map((s) => ({ id: s.id, score: Math.round(s.score * 1000) / 1000 }))
+          ),
+          guard.userId,
+          new Date().toISOString(),
+        ]
+      )
+    } catch (e) {
+      await recordWorkerError(env.DB, "content", "knowledge refusal log", e, undefined, {
+        teamId: guard.teamId,
+        userId: guard.userId,
+      })
+    }
+  })()
+  if (env.DEFER) env.DEFER(write)
+  else await write
+}
+
 /** Answer a question from the team's own material.
  *
  * IT STILL GENERATES NO PROSE. It finds the passages and their citations; if the
@@ -3361,7 +3415,11 @@ export async function retrieve(
 
   const fused = fuse(vector, lexical, named, recency)
 
-  if (!fused.length)
+  if (!fused.length) {
+    // No fused candidates at all — the shortlist worth logging is empty, and
+    // that emptiness is itself the fact: nothing narrowed by compartment or
+    // touched by any arm, not "something close that fell short".
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [])
     return knowledgeAnswer({
       question,
       compartments: route.compartments,
@@ -3370,6 +3428,7 @@ export async function retrieve(
       passages: [],
       candidates: 0,
     })
+  }
 
   // THE DATABASE DECIDES (R26). Everything above chose ids; the words come from
   // here, out of the team's own database, under the caller's own fence, with
@@ -3517,6 +3576,12 @@ export async function retrieve(
   // only if there was any. A writer that ran before this decision could be given
   // material the caller was never going to see.
   const decided = knowledgeAnswer(evidence)
+  // THE INTERESTING CASE: real candidates existed (`fused` is non-empty) and
+  // none survived to become an answer. This shortlist is what tells "the base
+  // genuinely holds nothing" apart from "something was close" — logged with
+  // the FUSED candidates rather than the (empty, by construction) `passages`.
+  if (!decided.found)
+    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused)
   if (!input.compose || !decided.found) return decided
   const written = await input.compose(decided.passages, decided.citations)
   // Nothing written (the model was unreachable, or said nothing) is not an error:
