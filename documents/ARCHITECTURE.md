@@ -435,9 +435,22 @@ on top follows [CACHING.md](CACHING.md).
   (`shared/workers/activity.ts`) writes to each team's own `activity` table; each
   row carries a relation (`related_table`/`related_row_id`) so the SAME feed
   surfaces four ways, the whole team, one user, one role, or one invite.
-- **Every record screen has an Overview tab + an Activity tab** (LOCKED
-  2026-06-17): Overview = the audit block (created/edited/deactivated + who);
-  Activity = that record's slice of the log. Both tabs render from LIBRARY
+- **Every record screen has an Overview tab, and its history is REACHABLE**
+  (LOCKED 2026-06-17; the ACTIVITY TAB half was retired 2026-09-07 at the
+  client's own ruling, "kill all old activity tabs"). Overview = the audit block
+  (created/edited/deactivated + who). The history is now reached from the ink
+  footer's Latest activity eyebrow, which opens the slide-in `ActivityRail` —
+  RULES.md R2 was amended that day, CLAUDE.md carries it, and the check follows
+  the history to the rail rather than to a tab.
+  WHY THIS LOCK WAS AMENDED RATHER THAN DELETED, and why that is not
+  relitigating it: what was locked is that a record's history is REACHABLE from
+  its screen. A tab was one way of delivering that, and the client replaced the
+  delivery without touching the guarantee. The lock stands; only its mechanism
+  moved. It sat here contradicting the enforced law for three days because
+  RULES.md, CLAUDE.md and the check were all amended on 7 Sep and this file was
+  committed to three times that day without anyone opening this section —
+  `story_checks_out_review` found it on 2026-09-10 and correctly refused to
+  touch a LOCKED item, so it is recorded here on the owner's instruction. Both tabs render from LIBRARY
   collections (`RecordDetail` / `DescriptionList` / `ActivityFeed`, now in
   `shared/ui/`) through the screen engine. Never a hand-built app
   component (UI comes from the library, §6). See the activity read path in
