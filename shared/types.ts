@@ -1424,6 +1424,25 @@ export type KnowledgeSource = {
   creatorName: string | null
   editorName: string | null
   updatedAt: string | null
+  /** 0073's additive arrays — every account/app this source concerns, beside
+   * the singular `accountId`/`appId` above. Empty on every row as of
+   * 10 Sep 2026 (nothing writes them yet); a screen falls back to the
+   * singular columns rather than reading an empty array as "filed
+   * nowhere". */
+  accounts: string[]
+  apps: string[]
+  /** 0073 — who may read this once it is in, distinct from `visibility`'s
+   * team/app/private narrowing above. Defaults `'agency'` on every row and
+   * nothing writes it yet either: display only, never the fence. */
+  sharedWith: "private" | "agency" | "agency_client"
+  /** 0074 — this source produced nothing beyond the sentence the app wrote
+   * for it: findable, never quotable. A source with `chunkCount === 0` AND
+   * this true is a CARD, on purpose, not a broken or empty source. */
+  generatedOnly: boolean
+  /** ONE PERSON'S SIGHT OF ONE THING — live sightings only (`gone_at` still
+   * null). Empty on every team as of 10 Sep 2026: nothing writes to
+   * `knowledge_sightings` yet, so this reads 0 rather than erroring. */
+  sightingsCount: number
 }
 
 /** One piece of a source, as retrieval hands it back: the text, and where it came

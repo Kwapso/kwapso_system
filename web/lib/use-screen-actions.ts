@@ -27,10 +27,12 @@ import {
   tasksKey,
   totalKey,
 } from "@/lib/live-resources"
-import { invalidate, primeCache } from "@shared/web/store"
+import { invalidate, primeCache, readCache } from "@shared/web/store"
 import { useT } from "@shared/web/language"
 import type { AccountFormValues } from "@/components/accounts/account-form-dialog"
 import type { KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
+import type { KnowledgeSource } from "@shared/types"
+import { recordActivityKey } from "@/lib/use-record-activity"
 
 /** The four agency-internal record kinds, keyed by their URL segment (which is
  * what the host has in hand when a panel opens). */
@@ -242,6 +244,35 @@ export function useScreenActions(teamId: string | null) {
     [teamId, t]
   )
 
+  // Correct a source's filing or who may use it — the row-level counterpart to
+  // the create above. A single row, not a paged collection, so the door's own
+  // answer patches the one row everyone already holds (R1) rather than
+  // re-pulling page one: the list stays exactly where it was, one entry
+  // corrected in place. Shares the shape `knowledge-detail.tsx`'s own
+  // `saveDetails` has carried since the detail screen's Edit button — this is
+  // the same door reached from the row instead of from the record.
+  const editKnowledge = React.useCallback(
+    async (id: string, values: KnowledgeFormValues) => {
+      const { source } = await contentApi.updateKnowledge({
+        id,
+        title: values.title,
+        body: values.body || null,
+        sourceUrl: values.sourceUrl || null,
+        accountId: values.accountId || null,
+        visibility: values.visibility,
+        visibleToAppId: values.visibleToAppId || null,
+      })
+      if (source && teamId) {
+        primeCache(`knowledge:one:${id}`, source)
+        const cur = readCache<KnowledgeSource[]>(knowledgeKey(teamId))
+        if (cur) primeCache(knowledgeKey(teamId), cur.map((s) => (s.id === id ? source : s)))
+        invalidate(recordActivityKey("knowledge_sources", id))
+      }
+      toast.success(t("Source updated."))
+    },
+    [teamId, t]
+  )
+
   // Upload a FILE as a source. Same cache move as the typed note above (page one
   // is re-pulled, because the list pages), and one thing it does not share: the
   // toast is DERIVED FROM THE ANSWER rather than assumed. A file we could not
@@ -315,6 +346,7 @@ export function useScreenActions(teamId: string | null) {
     createHelp,
     createAccount,
     createKnowledge,
+    editKnowledge,
     uploadKnowledgeFile,
     saveInternalRecord,
     setInternalActive,

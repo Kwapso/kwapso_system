@@ -20,7 +20,11 @@ import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 import {
   ScreenRenderer,
 } from "@shared/web/screen-engine/screen-renderer"
-import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
+import {
+  CollectionCreateActionProvider,
+  CollectionEmptyState,
+} from "@shared/web/screen-engine/collection-frame"
+import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Download, Graph, ListBullets, UploadSimple, Plus } from "@shared/ui/foundations/icons"
 import { cn } from "@shared/ui/lib/utils"
@@ -41,6 +45,7 @@ import {
 import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
+import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
 import { AskTheAssistant } from "@/components/assistant/ask-the-assistant"
 import { LoadMore } from "@/components/records/load-more"
@@ -56,7 +61,6 @@ import { formatCount } from "@shared/web/format-count"
 import {
   shapeAccountsList,
   shapeInvitesList,
-  shapeKnowledgeList,
   shapeMembersList,
   shapeRolesList,
 } from "@/components/deep-link/shape"
@@ -711,9 +715,16 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             }
             const rows = found.active ? found.rows : loadedSources
             if (rows === null) return <Skeleton variant="list" lines={4} />
-            const data = shapeKnowledgeList(rows, names)
-            // R62 — as on the accounts branch above.
-            const knowledgeRecipe = withDataDrivenCollection(recipe, data.rows ?? [])
+            // BESPOKE, LIKE THE SHAPE VIEW BESIDE IT — the generic engine's card
+            // (screen-renderer.tsx's `display: "cards"`) draws a title and one
+            // subtitle line; this row needs six facts, three of them editable
+            // inline, which is exactly the "no engine block draws this" test
+            // CLAUDE.md's recipe-vs-bespoke rule asks. `KnowledgeSourceCard`
+            // carries the fields; `SectionWithCreate` below drops `useKitPanel`
+            // (there is no kit collection-frame panel to hand the create button
+            // to any more) so its OWN header draws "Add a source"/"Upload a
+            // file" again — the exact branch R50's `empty` prop on this
+            // component was written for.
             return (
               <>
                 <SectionWithCreate
@@ -730,18 +741,33 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                     onClick: () => go(sectionPath, { panel: "add", module: "knowledge-file" }),
                   }}
                   onCreate={() => go(sectionPath, { panel: "add", module: "knowledge" })}
-                  useKitPanel
+                  empty={rows.length === 0}
                 >
-                  <ScreenRenderer
-                    recipe={knowledgeRecipe}
-                    data={data}
-                    rights={rights}
-                    onAction={onAction}
-                    onIntent={onIntent}
-                    useKitPanel
-                    /* R62 — the door above owns the search. */
-                    narrowedOutside={found.active}
-                  />
+                  {rows.length === 0 ? (
+                    <CollectionEmptyState
+                      title={t("Nothing in the knowledge base yet.")}
+                      description={t(
+                        "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it."
+                      )}
+                      filtered={found.active}
+                      onCreate={can("knowledge", "create") ? () => go(sectionPath, { panel: "add", module: "knowledge" }) : undefined}
+                    />
+                  ) : (
+                    <CardGrid>
+                      {rows.map((source) => (
+                        <KnowledgeSourceCard
+                          key={source.id}
+                          source={source}
+                          accountNames={names}
+                          canEdit={can("knowledge", "edit")}
+                          onOpen={() => onIntent?.({ kind: "open", module: "knowledge", id: source.id })}
+                          onEditFiling={() =>
+                            go(sectionPath, { panel: "edit", module: "knowledge", id: source.id })
+                          }
+                        />
+                      ))}
+                    </CardGrid>
+                  )}
                 </SectionWithCreate>
                 {/* R14: one source per ticket, per article, per account, plus every note
                     anybody writes — the list pages. */}

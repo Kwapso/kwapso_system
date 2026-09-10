@@ -121,6 +121,11 @@ function makeSource(over: Partial<KnowledgeSource>): KnowledgeSource {
     creatorName: "Aurora",
     editorName: null,
     updatedAt: null,
+    accounts: [],
+    apps: [],
+    sharedWith: "agency",
+    generatedOnly: false,
+    sightingsCount: 0,
     ...over,
   }
 }
