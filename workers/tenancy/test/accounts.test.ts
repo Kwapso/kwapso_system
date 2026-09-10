@@ -434,15 +434,23 @@ describe("contacts", () => {
     ).toBeNull()
   })
 
-  /* THE SAME FIELD, WITHHELD FROM A CLIENT LOGIN — and this fixture is why the
-     withholding is not paranoia. Marta is a contact of Bergman S.A. AND of
+  /* THE SAME FIELD, NOW SENT TO A CLIENT LOGIN TOO — the owner's ruling on
+     10 Sep 2026, "a client see his own collegues: yes", put to her as a yes/no
+     with the fence argument in front of her.
+
+     This fixture is the sharpest case for it and the reason the answer is safe
+     rather than merely permitted. Marta is a contact of Bergman S.A. AND of
      Bergman Marine and her own row hangs under NEITHER (`parent_account_id` is
-     null), which is the shape `listPersonCompanies` exists for. So a portal
-     caller standing at Bergman S.A. legitimately reads her LINK — the fence is
-     on `l.account_id` — while her account row is outside their world entirely.
-     The photograph is read off that outside row, which is exactly the case
-     `toAccount`'s own note reasons about for `companyName` and `relationship`. */
-  it("withholds that photograph from a client login, whose fence never reaches the person's row", async () => {
+     null). So her account row IS outside a Bergman portal caller's fence — and
+     they still read her here, because a link is reachable through the company it
+     hangs off and she is a contact AT Bergman. Every person this query can
+     return is the caller's own colleague; there is no row in it that is not.
+
+     What the ruling did NOT open is the other half, and this test guards it:
+     that she also works at Bergman Marine. That is `companyName` and
+     `relationship` on `toAccount`, still withheld. A face is about the person in
+     front of you; the other company is somebody else's business. */
+  it("sends that photograph to a client login — every person it can return is their own colleague", async () => {
     photograph(IDS.victimPerson, "/media/accounts/marta.jpg")
     const scope = await accountScope(cfg, { ...guard, userId: IDS.contactUser })
     expect(scope.kind).toBe("portal")
@@ -452,10 +460,20 @@ describe("contacts", () => {
     const links = await listAccountLinks(cfg, guard, scope, IDS.victimAccount)
     const marta = links.find((l) => l.personAccountId === IDS.victimPerson)
     expect(marta?.personName).toBe("Marta Ruiz")
-    // …and her row is genuinely outside their fence, so this is a NEW fact
-    // crossing it rather than one they could already read another way.
+    // …and her row is genuinely outside their fence, which is what makes this
+    // the case worth pinning rather than a trivially safe one.
     expect(scope.accountIds).not.toContain(IDS.victimPerson)
-    expect(marta?.personLogoUrl, "a client login was handed a face off a row outside its fence").toBeNull()
+    expect(
+      marta?.personLogoUrl,
+      "a client login was refused their own colleague's face"
+    ).toBe("/media/accounts/marta.jpg")
+    // THE BOUNDARY THAT DID NOT MOVE, asserted through the read that would
+    // actually leak it. Reading her face must not have made her OTHER companies
+    // readable — that is the fact the fence protects, and it is what keeps this
+    // test honest now the photograph is open. Staff see both companies (below);
+    // this caller must see only the one they stand in.
+    const hers = await listPersonCompanies(cfg, guard, scope, IDS.victimPerson)
+    expect(hers.map((l) => l.accountId)).toEqual([IDS.victimAccount])
     // Staff, through the same function on the same row, still get it.
     expect(
       (await listAccountLinks(cfg, guard, staff, IDS.victimAccount)).find(

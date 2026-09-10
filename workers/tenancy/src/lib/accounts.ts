@@ -1109,17 +1109,22 @@ export async function setAccountActive(
  * there and are what a contact list is FOR; a picture is a new fact, and a new
  * fact crossing a fence is a decision somebody has to make on purpose.
  *
- * SO IT IS WITHHELD RATHER THAN CONDITIONED ON WHAT THE PORTAL DRAWS. The
- * portal's company screen (`web-portal/components/company-screen.tsx`) renders
- * these rows and passes no picture today, so nothing on screen changes either
- * way — which is exactly why the decision has to be made at the door: "the
- * screen doesn't use it" is not a fence, it is the shape `getAccountDetail`'s
- * own header calls out ("the Portal-access tab was hidden client-side for
- * months while the server shipped the rows"). The day the portal wants a
- * colleague's face it can have one that is fenced on purpose.
+ * AND ON 10 SEP 2026 THE OWNER MADE THAT DECISION: "a client see his own
+ * collegues: yes." It was put to her as a yes/no with the paragraph above in
+ * front of her, so the picture is now sent to a portal caller too.
+ *
+ * The half of the old argument that was WRONG is worth keeping, because it is
+ * the reason this is safe rather than merely allowed: the person row is indeed
+ * outside the fence, but this query cannot REACH a person row that is not the
+ * caller's colleague — the `where` is the fence AND `l.account_id = ?`, so every
+ * row hangs off the caller's own company. Bergman's portal caller reads Marta
+ * because Marta is a contact at Bergman. What Bergman still may not learn is
+ * that she is also at Delaval, and that is `companyName`/`relationship`, which
+ * `toAccount` still withholds. A face is about the person in front of you.
  *
  * The `ours` spelling is `toAccount`'s, deliberately, so there is one shape in
- * this file for "a client login does not get this". */
+ * this file for "a client login does not get this" — it now governs the two
+ * fields above rather than three. */
 export async function listAccountLinks(
   cfg: D1Rest,
   guard: MemberGuard,
@@ -1127,7 +1132,6 @@ export async function listAccountLinks(
   accountId: string
 ): Promise<AccountLink[]> {
   const fence = accountScopeClause(scope, "l.account_id")
-  const ours = scope.kind === "portal"
   const rows = await d1Query<{
     id: string
     account_id: string
@@ -1155,7 +1159,24 @@ export async function listAccountLinks(
     accountId: r.account_id,
     personAccountId: r.person_account_id,
     personName: r.person_name,
-    personLogoUrl: ours ? null : r.person_logo_url,
+    // THE CLIENT SEES THEIR OWN COLLEAGUES' FACES. The owner's ruling, 10 Sep
+    // 2026, asked as a yes/no with the fence argument in front of her: "a client
+    // see his own collegues: yes."
+    //
+    // It is safe for a reason worth writing down rather than trusting. The
+    // picture does come off a PERSON row the fence does not cover — that half of
+    // the old argument was true. What it missed is WHICH person rows this query
+    // can return: the `where` is the account fence AND `l.account_id = ?`, so
+    // every row is a link hanging off the caller's own company, and every person
+    // named is therefore a contact OF that company. There is no row here that is
+    // not the caller's colleague, which is exactly the set she opened.
+    //
+    // The three fields below STAY withheld and the difference is the point:
+    // `companyName` and `relationship` describe the person's OTHER companies —
+    // Marta is a contact of Bergman and of Delaval, and Bergman may not learn the
+    // second. A face is about the person in front of you; those are about
+    // somebody else's business.
+    personLogoUrl: r.person_logo_url,
     relationship: r.relationship,
     isMainStakeholder: r.is_main_stakeholder === 1,
     active: r.deactivated_at == null,
@@ -1185,11 +1206,14 @@ export async function listAccountLinks(
  * rule about this shape, not two, and a field that was null in one of the two
  * directions would be a hole a reader has to know about.
  *
- * NO PORTAL WITHHOLDING HERE, and the asymmetry with the forward read is the
- * whole argument rather than an oversight: there the picture comes off a person
- * row the fence does not cover, here the joined row IS the fenced row
- * (`c.id = l.account_id`, and the fence is on `l.account_id`). There is no
- * second row to leak from. */
+ * NO PORTAL WITHHOLDING HERE, and since 10 Sep 2026 none on the forward read
+ * either: the owner ruled that a client sees their own colleagues' faces. The
+ * asymmetry this paragraph used to argue for is gone, and the reason it was
+ * never load-bearing is written at the forward read's own `personLogoUrl` — a
+ * link is only reachable through the company it hangs off, so every person
+ * either direction can return is already the caller's colleague. Here the joined
+ * row IS the fenced row (`c.id = l.account_id`), so there was never a second row
+ * to leak from at all. */
 export async function listPersonCompanies(
   cfg: D1Rest,
   guard: MemberGuard,
