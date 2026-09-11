@@ -45,7 +45,9 @@ import {
   KNOWLEDGE_SORTS,
   rebuildNameIndex,
   retrieve,
+  revisitUnhealthySources,
   setSourceActive,
+  unhealthySourceCount,
   updateSource,
   type SourceInput,
 } from "../lib/knowledge"
@@ -895,7 +897,14 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
   const { cfg, guard } = await gated(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
   const results = await sweepAll(env, cfg, guard)
-  if (results.some((r) => r.indexed > 0)) await publishChange(env, guard.teamId, "knowledge")
+  // THE REVISIT PASS — what the ordinary sweep's forward-only cursor cannot
+  // do on its own (`revisitUnhealthySources`'s own header). Rides this same
+  // press rather than only the fifteen-minute cron, so a person who presses
+  // "bring it up to date" gets the honest answer immediately rather than
+  // waiting for the next scheduled tick.
+  const revisit = await revisitUnhealthySources(env, cfg, guard)
+  if (results.some((r) => r.indexed > 0) || revisit.recovered > 0)
+    await publishChange(env, guard.teamId, "knowledge")
   // THE NAME INDEX, KEPT IN STEP HERE — a client, app, contact or colleague
   // renamed (or created, or deactivated) is a source row the sweep above just
   // touched, so the same tick that brings the material in step is the same
@@ -909,5 +918,12 @@ export async function postKnowledgeSync(request: Request, env: Env): Promise<Res
     results,
     caughtUp: results.every((r) => r.caughtUp && !r.error),
     total: await countSources(cfg, guard),
+    // THE HONEST NUMBER, never the raw `index_error` tally — see
+    // `unhealthySourceCount`'s own header for the twelve-to-one gap between
+    // the two. `revisited`/`recovered` say what THIS press just did about it;
+    // `unhealthy` says what is still true after.
+    unhealthy: await unhealthySourceCount(cfg, guard),
+    revisited: revisit.revisited,
+    recovered: revisit.recovered,
   })
 }

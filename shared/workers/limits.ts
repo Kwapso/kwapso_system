@@ -652,6 +652,17 @@ export const AGENT_PROPOSAL_TTL_MS = 30 * 60 * 1000
  * The same shape and the same reasoning as TRANSCRIPT_ATTEMPT_CAP next door. */
 export const EMBED_ATTEMPT_CAP = 5
 
+/** HOW MANY ORPHANED SOURCES ONE TICK WILL REVISIT.
+ *
+ * The ordinary sweep's cursor is forward-only and moves past a row the moment
+ * it is upserted — success or failure — so a source a mid-sweep throw ever
+ * touches is never read again by the ordinary tick, at ANY `embed_attempts`
+ * value, unless its own text changes. `EMBED_ATTEMPT_CAP` answers "does this
+ * document keep failing"; this answers a different question the cap cannot:
+ * "has anything asked this document again at all". R14 hard cap on the
+ * revisit read itself, said here rather than assumed at the call site. */
+export const INDEX_REVISIT_LIMIT = 25
+
 /** Open error rows one "resolve this whole failure" call will look at.
  *
  * The scan cannot be a WHERE clause — the volatile reference inside a message is

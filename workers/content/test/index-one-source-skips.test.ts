@@ -73,7 +73,7 @@ vi.mock("@shared/workers/d1-rest", async (importOriginal) => {
   }
 })
 
-const { indexOneSource } = await import("../src/lib/knowledge")
+const { indexOneSource, isVectorizeRateLimited } = await import("../src/lib/knowledge")
 
 const env = {} as never
 const cfg = {} as never
@@ -122,5 +122,55 @@ describe("indexOneSource — one document's failure is one document's", () => {
     holder.fails.set("awkward", new Error("boom"))
     holder.dbDown = new Error("D1 unreachable")
     await expect(indexOneSource(env, cfg, guard, "awkward")).rejects.toThrow("D1 unreachable")
+  })
+
+  // MIGRATION 0082 — "TOO MANY REQUESTS" MUST NOT SPEND THE GIVE-UP BUDGET.
+  // Measured on staging: 38 sources, one Vectorize rate-limit burst during
+  // the mass rebuild, none of them a document the model actually refused.
+  // The cap exists to stop paying for text that will never embed; a burst
+  // is a fact about Cloudflare at that instant, and counting it toward the
+  // same budget means five unlucky seconds can permanently give up on a
+  // source that was never asked a question it couldn't answer.
+  it("does NOT bump embed_attempts when Vectorize itself was rate-limited", async () => {
+    holder.fails.set("busy", new Error("VECTOR_UPSERT_ERROR (code = 40041): Too Many Requests"))
+    await indexOneSource(env, cfg, guard, "busy")
+    const repair = holder.writes.find((w) => w.sql.includes("index_error"))
+    expect(repair, "the failure must still be recorded on the row").toBeDefined()
+    expect(repair?.sql).toContain("content_hash = NULL")
+    // The error is still written and the hash is still blanked (so the next
+    // sweep re-reads it) — only the ATTEMPT COUNTER is spared.
+    expect(repair?.sql).not.toContain("embed_attempts + 1")
+    expect(repair?.sql).toContain("embed_attempts")
+  })
+
+  it("still bumps embed_attempts for a failure that is NOT a rate limit", async () => {
+    holder.fails.set("awkward", new Error("Vectorize refused that upsert"))
+    await indexOneSource(env, cfg, guard, "awkward")
+    const repair = holder.writes.find((w) => w.sql.includes("index_error"))
+    expect(repair?.sql).toContain("embed_attempts = embed_attempts + 1")
+  })
+
+  describe("isVectorizeRateLimited — narrow on purpose", () => {
+    it("recognises both error shapes actually seen on staging", () => {
+      expect(isVectorizeRateLimited(new Error("VECTOR_UPSERT_ERROR (code = 40041): Too Many Requests"))).toBe(true)
+      expect(isVectorizeRateLimited(new Error("VECTOR_DELETE_ERROR (code = 40041): Too Many Requests"))).toBe(true)
+    })
+
+    it("does not recognise an unrelated Vectorize failure, even a rate-limit-shaped one for a different code", () => {
+      // 40007/40006 are real Vectorize codes too (too many ids/vectors in one
+      // payload, `knowledge-vectors.ts`'s own DELETE_BATCH/UPSERT_BATCH
+      // comments) — a real defect in THIS app's own batching, never a
+      // reason to spare the give-up counter.
+      expect(isVectorizeRateLimited(new Error("VECTOR_DELETE_ERROR (code = 40007): too many ids in payload"))).toBe(
+        false
+      )
+      expect(isVectorizeRateLimited(new Error("some other Vectorize failure"))).toBe(false)
+      expect(isVectorizeRateLimited(new Error("model unavailable"))).toBe(false)
+    })
+
+    it("reads a non-Error throw the same way indexOneSource's own catch does", () => {
+      expect(isVectorizeRateLimited("Too Many Requests")).toBe(true)
+      expect(isVectorizeRateLimited("boom")).toBe(false)
+    })
   })
 })

@@ -115,7 +115,7 @@ import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { isVideoLink } from "@shared/media-links"
-import { numberVar } from "@shared/workers/limits"
+import { EMBED_ATTEMPT_CAP, INDEX_REVISIT_LIMIT, numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
   optionalDocument,
@@ -2365,7 +2365,7 @@ export async function indexSource(
  * be told about. The failing case chooses honestly between them without anybody
  * having to enumerate error codes.
  *
- * ── AND IT CANNOT LOOP FOR EVER ─────────────────────────────────────────────
+ * ── AND IT CANNOT LOOP FOR EVER — EXCEPT FOR THE ONE FAILURE THAT MUST NOT COUNT ──
  *
  * It bumps `embed_attempts`, the counter the loop below ALREADY consults against
  * `EMBED_ATTEMPT_CAP`, so a source that fails repeatably is given up on and
@@ -2373,6 +2373,20 @@ export async function indexSource(
  * again the moment its text changes, because the upsert clears the counter. It
  * also blanks `content_hash`, so a source that threw halfway through is re-read
  * rather than skipped as unchanged.
+ *
+ * BUT NOT WHEN GOOGLE'S ANSWER WAS "TOO MANY REQUESTS" (`isVectorizeRateLimited`
+ * below). Measured on staging: 38 sources from one burst during the mass
+ * rebuild, `VECTOR_UPSERT_ERROR`/`VECTOR_DELETE_ERROR (code = 40041)`, every
+ * one of them Cloudflare rate-limiting THIS ACCOUNT, none of them the text
+ * being unembeddable. `EMBED_ATTEMPT_CAP` exists to stop paying for a
+ * document the model will never accept; a burst of 429s is a fact about the
+ * INFRASTRUCTURE at that instant, not about any one of the 38 documents, and
+ * counting it toward the same budget means five unlucky seconds during one
+ * rebuild can permanently give up on a source that was never actually asked
+ * a question it couldn't answer. The five-year backfill (migration 0082) is
+ * exactly this shape of burst and there will be another one — a rate-limited
+ * attempt must cost nothing toward the give-up counter, for ever, not just
+ * for today's 38.
  *
  * Returns whether the source was indexed, so the caller's count stays true. */
 export async function indexOneSource(
@@ -2388,15 +2402,113 @@ export async function indexOneSource(
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
     console.error(`knowledge source ${sourceId} failed to index: ${reason}`)
+    const bumpAttempts = isVectorizeRateLimited(e) ? "embed_attempts" : "embed_attempts + 1"
     await d1Query(
       cfg,
       guard.databaseId,
-      `UPDATE knowledge_sources SET index_error = ?, content_hash = NULL, embed_attempts = embed_attempts + 1
+      `UPDATE knowledge_sources SET index_error = ?, content_hash = NULL, embed_attempts = ${bumpAttempts}
         WHERE id = ?`,
       [reason.slice(0, 300), sourceId]
     )
     return false
   }
+}
+
+/** GOOGLE — no, CLOUDFLARE — IS BUSY RIGHT NOW, not "this document is broken".
+ * Narrow on purpose: only the exact signature Vectorize sends for its own
+ * rate limit (code 40041, seen on both `upsertVectors` and `deleteVectors`
+ * — `knowledge-vectors.ts`'s `twice()` already retries once with no backoff,
+ * which does nothing against a sustained burst, so this is the failure that
+ * reaches here after that retry has already been spent). A genuine
+ * unembeddable-text failure, a network timeout, a malformed response — every
+ * other shape — still counts toward `EMBED_ATTEMPT_CAP` exactly as before. */
+export function isVectorizeRateLimited(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : String(e)
+  return message.includes("code = 40041") || /too many requests/i.test(message)
+}
+
+/** THE ONE EXPRESSION THAT DECIDES "IS THIS SOURCE ACTUALLY BROKEN" —
+ * measured against the raw `index_error IS NOT NULL` count and found to
+ * overstate it roughly twelve to one (38 raw vs. 3 real, staging, 11 Sep
+ * 2026): most rows that ever hit a Vectorize 429 finished chunking and
+ * embedding in full either before or after the one call that threw (see
+ * `clearIndex`'s own header for the DELETE-before-chunk-count-write ordering
+ * that makes a fully-embedded row able to carry a leftover error at all), so
+ * `index_error IS NOT NULL` alone answers "did an attempt ever fail", not
+ * "is anything actually missing".
+ *
+ * A row is unhealthy if it has an error AND (it produced no chunks at all)
+ * OR (fewer chunks are embedded than exist) OR (it is a card whose only
+ * vector — the record/summary one that makes it ROUTABLE — never landed).
+ * `deactivated_at` is deliberately NOT checked here — the caller decides
+ * whether a retired row should count, because the count on a screen and the
+ * revisit pass want different answers to that (a retired row needs no more
+ * attempts; a badge should not carry it as unread work at all).
+ *
+ * USED IN EXACTLY THREE PLACES, on purpose, per the hub's own condition: the
+ * revisit pass's SELECT, the housekeeping clear below (as `NOT (…)`), and
+ * `unhealthySourceCount` for the sweep's own status line. A fourth place
+ * that re-derives this OR by hand is the bug this constant exists to make
+ * impossible. */
+export const UNHEALTHY_INDEX_SQL = `index_error IS NOT NULL AND (
+  chunk_count = 0
+  OR indexed_chunks < chunk_count
+  OR (generated_only = 1 AND summary_embedding IS NULL)
+)`
+
+/** THE COUNT A SCREEN OR A STATUS LINE SHOWS — never the raw `index_error`
+ * tally, which is the number this whole law exists to stop anyone reading
+ * again. Excludes deactivated rows: a retired source has nothing left to
+ * fix and showing it as outstanding work is its own small dishonesty. */
+export async function unhealthySourceCount(cfg: D1Rest, guard: MemberGuard): Promise<number> {
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM knowledge_sources WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL})`
+  )
+  return rows[0]?.n ?? 0
+}
+
+/** THE REVISIT PASS — what a forward-only cursor can never do on its own.
+ * Two housekeeping jobs, in order, because they need different oracles and
+ * one of them costs nothing:
+ *
+ *   1. CLEAR THE FALSE ALARMS, no Vectorize call, no model call — a source
+ *      with an error that `UNHEALTHY_INDEX_SQL` does not recognise as broken
+ *      is, by definition, fully chunked and fully embedded (or a card with
+ *      its record vector already in place). There is nothing left to write,
+ *      so the honest fix is a bare UPDATE, not a wasted re-index.
+ *   2. RETRY THE REAL ONES, bounded (`INDEX_REVISIT_LIMIT`, R14) and
+ *      respecting `EMBED_ATTEMPT_CAP` exactly as the ordinary sweep does —
+ *      `isVectorizeRateLimited` failures never advanced that counter, so a
+ *      row sitting at the cap here genuinely failed for a reason unrelated
+ *      to a burst, and revisiting it would spend a model call on a document
+ *      already shown five times to be one the model will not accept. Oldest
+ *      `updated_at` first, so one dense burst cannot starve an older one. */
+export async function revisitUnhealthySources(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  limit = INDEX_REVISIT_LIMIT
+): Promise<{ cleared: number; revisited: number; recovered: number }> {
+  const cleared = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE knowledge_sources SET index_error = NULL
+      WHERE index_error IS NOT NULL AND NOT (${UNHEALTHY_INDEX_SQL})
+      RETURNING id`
+  )
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14: bounded by INDEX_REVISIT_LIMIT.
+    `SELECT id FROM knowledge_sources
+      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL}) AND embed_attempts < ${EMBED_ATTEMPT_CAP}
+      ORDER BY updated_at ASC LIMIT ${limit}`
+  )
+  let recovered = 0
+  for (const row of rows) if (await indexOneSource(env, cfg, guard, row.id)) recovered++
+  return { cleared: cleared.length, revisited: rows.length, recovered }
 }
 
 /** THE LABELS ON EVERY VECTOR A SOURCE PRODUCES — the notebook it belongs to,
