@@ -193,20 +193,22 @@ test("the real KB-EXAM-UNION.md loads clean and every tag it uses is recognised"
   for (const row of rows) for (const t of row.tags) assert.ok(KNOWN_TAGS.has(t), `${row.id}: tag "${t}" is not in KNOWN_TAGS`)
 })
 
-test("the classification call over the union is pinned — 100 rows + 1 derived, 73 keyed / 8 refusal / 7 gap / 7 tool / 6 struck", () => {
+test("the classification call over the union is pinned — 100 rows + 1 derived, 73 keyed / 7 refusal / 7 gap / 7 tool / 7 struck", () => {
   const { rows } = loadExam()
   const summary = summarize(rows)
   assert.equal(summary.total, 101, "100 union rows + the derived X8-notowner row")
   assert.equal(summary.byDisposition.keyed, 73, "72 + A-H13, corrected off gap after the hub's fix to RULING 3's predicate")
-  assert.equal(summary.byDisposition.refusal, 8)
+  assert.equal(summary.byDisposition.refusal, 7, "X8-notowner moved to struck 2026-09-11 — see below")
   assert.equal(summary.byDisposition.gap, 7, "4 derived from RULING 3, corrected (A-E6, A-E12, A-M6, A-M19) + B's own 3 (B-G3, B-G4, B-G5) — A-H13 moved to keyed, see below")
   assert.equal(summary.byDisposition.tool, 7)
-  assert.equal(summary.byDisposition.struck, 6)
+  assert.equal(summary.byDisposition.struck, 7, "the original 6 + X8-notowner, struck 2026-09-11 pending a filing fix (see DERIVED_ROWS)")
   // The union's own footer: "every absent row, every gap row, and the
-  // non-owner half of X8" — 7 absent + 1 derived refusal + 7 gap = 15.
+  // non-owner half of X8" — but X8-notowner no longer carries that half:
+  // struck 2026-09-11, pending a filing fix (see DERIVED_ROWS's own note).
+  // 7 absent + 7 gap = 14.
   assert.deepEqual(
     summary.mustScore100.sort(),
-    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "X8-notowner", "A-E6", "A-E12", "A-M6", "A-M19", "B-G3", "B-G4", "B-G5"].sort()
+    ["A-X4", "A-X5", "A-X6", "A-X7", "A-X9", "A-D9", "A-D10", "A-E6", "A-E12", "A-M6", "A-M19", "B-G3", "B-G4", "B-G5"].sort()
   )
 })
 

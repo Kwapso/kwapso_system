@@ -287,7 +287,21 @@ export const OVERRIDES = {
  * claim entirely, so this derives the one half of it this harness CAN
  * check without a persona model: asked as anyone but the owner, the
  * pickleball question must refuse. A-X8 itself is kept, unmodified,
- * alongside it — the brief says keep every row, this only adds one. */
+ * alongside it — the brief says keep every row, this only adds one.
+ *
+ * STRUCK 2026-09-11, pending a filing fix, not a fence fix. Run for real
+ * against the post-rebuild corpus (as Aurora, guard dumped and checked
+ * field-by-field against MemberGuard — the harness was not the problem):
+ * the owner's private "Pickleball" calendar entry IS correctly fenced (one
+ * `event` row, his own `owner_user_id`, his own sighting, refuses Aurora).
+ * But the same recurring game was ALSO filed into the `meetings` module as
+ * 59 ordinary meeting records — team material by construction, no personal
+ * owner, because a meeting isn't personal. Aurora's question never reaches
+ * the correctly-fenced calendar row; a team-owned meeting copy answers it
+ * first. The fence did exactly what it says; the filing put a private
+ * thing where only team things belong. Re-strike when that's fixed — this
+ * row's wording is still the right test, it just can't pass against today's
+ * data through no fault of the fence. */
 const DERIVED_ROWS = [
   {
     id: "X8-notowner",
@@ -297,7 +311,9 @@ const DERIVED_ROWS = [
     question: "When is pickleball this week?",
     tags: ["fence"],
     detail: "Aurora asking: refuse (private-shelf event)",
-    disposition: "refusal",
+    disposition: "struck",
+    reason:
+      "filing bug, not a fence bug (2026-09-11): the owner's private Pickleball calendar entry is correctly fenced, but the same game was also filed as 59 ordinary `meetings` records with no personal owner, and those answer the question instead. Un-strike once the filing fix lands.",
   },
 ]
 

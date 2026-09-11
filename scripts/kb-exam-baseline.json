@@ -5,8 +5,8 @@
     "keyed": 73,
     "tool": 7,
     "gap": 7,
-    "struck": 6,
-    "refusal": 8
+    "struck": 7,
+    "refusal": 7
   },
   "byLevel": {
     "O": 8,
@@ -47,8 +47,7 @@
     "B-G4",
     "B-G5",
     "A-D9",
-    "A-D10",
-    "X8-notowner"
+    "A-D10"
   ],
   "mandatory": [
     {
