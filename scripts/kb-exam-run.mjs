@@ -8,22 +8,37 @@
 //
 //   node --experimental-transform-types scripts/kb-exam-run.mjs
 //
-// Retrieval-only, by default and unless `--full-loop` is passed — no
-// `read`, no `compose`, nothing drawn from the team's AI allowance beyond
-// the embedding + Vectorize query every retrieval already needs (BUILD-5
-// §9: "grade retrieval-only for every iteration... spend kimi ONLY on the
-// final validation runs"). It scores every row `scripts/kb-exam.mjs`'s
-// `grade()` can score TODAY: every `refusal` row (needs no key at all —
-// `found === false` is the whole claim) plus whatever `keyed`/`gap` rows
-// already have an entry in `scripts/kb-exam-keys.json`. Most will not,
-// until the keying pass runs — this script reports those as "not yet
-// keyed", never silently drops them, so a first run right after the
-// rebuild is honest about how much of the 100 it can actually judge.
+// Retrieval-only, by default and unless `--reader` or `--full-loop` is
+// passed — no `read`, no `compose`, nothing drawn from the team's AI
+// allowance beyond the embedding + Vectorize query every retrieval already
+// needs (BUILD-5 §9: "grade retrieval-only for every iteration... spend
+// kimi ONLY on the final validation runs"). It scores every row
+// `scripts/kb-exam.mjs`'s `grade()` can score TODAY: every `refusal` row
+// (needs no key at all — `found === false` is the whole claim) plus
+// whatever `keyed`/`gap` rows already have an entry in
+// `scripts/kb-exam-keys.json`. Most will not, until the keying pass runs —
+// this script reports those as "not yet keyed", never silently drops them,
+// so a first run right after the rebuild is honest about how much of the
+// 100 it can actually judge.
 //
-// `--full-loop` adds the reader (Kimi K2.6) and the writer (llama-4-scout)
-// on top of the same retrieval — the pass that costs real money (see the
-// arithmetic in this lane's report to the hub). It is NEVER the default;
-// it needs its own flag every time, on purpose.
+// `--reader` passes a REAL `read` callback into `retrieve()` — the exact
+// shape `GET /api/content/knowledge/ask` builds when a caller sends
+// `read=1` (`payToRead`, `workers/content/src/routes/knowledge.ts`), not a
+// stand-in: gated on `agent:create`, metered against the team's real AI
+// allowance, logged. This is BUILD-5's headline fix — the reader re-reads
+// candidates a similarity floor alone would refuse — so a run without it
+// measures the system with that fix switched off. `payToRead` needs a real
+// `env.DB` (native D1 binding in production; `d1RestBinding` below is the
+// REST-backed stand-in, same trick as `vectorizeStandIn`) because the
+// metering ledger (`agent_usage`, `agent_usage_log`) lives there, not
+// behind `cfg`'s REST door. Only applied to rows this harness actually
+// scores (not `tool`/`struck`) — spending the allowance re-reading a row
+// nothing here grades buys nothing.
+//
+// `--full-loop` adds the writer (llama-4-scout) on top of `--reader` — the
+// pass that costs the most real money (see the arithmetic in this lane's
+// report to the hub). Neither is ever the default; each needs its own flag
+// every time, on purpose.
 //
 // ── HOW IT MEASURES A BRANCH WITHOUT DEPLOYING, same as scripts/kb-bench.mjs ──
 //
@@ -36,6 +51,7 @@
 //
 //   node --experimental-transform-types scripts/kb-exam-run.mjs
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --verbose
+//   node --experimental-transform-types scripts/kb-exam-run.mjs --reader
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --full-loop
 //
 // KB_INDEX / KB_CORE / KB_TEAM point it at another environment, same as
@@ -55,6 +71,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const VERBOSE = process.argv.includes("--verbose")
 const FULL_LOOP = process.argv.includes("--full-loop")
+const READER = FULL_LOOP || process.argv.includes("--reader")
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
@@ -63,6 +80,7 @@ const TEAM_NAME = process.env.KB_TEAM || "Kwapso"
 
 const { retrieve } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
 const { writeAnswer } = FULL_LOOP ? await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts")) : { writeAnswer: undefined }
+const { payToRead } = READER ? await importTs(join(REPO, "workers", "content", "src", "routes", "knowledge.ts")) : { payToRead: undefined }
 
 /* ------------------------------ the REST doors, same as kb-bench.mjs ----------------------------- */
 
@@ -107,6 +125,39 @@ function productionComposeModel() {
   return found[1]
 }
 
+/** A REST-backed stand-in for the native `D1Database` binding `payToRead`'s
+ * gate/meter chain needs (`consumeAiUnit`/`getQuota`/`logUsage` all call
+ * `env.DB.prepare(...).bind(...).run()`/`.first()` against the CORE
+ * database) — same trick as `vectorizeStandIn`, a real door, no binding.
+ * Only `.run()` and `.first()` are used anywhere on this path; `.all()` is
+ * included for completeness, not because anything here calls it. */
+function d1RestBinding(databaseId) {
+  return {
+    prepare(sqlText) {
+      let params = []
+      const exec = async () => (await cf(`/d1/database/${databaseId}/query`, { sql: sqlText, params }))[0]
+      return {
+        bind(...args) {
+          params = args
+          return this
+        },
+        async run() {
+          const r = await exec()
+          return { meta: r.meta, results: r.results }
+        },
+        async first() {
+          const r = await exec()
+          return r.results[0] ?? null
+        },
+        async all() {
+          const r = await exec()
+          return { results: r.results, meta: r.meta }
+        },
+      }
+    },
+  }
+}
+
 const AI = { async run(model, input) {
   const res = await fetch(`${CF}/accounts/${ACCOUNT}/ai/run/${model}`, {
     method: "POST",
@@ -133,6 +184,16 @@ if (!member) throw new Error("no member of this team may read the knowledge base
 
 const guard = { userId: member.user_id, teamId: team.id, roleId: member.role_id, databaseId: TEAM_DB }
 
+/** `payToRead`/`payToWrite` want an `Actor` (`{id, email, name}`) to log the
+ * spend against — only fetched under `--reader`/`--full-loop`, since a
+ * plain retrieval-only run never reaches either. */
+async function actorFor(userId) {
+  const [user] = await sql(CORE, "SELECT id, email, first_name, last_name FROM users WHERE id = ?", [userId])
+  if (!user) throw new Error(`kb-exam-run: no core user row for ${userId}`)
+  return { id: user.id, email: user.email, name: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email }
+}
+const actor = READER ? await actorFor(member.user_id) : null
+
 /** X8-notowner's own words are the persona: "Aurora asking: refuse (private-shelf event)."
  * The `member` above is whichever reader `created_at` picks first — on 2026-09-11 that
  * resolved to the owner, and a row built to test "anyone but the owner" cannot be graded
@@ -155,8 +216,9 @@ const env = {
   AI,
   WORKERS_AI_MODEL: FULL_LOOP ? productionComposeModel() : undefined,
   KNOWLEDGE_INDEX: vectorizeStandIn(),
-  DB: { prepare: () => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) }) },
+  DB: READER ? d1RestBinding(CORE) : { prepare: () => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) }) },
 }
+const CFG = { accountId: ACCOUNT, apiToken: TOKEN }
 
 /* --------------------------------- the run -------------------------------- */
 
@@ -169,7 +231,7 @@ if (structural.length) {
   process.exit(1)
 }
 
-console.log(`kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${FULL_LOOP ? ", FULL-LOOP (reader + writer)" : ", retrieval-only"}`)
+console.log(`kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${FULL_LOOP ? ", FULL-LOOP (reader + writer)" : READER ? ", READER ON (retrieval + reader, no writer)" : ", retrieval-only (reader OFF)"}`)
 for (const [rowId, email] of Object.entries(PERSONA_OVERRIDES)) console.log(`  persona override: ${rowId} asks as ${email}, not the default reader`)
 console.log()
 
@@ -181,18 +243,24 @@ for (const row of rows) {
     console.log(`${row.id.padEnd(14)} SKIP  not yet keyed`)
     continue
   }
+  const rowGuard = personaGuards[row.id] ?? guard
+  const notScored = row.disposition === "struck" || row.disposition === "tool"
+  // Reader spend only where it can change a score — a struck/tool row is
+  // never graded, so reading its shortlist would spend the allowance and
+  // teach us nothing this harness can act on.
+  const useReader = READER && !notScored
   let answer
   try {
-    answer = await retrieve(env, { accountId: ACCOUNT, apiToken: TOKEN }, personaGuards[row.id] ?? guard, {
+    answer = await retrieve(env, CFG, rowGuard, {
       question: row.question,
       compose: FULL_LOOP ? (material, sources) => writeAnswer(env, row.question, material, sources) : undefined,
+      read: useReader ? (q, shortlist) => payToRead(env, CFG, rowGuard, actor, q, shortlist) : undefined,
     })
   } catch (e) {
     console.log(`${row.id.padEnd(14)} FAIL  threw: ${String(e).slice(0, 120)}`)
     continue
   }
   resultsByRowId[row.id] = { found: answer.found, shortlistIds: shortlistFromAnswer(answer) }
-  const notScored = row.disposition === "struck" || row.disposition === "tool"
   console.log(`${row.id.padEnd(14)} ${answer.found ? `${answer.passages.length}p/${answer.citations.length}c` : "refused"}${notScored ? "  (tool/struck — not scored here)" : ""}`)
   if (VERBOSE && answer.citations.length) for (const c of answer.citations) console.log(`      · ${c.title} (${c.sourceId})`)
 }
