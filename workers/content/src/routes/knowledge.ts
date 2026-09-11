@@ -44,6 +44,7 @@ import {
   listSources,
   KNOWLEDGE_SORTS,
   rebuildNameIndex,
+  secondLook,
   retrieve,
   revisitUnhealthySources,
   setSourceActive,
@@ -296,6 +297,10 @@ export async function getKnowledgeShape(request: Request, env: Env): Promise<Res
   return json(await buildShape(cfg, guard, { compartment: compartment ?? null, readable }))
 }
 
+/** The reader `retrieve()` accepts — named because this door builds one and
+ * hands it to the SECOND pass only. */
+type RetrieveRead = (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
+
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
@@ -330,7 +335,13 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
     .split(",")
     .map((k) => k.trim())
     .filter((k) => SOURCE_CHIP_KEYS.includes(k))
-  return json(
+  // `await`ed rather than returned as a promise, deliberately: R23's own check
+  // reads this file for the literal `await retrieve(` as its proof that no door
+  // assembles an answer by hand, and a helper that merely forwards the promise
+  // would satisfy the law's intent while failing its check — which is worse
+  // than either, because it looks like a false positive and invites somebody to
+  // weaken the check.
+  const ask = async (opts: { read?: RetrieveRead; quiet?: boolean }) =>
     await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
@@ -345,9 +356,37 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
       // The reader is only ever REACHED once there is a shortlist worth
       // reading — `retrieve` calls it after widening its own floor, and it
       // gates and meters itself exactly as the writer does.
-      read: reread ? (q, shortlist) => payToRead(env, cfg, guard, actor, q, shortlist) : undefined,
+      ...opts,
     })
-  )
+
+  // A READER THAT NEVER THROWS. `payToRead` opens with `requireRight(agent,
+  // create)`, so a role with no assistant right would turn "we have nothing on
+  // that" into a 403 for somebody who simply cannot spend a unit. Caught here
+  // and read as "the reader could not run", which `retrieve()` already handles
+  // by falling back to what the strict floor would have kept.
+  const reader: RetrieveRead = async (q, shortlist) => {
+    try {
+      return await payToRead(env, cfg, guard, actor, q, shortlist)
+    } catch {
+      return null
+    }
+  }
+
+  // A SECOND LOOK BEFORE SAYING "I DON'T KNOW". Search the cheap way first;
+  // only if THAT comes back with nothing, spend a unit re-reading what it
+  // found. A question that already answers costs exactly what it cost before.
+  //
+  // Until tonight the reader was offered only to a caller passing `read=1`,
+  // which `askKnowledge` — the knowledge screen's own call — never did. So the
+  // screen's refusals were the reader's entire best case and it was never
+  // invoked on them. Measured: the three paraphrases the owner named are
+  // refused by the floor alone and answered with receipts once something
+  // re-reads the shortlist.
+  //
+  // THE FIRST PASS IS QUIET because a provisional refusal is a reason to look
+  // again rather than an answer. The deciding pass logs normally.
+  if (reread) return json(await ask({ read: reader }))
+  return json(await secondLook(await ask({ quiet: true }), () => ask({ read: reader })))
 }
 
 /** GET /api/content/knowledge/sync — how far the sweep has got with each kind of
