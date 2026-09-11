@@ -5715,6 +5715,96 @@ ALTER TABLE knowledge_sources DROP COLUMN identity_key;
 ALTER TABLE knowledge_sources ADD COLUMN grain_pieces TEXT;
 `,
   },
+  {
+    // THE SWEEP LEARNS TO LOOK BEHIND ITSELF (the owner's ask, by name: "make
+    // the knowledge base sync everything from five years back, automatically").
+    //
+    // THE WIPE DESTROYED WHAT THE SWEEP CANNOT RE-FETCH, and the reason is
+    // structural, not a bug in any one lane: `knowledge_ingest.cursor`
+    // (0007_knowledge_base) watermarks how far a Google kind has FILED, never
+    // how far it has LOOKED. Gmail and Chat read a fixed window near "now" on
+    // every tick — the newest 200 threads, the newest 50 messages per space —
+    // and once everything in that window is filed, every later tick reads the
+    // SAME window and finds nothing new. History that arrived before the
+    // window's floor was already true, and no ticking cursor was ever going to
+    // reach it. Measured on staging after the wipe: gmail -245, chat -116
+    // against their pre-wipe counts. Calendar's own gap (-11) is smaller for a
+    // reason that turned out to be a second, independent finding, not a
+    // smaller version of the same bug: `google-read.ts`'s calendar branch
+    // passes no `timeMin`/`timeMax` at all, and Google's answer to that (kb_A
+    // + the hub, both independently, against the real staging team database)
+    // is NOT "the oldest events ever" — it is "start near now and walk
+    // forward, ascending, into the future". Two connections' cursors were
+    // already sitting in January and May 2028, having spent their whole
+    // 250-event budget expanding one recurring series eighteen months out.
+    // Calendar's visible gap stayed small only because `meetings.ts`'s own,
+    // already-shipped 5-year backfill independently covers most calendar
+    // HISTORY for anything that became a meeting (this lane's own
+    // `meetingEventIds` exclusion, `google-read.ts`, keeps the two from
+    // double-filing) — the structural blindness is the same direction as
+    // gmail and chat, just mostly masked by a different subsystem's own fix.
+    //
+    // THE PATTERN ALREADY EXISTED IN THIS REPO, so this copies it rather than
+    // inventing one: `meetings.ts`'s `BACKFILL_YEARS_BACK`/`BACKFILL_SLICE_DAYS`
+    // walk a bounded 90-day slice at a time, forward-only, from a cursor kept
+    // on the connection, five years back to a year ahead — proven in
+    // production before this migration ever existed. The owner's own decision,
+    // asked and answered: five years, matching meetings, not a shorter number
+    // invented for this lane alone.
+    //
+    // ONE ROW, A SECOND COLUMN — not a second row with a synthetic key. A
+    // forward cursor ("how far filed") and a backward one ("how far looked")
+    // are two facts about ONE sweep, not two sweeps; splitting them into two
+    // `knowledge_ingest` rows would let `last_run_at`/`runs`/`last_error`
+    // disagree about whether a single tick actually succeeded — the exact
+    // split-state shape 0080, four rows up, spent this morning removing, this
+    // time in the very same table. `backfilled_through` rides the SAME row
+    // `sweepKind` already reads and writes for `cursor`.
+    //
+    // CHAT NEEDS A DIFFERENT SHAPE, and this is why it gets its own three
+    // columns rather than reusing `knowledge_ingest.backfilled_through`: one
+    // `message:<userId>` row can stand behind MANY named spaces
+    // (`google_sources`, one row per shared space), each with its own
+    // history and its own chance of going unreadable. The hub's ruling, once
+    // this was found: take the MINIMUM successfully-read frontier across
+    // spaces — correctness first, never skip material — but a space that
+    // cannot be read must be RECORDED, not silently dropped from the minimum.
+    // That needs PER-SPACE state to record against, and `google_sources`
+    // already has one row per space to carry it on — a derived MINIMUM over
+    // live spaces' `chat_backfilled_through` stands in for chat's own
+    // `knowledge_ingest.backfilled_through`, computed at read time rather
+    // than stored a second place, and BOTH shapes answer through the one
+    // accessor `backfilledThrough()` (knowledge-google.ts) — no caller may
+    // ever need to know which of the two backs a given kind, which is the
+    // hub's own condition for accepting this design.
+    //
+    // `chat_backfill_error`/`chat_backfill_error_at` are the record of a
+    // stall: TODAY, one space's read failing aborts every OTHER space that
+    // same person shared for the rest of that tick (`google-read.ts`'s chat
+    // loop had no try/catch at all, unlike Drive's per-file one and Gmail's
+    // `Promise.allSettled`) — a live, independent bug fixed on its own first,
+    // in the commit before this one, because it is a standalone defect and
+    // not merely scaffolding for this backfill. `_at` is set ONLY on the
+    // FIRST failure and cleared only on a real success, so it answers "since
+    // when", which a bare message cannot.
+    //
+    // NULL on every existing row — nothing has ever written any of these
+    // four columns, so this loses no data and needs no backfill of its own.
+    version: "0082_the_sweep_learns_to_look_behind_itself",
+    sql: `
+ALTER TABLE knowledge_ingest ADD COLUMN backfilled_through TEXT;
+ALTER TABLE google_sources ADD COLUMN chat_backfilled_through TEXT;
+ALTER TABLE google_sources ADD COLUMN chat_backfill_error TEXT;
+-- WHEN, not just what — the hub's own addition. An error with no timestamp
+-- cannot distinguish "failed once an hour ago" from "has been failing since
+-- June", and that is the difference between a person seeing a space that
+-- just stopped working and a stall nobody has looked at in months. Set ONLY
+-- on the FIRST failure (knowledge-google.ts's \`writeChatSpaceBackfillError\`
+-- COALESCEs against the existing value) and cleared only on a real success,
+-- so it is never wiped by a failure repeating.
+ALTER TABLE google_sources ADD COLUMN chat_backfill_error_at TEXT;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

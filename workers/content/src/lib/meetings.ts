@@ -1370,8 +1370,13 @@ const CATCH_UP_DAYS = 14
  * before this app is two years of Glide (glide/RECONCILIATION.md), and an agency
  * calendar older than five years is not a record anybody is going to ask a question
  * about. It is a FLOOR, not a promise about Google — a calendar that starts three
- * years ago simply runs out of entries and the walk finishes early. */
-const BACKFILL_YEARS_BACK = 5
+ * years ago simply runs out of entries and the walk finishes early.
+ *
+ * EXPORTED — the knowledge base's own Google backfill (gmail, calendar, chat;
+ * `knowledge-google.ts`) reuses this ONE number rather than re-declaring it, on
+ * the owner's own instruction: one horizon for the whole product, never two
+ * that quietly drift apart. Import it there; do not retype `5`. */
+export const BACKFILL_YEARS_BACK = 5
 
 /** …AND HOW FAR FORWARD. A year, because that is where a real calendar stops: an
  * annual review booked next spring is a real appointment, and a weekly stand-up
@@ -1383,8 +1388,10 @@ const BACKFILL_DAYS_AHEAD = 365
  * times has their history; small enough that one slice of one quiet quarter is
  * one or two Google reads. When a slice holds more entries than a bounded read
  * will walk, the cursor stops at the last one read (see `syncCalendar`), so a
- * busy quarter takes several calls and loses nothing. */
-const BACKFILL_SLICE_DAYS = 90
+ * busy quarter takes several calls and loses nothing.
+ *
+ * EXPORTED for the same reason `BACKFILL_YEARS_BACK` is — see its own comment. */
+export const BACKFILL_SLICE_DAYS = 90
 
 /** One instance of a repeating entry that is NOT yet a record — read-only, and
  * shown so nobody is surprised by it. */

@@ -72,9 +72,10 @@ import { ulid } from "@shared/workers/id"
 import { mendMojibake } from "@shared/workers/mojibake"
 import { GOOGLE_SCOPED_SERVICES, GOOGLE_SERVICES, type GoogleItem, type GoogleService, type GoogleShelf } from "@shared/types"
 import type { Env } from "../env"
-import { accessTokenFor, googleScope, listConnections, listNamedSources } from "./google"
-import { calendarEventIdInText, googlePresence, type ProbableService } from "./google-api"
-import { hydrateText, readGoogleMaterial } from "./google-read"
+import { accessTokenFor, googleScope, knownChatPeople, listConnections, listNamedSources } from "./google"
+import { calendarEventIdInText, chatMessages, googlePresence, isConnectionLost, type ChatMessage, type ProbableService } from "./google-api"
+import { chatThreadItem, chatThreads, hydrateText, readGoogleMaterial, tokenOrNull } from "./google-read"
+import { BACKFILL_SLICE_DAYS, BACKFILL_YEARS_BACK } from "./meetings"
 import { execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
@@ -565,6 +566,330 @@ export async function knownGmailIds(cfg: D1Rest, guard: MemberGuard): Promise<Se
   }
 }
 
+/* ────────────────── THE BACKWARD WALK — migration 0082 ──────────────────────
+ *
+ * `knowledge_ingest.cursor` (above, and knowledge-ingest.ts) watermarks how
+ * far a kind has FILED. It says nothing about how far a Google kind has
+ * LOOKED: gmail and calendar read a fixed window near "now" every tick — the
+ * newest ~200 threads, whatever `calendarList` hands back with no
+ * `timeMin`/`timeMax` at all — and once everything in that window is filed,
+ * every later tick reads the SAME window and finds nothing new. History
+ * older than the window's floor was never going to be reached by a cursor
+ * that only ever watermarks what was SEEN, because nothing ever asks Google
+ * to look further back. `backfilled_through` (`knowledge_ingest`) and
+ * `chat_backfilled_through` (`google_sources`, one row per named space — see
+ * below) are that second watermark, walked independently of the forward one
+ * and merged into the same tick's rows.
+ *
+ * ONE FLOOR, THE OWNER'S OWN NUMBER: `BACKFILL_YEARS_BACK` /
+ * `BACKFILL_SLICE_DAYS`, imported from `meetings.ts` rather than
+ * re-declared — meetings' own 5-year calendar backfill already proved this
+ * shape in production, and two copies of "five years" is two places the
+ * owner's ruling can drift apart.
+ *
+ * TWO DIRECTIONS, NOT ONE, because the two Google APIs involved hand results
+ * back in OPPOSITE orders and a backward walk is only gap-free when it reads
+ * its ALREADY-CONFIRMED boundary FIRST — see the header on
+ * `meetings.ts`'s own `backfillCursor`: "forward-only is the whole safety of
+ * it… a pair of frontiers crawling outwards from today can [leave a gap] the
+ * first time a slice truncates." A single frontier is gap-free only when a
+ * truncated read is guaranteed to have covered ground CONTIGUOUS with what
+ * was already confirmed, which depends on which end of the query window the
+ * API reads first:
+ *
+ *   • `calendarList` (`google-api.ts`) always orders ascending
+ *     (`orderBy: "startTime"`, Google's own requirement for it) — the read
+ *     starts at the OLDER edge. So calendar (and chat's own backfill below,
+ *     which chooses `orderBy: "createTime"` ascending on purpose to match)
+ *     walk RISING: from the floor toward now, exactly `meetings.ts`'s own
+ *     shape. A truncated read has fully covered `[from, X]` for some
+ *     `X < to` — contiguous with the already-confirmed ground below `from`,
+ *     never with a hole next to it.
+ *   • Gmail's `messages.list` has no ordering parameter at all and always
+ *     returns newest-first. Forcing calendar's shape onto it would mean the
+ *     read starts at `to` — the NEW, not-yet-confirmed edge — so a truncated
+ *     read (verified below: at the measured historical rate a 90-day slice
+ *     holds roughly 700 threads against a 200-thread page budget, so
+ *     truncation is the ORDINARY case here, not the exception calendar
+ *     treats it as) would credit ground next to the wrong boundary and open
+ *     a permanent hole beside the existing frontier. So gmail walks FALLING
+ *     instead: from now toward the floor, reading `to` (already-adjacent to
+ *     the live window) first — the same safety property, mirrored to match
+ *     the one order Gmail will actually give it.
+ *
+ * BOTH DIRECTIONS STOP FOR REAL. `now` (and the floor) recompute fresh every
+ * call — cheap, and correct for the live windows, which is why
+ * `meetings.ts`'s own future-facing ceiling is happy to "keep pace with it,
+ * a slice at a time, for ever": the future keeps producing new ground to
+ * keep pace WITH. This walk has an actual finish line — the ordinary forward
+ * sweep already owns everything from near-now onward — so recomputing a
+ * live boundary every tick would reopen a sliver-sized slice for ever,
+ * costing a Google call every fifteen minutes for five years for nothing
+ * anyone would ever notice. `BACKFILL_DONE` is the explicit "stop asking"
+ * flag that a moving `now` cannot quietly undo.
+ */
+
+/** THE SENTINEL, not a timestamp — and it never crosses the boundary of this
+ * file. A stored value this cannot parse as a date would fall back to "never
+ * backfilled" and restart the whole walk from the floor — the opposite of
+ * done — which is why every read of the raw column goes through
+ * `stateFromRaw` before anything else touches it, and every write goes
+ * through `rawFromState` on the way back out. Nothing outside those two
+ * functions may compare the raw column value, in TypeScript or in SQL: a
+ * `WHERE backfilled_through < ?` written anywhere else would compare
+ * `"caught-up"` against an ISO string and get an answer that happens to work
+ * by an accident of alphabet, until one day it does not. */
+const BACKFILL_DONE = "caught-up"
+
+/** THE ONE SHAPE EVERY CALLER SEES — never the raw column, never the
+ * sentinel string. `through: null` means "never backfilled at all", which is
+ * a real, distinct state from `done` (nothing walked yet) and from a real
+ * timestamp (walked, not yet finished). */
+export type BackfillState = { done: true } | { done: false; through: string | null }
+
+function stateFromRaw(raw: string | null): BackfillState {
+  return raw === BACKFILL_DONE ? { done: true } : { done: false, through: raw }
+}
+
+function rawFromState(state: BackfillState): string {
+  return state.done ? BACKFILL_DONE : (state.through ?? "")
+}
+
+/** RISING: floor → now, ascending. Calendar, and chat's own per-space walk.
+ *
+ * WHY ASCENDING IS RISING AND NOT A PREFERENCE: Google returns ascending and
+ * offers no descending option for either lane that uses this direction
+ * (`calendarList`'s own `orderBy: "startTime"`, and chat's backfill choosing
+ * `orderBy: "createTime"` to match). A forward walk reads from the CONFIRMED
+ * frontier into new territory, so a truncated read trims the far,
+ * unattempted edge and the confirmed region stays contiguous — nothing is
+ * ever credited that was not actually seen. A backward walk over the same
+ * ascending order would read from the UNEXPLORED end instead, so a
+ * truncation drops entries adjacent to the safe frontier — and crediting
+ * that read opens a permanent hole the walk has already moved past. It would
+ * never be found again, because nothing ever revisits ground behind a
+ * single, forward-only frontier. That is exactly the failure `meetings.ts`'s
+ * own header warns about ("a pair of frontiers crawling outwards from
+ * today… does [leave a gap] the first time a slice truncates"), and it is
+ * why this direction is not a simplification waiting to happen — walking
+ * this backward would silently reintroduce it.
+ *
+ * `null` means no Google call this tick — either genuinely done or,
+ * transiently, a slice that already reached `now` (the caller is expected to
+ * persist the done state once it sees that; see `advanceRisingBackfill`).
+ * The floor recomputes off `now` every call, same as `meetings.ts`'s own. */
+export function risingBackfillWindow(now: Date, state: BackfillState): { from: string; to: string } | null {
+  if (state.done) return null
+  const floor = new Date(now.getTime() - BACKFILL_YEARS_BACK * 365 * 24 * 60 * 60 * 1000)
+  const parsed = Date.parse(state.through ?? "")
+  const from = Number.isFinite(parsed) && parsed > floor.getTime() ? new Date(parsed) : floor
+  if (from.getTime() >= now.getTime()) return null
+  const to = new Date(Math.min(from.getTime() + BACKFILL_SLICE_DAYS * 24 * 60 * 60 * 1000, now.getTime()))
+  return { from: from.toISOString(), to: to.toISOString() }
+}
+
+/** MOVE THE RISING WALK ON, honestly — mirrors `meetings.ts`'s own
+ * `advanceBackfill` exactly: a truncated read (ascending) has covered
+ * `[window.from, lastEntryAt]`, so the next call resumes there rather than
+ * at `window.to`; a truncated read whose last entry starts no later than
+ * `window.from` (a pile of simultaneous entries) advances anyway rather
+ * than stalling for ever, same degenerate case, same answer. Reaching `now`
+ * returns `{done:true}` instead of a timestamp `now` would immediately be
+ * behind on the very next call — see the header on `BACKFILL_DONE` for why a
+ * moving `now` cannot be allowed to undo that once it is reached. */
+function advanceRisingBackfill(
+  now: Date,
+  window: { from: string; to: string },
+  truncated: boolean,
+  lastEntryAt: string | null
+): BackfillState {
+  let next = window.to
+  if (truncated) {
+    const at = Date.parse(lastEntryAt ?? "")
+    if (Number.isFinite(at) && at > Date.parse(window.from)) next = new Date(at).toISOString()
+  }
+  return Date.parse(next) >= now.getTime() ? { done: true } : { done: false, through: next }
+}
+
+/** FALLING: now → floor, and the read must start at `to` — see the header on
+ * `risingBackfillWindow` for why gmail alone walks this direction (Gmail's
+ * `messages.list` has no ordering parameter and always returns newest-first,
+ * so `to` — already adjacent to the live window — is the end that reads
+ * first here, the same safety property mirrored to match the one order
+ * Gmail will actually give it). `through: null` here means "nothing
+ * confirmed yet", which reads as "start at now". */
+function fallingBackfillWindow(now: Date, state: BackfillState): { from: string; to: string } | null {
+  if (state.done) return null
+  const floor = new Date(now.getTime() - BACKFILL_YEARS_BACK * 365 * 24 * 60 * 60 * 1000)
+  const parsed = Date.parse(state.through ?? "")
+  const to = Number.isFinite(parsed) && parsed < now.getTime() ? new Date(parsed) : now
+  if (to.getTime() <= floor.getTime()) return null
+  const from = new Date(Math.max(to.getTime() - BACKFILL_SLICE_DAYS * 24 * 60 * 60 * 1000, floor.getTime()))
+  return { from: from.toISOString(), to: to.toISOString() }
+}
+
+/** MOVE THE FALLING WALK ON — the mirror image of `advanceRisingBackfill`:
+ * the read starts at `window.to` (newest-first), so a truncated read has
+ * covered `[firstEntryAt, window.to]` and the next call resumes at
+ * `firstEntryAt` rather than at `window.from`. Reaching the floor returns
+ * `{done:true}` for the same reason the rising walk does at `now`. */
+function advanceFallingBackfill(
+  now: Date,
+  window: { from: string; to: string },
+  truncated: boolean,
+  firstEntryAt: string | null
+): BackfillState {
+  let next = window.from
+  if (truncated) {
+    const at = Date.parse(firstEntryAt ?? "")
+    if (Number.isFinite(at) && at < Date.parse(window.to)) next = new Date(at).toISOString()
+  }
+  const floor = new Date(now.getTime() - BACKFILL_YEARS_BACK * 365 * 24 * 60 * 60 * 1000)
+  return Date.parse(next) <= floor.getTime() ? { done: true } : { done: false, through: next }
+}
+
+/** THE ONE ACCESSOR — the hub's condition: gmail and calendar keep a single
+ * watermark on their own `knowledge_ingest` row; chat's one row can stand
+ * behind MANY named spaces (migration 0082's own header says why), so its
+ * answer to "how far back has this kind's backfill reached" is DERIVED — the
+ * MINIMUM across its own live spaces' watermarks, correctness first, never a
+ * silent drop of a space that cannot be read (see `writeChatSpaceBackfillError`
+ * for the half that keeps that honest). Both are right for their own shape,
+ * and this is the ONE place that knows which is which — every caller that
+ * wants a KIND's overall progress (as opposed to one space's own, which
+ * `chatBackfillRows` still needs at finer grain than this) asks HERE, so
+ * shipping a second way to answer the same question stays impossible by
+ * construction rather than by remembering. */
+async function backfilledThrough(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  kind: "gmail" | "calendar" | "chat",
+  stateKey: string
+): Promise<BackfillState> {
+  if (kind !== "chat") {
+    const rows = await d1Query<{ backfilled_through: string | null }>(
+      cfg,
+      guard.databaseId,
+      // R14: one row by primary key.
+      "SELECT backfilled_through FROM knowledge_ingest WHERE kind = ? LIMIT 1",
+      [stateKey]
+    )
+    return stateFromRaw(rows[0]?.backfilled_through ?? null)
+  }
+  const rows = await d1Query<{ chat_backfilled_through: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14: bounded by how many spaces one person can name (a hand-kept list).
+    "SELECT chat_backfilled_through FROM google_sources WHERE user_id = ? AND service = 'chat' AND deactivated_at IS NULL",
+    [guard.userId]
+  )
+  // NO LIVE SPACES IS VACUOUSLY DONE — there is nothing left to walk, which
+  // is a true and different sentence from "walked and finished".
+  if (rows.length === 0) return { done: true }
+  const states = rows.map((r) => stateFromRaw(r.chat_backfilled_through))
+  if (states.every((s) => s.done)) return { done: true }
+  // A SPACE THAT HAS NEVER STARTED counts as the earliest possible position —
+  // the minimum cannot be more advanced than its least-advanced member.
+  const unfinished = states.filter((s): s is { done: false; through: string | null } => !s.done)
+  if (unfinished.some((s) => s.through === null)) return { done: false, through: null }
+  const throughs = unfinished.map((s) => s.through as string).sort()
+  return { done: false, through: throughs[0] ?? null }
+}
+
+/** WHERE THE WALK HAS GOT TO, for gmail/calendar — `knowledge_ingest`, the
+ * same row `sweepKind` already reads/writes for `cursor` (see migration
+ * 0082's header for why this is one row, not two). An UPSERT rather than
+ * `meetings.ts`'s bare UPDATE: unlike `google_connections` (a row created at
+ * OAuth-connect time, always there before any sync runs), a `knowledge_ingest`
+ * row for a stateKey that has never filed anything yet may not exist. The
+ * other columns take their table defaults (`runs`/`sources_indexed` = 0) on
+ * the INSERT branch; `sweepKind`'s own `recordRun` UPSERT (knowledge-ingest.ts)
+ * reconciles them afterwards either way, whichever of the two writes this
+ * tick happens to reach first. */
+async function writeBackfillThrough(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  stateKey: string,
+  state: BackfillState
+): Promise<void> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `INSERT INTO knowledge_ingest (kind, backfilled_through) VALUES (?, ?)
+       ON CONFLICT (kind) DO UPDATE SET backfilled_through = excluded.backfilled_through`,
+    [stateKey, rawFromState(state)]
+  )
+}
+
+/** CHAT'S OWN PER-SPACE READ — finer grain than `backfilledThrough` above on
+ * purpose: `chatBackfillRows` decides each NAMED SPACE's own window, which is
+ * a different question from the kind's overall progress and is answered from
+ * the same row (`google_sources`) the space itself lives on, so a stall
+ * shows up next to the space a person actually shared rather than buried in
+ * an aggregate nobody can act on. */
+async function readChatSpaceBackfill(cfg: D1Rest, guard: MemberGuard, sourceId: string): Promise<BackfillState> {
+  const rows = await d1Query<{ chat_backfilled_through: string | null }>(
+    cfg,
+    guard.databaseId,
+    // R14: one row by primary key.
+    "SELECT chat_backfilled_through FROM google_sources WHERE id = ? LIMIT 1",
+    [sourceId]
+  )
+  return stateFromRaw(rows[0]?.chat_backfilled_through ?? null)
+}
+
+/** ONE WRITE, both columns — success clears any earlier `chat_backfill_error`
+ * (and its timestamp) in the SAME statement that advances the watermark, so
+ * a space that stalled once and then recovers does not keep showing a stale
+ * error next to fresh progress. A bare UPDATE is right here (unlike
+ * `writeBackfillThrough`'s UPSERT): the row already exists — it is the named
+ * space itself. */
+async function writeChatSpaceBackfill(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  sourceId: string,
+  state: BackfillState
+): Promise<void> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `UPDATE google_sources
+        SET chat_backfilled_through = ?, chat_backfill_error = NULL, chat_backfill_error_at = NULL
+      WHERE id = ?`,
+    [rawFromState(state), sourceId]
+  )
+}
+
+/** THE STALL, RECORDED — the hub's ruling, structurally: `chat_backfilled_through`
+ * is left exactly where it was (never wiped, same reasoning as
+ * `recordRun`'s own `cursor`-preserving `ON CONFLICT`), and the error sits
+ * beside it where the space's own row already is.
+ *
+ * `chat_backfill_error_at` is set ONLY ON THE FIRST FAILURE — the hub's own
+ * addition: an error with no timestamp cannot distinguish "failed once an
+ * hour ago" from "has been failing since June", and that distinction is the
+ * difference between a person seeing "this space stopped working just now"
+ * and a stall nobody has looked at in months. `COALESCE` against the
+ * EXISTING column is what makes repeated failures leave it alone; only a
+ * successful `writeChatSpaceBackfill` clears it, matching the message. */
+async function writeChatSpaceBackfillError(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  sourceId: string,
+  error: string,
+  now: string
+): Promise<void> {
+  await d1Query(
+    cfg,
+    guard.databaseId,
+    `UPDATE google_sources
+        SET chat_backfill_error = ?,
+            chat_backfill_error_at = COALESCE(chat_backfill_error_at, ?)
+      WHERE id = ?`,
+    [error, now, sourceId]
+  )
+}
+
 export function googleIngestKinds(
   env: Env,
   cfg: D1Rest,
@@ -699,23 +1024,39 @@ export function googleIngestKinds(
     cursor: { at: string; id: string } | null,
     limit: number,
     toRows: (items: GoogleItem[]) => IngestRow[],
-    hydrate = false
-  ): Promise<IngestRow[]> => {
+    hydrate = false,
+    /** THE BACKFILL'S OWN WINDOW (migration 0082), when this call is walking
+     * backward rather than watching the live one. Present ⇒ `readGoogleMaterial`
+     * is bounded to it, `afterCursor` is skipped entirely (the window itself is
+     * the bound; the forward cursor's position is irrelevant to material it has
+     * already passed by, ahead or behind), and `truncated` is handed back so the
+     * caller can advance the backfill honestly instead of guessing from the row
+     * count alone. NOT recorded into `seen` — that map answers "what does
+     * Google currently hold", and a bounded historical slice is a different,
+     * much narrower question. */
+    window?: { from: string; to: string }
+  ): Promise<{ rows: IngestRow[]; truncated: boolean }> => {
     const gmailKnownIds = gmailKnownIdsApply(service, cursor) ? await knownGmailIds(cfg, guard) : undefined
-    const { items } = await readGoogleMaterial(env, cfg, guard, { services: [service], gmailKnownIds })
+    const { items, truncated } = await readGoogleMaterial(env, cfg, guard, {
+      services: [service],
+      gmailKnownIds,
+      from: window?.from,
+      to: window?.to,
+    })
     // RECORDED BEFORE THE CURSOR NARROWS IT. The slice below is what this tick
     // will FILE; this is everything the service currently holds, which is a
     // different and much larger sentence — and it is the only one that can tell
     // "Google no longer has this" from "the cursor has already passed it".
-    if (seen) seen.set(service, new Map(items.map((i) => [i.externalId, i.shelf])))
-    const wanted = afterCursor(inCursorOrder(toRows(items)), cursor).slice(0, limit)
+    if (seen && !window) seen.set(service, new Map(items.map((i) => [i.externalId, i.shelf])))
+    const ordered = inCursorOrder(toRows(items))
+    const wanted = (window ? ordered : afterCursor(ordered, cursor)).slice(0, limit)
     // THE FOLD RIDES THE SAME EXIT `mended` DOES, and for the same reason: a
     // fifth lane added tomorrow is covered because it goes through `slice`, not
     // because somebody remembered.
     const targets = await foldTargets()
     const fold = (r: IngestRow) =>
       settledEvent(statedEvent(service, folded(service, mended(r), targets)), targets)
-    if (!hydrate || wanted.length === 0) return wanted.map(fold)
+    if (!hydrate || wanted.length === 0) return { rows: wanted.map(fold), truncated }
     // Hydration is per ITEM, so the slice is mapped back to the items it came
     // from — by the id this module builds, which is the only key both sides share.
     const byId = new Map(items.map((i) => [rowId(i), i]))
@@ -729,7 +1070,95 @@ export function googleIngestKinds(
       wanted.map((r) => byId.get(r.originRowId)).filter((i): i is GoogleItem => Boolean(i))
     )
     const textById = new Map(full.map((i) => [rowId(i), i.text]))
-    return wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body }))
+    return { rows: wanted.map((r) => fold({ ...r, body: textById.get(r.originRowId) || r.body })), truncated }
+  }
+
+  /** ONE KIND'S BACKWARD WALK, folded into its regular forward read — the
+   * shape shared by calendar (rising) and gmail (falling): read the current
+   * `backfilled_through`, compute this tick's slice, read it through the
+   * SAME `slice()` every regular read uses (same fold, same fencing, same
+   * mojibake mend — a fifth backfilled kind gets all of that for free), and
+   * advance the watermark by what was ACTUALLY read, never by what was asked
+   * for. Merged with the forward rows by `originRowId` — an item both windows
+   * happen to see this tick is upserted once, not filed twice (the fold's own
+   * `ON CONFLICT`, R68, already makes a double-upsert harmless; this is
+   * simply not doing it twice on purpose). Returns `[]` and touches Google
+   * not at all once the walk is done — `risingBackfillWindow`/
+   * `fallingBackfillWindow` returning `null` is the whole of that. */
+  const backfillRows = async (
+    service: "calendar" | "gmail",
+    stateKey: string,
+    limit: number,
+    toRows: (items: GoogleItem[]) => IngestRow[],
+    hydrate: boolean,
+    rising: boolean
+  ): Promise<IngestRow[]> => {
+    const now = new Date()
+    const state = await backfilledThrough(cfg, guard, service, stateKey)
+    const window = rising ? risingBackfillWindow(now, state) : fallingBackfillWindow(now, state)
+    if (!window) return []
+    const { rows, truncated } = await slice(service, null, limit, toRows, hydrate, window)
+    const boundary = rows.map((r) => r.sortAt).filter(Boolean).sort()
+    const next = rising
+      ? advanceRisingBackfill(now, window, truncated, boundary[boundary.length - 1] ?? null)
+      : advanceFallingBackfill(now, window, truncated, boundary[0] ?? null)
+    await writeBackfillThrough(cfg, guard, stateKey, next)
+    return rows
+  }
+
+  /** MERGE THE TWO WINDOWS BY `originRowId` — the forward read wins a
+   * collision (it is the one already trusted to decide `retired`/fold state
+   * for the live case), matching `meetings.ts`'s own dedup-by-id over
+   * `past ∪ future ∪ slice`. */
+  const mergeWindows = (forward: IngestRow[], backfill: IngestRow[]): IngestRow[] => {
+    const byId = new Map(forward.map((r) => [r.originRowId, r]))
+    for (const r of backfill) if (!byId.has(r.originRowId)) byId.set(r.originRowId, r)
+    return [...byId.values()]
+  }
+
+  /** CHAT'S PER-SPACE RISING WALK — the shape the hub ruled on: correctness
+   * first (a stalled space never gets silently dropped from the answer), a
+   * stall RECORDED rather than swallowed (`chat_backfill_error`, next to the
+   * space that produced it), and each space's own frontier kept on its own
+   * row so the aggregate is never the only place the truth lives.
+   *
+   * ONE PAGE PER SPACE PER TICK, ascending (`chatMessages`'s own `window`
+   * param — see its header for why ascending is the direction that keeps a
+   * truncated read gap-free here, same reasoning as `risingBackfillWindow`).
+   * A dense space simply takes more ticks to drain its own history; it does
+   * not cost any OTHER space a turn, and it does not cost the live read a
+   * thing — this is an entirely separate call, bounded on its own. */
+  const chatBackfillRows = async (
+    toRows: (items: GoogleItem[]) => IngestRow[],
+    limit: number
+  ): Promise<IngestRow[]> => {
+    const token = await tokenOrNull(env, cfg, guard, "chat")
+    if (!token) return []
+    const now = new Date()
+    const rows: IngestRow[] = []
+    const known = await knownChatPeople(cfg, guard)
+    for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active)) {
+      const state = await readChatSpaceBackfill(cfg, guard, space.id)
+      const window = risingBackfillWindow(now, state)
+      if (!window) continue
+      let page: { messages: ChatMessage[]; learned: Map<string, string>; truncated: boolean }
+      try {
+        page = await chatMessages(token, space.externalId, known, window)
+      } catch (e) {
+        if (isConnectionLost(e)) throw e
+        const reason = e instanceof Error ? e.message : String(e)
+        await writeChatSpaceBackfillError(cfg, guard, space.id, reason, now.toISOString())
+        continue
+      }
+      for (const [id, name] of page.learned) known.set(id, name)
+      const items = chatThreads(page.messages).map((m) => chatThreadItem(space, m, guard.userId))
+      const mapped = toRows(items)
+      rows.push(...mapped.slice(0, limit))
+      const sortAts = mapped.map((r) => r.sortAt).filter(Boolean).sort()
+      const next = advanceRisingBackfill(now, window, page.truncated, sortAts[sortAts.length - 1] ?? null)
+      await writeChatSpaceBackfill(cfg, guard, space.id, next)
+    }
+    return rows
   }
 
   return [
@@ -745,29 +1174,36 @@ export function googleIngestKinds(
       label: "Drive documents",
       windowed: true,
       textVersion: 1,
-      read: (_cfg, _guard, cursor, limit) =>
-        slice(
-          "drive",
-          cursor,
-          limit,
-          (items) =>
-            items.map((item) => ({
-              originRowId: rowId(item),
-              sortAt: moment(item.updatedAt),
-              // WHEN THIS IS FROM. Every Google lane already builds this moment
-              // for its cursor and none of them wrote it to the row, so 799 of the
-              // agency's 4,026 sources — every email, document, chat thread and
-              // calendar entry, 20% of the base — carried no date at all. Nothing
-              // that reasons about "latest" or "since last week" can see them.
-              recordDate: moment(item.updatedAt) || null,
-              title: item.title,
-              // Empty until hydration — the listing has no text in it at all.
-              body: "",
-              sourceUrl: item.url,
-              ...fencing(item),
-            })),
-          true
-        ),
+      read: async (_cfg, _guard, cursor, limit) =>
+        (
+          await slice(
+            "drive",
+            cursor,
+            limit,
+            (items) =>
+              items.map((item) => ({
+                originRowId: rowId(item),
+                sortAt: moment(item.updatedAt),
+                // WHEN THIS IS FROM. Every Google lane already builds this moment
+                // for its cursor and none of them wrote it to the row, so 799 of the
+                // agency's 4,026 sources — every email, document, chat thread and
+                // calendar entry, 20% of the base — carried no date at all. Nothing
+                // that reasons about "latest" or "since last week" can see them.
+                recordDate: moment(item.updatedAt) || null,
+                title: item.title,
+                // Empty until hydration — the listing has no text in it at all.
+                body: "",
+                sourceUrl: item.url,
+                ...fencing(item),
+              })),
+            true
+          )
+        ).rows,
+      // NO BACKWARD WALK HERE, ON PURPOSE. `driveList` lists an entire named
+      // folder every call (bounded by the folder's own size, not by a "newest
+      // N" window near now) — there is no history beyond what one call already
+      // reaches, so migration 0082's blindness does not apply to Drive at all.
+      // Measured: Drive's own gap after the wipe was zero.
     },
     {
       kind: KIND_OF.gmail,
@@ -784,27 +1220,41 @@ export function googleIngestKinds(
       // this on 20 Aug 2026 (`read: 1, indexed: 1, caughtUp: true` against
       // five spaces holding fifty messages each) when it made the same move.
       textVersion: 2,
-      read: (_cfg, _guard, cursor, limit) =>
-        slice(
+      read: async (_cfg, _guard, cursor, limit) => {
+        const toRows = (items: GoogleItem[]) =>
+          items.map((item) => ({
+            originRowId: rowId(item),
+            sortAt: moment(item.updatedAt),
+            // WHEN THIS IS FROM — the mail's own date. See the drive lane above.
+            recordDate: moment(item.updatedAt) || null,
+            title: item.title,
+            // The snippet until hydration replaces it with the real body. It is
+            // a hundred characters, which is enough to be worth having and not
+            // enough to answer anything — which is why mail is hydrated.
+            body: item.text,
+            sourceUrl: item.url,
+            ...fencing(item),
+          }))
+        // FALLING (now → floor): Gmail's `messages.list` has no ordering
+        // parameter and always returns newest-first — see the header on
+        // `fallingBackfillWindow` above for why that is the direction that
+        // keeps a truncated read gap-free here specifically.
+        //
+        // SEQUENTIAL, not `Promise.all` — two independent Gmail searches at
+        // once is two independent rate-limit risks for one tick's read; this
+        // walk has no deadline the way the live window does, so there is
+        // nothing bought by racing them.
+        const { rows: forward } = await slice("gmail", cursor, limit, toRows, true)
+        const backfill = await backfillRows(
           "gmail",
-          cursor,
+          googleStateKey("gmail", guard.userId),
           limit,
-          (items) =>
-            items.map((item) => ({
-              originRowId: rowId(item),
-              sortAt: moment(item.updatedAt),
-              // WHEN THIS IS FROM — the mail's own date. See the drive lane above.
-              recordDate: moment(item.updatedAt) || null,
-              title: item.title,
-              // The snippet until hydration replaces it with the real body. It is
-              // a hundred characters, which is enough to be worth having and not
-              // enough to answer anything — which is why mail is hydrated.
-              body: item.text,
-              sourceUrl: item.url,
-              ...fencing(item),
-            })),
-          true
-        ),
+          toRows,
+          true,
+          false
+        )
+        return mergeWindows(forward, backfill)
+      },
     },
     {
       kind: KIND_OF.calendar,
@@ -851,8 +1301,8 @@ export function googleIngestKinds(
       // this retires rather than skips, the day the meeting finally happens the
       // condition stops being true, the sweep meets a live row, and the engine
       // revives it (see `sweepKind` — the app may undo its own retirement).
-      read: (_cfg, _guard, cursor, limit) =>
-        slice("calendar", cursor, limit, (items) => {
+      read: async (_cfg, _guard, cursor, limit) => {
+        const toRows = (items: GoogleItem[]) => {
           const now = new Date().toISOString()
           return items.map((item) => {
             const at = moment(item.updatedAt)
@@ -885,7 +1335,22 @@ export function googleIngestKinds(
               ...fencing(item),
             }
           })
-        }),
+        }
+        // RISING (floor → now): `calendarList` always orders ascending, the
+        // one direction that keeps a truncated slice gap-free here — see the
+        // header on `risingBackfillWindow` above. Sequential for the same
+        // reason gmail's own backfill is: no deadline to race against.
+        const { rows: forward } = await slice("calendar", cursor, limit, toRows)
+        const backfill = await backfillRows(
+          "calendar",
+          googleStateKey("calendar", guard.userId),
+          limit,
+          toRows,
+          false,
+          true
+        )
+        return mergeWindows(forward, backfill)
+      },
     },
     {
       kind: KIND_OF.chat,
@@ -955,8 +1420,8 @@ export function googleIngestKinds(
       // folding itself lives in google-read's `chatThreads`, beside the reader
       // that knows what a message is — so by the time an item reaches here it IS
       // a conversation, and this lane has nothing left to group.
-      read: (_cfg, _guard, cursor, limit) =>
-        slice("chat", cursor, limit, (items) =>
+      read: async (_cfg, _guard, cursor, limit) => {
+        const toRows = (items: GoogleItem[]) =>
           items.map((item) => ({
             // The THREAD is the row, so the thread's own id is the key. A new
             // reply updates the conversation in place rather than filing a
@@ -1041,7 +1506,14 @@ export function googleIngestKinds(
             retired: item.appOnly === true,
             ...fencing(item),
           }))
-        ),
+        // THE LIVE READ (unbounded, newest per space) plus CHAT'S OWN
+        // per-space rising walk (`chatBackfillRows`, migration 0082) — two
+        // genuinely separate calls, merged the same way gmail's and
+        // calendar's are.
+        const { rows: forward } = await slice("chat", cursor, limit, toRows)
+        const backfill = await chatBackfillRows(toRows, limit)
+        return mergeWindows(forward, backfill)
+      },
     },
   ]
 }

@@ -1,5 +1,5 @@
 // ONE SPACE'S REFUSAL IS ONE SPACE'S — a live defect, found while building
-// migration 0081's backfill rather than caused by it, and fixed on its own
+// migration 0082's backfill rather than caused by it, and fixed on its own
 // first: `google-read.ts`'s chat branch had NO try/catch around `chatMessages`
 // at all, unlike Drive's per-file isolation (`driveFileText`, same file) and
 // Gmail's `Promise.allSettled` (`google-api.ts`'s `gmailSearch`). A space that
