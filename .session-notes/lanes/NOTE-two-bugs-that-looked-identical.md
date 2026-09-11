@@ -60,20 +60,42 @@ in three passes against three rows is a prompt fitted to noise, and the branch i
 left unmerged for the same reason: shipping it would mean shipping a change whose
 only evidence is that it did not break anything.
 
-## What would actually close it — for whoever picks this up
+## What I thought would close it — MEASURED, AND IT IS WRONG
 
-The signal nobody is using is the one that is already sitting there: **a content
-word from the question that appears in ZERO chunks.** "dinner" is not a rare
-word, it is an ABSENT one, and absence is a different fact from rarity. The
-corpus can answer "do we hold anything about a dinner at all?" before any model
-is asked to judge relevance — one FTS count, no spend, and it is the same shape
-as `isRareAccountToken` reading the corpus to decide whether a name may narrow.
+The idea written here first was: **a content word from the question that appears
+in ZERO chunks.** "dinner" is not a rare word, it is an ABSENT one, and absence
+is a different fact from rarity — one FTS count, no spend.
 
-Risks to weigh before building it: a typo would look identical to an absence, and
-a question whose subject is genuinely new would refuse rather than saying "we
-have nothing on that yet" — which may be the same sentence, or may not.
+**It would have broken a question that works.** Measured against the live corpus
+before anybody built it:
 
-## Related
+```
+A-X9  "…discuss at dinner on the 14th?"     dinner=0                    would refuse ✓
+A-O2  "…agree with Asekurans…?"             asekurans=0 (a known name)  excludable ✓
+A-O1  "How does a chemist get reimbursed?"  chemist=0  reimbursed=0     would REFUSE ✗
+```
 
-- [[NOTE-a-thinking-model-cannot-do-a-bounded-job]] — the reader's model.
-- The floor's own header in `knowledge.ts` carries both measured numbers.
+**A-O1 is one of the owner's own eight, and it was proved working four hours
+earlier** — it answers out of the voucher material, which never uses the words
+"chemist" or "reimbursed" at all. It says "pharmacy" and "voucher".
+
+That is not a flaw in the rule's implementation. **It is the rule contradicting
+the thing semantic search is FOR.** A question that shares no words with the
+material it should find is the paraphrase case — the entire reason the reader
+exists, and the exact category (`para`, 23/28) this rebuild spent the day
+fixing. A zero-count rule would refuse the best answers this base gives.
+
+The known-name exclusion rescues A-O2 and does nothing for A-O1, because
+"chemist" is not a name and never will be.
+
+**So: no cheap fix. A-X9 stays open, and the next person should NOT start here.**
+The honest shape of the remaining problem is that the retrieved passage is REAL,
+about the RIGHT PERSON, on approximately the RIGHT DAY, and the only thing wrong
+with it is that no dinner happened — which is a fact about the world that
+nothing in the corpus records, because corpora record what DID happen.
+
+Anyone picking this up should start by asking whether that is a retrieval
+problem at all, rather than a question the writer should be answering with "I
+can see what Alaap was doing around the 14th, but nothing here mentions a
+dinner" — which is the `d-thin` behaviour the base already has, and already
+does well.
