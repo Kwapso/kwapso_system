@@ -37,7 +37,7 @@ export type MintFail = { error: string; message: string; status: number }
  * escape, and never anybody else's turn. */
 export function clientIp(request: Request): string {
   const raw = request.headers.get("CF-Connecting-IP") ?? ""
-  // Attacker-shaped input on a pre-auth door: strip NULs (D1 rejects them → a
+  // Attacker-shaped input on a pre-auth door: strip NULs (they truncate every SQLite text function → a
   // 500), trim, and cap at the longest real IPv6-with-zone. Truncate rather than
   // refuse — a strange header must not be able to break sign-in.
   const clean = raw.split(String.fromCharCode(0)).join("").trim().slice(0, 45)

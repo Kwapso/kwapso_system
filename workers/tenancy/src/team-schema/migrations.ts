@@ -5667,10 +5667,14 @@ ALTER TABLE knowledge_sources DROP COLUMN identity_key;
     // THE FIRST FIX ENCODED A MARK IN THE PROSE ITSELF (a NUL-bracketed tag in
     // front of each piece, stripped again before a chunk's stored text) and it
     // is why this migration exists rather than a code-only patch: this repo
-    // already knows D1 rejects an embedded NUL. \`shared/workers/validate.ts\`
-    // says so in its own header ("SQLite (D1) also rejects embedded NUL
-    // bytes") and strips one from every REQUEST field for exactly that
-    // reason. A mark built the same way inside \`knowledge_sources.body\` —
+    // already strips NULs at its request boundary. WHY it does was recorded
+    // WRONGLY across seven files until this migration landed, and the true
+    // reason is the sharper one: D1 does NOT reject an embedded NUL. Measured
+    // 2026-09-11 against the live REST door — a bound \`A\\0B\\0C\` returns HTTP
+    // 200 and \`hex()\` hands back \`4100420043\`, every byte intact. But every
+    // SQLite TEXT function stops at the first NUL, so \`length()\` on that same
+    // value answers 1. There is no error to catch; the value simply reads back
+    // short. A mark built the same way inside \`knowledge_sources.body\` —
     // which never passes through that boundary seam, because it arrives from
     // Google, not a request — would have been rejected at the write or
     // silently mangled on the way, and every test that proved the mark

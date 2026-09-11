@@ -207,7 +207,8 @@ export type GrainPiece = { text: string; speaker: string | null; saidAt: string 
  * stores it — `chunkChat`'s own speaker/time, still attached, JSON-parsed off
  * that column rather than recovered from prose. THE FIRST ATTEMPT encoded
  * this in `body` itself, behind a NUL-bracketed mark, and could not have
- * worked: D1 rejects an embedded NUL (`shared/workers/validate.ts` strips one
+ * worked: an embedded NUL truncates every SQLite text function at the first
+ * one, and D1 stores it without complaint (`shared/workers/validate.ts` strips one
  * from every request field for exactly that reason), so a source carrying
  * one would fail the write or be silently mangled on the way — caught before
  * merge. The column is what that migration's own header explains at length. */

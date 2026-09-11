@@ -1,8 +1,19 @@
 // Input-boundary validation for worker request handlers. The bare
 // `body.field?.trim()` pattern only guards null/undefined — a non-string (number,
 // array, object, boolean) makes `.trim` undefined and throws a TypeError, which the
-// central catch turns into a 500. SQLite (D1) also rejects embedded NUL bytes
-// (U+0000) → another 500. And nothing capped text length, so a multi-MB string
+// central catch turns into a 500. Embedded NUL bytes (U+0000) are the second
+// trap, and this comment described them WRONGLY until 2026-09-11: D1 does not
+// reject a NUL. MEASURED against the live REST door that day — a bound
+// parameter of `A\0B\0C` returns HTTP 200 and `hex()` gives back `4100420043`,
+// all five bytes, byte-perfect. What it does instead is quieter and worse:
+// every SQLite TEXT function stops at the first NUL, so `length()` on that
+// same value answers **1**. A stored string carrying one therefore lies about
+// itself to `length`, `substr`, `instr` and LIKE, and reads back truncated
+// with no error anywhere. That is why they are stripped HERE, at the boundary,
+// rather than left for a 500 that never comes. (The bug that earned the
+// measurement: a chat body was to be marked up with NULs, and
+// `knowledge.ts`'s detail excerpt draws through `substr(body, 1, N)` — every
+// chat source would have rendered a blank panel.) And nothing capped text length, so a multi-MB string
 // either bloated a row or 500'd. These helpers type-check, strip NULs, cap length,
 // and throw a GuardError the worker already maps to a clean 400 — one validation seam.
 

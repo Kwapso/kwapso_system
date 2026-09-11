@@ -517,7 +517,8 @@ export function isMaintenancePath(pathname: string): boolean {
  * resolved — so the per-caller ceiling in `teamContext` cannot apply, and the IP
  * is what is left. Hardened the same way auth's own `clientIp` is, and for the
  * same reason: this is attacker-shaped input on a pre-auth door, so NULs are
- * stripped (D1 rejects them, which would turn a record into a 500), it is
+ * stripped (a NUL truncates every SQLite text function at the first one, so a
+ * record would read back silently short), it is
  * trimmed, and it is capped at the longest real IPv6-with-zone. Truncate rather
  * than refuse — a strange header must not become a way to skip the throttle. */
 export function maintenanceCaller(request: Request): string {

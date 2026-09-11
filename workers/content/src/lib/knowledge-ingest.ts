@@ -155,7 +155,8 @@ export type IngestRow = {
   accounts?: string[]
   /** THE SOURCE'S OWN STRUCTURED PIECES — text, speaker and time, kept apart
    * from `body` rather than encoded in it (tracker `a-pieces`, migration
-   * 0081's own comment says why: D1 rejects an embedded NUL, so an in-band
+   * 0081's own comment says why: an embedded NUL truncates every SQLite text
+   * function at the first one, so an in-band
    * mark could not have worked). Set only by a reader that already computes
    * per-message identity — chat's `chatThreads` today, `google-read.ts` — and
    * absent everywhere else, which is the correct, generic answer: a document,

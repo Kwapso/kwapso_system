@@ -1,6 +1,6 @@
 // tracker `a-pieces`, take two. The first attempt encoded a piece's speaker
 // and time as a mark inside `body` itself and could not have worked — D1
-// rejects an embedded NUL (shared/workers/validate.ts's own header says so).
+// truncates every SQLite text function at an embedded NUL (validate.ts says so).
 // The hub's ruling: a separate column, `knowledge_sources.grain_pieces`
 // (migration 0081), read by `indexSource` INSTEAD of re-chunking `body` when
 // it is present. This is that: PIECES WIN, AND seq FOLLOWS THEM, proven

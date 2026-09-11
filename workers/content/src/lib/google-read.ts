@@ -292,7 +292,8 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  *
  * THE FIRST FIX ENCODED IT IN THE PROSE ITSELF — a mark in front of each run,
  * stripped again before a chunk's stored text — and could not have worked:
- * D1 rejects an embedded NUL byte (`shared/workers/validate.ts` strips one
+ * an embedded NUL truncates every SQLite text function at the first one — D1
+ * stores it fine, which is the trap (`shared/workers/validate.ts` strips one
  * from every request field for exactly that reason), and `body` never passes
  * through that seam, because it arrives from Google, not a request. Caught
  * before merge.

@@ -1125,7 +1125,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // through this same engine from a different call site) is what actually
 // reaches the 105 chat sources already on file; nothing here re-indexes
 // on its own.
-const SHARED_DIGEST = "d3c9ee8cfa2eefcb"
+// RE-PINNED, 2026-09-11 (the NUL correction): COMMENT-ONLY. This digest hashes
+// the shared helpers' source TEXT, comments included — which is the point of it,
+// and why a prose fix moves it. Seven files asserted that "D1 rejects an embedded
+// NUL". It does not: measured against the live REST door, a bound `A\0B\0C`
+// returns HTTP 200 and `hex()` gives back `4100420043`, every byte intact. Every
+// SQLite TEXT function simply stops at the first NUL, so `length()` answers 1.
+// Correcting that sentence changed no SQL, no chunker, no reader and nothing any
+// kind SAYS — every per-kind digest below is unmoved, which is the evidence. A
+// textVersion bump would re-embed the whole base to change zero words.
+const SHARED_DIGEST = "d43c48ae8025321f"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
