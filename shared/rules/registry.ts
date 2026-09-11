@@ -1385,9 +1385,15 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // NOT one of the three — it is data, not catalogued copy, and never
   // touches `t()` (see `WhatItDid` in web/components/assistant/agent-sources.tsx).
   // Same $0-spend reason as every entry above it.
-  de: 19,
-  es: 19,
-  ca: 19,
+  //
+  // RAISED 19 -> 20 in all three, 11 Sep 2026, tracker `b-gmail`: one new
+  // sentence in the knowledge form's "Who can use it" field, said only for a
+  // mirrored source genuinely sitting at "private" — see the file's own
+  // comment on why the control used to show a wrong state instead of this
+  // sentence. Same $0-spend reason as every entry above it.
+  de: 20,
+  es: 20,
+  ca: 20,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
