@@ -185,7 +185,8 @@ import { useRemembered } from "@shared/web/remembered"
 
 import { RECORD_TABS_CONFIG } from "@/components/records/record-chrome"
 import { TabsView } from "@shared/web/screen-engine/tabs-view"
-import { NoAccess } from "@/components/deep-link/screen-bits"
+import { NoAccess, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { MembersGallery } from "@/components/team/members-gallery"
 import { moduleSettingsIndex } from "@/components/screens/module-settings-screen"
 import { RolesMatrix } from "@/components/team/roles-matrix"
@@ -229,6 +230,29 @@ export function SettingsScreen({
   const [tab, setTab] = useRemembered("tab", initialTab ?? "appearance", (remembered) =>
     initialTab ? initialTab : typeof remembered === "string" ? remembered : undefined
   )
+
+  // THE MODULES WALL'S OWN TOOLBAR STATE — client, 11 Sep 2026: *"to modules in
+  // settings, also add toolbar / no add buton / sort by - name"*. R48 is the law
+  // that already said this ("the toolbar, including the search, should be
+  // absolutely everywhere we have a data view or a collection view"), and it
+  // could not see this wall: both of its censuses ask about a TAG — a
+  // `BASE_RECIPES` entry carrying a `CollectionConfig`, or a `<ToolbarRow>` call
+  // site — and a hand-built `CardGrid` of `<Card>`s is neither. There is now a
+  // `<ToolbarRow>` on this panel, so the second census sees it from here on.
+  //
+  // DECLARED HERE RATHER THAN IN THE PANEL, because the panel is a BRANCH of
+  // `renderPanel` — a render prop, called inside `TabsView`'s own render — and
+  // a `useState` in one arm of a five-way dispatch is a hook whose position
+  // moves with the open tab. The two containers this tab draws beside it
+  // (`MembersGallery`, `RolesMatrix`) are components and hold their own; this
+  // wall is drawn inline because R67's panel census reads what a branch
+  // RETURNS, and a body it cannot see through is a body it reports as standing
+  // on the bare page.
+  const [moduleQuery, setModuleQuery] = React.useState("")
+  // NAME, BOTH WAYS. The field is fixed and the DIRECTION is the live question —
+  // see the `sort` slot below for the argument and for the two call sites in
+  // `web/components/accounts/` that already ship a single-option control.
+  const [moduleSortDir, setModuleSortDir] = React.useState<"asc" | "desc">("asc")
 
   // MEMBERS + ROLES — ONE READ, TWO CONTAINERS. `useScreenData` loads members
   // only "on its own module" (its own doc), which `module: "members"` turns on;
@@ -533,6 +557,32 @@ export function SettingsScreen({
             // disagreeing (R61 holds this to one expression).
             const modules = moduleSettingsIndex(can)
 
+            // SEARCHED FIRST, THEN ORDERED — the same order every collection in
+            // the app applies, and the same seam: a `SearchInput`, a piece of
+            // component state, and one `.filter()` over the rows already in the
+            // browser (`members-gallery.tsx`, the wall this one was built to
+            // match, and all nine of `contact-panels.tsx`/`client-org-panel.tsx`'s
+            // bespoke rows). Nothing new is written here.
+            //
+            // BY THE MODULE'S OWN NAME, and only that. The card carries a second
+            // line — the page's section titles, "Ticket types · Automations" —
+            // and it is deliberately NOT searched: the client asked for a
+            // toolbar and a sort by name, and a search box that also matches a
+            // subtitle answers a question nobody asked while making "why did
+            // Accounts come back for `automations`?" the reader's problem.
+            // `t(page.title)` rather than the raw key, so the search matches the
+            // words actually on the card in the language actually on screen.
+            const moduleQ = moduleQuery.trim().toLowerCase()
+            const shownModules = modules
+              .filter(({ page }) => !moduleQ || t(page.title).toLowerCase().includes(moduleQ))
+              // `.filter()` above already returns a fresh array, so this sorts
+              // our own copy and never `MODULE_SETTINGS`' own order.
+              .sort(
+                (a, b) =>
+                  t(a.page.title).localeCompare(t(b.page.title)) *
+                  (moduleSortDir === "asc" ? 1 : -1)
+              )
+
             // NOTHING TO SHOW AND NOTHING TO EXPLAIN. The same answer the
             // module settings PAGE gives a reader it refuses (`NoAccess` on
             // `/settings/<segment>`), and for the same reason —
@@ -554,160 +604,312 @@ export function SettingsScreen({
               )
 
             return (
-              <div className="flex flex-col gap-4">
-                {/* THE SENTENCE THAT MAKES ONE ROW READ AS FINISHED. Today
-                    Tickets is the only module with anything to set, so this list
-                    has exactly one row — correct, and it would look like a bug
-                    without a line saying what the list is FOR. It says three
-                    things and each is load-bearing: the list holds the modules
-                    with something to set (so a short list is the answer, not a
-                    truncation), a row is the same page as that module's gear (so
-                    a reader who found it the other way is not looking at a
-                    second copy), and a module with nothing to set is absent (her
-                    own ruling, *"Only the ones with something to set"*, said out
-                    loud rather than left to be inferred from a gap). */}
-                <p className="text-muted-foreground text-sm">
-                  {t(
-                    "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed."
-                  )}
-                </p>
+              /* THE CONTAINER MOVED OUT OF THE WALL AND ROUND THE WHOLE PANEL,
+                 AND THE TOOLBAR IS THE REASON — client, 11 Sep 2026: *"to
+                 modules in settings, also add toolbar / no add buton / sort by
+                 - name"*.
 
-                {/* A WALL OF CARDS, EACH WITH ITS MODULE'S ICON — client,
-                    2026-09-10: *"the settings / modules i want in the same
-                    component kinda grid like team members, each with its
-                    icon."* It was the same `<List>` "This team" draws one tab
-                    to the left, and she has now named a different shape for
-                    this one.
+                 IT WAS `CardGrid tone="panel"`, WHICH CONTAINED THE WALL AND
+                 NOTHING ELSE. That was the right answer to her previous ruling
+                 ("remember in settings modules card, needs container
+                 background") and it is the wrong shape to hang a toolbar off:
+                 a `<ToolbarRow>` above that grid would have stood on the
+                 SETTINGS PAGE GROUND, and the row's own pill is
+                 `bg-surface-raised`. Measured on staging, light, 2026-09-11:
+                 the shell's body pane is `--surface-raised` #FFFEF9 and
+                 `--background` is #FFFEF9 — so the toolbar would have painted
+                 itself at CONTRAST 1.000 against what it was standing on,
+                 which is the exact pairing R67 was earned by, one control
+                 along and invisible in the palette where it lives.
 
-                    THE SAME COMPONENT, LITERALLY. `CardGrid` is the kit part
-                    the members gallery is built on
-                    (`web/components/team/members-gallery.tsx`), reached the
-                    same way — `fluid`, so the wall chooses its own column
-                    count from the cell width rather than stranding a lone card
-                    on the fixed three-column ladder. That file's own note
-                    carries the argument; this is the second caller, not a
-                    second grid.
+                 SO THE PANEL IS THE BOX AND THE WALL IS BARE — the shape the
+                 members gallery next door already draws, and the shape she
+                 named for this wall in the first place ("the settings /
+                 modules i want in the same component kinda grid like team
+                 members"). The box is the kit's own `Card` at its DEFAULT
+                 variant, which is `bg-surface-panel` and the box radius, with
+                 `CardContent`'s own untouched inset — `p-6 lg:p-[var(--space-7)]`,
+                 the identical ladder `CardGrid`'s `tone="panel"` was spending
+                 here and `TeamPanel` spends one tab over — so the box a reader
+                 sees does not move by a pixel and not one number is typed at
+                 this call site. The two tones stay two (§2.6): panel ground,
+                 `raised` cells, and now a `raised` toolbar pill — 1.103 light,
+                 1.111 dark, the numbers team-panel.tsx measured for the same
+                 pairing.
 
-                    `MIN_MODULE_CARD` IS WIDER THAN A MEMBER'S. A member's cell
-                    is a round mark and two centred lines; this one carries a
-                    subtitle that lists the page's sections ("Ticket types"),
-                    which is a phrase rather than a name. 16rem is the kit's
-                    smaller figure (210px) plus room for that line to sit on
-                    one row at the common case.
+                 KIT PARTS AND NOT `TeamPanel`, AND NOT `CollectionCard`, AND
+                 BOTH REFUSALS ARE A CENSUS'S LIMIT RATHER THAN A PREFERENCE.
+                 R67 resolves what a component paints by NAME off its own
+                 declaration text: `TeamPanel` is a name TWO components in this
+                 repo answer to (this law's own note says so) and the walk picks
+                 the OTHER one, which paints nothing — measured, red, 11 Sep
+                 2026; and `CollectionCard` paints through a `Card` it renders,
+                 which that walk deliberately does not follow. A `<Card>` here
+                 is read through its `cva` instead, which is exact. The cost is
+                 written down rather than hidden: `CollectionCard` is the box
+                 that PUBLISHES `--pinned-lead`/`--pinned-inset-x`, so this
+                 panel's toolbar pins square and flush instead of carrying the
+                 container's top band and rounded corners with it (R63 v/vi) —
+                 exactly as the members gallery's own row does, for the same
+                 reason. Only two files may name either property, so closing it
+                 is a change to R63 and R67 together, not to this panel.
 
-                    A REAL ANCHOR, WHICH THE ROW WAS NOT. This used to be a
-                    `List` with `onItemClick`, and the comment here said so at
-                    length: the kit's row has no href, so the index could not be
-                    middle-clicked or copied while the gear pointing at the same
-                    page could. Owning the cell means owning that too —
-                    `InAppLink` (R37) is what the gear already uses, so both
-                    doors onto one page are now the same kind of door.
+                 R67 IS UNTOUCHED AND STRICTER. This branch's body still stands
+                 on paper; the caption came INSIDE the box with it, which is
+                 where amendment 4 (2026-09-11) put a sentence that would
+                 otherwise be its own body on the page ground. */
+              <Card>
+                <CardContent className="flex min-w-0 flex-col gap-4">
+                  {/* THE SENTENCE THAT SAYS WHAT THE LIST IS FOR. It says three
+                      things and each is load-bearing: the list holds the modules
+                      with something to set (so a short list is the answer, not a
+                      truncation), a row is the same page as that module's gear (so
+                      a reader who found it the other way is not looking at a
+                      second copy), and a module with nothing to set is absent (her
+                      own ruling, *"Only the ones with something to set"*, said out
+                      loud rather than left to be inferred from a gap). */}
+                  <p className="text-muted-foreground text-sm">
+                    {t(
+                      "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed."
+                    )}
+                  </p>
 
-                    THE ICON IS DERIVED AND NOT DECLARED. `CONCEPT_ICON` is the
-                    app's one icon vocabulary, keyed by concept, and a settings
-                    segment IS a module key — so the card wears the glyph the
-                    nav rail and every tab already use for that module, without
-                    this panel or `MODULE_SETTINGS` naming one. A segment the
-                    vocabulary has never heard of falls back to the gear, which
-                    is what a settings page is; R61 (ii) is untouched because
-                    nothing here spells a segment. */}
-                {/* THE GROUND THE WALL STANDS ON — client, 2026-09-10:
-                    *"remember in settings modules card, needs container
-                    background."* Her third saying of one sentence (the Team
-                    tab, then Settings › Integrations, which became R67), and
-                    the first one R67 could not see: the law's subject is a
-                    `<section>` carrying a heading, and a TAB PANEL has no
-                    heading of its own — it is titled by the strip above it.
-                    Every settings tab was invisible to the law by
-                    construction. R67 is widened to the panel body in the same
-                    change as this fix; the comment in
-                    `web/test/sections-stand-on-paper.test.ts` carries the
-                    argument.
+                  {/* THE ROW AND THE WALL IN ONE UNGAPPED COLUMN — R49. The gap
+                      between a toolbar and what it sits above is ONE number and
+                      the row pays it itself (`mb-[var(--toolbar-content-gap)]` on
+                      its own root); this panel's `CardContent` is a `flex flex-col gap-4`, so a
+                      row that were its direct child would be handed a second,
+                      competing number for the same distance. That is the exact
+                      double-spend R49 was written about, and it is invisible to
+                      R49's own census here, which reads the nearest open
+                      `<div>`/`<section>` and stops at a COMPONENT wrapper — see
+                      this lane's report. So the pair gets its own column with no
+                      gap of its own, and the `CardContent`'s `gap-4` is spent where it
+                      belongs: between the caption and the collection. The same
+                      shape `contact-panels.tsx` already uses round its three
+                      rows. */}
+                  <div className="flex min-w-0 flex-col">
+                    {/* THE TOOLBAR — client, 11 Sep 2026: *"to modules in
+                        settings, also add toolbar / no add buton / sort by -
+                        name"*, and R48 before her: "the toolbar, including the
+                        search, should be absolutely everywhere we have a data
+                        view or a collection view."
 
-                    `tone="panel"` IS THE KIT'S OWN ANSWER, NOT A WRAPPER WE
-                    BUILT. `CardGrid` already has the variant, and its source
-                    describes this exact failure: "`panel` is for a wall
-                    standing on the PAGE, where a `--card` cell measures 1.000
-                    against the page tone and would be held up by its shadow
-                    alone." That is not a risk here, it is what was shipping:
-                    the cells are `Card variant="raised"` (`bg-card`), and in
-                    LIGHT `--card`, `--surface-raised` and `--background` are
-                    all #FFFEF9 — the identical 1.000 the Team tab measured
-                    before `team-panel.tsx` was written, one tab over.
+                        NO `actions`, AND IT IS NOT A SLOT LEFT EMPTY. She said no
+                        add button, and there is nothing here to create: these
+                        rows are `MODULE_SETTINGS` put through `visibleModuleSettings`
+                        (R61), a table in the source, so a `+` would be a control
+                        with nothing behind it. R50 needs no entry for a slot a
+                        collection genuinely has no act for.
 
-                    THE TWO TONES STAY TWO. §2.6 gives the app two paper tones
-                    and no third, so the container takes the PANEL tone
-                    (`--surface-panel`) and the cards keep `raised` — soft
-                    paper under off-beige, which is the same pairing
-                    `CollectionFrame` and `TeamPanel` draw. A third tone here,
-                    or panelling the cards instead of the ground, would
-                    collapse the pair and the cards would stop reading as
-                    cards. Measured on the running page, both palettes:
-                    light  panel #F7F2EB on page #FFFEF9 1.103, raised card
-                    #FFFEF9 on panel 1.103; dark  panel #1C1B18 on page
-                    #141310 1.079, raised card #26241F on panel 1.111.
+                        AND IT PINS (R63), flush at the pane's top edge, because
+                        nothing pins above it: this screen's tab strip is not a
+                        collection strip and wears no `PINNED_STRIP_MARK`, so
+                        `--pinned-chrome-h` resolves to the `0px` both front doors'
+                        `globals.css` declare — measured on staging, 2026-09-11.
+                        What does NOT ride along is R63 (v)/(vi)'s container band
+                        and its rounded top corners: `--pinned-lead` and
+                        `--pinned-inset-x` are published by `CollectionCard` and by
+                        the kit panel and by nothing else (the law allows exactly
+                        two files to name either property), so a toolbar inside a
+                        this `<Card>` pins square and flush — identically to the
+                        members gallery's own row one tab to the left, which has
+                        done so since R63 shipped. Written down rather than fixed
+                        here: closing it means either publishing the pair from a
+                        third box (which the law forbids) or moving both walls into
+                        `CollectionCard` (which R67's paint census cannot see
+                        through, so it would report both panels as standing on the
+                        bare page). That is a change to two laws, not to this
+                        panel. */}
+                    <ToolbarRow
+                      // R50 — the collection's RAW count, before the search
+                      // narrows it. It is guaranteed false here, because the
+                      // `modules.length === 0` return above is the refusal branch
+                      // and this row is only reached past it. Written as the
+                      // DERIVED expression rather than the `empty={false}` literal
+                      // its three cousins in `EMPTY_TOOLBAR_EXEMPT` carry: the
+                      // literal needs a registry line to explain it and a reviewer
+                      // to re-read that line the day the early return moves, and
+                      // this says the same thing off the collection itself and
+                      // keeps being true if it does.
+                      empty={modules.length === 0}
+                      search={
+                        <SearchInput
+                          value={moduleQuery}
+                          onChange={(e) => setModuleQuery(e.target.value)}
+                          onClear={() => setModuleQuery("")}
+                          placeholder={t("Search modules…")}
+                          className="w-full"
+                        />
+                      }
+                      // ONE FIELD, AND THE CONTROL STILL DECIDES SOMETHING —
+                      // *"sort by - name"*. A picker offering one option and
+                      // nothing else would be R36's "a box that decides nothing"
+                      // in a different costume; this is not that, because
+                      // `SortControl` draws a DIRECTION button beside the field
+                      // unless a caller passes `showDirection: false`, and
+                      // `ToolbarRow` never does. So the chip is A→Z / Z→A on a
+                      // wall of twelve, which is a real choice and is what a sort
+                      // control with one field normally offers. Two call sites
+                      // already ship exactly this and say so —
+                      // `account-detail-panels.tsx` ("one order worth offering, so
+                      // the FIELD is fixed and the DIRECTION is the live
+                      // question") and `contact-panels.tsx`' meetings list — which
+                      // is why `onValueChange` has nothing to do.
+                      //
+                      // AND NOT A SECOND FIELD SHE DID NOT ASK FOR. The card's
+                      // subtitle lists the page's sections and would order the
+                      // wall by a phrase most readers have never read; "sort by -
+                      // name" is one field, and offering two would be this lane
+                      // deciding something on her behalf.
+                      sort={{
+                        options: [{ value: "name", label: t("Name") }],
+                        value: "name",
+                        onValueChange: () => undefined,
+                        direction: moduleSortDir,
+                        onDirectionChange: setModuleSortDir,
+                      }}
+                    />
+                  {/* A WALL OF CARDS, EACH WITH ITS MODULE'S ICON — client,
+                      2026-09-10: *"the settings / modules i want in the same
+                      component kinda grid like team members, each with its
+                      icon."* It was the same `<List>` "This team" draws one tab
+                      to the left, and she has now named a different shape for
+                      this one.
 
-                    THE SENTENCE ABOVE STAYS OUTSIDE THE BOX. It is the
-                    panel's caption, the same position the heading takes on
-                    the Team tab's "This team" section and the same shape
-                    `CollectionFrame` draws everywhere — title out, content on
-                    paper. R67 excludes prose from containment for exactly
-                    this reason. */}
-                <CardGrid
-                  fluid
-                  tone="panel"
-                  minItemWidth={MIN_MODULE_CARD}
-                  label={t("Modules")}
-                >
-                  {modules.map(({ page, sections }) => (
-                    <Card key={page.segment} variant="raised">
-                      <InAppLink href={`/settings/${page.segment}`} className="block">
-                        <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
-                          <Icon
-                            name={
-                              CONCEPT_ICON[page.segment as keyof typeof CONCEPT_ICON] ??
-                              CONCEPT_ICON.settings
-                            }
-                            className="text-muted-foreground size-6"
-                          />
-                          {/* THE PAGE'S OWN NAME, so all three doors say the
-                              same words: this card, the gear's tooltip and
-                              accessible name, and the `<h1>` you land on. A
-                              card whose label is the module and whose
-                              destination is titled something else is the
-                              smallest possible way to make one page feel like
-                              two.
+                      THE SAME COMPONENT, LITERALLY. `CardGrid` is the kit part
+                      the members gallery is built on
+                      (`web/components/team/members-gallery.tsx`), reached the
+                      same way — `fluid`, so the wall chooses its own column
+                      count from the cell width rather than stranding a lone card
+                      on the fixed three-column ladder. That file's own note
+                      carries the argument; this is the second caller, not a
+                      second grid.
 
-                              THE KIT'S OWN TITLE PART, not a `<span>` — R65
-                              (`chip-above-title`). The law is about where a
-                              chip sits relative to the title, and a title
-                              hand-rolled into a span has no position a census
-                              can read, so every card that stands for a record
-                              names itself through `CardTitle`. `text-sm`
-                              because the kit's step is chapter 13's 18/500 for
-                              a full card and this is a cell on a wall — the
-                              class carries the wall's own step, exactly as it
-                              did when this was a span, and nothing about the
-                              drawing changes. */}
-                          <CardTitle className="text-sm">{t(page.title)}</CardTitle>
-                          {/* WHAT IS ACTUALLY CONFIGURABLE THERE, in the words
-                              the page's own section headings use — "Ticket
-                              types" rather than a repeat of the module's name.
-                              Off the FILTERED sections, so the line never
-                              advertises a block this reader will not be shown.
-                              The separator is punctuation and not a sentence,
-                              so it is not a catalogue string; each name is one,
-                              and each is already translated where
-                              MODULE_SETTINGS declares it. */}
-                          <span className="text-muted-foreground w-full truncate text-xs">
-                            {sections.map((s) => t(s.title)).join(" · ")}
-                          </span>
-                        </CardContent>
-                      </InAppLink>
-                    </Card>
-                  ))}
-                </CardGrid>
-              </div>
+                      `MIN_MODULE_CARD` IS WIDER THAN A MEMBER'S. A member's cell
+                      is a round mark and two centred lines; this one carries a
+                      subtitle that lists the page's sections ("Ticket types"),
+                      which is a phrase rather than a name. 16rem is the kit's
+                      smaller figure (210px) plus room for that line to sit on
+                      one row at the common case.
+
+                      A REAL ANCHOR, WHICH THE ROW WAS NOT. This used to be a
+                      `List` with `onItemClick`, and the comment here said so at
+                      length: the kit's row has no href, so the index could not be
+                      middle-clicked or copied while the gear pointing at the same
+                      page could. Owning the cell means owning that too —
+                      `InAppLink` (R37) is what the gear already uses, so both
+                      doors onto one page are now the same kind of door.
+
+                      THE ICON IS DERIVED AND NOT DECLARED. `CONCEPT_ICON` is the
+                      app's one icon vocabulary, keyed by concept, and a settings
+                      segment IS a module key — so the card wears the glyph the
+                      nav rail and every tab already use for that module, without
+                      this panel or `MODULE_SETTINGS` naming one. A segment the
+                      vocabulary has never heard of falls back to the gear, which
+                      is what a settings page is; R61 (ii) is untouched because
+                      nothing here spells a segment. */}
+                  {/* THE GROUND THE WALL STANDS ON — client, 2026-09-10:
+                      *"remember in settings modules card, needs container
+                      background."* Her third saying of one sentence (the Team
+                      tab, then Settings › Integrations, which became R67), and
+                      the first one R67 could not see: the law's subject is a
+                      `<section>` carrying a heading, and a TAB PANEL has no
+                      heading of its own — it is titled by the strip above it.
+                      Every settings tab was invisible to the law by
+                      construction. R67 is widened to the panel body in the same
+                      change as this fix; the comment in
+                      `web/test/sections-stand-on-paper.test.ts` carries the
+                      argument.
+
+                      THE GROUND MOVED UP A LEVEL ON 11 SEP 2026, AND THE TONES
+                      DID NOT MOVE AT ALL. It was `CardGrid tone="panel"`, the
+                      kit's own answer, and that contained the WALL. The toolbar
+                      she asked for the next day has to stand on the same paper
+                      or it paints itself at 1.000 against the page (see this
+                      branch's own head), so the box is now a kit `<Card>` round the
+                      whole panel and the wall keeps `CardGrid`'s default
+                      `tone="bare"` — "the ground is already paid for one level
+                      up", which is the sentence `members-gallery.tsx` writes
+                      about the identical wall one tab to the left. A second
+                      `bg-surface-panel` inside this one would be the 1.000 all
+                      over again, pointing the other way.
+
+                      THE TWO TONES STAY TWO. §2.6 gives the app two paper tones
+                      and no third, so the container takes the PANEL tone
+                      (`--surface-panel`) and the cards keep `raised` — soft
+                      paper under off-beige, which is the same pairing
+                      `CollectionFrame` and `TeamPanel` draw. Measured on the
+                      running page, both palettes: light panel #F7F2EB on page
+                      #FFFEF9 1.103, raised card #FFFEF9 on panel 1.103; dark
+                      panel #1C1B18 on page #141310 1.079, raised card #26241F on
+                      panel 1.111. The toolbar's own pill is `--surface-raised`
+                      and now reads against the same 1.103/1.111. */}
+                    <CardGrid
+                      fluid
+                      minItemWidth={MIN_MODULE_CARD}
+                      label={t("Modules")}
+                      // THE FILTERED ZERO, AND ONLY THE FILTERED ONE. A team with
+                      // no module settings at all never reaches here — the
+                      // `modules.length === 0` branch above returns the refusal
+                      // instead — so the only zero this wall can show is "your
+                      // search matched nothing", which is R62's `filtered`
+                      // register read through the kit's own `empty`/`emptyLabel`,
+                      // the same pair the members gallery passes.
+                      empty={shownModules.length === 0}
+                      emptyLabel={t("No modules match what you're looking for.")}
+                    >
+                      {shownModules.map(({ page, sections }) => (
+                        <Card key={page.segment} variant="raised">
+                          <InAppLink href={`/settings/${page.segment}`} className="block">
+                            <CardContent className="flex flex-col items-center gap-2 p-4 text-center">
+                              <Icon
+                                name={
+                                  CONCEPT_ICON[page.segment as keyof typeof CONCEPT_ICON] ??
+                                  CONCEPT_ICON.settings
+                                }
+                                className="text-muted-foreground size-6"
+                              />
+                              {/* THE PAGE'S OWN NAME, so all three doors say the
+                                  same words: this card, the gear's tooltip and
+                                  accessible name, and the `<h1>` you land on. A
+                                  card whose label is the module and whose
+                                  destination is titled something else is the
+                                  smallest possible way to make one page feel like
+                                  two.
+
+                                  THE KIT'S OWN TITLE PART, not a `<span>` — R65
+                                  (`chip-above-title`). The law is about where a
+                                  chip sits relative to the title, and a title
+                                  hand-rolled into a span has no position a census
+                                  can read, so every card that stands for a record
+                                  names itself through `CardTitle`. `text-sm`
+                                  because the kit's step is chapter 13's 18/500 for
+                                  a full card and this is a cell on a wall — the
+                                  class carries the wall's own step, exactly as it
+                                  did when this was a span, and nothing about the
+                                  drawing changes. */}
+                              <CardTitle className="text-sm">{t(page.title)}</CardTitle>
+                              {/* WHAT IS ACTUALLY CONFIGURABLE THERE, in the words
+                                  the page's own section headings use — "Ticket
+                                  types" rather than a repeat of the module's name.
+                                  Off the FILTERED sections, so the line never
+                                  advertises a block this reader will not be shown.
+                                  The separator is punctuation and not a sentence,
+                                  so it is not a catalogue string; each name is one,
+                                  and each is already translated where
+                                  MODULE_SETTINGS declares it. */}
+                              <span className="text-muted-foreground w-full truncate text-xs">
+                                {sections.map((s) => t(s.title)).join(" · ")}
+                              </span>
+                            </CardContent>
+                          </InAppLink>
+                        </Card>
+                      ))}
+                    </CardGrid>
+                  </div>
+                </CardContent>
+              </Card>
             )
           }
 

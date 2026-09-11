@@ -47,7 +47,6 @@ import {
 } from "@shared/ui/components/select/select"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { toast } from "@shared/ui/components/sonner/sonner"
-import { Headline } from "@shared/ui/components/typography/typography"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import { PencilSimple, X, Check, UploadSimple, Download, Power, Shield, ShieldSlash } from "@shared/ui/foundations/icons"
 
@@ -489,14 +488,28 @@ function GroupValues({ items, ctx }: { items: SelectableValue[]; ctx: RowContext
  * team with no ticket types but plenty of sprint types would draw a toolbar
  * over nothing, which is the exact shape R50 exists to refuse.
  *
- * `title`/`description` come with it rather than being derived, because the
- * embedded heading's own words ("Choices" / "Ticket types, Sprint types and
- * more") are true of the whole vocabulary and false of any slice of it. */
+ * `title` COMES WITH IT rather than being derived, because the embedded
+ * heading's own words ("Choices" / "Ticket types, Sprint types and more") are
+ * true of the whole vocabulary and false of any slice of it.
+ *
+ * `description` WAS BESIDE IT AND IS GONE — client, 2026-09-11, over a
+ * screenshot of this very screen: *"ticket types should be on top of the
+ * searchbar inside the container without subtitle, make this. always"*, her
+ * second saying of it (2026-09-10: *"in ticket settings (or any other module)
+ * no subtilte"*). Between the two she said the opposite once — *"The section
+ * description: no, I want to keep it."* — and that line is OVERRULED rather
+ * than overlooked: two clearer statements either side of it, the later one
+ * drawn on a screenshot of the screen. `shared/web/settings-section.tsx` holds
+ * the full account and the same deletion.
+ *
+ * THE FIELD WENT WITH THE SENTENCE, which is the half that matters: a section
+ * with nowhere to put a subtitle cannot grow one back, and `MODULE_SETTINGS`
+ * lost its `description` column in the same change. This is the shape
+ * `standalone` left by. */
 export interface SelectableScope {
   /** The `selectable_data.type` groups this mounting shows. */
   types: string[]
   title: string
-  description: string
   /** MAY A NEW VALUE BE ADDED TO THIS SLICE — a fact about the vocabulary, not
    * about the reader (the reader's own `selectable_data:create` right is asked
    * separately and both must agree).
@@ -737,20 +750,19 @@ export function SelectableScreen({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        {/* THE SECTION SAYS WHICH SLICE IT IS. A module settings page stacks
-            several sections on one screen, so "Choices" as a heading would name
-            the mechanism rather than the subject and would be the same word
-            over each of them. `scope.title` is the section's own name, supplied
-            by the page (see `SelectableScope`).
+      {/* THE TITLE USED TO STAND HERE, on the bare page ground, with its
+          description under it and the card below that — the exact three lines
+          the client drew on. It is now `<ToolbarRow title>`'s, one element
+          down: inside the container, on top of the search box, pinned with the
+          toolbar it titles. The words are unchanged and still `scope.title`'s;
+          what moved is who PLACES them, and that is the whole point — a
+          heading a call site positions is a heading a call site can position on
+          the white, which is what happened here through four rulings.
 
-            NO `CollectionHeading` AND NO COUNT (R16 ii). This used to branch on
-            `standalone`, because the whole-vocabulary SCREEN named and counted
-            itself through the registry; a section inside a page is never the
-            page, and the page above already carries the title. */}
-        <Headline as="h2" size="h4">{scope.title}</Headline>
-        <p className="text-muted-foreground mt-1 text-sm">{scope.description}</p>
-      </div>
+          NO `CollectionHeading` AND NO COUNT (R16 ii). This used to branch on
+          `standalone`, because the whole-vocabulary SCREEN named and counted
+          itself through the registry; a section inside a page is never the
+          page, and the page above already carries the title. */}
 
       {canCreate && (
         <SelectableFormDialog
@@ -774,6 +786,17 @@ export function SelectableScreen({
           search — so the button cannot drift back onto its own row. */}
       <CollectionCard>
           <ToolbarRow
+            // THE SECTION'S OWN NAME, INSIDE THE CONTAINER, ON TOP OF THE
+            // SEARCH BOX — client, 2026-09-11, this screen, verbatim: "ticket
+            // types should be on top of the searchbar inside the container
+            // without subtitle, make this. always". A STRING, so there is no
+            // position here for this call site to get wrong; the row draws it
+            // inside the pinned band (screen-bits.tsx's `title`).
+            //
+            // AND IT OUTLIVES `empty` BELOW. R50 takes the row away on an empty
+            // collection and the title stays — `CollectionEmptyState`'s "No
+            // values yet." is the register, not the section's name.
+            title={scope.title}
             // R50 — never toolbar on an empty collection. This row USED TO
             // draw regardless of `values.length` whenever `canCreate` was
             // true — a lone "New value" (plus Import CSV, for an import-
@@ -912,7 +935,32 @@ export function SelectableScreen({
           <div className="flex flex-col gap-6">
             {grouped.map((g) => (
               <div key={g.type} className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">{g.type}</h2>
+                {/* A GROUP LABEL ONLY WHERE THERE IS MORE THAN ONE GROUP.
+                    Ticket settings drew "Ticket types" as the section's title
+                    and then, two lines down, "Ticket type" as this label —
+                    twice for one thing, the second time because a section CAN
+                    hold several groups, not because this one does. On Accounts
+                    (Industries and countries) and Apps (Stages and deliverable
+                    kinds) the labels sort a real mixture and earn their place;
+                    on the other five they are the title said again in a smaller
+                    face.
+
+                    SELF-EXEMPTING, off its own data, which is the shape the kit
+                    already uses one control along: `ViewSwitch`
+                    (shared/ui/components/collection-frame/view-switch.tsx)
+                    decides from `views.length` whether it is a switch, a static
+                    label or nothing at all, rather than taking a prop for it —
+                    "an absent third zone is not a toolbar variation; it is an
+                    absence of data". `grouped` is this section's own answer to
+                    the same question, and a `showGroupLabels` prop would put it
+                    back at the six call sites that must not each decide.
+
+                    `grouped` AND NOT `scope.types`: the count that matters is
+                    how many groups are ON SCREEN. A section scoped to two
+                    groups whose second one has no values yet is showing one
+                    list, and a label over it names nothing the reader can see
+                    a second of. It reappears the moment the second group does. */}
+                {grouped.length > 1 && <h2 className="text-sm font-medium">{g.type}</h2>}
                 {/* A WALL OR A LADDER, decided by whether this mounting's group
                     has a palette (`SelectableScope.colour`) and by nothing
                     else. Client, 2026-09-10, on Ticket types: *"show it like

@@ -3279,13 +3279,51 @@ describe("RULES — the laws of the base", () => {
     const screenBits = stripComments(readFileSync(join(WEB, "components/deep-link/screen-bits.tsx"), "utf8"))
     // i(a) · `ToolbarRow`'s own central guard — checked BEFORE the "nothing to
     // draw" early return, so `empty` decides ahead of every slot.
+    // ── AMENDED 2026-09-11: THE GUARD RETURNS `heading`, AND `heading` IS A
+    //    TITLE OR NOTHING. ────────────────────────────────────────────────────
+    //
+    // This clause asserted the LITERAL `if (empty) return null`, which was the
+    // right proxy for "the row draws nothing" for as long as a row had nothing
+    // but controls in it. On 2026-09-11 the client ruled that a section's title
+    // sits inside its container, above the toolbar — "ticket types should be on
+    // top of the searchbar inside the container without subtitle, make this.
+    // always" — and `<ToolbarRow title>` is where that title is drawn, because
+    // it is the only element inside the container whose pinned band the title
+    // can ride (R63 part 3's `band`; a title drawn as the card's first child
+    // instead pushes the pinned box's top edge into the middle of the title
+    // block and cuts two page-coloured notches into the card's sides).
+    //
+    // SO R50's SENTENCE IS UNCHANGED AND ITS PROXY MOVED. "Never TOOLBAR on an
+    // empty collection, not even the create button" — a title is not a toolbar;
+    // it is pressed by nobody, it offers nothing, and taking a section's NAME
+    // away at the exact moment its collection is empty is R67's Access-tokens
+    // finding said about the heading instead of the register.
+    //
+    // THE NEW PROXY IS STRICTLY TIGHTER THAN THE OLD ONE, which is the reason
+    // it is acceptable. It does not merely allow a non-`null` return: it pins
+    // WHAT that return can be. `heading` is declared exactly once, as a
+    // conditional on `title`, so the empty exit is provably a title block or
+    // `null` and can never come to carry a slot — where `return null` only ever
+    // proved the shape on the day somebody read it.
     const toolbarRowBody = screenBits.slice(screenBits.indexOf("export function ToolbarRow("))
-    const emptyGateAt = toolbarRowBody.indexOf("if (empty) return null")
+    const emptyGateAt = toolbarRowBody.indexOf("if (empty) return heading")
     const noSlotsGateAt = toolbarRowBody.indexOf("if (!search && !filters && !sort && !view && !actions)")
     expect(
       emptyGateAt,
-      "R50 — ToolbarRow must open with `if (empty) return null` (screen-bits.tsx) — the central guard every call site leans on instead of gating its own `actions`"
+      "R50 — ToolbarRow must open with `if (empty) return heading` (screen-bits.tsx) — the central guard every call site leans on instead of gating its own `actions`"
     ).toBeGreaterThan(-1)
+    // …AND `heading` IS A TITLE OR NOTHING. Without this line the clause above
+    // would accept `const heading = <>{search}{actions}</>` and R50 would be
+    // enforcing its own spelling rather than its own sentence.
+    expect(
+      toolbarRowBody,
+      "R50 — ToolbarRow's `empty` exit returns `heading`, so `heading` must be declared as `title ? … : null` " +
+        "and nothing else: the one thing a row may draw on an empty collection is the section's own name"
+    ).toMatch(/const heading = title \? \(/)
+    expect(
+      toolbarRowBody.slice(0, toolbarRowBody.indexOf("const heading =")).includes("heading"),
+      "R50 — nothing may read `heading` before it is declared as the title-or-nothing node"
+    ).toBe(false)
     expect(
       noSlotsGateAt === -1 || emptyGateAt < noSlotsGateAt,
       "R50 — ToolbarRow's `empty` check must run BEFORE the no-slots-truthy check, so a truthy `actions` alone can never keep the row alive on an empty collection"
