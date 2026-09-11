@@ -1351,12 +1351,18 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // own wording ("Found in search — never quoted in an answer.", "N people
   // have seen this" / "1 person has seen this") — net +1 string (two removed,
   // three added, one gaining a singular form) — and the ceiling moves with
-  // it, in this same change, same as R44 asks. Accepted debt, not a
-  // regression to chase: raise it back to 0 once a translation pass answers
-  // these twelve.
-  de: 12,
-  es: 12,
-  ca: 12,
+  // it, in this same change, same as R44 asks.
+  //
+  // RAISED 12 -> 16 in all three, 11 Sep 2026, tracker `b-filing`: the
+  // account-match confirm sheet's four sentences (the title, the "looks
+  // like it belongs to" line, and the two button labels). Same reason as
+  // every entry above it — a $0-cap build lane, not fluent enough in
+  // Catalan to hand-translate a shipping product string, and forbidden from
+  // spending on the translation model. Accepted debt, not a regression to
+  // chase: raise it back to 0 once a translation pass answers all sixteen.
+  de: 16,
+  es: 16,
+  ca: 16,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

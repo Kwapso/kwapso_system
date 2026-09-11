@@ -1360,6 +1360,16 @@ export const content = {
         q ? `&q=${enc(q)}` : ""
       }`
     ),
+  /** DOES THIS NAME MATCH AN ACCOUNT? (b-filing, 10 Sep 2026.) Asked as
+   * somebody is naming a Drive folder or a Chat space, never as they submit —
+   * this only answers, it never files anything. Empty when nothing on file
+   * matches, one entry for a confident match, or several when the name is
+   * genuinely ambiguous (the caller's job to decide what to do with more than
+   * one — today, only exactly one match is offered as a confirm). */
+  googleMatchAccount: (name: string) =>
+    api<{ matches: { id: string; name: string }[] }>(
+      `/api/content/google/match-account?name=${enc(name)}`
+    ),
   /** Share SEVERAL — and say, in the same call, who may read them AND whose
    * material they are. Both questions are about where the contents end up,
    * neither can be read back off the contents afterwards, and both are the same

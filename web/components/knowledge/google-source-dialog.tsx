@@ -55,6 +55,7 @@ import { defaultFieldConfig } from "@shared/web/screen-engine/config"
 
 import type { GoogleShelf, GoogleSourceKind } from "@shared/types"
 import { ApiFailure, content } from "@/lib/api"
+import { GoogleAccountMatchSheet } from "@/components/knowledge/google-account-match-sheet"
 import { pickerKey, searchAccounts } from "@/lib/picker-sources"
 import { RecordPicker } from "@/components/records/record-picker"
 import { accountOption, type PickableRecord } from "@/lib/pickable"
@@ -178,6 +179,22 @@ export function GoogleSourceDialog({
   const noun = service === "chat" ? "space" : kind === "file" ? "file" : "folder"
   const chosen = values.items ?? []
   const ready = chosen.length > 0
+  // b-filing: the ONE name-matched account this sitting has found, waiting on
+  // a person's yes/no. Never more than one candidate at once — see the sheet's
+  // own header for why a batch of several items does not get one each.
+  const [pendingMatch, setPendingMatch] = React.useState<{
+    externalId: string
+    itemName: string
+    accountId: string
+    accountName: string
+  } | null>(null)
+  // A LIVE MIRROR of `values`, read inside `matchAccount` AFTER its `await` —
+  // the closure that function was created in holds whatever `values` was at
+  // the moment it was called, and a real request outlives that render. Ref,
+  // not state: nothing should re-render when this changes, it exists only to
+  // be read.
+  const valuesRef = React.useRef(values)
+  valuesRef.current = values
 
   async function look() {
     if (looking) return
@@ -200,11 +217,52 @@ export function GoogleSourceDialog({
    * multi-select where the only way to undo a mis-tap is to close the form and
    * start again is a multi-select that makes people slower. */
   function toggle(option: PickOption) {
+    const wasEmpty = (values.items ?? []).length === 0
+    const accountUntouched = values.accountId === AGENCY
     setValues((v) => {
       const items = v.items ?? []
       return items.some((i) => i.externalId === option.externalId)
         ? { ...v, items: items.filter((i) => i.externalId !== option.externalId) }
         : { ...v, items: [...items, { externalId: option.externalId, name: option.name, kind }] }
+    })
+    // b-filing — only fires for the FIRST item of a fresh selection, and only
+    // while nobody has already answered "whose material is this" by hand.
+    // Not on un-picking (that branch above removes an item, never adds one),
+    // and never for a second item beside the first — the single-account-per-
+    // sitting shape this whole form already has (see the header note).
+    if (wasEmpty && accountUntouched) void matchAccount(option)
+  }
+
+  async function matchAccount(option: PickOption) {
+    let matches: { id: string; name: string }[]
+    try {
+      matches = (await content.googleMatchAccount(option.name)).matches
+    } catch {
+      // A FAILED SUGGESTION IS SILENT, NEVER A REFUSAL. This is a courtesy on
+      // top of the ordinary manual picker below it, not a step the form
+      // depends on — somebody who cannot get a suggestion still shares the
+      // folder exactly as they always could.
+      return
+    }
+    // EXACTLY ONE, ONLY. Two or more real candidates is a genuinely ambiguous
+    // name (KB-AUDIT.md §4.2's own "solutions" problem in miniature) — the
+    // honest answer there is silence, the same one a caller manually
+    // searching gets, not a coin toss dressed as a confirm.
+    if (matches.length !== 1) return
+    // STILL TRUE? The lookup is a real request; a fast typist can un-pick the
+    // item, pick a different one, or pick their own account by hand before it
+    // answers. Read off `valuesRef` (the LIVE value), never the `values` this
+    // function's own closure captured when it was called — that copy is
+    // already as old as the request.
+    const fresh = valuesRef.current
+    const stillTheOneItem =
+      (fresh.items ?? []).length === 1 && fresh.items?.[0]?.externalId === option.externalId
+    if (!stillTheOneItem || fresh.accountId !== AGENCY) return
+    setPendingMatch({
+      externalId: option.externalId,
+      itemName: option.name,
+      accountId: matches[0].id,
+      accountName: matches[0].name,
     })
   }
 
@@ -229,6 +287,7 @@ export function GoogleSourceDialog({
   }
 
   return (
+    <>
     <FormShellDialog
       open={open}
       onOpenChange={onOpenChange}
@@ -469,5 +528,19 @@ export function GoogleSourceDialog({
         </p>
       </Field>
     </FormShellDialog>
+    {/* b-filing — the confirm-once sheet, over the form rather than inside
+        it: it answers a question the form asked itself, and closing it
+        (either button) always returns here with nothing else disturbed. */}
+    <GoogleAccountMatchSheet
+      open={!!pendingMatch}
+      itemName={pendingMatch?.itemName ?? ""}
+      accountName={pendingMatch?.accountName ?? ""}
+      onConfirm={() => {
+        if (pendingMatch) setValues((v) => ({ ...v, accountId: pendingMatch.accountId }))
+        setPendingMatch(null)
+      }}
+      onDecline={() => setPendingMatch(null)}
+    />
+    </>
   )
 }

@@ -150,6 +150,8 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "takes somebody's Google connection away and asks Google to revoke the grant. A person disconnects their own account, from their own settings, having decided to — it is not an errand, and an assistant able to end the connection it is working through is a strange thing to have built.",
   "GET /api/content/google/pick":
     "lists the Drive folders, Chat spaces, calendars or mail labels a person COULD name, so a form can offer them. Its answer is only useful to the sharing and scope doors, both deliberately toolless below — a picker for a form no machine fills in is a capability with nowhere to go.",
+  "GET /api/content/google/match-account":
+    "the same reasoning as the picker right above it, one step further in: does the folder or space a person just named match an account on file, so the share form can ask them to confirm it (tracker b-filing). It answers a question only that form's own confirm sheet asks, of a caller who is already mid-way through naming something in a UI a machine does not drive — an assistant does not name a Drive folder, it calls list_drive_files/list_chat_spaces and shares by id, so it has no 'what did I just type' to match in the first place.",
   "POST /api/content/google/sources":
     "shares a Drive folder or a Chat space, and in the same call decides WHO MAY READ IT — just this person, or the whole team. That is the decision the module is built around, asked in words at the moment of sharing, and it is not one an assistant should be able to make on somebody's behalf: an assistant that can widen what it is allowed to see is not fenced by anything.",
   "POST /api/content/google/scope":

@@ -223,6 +223,7 @@ import {
   postUploadStaffFile,
 } from "./routes/staff"
 import {
+  getGoogleAccountMatch,
   getGoogleCallback,
   getGoogleChat,
   getGoogleChatSpaces,
@@ -612,6 +613,9 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/content/google/disconnect": { handler: postGoogleDisconnect, kind: "mutation" },
   // What a connection shares: the picker, and the named folders and spaces.
   "GET /api/content/google/pick": { handler: getGooglePick, kind: "read" },
+  // b-filing: does this folder/space's own NAME match an account on file?
+  // Answers only — nothing here writes a row.
+  "GET /api/content/google/match-account": { handler: getGoogleAccountMatch, kind: "read" },
   "POST /api/content/google/sources": { handler: postGoogleSource, kind: "mutation" },
   // HOW MUCH OF A CONNECTION KWAPSO MAY READ — the Gmail and Calendar half of
   // the same question the sources door asks about Drive and Chat. routes/google.ts
