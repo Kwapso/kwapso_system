@@ -5805,6 +5805,47 @@ ALTER TABLE google_sources ADD COLUMN chat_backfill_error TEXT;
 ALTER TABLE google_sources ADD COLUMN chat_backfill_error_at TEXT;
 `,
   },
+  {
+    // c-misspell (BUILD-5's own promise, never built: §87 lists the name
+    // index's scope as "…aliases, misspellings", DATA-MODEL.md's own line on
+    // knowledge_names.name says it may hold "canonical, an alias, or a
+    // misspelling"). Measured on staging, 11 Sep 2026: `rebuildNameIndex`
+    // writes exactly the canonical name and `code.toLowerCase()`, nothing
+    // else — no row for "Paddlebase" (Padelbase) or "Asekurans" (Assecuranz)
+    // could ever exist, so the owner's own question ("What is happening with
+    // Paddlebase?") routed as "named no client" and answered off a brute
+    // search rather than the account.
+    //
+    // THE RULING (the hub, after weighing edit-distance and a phonetic key
+    // against a seeded list, and rejecting both): these are not typos, they
+    // are the owner's own STABLE spelling of a word ("padel" the sport is
+    // usually spelled with two d's; "Assecuranz" is German, written
+    // phonetically). An edit-distance or phonetic net would also catch
+    // unrelated words — this codebase already refused exactly that shape
+    // twice, by name, elsewhere (help.ts: "never free text — a fuzzy ranked
+    // match is not something a person can approve"; query-grammar.ts: "no
+    // edit distance, because…") — and HOGO is four letters, which is where
+    // any distance-1 net starts matching things that are not HOGO. A handful
+    // of active clients makes a curated list entirely tractable.
+    //
+    // WHY A COLUMN, NOT A ROW SEEDED DIRECTLY INTO knowledge_names:
+    // rebuildNameIndex EMPTIES that table and rebuilds it whole every run
+    // (0073's own design) — anything written straight into it would be
+    // wiped on the very next rebuild unless it were re-derived from
+    // something persistent, which only moves the problem back to needing a
+    // real column somewhere. This IS that column: real data a future door
+    // can read and write, not a constant in application code, and
+    // `rebuildNameIndex` reads it exactly the way it already reads `code`.
+    //
+    // NO GENERATED VARIANTS. A row here is a spelling a person chose to
+    // declare, never a computed "one letter off" — the ruling's own third
+    // rule, held structurally by never writing to this column from
+    // anywhere except a person's own input.
+    version: "0083_a_name_can_be_spelled_more_than_one_way",
+    sql: `
+ALTER TABLE accounts ADD COLUMN alt_names TEXT NOT NULL DEFAULT '[]';
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

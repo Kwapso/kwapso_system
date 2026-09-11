@@ -762,6 +762,77 @@ describe("the account router is not hijacked by a name that is also an ordinary 
   })
 })
 
+// c-misspell. The owner asked the live assistant "What is happening with
+// Paddlebase?" (his own spelling — the real account is Padelbase) and it
+// answered "the question named no client", off a brute search rather than the
+// account. Measured on staging (0083's own migration comment has the full
+// trail): rebuildNameIndex wrote only the canonical name and code.toLowerCase(),
+// so no row for "Paddlebase" or "Asekurans" could ever exist.
+//
+// THE HUB'S RULING, not mine to relitigate here: a DECLARED alias
+// (accounts.alt_names, a JSON array a person writes), never a generated
+// variant. Edit-distance and phonetic matching were both considered and
+// refused — this file's own §4.2 block two names up is the proof of why:
+// "solutions" hijacking every question about VU Solutions is what an
+// unrestricted matcher already did once, and HOGO is four letters, which is
+// exactly where any distance-1 net starts matching words that are not HOGO.
+// So the hijack tests come first, and the FIRST of them proves this
+// mechanism adds no fuzzy tolerance at all — a word one edit from a real
+// account's own CODE, never declared as an alias, must resolve nothing.
+describe("c-misspell: a DECLARED alt_name resolves the owner's own spelling — hijack case first", () => {
+  const PADELBASE = "A_PADELBASE"
+  const ASSECURANZ = "A_ASSECURANZ"
+  const HOGO = "A_HOGO_MISSPELL"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, alt_names, created_at) VALUES
+         ('${PADELBASE}', 'entity', 'Padelbase', NULL, '["paddlebase"]', '2026-01-01'),
+         ('${ASSECURANZ}', 'entity', 'Assecuranz', NULL, '["asekurans"]', '2026-01-01'),
+         ('${HOGO}', 'entity', 'Hogo Health Systems', 'HOGO', '[]', '2026-01-01');`
+    )
+  })
+
+  it("HIJACK: a word one edit from a real account's own CODE, never declared, resolves nothing — this mechanism is not fuzzy", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    // "hoga" is HOGO's own code with the last letter changed — exactly the
+    // shape an edit-distance-1 net would catch, and exactly why the hub
+    // refused one. Never declared as an alt_name, so it must not resolve.
+    const answer = await ask(IDS.staffUser, "what's the latest with hoga?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("Paddlebase (the owner's own spelling) narrows to the Padelbase account", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is happening with Paddlebase?")
+    expect(answer.compartments).toEqual([`account:${PADELBASE}`, "agency"])
+    // The REASON names the CANONICAL spelling, not the alias the question
+    // used — a person reading "I searched Paddlebase's material" would not
+    // recognise their own client; `alias_of` is what makes this say
+    // "Padelbase" instead.
+    expect(answer.reason).toContain("Padelbase")
+  })
+
+  it("Asekurans (the owner's own spelling) narrows to the Assecuranz account", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what did we agree with Asekurans?")
+    expect(answer.compartments).toEqual([`account:${ASSECURANZ}`, "agency"])
+    expect(answer.reason).toContain("Assecuranz")
+  })
+
+  it("REGRESSION: one account's declared alias never narrows a DIFFERENT account's question", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what did we agree with Asekurans?")
+    const compartments = answer.compartments
+    expect(compartments).toContain(`account:${ASSECURANZ}`)
+    // The failure this guards: a bind-order or dedup bug in rebuildNameIndex
+    // that let one account's alias row carry a DIFFERENT account's ref_id.
+    expect(compartments, "Padelbase's own compartment must not appear").not.toContain(`account:${PADELBASE}`)
+    expect(compartments, "HOGO's own compartment must not appear either").not.toContain(`account:${HOGO}`)
+  })
+})
+
 // tracker item d-fanout: "Fan-out is visible and capped at 12 — the step line
 // shows the count, never more than 12." BUILD-5's own fan-out ceiling
 // (NAMED_ACCOUNTS_CAP, lib/knowledge.ts) is exercised here directly — 13 real
