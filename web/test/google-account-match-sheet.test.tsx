@@ -27,6 +27,29 @@ describe("GoogleAccountMatchSheet", () => {
     expect(screen.getByText(/HOGO Q3 Project Files/)).toBeTruthy()
   })
 
+  it("the matched account carries its own face (R35) — a RecordMark, not a bare word", () => {
+    render(
+      <GoogleAccountMatchSheet
+        open
+        itemName="HOGO Q3 Project Files"
+        accountName="Hogo Health Systems"
+        onConfirm={() => {}}
+        onDecline={() => {}}
+      />
+    )
+    // The Sheet renders through a portal into document.body, so the mark box
+    // is looked up there, not on the render's own container. RecordMark's box
+    // carries `bg-muted` — nothing else in this sheet does — and with no
+    // picture on file its last-resort fallback is the account name's first
+    // letter (record-mark.tsx's own rule). A plain <span> beside the name
+    // would pass every other test in this file while still being the
+    // bare-word row R35 refuses, so this checks the actual mark box and its
+    // fallback glyph, not just any hidden element.
+    const mark = document.body.querySelector('[class*="bg-muted"]')
+    expect(mark, "no RecordMark box found beside the matched account's name").toBeTruthy()
+    expect(mark?.textContent).toBe("H")
+  })
+
   it("renders nothing when closed", () => {
     render(
       <GoogleAccountMatchSheet

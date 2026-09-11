@@ -36,14 +36,22 @@ const found = {
   passages: [{ sourceId: "s-1", title: "Dispatch note", kind: "note", url: null, recordPath: null, compartment: "account:a1", seq: 1, text: "Thursdays.", score: 0.9 }],
   citations: [{ sourceId: "s-1", title: "Dispatch note", kind: "note", url: null, recordPath: null, liveStatus: null, checkedAt: null }],
   candidates: 12,
+  reread: true,
 }
 
 const nothing = { ...found, found: false, passages: [], citations: [], answer: null }
 
 describe("knowledgeEvidence: the retrieval reaches the screen", () => {
-  it("forwards the seam's own two lists, unchanged", () => {
+  it("forwards the seam's own two lists, and the what-it-did facts beside them (d-steps)", () => {
     const ev = knowledgeEvidence("ask_knowledge", found)
-    expect(ev).toEqual({ t: "sources", citations: found.citations, passages: found.passages })
+    expect(ev).toEqual({
+      t: "sources",
+      citations: found.citations,
+      passages: found.passages,
+      reason: found.reason,
+      candidates: found.candidates,
+      reread: found.reread,
+    })
   })
 
   it("says nothing when the base had nothing", () => {
@@ -71,6 +79,23 @@ describe("a reopened conversation still shows what it read", () => {
     expect(evidenceFromSaved("ask_knowledge", saved)).toEqual({
       citations: found.citations,
       passages: found.passages,
+      reason: found.reason,
+      candidates: found.candidates,
+      reread: found.reread,
+    })
+  })
+
+  it("a thread saved before d-steps shipped has no `reread` in its JSON — reads as false, never a guess", () => {
+    // The exact shape `trimResult(found)` produced before this tracker added
+    // the field: everything else `found` has, `reread` genuinely absent.
+    const { reread: _reread, ...preDSteps } = found
+    const saved = `${SAVED_RESULT_PREFIX}${JSON.stringify(preDSteps)}`
+    expect(evidenceFromSaved("ask_knowledge", saved)).toEqual({
+      citations: found.citations,
+      passages: found.passages,
+      reason: found.reason,
+      candidates: found.candidates,
+      reread: false,
     })
   })
 

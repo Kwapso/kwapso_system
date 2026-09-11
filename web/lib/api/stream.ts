@@ -25,8 +25,14 @@ export type AgentStreamEvent =
   /** WHAT THE ASSISTANT JUST READ — the answer seam's own citations and passages
    * (Law R23), for the turn that is streaming. The one tool result that reaches
    * this side, because a citation mark in the reply has to have something under
-   * it to point at. Repeats: a turn that asks twice retrieves twice. */
-  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
+   * it to point at. Repeats: a turn that asks twice retrieves twice.
+   *
+   * TRACKER `d-steps`: `reason`/`candidates`/`reread` ride alongside — this
+   * must stay the same shape as the `sources` variant in `shared/types.ts`'s
+   * own `StreamEvent`, which is what "the wire contract data-ops emits" (this
+   * file's own header) means: one worker writes it, two independently
+   * declared client types read it, and both have to agree with the wire. */
+  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[]; reason: string; candidates: number; reread: boolean }
   | { t: "confirm"; threadId: string; calls: PendingCall[]; text?: string }
   | { t: "final"; outcome: ChatOutcome }
   /** `reason` is set when the failure was the MODEL door and could be

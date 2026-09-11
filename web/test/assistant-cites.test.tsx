@@ -58,7 +58,15 @@ const passage = (sourceId: string, text: string): KnowledgePassage => ({
 
 /** One assistant turn, rendered the way the panel renders it. */
 function turn(reply: string, citations: KnowledgeCitation[]) {
-  const evidence = { citations, passages: citations.map((c) => passage(c.sourceId, "the words")) }
+  const evidence = {
+    citations,
+    passages: citations.map((c) => passage(c.sourceId, "the words")),
+    // Not under test here — citationPills reads only citations/passages, and
+    // the pill-shape assertions below cover those on their own.
+    reason: "",
+    candidates: 0,
+    reread: false,
+  }
   return render(
     <AgentChat
       composer={false}
@@ -118,7 +126,13 @@ describe("the assistant's answer carries its sources", () => {
     // RULING D7-2: "a pill carrying only a collection is the invention this
     // ruling closes." Both halves, in that order, with the artifact's middot.
     const pills = citationPills(
-      { citations: [citation("s-1", "Ostwald retainer", "file")], passages: [] },
+      {
+        citations: [citation("s-1", "Ostwald retainer", "file")],
+        passages: [],
+        reason: "",
+        candidates: 0,
+        reread: false,
+      },
       (english) => english
     )
     expect(pills).toHaveLength(1)

@@ -447,7 +447,16 @@ export function useAgentChat(teamId: string | null, open: boolean, canUse: boole
           setItems((prev) =>
             prev.map((it) =>
               it.id === assistantId && it.role === "assistant"
-                ? { ...it, evidence: mergeEvidence(it.evidence, { citations: ev.citations, passages: ev.passages }) }
+                ? {
+                    ...it,
+                    evidence: mergeEvidence(it.evidence, {
+                      citations: ev.citations,
+                      passages: ev.passages,
+                      reason: ev.reason,
+                      candidates: ev.candidates,
+                      reread: ev.reread,
+                    }),
+                  }
                 : it
             )
           )

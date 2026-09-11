@@ -100,8 +100,26 @@ export const CITE_RULE =
 
 /** WHAT ONE TURN READ — the answer seam's own two lists, carried together
  * because they are one decision (Law R23) and separating them is how a citation
- * ends up with no passage behind it. */
-export type TurnEvidence = { citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
+ * ends up with no passage behind it.
+ *
+ * TRACKER `d-steps` ADDED THE OTHER THREE: `reason` and `candidates` were
+ * always on `KnowledgeAnswer`, shown to nobody; `reread` is new on the wire
+ * (see `KnowledgeAnswer` in shared/types.ts). Together they are the
+ * WHAT-IT-DID line drawn under the answer (`agent-sources.tsx`) — real facts
+ * about the search that already happened, not a second, fake stream of
+ * progress. `reason` CARRIES `compartments` ALREADY, in words rather than
+ * ids — it is R23's own sentence, "WHY those compartments, in words a person
+ * can disagree with", built server-side from real account names
+ * (`deriveCompartment` in workers/content/src/lib/knowledge.ts), so this does
+ * not also carry the raw `compartments: string[]` (bare values like
+ * `account:<id>`) and re-resolve it into names a second time on the client. */
+export type TurnEvidence = {
+  citations: KnowledgeCitation[]
+  passages: KnowledgePassage[]
+  reason: string
+  candidates: number
+  reread: boolean
+}
 
 /**
  * A retrieval result → the evidence a turn draws, or null.
@@ -117,6 +135,11 @@ export type TurnEvidence = { citations: KnowledgeCitation[]; passages: Knowledge
  * citation means no passage means nothing to draw. The array guards cannot fire
  * for an answer this base built; they are here because this is JSON that came
  * off a fetch or out of a database column, and JSON is checked where it is used.
+ *
+ * `reread` DEFAULTS TO FALSE ON A MISSING VALUE, deliberately, and not just for
+ * the type checker: a thread saved before `d-steps` shipped has no opinion in
+ * its stored JSON, and "the floor alone decided" is the honest reading of a
+ * silence there — never a guess that the reader ran.
  */
 export function evidenceFrom(data: unknown): TurnEvidence | null {
   if (!data || typeof data !== "object") return null
@@ -124,19 +147,37 @@ export function evidenceFrom(data: unknown): TurnEvidence | null {
   if (answer.found !== true) return null
   const citations = Array.isArray(answer.citations) ? answer.citations : []
   const passages = Array.isArray(answer.passages) ? answer.passages : []
-  return citations.length ? { citations, passages } : null
+  return citations.length
+    ? {
+        citations,
+        passages,
+        reason: typeof answer.reason === "string" ? answer.reason : "",
+        candidates: typeof answer.candidates === "number" ? answer.candidates : 0,
+        reread: answer.reread === true,
+      }
+    : null
 }
 
 /** Two turns' worth of evidence, merged. A turn may ask more than once, and the
  * same source can answer both questions — the citation is kept ONCE, at its
  * first position, because that position is the number the mark in the prose is
- * already pointing at. */
+ * already pointing at.
+ *
+ * THE WHAT-IT-DID FIELDS ARE `next`'S, NOT MERGED — `reason`, `candidates` and
+ * `reread` describe ONE search, and a second question in the same turn is a
+ * second, different search (`ask_knowledge`'s own rule: "each question gets
+ * its own call"). Showing the LATEST search's own facts under the LATEST
+ * answer is the honest reading; averaging or concatenating two different
+ * searches' candidate counts would describe a search that never ran. */
 export function mergeEvidence(before: TurnEvidence | undefined, next: TurnEvidence): TurnEvidence {
   if (!before) return next
   const seen = new Set(before.citations.map((c) => c.sourceId))
   return {
     citations: [...before.citations, ...next.citations.filter((c) => !seen.has(c.sourceId))],
     passages: [...before.passages, ...next.passages],
+    reason: next.reason,
+    candidates: next.candidates,
+    reread: next.reread,
   }
 }
 

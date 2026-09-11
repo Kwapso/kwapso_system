@@ -249,6 +249,7 @@ describe("R23 — a written answer cannot outlive its sources", () => {
       records: [],
       passages: [],
       candidates: 0,
+      reread: false,
       written: "Yes, absolutely, the window is Tuesdays.",
     })
     expect(answer.found).toBe(false)
@@ -264,6 +265,7 @@ describe("R23 — a written answer cannot outlive its sources", () => {
       records: [],
       passages: [passage("S1", "Bergman rollout note", "Tuesdays.")],
       candidates: 4,
+      reread: false,
       written: "The Bergman rollout note says Tuesdays.",
     })
     expect(answer.found).toBe(true)
@@ -281,6 +283,7 @@ describe("R23 — a written answer cannot outlive its sources", () => {
       records: [],
       passages: [passage("S1", "Bergman rollout note", "Tuesdays.")],
       candidates: 4,
+      reread: false,
     })
     expect(answer.found).toBe(true)
     expect(answer.answer).toBeNull()
