@@ -35,6 +35,7 @@ import {
 } from "@shared/ui/components/sheet/sheet"
 
 import { useT } from "@shared/web/language"
+import { RecordMark } from "@shared/web/record-mark"
 
 export function GoogleAccountMatchSheet({
   open,
@@ -65,6 +66,14 @@ export function GoogleAccountMatchSheet({
               name: itemName,
             })}
           </SheetDescription>
+          {/* R35: the matched RECORD carries its own face here too — `accountsNamedIn`
+              hands back only { id, name } (it reads knowledge_names, not the account's
+              own logo_url), so this is the same last-resort initial `RecordMark` draws
+              for any record with no picture, never a bare word standing in for one. */}
+          <div className="flex items-center gap-2 pt-1">
+            <RecordMark name={accountName} size="choice" />
+            <span className="text-sm font-medium">{accountName}</span>
+          </div>
         </SheetHeader>
         <SheetFooter>
           <Button variant="secondary" onClick={onDecline}>

@@ -15,12 +15,22 @@
 // THE THIRD FIELD IS THE SAME ARGUMENT, ONE STEP ALONG: whose material is in it.
 // A folder's contents become knowledge-base sources, and every source is filed in
 // a COMPARTMENT — one client's, or the agency's own. That could have been guessed
-// by matching client names inside the documents; guessing it is precisely the
-// failure the compartment idea exists to prevent, because a document filed under
-// the wrong client is worse than one filed under nobody: the assistant will quote
-// it confidently at the wrong person. The person naming the folder knows. So the
-// form asks, here, beside the question about who may read it — the two decisions
-// that cannot be read back off the contents afterwards.
+// SILENTLY, by matching client names inside the documents and filing on the
+// machine's own say-so; a silent guess is precisely the failure the compartment
+// idea exists to prevent, because a document filed under the wrong client is worse
+// than one filed under nobody: the assistant will quote it confidently at the wrong
+// person. The person naming the folder knows. So the form asks, here, beside the
+// question about who may read it — the two decisions that cannot be read back off
+// the contents afterwards.
+//
+// TRACKER `b-filing`, 11 Sep 2026: the field is now PRE-FILLED once, not left
+// silent. When exactly one folder or space is picked and its own name matches an
+// account already on file, `GoogleAccountMatchSheet` names the match and asks —
+// "file this under {account}?" — and only a YES sets this field; declining leaves
+// it exactly where it was. That is a suggestion offered and confirmed, not a guess
+// that takes effect on the machine's own authority, so it does not have the
+// property this comment refuses above: nothing is filed without the person who
+// named the folder saying so. See `matchAccount` below.
 //
 // AND IT SHARES SEVERAL AT ONCE. The owner: "can you make it so that I can
 // select multiple spaces, multiple folders, and multiple files at once?" The

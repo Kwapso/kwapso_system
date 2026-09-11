@@ -126,6 +126,39 @@ export function citationPills(
 }
 
 /**
+ * THE WHAT-IT-DID LINE (tracker `d-steps`), ALWAYS VISIBLE under the answer —
+ * never behind the "What I read" disclosure below, because the hub's ruling
+ * on this tracker was explicit: a person who has just waited gets told what
+ * the wait bought without having to click for it. Built entirely from facts
+ * already on the wire (Law R23's own object — `reason`, `candidates`,
+ * `reread`), never a timer and never a fake step: "a progress animation that
+ * does not track real progress is a lie told with a spinner, and this base
+ * does not ship those."
+ *
+ * `reason` RENDERS AS WRITTEN, not through `t()`. It is server-composed prose
+ * with real account names already in it (`deriveCompartment`,
+ * workers/content/src/lib/knowledge.ts) — the exact sentence R23 calls "WHY
+ * those compartments, in words a person can disagree with", meant to be read
+ * rather than only handed to the model. Like a citation's title or a
+ * passage's own text a few lines below, it is DATA the answer carries, not
+ * catalogued UI copy, so R28's walk never reaches it — it reaches the `t()`
+ * calls around it instead.
+ */
+function WhatItDid({ evidence }: { evidence: TurnEvidence }) {
+  const t = useT()
+  if (!evidence.reason) return null
+  return (
+    <p className="text-muted-foreground mt-1 text-xs">
+      {evidence.reason}{" "}
+      {evidence.candidates === 1
+        ? t("I looked at 1 piece of material.")
+        : t("I looked at {count} pieces of material.", { count: String(evidence.candidates) })}
+      {evidence.reread ? ` ${t("Then I re-read the strongest passages before answering.")}` : ""}
+    </p>
+  )
+}
+
+/**
  * THE EVIDENCE, one press away.
  *
  * Grouped by SOURCE and numbered to match the pills above, so "what is 2?" is
@@ -146,82 +179,85 @@ export function TurnSources({ evidence, teamId }: { evidence: TurnEvidence; team
   }))
 
   return (
-    /* `[contain:inline-size]` IS LOAD-BEARING, and it is the only thing that
-       works — measured, not reasoned. A passage is a paragraph of somebody's
-       meeting notes, so its MAX-CONTENT is that paragraph on one line; the
-       bubble is a shrink-to-fit box, so it took 545px inside a 522px panel and
-       gave the whole conversation a horizontal scrollbar. `w-full`,
-       `max-w-full`, `min-w-0` and `width:min-content` were each tried in the
-       browser and each left it at 545 — a percentage is not a definite width
-       to an intrinsic-sizing pass, which is the same trap the kit's own source
-       chips wrote up from the other end. Inline-size containment says the one
-       true thing: this box's width comes from what holds it, never from what
-       is in it. Its HEIGHT still comes from its content, which is what
-       Radix measures for the open/close animation. */
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-2 min-w-0 [contain:inline-size]">
-      <CollapsibleTrigger className="text-muted-foreground hover:text-foreground text-xs">
-        {/* The mark ROTATES rather than swapping glyph — the kit's own
-            disclosure behaviour, motion.css §9. */}
-        <CaretDown className="motion-disclosure-marker size-3.5" aria-hidden />
-        {t("What I read")}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-2 flex min-w-0 flex-col gap-3">
-          {byIndex.map(({ citation, number, passages }) => (
-            <div key={citation.sourceId} className="flex min-w-0 flex-col gap-1">
-              <div className="flex min-w-0 items-start gap-2 text-sm">
-                <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-[var(--radius)] text-xs tabular-nums">
-                  {number}
-                </span>
-                <span className="min-w-0">
-                  {/* THE SOURCE'S OWN FACE (R35): a citation IS a record
-                      appearing, and "where did that come from?" is the whole
-                      question being asked here. Same glyph vocabulary as the
-                      knowledge base's own list. */}
-                  <Icon
-                    name={(KNOWLEDGE_KIND_ICON[citation.kind] ?? "file") as IconName}
-                    aria-hidden
-                    className="me-1 inline size-3.5 align-[-0.2em]"
-                  />
-                  <InAppLink
-                    href={`/t/${teamId}/knowledge/${citation.sourceId}`}
-                    className="hover:text-primary underline underline-offset-2"
-                  >
-                    {/* NEVER EMPTY - see `citationTitle`. This was a bare
-                        `{citation.title}`, and a source with no title rendered
-                        an anchor with nothing inside it. */}
-                    {citationTitle(citation, t)}
-                  </InAppLink>
-                  <span className="text-muted-foreground text-xs">
-                    {" · "}
-                    {t(KNOWLEDGE_KIND[citation.kind] ?? citation.kind)}
+    <>
+      <WhatItDid evidence={evidence} />
+      {/* `[contain:inline-size]` IS LOAD-BEARING, and it is the only thing that
+          works — measured, not reasoned. A passage is a paragraph of somebody's
+          meeting notes, so its MAX-CONTENT is that paragraph on one line; the
+          bubble is a shrink-to-fit box, so it took 545px inside a 522px panel and
+          gave the whole conversation a horizontal scrollbar. `w-full`,
+          `max-w-full`, `min-w-0` and `width:min-content` were each tried in the
+          browser and each left it at 545 — a percentage is not a definite width
+          to an intrinsic-sizing pass, which is the same trap the kit's own source
+          chips wrote up from the other end. Inline-size containment says the one
+          true thing: this box's width comes from what holds it, never from what
+          is in it. Its HEIGHT still comes from its content, which is what
+          Radix measures for the open/close animation. */}
+      <Collapsible open={open} onOpenChange={setOpen} className="mt-2 min-w-0 [contain:inline-size]">
+        <CollapsibleTrigger className="text-muted-foreground hover:text-foreground text-xs">
+          {/* The mark ROTATES rather than swapping glyph — the kit's own
+              disclosure behaviour, motion.css §9. */}
+          <CaretDown className="motion-disclosure-marker size-3.5" aria-hidden />
+          {t("What I read")}
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-2 flex min-w-0 flex-col gap-3">
+            {byIndex.map(({ citation, number, passages }) => (
+              <div key={citation.sourceId} className="flex min-w-0 flex-col gap-1">
+                <div className="flex min-w-0 items-start gap-2 text-sm">
+                  <span className="bg-muted text-muted-foreground mt-0.5 grid size-5 shrink-0 place-items-center rounded-[var(--radius)] text-xs tabular-nums">
+                    {number}
                   </span>
-                  {/* WHAT THE LIVE ROW SAYS RIGHT NOW. The passage is what was
-                      indexed; this is what is true today, and the two
-                      disagreeing is exactly the thing a reader must be told
-                      rather than protected from. */}
-                  {citation.liveStatus && (
+                  <span className="min-w-0">
+                    {/* THE SOURCE'S OWN FACE (R35): a citation IS a record
+                        appearing, and "where did that come from?" is the whole
+                        question being asked here. Same glyph vocabulary as the
+                        knowledge base's own list. */}
+                    <Icon
+                      name={(KNOWLEDGE_KIND_ICON[citation.kind] ?? "file") as IconName}
+                      aria-hidden
+                      className="me-1 inline size-3.5 align-[-0.2em]"
+                    />
+                    <InAppLink
+                      href={`/t/${teamId}/knowledge/${citation.sourceId}`}
+                      className="hover:text-primary underline underline-offset-2"
+                    >
+                      {/* NEVER EMPTY - see `citationTitle`. This was a bare
+                          `{citation.title}`, and a source with no title rendered
+                          an anchor with nothing inside it. */}
+                      {citationTitle(citation, t)}
+                    </InAppLink>
                     <span className="text-muted-foreground text-xs">
                       {" · "}
-                      {t("that record says “{status}” right now", { status: citation.liveStatus })}
+                      {t(KNOWLEDGE_KIND[citation.kind] ?? citation.kind)}
                     </span>
-                  )}
-                  <OpenTheRecord from={citation} teamId={teamId} />
-                </span>
-              </div>
-              {passages.map((p) => (
-                // The passage as the assistant saw it, through the ONE renderer
-                // a reply uses — most of these arrive as markdown now that
-                // documents are converted into the base.
-                <div key={p.seq} className="text-muted-foreground min-w-0 ps-7 text-sm break-words">
-                  <AgentMarkdown text={p.text} />
+                    {/* WHAT THE LIVE ROW SAYS RIGHT NOW. The passage is what was
+                        indexed; this is what is true today, and the two
+                        disagreeing is exactly the thing a reader must be told
+                        rather than protected from. */}
+                    {citation.liveStatus && (
+                      <span className="text-muted-foreground text-xs">
+                        {" · "}
+                        {t("that record says “{status}” right now", { status: citation.liveStatus })}
+                      </span>
+                    )}
+                    <OpenTheRecord from={citation} teamId={teamId} />
+                  </span>
                 </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+                {passages.map((p) => (
+                  // The passage as the assistant saw it, through the ONE renderer
+                  // a reply uses — most of these arrive as markdown now that
+                  // documents are converted into the base.
+                  <div key={p.seq} className="text-muted-foreground min-w-0 ps-7 text-sm break-words">
+                    <AgentMarkdown text={p.text} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </>
   )
 }
 

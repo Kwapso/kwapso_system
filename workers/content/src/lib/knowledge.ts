@@ -2675,6 +2675,12 @@ export function knowledgeAnswer(input: {
    * answer may exist is made in the same breath as `found`. No citation, no
    * passage, no answer — one decision, not three. */
   written?: string | null
+  /** TRACKER `d-steps`: did the reader run on this search. Required rather
+   * than defaulted here, so every call site says so explicitly — the app
+   * side (`evidenceFrom`) still defaults it, because a thread saved before
+   * this field existed has no opinion and false ("the floor alone decided")
+   * is the honest reading of silence there. */
+  reread: boolean
 }): KnowledgeAnswer {
   const citations: KnowledgeCitation[] = []
   for (const p of input.passages)
@@ -2717,6 +2723,7 @@ export function knowledgeAnswer(input: {
     passages: found ? input.passages : [],
     citations,
     candidates: input.candidates,
+    reread: input.reread,
   }
 }
 
@@ -3587,6 +3594,8 @@ export async function retrieve(
       records: route.records,
       passages: [],
       candidates: 0,
+      // No shortlist ever existed for a reader to look at.
+      reread: false,
     })
   }
 
@@ -3729,6 +3738,11 @@ export async function retrieve(
     passages,
     candidates: fused.length,
     live,
+    // TRACKER `d-steps`: whether the reader ran is decided by whether the
+    // caller gave `retrieve()` one — see the `if (input.read && ...)` block
+    // above — not by whether it found anything, so a re-read that came back
+    // empty still says so honestly.
+    reread: !!input.read,
   }
   // DECIDED FIRST, WRITTEN SECOND, and the order is the law. The seam settles
   // `found`, which sources are cited and which passages survive; only then is the

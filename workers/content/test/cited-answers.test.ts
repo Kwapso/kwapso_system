@@ -53,6 +53,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       records: [],
       passages: [],
       candidates: 0,
+      reread: false,
     })
     expect(answer.found).toBe(false)
     expect(answer.citations).toEqual([])
@@ -71,6 +72,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       records: [{ sourceId: "S1", title: "Bergman rollout note" }],
       passages: [passage("S1", "Bergman rollout note", 0), passage("S1", "Bergman rollout note", 1), passage("S2", "Process: rollouts")],
       candidates: 12,
+      reread: false,
     })
     expect(answer.found).toBe(true)
     expect(answer.passages).toHaveLength(3)
@@ -100,11 +102,30 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
         passage("S2", "A note somebody typed", 0, null),
       ],
       candidates: 4,
+      reread: false,
     })
     expect(answer.citations.map((c) => c.recordPath)).toEqual(["tickets/H1", null])
     // A source with no record screen renders no link rather than a broken one —
     // a note somebody typed IS the record.
     expect(answer.citations[1].recordPath).toBeNull()
+  })
+
+  it("carries whether the reader ran (tracker `d-steps`) — the caller's own flag, not a guess", () => {
+    // The what-it-did line under an answer (agent-sources.tsx) says whether a
+    // second model re-read the shortlist. That has to be the ACTUAL flag the
+    // caller passed to `retrieve()`, never a constant — a hardcoded `true` or
+    // `false` here would tell every reader the same false story about half of
+    // their questions.
+    const base = {
+      question: "what did we agree?",
+      compartments: [],
+      reason: "…",
+      records: [],
+      passages: [passage("S1", "Bergman rollout note", 0)],
+      candidates: 4,
+    }
+    expect(knowledgeAnswer({ ...base, reread: true }).reread).toBe(true)
+    expect(knowledgeAnswer({ ...base, reread: false }).reread).toBe(false)
   })
 
   it("cannot be talked into passages without citations", () => {
@@ -118,6 +139,7 @@ describe("R23 — the answer seam decides `found` and `citations` together", () 
       records: [],
       passages: [],
       candidates: 200,
+      reread: false,
     })
     expect(answer.passages.length === 0 || answer.citations.length > 0).toBe(true)
   })

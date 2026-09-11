@@ -1141,8 +1141,13 @@ export type StreamEvent =
    * retrieval the answer was written from.
    *
    * It belongs to the turn that is streaming when it arrives, and it repeats: a
-   * turn that asks two questions retrieves twice. */
-  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[] }
+   * turn that asks two questions retrieves twice.
+   *
+   * TRACKER `d-steps` widened this to the answer seam's WHAT-IT-DID facts too
+   * — `reason`, `candidates`, `reread` — the same object `evidenceFrom` builds
+   * on both sides of the wire (shared/agent-cites.ts), spread here rather than
+   * picked apart, so a fourth field added there needs no matching edit here. */
+  | { t: "sources"; citations: KnowledgeCitation[]; passages: KnowledgePassage[]; reason: string; candidates: number; reread: boolean }
   /** TERMINAL: needs confirmation; the client shows the yes/no panel. Carries the
    * `threadId` so a FIRST-turn confirm (a brand-new conversation whose opening
    * message proposes a dangerous action) can be resolved — the thread is already
@@ -1520,6 +1525,12 @@ export type KnowledgeAnswer = {
   citations: KnowledgeCitation[]
   /** how many chunks the search considered (the bounded candidate set) */
   candidates: number
+  /** TRACKER `d-steps`: did a second model re-read the shortlist before any of
+   * this was decided (BUILD-5 §5-6), or did the similarity floor alone decide?
+   * `retrieve()`'s own `input.read` flag, carried through rather than lost —
+   * a caller asked for the reader or did not, and until now the answer never
+   * said which. False on the early exit before a shortlist existed to read. */
+  reread: boolean
 }
 
 // ── Process maps, versions and the money (SCOPE ch.02 · .plans/BUILD-3) ───────

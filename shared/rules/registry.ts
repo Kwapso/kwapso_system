@@ -1360,9 +1360,17 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // Catalan to hand-translate a shipping product string, and forbidden from
   // spending on the translation model. Accepted debt, not a regression to
   // chase: raise it back to 0 once a translation pass answers all sixteen.
-  de: 16,
-  es: 16,
-  ca: 16,
+  //
+  // RAISED 16 -> 19 in all three, same day, tracker `d-steps`: the
+  // what-it-did line's two `t()` sentences (a knowledge answer's candidate
+  // count, singular and plural) and the third for whether the reader
+  // re-read the shortlist. The server's own `reason` sentence beside them is
+  // NOT one of the three — it is data, not catalogued copy, and never
+  // touches `t()` (see `WhatItDid` in web/components/assistant/agent-sources.tsx).
+  // Same $0-spend reason as every entry above it.
+  de: 19,
+  es: 19,
+  ca: 19,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not
