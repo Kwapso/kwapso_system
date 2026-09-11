@@ -2754,12 +2754,23 @@ export async function accountsNamedIn(
  * independently-tested route to colleagues (`knowledge_sources kind='person'`
  * directly), so nothing in this build regresses by their absence here.
  *
- * ALIASES ARE DELIBERATELY THIN: an account's own `code` (BERG, HOGO) is the
- * only one generated, because it is DATA the app already holds, not a guess.
- * Misspelling/nickname GENERATION — 0073's own migration comment says that is
- * "Lane C's job, not this table's" — needs a model call this build has not
- * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
- * rule is ask first). A canonical name with no alias is still fully usable:
+ * ALIASES: an account's own `code` (BERG, HOGO) is one, generated, because it
+ * is DATA the app already holds, not a guess. `alt_names` (0083, c-misspell)
+ * is the second — a JSON array of spellings a PERSON declared, never a
+ * generated variant. This supersedes the assumption this comment used to
+ * make: that misspelling coverage needed a model call to GUESS variants
+ * (BUILD-5 §3's $0.10 price for exactly that). Measured on staging, 11 Sep
+ * 2026: "Paddlebase"/"Asekurans" are not typos a distance metric would catch
+ * near "Padelbase"/"Assecuranz" — they are the owner's own STABLE spelling of
+ * a word, and the hub ruled a curated alias beats a fuzzy one: an
+ * edit-distance or phonetic net would also catch unrelated words (this
+ * codebase already refuses that shape twice elsewhere, by name), where a
+ * declared spelling can never match anything it wasn't written for. Both
+ * kinds of alias row are read identically below (exact match, no rarity
+ * gate — a human already decided this one), and both are SINGLE TOKENS only:
+ * the confirmation match is `asked.has(alias)` against the question's own
+ * tokenised words, so a multi-word alias could never appear as one of them.
+ * A canonical name with no alias at all is still fully usable:
  * `accountsNamedIn`'s multi-token and rare-single-token rules both read it
  * alone, and a client whose accepted name IS a single ordinary word (the
  * audit's own "green"/"solutions" cases) still resolves once it clears the
@@ -2771,12 +2782,12 @@ export async function accountsNamedIn(
  * which cannot express a RENAME, because the old name is part of the key an
  * upsert would leave behind as an orphan row. */
 export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
-  const accounts = await d1Query<{ id: string; name: string; code: string | null }>(
+  const accounts = await d1Query<{ id: string; name: string; code: string | null; alt_names: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: bounded by how many accounts this team holds — an
     // agency's own client roster, not a growing log.
-    "SELECT id, name, code FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+    "SELECT id, name, code, alt_names FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
   const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
     cfg,
@@ -2799,6 +2810,13 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
     rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.name, alias_of: null, compartment })
     if (a.code)
       rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.code.toLowerCase(), alias_of: a.name, compartment })
+    // c-misspell. Declared, never generated (see this function's own doc
+    // comment) — one row per spelling a person chose, read identically to
+    // `code` above: exact match, no rarity gate.
+    for (const spelling of parseIdList(a.alt_names ?? "[]")) {
+      const clean = spelling.trim().toLowerCase()
+      if (clean) rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: clean, alias_of: a.name, compartment })
+    }
   }
   for (const app of apps) {
     if (!app.name) continue
