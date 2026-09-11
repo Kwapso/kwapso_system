@@ -36,9 +36,16 @@ describe("chatThreads — the body is runs, not one blob", () => {
       msg("m1", "t1", "Ana", "2026-09-07T10:00:00Z", "first thing said"),
       msg("m2", "t1", "Aurora", "2026-09-07T10:01:00Z", "second thing said"),
     ])
-    // BYTE FOR BYTE what the old flat join produced for a short thread — the
-    // exact assertion google-ingest.test.ts already makes on this shape.
+    // BYTE FOR BYTE what the flat join has always produced for a short thread
+    // — `body` carries only the words, unchanged by tracker `a-pieces` (0081):
+    // the structured speaker/time live on `grainPieces`, a SEPARATE field, not
+    // encoded in this one. The exact assertion google-ingest.test.ts also makes
+    // on this shape.
     expect(folded.text).toBe("Ana: first thing said\nAurora: second thing said")
+    // AND THE STRUCTURED HALF, alongside it rather than hidden inside it.
+    expect(folded.grainPieces).toEqual([
+      { text: "Ana: first thing said\nAurora: second thing said", speaker: "Ana, Aurora", saidAt: "2026-09-07T10:00:00Z" },
+    ])
   })
 
   it("cuts a long thread into runs separated by a blank line, never mid-message", () => {
@@ -51,8 +58,17 @@ describe("chatThreads — the body is runs, not one blob", () => {
     // Nothing is lost, and nothing is fused across a run boundary mid-message:
     // every "line number N" appears whole, exactly once.
     for (let i = 0; i < 20; i++) expect(folded.text.match(new RegExp(`line number ${i}\\b`, "g"))?.length).toBe(1)
-    // Each run is still attributed, never re-attributed by anything upstream.
-    for (const run of runs) expect(run).toMatch(/^(Ana|Aurora): /)
+    // Each run is still attributed, in the prose AND in `grainPieces`, which
+    // must carry exactly as many pieces as `body` has runs — never re-derived
+    // by splitting the prose back apart. A run can mix both voices (alternating
+    // messages, one run of up to six), so `speaker` is one name or a
+    // comma-joined few, never something outside that set.
+    expect(folded.grainPieces).toHaveLength(runs.length)
+    for (const [i, run] of runs.entries()) {
+      expect(run).toMatch(/^(Ana|Aurora): /)
+      expect(folded.grainPieces?.[i].text).toBe(run)
+      expect(folded.grainPieces?.[i].speaker.split(", ").every((s) => s === "Ana" || s === "Aurora")).toBe(true)
+    }
   })
 
   it("still folds to the newest message's time and every voice, run-cutting aside", () => {

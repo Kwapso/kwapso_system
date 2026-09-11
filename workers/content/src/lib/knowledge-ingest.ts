@@ -153,6 +153,16 @@ export type IngestRow = {
    * `fencing`), off the same address/attendee match `accountId` already
    * makes, kept instead of discarded past the first hit. */
   accounts?: string[]
+  /** THE SOURCE'S OWN STRUCTURED PIECES — text, speaker and time, kept apart
+   * from `body` rather than encoded in it (tracker `a-pieces`, migration
+   * 0081's own comment says why: D1 rejects an embedded NUL, so an in-band
+   * mark could not have worked). Set only by a reader that already computes
+   * per-message identity — chat's `chatThreads` today, `google-read.ts` — and
+   * absent everywhere else, which is the correct, generic answer: a document,
+   * a ticket, an email, all re-chunk `body` from scratch exactly as they
+   * always have. `indexSource` reads this instead of `body` when present;
+   * `seq` follows the pieces, not the generic chunker, once it does. */
+  grainPieces?: { text: string; speaker: string; saidAt: string }[]
 }
 
 /** One kind of in-app material: where it lives, and how a row of it reads.
@@ -2091,8 +2101,8 @@ async function sweepKind(
          (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
           app_id, ticket_id, sprint_id, record_date, event_id, event_id_from,
           title, summary, body, body_bytes, generated_only,
-          source_url, created_at, creator_name, accounts)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)}, ?)
+          source_url, created_at, creator_name, accounts, grain_pieces)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)}, ?, ?)
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
@@ -2106,6 +2116,13 @@ async function sweepKind(
                      -- the next sweep. Empty for every other kind, every sweep,
                      -- by construction — see IngestRow.accounts' own comment.
                      accounts = excluded.accounts,
+                     -- RE-DECIDED ON EVERY SWEEP, same reasoning as body itself:
+                     -- a conversation that gains a reply gains a new run, and the
+                     -- old pieces describe a conversation that no longer exists.
+                     -- NULL for every kind that never sets it (IngestRow.grainPieces'
+                     -- own comment) — indexSource reads that as "chunk the body
+                     -- generically", never as "keep whatever was here before".
+                     grain_pieces = excluded.grain_pieces,
                      -- AN EVENT IS LEARNED AND NEVER UNLEARNED, which is what
                      -- COALESCE says here and a plain assignment would not. Three
                      -- lanes can state this and only one of them ever sees a given
@@ -2169,11 +2186,13 @@ async function sweepKind(
         row.generatedOnly ? 1 : 0,
         row.sourceUrl,
         now,
-        // accounts' VALUES placeholder sits here, between created_at and the
-        // updated_at that belongs to the ON CONFLICT SET clause below — D1
-        // binds every `?` positionally, in the order it appears in the SQL
-        // text, not in column-list order once a SET clause is in play.
+        // accounts'/grain_pieces' VALUES placeholders sit here, between
+        // created_at and the updated_at that belongs to the ON CONFLICT SET
+        // clause below — D1 binds every `?` positionally, in the order it
+        // appears in the SQL text, not in column-list order once a SET
+        // clause is in play.
         JSON.stringify(row.accounts ?? []),
+        row.grainPieces ? JSON.stringify(row.grainPieces) : null,
         now,
       ]
     )

@@ -18,6 +18,7 @@ import {
   contextLinePrompt,
   decodeEmbedding,
   encodeEmbedding,
+  expandGrainPieces,
   freshnessOf,
   plainText,
   questionTerms,
@@ -241,6 +242,50 @@ describe("chunkChat — a piece is a run of messages, with who and when", () => 
     expect(pieces).toHaveLength(1)
     expect(pieces[0].text).toContain("Still here.")
     expect(pieces[0].text).not.toContain("Jane Doe")
+  })
+})
+
+describe("expandGrainPieces — indexSource's reader for knowledge_sources.grain_pieces (migration 0081)", () => {
+  it("keeps a piece's text, speaker and time exactly, one chunk per piece", () => {
+    const pieces = expandGrainPieces([
+      { text: "Jane Doe: hello\nJohn Smith: hi", speaker: "Jane Doe, John Smith", saidAt: "2026-09-10T10:02:00Z" },
+    ])
+    expect(pieces).toHaveLength(1)
+    expect(pieces[0]).toEqual({
+      text: "Jane Doe: hello\nJohn Smith: hi",
+      speaker: "Jane Doe, John Smith",
+      saidAt: "2026-09-10T10:02:00Z",
+    })
+  })
+
+  it("keeps several pieces in order, each with its own speaker and time", () => {
+    const pieces = expandGrainPieces([
+      { text: "Ana: first thing said", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" },
+      { text: "Bob: second thing said", speaker: "Bob", saidAt: "2026-09-10T09:05:00Z" },
+    ])
+    expect(pieces).toEqual([
+      { text: "Ana: first thing said", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" },
+      { text: "Bob: second thing said", speaker: "Bob", saidAt: "2026-09-10T09:05:00Z" },
+    ])
+  })
+
+  it("splits an oversized piece into several chunks that all keep its one speaker and time", () => {
+    const long = "word ".repeat(400) // well past CHUNK_TARGET_CHARS
+    const pieces = expandGrainPieces([{ text: long, speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" }])
+    expect(pieces.length).toBeGreaterThan(1)
+    for (const p of pieces) {
+      expect(p.speaker).toBe("Ana")
+      expect(p.saidAt).toBe("2026-09-10T09:00:00Z")
+    }
+    expect(pieces.map((p) => p.text).join(" ")).toContain(long.trim().slice(0, 20))
+  })
+
+  it("returns nothing for no pieces, never one empty chunk", () => {
+    expect(expandGrainPieces([])).toEqual([])
+  })
+
+  it("drops a piece with no real words, same as chunkText would", () => {
+    expect(expandGrainPieces([{ text: "   ", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" }])).toEqual([])
   })
 })
 

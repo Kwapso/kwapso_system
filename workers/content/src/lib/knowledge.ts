@@ -128,13 +128,17 @@ import type {
   KnowledgeSource,
 } from "@shared/types"
 import type { Env } from "../env"
+import { contextLineFor } from "./source-readers"
 import {
   CHUNK_TARGET_CHARS,
   chunkText,
   contentHash,
   encodeEmbedding,
+  expandGrainPieces,
+  type GrainPiece,
   plainText,
   questionTerms,
+  type StoredGrainPiece,
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
@@ -1911,6 +1915,59 @@ async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
  * so a sweep knows whether to come back. */
 export type IndexProgress = { total: number; indexed: number; done: boolean }
 
+/** `knowledge_sources.grain_pieces` (migration 0081), read honestly: a row
+ * this app wrote is JSON or NULL, never anything else, but a malformed value
+ * must not fail the whole sweep for one source — same discipline as `embed`'s
+ * own best-effort catch. NULL, missing, or an empty/malformed array all read
+ * as "no structured pieces", which is exactly the safe, generic fallback
+ * `indexSource` already has for every kind that never sets this column. */
+function parseGrainPieces(raw: string | null): StoredGrainPiece[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length ? (parsed as StoredGrainPiece[]) : null
+  } catch {
+    return null
+  }
+}
+
+/** Which source KINDS may spend on a context line (BUILD-5 §2) — a SPEND
+ * decision the owner ruled on, 11 Sep 2026, and not one this function may
+ * widen on its own: "not on email, not on chat" — an email or a chat message
+ * already says who wrote it and when, so a generated summary adds almost
+ * nothing; a paragraph from page 40 of a contract means nothing alone.
+ * Measured shape behind the number: Drive averages 27.6 chunks per source
+ * against 1.8 for email and 1.3 for chat, so gating on kind alone (rather
+ * than "documents" in the loose sense) is what keeps the bill the owner
+ * actually approved (~$0.55) rather than the ~$5.06 a blanket rollout costs.
+ *
+ * DELIBERATELY NARROWER than "a document": a typed note (`kind === "note"`)
+ * and a manual upload (`kind === "file"`) are NOT here — the owner's own
+ * numbers were Google Drive's specifically (`KIND_OF.drive` → `"document"`),
+ * and widening past that is the same spend decision R42/BUILD-5 already
+ * warn against making silently. Change this one line and say why. */
+function wantsContextLine(kind: string): boolean {
+  return kind === "document"
+}
+
+/** What this batch's chunk ids already say, read BEFORE any of them are
+ * overwritten — the one read that lets `wantsContextLine`'s spend be skipped
+ * for a piece whose own text has not changed. A chunk that does not exist
+ * yet (a genuinely new piece) is simply absent from the map, which reads the
+ * same as "always spend" below. */
+async function priorContextLinesFor(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  ids: string[]
+): Promise<Map<string, { text: string; contextLine: string | null }>> {
+  const rows = await d1Query<{ id: string; text: string; context_line: string | null }>(
+    cfg,
+    guard.databaseId,
+    `SELECT id, text, context_line FROM knowledge_chunks WHERE id IN (${ids.map(sqlString).join(", ")})`
+  )
+  return new Map(rows.map((r) => [r.id, { text: r.text, contextLine: r.context_line }]))
+}
+
 /** (Re)build one source's chunks, postings and vectors from its own text — in
  * SLICES, so a document of any size the door accepts is indexed by repeating one
  * bounded piece of work rather than by one call that has to finish.
@@ -1942,6 +1999,7 @@ export async function indexSource(
       generated_only: number
       shared_with: string
       team_visible: number
+      grain_pieces: string | null
     }
   >(
     cfg,
@@ -1953,9 +2011,12 @@ export async function indexSource(
     // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts. `team_visible`
     // rides along so the chunk/term write below can denormalise it — see that
     // write's own comment for why silently defaulting to 0 was a real gap.
+    // `grain_pieces` (0081) rides along so a grain-bearing source can be
+    // chunked from its own structured pieces rather than generically —
+    // see `parseGrainPieces`/`expandGrainPieces` below.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
             owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only, shared_with,
-            team_visible, deactivated_at, created_at
+            team_visible, grain_pieces, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -1978,16 +2039,26 @@ export async function indexSource(
   // §4.3). The reader decided this per ROW at ingest, because every mirror kind
   // can also carry words a person typed and only the reader can tell.
   const card = source.generated_only === 1
-  const chunks = card ? [] : chunkText(text)
-  const total = Math.min(chunks.length, MAX_CHUNKS_PER_SOURCE)
+  // PIECES WIN, AND `seq` FOLLOWS THEM (migration 0081's own answer to this):
+  // when the source's own reader left structured pieces behind, they are
+  // chunked directly — never re-derived by cutting `body` from scratch — and
+  // only a source with none (every kind but chat today) falls back to the
+  // ordinary generic chunker.
+  const grainPieces = card ? null : parseGrainPieces(source.grain_pieces)
+  const pieces: GrainPiece[] = card
+    ? []
+    : grainPieces
+      ? expandGrainPieces(grainPieces)
+      : chunkText(text).map((t) => ({ text: t, speaker: null, saidAt: null }))
+  const total = Math.min(pieces.length, MAX_CHUNKS_PER_SOURCE)
   // NOT SILENT. A mirrored row bigger than the indexer's ceiling keeps the part
   // that fits — making an existing record unfindable would be a worse answer
   // than an incomplete one — but it SAYS SO on the row, in both numbers, where
   // the sync screen and the machine surface both read it. (An UPLOAD past the
   // ceiling never gets here: the door refuses it outright, and nothing is saved.)
   const overflow =
-    chunks.length > MAX_CHUNKS_PER_SOURCE
-      ? `Too big to index whole: the first ${MAX_CHUNKS_PER_SOURCE} of ${chunks.length} pieces are searchable.`
+    pieces.length > MAX_CHUNKS_PER_SOURCE
+      ? `Too big to index whole: the first ${MAX_CHUNKS_PER_SOURCE} of ${pieces.length} pieces are searchable.`
       : null
 
   let from = source.indexed_chunks
@@ -2021,12 +2092,12 @@ export async function indexSource(
   const slices = Math.max(1, opts.slices ?? INDEX_SLICES_PER_CALL)
 
   for (let slice = 0; slice < slices && from < total; slice++) {
-    const piece = chunks.slice(from, Math.min(from + INDEX_CHUNKS_PER_SLICE, total))
-    const vectors = await embed(env, piece.map((c) => embeddableText(source, c)))
+    const slicePieces = pieces.slice(from, Math.min(from + INDEX_CHUNKS_PER_SLICE, total))
+    const vectors = await embed(env, slicePieces.map((p) => embeddableText(source, p.text)))
     const upserts: VectorRow[] = []
 
-    for (let start = 0; start < piece.length; start += CHUNK_WRITE_BATCH) {
-      const batch = piece.slice(start, start + CHUNK_WRITE_BATCH)
+    for (let start = 0; start < slicePieces.length; start += CHUNK_WRITE_BATCH) {
+      const batch = slicePieces.slice(start, start + CHUNK_WRITE_BATCH)
       const ids = batch.map((_, offset) => chunkVectorId(sourceId, from + start + offset))
       // THE POSTINGS THIS BATCH IS ABOUT TO REPLACE, in the FTS5 index — a chunk
       // keeps its id when its text changes, so its old words would otherwise
@@ -2044,10 +2115,31 @@ export async function indexSource(
         `INSERT INTO knowledge_chunks_fts (knowledge_chunks_fts, rowid, text)
            SELECT 'delete', rowid, text FROM knowledge_chunks WHERE id IN (${ids.map(sqlString).join(", ")});`,
       ]
-      batch.forEach((chunk, offset) => {
+      // THE PIECE'S OWN CONTENT_HASH DECIDES WHETHER A CONTEXT LINE IS SPENT
+      // AGAIN — read BEFORE any of this batch's rows are overwritten, exactly
+      // like the FTS delete above needs the OLD text first. A chunk whose own
+      // TEXT is unchanged from what is already on the row keeps its existing
+      // line; only a new or genuinely changed piece spends a model call. See
+      // `contextLineFor`'s own doc comment (source-readers.ts) for why this is
+      // the caller's job: "the difference between spending BUILD-5's $1.70
+      // once and spending it on every rebuild."
+      const priorContextLines = wantsContextLine(source.kind) ? await priorContextLinesFor(cfg, guard, ids) : null
+      for (const [offset, piece] of batch.entries()) {
         const seq = from + start + offset
         const chunkId = ids[offset]
         const vector = vectors[start + offset]
+        // DOCUMENTS ONLY (`wantsContextLine`) — the owner's own spend ruling,
+        // not a code-path a chat or mail piece can reach. `line || null` so a
+        // model failure (`contextLineFor`'s own honest empty string) stores as
+        // NULL rather than "", which is what lets the NEXT sweep retry it
+        // instead of treating an empty sentence as done forever.
+        const prior = priorContextLines?.get(chunkId)
+        const contextLine =
+          !priorContextLines
+            ? null
+            : prior && prior.text === piece.text && prior.contextLine
+              ? prior.contextLine
+              : (await contextLineFor(env, { sourceTitle: source.title, piece: piece.text })).line || null
         // WRITING THE SAME PIECE TWICE IS NOT AN ERROR (R17's discipline, on the
         // one write in this app whose key is DERIVED rather than minted). The id
         // is `<sourceId>:<seq>`, so the same slice re-run — by a retry inside the
@@ -2074,10 +2166,20 @@ export async function indexSource(
         // that merge. A stale single value copied here would exclude a
         // legitimate colleague from this very candidate pool with no
         // downstream fence able to rescue it.
+        //
+        // SPEAKER/SAID_AT RIDE FROM THE PIECE ITSELF (tracker `a-pieces`) — both
+        // null for an ordinary document chunk, both non-null for one that came
+        // out of `expandGrainPieces` (`knowledge_sources.grain_pieces`, 0081).
+        // This is the fix for the bug that named this tracker item: the
+        // migration added the columns, nothing ever wrote them, and 3,954
+        // chunks sat with all three grain columns empty.
+        // CONTEXT_LINE is computed above, DOCUMENTS ONLY, keyed on the piece's
+        // own text so an unchanged chunk never re-spends (see the comment on
+        // `priorContextLines` above the loop).
         statements.push(
-          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, team_visible, seq, text, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${seq}, ${sqlString(chunk)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
-             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, text = excluded.text, embedding = excluded.embedding
-             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id OR knowledge_chunks.team_visible IS NOT excluded.team_visible;`
+          `INSERT INTO knowledge_chunks (id, source_id, compartment, owner_user_id, team_visible, seq, text, speaker, said_at, context_line, embedding, created_at) VALUES (${sqlString(chunkId)}, ${sqlString(sourceId)}, ${sqlString(source.compartment)}, ${sqlString(source.owner_user_id)}, ${source.team_visible}, ${seq}, ${sqlString(piece.text)}, ${sqlString(piece.speaker)}, ${sqlString(piece.saidAt)}, ${sqlString(contextLine)}, ${sqlString(vector ? encodeEmbedding(vector) : null)}, ${sqlString(now)})
+             ON CONFLICT (id) DO UPDATE SET compartment = excluded.compartment, owner_user_id = excluded.owner_user_id, team_visible = excluded.team_visible, text = excluded.text, speaker = excluded.speaker, said_at = excluded.said_at, context_line = excluded.context_line, embedding = excluded.embedding
+             WHERE knowledge_chunks.text IS NOT excluded.text OR knowledge_chunks.embedding IS NOT excluded.embedding OR knowledge_chunks.compartment IS NOT excluded.compartment OR knowledge_chunks.owner_user_id IS NOT excluded.owner_user_id OR knowledge_chunks.team_visible IS NOT excluded.team_visible OR knowledge_chunks.speaker IS NOT excluded.speaker OR knowledge_chunks.said_at IS NOT excluded.said_at OR knowledge_chunks.context_line IS NOT excluded.context_line;`
         )
         // THE FRESH POSTING — read back AFTER the row above has written the new
         // text, same rowid (an UPDATE never changes SQLite's own rowid, only a
@@ -2086,12 +2188,12 @@ export async function indexSource(
           `INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id = ${sqlString(chunkId)};`
         )
         if (vector) upserts.push({ id: chunkId, values: vector, labels: { ...labels, level: "chunk" } })
-      })
+      }
       await d1ExecScript(cfg, guard.databaseId, statements.join("\n"))
     }
 
     await upsertVectors(env, guard, upserts)
-    from += piece.length
+    from += slicePieces.length
     await d1Query(cfg, guard.databaseId, "UPDATE knowledge_sources SET indexed_chunks = ?, indexed_at = ? WHERE id = ?", [
       from,
       now,

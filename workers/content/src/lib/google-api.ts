@@ -2358,6 +2358,11 @@ export type ChatMessage = {
    * read in context. Built from the ids rather than asked for, because Chat's
    * API does not return a link. */
   url: string | null
+  /** SET ONLY ON A FOLDED THREAD (`chatThreads`' own output, never a raw
+   * message) — `chunkChat`'s runs, alongside `text` rather than hidden inside
+   * it (tracker `a-pieces`). See `knowledge_sources.grain_pieces`, migration
+   * 0081, for why this is a separate field and not a mark in the prose. */
+  grainPieces?: { text: string; speaker: string; saidAt: string }[]
 }
 
 /**

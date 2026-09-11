@@ -198,6 +198,35 @@ export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
   return pieces
 }
 
+/** A chunk carrying grain's per-message identity — non-null only for a piece
+ * that came from a run of messages, per the migration's own comment: "both
+ * NULL for an ordinary document chunk." */
+export type GrainPiece = { text: string; speaker: string | null; saidAt: string | null }
+
+/** ONE STRUCTURED PIECE, as `knowledge_sources.grain_pieces` (migration 0081)
+ * stores it — `chunkChat`'s own speaker/time, still attached, JSON-parsed off
+ * that column rather than recovered from prose. THE FIRST ATTEMPT encoded
+ * this in `body` itself, behind a NUL-bracketed mark, and could not have
+ * worked: D1 rejects an embedded NUL (`shared/workers/validate.ts` strips one
+ * from every request field for exactly that reason), so a source carrying
+ * one would fail the write or be silently mangled on the way — caught before
+ * merge. The column is what that migration's own header explains at length. */
+export type StoredGrainPiece = { text: string; speaker: string; saidAt: string }
+
+/** `indexSource`'s reader for a grain-bearing source — PIECES WIN, AND `seq`
+ * FOLLOWS THEM: called instead of `chunkText(body)` whenever
+ * `knowledge_sources.grain_pieces` parses to a non-empty array, never
+ * alongside it. Almost always one chunk per piece (`chunkChat` already keeps
+ * a piece under `CHUNK_TARGET_CHARS`); `chunkText` only actually runs — and
+ * only on that ONE piece's own text — for an oversized piece (a long mail
+ * message, once that lane is wired), and every chunk it produces keeps that
+ * piece's one speaker and time. */
+export function expandGrainPieces(pieces: StoredGrainPiece[]): GrainPiece[] {
+  const out: GrainPiece[] = []
+  for (const piece of pieces) for (const text of chunkText(piece.text)) out.push({ text, speaker: piece.speaker, saidAt: piece.saidAt })
+  return out
+}
+
 export type MailMessage = { from: string; at: string; text: string }
 export type MailPiece = { text: string; from: string; at: string }
 

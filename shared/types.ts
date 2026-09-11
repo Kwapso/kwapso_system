@@ -2734,4 +2734,11 @@ export type GoogleItem = {
    * (`google-read.ts`'s `mailThreads` says why, and what it costs). Absent
    * on every other service. */
   threadMessageIds?: string[]
+  /** CHAT ONLY (today) — `chunkChat`'s own runs, alongside `text` rather than
+   * hidden inside it (tracker `a-pieces`). `knowledge-google.ts`'s chat kind
+   * carries this onto `knowledge_sources.grain_pieces` (migration 0081),
+   * which `indexSource` reads instead of re-chunking `body` from scratch when
+   * it is present — see that migration's own comment for why a column and
+   * not a mark in the prose. */
+  grainPieces?: { text: string; speaker: string; saidAt: string }[]
 }
