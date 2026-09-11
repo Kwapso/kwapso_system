@@ -22,6 +22,7 @@ import { ownedMediaKey, reclaimMedia, storeImageDataUrl, teamMediaKey } from "@s
 import { unreferencedKeys } from "@shared/workers/media-reclaim"
 import { GuardError, hasRight, teamContext, whoAmI, type MemberGuard } from "@shared/workers/gating"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
+import { isRareAccountToken } from "@shared/workers/account-rarity"
 import type { PortalUser } from "@shared/types"
 import { resolveOrdering } from "@shared/workers/sorting"
 import {
@@ -363,6 +364,66 @@ function accountPatch(body: Record<string, unknown>): Record<string, string | nu
   )
 }
 
+/** THE TWO REFUSALS `alt_names` (0083, c-misspell) OWED SINCE IT SHIPPED —
+ * a schema column with NO WRITE DOOR anywhere in the app until now (kb_review,
+ * ship-gate finding, 11 Sep 2026). This door refuses exactly the two ways a
+ * declared spelling could turn a misspelling fix into a second, UNGATED hijack
+ * surface, before it ever reaches `updateAccount`:
+ *
+ *   • MULTI-WORD. `rebuildNameIndex`'s own header already proves a multi-word
+ *     entry could never MATCH (the confirmation is `asked.has(alias)` against
+ *     a question's own SINGLE tokenised words) — refused here rather than
+ *     silently accepted as dead data nobody would ever notice failing.
+ *   • A COMMON WORD, undeclared. An alt_names row is read EXACTLY like an
+ *     account's `code` — an exact match, no rarity gate at all
+ *     (`rebuildNameIndex`'s own doc comment) — which makes a declared
+ *     spelling that happens to be an ordinary word MORE dangerous than an
+ *     undeclared collapsed canonical name, not less: even a canonical
+ *     single-token name still has to clear `ACCOUNT_TOKEN_MAX_CHUNKS`
+ *     (`@shared/workers/account-rarity`). So a candidate spelling that is not
+ *     rare enough is refused UNLESS this same request — or the account
+ *     already — declares `nameNarrowsAlone` (0085, c-hijack B): the SAME
+ *     declared-safety signal, reused rather than each door inventing its own
+ *     (`.session-notes/lanes/NOTE-c-hijack-B-declared-safety.md`'s own closing
+ *     line: "the two probably want to be one door, not two").
+ *
+ * `undefined` means the caller said nothing about `altNames` at all — the
+ * PATCH stays a patch, same as every other field on this door. */
+async function declaredAltNames(
+  cfg: D1Rest,
+  guard: MemberGuard,
+  scope: AccountScope,
+  id: string,
+  raw: unknown[] | undefined,
+  nameNarrowsAloneInThisRequest: boolean | undefined
+): Promise<string[] | undefined> {
+  if (!raw) return undefined
+  const clean = raw
+    .filter((x): x is string => typeof x === "string")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  for (const spelling of clean) {
+    if (/\s/.test(spelling))
+      throw new GuardError(
+        400,
+        "invalid_input",
+        `"${spelling}" is more than one word — a declared spelling names one word of this account's own name, the way its reference code does.`
+      )
+  }
+  if (!clean.length) return clean
+  const declared =
+    nameNarrowsAloneInThisRequest ?? (await getAccountRow(cfg, guard, scope, id)).nameNarrowsAlone
+  if (!declared)
+    for (const spelling of clean)
+      if (!(await isRareAccountToken(cfg, guard, spelling.toLowerCase())))
+        throw new GuardError(
+          400,
+          "common_word",
+          `"${spelling}" is too common a word to declare as a spelling without also ticking "may narrow the knowledge base alone" for this account — declared, it would match on its own, everywhere, with no rarity check at all.`
+        )
+  return clean
+}
+
 export async function postUpdateAccount(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<Body>(
     request,
@@ -374,6 +435,9 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
   const id = requireText(body.id, "Account", TEXT_LIMITS.short)
   const name = requireText(body.name, "Name", TEXT_LIMITS.short)
   const patch = accountPatch(body)
+  const nameNarrowsAlone = typeof body.nameNarrowsAlone === "boolean" ? body.nameNarrowsAlone : undefined
+  const rawAltNames = Array.isArray(body.altNames) ? body.altNames : undefined
+  const altNames = await declaredAltNames(cfg, guard, scope, id, rawAltNames, nameNarrowsAlone)
   // A NEW image only. `accountPatch` keeps absent/null/"" meaning what they mean
   // (leave it, clear it), and only a data URL is something to store — so the
   // upload happens for exactly the field the person just changed.
@@ -387,6 +451,8 @@ export async function postUpdateAccount(request: Request, env: Env): Promise<Res
     ...(stored.logoUrl !== undefined ? { logoUrl: stored.logoUrl } : {}),
     ...(stored.coverUrl !== undefined ? { coverUrl: stored.coverUrl } : {}),
     commercialsVisible: typeof body.commercialsVisible === "boolean" ? body.commercialsVisible : undefined,
+    altNames,
+    nameNarrowsAlone,
   })
   await publishChange(env, guard.teamId, "accounts", id)
   // THE PICTURE THAT IS NO LONGER ANYBODY'S — deleted AFTER the row moved, and

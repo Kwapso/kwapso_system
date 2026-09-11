@@ -52,6 +52,12 @@ type AccountRow = {
   locale: string | null
   timezone: string | null
   commercials_visible: number
+  /** a JSON array of spellings a person declared for this account (0083,
+   * c-misspell) — see `rebuildNameIndex` (workers/content/src/lib/knowledge.ts). */
+  alt_names: string | null
+  /** 0085, c-hijack B: a person declared that this account's collapsed
+   * single-token name may narrow a knowledge-base search on its own. */
+  name_narrows_alone: number
   deactivated_at: string | null
   created_at: string
   creator_name: string | null
@@ -137,7 +143,8 @@ const LINKED_COMPANY = (field: string) => `CASE WHEN account_type = 'individual'
  * on created_at, so it is selected once here rather than twice at the call site. */
 const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone,
   street, postal_code, city, country, industry, about, logo_url, cover_url, code,
-  currency, locale, timezone, commercials_visible, deactivated_at,
+  currency, locale, timezone, commercials_visible, alt_names, name_narrows_alone,
+  deactivated_at,
   created_at, creator_name, updated_at, editor_name,
   ${LINKED_COMPANY("(SELECT c.name FROM accounts c WHERE c.id = l.account_id)")} AS company_name,
   ${LINKED_COMPANY("l.relationship")} AS relationship`
@@ -176,6 +183,23 @@ const ACCOUNT_COLUMNS = `id, account_type, parent_account_id, name, email, phone
  * The one thing that must NOT come through here is a WRITE's before-image: an
  * edit compares against what is stored, not against what the caller may see.
  * `accountRowOrThrow` below is the raw read updateAccount uses for that. */
+/** A JSON array column, defensively — same shape as
+ * `workers/content/src/lib/knowledge.ts`'s own `parseIdList`: anything that
+ * isn't an array of strings reads as empty rather than throwing, because this
+ * is a DISPLAY read and a malformed row should never turn a screen into an
+ * error page. Not imported from there — that file belongs to a different
+ * worker (no cross-worker import path exists in this repo; see
+ * `@shared/workers/account-rarity.ts`'s own header for the seam that DOES
+ * cross workers, and why this three-line parse did not need to). */
+function parseAltNames(json: string | null): string[] {
+  try {
+    const v = JSON.parse(json ?? "[]")
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
+  } catch {
+    return []
+  }
+}
+
 function toAccount(r: AccountRow, scope: AccountScope): Account {
   const ours = scope.kind === "portal"
   // THE LINK'S TWO FACTS, READ BEFORE THE PROJECTION DECIDES WHO MAY HAVE THEM.
@@ -207,6 +231,12 @@ function toAccount(r: AccountRow, scope: AccountScope): Account {
     locale: r.locale,
     timezone: r.timezone,
     commercialsVisible: ours ? null : r.commercials_visible === 1,
+    // BOTH KNOWLEDGE-BASE SAFETY DECLARATIONS ARE OURS ABOUT THEM, never
+    // theirs to read or set — the same reasoning `commercialsVisible` above
+    // already carries. A client cannot review how their own name searches;
+    // that is a staff judgement about corpus behaviour, not their record.
+    altNames: ours ? [] : parseAltNames(r.alt_names),
+    nameNarrowsAlone: ours ? false : r.name_narrows_alone === 1,
     // WHERE SHE WORKS AND WHAT SHE DOES THERE — the contacts table's two middle
     // columns, and the third pair of fields this projection withholds from a
     // client login. Not because a role is a secret: because a person can be a
@@ -843,6 +873,14 @@ export async function updateAccount(
     locale?: Patch
     timezone?: Patch
     commercialsVisible?: boolean
+    /** 0083/c-misspell, still unreached until now: declared spelling variants
+     * of this account's own name, ALREADY VALIDATED at the door (single
+     * token each, and a common one only alongside `nameNarrowsAlone`) —
+     * this function trusts its caller the same way it trusts `name`. */
+    altNames?: string[]
+    /** 0085/c-hijack B: may this account's collapsed single-token name
+     * narrow a knowledge-base search on its own, bypassing the rarity gate. */
+    nameNarrowsAlone?: boolean
   }
 ): Promise<{ supersededUrls: (string | null)[] }> {
   // THE STORED ROW, not the caller's view of it — see accountRowOrThrow.
@@ -878,7 +916,8 @@ export async function updateAccount(
       guard.databaseId,
       `UPDATE accounts SET name = ?, email = ?, phone = ?, street = ?, postal_code = ?, city = ?,
          country = ?, industry = ?, about = ?, logo_url = ?, cover_url = ?, code = ?, currency = ?,
-         locale = ?, timezone = ?, commercials_visible = ?, ${audit.sql}
+         locale = ?, timezone = ?, commercials_visible = ?, alt_names = ?, name_narrows_alone = ?,
+         ${audit.sql}
        ${where([fence.sql, "id = ?"])} RETURNING id`,
       [
         input.name,
@@ -897,6 +936,8 @@ export async function updateAccount(
         next.locale,
         next.timezone,
         input.commercialsVisible === undefined ? before.commercials_visible : input.commercialsVisible ? 1 : 0,
+        input.altNames === undefined ? before.alt_names : JSON.stringify(input.altNames),
+        input.nameNarrowsAlone === undefined ? before.name_narrows_alone : input.nameNarrowsAlone ? 1 : 0,
         ...audit.params,
         ...fence.params,
         id,

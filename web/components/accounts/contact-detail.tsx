@@ -201,6 +201,11 @@ export function ContactDetailScreen({
       logoUrl: values.logoUrl || null,
       coverUrl: values.coverUrl || null,
       locale: values.locale.trim() || null,
+      altNames: values.altNames
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+      nameNarrowsAlone: values.nameNarrowsAlone,
     })
     refresh()
     toast.success(t("Contact updated."))
@@ -630,6 +635,8 @@ export function ContactDetailScreen({
           logoUrl: account.logoUrl ?? "",
           coverUrl: account.coverUrl ?? "",
           locale: account.locale ?? "",
+          altNames: account.altNames.join(", "),
+          nameNarrowsAlone: account.nameNarrowsAlone,
         }}
         onSubmit={save}
       />
