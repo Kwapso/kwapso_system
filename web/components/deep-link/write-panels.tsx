@@ -338,6 +338,8 @@ export function WritePanels({
         appOptions={openableApps}
         textOwnedElsewhere={knowledgeTextOwnedElsewhere}
         titleOwnedElsewhere={knowledgeMirrored}
+        mirrored={knowledgeMirrored}
+        sightingsCount={knowledgeEditRow?.sightingsCount}
         textOwnedNote={
           knowledgeEditRow?.fileUrl
             ? t(
