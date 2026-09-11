@@ -2747,37 +2747,87 @@ async function sourceTitles(
   return new Map(rows.map((r) => [r.id, r.title]))
 }
 
-/** IS THIS TOKEN RARE ENOUGH TO MEAN SOMETHING ON ITS OWN — the same question
- * `EXACT_TERM_MAX_CHUNKS` already answers for the lexical arm's rare-token
- * bypass, asked here for `accountsNamedIn` instead of inventing a second
- * number for the same idea. UNFENCED (whole-team chunk count over FTS5),
- * because this runs BEFORE the compartment is known — narrowing to a
- * compartment is the very question this function exists to answer. */
-async function isRareTerm(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
+/** IS THIS TOKEN RARE ENOUGH TO NAME AN ACCOUNT ON ITS OWN — c-hijack, 11 Sep
+ * 2026. This USED to ask the same question `EXACT_TERM_MAX_CHUNKS` answers for
+ * the lexical arm's rare-token bypass, on the theory that one number could
+ * serve two questions. It could not: `EXACT_TERM_MAX_CHUNKS` (100) was
+ * measured against DIGIT-BEARING reference terms — ticket numbers, years — a
+ * population where "how many chunks mention this" tracks "how distinctive is
+ * this" reasonably well. Account-name tokens are ORDINARY WORDS, and that
+ * correlation does not hold: measured against every one of the 26 staging
+ * accounts whose canonical name collapses to a single surviving token —
+ *
+ *     0  Natalya · Sadia · Sandra (person accounts, no material yet)
+ *     1  bergman   ← Bergman S.A.        — an ordinary surname, HIJACKS
+ *     2  klaus, 5 manuel, 7 markus (person accounts)
+ *    35  green     ← re-green            — an ordinary word, HIJACKS
+ *    56  pickl     ← Pickl               — UNCERTAIN, see below
+ *    72  demo      ← DEMO                — an ordinary word, HIJACKS
+ *    79  solutions ← VU Solutions        — an ordinary word, HIJACKS (KB-AUDIT §4.2)
+ *   106  larissa   ← Larissa Grün        — a rare surname, safe
+ *   115  aws       ← aWs                 — a common tech acronym, LIKELY HIJACKS
+ *   115  nareyka   ← Björn Nareyka       — a rare surname, safe
+ *   116+ looom, safety4you, 196+, PLATINUM, fluclinic, assecuranz,
+ *        amstella, padelbase, kwapso, confia, hogo, alaap — brand names and
+ *        real client names, all safe, up to 4,860 (the owner's own name)
+ *
+ * — no single ceiling separates every hijack from every safe name. "aws" and
+ * "nareyka" tie at 115: one is a common acronym, the other a rare surname,
+ * and corpus frequency cannot tell them apart. PLATINUM (246, an ordinary
+ * word) sits BELOW several genuinely safe real client names. This ceiling is
+ * therefore set to close the THREE proven cases (green, demo, solutions — all
+ * ≥35) while preserving every person-account name measured (≤7) — bergman (1)
+ * is not closeable by any positive threshold, and "aws"/"platinum" are not
+ * closeable without also excluding legitimately safe, higher-count real
+ * client names. Both are named, tracked residuals (c-hijack's own report),
+ * not silently accepted. Pickl (56) falls on the excluded side as an HONEST
+ * side effect — its own count is high enough to look exactly like the
+ * three proven hijacks from corpus frequency alone, and nothing here can
+ * tell whether that is coincidence or the same defect wearing a fourth name;
+ * see the same report before assuming either way.
+ *
+ * UNFENCED (whole-team chunk count over FTS5), because this runs BEFORE the
+ * compartment is known — narrowing to a compartment is the very question
+ * this function exists to answer. */
+const ACCOUNT_TOKEN_MAX_CHUNKS = 30
+
+async function isRareAccountToken(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
   const rows = await d1Query<{ n: number }>(
     cfg,
     guard.databaseId,
     "SELECT COUNT(*) AS n FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?",
     [`"${term}"`]
   )
-  return (rows[0]?.n ?? 0) <= EXACT_TERM_MAX_CHUNKS
+  return (rows[0]?.n ?? 0) <= ACCOUNT_TOKEN_MAX_CHUNKS
 }
 
 /** The account a question names, or null. Reads `knowledge_names` (0073)
  * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
  *
  * KB-AUDIT.md §4.2: "VU Solutions" → "solutions", "re-green" → "green",
- * "DEMO" → "demo" — 26 of 134 staging accounts have a single-token name, and
- * the token is often an ordinary English word, so "what solutions have we
- * proposed for data import?" used to silently narrow to VU Solutions. TWO
- * WAYS a candidate may still win: its name is ≥2 tokens, every one of them
- * present in the question (two specific words appearing together is not a
- * coincidence the way one common word is); or it is a single token that is
- * RARE across the corpus (`isRareTerm`) — "Paddlebase" and "Asekurans" are
- * still one token each, and still have to resolve. An ALIAS (the account's own
- * `code`, e.g. BERG) bypasses both: a code is chosen to be a short,
- * unambiguous handle on purpose, so an exact match is evidence on its own,
- * exactly as it was before this function moved off `accounts.code`. */
+ * "DEMO" → "demo" — 26 of 134 staging accounts have a canonical name that
+ * collapses to ONE surviving token (`tokenise` drops short words and shatters
+ * anything with a non-ASCII character, so a two-word name is not safe from
+ * this just for having two words — "Björn Nareyka" collapses exactly the same
+ * way "VU Solutions" does), and the surviving token is often an ordinary word,
+ * so "what solutions have we proposed for data import?" used to silently
+ * narrow to VU Solutions. THIS WAS TICKED FIXED ONCE (11 Sep 2026) ON THE
+ * WRONG EVIDENCE — a rarity check alone (`isRareAccountToken`,
+ * `ACCOUNT_TOKEN_MAX_CHUNKS`) narrows the window but cannot close it: a word
+ * can be corpus-rare purely because the topic has not come up yet while still
+ * being an ordinary word or surname that will eventually collide (see
+ * `ACCOUNT_TOKEN_MAX_CHUNKS`'s own header for the measured distribution and
+ * the two named cases — "aws", "bergman" — that rarity alone cannot touch).
+ *
+ * THREE WAYS a candidate may still win, not two: its name is ≥2 tokens, every
+ * one of them present in the question (two specific words appearing together
+ * is not a coincidence the way one common word is); or it is a single
+ * surviving token that clears `ACCOUNT_TOKEN_MAX_CHUNKS` AND names exactly
+ * ONE account, not more (the second pass below — a token that names two real
+ * accounts is evidence about the WORD, not either company, and resolves to
+ * neither); or it is an ALIAS (the account's own `code`, e.g. BERG), which
+ * bypasses both — a code is chosen to be a short, unambiguous handle on
+ * purpose, so an exact match is evidence on its own. */
 /** How many DISTINCT accounts one question may name before the compartment
  * search widens to all of them. BUILD-5-knowledge-rebuild.md's own fan-out
  * ceiling ("hard cap 12"), reused here rather than a second number invented
@@ -2841,31 +2891,65 @@ export async function accountsNamedIn(
     params
   )
   const asked = new Set(terms)
+  // TWO PASSES, not one — c-hijack's second half (A2). Alias and multi-token
+  // matches are confirmed and kept immediately, exactly as before. A
+  // single-collapsed-token match is held back until every candidate has been
+  // read, because confirming it correctly needs to know something no ONE
+  // candidate can answer alone: does this same token ALSO name a DIFFERENT
+  // account? Two real companies sharing one ordinary surviving word ("Bergman
+  // S.A." and a hypothetical second "Bergman…" if one existed) is not evidence
+  // about either of them — it is evidence about the WORD, derived from the
+  // data itself, no dictionary and no threshold required. So a token that
+  // resolves to more than one distinct account NARROWS TO NONE OF THEM rather
+  // than widening to all — the fan-out path below (`deriveCompartment`,
+  // `named.length > 1`) is for a question that names several DIFFERENT
+  // entities by their OWN distinct terms (BERG, HOGO — each its own alias or
+  // multi-token match), never for one ambiguous word standing in for several.
   const found: { id: string; name: string }[] = []
   const seen = new Set<string>()
+  const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
-    if (found.length >= NAMED_ACCOUNTS_CAP) break
-    let match: { id: string; name: string } | null = null
     // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
     // no token-count/rarity gate. `alias_of` carries the canonical name back.
     if (c.alias_of) {
-      if (asked.has(c.name.toLowerCase())) match = { id: c.ref_id, name: c.alias_of }
-    } else {
-      const nameTerms = [...tokenise(c.name).keys()]
-      if (nameTerms.length && nameTerms.every((t) => asked.has(t))) {
-        if (nameTerms.length >= 2 || (await isRareTerm(cfg, guard, nameTerms[0])))
-          match = { id: c.ref_id, name: c.name }
+      if (asked.has(c.name.toLowerCase()) && !seen.has(c.ref_id)) {
+        seen.add(c.ref_id)
+        found.push({ id: c.ref_id, name: c.alias_of })
       }
+      continue
     }
-    // DEDUPED BY ACCOUNT, not by row: the same account's canonical name and
-    // its code can both match one question ("BERG, the Bergman account…"),
-    // and that is one account named twice, not two.
-    if (match && !seen.has(match.id)) {
-      seen.add(match.id)
-      found.push(match)
+    const nameTerms = [...tokenise(c.name).keys()]
+    if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
+    if (nameTerms.length >= 2) {
+      if (!seen.has(c.ref_id)) {
+        seen.add(c.ref_id)
+        found.push({ id: c.ref_id, name: c.name })
+      }
+      continue
+    }
+    // THE COLLAPSED CASE — one surviving token, held back for the second pass.
+    if (await isRareAccountToken(cfg, guard, nameTerms[0])) {
+      const token = nameTerms[0]
+      const list = pendingByToken.get(token) ?? []
+      list.push({ id: c.ref_id, name: c.name })
+      pendingByToken.set(token, list)
     }
   }
-  return found
+  // THE SECOND PASS. A token naming exactly one account is real evidence,
+  // kept; a token naming more than one is evidence about the token, not
+  // either account, and neither is added.
+  for (const list of pendingByToken.values()) {
+    if (list.length !== 1) continue
+    const only = list[0]
+    if (!seen.has(only.id)) {
+      seen.add(only.id)
+      found.push(only)
+    }
+  }
+  // R14: the cap applies to the FINAL set, after ambiguous tokens are
+  // dropped — capping mid-collection would let an early ambiguous token
+  // crowd out a later, genuine one before the second pass ever saw it.
+  return found.slice(0, NAMED_ACCOUNTS_CAP)
 }
 
 /** Rebuilds `knowledge_names` (0073) — THE NAME INDEX `accountsNamedIn` reads.

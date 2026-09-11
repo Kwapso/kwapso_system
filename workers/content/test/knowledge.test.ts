@@ -762,6 +762,132 @@ describe("the account router is not hijacked by a name that is also an ordinary 
   })
 })
 
+// c-hijack, ticked once on the wrong evidence (11 Sep 2026) and unticked the
+// same day: §4.2's own test above used 120 filler chunks for "solutions",
+// already over the OLD ceiling (EXACT_TERM_MAX_CHUNKS, 100) by construction —
+// it could never have caught the real bug, because staging's real count (79)
+// sits UNDER that ceiling. These three use the REAL measured staging counts
+// (this file's own `ACCOUNT_TOKEN_MAX_CHUNKS` header has the full 26-account
+// distribution), so a threshold that only looks tight is told apart from one
+// that actually is.
+describe("c-hijack (A): a threshold measured against the RIGHT population closes the three proven cases", () => {
+  const SOLUTIONS = "A_HIJACK_SOLUTIONS"
+  const GREEN = "A_HIJACK_GREEN"
+  const UMLAUT = "A_HIJACK_UMLAUT"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${SOLUTIONS}', 'entity', 'VU Solutions', NULL, '2026-01-01'),
+         ('${GREEN}', 'entity', 're-green', NULL, '2026-01-01'),
+         ('${UMLAUT}', 'entity', 'Grün Logistik', NULL, '2026-01-01');`
+    )
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    const rows: string[] = []
+    // 79 — VU Solutions's real measured staging count.
+    for (let i = 0; i < 79; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_SOL_${i}', 'S_FILLER', 'agency', ${i}, 'we discussed several possible solutions', '2026-01-01');`
+      )
+    // 35 — re-green's real measured staging count.
+    for (let i = 0; i < 35; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_GRN_${i}', 'S_FILLER', 'agency', ${100 + i}, 'the light was green when we checked', '2026-01-01');`
+      )
+    // 40 — an UMLAUT-collapsed ordinary word ("Logistik" — German for
+    // "logistics"), never a dropped SHORT word: "Grün" shatters entirely
+    // (both fragments under the 3-character floor), leaving "logistik" as
+    // the sole survivor — the mechanism this describe block's sibling test
+    // is for.
+    for (let i = 0; i < 40; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_LOG_${i}', 'S_FILLER', 'agency', ${200 + i}, 'the logistik team confirmed the delivery window', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_FILLER';"
+    )
+  })
+
+  it("VU Solutions no longer hijacks 'what solutions have we proposed for data import?'", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what solutions have we proposed for data import?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("re-green no longer hijacks 'which parts are green and ready?' — including the outright refusal it used to cause", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "which parts are green and ready?")
+    expect(answer.compartments).toEqual([])
+    // KB-AUDIT's own worst outcome: a wrong narrow that then finds nothing
+    // and refuses outright, on a corpus that had the answer all along.
+    // Fixed at the ROUTING layer, this shape cannot recur from THIS cause —
+    // a genuinely empty result for an unnarrowed search is a separate,
+    // legitimate "found: false" this test does not claim to touch.
+  })
+
+  it("an umlaut-collapsed ordinary word is caught exactly like a dropped-short-word collapse — same fix, different mechanism", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "has the logistik process changed this month?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+})
+
+// c-hijack (A2): a single collapsed token that names more than one real
+// account is evidence about the WORD, not either company — derived from the
+// data itself, no dictionary and no threshold. Fixture names deliberately do
+// NOT appear in spine-harness.ts: reusing "Bergman S.A." from there is
+// exactly what produced a false "two accounts collide" reading earlier in
+// this investigation (a name duplicate, not a real finding), and it is not
+// a mistake worth repeating in the test that is supposed to prove the fix.
+describe("c-hijack (A2): an ambiguous shared token resolves to NEITHER account, not both", () => {
+  const ROSEWOOD_1 = "A_HIJACK_ROSEWOOD_1"
+  const ROSEWOOD_2 = "A_HIJACK_ROSEWOOD_2"
+
+  beforeEach(() => {
+    // "VX Rosewood" and "re-rosewood" collapse to the identical single token
+    // "rosewood" by two different routes (a dropped short prefix, a dropped
+    // short word) — two genuinely different companies, one shared word.
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${ROSEWOOD_1}', 'entity', 'VX Rosewood', NULL, '2026-01-01'),
+         ('${ROSEWOOD_2}', 'entity', 're-rosewood', NULL, '2026-01-01');`
+    )
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    // Well under ACCOUNT_TOKEN_MAX_CHUNKS on its own — proving this is NOT
+    // the threshold doing the work, it is the ambiguity check.
+    const rows: string[] = []
+    for (let i = 0; i < 5; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_ROSE_${i}', 'S_FILLER', 'agency', ${i}, 'the rosewood finish was approved', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_FILLER';"
+    )
+  })
+
+  it("a question mentioning the shared word names neither account", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "was the rosewood finish approved yet?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.compartments).not.toContain(`account:${ROSEWOOD_1}`)
+    expect(answer.compartments).not.toContain(`account:${ROSEWOOD_2}`)
+  })
+})
+
 // c-misspell. The owner asked the live assistant "What is happening with
 // Paddlebase?" (his own spelling — the real account is Padelbase) and it
 // answered "the question named no client", off a brute search rather than the
