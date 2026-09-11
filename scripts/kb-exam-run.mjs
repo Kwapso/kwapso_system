@@ -125,6 +125,21 @@ function productionComposeModel() {
   return found[1]
 }
 
+/** Staging's real daily AI allowance, read off the config the same way —
+ * NEVER the credits.ts fallback (`FREE_DAILY`, 25), which is what a caller
+ * that never sets this var gets, and which reads as "quota exhausted"
+ * after exactly 25 real calls when it is a stand-in clamp, not a ceiling
+ * (measured live, 2026-09-11: staging's own value is 2000). The wrangler
+ * file has TWO `AGENT_FREE_DAILY` lines (a production default, then the
+ * staging env override) — the staging block's, last in the file, is what a
+ * `cf-exec` run against staging actually sees. */
+function agentFreeDaily() {
+  const raw = readFileSync(join(REPO, "workers", "content", "wrangler.jsonc"), "utf8")
+  const found = [...raw.matchAll(/"AGENT_FREE_DAILY"\s*:\s*"(\d+)"/g)]
+  if (!found.length) throw new Error("workers/content/wrangler.jsonc no longer names AGENT_FREE_DAILY — this run cannot know staging's real allowance")
+  return found[found.length - 1][1]
+}
+
 /** A REST-backed stand-in for the native `D1Database` binding `payToRead`'s
  * gate/meter chain needs (`consumeAiUnit`/`getQuota`/`logUsage` all call
  * `env.DB.prepare(...).bind(...).run()`/`.first()` against the CORE
@@ -217,6 +232,13 @@ const env = {
   WORKERS_AI_MODEL: FULL_LOOP ? productionComposeModel() : undefined,
   KNOWLEDGE_INDEX: vectorizeStandIn(),
   DB: READER ? d1RestBinding(CORE) : { prepare: () => ({ bind: () => ({ run: async () => {}, all: async () => ({ results: [] }) }) }) },
+  // Read straight off the config, never assumed — same discipline as
+  // `productionComposeModel()`. Without this, `numberVar` falls back to
+  // `shared/workers/credits.ts`'s hardcoded FREE_DAILY (25) instead of
+  // staging's real allowance, and a run that happens to spend exactly 25
+  // reads as "quota exhausted" when it is a stand-in clamp, not the real
+  // ceiling (measured live, 2026-09-11 — see this lane's report).
+  AGENT_FREE_DAILY: READER ? agentFreeDaily() : undefined,
 }
 const CFG = { accountId: ACCOUNT, apiToken: TOKEN }
 

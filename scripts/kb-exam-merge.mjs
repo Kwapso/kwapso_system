@@ -118,8 +118,7 @@ const MATCHES = [
  * meeting, fully absent, so the corrected rule changes nothing about them
  * either. */
 const DERIVED_GAP_OVERRIDES = {
-  M6: { leftOut: "HORST matching test run 25 Aug", score: 0.6, note: "same meeting as B.G3, different question (threshold vs. how it went) — not merged with G3, stays a distinct gap row" },
-  M19: { leftOut: "FluClinic task 3144 meeting 25 Aug", score: 0.5, note: "no B row exists for this meeting at all; its one MEETING source is fully absent — the 'ticket record' mention is a different door (the tickets module), never a candidate for the ≥15-piece transcript check, so it is not a competing source under the corrected rule" },
+  M19: { leftOut: "FluClinic task 3144 meeting 25 Aug", score: 0.5, note: "no B row exists for this meeting at all; its one MEETING source is fully absent — the 'ticket record' mention is a different door (the tickets module), never a candidate for the ≥15-piece transcript check, so it is not a candidate source under the corrected rule" },
 }
 
 /** A-H13 moved OUT of DERIVED_GAP_OVERRIDES: it cites two MEETING sources
@@ -132,6 +131,29 @@ const DERIVED_GAP_OVERRIDES = {
  * no sixth disposition, per the hub's own instruction. */
 const THIN_EVIDENCE_NOTES = {
   H13: 'THIN EVIDENCE, not gap: keyed to "HOGO x Claude math pt 2, 26 Aug (23 pieces)" — pt 1 (25 Aug) has no transcript. A complete answer draws from pt 2 AND names that pt 1 was never recorded; this is the exam\'s one row testing partial knowledge, not absence.',
+}
+
+/** A-M6 moved OUT of DERIVED_GAP_OVERRIDES on 2026-09-11, same shape as
+ * H13's correction above but discovered the other way round: the keying
+ * pass (post-rebuild) found a real, chunked transcript for "HORST: Claude
+ * Matchings test run" (12 pieces) — the meeting B's own file had left out
+ * is not actually absent from the rebuilt corpus. The row's premise ("no
+ * transcript exists") was true when the union was built and is not true
+ * now, so it falls through to plain `keyed` (tags `para, exact`, nothing
+ * else forces a disposition) rather than staying a gap the base can now
+ * answer correctly and be marked wrong for it. */
+const SETTLED_NOTES = {
+  M6: 'SETTLED, not gap: the rebuild produced a real transcript for "HORST: Claude Matchings test run" (12 pieces) — B\'s own file had this meeting left out, but it is not actually absent from the corpus. Keyed to that source; the row now grades as an ordinary keyed question.',
+}
+
+/** A KEYING confidence note, distinct from the two above (which are about
+ * whether the QUESTION is a gap): this is about how SURE the keying pass
+ * is of its own answer. `kb-exam-keys.json` is flat id→sourceIds JSON with
+ * no room for prose, so a lower-confidence key rides in the one place a
+ * reader of the exam actually looks — the row's own detail column, the
+ * same seam THIN_EVIDENCE_NOTES/SETTLED_NOTES already use. */
+const KEY_CONFIDENCE_NOTES = {
+  O1: 'LOWER-CONFIDENCE KEY (2026-09-11): the hub proposed two ticket ids about email delivery ("Covid Order Confirmation", "COVID Activation Email") that turned out to be about sending confirmation emails, not the reimbursement process this row asks about — not used. Keyed instead to "Voucher Redemptions - Pharmacy App", the closest real match found; unlike this exam\'s other keys, this one is NOT corroborated by an exact chunk-count match against a named piece count, because the row cites no single authoritative source with one.',
 }
 
 // Disposition (keyed/refusal/gap/tool/struck) is NOT decided here — it is
@@ -178,6 +200,7 @@ function buildUnion() {
     const detailBits = [a.detail]
     if (!sameText) detailBits.push(`(B asked: "${b.question}")`)
     if (norm(a.detail) !== norm(b.detail) && b.detail) detailBits.push(`B source: ${b.detail}`)
+    if (KEY_CONFIDENCE_NOTES[aId]) detailBits.push(`[${KEY_CONFIDENCE_NOTES[aId]}]`)
     detailBits.push(`[also B-${bId}, ${kind}]`)
     unionRows.push({
       id: `A-${aId}`, section: a.section, level: a.level,
@@ -191,6 +214,8 @@ function buildUnion() {
     if (derived && !tags.includes("gap")) tags.push("gap")
     let detail = derived ? `${a.detail} — [DERIVED gap: matches B's left-out "${derived.leftOut}" (score ${derived.score}); ${derived.note}]` : a.detail
     if (THIN_EVIDENCE_NOTES[a.id]) detail = `${detail} — [${THIN_EVIDENCE_NOTES[a.id]}]`
+    if (SETTLED_NOTES[a.id]) detail = `${detail} — [${SETTLED_NOTES[a.id]}]`
+    if (KEY_CONFIDENCE_NOTES[a.id]) detail = `${detail} — [${KEY_CONFIDENCE_NOTES[a.id]}]`
     unionRows.push({ id: `A-${a.id}`, section: a.section, level: a.level, question: a.question, tags, detail })
   }
   for (const b of B) {
