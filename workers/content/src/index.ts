@@ -256,7 +256,7 @@ import {
   postGoogleSourceActive,
 } from "./routes/google"
 import { googleAutopilot } from "./lib/google-autopilot"
-import { revisitUnhealthySources } from "./lib/knowledge"
+import { rebuildNameIndex, revisitUnhealthySources } from "./lib/knowledge"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { clientUserIds } from "@shared/workers/record-link"
@@ -815,6 +815,17 @@ export default {
         // not. This is what actually closes the gap a forward-only cursor
         // opens — see `revisitUnhealthySources`'s own header.
         const revisit = await revisitUnhealthySources(env, d1ConfigFrom(env, "automation"), guard)
+        // THE NAME INDEX RIDES THIS TICK TOO. `postKnowledgeSync` has rebuilt it
+        // since the day it shipped, with a comment saying the sweep keeps
+        // `accountsNamedIn`'s router current — true of that door, and that door
+        // is pressed by a person. This is the sweep that runs when nobody does,
+        // and it did not. So a client created, renamed, deactivated or given a
+        // declared alternate spelling (`alt_names`, 0083) stayed invisible to
+        // the router until somebody happened to press the button, and the
+        // failure has no symptom: the question still answers, it just answers
+        // without narrowing to the client the person named. Bounded work, no AI
+        // spend, same argument the door's own comment makes.
+        await rebuildNameIndex(d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0) + revisit.recovered
         if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 
