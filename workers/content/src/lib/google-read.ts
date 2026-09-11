@@ -35,9 +35,9 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
-import { LIST_HARD_CAP } from "@shared/workers/limits"
+import { LIST_HARD_CAP, GMAIL_SWEEP_PAGES } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
-import type { GoogleItem, GoogleService } from "@shared/types"
+import type { GoogleItem, GoogleService, GoogleSource } from "@shared/types"
 import type { ChatMessage } from "./google-api"
 import { chunkChat, chunkMail } from "./knowledge-text"
 import type { ReaderEnv } from "./source-readers"
@@ -52,6 +52,7 @@ import {
   gmailSearch,
   isConnectionLost,
   GMAIL_CONTACT_CAP,
+  GOOGLE_PAGE_SIZE,
   type CalendarWindow,
   type MailMessage,
 } from "./google-api"
@@ -167,7 +168,13 @@ export type GoogleReadRequest = {
   /** read the full text of each item (Drive files only today; a mail list
    * carries snippets, and a body per message is a call per message). */
   withText?: boolean
-  /** calendar only — the window to read. */
+  /** CALENDAR AND GMAIL — the window to read. ISO moments; calendar passes
+   * them straight through as `timeMin`/`timeMax`, gmail folds them into the
+   * query as `after:`/`before:` (epoch seconds — see the gmail branch
+   * below). Absent for every caller but the knowledge backfill (migration
+   * 0082, knowledge-google.ts), which is the only one that ever sets them —
+   * every interactive read still asks for "whatever Google hands back with
+   * no bound", exactly as before. */
   from?: string
   to?: string
   /** GMAIL ONLY — ids this lane has already filed, so their header is worth
@@ -564,6 +571,34 @@ export async function scopedCalendarEvent(
   return null
 }
 
+/** ONE CHAT CONVERSATION, AS A `GoogleItem` — pulled out so the knowledge
+ * backfill's own per-space walk (migration 0082, `knowledge-google.ts`) can
+ * build the exact same shape the live read below does, without going through
+ * `readGoogleMaterial`'s all-services-at-once loop: the backfill reads ONE
+ * space at a time, on its own cursor, and needs the mapping without the loop
+ * around it. Both call sites stay byte-for-byte the same item. `url` is
+ * `message.url`, THE LINK BACK already built from the message's own ids by
+ * `chatMessageUrl` (google-api.ts) — nothing here recomputes it. */
+export function chatThreadItem(space: GoogleSource, message: ChatMessage, userId: string): GoogleItem {
+  return {
+    service: "chat",
+    sourceId: space.id,
+    externalId: message.id,
+    title: `${space.name} — ${message.sender}`,
+    url: message.url,
+    text: message.text,
+    updatedAt: message.createdAt,
+    shelf: space.shelf,
+    ownerUserId: userId,
+    accountId: space.accountId,
+    appOnly: message.senderIsApp,
+    // THE STRUCTURED RUNS, alongside `text` — tracker `a-pieces`, migration
+    // 0081 (feat/kb-piece-grain). `knowledge-google.ts`'s chat kind carries
+    // this onto `grain_pieces`.
+    grainPieces: message.grainPieces,
+  }
+}
+
 export async function readGoogleMaterial(
   env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
@@ -574,12 +609,19 @@ export async function readGoogleMaterial(
   contactsUsed: number
   contactsCapped: boolean
   skipped: GoogleSkip[]
+  /** CALENDAR ONLY, false otherwise. `scopedCalendarWindow`'s own signal that
+   * the window held more than one bounded read walked — the knowledge
+   * backfill (`knowledge-google.ts`, migration 0082) needs this to know
+   * whether it may credit a slice as fully read or must resume inside it;
+   * nothing else in this file consumed it before this. */
+  truncated: boolean
 }> {
   const wanted = request.services ?? (["drive", "gmail", "calendar", "chat"] as GoogleService[])
   const items: GoogleItem[] = []
   const skipped: GoogleSkip[] = []
   let contactsUsed = 0
   let contactsCapped = false
+  let truncated = false
   // Read ONCE for the whole call, not per service: Gmail needs the addresses to
   // build its fence and both Gmail and Calendar need the account behind each
   // one, and that is the same read of the same table.
@@ -685,10 +727,31 @@ export async function readGoogleMaterial(
       // THROUGH THE SCOPED READ, never `gmailSearch` directly — the sweep is the
       // largest consumer of a person's mailbox and would be the worst place for
       // the fence to be missing.
+      // THE BACKFILL'S OWN BOUND (migration 0082, knowledge-google.ts). Gmail's
+      // `messages.list` has no `timeMin`/`timeMax` of its own — `before:`/
+      // `after:` are ordinary query terms, epoch seconds, ANDed onto whatever
+      // `request.search` already asked for exactly the way a second contact
+      // address would be. Absent for every caller but the backfill, which is
+      // the only one that ever sets `request.from`/`request.to` on a gmail read.
+      const timeBound = [
+        request.from ? `after:${Math.floor(Date.parse(request.from) / 1000)}` : "",
+        request.to ? `before:${Math.floor(Date.parse(request.to) / 1000)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+      const boundedSearch = [request.search, timeBound].filter(Boolean).join(" ")
+      const threadMessages = await scopedGmailSearch(cfg, guard, token, "", boundedSearch, request.gmailKnownIds)
+      // A COUNT, NOT A PAGE-TOKEN READ-BACK — `gmailSearch`'s own return shape
+      // ends at `MailMessage[]`, and widening it to also carry `truncated`
+      // would touch every caller (google-transcript.ts's notice search among
+      // them) for a signal only the backfill needs. `GMAIL_SWEEP_PAGES ×
+      // GOOGLE_PAGE_SIZE` is the hard cap the internal page loop cannot
+      // exceed (`gmailSearch`, google-api.ts) — reaching it is the same
+      // "there was more to see" signal `calendarList`'s own `truncated` is,
+      // read off the one number this function already has in hand.
+      truncated = truncated || threadMessages.length >= GMAIL_SWEEP_PAGES * GOOGLE_PAGE_SIZE
       // ONE SOURCE PER THREAD, NOT PER MESSAGE. See `mailThreads`.
-      for (const { threadId, ordered } of mailThreads(
-        await scopedGmailSearch(cfg, guard, token, "", request.search, request.gmailKnownIds)
-      )) {
+      for (const { threadId, ordered } of mailThreads(threadMessages)) {
         const first = ordered[0]
         const last = ordered[ordered.length - 1]
         if (!first || !last) continue
@@ -742,10 +805,10 @@ export async function readGoogleMaterial(
     // EVENTS THIS APP ALREADY HOLDS AS MEETINGS, so they are not filed twice.
     // See `meetingEventIds` for the measurement that made this necessary.
     const alreadyMeetings = token ? await meetingEventIds(cfg, guard) : new Set<string>()
-    if (token)
-      for (const event of (
-        await scopedCalendarWindow(cfg, guard, token, { from: request.from, to: request.to })
-      ).events) {
+    if (token) {
+      const window = await scopedCalendarWindow(cfg, guard, token, { from: request.from, to: request.to })
+      truncated = window.truncated
+      for (const event of window.events) {
         if (alreadyMeetings.has(event.id)) continue
         items.push({
           service: "calendar",
@@ -766,6 +829,7 @@ export async function readGoogleMaterial(
           accounts: matchedAccounts(contacts, event.attendees.map((a) => a.email).join(" ")),
         })
       }
+    }
   }
 
   if (wanted.includes("chat")) {
@@ -777,43 +841,34 @@ export async function readGoogleMaterial(
     const fresh = new Map<string, string>()
     if (token)
       for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active)) {
-        const page = await chatMessages(token, space.externalId, known)
+        // ONE SPACE'S REFUSAL IS ONE SPACE'S — the same reasoning Drive's own
+        // per-file try/catch and Gmail's `Promise.allSettled` give, applied
+        // here for the first time. Before this, a space that became
+        // unreadable (deleted, access revoked) threw straight out of this
+        // loop and silently took every space named AFTER it with it, in
+        // every tick from then on — a live bug, found while building
+        // migration 0082's backfill rather than caused by it.
+        let page: { messages: ChatMessage[]; learned: Map<string, string> }
+        try {
+          page = await chatMessages(token, space.externalId, known)
+        } catch (e) {
+          // A DEAD TOKEN IS EVERY SPACE'S FAILURE, not this one's — same
+          // guard as the Drive and Gmail loops above: retrying it space by
+          // space would multiply one real problem into N silent skips
+          // instead of the one clear "reconnect" this already surfaces.
+          if (isConnectionLost(e)) throw e
+          const reason = e instanceof Error ? e.message : String(e)
+          console.error(`google chat space "${space.name}" (${space.externalId}) skipped: ${reason}`)
+          skipped.push({ title: space.name, reason })
+          continue
+        }
         // WHAT THIS SPACE TAUGHT US IS AVAILABLE TO THE NEXT ONE, in this same
         // sweep, before anything is written down.
         for (const [id, name] of page.learned) { known.set(id, name); fresh.set(id, name) }
         // ONE SOURCE PER CONVERSATION, NOT PER MESSAGE. See `chatThreads`.
-        for (const message of chatThreads(page.messages))
-          items.push({
-            service: "chat",
-            sourceId: space.id,
-            externalId: message.id,
-            title: `${space.name} — ${message.sender}`,
-            // THE LINK BACK, built from the message's own ids (`chatMessageUrl`).
-            // This was `null` from the day it was written, which made Chat the
-            // one Google kind the assistant could quote and nobody could go and
-            // read in context.
-            url: message.url,
-            // ALREADY ATTRIBUTED LINE BY LINE by `chatThreads` above, which is
-            // the half that actually answers the owner's complaint: retrieval
-            // hands the assistant PASSAGES, and a passage holding only the words
-            // has thrown the speaker away by the time anybody reads it. Adding a
-            // sender here as well is what produced "Somebody in this space:
-            // Somebody in this space:" on every line.
-            text: message.text,
-            updatedAt: message.createdAt,
-            shelf: space.shelf,
-            ownerUserId: guard.userId,
-            // The space says whose it is, exactly as a Drive folder does.
-            accountId: space.accountId,
-            // NOBODY HUMAN EVER SPOKE IN THIS ONE. Decided by `chatThreads` off
-            // Google's own sender type and carried through; the knowledge lane
-            // retires on it (lib/knowledge-google.ts, the chat kind).
-            appOnly: message.senderIsApp,
-            // THE STRUCTURED RUNS, alongside `text` — tracker `a-pieces`,
-            // migration 0081. `knowledge-google.ts`'s chat kind carries this
-            // onto `grain_pieces`.
-            grainPieces: message.grainPieces,
-          })
+        // `chatThreadItem` is the shape — see its own doc for why it is
+        // pulled out rather than written here a second time.
+        for (const message of chatThreads(page.messages)) items.push(chatThreadItem(space, message, guard.userId))
       }
     // WRITTEN DOWN ONCE, AT THE END. Everything this sweep learned, from every
     // space, so the next sweep starts knowing it — which is the whole point:
@@ -822,7 +877,7 @@ export async function readGoogleMaterial(
     if (fresh.size) await rememberChatPeople(cfg, guard, fresh)
   }
 
-  return { items, contactsUsed, contactsCapped, skipped }
+  return { items, contactsUsed, contactsCapped, skipped, truncated }
 }
 
 /**
@@ -909,7 +964,7 @@ export async function hydrateText(
  * ONLY the "not connected" refusal is swallowed — a revoked grant, an unreadable
  * token or a Google outage still throws, because those are things somebody needs
  * to be told about rather than an empty answer that looks like an empty Drive. */
-async function tokenOrNull(
+export async function tokenOrNull(
   env: GoogleEnv & ReaderEnv,
   cfg: D1Rest,
   guard: MemberGuard,

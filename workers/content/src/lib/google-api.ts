@@ -46,8 +46,12 @@ import { GOOGLE_TIMEOUT_MS } from "./google-oauth"
 
 /** Rows one Google list call will ask for. Google's own maximums are far higher;
  * this is what a screen and a model turn can actually use, and asking for more
- * would be paying for material nobody reads. */
-const GOOGLE_PAGE_SIZE = 50
+ * would be paying for material nobody reads.
+ *
+ * EXPORTED so `google-read.ts`'s gmail branch can read off the SAME number to
+ * infer a page-cap truncation, rather than a second `50` risking drift from
+ * this one. */
+export const GOOGLE_PAGE_SIZE = 50
 
 /** THE WAYS A KNOWN CONTACT CAN BE ON A MESSAGE.
  *
@@ -2421,16 +2425,34 @@ export async function chatMessages(
    * rather than looked up here because this file talks to Google and never to
    * the database — the caller owns the remembering (team migration
    * 0049_chat_people says why it has to be remembered at all). */
-  known: Map<string, string> = new Map()
-): Promise<{ messages: ChatMessage[]; learned: Map<string, string> }> {
+  known: Map<string, string> = new Map(),
+  /** THE BACKFILL'S OWN BOUND (migration 0082, knowledge-google.ts). Absent
+   * for the ordinary live read (unbounded, newest-first, exactly as before).
+   * Present ⇒ ASCENDING (`orderBy: "createTime"`, the opposite of the live
+   * read's default) and bounded by Chat's own `filter` clause — the one
+   * direction that keeps a truncated per-space read gap-free, mirroring
+   * `calendarList`'s own ascending order for the same reason (see the header
+   * on `risingBackfillWindow`, knowledge-google.ts). */
+  window?: { from: string; to: string }
+): Promise<{ messages: ChatMessage[]; learned: Map<string, string>; truncated: boolean }> {
   // WHO IS IN THIS SPACE, asked once for the whole page of messages rather than
   // once per message. See `chatMembers` for why this call has to exist at all.
   const members = await chatMembers(token, spaceName)
   const url = new URL(`https://chat.googleapis.com/v1/${encodeURI(spaceName)}/messages`)
   url.searchParams.set("pageSize", String(GOOGLE_PAGE_SIZE))
-  url.searchParams.set("orderBy", "createTime desc")
-  const data = (await googleFetch(url.toString(), token)) as { messages?: unknown }
+  if (window) {
+    url.searchParams.set("orderBy", "createTime")
+    url.searchParams.set("filter", `createTime > "${window.from}" AND createTime < "${window.to}"`)
+  } else {
+    url.searchParams.set("orderBy", "createTime desc")
+  }
+  const data = (await googleFetch(url.toString(), token)) as { messages?: unknown; nextPageToken?: unknown }
   const messages = Array.isArray(data.messages) ? data.messages : []
+  // ONE PAGE, PER SPACE, PER TICK — same R14 shape as every other lane here:
+  // a dense space's window just takes another tick to fully drain, reported
+  // honestly through `truncated` rather than silently walked further (which
+  // would turn one space's history into the whole tick's budget).
+  const truncated = Boolean(window) && str(data.nextPageToken) !== ""
   // AND THE SPACE TEACHES US THE REST OF THE NAMES ITSELF.
   //
   // Every avenue Google offers for "who is this person" came up short: a message
@@ -2470,6 +2492,7 @@ export async function chatMessages(
       }
     }),
     learned,
+    truncated,
   }
 }
 
