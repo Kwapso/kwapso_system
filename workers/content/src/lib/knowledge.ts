@@ -647,7 +647,14 @@ function toSource(r: SourceRow): KnowledgeSource {
  * read correctly for the calendar fold, where measured on staging every one of
  * 27 doubly-or-triply-sighted events is private, on the private shelf, seen by
  * more than one person: `NULL` there would answer for everybody, and a single
- * saved id would lock the others out. See scripts/measure-source-identity.mjs. */
+ * saved id would lock the others out. See scripts/measure-source-identity.mjs.
+ *
+ * THE SIZE OF THE WALL IS NOT THE SIZE OF THE BUG. Branch 2 above (the
+ * no-sightings legacy rule) is almost every fixture source in the suite —
+ * deleting it reddens ~85 tests across nine files. Branch 1 reddens 2. If you
+ * are debugging this at 2am and see dozens of unrelated-looking failures, that
+ * is what heavy, honest coverage of a two-line clause looks like, not a sign
+ * the app is on fire (kb_review, 11 Sep 2026, mutation-tested branch by branch). */
 function ownerClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
   // ALWAYS QUALIFIED, never bare `id` — `knowledge_sightings` has an `id`
   // column of its own (its primary key), and inside the correlated subqueries
@@ -950,7 +957,16 @@ export async function execKnowledgeScript(cfg: D1Rest, databaseId: string, scrip
  * moment, and no second fetch to forget at a call site.
  *
  * A member staffed to nothing simply matches no restricted source, which is the
- * honest empty answer rather than an error. */
+ * honest empty answer rather than an error.
+ *
+ * THE SIZE OF THE WALL IS NOT THE SIZE OF THE BUG. Branch 1 above
+ * (`visible_to_app_id IS NULL`) is almost every fixture source in the suite —
+ * deleting it reddens ~91 tests across nine files. The `app_staff` branch
+ * reddens 8, the `is_default` bypass branch 1 (see `test/app-fence-clause`). If
+ * you are debugging this at 2am and see dozens of unrelated-looking failures,
+ * that is what heavy, honest coverage of a two-line clause looks like, not a
+ * sign the app is on fire (kb_review, 11 Sep 2026, mutation-tested branch by
+ * branch). */
 function appClause(guard: MemberGuard, prefix = ""): { sql: string; params: string[] } {
   const col = `${prefix}visible_to_app_id`
   return {
