@@ -530,6 +530,50 @@ describe("the reader recovers a paraphrase the floor alone would refuse (BUILD-5
     expect(answer.found).toBe(false)
     expect(answer.passages).toEqual([])
   })
+
+  // AND THE OTHER HALF OF THAT SENTENCE, WHICH WENT UNWRITTEN FOR A DAY.
+  //
+  // The test above is correct and stays: its fixture pins an impossibly strict
+  // `minScore`, so the strict floor would have kept NOTHING, and refusing is
+  // the only honest answer. What it does not say — and what nothing said — is
+  // what happens when a reader fails on material the strict floor WOULD have
+  // allowed through cleanly. The old code cleared `ranked` to empty either
+  // way, so a reader outage did not cost the widened extras it was summoned
+  // for: it cost the ORDINARY answer as well, the one the base would have
+  // given if nobody had asked for a reader at all.
+  //
+  // Its own comment admitted the price ("it costs an answer the strict floor
+  // might have allowed through cleanly") on the assumption that a failed
+  // reader is a rare model outage. MEASURED 11 Sep 2026 by kb_E against the
+  // real model and a real twelve-passage shortlist: the reader fails on
+  // ORDINARY questions, because it writes its reasoning into the same token
+  // budget as its answer and runs out. Four columns of the exam: 27/36 with no
+  // reader, 8/36 with one. A mechanism built to RECOVER answers was destroying
+  // two thirds of them, and this handling is why.
+  //
+  // So a failed reader now costs only what it was supposed to add. The
+  // widened pool is narrowed back to what the strict floor would have kept,
+  // which is the pre-reader behaviour — not identical to it (the fuse ranks
+  // over a different candidate list), and deliberately not claimed as
+  // identical; what is guaranteed is that nothing survives here that the
+  // strict floor would have rejected.
+  it("a reader that fails costs the widened extras and NOT the ordinary answer", async () => {
+    const question = "who organises the monthly team assembly?"
+    // What the base says with no reader involved at all — the floor alone.
+    const withoutReader = await retrieve(env(IDS.staffUser, {}), {} as never, guard, { question })
+    expect(withoutReader.found, "fixture broken: the plain floor must answer this one").toBe(true)
+    expect(titles(withoutReader)).toContain("Team Assembly")
+
+    // The same question, a reader asked for, and the reader falls over.
+    const readerDied = await retrieve(env(IDS.staffUser, { readerMinScore: "0.15" }), {} as never, guard, {
+      question,
+      read: async () => null,
+    })
+    expect(readerDied.found, `a reader outage swallowed the ordinary answer; reason: ${readerDied.reason}`).toBe(
+      true
+    )
+    expect(titles(readerDied)).toContain("Team Assembly")
+  })
 })
 
 // KB-AUDIT.md §4.5, MEASURED 10 Sep 2026: "what changed this week?" returned

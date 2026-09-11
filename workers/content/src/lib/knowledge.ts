@@ -3964,6 +3964,13 @@ export async function retrieve(
     ? numberVar(env.KNOWLEDGE_READER_MIN_SCORE, READER_HALLUCINATION_FLOOR)
     : numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
   const vector = hits.filter((h) => h.score >= floor)
+  // WHAT THE STRICT FLOOR WOULD HAVE THROWN AWAY — computed here, beside the
+  // decision it mirrors, and used in exactly one place: the reader-could-not-run
+  // branch below. When no reader is coming `floor` IS the strict floor and this
+  // set is disjoint from `vector` by construction, so it costs a pass over a
+  // bounded list and changes nothing.
+  const strictFloor = numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
+  const belowStrictFloor = new Set(hits.filter((h) => h.score < strictFloor).map((h) => h.id))
 
 
 
@@ -4153,26 +4160,49 @@ export async function retrieve(
       question,
       shortlist.map(({ row, score }) => toPassage(row, score))
     )
-    // BOTH OUTCOMES CLEAR `ranked` TO EMPTY UNLESS THE READER SAYS OTHERWISE —
-    // and that is deliberately the SAME handling for "the reader looked and
-    // found nothing" and "the reader could not run". `ranked` at this point was
-    // built against the WIDENED floor (`READER_HALLUCINATION_FLOOR`), which by
-    // design is not a safe floor on its own — it is a hallucination guard, and
-    // the reader's judgment is what was supposed to turn it into a real
-    // decision. A reader that FAILED never supplied that judgment, so passing
-    // the widened, unjudged pool through anyway would reintroduce exactly the
-    // failure this whole mechanism exists to fix — a low, uncalibrated cosine
-    // standing in for a real "is this evidence" decision, quietly, on the one
-    // path (a model outage) where nobody is watching. Refusing is the safe
-    // direction: it costs an answer the strict floor might have allowed
-    // through cleanly, never a confident one built on unverified material.
+    // TWO OUTCOMES, AND THEY ARE NOT THE SAME OUTCOME. This used to treat them
+    // identically — both cleared `ranked` to empty — and that identity is what
+    // made the reader net harmful.
+    //
+    // "THE READER LOOKED AND FOUND NOTHING" is a judgment, and it stands: an
+    // empty verdict means empty, because the whole point of widening the floor
+    // was to let a real reader decide, and it decided.
+    //
+    // "THE READER COULD NOT RUN" is not a judgment about anything. The old
+    // handling refused, reasoning that `ranked` was built against the WIDENED
+    // floor (`READER_HALLUCINATION_FLOOR`) — a hallucination guard, never a
+    // real decision — so exposing it unjudged would reintroduce the
+    // uncalibrated-cosine failure this mechanism exists to fix. That half of
+    // the argument is still right, and nothing below exposes the widened pool.
+    // What was wrong is the conclusion: the choice was never "the widened pool
+    // or nothing". Narrowing the same pool back to what the STRICT floor would
+    // have kept costs the reader's extras — exactly what was never vouched for
+    // — and keeps the ordinary answer the base would have given if nobody had
+    // asked for a reader at all.
+    //
+    // Its own comment priced this as "an answer the strict floor might have
+    // allowed through cleanly", on the assumption that a failed reader is a
+    // rare outage. MEASURED 11 Sep 2026 against the real model and a real
+    // twelve-passage shortlist: the reader fails on ORDINARY questions —
+    // @cf/moonshotai/kimi-k2.6 writes `reasoning_content` into the same token
+    // budget as its answer and runs out mid-shortlist, returning empty
+    // `content` and a null verdict. The exam, four columns: 27/36 with no
+    // reader, 8/36 with one. The rare-outage assumption was the load-bearing
+    // one and it was false, so a mechanism built to RECOVER answers was
+    // destroying two thirds of them.
+    //
+    // NOT CLAIMED TO BE IDENTICAL to the no-reader path: `fuse` ranked over a
+    // different candidate list, so ordering and the pool's own truncation can
+    // differ. What IS guaranteed is the safety property the old code was
+    // protecting — nothing survives this branch that the strict floor would
+    // have rejected.
     const byId = new Map(shortlist.map((r) => [passageId({ sourceId: r.row.source_id, seq: r.row.seq }), r]))
     ranked = verdict
       ? verdict.relevant.flatMap((id) => {
           const r = byId.get(id)
           return r ? [r] : []
         })
-      : []
+      : ranked.filter(({ row }) => !belowStrictFloor.has(row.id))
   }
 
   const passages: KnowledgePassage[] = ranked.slice(0, want).map(({ row, score }) => toPassage(row, score))
