@@ -155,8 +155,10 @@ export type IngestRow = {
   accounts?: string[]
   /** THE SOURCE'S OWN STRUCTURED PIECES — text, speaker and time, kept apart
    * from `body` rather than encoded in it (tracker `a-pieces`, migration
-   * 0081's own comment says why: D1 rejects an embedded NUL, so an in-band
-   * mark could not have worked). Set only by a reader that already computes
+   * 0081's own comment says why an in-band mark could not have worked: not
+   * because D1 rejects a NUL, but because a SQLite TEXT FUNCTION stops at
+   * one, and a screen reads `body` through exactly one). Set only by a
+   * reader that already computes
    * per-message identity — chat's `chatThreads` today, `google-read.ts` — and
    * absent everywhere else, which is the correct, generic answer: a document,
    * a ticket, an email, all re-chunk `body` from scratch exactly as they

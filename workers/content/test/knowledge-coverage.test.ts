@@ -1125,7 +1125,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // through this same engine from a different call site) is what actually
 // reaches the 105 chat sources already on file; nothing here re-indexes
 // on its own.
-const SHARED_DIGEST = "d3c9ee8cfa2eefcb"
+//
+// RE-PINNED AGAIN, SAME DAY: the hub's own correction landed — D1 does not
+// reject an embedded NUL (measured; the real fault was a SQLite TEXT
+// FUNCTION truncating at one), so IngestRow.grainPieces' comment was
+// rewritten to say the true reason. A DOCUMENTATION edit inside this file's
+// own text moves this digest exactly as a behaviour change would (the walk
+// hashes the file, not a diff of meaning), and that is the correct,
+// conservative failure mode: the alternative is a check that trusts a
+// human's claim that "only a comment changed" instead of verifying it.
+const SHARED_DIGEST = "5d3f8dc8b4364fe6"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

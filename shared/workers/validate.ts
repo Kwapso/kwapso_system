@@ -1,10 +1,17 @@
 // Input-boundary validation for worker request handlers. The bare
 // `body.field?.trim()` pattern only guards null/undefined — a non-string (number,
 // array, object, boolean) makes `.trim` undefined and throws a TypeError, which the
-// central catch turns into a 500. SQLite (D1) also rejects embedded NUL bytes
-// (U+0000) → another 500. And nothing capped text length, so a multi-MB string
-// either bloated a row or 500'd. These helpers type-check, strip NULs, cap length,
-// and throw a GuardError the worker already maps to a clean 400 — one validation seam.
+// central catch turns into a 500. A NUL byte (U+0000) is NOT rejected by D1 —
+// measured, 11 Sep 2026, against a real write: it stores and reads back
+// byte-perfect. The real fault is downstream and quieter than a 500 — every
+// SQLite TEXT FUNCTION (`substr`, `length`, `LIKE`, …) stops at the first NUL,
+// so a stored one silently truncates any read that uses one (a detail screen's
+// `substr(body, 1, N)` excerpt, an exact-length check) while the full value
+// sits there intact. A screen going blank with no error is worse than the 500
+// this comment used to (wrongly) predict. And nothing capped text length, so a
+// multi-MB string either bloated a row or 500'd. These helpers type-check,
+// strip NULs, cap length, and throw a GuardError the worker already maps to a
+// clean 400 — one validation seam.
 
 import { GuardError } from "./gating"
 import { MAX_IMAGE_BYTES } from "./image"

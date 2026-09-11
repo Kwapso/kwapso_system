@@ -106,7 +106,9 @@
 
 import { recordWorkerError } from "@shared/workers/error-log"
 import { describeChanges, logActivity, type Actor } from "@shared/workers/activity"
+import { addTokens, logUsage, NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
 import { countCollection } from "@shared/workers/count"
+import { brand } from "@shared/brand"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
@@ -2090,6 +2092,10 @@ export async function indexSource(
   const labels = labelsFor(source)
   const now = new Date().toISOString()
   const slices = Math.max(1, opts.slices ?? INDEX_SLICES_PER_CALL)
+  // SUMMED ACROSS THE WHOLE CALL, ONE ROW PER logUsage'S OWN DOCTRINE ("the
+  // row is per COMMAND"), not per chunk — a 300-page contract's first index
+  // would otherwise write hundreds of usage-log rows for one tick's work.
+  let contextLineUsage: TokenUsage = NO_TOKENS
 
   for (let slice = 0; slice < slices && from < total; slice++) {
     const slicePieces = pieces.slice(from, Math.min(from + INDEX_CHUNKS_PER_SLICE, total))
@@ -2132,14 +2138,21 @@ export async function indexSource(
         // not a code-path a chat or mail piece can reach. `line || null` so a
         // model failure (`contextLineFor`'s own honest empty string) stores as
         // NULL rather than "", which is what lets the NEXT sweep retry it
-        // instead of treating an empty sentence as done forever.
+        // instead of treating an empty sentence as done forever. The spend
+        // itself is folded into `contextLineUsage` (never on the reused-line
+        // branch, which spent nothing) and written once, below, after the
+        // whole call finishes — see that write's own comment for why.
         const prior = priorContextLines?.get(chunkId)
-        const contextLine =
-          !priorContextLines
-            ? null
-            : prior && prior.text === piece.text && prior.contextLine
-              ? prior.contextLine
-              : (await contextLineFor(env, { sourceTitle: source.title, piece: piece.text })).line || null
+        let contextLine: string | null = null
+        if (priorContextLines) {
+          if (prior && prior.text === piece.text && prior.contextLine) {
+            contextLine = prior.contextLine
+          } else {
+            const spent = await contextLineFor(env, { sourceTitle: source.title, piece: piece.text })
+            contextLineUsage = addTokens(contextLineUsage, spent.usage)
+            contextLine = spent.line || null
+          }
+        }
         // WRITING THE SAME PIECE TWICE IS NOT AN ERROR (R17's discipline, on the
         // one write in this app whose key is DERIVED rather than minted). The id
         // is `<sourceId>:<seq>`, so the same slice re-run — by a retry inside the
@@ -2258,6 +2271,39 @@ export async function indexSource(
       sourceId,
     ])
   }
+
+  // CONTEXT-LINE SPEND, LOGGED — the hub's own ruling: a spend that never
+  // reaches agent_usage_log is a spend nobody can audit, and this is the
+  // ledger the owner's cost questions get answered from. ONE ROW for the
+  // whole call (`addTokens`'s own doctrine, "the row is per COMMAND"), only
+  // when something was actually spent — a reused-line tick writes nothing,
+  // same as an ordinary hash-skip writes nothing.
+  //
+  // `credits: 0` ON PURPOSE. `credits` meters a TEAM's own daily/monthly AI
+  // allowance (`consumeAiUnit`/`FREE_DAILY`) — the thing a person reads as
+  // "25 left today". Ingestion is not a feature a team invoked; it is
+  // rebuild infrastructure the owner is paying for directly, tracked at the
+  // account level (COSTS.md, the $5 BUILD-5 cap, `scripts/ai-spend.mjs`) —
+  // so this row is real, auditable SPEND with zero metered UNITS, exactly as
+  // `UsageSource`'s own doctrine distinguishes the two.
+  //
+  // NO SIGNED-IN ACTOR — a scheduled sweep tick has nobody logged in, the
+  // same reason `knowledge-ingest.ts`'s own retirement flows stamp
+  // `brand.name` rather than a person's. `agent_usage_log.actor_id` is
+  // nullable for exactly this shape; `Actor.id` itself is not (every other
+  // caller is a real person), so this is the narrowest way to say "the app
+  // did this" without widening a type every other call site depends on.
+  if (wantsContextLine(source.kind) && contextLineUsage !== NO_TOKENS)
+    await logUsage(
+      env,
+      guard.teamId,
+      { id: "system", email: "", name: brand.name },
+      0,
+      "free",
+      `Knowledge base: context lines for "${source.title}"`.slice(0, 140),
+      "action",
+      contextLineUsage
+    )
 
   return { total, indexed: from, done: from >= total }
 }

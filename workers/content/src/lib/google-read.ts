@@ -291,11 +291,15 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  * single string, with no second call to Google later to get it back.
  *
  * THE FIRST FIX ENCODED IT IN THE PROSE ITSELF — a mark in front of each run,
- * stripped again before a chunk's stored text — and could not have worked:
- * D1 rejects an embedded NUL byte (`shared/workers/validate.ts` strips one
- * from every request field for exactly that reason), and `body` never passes
- * through that seam, because it arrives from Google, not a request. Caught
- * before merge.
+ * stripped again before a chunk's stored text — and could not have worked,
+ * though not for the reason first suspected. D1 does NOT reject an embedded
+ * NUL byte (measured, 11 Sep 2026: stores and reads back byte-perfect). The
+ * real fault is quieter: every SQLite TEXT FUNCTION (`substr`, `length`, …)
+ * stops at the first NUL, and the source detail screen reads its body
+ * excerpt through exactly one (`knowledge.ts`'s `DETAIL_COLS`,
+ * `substr(body, 1, N)`) — a chat body starting with the mark would have made
+ * every chat source's detail panel render BLANK, silently. Caught before
+ * merge, not after.
  *
  * SO THE RUNS RIDE ALONGSIDE `text` INSTEAD, on `grainPieces` — the SAME
  * `chunkChat` call's own pieces, kept rather than thrown away, written by
