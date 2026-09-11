@@ -242,6 +242,27 @@ export const accountCompartment = (accountId: string): string => `account:${acco
 const LEXICAL_TOP_K = 10
 const LEXICAL_WEIGHT = 0.1
 
+/** HOW MANY UNION-ALL BRANCHES ONE D1 STATEMENT MAY HOLD — d-lexical-branch-
+ * limit, 11 Sep 2026, and this is the number to re-derive against, never
+ * MAX_QUESTION_TERMS (24, `shared/workers/limits.ts`, which governs the
+ * PARAMETER budget and is a different ceiling guarding a different thing).
+ *
+ * MEASURED, not assumed, against the live REST door, staging, harmless
+ * `SELECT 1 AS x` branches, no table touched:
+ *   4 branches → success   ·   5 branches → success
+ *   6 branches → refused, every time:
+ *   {"code":7500,"message":"too many terms in compound SELECT: SQLITE_ERROR"}
+ *
+ * THIS IS A CLOUDFLARE D1 PLATFORM CEILING, not a SQLite default — SQLite's
+ * own documented `SQLITE_MAX_COMPOUND_SELECT` is 500. Nobody who tuned
+ * MAX_QUESTION_TERMS against the 100-parameter budget ever measured this one,
+ * because it is two orders of magnitude below what SQLite itself allows and
+ * nothing about compiling against SQLite's own docs would have surfaced it.
+ * `lexicalArm`'s old single UNION ALL of one branch per term threw, uncaught,
+ * on every question that tokenised to 6+ distinct terms — see its own header
+ * for the batched shape this cap now bounds. */
+const LEXICAL_MAX_BRANCHES = 5
+
 /** WHAT A CHUNK IS WORTH WHEN IT LITERALLY CONTAINS THE REFERENCE SOMEBODY TYPED.
  *
  * `LEXICAL_WEIGHT` is a tenth of a vote, and it was measured: at parity the word
@@ -2992,7 +3013,7 @@ const OVERRULE_TERM_SHARE = 0.75
 /** WHY THE WORD MATCH IS RUNNING — three situations, and it may claim something
  * different in each. It used to be a boolean, and the two cases it collapsed
  * together are opposites. */
-type LexicalRole =
+export type LexicalRole =
   /** The vector arm has evidence. This is a tenth of a vote on a list somebody
    * else decided the shape of, and cannot turn a refusal into an answer. */
   | "beside"
@@ -3315,36 +3336,72 @@ async function recencyArm(
  * hands back, so nothing downstream had to change to accept a bm25 number in
  * place of a weight sum.
  *
- * ONE TERM, ONE BRANCH. FTS5 has no "how many of these N terms does this row
- * contain" primitive the way a `GROUP BY chunk_id` over a term-postings table
- * did, so `scoped` is a UNION ALL of one `MATCH` per term. Each term is
- * double-quoted in its MATCH string so a token that happens to collide with an
- * FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal search rather
- * than a syntax error — `tokenise()` already drops the ordinary stopwords that
- * would otherwise raise this, but a quoted term costs nothing and closes the
- * case a future stopword list forgets.
+ * ONE TERM, ONE BRANCH — BATCHED, not a single UNION ALL any more (d-lexical-
+ * branch-limit). FTS5 has no "how many of these N terms does this row contain"
+ * primitive the way a `GROUP BY chunk_id` over a term-postings table did, so
+ * each batch of `scoped` is still a UNION ALL of one `MATCH` per term. Each
+ * term is double-quoted in its MATCH string so a token that happens to
+ * collide with an FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal
+ * search rather than a syntax error — `tokenise()` already drops the ordinary
+ * stopwords that would otherwise raise this, but a quoted term costs nothing
+ * and closes the case a future stopword list forgets.
  *
- * THE FENCE IS APPLIED ONCE, on the union's output, not once per branch —
- * per-branch fencing would multiply the fence's own parameters by up to 24
- * terms and blow the budget below for nothing: every branch shares the same
- * owner and compartment.
+ * WHY BATCHED. Measured against the live REST door, staging, 11 Sep 2026,
+ * harmless `SELECT 1 AS x` branches, no table touched:
+ *   4 branches OK · 5 branches OK · 6 branches REFUSED, every time:
+ *   {"code":7500,"message":"too many terms in compound SELECT: SQLITE_ERROR"}
+ * That is a D1 PLATFORM ceiling on compound SELECTs — UNION ALL, INTERSECT,
+ * EXCEPT all count — and it is unrelated to and far below SQLite's own
+ * documented default (`SQLITE_MAX_COMPOUND_SELECT` = 500). This arm's OLD
+ * comment budgeted only against D1's *parameter* ceiling (~76/100 at
+ * MAX_QUESTION_TERMS=24) and never mentioned this one, so every question
+ * tokenising to 6+ distinct terms threw — uncaught, all the way out of
+ * `retrieve` — discarding the vector arm's already-completed work with it.
+ * `LEXICAL_MAX_BRANCHES` below is that measured 5, not a nearby round number:
+ * see its own header for the same probe recorded beside the cap it justifies.
  *
- * THE PARAMETER BUDGET, same discipline as the ceiling this arm used to
- * document. Worst case is MAX_QUESTION_TERMS (24) terms, every one of them
- * digit-bearing (all 24 "rare"): the branches bind 2 params each (48), the
- * fence binds one owner id plus a handful of compartments, the rare-term
- * filter binds at most 24 more, and the combined MATCH for `bm25()` binds 1 —
- * about 76 against D1's ceiling of 100. Higher than the old arm's 53 because
- * this one binds two params per term-branch instead of one, and still well
- * inside the ceiling MAX_QUESTION_TERMS was chosen to respect.
+ * THE FLOOR/RARITY DECISION ITSELF DID NOT MOVE. `termFloor` and
+ * `EXACT_TERM_MAX_CHUNKS` are unchanged, called exactly as they were — this
+ * arm's anti-hijack-adjacent precision gate is correctness-critical and
+ * reimplementing it was refused on purpose (KB-CD hub ruling, 11 Sep 2026).
+ * What moved is WHERE a chunk's total hit-count across ALL of `terms` is
+ * summed: each batch's own `counted` CTE (below) is *itself* unchanged SQL,
+ * it just cannot apply the real floor — a floor computed against the FULL
+ * term count would wrongly reject a chunk that only clears it once every
+ * batch's partial hits are added together. So each batch returns its own
+ * UNFILTERED `(row_id, hits, exact)` — no `HAVING`, nothing dropped — and the
+ * SUMMATION across batches (a `Map` accumulator: `hits += `, `exact += `,
+ * pure arithmetic, nothing a SQL `GROUP BY … COUNT(*)` would not have
+ * produced) plus the ONE `termFloor(...)` comparison happen after. The
+ * threshold and its formula are untouched; only the addition that feeds it
+ * now happens once in JS instead of once in a `HAVING`.
+ *
+ * THE FENCE IS APPLIED ONCE PER BATCH, on that batch's own union output —
+ * every batch shares the same owner and compartment, so this is the same
+ * "not once per branch" discipline the old comment described, now one level
+ * up.
+ *
+ * NOTHING IS DROPPED BEFORE THE FLOOR SEES IT. Each batch's query carries no
+ * `LIMIT` — every row that matched any of that batch's terms ships back, so
+ * the floor (which needs the TRUE total) never loses a candidate to an
+ * intermediate cut. The cost is real and stated rather than hidden: worst
+ * case (24 terms, 5 batches) ships more rows over five round trips than the
+ * old single compound SELECT shipped over one — bounded by how many chunks
+ * match ANY of a batch's five terms, not by term count. If that ever shows up
+ * as a real latency problem, the upgrade is the two-phase design this
+ * function's own commit message describes and rejects for now (a new
+ * multi-statement capability in shared/workers/d1-rest.ts, which every
+ * worker touches — the wrong blast radius for one function today). Measure
+ * it before building it.
  *
  * bm25() IS ASCENDING — SQLite's convention is a MORE NEGATIVE number for a
  * BETTER match (measured against this exact table: a chunk repeating both
  * query terms scored more negative than one containing them once each), the
- * opposite of the old `SUM(weight)`. That is why the final `ORDER BY` reads
- * `ASC` where the old one read `DESC`; the array POSITION `fuse` reads is
- * unchanged — the exact bypass still leads, relevance still breaks the tie. */
-async function lexicalArm(
+ * opposite of the old `SUM(weight)`. The final sort (now in JS — see below)
+ * reads `exact` DESC then `lex` ASC for the same reason the old `ORDER BY`
+ * did; the array POSITION `fuse` reads is unchanged — the exact bypass still
+ * leads, relevance still breaks the tie. */
+export async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
   terms: string[],
@@ -3384,14 +3441,6 @@ async function lexicalArm(
     fenceParams.push(...compartments)
   }
 
-  // ONE UNION-ALL BRANCH PER TERM. `?` for the term's own label (read back as
-  // `scoped.term`) and `?` for the MATCH query, quoted — see the header.
-  const branches = terms
-    .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
-    .join(" UNION ALL ")
-  const branchParams: string[] = []
-  for (const t of terms) branchParams.push(t, `"${t}"`)
-
   // THE ONE CLAUSE THAT LETS AN EXACT TERM PAST THE PROPORTIONAL FLOOR, and it
   // is absent — statement for statement, parameter for parameter — from a
   // question that has no exact term in it. The floor's measured behaviour on
@@ -3400,50 +3449,94 @@ async function lexicalArm(
   const rare = exact.filter((t) => terms.includes(t))
   // THE COMBINED QUERY, for `bm25()` alone — every branch's row set is by
   // construction a subset of what this OR-of-all-terms query matches, so the
-  // join below can never drop a row `scoped` found.
+  // read-back below can never miss a row a batch found. ONE MATCH expression,
+  // however many terms — this never branches and never touches the ceiling.
   const combinedMatch = terms.map((t) => `"${t}"`).join(" OR ")
 
-  const rows = await d1Query<CandidateRow>(
+  // ONE BATCH PER ≤LEXICAL_MAX_BRANCHES TERMS. In parallel — each batch is an
+  // independent read with no data dependency on any other.
+  const batches: string[][] = []
+  for (let i = 0; i < terms.length; i += LEXICAL_MAX_BRANCHES) batches.push(terms.slice(i, i + LEXICAL_MAX_BRANCHES))
+
+  const batchResults = await Promise.all(
+    batches.map((batchTerms) => {
+      const branches = batchTerms
+        .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
+        .join(" UNION ALL ")
+      const branchParams: string[] = []
+      for (const t of batchTerms) branchParams.push(t, `"${t}"`)
+      const rareInBatch = rare.filter((t) => batchTerms.includes(t))
+
+      // NO `HAVING`, NO `LIMIT` — this batch cannot know the TRUE floor
+      // (computed against every term across every batch, not just its own
+      // five), so it hands back every row it found, unfiltered, and the
+      // floor is applied once the batches are summed. See this function's
+      // own header for why that summation is arithmetic, not a
+      // reimplementation of the floor itself.
+      return d1Query<{ row_id: number; hits: number; exact: number }>(
+        cfg,
+        guard.databaseId,
+        `WITH scoped AS (
+           SELECT u.row_id, u.term FROM (${branches}) u
+           JOIN knowledge_chunks k ON k.rowid = u.row_id
+           WHERE ${fenceWhere.join(" AND ")}
+         )${
+           rareInBatch.length
+             ? `, rareTerms AS (
+           SELECT term FROM scoped WHERE term IN (${rareInBatch.map(() => "?").join(", ")})
+            GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
+         )`
+             : ""
+         }
+         SELECT row_id, COUNT(*) AS hits,
+           ${rareInBatch.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
+         FROM scoped GROUP BY row_id`,
+        [...branchParams, ...fenceParams, ...(rareInBatch.length ? rareInBatch : [])]
+      )
+    })
+  )
+
+  // THE SUM, ACROSS BATCHES — a `Map` accumulator, nothing a single SQL
+  // `GROUP BY row_id, COUNT(*)` would not have produced over the same rows.
+  const merged = new Map<number, { hits: number; exact: number }>()
+  for (const rows of batchResults)
+    for (const r of rows) {
+      const m = merged.get(r.row_id) ?? { hits: 0, exact: 0 }
+      m.hits += r.hits
+      m.exact += r.exact
+      merged.set(r.row_id, m)
+    }
+
+  // THE FLOOR, APPLIED ONCE, AGAINST THE TRUE TOTAL — `termFloor` itself is
+  // untouched; only where its `>=` is evaluated moved.
+  const floor = termFloor(terms.length, role)
+  const survivors = new Map<number, number>() // row_id → exact
+  for (const [rowId, m] of merged) if (m.hits >= floor || m.exact > 0) survivors.set(rowId, m.exact)
+  if (!survivors.size) return []
+
+  // THE RANK, unbatched — bm25() over the combined MATCH never branches, so
+  // it was never at risk and does not need batching. Unfenced on purpose, as
+  // it always was: only rows already fenced by surviving a batch above are
+  // ever read out of this by the join in JS below.
+  const ranked = await d1Query<{ chunk_id: string; row_id: number; lex: number }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: LIMIT ${LEXICAL_TOP_K} at the statement, same as before.
-    //
-    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK — the same reason
-    // as before: filtering afterwards would let the LIMIT choose loudest first
-    // and throw the floor's own candidates away before it ever saw them.
-    // `termFloor(...)` is a derived integer, interpolated like every other
-    // server-owned value (CONVENTIONS), never bound.
-    `WITH scoped AS (
-       SELECT u.row_id, u.term FROM (${branches}) u
-       JOIN knowledge_chunks k ON k.rowid = u.row_id
-       WHERE ${fenceWhere.join(" AND ")}
-     )${
-       rare.length
-         ? `, rareTerms AS (
-       SELECT term FROM scoped WHERE term IN (${rare.map(() => "?").join(", ")})
-        GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
-     )`
-         : ""
-     },
-     counted AS (
-       SELECT row_id, COUNT(*) AS hits,
-         ${rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
-       FROM scoped GROUP BY row_id
-        HAVING hits >= ${termFloor(terms.length, role)} ${rare.length ? "OR exact > 0" : ""}
-     ),
-     ranked AS (
-       SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
-       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
-     )
-     SELECT k.id AS chunk_id, ranked.rel AS lex, counted.exact AS exact
-       FROM counted
-       JOIN ranked ON ranked.row_id = counted.row_id
-       JOIN knowledge_chunks k ON k.rowid = counted.row_id
-      ORDER BY counted.exact DESC, ranked.rel ASC
-      LIMIT ${LEXICAL_TOP_K}`,
-    [...branchParams, ...fenceParams, ...(rare.length ? rare : []), combinedMatch]
+    `SELECT k.id AS chunk_id, ranked.row_id, ranked.rel AS lex
+       FROM (
+         SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
+         FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
+       ) ranked
+       JOIN knowledge_chunks k ON k.rowid = ranked.row_id`,
+    [combinedMatch]
   )
-  return rows
+
+  // THE JOIN AND THE ORDER, now in JS — the same `ORDER BY exact DESC, lex
+  // ASC` the old single query ran, and the same `LIMIT LEXICAL_TOP_K` (R14).
+  return ranked
+    .filter((r) => survivors.has(r.row_id))
+    .map((r) => ({ chunk_id: r.chunk_id, lex: r.lex, exact: survivors.get(r.row_id) as number }))
+    .sort((a, b) => b.exact - a.exact || a.lex - b.lex)
+    .slice(0, LEXICAL_TOP_K)
 }
 
 type ScoredRow = {
