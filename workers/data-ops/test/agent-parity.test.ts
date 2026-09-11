@@ -119,6 +119,40 @@ describe("agent-app parity (Law R9): the agent knows what the app can do", () =>
     expect(KNOWLEDGE_CITATION_RULE).toContain("ask_knowledge")
   })
 
+  // d-followup. The knowledge door stays stateless (no thread/context param —
+  // see BUILD-5-knowledge-rebuild.md's follow-up ruling: a parameter here would
+  // duplicate conversation the model already has, and drag R19/R22/R27 parity
+  // behind it across every tool on this door). The fix lives where the model
+  // actually reads: `q` must be built to stand alone BEFORE the call, because
+  // retrieval only ever sees that string. Both surfaces have to say so — the
+  // tool's own summary (the one line sent on every manifest, tool-diet.test.ts
+  // holds its ceiling) and the system rule wall — or a model that skips
+  // `describe_tool` sees only half the instruction.
+  it("both surfaces say the question passed to ask_knowledge must stand alone", () => {
+    const ask = sharedByName("ask_knowledge")
+    expect(ask, "the ask_knowledge tool must exist").toBeDefined()
+    expect(SYSTEM, "the system rule wall must carry the standalone-question rule").toContain(
+      "Before you call ask_knowledge, make sure `q` STANDS ALONE."
+    )
+
+    for (const [surface, text] of [
+      ["the tool's own summary", ask!.summary],
+      ["the system rule wall", SYSTEM],
+    ] as const) {
+      const t = text.toLowerCase()
+      expect(t, `${surface} must say the question stands alone`).toMatch(/stands? alone/)
+      // A rule that never mentions the shape of the failure (a pronoun, a bare
+      // follow-up) is easy to satisfy with an unrelated sentence and call it done.
+    }
+    expect(
+      SYSTEM.toLowerCase(),
+      "the system rule wall must name the concrete failure shape — a pronoun or a bare follow-up"
+    ).toMatch(/pronoun/)
+    // And it must name the argument this is actually about — a rule that never
+    // says `q` could be satisfied by any unrelated sentence containing "alone".
+    expect(ask!.summary).toContain("`q`")
+  })
+
   /* ------------------------- R9, the DRAWING half ------------------------- */
   //
   // The assistant can now emit VISUAL BLOCKS — a fenced block the app renders as a

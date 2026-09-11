@@ -144,6 +144,13 @@ export const KNOWLEDGE_FIRST_RULE = [
  * against the ask tool's own description by agent-parity.test.ts. */
 export const KNOWLEDGE_CITATION_RULE = [
   "When a question is about what the team KNOWS — a client's history, how we do something, what was agreed — call ask_knowledge first. Then answer ONLY from the passages it returns. If it comes back with found:false, never fill the gap from memory — say so in its own words. Where the question was about a RECORD rather than about something written down, looking that record up live is the one thing you may do instead: a lookup is not a guess.",
+  // d-followup. The door is stateless and stays that way (no thread param — see
+  // BUILD-5-knowledge-rebuild.md's follow-up ruling): retrieval only ever sees
+  // the `q` string itself, never the turns around it. You already have the
+  // conversation in front of you when you decide what to call, which is the one
+  // place this can be fixed for free — so fix it there, not by teaching the door
+  // to remember.
+  "Before you call ask_knowledge, make sure `q` STANDS ALONE. Retrieval sees only that string, never the rest of the conversation, so resolve any pronoun or follow-up shorthand from what was already said — \"and last week?\" becomes the question it's actually asking (e.g. \"what changed with FluClinic last week?\"), not the two words themselves. Never pass a follow-up as typed.",
   // THE MARK, not a list of titles. This sentence replaced "NAME the sources you
   // used (their titles) in your reply", which was the only instruction the model
   // had and which it obeyed by writing its own list — measured on the composing
