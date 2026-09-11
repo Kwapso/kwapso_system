@@ -1103,7 +1103,17 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // claim. A textVersion bump would be actively wrong here for the same reason
 // the note above gives — it would re-embed the whole base to change zero
 // words of anyone's indexed text.
-const SHARED_DIGEST = "4836e0b2cc6a2e78"
+// RE-PINNED AGAIN, 2026-09-11 (d-ingest-filing): `sweepKind`'s upsert now
+// writes an `accounts` column — the filing half of BUILD-5 §1, Gmail and
+// Calendar's full contact match kept instead of discarded past the first
+// hit (google-read.ts's `matchedAccounts`). It is a PARENT, not a sentence:
+// the write reaches no `title`, `summary` or `body` anywhere, only a JSON
+// array of ids alongside them, and every one of the 13 per-kind digests
+// above is unchanged — the 13 mirrored kinds never set `row.accounts` at
+// all, so their upsert runs exactly as it did. A textVersion bump would be
+// actively wrong here for the same reason the notes above give: it would
+// re-embed the whole base to change zero words of anyone's indexed text.
+const SHARED_DIGEST = "f9e9f4c22a7474e8"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

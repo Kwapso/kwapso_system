@@ -143,6 +143,16 @@ export type IngestRow = {
    * can be found and never quoted. Absent reads as false, which is the safe
    * direction: a row nobody has taught keeps its words. */
   generatedOnly?: boolean
+  /** WHICH CLIENTS THIS CONCERNS, beyond `accountId` — d-ingest-filing
+   * (BUILD-5 §1's filing half). Additive (migration 0073): `accountId` keeps
+   * deciding the compartment, this is the wider "also relevant to" list.
+   * Absent or empty is the CORRECT answer for the 13 kinds this app mirrors
+   * off its own tables — each has exactly one account, by the schema, and
+   * wrapping it here would be redundant data dressed up as coverage, not new
+   * information. Only Gmail and Calendar ever set this (knowledge-google.ts's
+   * `fencing`), off the same address/attendee match `accountId` already
+   * makes, kept instead of discarded past the first hit. */
+  accounts?: string[]
 }
 
 /** One kind of in-app material: where it lives, and how a row of it reads.
@@ -2081,14 +2091,21 @@ async function sweepKind(
          (id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id,
           app_id, ticket_id, sprint_id, record_date, event_id, event_id_from,
           title, summary, body, body_bytes, generated_only,
-          source_url, created_at, creator_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)})
+          source_url, created_at, creator_name, accounts)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${sqlString(brand.name)}, ?)
        ON CONFLICT (origin_table, origin_row_id) WHERE origin_row_id IS NOT NULL
        DO UPDATE SET title = excluded.title, summary = excluded.summary, body = excluded.body,
                      body_bytes = excluded.body_bytes, source_url = excluded.source_url,
                      compartment = excluded.compartment, account_id = excluded.account_id,
                      app_id = excluded.app_id, ticket_id = excluded.ticket_id, sprint_id = excluded.sprint_id,
                      record_date = excluded.record_date,
+                     -- d-ingest-filing. RE-DECIDED ON EVERY SWEEP, same reasoning
+                     -- as generated_only below: Gmail/Calendar's match can only
+                     -- ever grow more accurate as more contacts are filed, and a
+                     -- thread that gains a CC'd second client should say so on
+                     -- the next sweep. Empty for every other kind, every sweep,
+                     -- by construction — see IngestRow.accounts' own comment.
+                     accounts = excluded.accounts,
                      -- AN EVENT IS LEARNED AND NEVER UNLEARNED, which is what
                      -- COALESCE says here and a plain assignment would not. Three
                      -- lanes can state this and only one of them ever sees a given
@@ -2152,6 +2169,11 @@ async function sweepKind(
         row.generatedOnly ? 1 : 0,
         row.sourceUrl,
         now,
+        // accounts' VALUES placeholder sits here, between created_at and the
+        // updated_at that belongs to the ON CONFLICT SET clause below — D1
+        // binds every `?` positionally, in the order it appears in the SQL
+        // text, not in column-list order once a SET clause is in play.
+        JSON.stringify(row.accounts ?? []),
         now,
       ]
     )

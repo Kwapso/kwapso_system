@@ -134,6 +134,25 @@ function accountForAddresses(
   return null
 }
 
+/** EVERY account an address list points at, not just the first — the FILING
+ * question (d-ingest-filing, BUILD-5 §1), answered from the exact same loop as
+ * `accountForAddresses` above and the exact same reason it does not touch that
+ * function: `account_id`/compartment is a SEARCH PARTITION and has to be one
+ * value, so the first hit stays the first hit, on purpose, per that function's
+ * own comment. `accounts[]` is a different question — "which clients does this
+ * concern" — and the migration that added the column (0073) says the two are
+ * additive: the singular column untouched, this one alongside it. A thread or
+ * an event naming three clients now says so in `accounts[]` while still
+ * answering ONE question — "where do I search for this" — through `accountId`.
+ * Zero extra cost: `contacts` is already loaded for the caller above, this
+ * walks the same list once more instead of returning on the first match. */
+function matchedAccounts(contacts: { email: string; accountId: string }[], ...headers: string[]): string[] {
+  const haystack = headers.join(" ").toLowerCase()
+  const found = new Set<string>()
+  for (const c of contacts) if (c.email && haystack.includes(c.email)) found.add(c.accountId)
+  return [...found]
+}
+
 /** One file or message a read could not open — named, so the person who shared
  * it can go and fix it, rather than a whole sweep turning up empty with nothing
  * saying why. */
@@ -650,6 +669,10 @@ export async function readGoogleMaterial(
           accountId = accountForAddresses(contacts, m.from, m.to)
           if (accountId) break
         }
+        // EVERY ACCOUNT ON THE THREAD, not just the first — see
+        // `matchedAccounts`' own comment. Same headers, whole thread, one more
+        // pass over the same `contacts` list.
+        const accounts = matchedAccounts(contacts, ...ordered.flatMap((m) => [m.from, m.to]))
         items.push({
           service: "gmail",
           sourceId: null,
@@ -669,6 +692,7 @@ export async function readGoogleMaterial(
           shelf: "private",
           ownerUserId: guard.userId,
           accountId,
+          accounts,
           // WHICH MESSAGES `hydrateText` reads to assemble this thread's
           // body. See `mailThreads`' own doc for the one gap this carries
           // forward rather than silently fixing: a message the known-id skip
@@ -704,6 +728,9 @@ export async function readGoogleMaterial(
           // nobody but us in the room is the agency's own. The guest list is the
           // only place on an event where that is written down.
           accountId: accountForAddresses(contacts, event.attendees.map((a) => a.email).join(" ")),
+          // EVERY CLIENT ON THE GUEST LIST, not just the first — see
+          // `matchedAccounts`.
+          accounts: matchedAccounts(contacts, event.attendees.map((a) => a.email).join(" ")),
         })
       }
   }
