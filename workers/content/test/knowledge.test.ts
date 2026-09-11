@@ -1049,6 +1049,34 @@ describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed 
     expect(titles(answer)).toContain("Lighting spec sheet")
     expect(answer.reason).toContain("found nothing there")
   })
+
+  // THE QUESTION THE HUB ASKED ME TO PROVE, NOT REASON ABOUT (11 Sep 2026):
+  // can A3's unnarrowed retry reach a source the CALLER'S OWN FENCE would
+  // have refused? `route.compartments` only decides which COMPARTMENTS the
+  // candidate arms search — the read-back that turns a candidate id into a
+  // passage (`retrieve`'s `readerClause(guard, "s.")` join) runs
+  // unconditionally, after every `searchArms` call including the retry, and
+  // never reads `route.compartments` at all. So a private source sitting in
+  // the wide-open retry's path must still be invisible to a colleague who
+  // has no sighting of it and does not own it — proved here by mutation,
+  // not asserted from reading the source.
+  it("SECURITY: the unnarrowed retry cannot surface a source the caller's own fence would refuse", async () => {
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, owner_user_id, team_visible, created_at)
+         VALUES ('S_LUMEN_PRIVATE', 'note', 'Lumen — my own read on the relocation', 'account:${ELSEWHERE}', '${OTHER_STAFF}', 0, '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_LUMEN_PRIVATE', 'S_LUMEN_PRIVATE', 'account:${ELSEWHERE}', 0, 'my private note: the Lumen relocation review moved to next quarter', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_LUMEN_PRIVATE';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    // IDS.staffUser is not OTHER_STAFF, holds no sighting of this source, and
+    // does not own it — the retry's own widened search WILL surface this
+    // chunk as a candidate (proved by the sibling test above, same shape,
+    // same account, no owner set); the only thing standing between that
+    // candidate and an answer is the read-back fence.
+    const answer = await ask(IDS.staffUser, "what is the Lumen relocation?")
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
 })
 
 // c-misspell. The owner asked the live assistant "What is happening with
