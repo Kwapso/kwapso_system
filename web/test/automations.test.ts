@@ -44,6 +44,7 @@ import {
   AUTOMATION_OWN_FILES,
   AUTOMATION_OWN_FILE_EXEMPT,
 } from "@shared/automations"
+import { GLOSSARY } from "@shared/glossary"
 import { emailSites } from "@shared/rules/email-sites"
 import { sourceFiles, stripComments, stripJsoncComments } from "@shared/rules/source-scan"
 
@@ -111,6 +112,130 @@ describe("R70 — every automation is visible, and one that cannot be switched s
       explainedAnyway.map((a) => a.key),
       "R70 — these automations CAN be switched off and carry a reason why they cannot. Delete the reason or make the row honest"
     ).toEqual([])
+  })
+
+  // ── THE MARK, AND THE REASON IT CANNOT BE PARTED FROM ─────────────────────
+  //
+  // THE CLIENT, 2026-09-11, SHOWN THE AUTOMATIONS LIST:
+  //   *"ah ok, i like it. like we have protected choices to have protected
+  //    automations! Still have the visibility, but cannot change it"*
+  //
+  // One word across both halves of a module's settings page. The clause above
+  // holds the REASON in the data; this one holds the two things a person
+  // actually sees, off the screen's own source:
+  //
+  //   · THE WORD IS THE DICTIONARY'S, read out of `GLOSSARY.protectedChoice`
+  //     rather than typed here — so the day that term is reworded, the screen
+  //     that must say it is what goes red, not this file.
+  //   · THE PART IS THE CHOICES HALF'S OWN, derived by finding the badge that
+  //     carries that word in `selectable-screen.tsx` and requiring the same
+  //     element and the same variant here. Two different-looking badges for one
+  //     concept on one page is the fault her ruling was aimed at, and a check
+  //     that hard-coded `variant="secondary"` would let the two drift apart the
+  //     moment the Choices half changed.
+  //   · THE MARK AND THE REASON SHARE ONE GUARD, which is the half that matters
+  //     most. The word carries a DIFFERENT promise on each half of the page — a
+  //     choice's protection comes off in one click, an automation's never comes
+  //     off at all — so the badge alone would teach a reader the Choices
+  //     sentence and let them carry it to a row where it is false. Sharing a
+  //     branch makes "badge with no reason" unwriteable rather than merely
+  //     discouraged, and R70's own data clause (a `switchable: false` always
+  //     carries `helpText`) is what then puts the pair on EVERY unswitchable
+  //     row.
+  //
+  // And the negative half, which is the one a later edit would break: nothing a
+  // person can switch wears the mark. It is read positionally, in the shape
+  // R20's own census uses — each marker is tied to the CONDITION that governs
+  // it, sliced by brace balance from the `{` that opens the branch, so "inside
+  // this branch" is a fact about the file and not about a regex's appetite.
+
+  /** Every JSX expression container in `src` that OPENS WITH A CONDITION —
+   * `{cond ? (…)}` or `{cond && (…)}` — as that condition and the source it
+   * governs. The body is sliced by brace balance, so a marker is inside a
+   * branch or it is not, and a nested `{t(a.title)}` is never mistaken for one
+   * (it opens with no condition). */
+  function guardedBranches(src: string): { cond: string; body: string }[] {
+    const out: { cond: string; body: string }[] = []
+    for (let i = 0; i < src.length; i++) {
+      if (src[i] !== "{") continue
+      const opener = /^\s*([^{}]*?)\s*(?:\?|&&)\s*\(/.exec(src.slice(i + 1, i + 300))
+      if (!opener) continue
+      let depth = 0
+      let j = i
+      for (; j < src.length; j++) {
+        if (src[j] === "{") depth++
+        else if (src[j] === "}" && --depth === 0) break
+      }
+      out.push({ cond: opener[1], body: src.slice(i, j + 1) })
+    }
+    return out
+  }
+
+  it("a row that cannot be switched wears the dictionary's mark beside its reason, and a row that can wears neither", () => {
+    const term = GLOSSARY.protectedChoice.term
+    const says = `{t("${term}")}`
+    /** The word as a literal inside a pattern — it carries braces, brackets and
+     * parentheses of its own, every one of them a regex operator. */
+    const literal = says.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+    // 1 · THE PART, DERIVED OFF THE CHOICES HALF. Same page, same concept.
+    const choices = stripComments(
+      read(join(WEB, "components/choices/selectable-screen.tsx"))
+    )
+    const drawn = new RegExp(`<(\\w+)([^>]*)>\\s*${literal}`).exec(choices)
+    expect(
+      drawn,
+      `R70 — the Choices half no longer draws "${term}" as a badge, so there is nothing to derive the automations mark FROM. If the Choices screen changed, this check must follow it rather than be deleted: one concept, one part, one word, on one page`
+    ).not.toBeNull()
+    const part = drawn![1]
+    const variant = /variant="(\w+)"/.exec(drawn![2])?.[1]
+    expect(variant, `R70 — the Choices badge for "${term}" names no variant`).toBeTruthy()
+
+    // 2 · THE AUTOMATIONS HALF SAYS THE SAME WORD, ONCE, THROUGH THE SAME PART.
+    const screen = stripComments(read(join(WEB, "components/screens/module-automations.tsx")))
+    const said = screen.split(says).length - 1
+    expect(
+      said,
+      `R70 — the automations rows say "${term}" ${said} time(s) and must say it exactly once: the mark belongs to the ONE branch that draws a row nobody can switch. The client's ruling of 2026-09-11 is that an unswitchable automation wears the same word a protected choice does ("like we have protected choices to have protected automations"), and a second occurrence is a mark drawn somewhere a person CAN change the row`
+    ).toBe(1)
+    expect(
+      new RegExp(`<${part}\\s[^>]*variant="${variant}"[^>]*>\\s*${literal}`).test(screen),
+      `R70 — the automations mark is not the Choices half's own part. Both must be <${part} variant="${variant}"> carrying t("${term}"): two different-looking badges for one concept on one page is exactly what the ruling that asked for the word was aimed at`
+    ).toBe(true)
+
+    // 3 · IT SHARES ITS GUARD WITH THE REASON, AND THAT GUARD IS THE
+    //     UNSWITCHABLE ONE.
+    const branches = guardedBranches(screen)
+    expect(
+      branches.length,
+      "R70 — read no conditional branch at all out of the automations screen; the slicer is broken, and a blind check passes exactly like a clean one"
+    ).toBeGreaterThan(1)
+
+    const marked = branches.filter((b) => b.body.includes(says))
+    expect(
+      marked.length,
+      `R70 — the mark must sit inside exactly one guarded branch; found ${marked.length}. A "${term}" badge drawn unconditionally would be worn by every row on the page, including the ones with a working switch`
+    ).toBe(1)
+    expect(
+      /^!a\.switchable\b/.test(marked[0].cond),
+      `R70 — the mark is drawn under \`${marked[0].cond}\`, which is not the row that cannot be switched. The badge says "you can see this and you cannot change it"; on a row with a switch beside it, that is a lie a person can act on`
+    ).toBe(true)
+    expect(
+      marked[0].body.includes("t(a.helpText)"),
+      `R70 — the mark renders without the reason in the same branch. "${term}" promises something DIFFERENT on each half of this page — a choice's protection comes off in one click, an automation's never comes off — so the sentence beside the badge is what says which promise this row is making. They share one guard so that no later edit can leave the badge standing alone`
+    ).toBe(true)
+
+    // …and the switch is the other branch, so the page has exactly two answers
+    // to "can I change this?" and a row gives one of them.
+    const switched = branches.filter((b) => b.body.includes("<Switch"))
+    expect(
+      switched.length,
+      `R70 — the switch must sit inside exactly one guarded branch; found ${switched.length}`
+    ).toBe(1)
+    expect(
+      /^a\.switchable\b/.test(switched[0].cond),
+      `R70 — the switch is drawn under \`${switched[0].cond}\` rather than \`a.switchable\`, so a row the registry says cannot be switched may be drawn with a control that moves`
+    ).toBe(true)
   })
 
   // ── THE SOURCE STILL EXISTS ───────────────────────────────────────────────

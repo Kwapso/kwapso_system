@@ -47,6 +47,7 @@
 
 import * as React from "react"
 
+import { Badge } from "@shared/ui/components/badge/badge"
 import { Headline, Text } from "@shared/ui/components/typography/typography"
 import { Switch } from "@shared/ui/components/switch/switch"
 import { toast } from "@shared/ui/components/sonner/sonner"
@@ -157,12 +158,38 @@ export function ModuleAutomations({
               <div className="flex min-w-0 flex-col gap-1">
                 <Text className="font-medium">{t(a.title)}</Text>
                 <Text className="text-muted-foreground">{t(a.description)}</Text>
-                {/* THE REASON, WHICH IS THE HALF THE CLIENT'S RULING TURNS ON.
-                    R70 requires it on every row that cannot be switched and
-                    forbids it on every row that can, so this branch can never
-                    be a row that quietly says nothing. */}
+                {/* THE MARK AND THE REASON, AND THEY ARE ONE BRANCH ON PURPOSE.
+                    R70 requires the reason on every row that cannot be switched
+                    and forbids it on every row that can, so this branch can
+                    never be a row that quietly says nothing.
+
+                    THE WORD IS THE DICTIONARY'S (client, 2026-09-11, shown this
+                    list): *"like we have protected choices to have protected
+                    automations! Still have the visibility, but cannot change
+                    it"*. It is `protectedChoice` in `shared/glossary.ts` — one
+                    word for one concept across both halves of a module's
+                    settings page — and it is the same kit part the Choices half
+                    draws (`Badge variant="secondary"` in
+                    `web/components/choices/selectable-screen.tsx`), because two
+                    different-looking badges for one concept on one page would
+                    defeat the ruling that asked for the word.
+
+                    THE MARK MAY NEVER APPEAR WITHOUT THE REASON BESIDE IT, and
+                    that is structural rather than a convention: the two render
+                    from ONE guard, so there is no edit that leaves the badge
+                    behind on its own. It matters because the word carries a
+                    DIFFERENT promise on each half — take the protection off a
+                    choice and it can be switched off; an automation's never
+                    comes off, at this door as well as on this screen — and the
+                    sentence beside the badge is what says which one this is.
+                    R70 reads all of it off this file. */}
                 {!a.switchable && a.helpText ? (
-                  <Text className="text-muted-foreground">{t(a.helpText)}</Text>
+                  <div className="flex flex-wrap items-start gap-2">
+                    <Badge variant="secondary" className="shrink-0">
+                      {t("Protected")}
+                    </Badge>
+                    <Text className="text-muted-foreground">{t(a.helpText)}</Text>
+                  </div>
                 ) : null}
               </div>
               {a.switchable ? (

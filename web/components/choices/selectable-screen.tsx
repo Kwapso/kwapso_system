@@ -35,8 +35,7 @@ import * as React from "react"
 import { useRemembered } from "@shared/web/remembered"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { cn } from "@shared/ui/lib/utils"
-import { Button, buttonVariants } from "@shared/ui/components/button/button"
+import { Button } from "@shared/ui/components/button/button"
 import { Input } from "@shared/ui/components/input/input"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import {
@@ -60,12 +59,12 @@ import { RecordActionsMenu, type RecordAction } from "@/components/records/recor
 import { Swatch } from "@/components/records/record-picker"
 import { SelectableFormDialog } from "@/components/choices/selectable-form-dialog"
 import { usePermissions } from "@/lib/perms"
+import { safeHref } from "@shared/web/rich-text"
 import { primeCache, useCached } from "@shared/web/store"
 import { useT } from "@shared/web/language"
-import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
+import { AddButton, CollectionCard, ToolbarAction, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
-import { safeHref } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
 
 /** WHAT A DROPDOWN VALUE MAY BE ORDERED BY. "Value" reorders the words INSIDE
@@ -853,25 +852,38 @@ export function SelectableScreen({
                     that is what the agent's capability brief, MCP's
                     `export_dropdown_values_csv` and any saved link already ask
                     for. */}
+                {/* ── THE TWO WORDS FOLD WHEN THE ROW IS TIGHT — 11 SEP 2026,
+                    measured. These two buttons are what took the search box on
+                    this very screen from 203px at 1280 to 23px at 1100, with
+                    "Search values…" clipped to "Sea". B4 still stands wherever
+                    the word fits; `ToolbarAction` (screen-bits.tsx) is where
+                    the fold and the accessible name are decided, once, for
+                    every toolbar action in the app rather than for this one
+                    screen. Both buttons keep their glyph, their word and their
+                    gate exactly as they were. */}
                 {values.length > 0 && (
-                  <a
+                  <ToolbarAction
+                    label={t("Export CSV")}
+                    icon={<Download className="size-4" aria-hidden />}
                     // THROUGH THE SEAM, like every other bound URL in the app
                     // (`safeHref`, shared/web/rich-text.ts). The groups come
                     // from `MODULE_SETTINGS`, a code constant, so nothing a
                     // person typed is in this string — and that is exactly the
                     // argument every unchecked href has ever been defended
                     // with, which is why the census reads the EXPRESSION and
-                    // not the argument.
+                    // not the argument. `ToolbarAction` asks the seam AGAIN at
+                    // the one place the attribute actually exists; two calls of
+                    // an idempotent check is not a cost, and the census cannot
+                    // tell a prop named `href` from an attribute.
                     href={safeHref(tenancy.selectableExportHref(scope.types)) ?? ""}
-                    className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
-                  >
-                    <Download className="size-4" aria-hidden /> {t("Export CSV")}
-                  </a>
+                  />
                 )}
                 {canCreate && onImport && (
-                  <Button variant="secondary" onClick={onImport} className="gap-1">
-                    <UploadSimple className="size-4" aria-hidden /> {t("Import CSV")}
-                  </Button>
+                  <ToolbarAction
+                    label={t("Import CSV")}
+                    icon={<UploadSimple className="size-4" aria-hidden />}
+                    onClick={onImport}
+                  />
                 )}
                 {canCreate && <AddButton label={t("New value")} onClick={() => setAddOpen(true)} />}
               </>

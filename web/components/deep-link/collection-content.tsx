@@ -25,9 +25,7 @@ import {
   CollectionEmptyState,
 } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Download, Graph, ListBullets, UploadSimple, Plus } from "@shared/ui/foundations/icons"
-import { cn } from "@shared/ui/lib/utils"
 
 import { WavesScreen } from "@/components/work/waves-screen"
 import { ProcessesScreen } from "@/components/process/processes-screen"
@@ -42,7 +40,7 @@ import {
   BrandLibraryScreen,
   PurposesScreen,
 } from "@/components/team/internal-screens"
-import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
+import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton, ToolbarAction } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
@@ -492,24 +490,27 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   machine could export the customer book and a person could
                   not. Export needs READ, which is implied by seeing the
                   list at all. */}
+              {/* ── THE TWO WORDS FOLD WHEN THE ROW IS TIGHT — 11 SEP 2026,
+                  measured on staging. This row is the SECOND toolbar the two
+                  CSV buttons broke, and it broke differently: its search slot
+                  has one tenant, so the slot's floor held the field at a
+                  readable width and the TRACK gave instead — 104px at 1100 and
+                  at 900, two lines, against the client's own "one row, always".
+                  Same cause, same fix, decided once in `ToolbarAction`
+                  (screen-bits.tsx) rather than here. */}
               {(totals.accounts ?? 0) > 0 && (
-                <a
+                <ToolbarAction
+                  label={t("Export CSV")}
+                  icon={<Download className="size-4" />}
                   href={`/api/tenancy/accounts/export${queryString}`}
-                  className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
-                >
-                  <Download className="size-4" />
-                  {t("Export CSV")}
-                </a>
+                />
               )}
               {canCreateAccount && (
-                <Button
-                  variant="secondary"
+                <ToolbarAction
+                  label={t("Import CSV")}
+                  icon={<UploadSimple className="size-4" />}
                   onClick={() => go(`/t/${teamId}/import/accounts`)}
-                  className="gap-1"
-                >
-                  <UploadSimple className="size-4" />
-                  {t("Import CSV")}
-                </Button>
+                />
               )}
               {canCreateAccount && (
                 <AddButton

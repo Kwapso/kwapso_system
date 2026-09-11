@@ -33,6 +33,7 @@ import { useFilterBar } from "@shared/web/screen-engine/filter-bar"
 import type { FilterFacet } from "@shared/web/screen-engine/config"
 import { RecordMark } from "@shared/web/record-mark"
 import { PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
+import { TOOLBAR_SEARCH_SLOT } from "@/components/deep-link/screen-bits"
 import { useT } from "@shared/web/language"
 import type { Account } from "@shared/types"
 import type { Wave } from "@shared/waves"
@@ -302,8 +303,15 @@ export function WaveFinder({
               like in your atifact": the reference artifact's search element is
               `flex: 1 1 auto`, not a fixed width, so it grows to push the filter
               pill/sort/period after it to the track's far edge instead of sitting
-              immediately after a narrow box. */}
-          <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+              immediately after a narrow box.
+
+              THE FLOOR IS THE ROW'S, AND IT IS ON THE FIELD — `TOOLBAR_SEARCH_SLOT`
+              (screen-bits.tsx), the one string `<ToolbarRow>` and `<PagedFind>` also
+              wear. This file is a hand-written second copy of the row
+              (`TOOLBAR_CONTROL_OWNERS` pins the divergence, R53), so a guarantee the
+              row makes and this copy does not is exactly the drift that registry
+              exists to keep readable. */}
+          <div className={TOOLBAR_SEARCH_SLOT}>
             <SearchInput
               value={query.q}
               onChange={(e) => onChange({ ...query, q: e.currentTarget.value })}

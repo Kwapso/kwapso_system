@@ -79,7 +79,7 @@ import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine
 
 import type { CollectionOrder } from "@/lib/collection-sorts"
 import { cursorKey } from "@/lib/live-resources"
-import type { ToolbarViewSlot } from "@/components/deep-link/screen-bits"
+import { TOOLBAR_SEARCH_SLOT, type ToolbarViewSlot } from "@/components/deep-link/screen-bits"
 import { fill } from "@shared/i18n"
 import { formatSearchTotal } from "@shared/web/format-count"
 import { primeCache, useCached, useCachedValue } from "@shared/web/store"
@@ -672,8 +672,16 @@ export function PagedFind<T>({
                 technique this file's own comment below already argues for a
                 `w-full` child: a `flex-1` box here claims the row's remaining
                 width, and only then does the plain `w-full` `SearchInput` inside
-                fill exactly that box. */}
-            <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">
+                fill exactly that box.
+
+                THE FLOOR IS THE ROW'S, AND IT IS ON THE FIELD — `TOOLBAR_SEARCH_SLOT`
+                (screen-bits.tsx), shared with `<ToolbarRow>` and `wave-finder.tsx`
+                so all three bespoke rows make one guarantee. This row's search slot
+                has a single tenant today, so the slot's own `min-w-[10rem]` has been
+                doing the job by accident; the field's own floor is what keeps that
+                true the day a call site puts a second control in here, which is
+                exactly how `/settings/tickets` reached 23px. */}
+            <div className={TOOLBAR_SEARCH_SLOT}>
               <SearchInput
                 value={text}
                 // THE BOX KEEPS UP WITH THE KEYBOARD — `text` is set on the
