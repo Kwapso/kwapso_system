@@ -48,7 +48,8 @@
 import * as React from "react"
 
 import { Badge } from "@shared/ui/components/badge/badge"
-import { Headline, Text } from "@shared/ui/components/typography/typography"
+import { Text } from "@shared/ui/components/typography/typography"
+import { SettingsSection } from "@shared/web/settings-section"
 import { Switch } from "@shared/ui/components/switch/switch"
 import { toast } from "@shared/ui/components/sonner/sonner"
 import { primeCache, useCached } from "@shared/web/store"
@@ -73,16 +74,25 @@ export function ModuleAutomations({
   teamId,
   segment,
   title,
-  description,
 }: {
   teamId: string
   /** The settings segment this section belongs to — the rows are the registry's
    * own, filtered to it, in the order the registry declares them. */
   segment: string
   /** English, already translated by the host (the same treatment every other
-   * section title gets). */
+   * section title gets). Handed straight to `<SettingsSection>`, which is what
+   * DRAWS it — inside the paper, above everything else in the box. This
+   * component no longer writes a heading of its own, and that is the point:
+   * client, 2026-09-11, "ticket types should be on top of the searchbar inside
+   * the container without subtitle, make this. always". */
   title: string
-  description: string
+  /* NO `description`. It was the same fourteen-word sentence on all seven of
+   * this component's mountings — "What this module does on its own. Some can be
+   * switched off; the rest say why not." — and every row below already says
+   * both halves for itself, the switch by being a switch and the protected one
+   * by carrying R70's badge and its reason. Deleted with the column it came
+   * from (`ModuleSettingsSectionBase`), which carries the ruling and the one
+   * ruling that went the other way. */
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -138,15 +148,14 @@ export function ModuleAutomations({
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
-      {/* THE TITLE BLOCK — heading and sentence, the shape every settings
-          section in this app already uses, and the shape R67 reads as a title
-          block rather than as content standing on nothing. */}
-      <div className="flex flex-col gap-1">
-        <Headline as="h2" size="h4">{title}</Headline>
-        <Text className="text-muted-foreground">{description}</Text>
-      </div>
-
+    /* THE BOX AND THE TITLE INSIDE IT ARE `SettingsSection`'s NOW. This file
+       drew its own `<section className="… bg-surface-panel …">` with a
+       `<Headline>` and a `<Text>` in it — the right shape, written out at one
+       of the four places that needed it, which is how the OTHER three (the
+       Appearance sections) came to draw a hand-rolled `<h2 className="text-lg
+       font-medium">` above their paper instead of inside it. One component
+       owns the box and the heading now; this one owns the rows. */
+    <SettingsSection title={title}>
       <ul className="flex flex-col gap-3">
         {rows.map((a) => {
           const off = isAutomationOff(stored, a.key)
@@ -204,6 +213,6 @@ export function ModuleAutomations({
           )
         })}
       </ul>
-    </section>
+    </SettingsSection>
   )
 }

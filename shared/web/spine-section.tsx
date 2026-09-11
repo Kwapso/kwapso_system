@@ -87,6 +87,7 @@ import {
 
 import { toSpine, type Spine } from "../spine"
 import { useLanguage } from "./language"
+import { SettingsSection } from "./settings-section"
 
 /** THE THREE CARDS AND NOTHING ELSE — no heading, no prose, no save.
  *
@@ -187,11 +188,9 @@ export function SpineSection({
   value,
   /** Persist the choice. The agency app passes its own `auth.setSpine`. */
   save,
-  className,
 }: {
   value: string | null
   save: (spine: Spine) => Promise<unknown>
-  className?: string
 }) {
   const { t } = useLanguage()
 
@@ -218,28 +217,28 @@ export function SpineSection({
   }
 
   return (
-    <section className={className}>
-      <h2 className="text-lg font-medium">{t("Background")}</h2>
-      <p className="text-muted-foreground mt-1 text-sm">
-        {t("Three looks for the whole app, not just the rail.")}
-      </p>
-      {/* R67 — THE OPTION CARDS STAND ON SOFT PAPER, NOT ON THE PAGE.
-       * Client, 2026-09-10: "nothing shoudl sit on the white, everything
-       * contained!" This one is not merely a rule being applied — the kit's
-       * option card is `Card`'s DEFAULT variant (sheet paper), and in LIGHT
-       * `--card`, `--background` and `--surface-raised` are all #FFFEF9, so on
-       * the bare page these cards measured contrast 1.000 and were held up by
-       * their hairline alone. It is the identical pairing
-       * web/components/team/team-panel.tsx documents from the Team tab the day
-       * before. On `--surface-panel` they are 1.103 light / 1.111 dark. */}
-      <div className="mt-4 rounded-[var(--radius)] bg-surface-panel p-4">
-        <SpineChoice
-          value={chosen}
-          disabled={saving !== null}
-          onChange={(next) => void choose(next)}
-          badgeLabel={t("In use")}
-        />
-      </div>
-    </section>
+    <SettingsSection title={t("Background")}>
+      {/* R67, AND NOW THE TITLE WITH IT — client, 2026-09-11: "ticket types
+       * should be on top of the searchbar inside the container without
+       * subtitle, make this. always". Said of a module settings page and
+       * applied here because it is the same shape: a heading and a sentence on
+       * the white above a box that could have held them.
+       *
+       * THIS SECTION WAS HALF-FIXED ON 2026-09-10 and this is the other half.
+       * That pass moved the option cards off `bg-card` — in LIGHT `--card`,
+       * `--background` and `--surface-raised` are all #FFFEF9, so they measured
+       * CONTRAST 1.000 against the page and were held up by their hairline
+       * alone — and left the title block standing on the white, because R67
+       * said prose was not content. The box is now `SettingsSection`'s, the
+       * heading is drawn INSIDE it, and the sentence is DELETED (it said what
+       * the title says). Soft paper on page measures 1.103 light / 1.079 dark;
+       * the raised option cards on it, 1.103 light / 1.111 dark. */}
+      <SpineChoice
+        value={chosen}
+        disabled={saving !== null}
+        onChange={(next) => void choose(next)}
+        badgeLabel={t("In use")}
+      />
+    </SettingsSection>
   )
 }

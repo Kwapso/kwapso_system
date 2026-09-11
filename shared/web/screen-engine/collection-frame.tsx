@@ -192,6 +192,7 @@ export function CollectionEmptyState({
   filteredDescription,
   filtered = false,
   onCreate,
+  createLabel,
   onImport,
   onClearFilters,
   className,
@@ -224,6 +225,16 @@ export function CollectionEmptyState({
    * B3. Absent draws no button (a reader with no create right). WITHDRAWN
    * when `filtered`, by this component rather than by the caller. */
   onCreate?: () => void
+  /** THE WORD ON THAT BUTTON, where "Add the first" is not the act. Added
+   * 2026-09-11 for Settings › Integrations: the client asked for the Google
+   * section to be "sth like 'connect to google' and the button to do so",
+   * i.e. THIS register with a different first step — you do not add a Google
+   * connection, you approve one. A prop rather than a second component,
+   * because two cards that mean the same thing must not be two components;
+   * the default is the collection word and every existing call site keeps it.
+   * The GLYPH does not move: create and connect are both `Plus` here, which
+   * is what the section it replaced already drew. */
+  createLabel?: string
   /** The paper action beside it — absent unless a real import target exists
    * for this record AND the reader may run it. Withdrawn when `filtered` for
    * the same reason `onCreate` is: it fills a collection that is already full. */
@@ -279,7 +290,7 @@ export function CollectionEmptyState({
           {create && (
             <Button onClick={create} className="gap-1">
               <Plus className="size-4" />
-              {t("Add the first")}
+              {createLabel ?? t("Add the first")}
             </Button>
           )}
           {importer && (

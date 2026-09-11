@@ -56,6 +56,7 @@ import { toast } from "@shared/ui/components/sonner/sonner"
 import { coverage, LANGUAGES, translate, type Language } from "../i18n"
 import { brand } from "../brand"
 import { useLanguage } from "./language"
+import { SettingsSection } from "./settings-section"
 
 /** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
  * itself "THE one place to brand this app" and twenty-three files read it; the
@@ -70,14 +71,13 @@ const BRAND = { brand: brand.name }
 export function LanguageSection({
   /** Persist the choice. Both apps pass their own `auth.setLanguage`. */
   save,
-  /** Override the section wrapper. There is ONE call site — the Appearance tab
-   * in `web/components/screens/settings-screen.tsx` — and it passes nothing, so
-   * the default below is what ships. Kept because the wrapper is the only thing
-   * a host could reasonably need to change. */
-  className,
+  /* NO `className` OVERRIDE ANY MORE. It had one call site and that call site
+   * passed nothing, so the "default" was what shipped — and the default was
+   * this section's own wrapper, which is now `SettingsSection`'s. A prop whose
+   * only purpose was to let a host restyle the box is the door R67 has been
+   * shut through five rulings. */
 }: {
   save: (lang: Language) => Promise<unknown>
-  className?: string
 }) {
   const { lang, setLang, t } = useLanguage()
   const [saving, setSaving] = React.useState(false)
@@ -116,18 +116,27 @@ export function LanguageSection({
   const currentPercent = percent(current.code)
 
   return (
-    <section className={className ?? "motion-panel-in flex flex-col gap-4"}>
-      {/* The Appearance tab's own heading, not the profile page's. `Size`,
-        * `Appearance` and `Background` above this are `text-lg font-medium`
-        * (scale-section.tsx, theme-section.tsx, spine-section.tsx); a fourth
-        * card in a muted micro-caps eyebrow would read as a different KIND of
-        * thing sitting under the same tab. The uppercase eyebrow it wore until
-        * 2026-09-10 was matching its old neighbours on the profile page, which
-        * is the same reasoning pointed at a different screen. */}
-      <h2 className="text-lg font-medium">
-        {t("Language")}
-      </h2>
-      <div className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">
+    /* THE FOURTH SECTION ON THE SAME TAB, and it gets the same shape for the
+       same reason: client, 2026-09-11, "ticket types should be on top of the
+       searchbar inside the container without subtitle, make this. always".
+       Its heading was the one thing on this tab still standing on the white
+       after its three neighbours came inside — three sections one way and one
+       the other, on one tab, is precisely the inconsistency the ruling is
+       about.
+
+       THE SENTENCE BELOW STAYS, and it is not a subtitle surviving under
+       another name. It is INSIDE the container, directly above the control it
+       is about, and it carries a fact the title cannot: what people type stays
+       in the language they typed it. That is R67 amendment 4's own line — prose
+       is exempt where it is in the thing it describes — read as a design rule
+       rather than as a loophole.
+
+       `motion-panel-in` WENT WITH THE WRAPPER. Three of this section's four
+       neighbours never had it, so one tab was animating in quarters; one
+       behaviour for one tab is the trade, and it is recorded here rather than
+       discovered later. */
+    <SettingsSection title={t("Language")}>
+      <div className="flex flex-col gap-4">
         <p className="text-muted-foreground text-sm">
           {t("Choose the language you want {brand} in.", BRAND)}{" "}
           {t("What people type stays in the language they typed it.")}
@@ -182,6 +191,6 @@ export function LanguageSection({
           </p>
         )}
       </div>
-    </section>
+    </SettingsSection>
   )
 }

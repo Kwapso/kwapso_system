@@ -70,7 +70,6 @@ describe("the dropdown-values screen windows a group that has grown", () => {
         scope={{
           types: ["Big group", "Small group"],
           title: "Groups",
-          description: "Two groups, one big.",
           create: true,
         }}
       />

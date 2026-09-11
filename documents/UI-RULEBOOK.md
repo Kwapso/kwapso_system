@@ -9,8 +9,9 @@ repository until 2026-08-22), and is now a deliberate scope line: these are arra
 decisions, and they should hold whatever the reskin does to the lego underneath them.
 
 **Its relationship to the other law books.** [UI-CONVENTIONS.md](UI-CONVENTIONS.md) is
-the *enforced* law (R2, R3, R4, R6, R7, R8, R16 and the action-icon mapping); it stays
-in force and nothing here contradicts it. This file is the layer above: the arrangement
+the *enforced* law — it carries the table of every law in `shared/rules/registry.ts` with
+`dimension: "ui"`, plus the action-icon mapping; it stays in force and nothing here
+contradicts it. This file is the layer above: the arrangement
 decisions those laws leave open. Where a rule here would change an enforced law, it says
 so out loud and proposes the in-rule route (see [Rule G1](#g1-a-record-type-carries-a-glyph)
 and [Conflicts to settle before building](#conflicts-to-settle-before-building)).
@@ -35,18 +36,19 @@ the concrete implementation, and its evidence.
 ## Contents
 
 - [0. The diagnosis: three findings that explain most of the complaints](#0-the-diagnosis-three-findings-that-explain-most-of-the-complaints)
-- [1. Colour and surface](#1-colour-and-surface) (C1 to C11)
-- [2. Page layout and width](#2-page-layout-and-width) (L1 to L7)
-- [3. Detail screens](#3-detail-screens) (D1 to D10)
-- [4. Collections](#4-collections) (K1 to K9)
-- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B9)
-- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F9)
-- [7. Typography](#7-typography) (T1 to T7)
+- [1. Colour and surface](#1-colour-and-surface) (C1 to C12)
+- [2. Page layout and width](#2-page-layout-and-width) (L1 to L9)
+- [3. Detail screens](#3-detail-screens) (D1 to D12)
+- [4. Collections](#4-collections) (K1 to K16)
+- [5. Buttons and actions](#5-buttons-and-actions) (B1 to B10)
+- [6. Forms and dialogs](#6-forms-and-dialogs) (F1 to F10)
+- [7. Typography](#7-typography) (T1 to T8)
 - [8. Spacing, and the scale setting](#8-spacing-and-the-scale-setting) (S1 to S6)
 - [9. Mobile](#9-mobile) (M1 to M6)
-- [10. Copy](#10-copy) (W1 to W5)
-- [11. Record type glyphs](#11-record-type-glyphs) (G1 to G4)
+- [10. Copy](#10-copy) (W1 to W12)
+- [11. Record type glyphs](#11-record-type-glyphs) (G1 to G6)
 - [12. Density: the glance budget](#12-density-the-glance-budget-n1-to-n12) (N1 to N12)
+- [13. The kit, and what counts as using it](#13-the-kit-and-what-counts-as-using-it-u1-to-u3) (U1 to U3)
 - [What the old app did better](#what-the-old-app-did-better)
 - [Do not do](#do-not-do)
 - [Conflicts to settle before building](#conflicts-to-settle-before-building)
@@ -319,6 +321,112 @@ ships an explicit `prefers-reduced-motion` block. It has **zero** Webflow scroll
 interactions (`data-w-id` appears nowhere in the markup), which for a marketing site is a
 deliberate restraint worth carrying into a working tool.
 
+### C12: nothing stands on the bare page ground
+
+**The rule.** The client, four times in three days, and by the second one she was asking
+for the law:
+
+> *"more members in each row, too much blank space. needs container!! **nothing on top of
+> white background, its a rule!**"* (2026-09-09, the Team tab)
+>
+> *"but give it a container. **once again**, nothing shoudl sit on the white, everything
+> contained! (make this a law)"* (2026-09-10, Settings › Integrations)
+>
+> *"remember in settings modules card, needs container background."* (2026-09-11)
+>
+> *"i said nothing on white backgorund. remove this text … remove the text directly on
+> white background."* (2026-09-11, Integrations again)
+
+A titled section of content — and a **tab panel**, which is titled by its strip rather than
+by a heading of its own — stands on paper. It passes in exactly **two shapes**, and they
+are one sentence read from either end:
+
+1. **the section IS the box** — it, or something above it in its own file, carries a paper
+   fill; or
+2. **every body it draws stands in one** — heading outside, content on paper, which is what
+   every collection screen in the base already does.
+
+**This is not "every screen's root is a panel".** That version was written first and thrown
+away: it is either trivially true, or it forbids the shape the whole app already uses and
+she has already approved.
+
+**The clause with the teeth is "every body".** Containment is asked **per branch** — through
+fragments, ternaries, `&&` and `.map()` — so a section cannot pass on the strength of the
+one branch that happens to have a panel in it. That is the difference between a rule that
+catches her bug and one that reports success over it: `access-tokens.tsx` drew its ROWS on
+soft paper and its error, its skeleton and its zero on the page, and she was looking at the
+branch with nothing in it.
+
+**Four things are deliberately not content**, each a decision rather than a convenience:
+the **title block** (a heading is not something that stands on anything, and the create
+button rides beside it), an **act** (a lone button or a link — a control is pressed, not
+read), an **overlay** (a slide-in is not lying on the page), and anything hidden or
+screen-reader-only.
+
+**Prose used to be a fifth, and she overruled it** (2026-09-11). A sentence is exempt only
+where it is IN the title block or inside a body that already paints. **A sentence that is
+its own body, standing on the page ground beside the box it describes, is content and
+fails.** And a section does not leave this rule by deleting its title: the subject is every
+`<section>`, because a heading was only ever a proxy for it, and *a law you leave by
+deleting your title rewards the wrong fix*.
+
+**Where the title goes, and what happened to the subtitle** (2026-09-11, her ruling on
+Ticket settings: *"ticket types should be on top of the searchbar inside the container
+without subtitle, make this. **always**"*). A section's title sits **inside its container,
+above the toolbar**, and there is no subtitle under it. Both halves are held by a
+chokepoint rather than a census, which is why a seventeenth section cannot get this wrong:
+`description` is **gone from the data model** — `ModuleSettingsSection`, `SelectableScope`
+and `ModuleAutomations` have no such column to declare one in — and the title is a
+**string** handed to `<ToolbarRow title>` or to `SettingsSection`, never a heading a call
+site positions for itself. The same move R53 makes with the sort control: the row draws it,
+the call site hands over the answers.
+
+**The cost, and it is a real one.** Fourteen sections lost a sentence each that explained
+what they were for — *"the kinds a ticket can be raised as; each one is a tab on the ticket
+list and a filter beside it"* and its thirteen siblings. Nothing on screen says that now.
+Where a fact is genuinely needed at the moment of use it belongs **on the control it is
+about**, inside the paper — not restored as a subtitle under another name. She said "no
+subtitle" twice with a screenshot in front of her; one intervening *"the section
+description: no, I want to keep it"* (2026-09-10) is recorded at each deletion site as
+weighed and overruled, so the next reader knows it was not simply missed.
+
+**What the walk follows, and what it refuses to** (amendment 5). Deciding "does this
+component paint?" by reading its own text reports a false offender the moment a section
+stands in a **shared** box instead of spelling the fill itself — which is exactly what the
+chokepoint above created. So the walk follows **one** edge: the single element a component
+*returns*, transitively. That is a difference in kind from the version this file tried and
+threw away, which followed everything a component *renders* and turned every uncontained
+zero register green off a fill two files away. Measured on the day it landed, the root walk
+changed **exactly one verdict** in the whole census — the false one.
+
+**What it costs, and this is the part to read before you reach for `bg-card`.** In the
+light palette `--card`, `--surface-raised`, `--surface-lift`, `--surface-selected` and
+`--background` **all resolve to the same colour**. A body painted `bg-card` and standing on
+the page was answering "I am contained" at **contrast 1.000**, held up by a hairline and
+nothing else. Dark measured a perfectly visible 1.198 the whole time, which is why nobody
+caught it by looking. So a container is derived by VALUE, per palette, not by the name of
+the token — `bg-card` is a fine container on a panel (the kit's own raised-on-soft-paper
+pairing) and is not a container on the PAGE. The kit's own answer for a wall of cards
+standing on the page is `tone="panel"`, measured at 1.103 in light and 1.079 in dark.
+
+**A second cost, in the same shape.** Where a fill comes from a `cva`, **the variant the
+call site selects decides.** A component whose `tone` defaults to bare answered "I paint"
+off a `panel` option declared two lines below it — and that call was the wall she reported.
+
+**The exceptions are a census awaiting her ruling, not a settled list.** The whole client
+portal is exempt because it is consistent with ITSELF — stacking titled sections on an
+unpainted `<main>` is its visual language, not six oversights, and giving it panels is a
+redesign of the client-facing app that belongs in a deliberate pass with her looking at it.
+Several agency entries are open questions of the same kind, because she HAS ruled the other
+way once, about the module settings pages' own descriptions: *"The section description: no,
+I want to keep it."* The two rulings reconcile — keep the words, stop leaving them on the
+white — but which she means for each screen is hers. **Read
+`UNCONTAINED_SECTION_OK`, not this paragraph.**
+
+**Law.** [R67](../RULES.md) (`sections-stand-on-paper`). This rule is being amended as the
+client rules on the screens above; the registry's law text and `RULES.md` carry the running
+account, and they are the version to trust over this summary.
+
 ---
 
 ## 2. Page layout and width
@@ -415,6 +523,62 @@ Today `home-screen.tsx`, `settings-screen.tsx` and `invitations-screen.tsx` disa
 Every screen gets one `<h1>` at the scale set in [T1](#t1-one-heading-scale-per-front-door).
 
 Evidence: `A-4.07.25` gives the ticket the same large title every other record gets.
+
+### L8: a panel that minimises collapses, and a shut panel is shut for the keyboard too
+
+**The rule.** The assistant column closes by COLLAPSING, never by vanishing. Three things
+have to be true together, and the third is the one a designer has to remember to ask for:
+
+1. the column stays **mounted** across the open/shut flip. Writing
+   `isAsideOpen ? <aside…> : null` throws away the element the exit animation would have
+   played on, so there is nothing left to animate;
+2. the wrapper that collapses carries `.motion-column-collapse`, a `data-state` bound to
+   the open flag, and a `--motion-column-size`
+   (`shared/ui/compositions/templates/screen-shell.tsx`,
+   `shared/ui/foundations/motion/motion.css`);
+3. it also carries **`inert`**, bound to the negation of that flag. A collapsed column is
+   zero width and fully transparent and is still in the tab order and the accessibility
+   tree. Without `inert`, "closed" is true for the eye and false for a keyboard and a
+   screen reader — which is not what the client asked for: *"closed assistant show
+   nothing. it's literally only the bar."*
+
+**What it costs, and the trap that earned it.** `.motion-column-collapse` may **not** size
+itself with `grid-template-columns` or `fr` units. That is the row-collapse rule with the
+axis turned ninety degrees; it reads correctly, it type-checks, it lints, and inside a
+flex row it silently does nothing — a flex item's grid is sized under an intrinsic
+constraint, and under an intrinsic constraint a `0fr` track is floored at its own base
+size instead of resolving to zero. Measured in the verify sandbox, the track never moved
+off 356.25px: the panel went fully transparent and kept every pixel of its width. That is
+visibly **worse** than the instant disappearance it replaced, and it is only visible to
+somebody who measures the settled geometry. The column is sized on `inline-size`.
+
+**Law.** [R51](../RULES.md) (`aside-collapse`).
+
+### L9: every section on the team area's strip has a door, or names the screen that took its place
+
+**The rule.** A section that lives on the team area's own strip (`TEAM_SECTIONS` in
+`web/lib/pages.ts`, `placement: "tab"`) is reached from exactly one place in the app: the
+"This team" list on Settings › Team, which is built from that same table minus the keys it
+subtracts. **If you take a section off that list, the capability does not disappear — the
+door does.** So the section names the screen that carries its material instead, and that
+screen must really make the same door calls the section's own actions made. A section with
+`placement: "contextual"` never appears on that list at all, so it needs a literal link
+somewhere under `web/` that ends at its segment, or the same written line.
+
+**What it costs.** Only LITERAL paths are visible to the census, so a section reached by a
+computed segment reads as unreachable and has to be written down — a reviewer reading a
+claim, rather than a build going quiet.
+
+**Why it exists, in one sentence you can check on screen.** The 2026-09-09 Team redesign
+left three acts — change a member's role, remove a member, revoke an invitation — on
+screens that exactly one thing in the app linked to, and that one link pointed at a
+member's RECORD. Somebody with full team-member rights and the wrong commercial right had
+no in-app path to any of them, under a green build, with the gallery's own comment telling
+the next reader it was fine. And `dropdowns` moved tab → contextual on 2026-09-01: from
+that moment nothing in the app opened it, and a screen with an import door, an export and
+a record split sat unreachable for ten days.
+
+**Law.** [R64](../RULES.md) (`sections-have-a-door`).
 
 ---
 
@@ -592,6 +756,53 @@ Evidence: `A-3.57.42`, `A-3.58.01`, `A-4.05.52` ("TICKET", "DESCRIPTION", "BUILD
 "SCREENSHOTS", "MEMBER", "DURATION"). `DescriptionList` already ships with exactly this
 config shape.
 
+### D11: every detail screen wears the same title treatment, and it comes from one constant
+
+**The rule.** The record heading's step (h1, 44px) and the 80% title-to-actions split are
+ONE exported string, `RECORD_TITLE_TREATMENT` in `shared/web/record-heading.tsx`. This app
+draws a record detail two ways — the hand-composed `*-detail.tsx` screens through
+`RecordScreen` (`web/components/records/record-chrome.tsx`) and the recipe-driven ones
+through `renderDetail` (`shared/web/screen-engine/screen-renderer.tsx`) — and **both** apply
+that exact constant and import it from that file. No call site passes a `titleSize` of its
+own.
+
+**Why a constant and not a class.** The 44px title was a real fix for a real correction
+(*"title on main screens still way too small!"*) and it was written as a PRIVATE constant
+inside the first of the two paths. The second path never saw it and fell through to the
+kit's own `h3` default, so five recipe details — the team's own landing screen among them —
+set a record's name at 24px while thirteen sibling screens set it at 44px. A 20px step,
+and every pixel of it lands on the tab strip below, which is the height the client was
+actually pointing at. Nothing was red and nothing could have been: a default on one path
+and a class on the other is not a contradiction any type or any test can see, and neither
+file names the other. Contrast the tab-strip gap, which was uniform on both paths the whole
+time, because it had been made a token rather than a class in one file.
+
+**The standing instruction behind it**, which the client has now given three times:
+*"i dont want you to hardcode fixes for single pages, but to state rules about
+components."*
+
+**Law.** [R52](../RULES.md) (`record-title-treatment`).
+
+### D12: a screen showing one record asks the door for that record, never the loaded page
+
+**The rule.** A screen that shows ONE record out of a collection that PAGES must read that
+record **by id** — a dedicated per-record door, or a `<module>:one:<id>` cache key beside
+the list. Never `find` over the cached list, which holds only the prefix that has been
+loaded. The by-id key then has to reach a live listener like any other key, or a status
+change patches the list and leaves the open record showing yesterday.
+
+**What it costs.** Nothing, on a BOUNDED collection: where page one IS the collection
+(apps, member roles), a `find` is honest and the rule does not reach it.
+
+**Why it exists.** The owner opened a ticket from the triage queue and was told *"That
+ticket no longer exists."* It existed — number 1,030 of 1,820 on staging — and the whole
+lookup was a `find` over the newest fifty rows. Every ticket past the cursor was
+unreachable by direct link, from an email button, from a bookmark, and the screen made the
+most alarming claim available to it on a collection whose entire point is that it grows.
+The door had accepted an id the whole time.
+
+**Law.** [R38](../RULES.md) (`details-ask-the-door`).
+
 ---
 
 ## 4. Collections
@@ -690,6 +901,214 @@ Apps, accounts and deliverables have logos or thumbnails, so they may render as
 
 Evidence: `A-3.58.58` (customer cards with cover images), `P-4.10.19` (deliverable cards
 with video thumbnails) against `A-4.06.45` (stories as a table).
+
+### K10: every collection screen shows a search box, and it is not the screen's choice
+
+**The rule.** *"the toolbar, including the search, should be absolutely everywhere we have
+a data view or a collection view. Stop hardcoding this. Just write it as a rule."* A
+collection or data view draws its toolbar's search box **by default**. Not because the
+screen's author remembered to switch it on — because switching it OFF is the thing you have
+to write down and give a reason for.
+
+Two places it can be decided, and both are held: a recipe-driven collection
+(`web/lib/screens.ts`) carries `searchable: true`, and a bespoke
+`<ToolbarRow>` passes a `search` prop. Either way out is the same named, rot-checked
+registry entry, so the exemption list can only shrink.
+
+**Why the default was flipped rather than the two screens fixed.** `searchable` and
+`search` were ordinary optional fields, and two screens quietly omitted the second — Tasks'
+Calendar tab and the Triage queue each drew a toolbar with a button and no search box,
+reasoned only in a comment nothing reads at build time. **An opt-in can be forgotten by
+omission, which is exactly what happened; an opt-out has to be written down and given a
+reason a reviewer can read.** Note the client's phrasing: she was correcting a narrower
+answer already given once.
+
+**The one reason that was left standing has since been superseded**, and it is worth
+reading as a lesson rather than a rule: a collection genuinely empty of rows used to keep a
+bare toolbar carrying only its create button, on the grounds that a search box over zero
+rows can do nothing. That is precisely how a lone create button kept escaping — this rule's
+censuses ask whether `search` is PRESENT, never whether `actions` agrees with it. See
+[K11](#k11-an-empty-collection-draws-no-toolbar-at-all-not-even-the-add-button), which now
+answers that question for the whole row.
+
+**Law.** [R48](../RULES.md) (`toolbar-shows-search`).
+
+### K11: an empty collection draws no toolbar at all, not even the add button
+
+**The rule.** While a collection holds **zero rows before anything narrows it**, the
+toolbar does not exist. `<ToolbarRow>` takes a required `empty` prop and returns nothing
+when it is true, **before** search, filters, sort, view or its own `actions` are
+considered; `<PagedFind>` takes the equivalent `restingEmpty` for the door-searched half of
+the app. The prop is derived from the collection's real row count — never a hardcoded
+`{true}`/`{false}`, which is the row answering the question with a constant.
+
+**And one layer down.** A section heading built from a `<div>` and an `<h2>` is not a
+`<ToolbarRow>` and was outside the rule by construction, so five sections drew a create
+button over an empty collection while the empty state underneath already offered the first
+add. `AddButton` (the app's one create-button seam) therefore takes its own `empty` and
+opens with the same early return, and every call site either sits inside a toolbar's
+`actions` slot — where the row has already answered — or passes `empty` itself.
+
+**One thing outlives the toolbar: its title.** Since the section heading moved inside the
+container (C12), the row's empty exit is `if (empty) return heading` rather than
+`return null` — otherwise a collection with no rows loses its name along with its controls.
+`heading` is `title ? … : null` and nothing else, so the seventeen call sites that pass no
+title are byte-identical to the old behaviour, and the check pins what the empty return may
+*be* rather than proving its shape on the day somebody read it.
+
+**Where the exceptions are.** `EMPTY_TOOLBAR_EXEMPT` in `shared/rules/registry.ts`, with a
+reason each and rot-checked. It has never been empty, and every line in it is an
+`empty={false}` written down on purpose. **Read the list, not this sentence.**
+
+**The client's own correction**, after the same shape had recurred eight times over:
+*"once again, when empty collection no toolbar at all — fix everywhere and set as a
+rule."*
+
+**Law.** [R50](../RULES.md) (`empty-toolbar`).
+
+### K12: the toolbar's slots are the row's, in one order, and sort is a default
+
+**The rule.** `<ToolbarRow>` draws five slots in one fixed order — **search → filters →
+sort → view → actions** — and two of them, `sort` and `view`, are structured CONFIGS the
+row builds the `<SortControl>` and `<ViewSwitch>` from itself. They are not
+`React.ReactNode`: a slot that accepts anything enforces nothing. Nobody else in either
+front door builds either control unless they are named in `TOOLBAR_CONTROL_OWNERS`, and
+every call site passes a `sort`, or names its enclosing component in `TOOLBAR_SORT_EXEMPT`
+with the real reason its rows have no order to offer.
+
+**`view` needs no exemption list**, and that is a property of the control rather than a gap:
+`ViewSwitch` draws nothing below two views, so a single-body collection is self-exempting.
+
+**Why it exists.** The client put two of her own screens side by side — *"why the fuck i
+still have different toolbar variations??? unify joder"* — and eleven of the eighteen
+bespoke toolbars turned out to draw a sort control, **eight of them by handing it to
+`search`**, the row's one growing slot, where a prop census cannot see it. That is the
+hole: [K10](#k10-every-collection-screen-shows-a-search-box-and-it-is-not-the-screens-choice)
+and [K11](#k11-an-empty-collection-draws-no-toolbar-at-all-not-even-the-add-button) ask
+whether a prop is PRESENT, and the contents of a node slot are invisible to that question
+by construction.
+
+**Law.** [R53](../RULES.md) (`toolbar-slot-set`).
+
+### K13: the gap under a toolbar is one number, and the row pays it
+
+**The rule.** `<ToolbarRow>` carries `--toolbar-content-gap` as its own trailing margin, on
+its own root, so every call site gets the right gap for free. **No call site pays it
+again**: not by wrapping the row in a `flex-col` that also declares a `gap-*`/`space-y-*`,
+and not by passing an `mb-*` of its own. Either is the same number spent twice, which is
+how it grows past what it was meant to be.
+
+**The value is shared with the tab strip on purpose.** `--toolbar-content-gap` spends the
+same `--space-5` as `--tab-content-gap`, because both are "the gap between a control strip
+and the content under it", and a system with one rhythm does not mint a second number for
+the same sentence.
+
+**Why it exists.** The client, in the spacing round: *"tehre's wahy too much space between
+the toolbar and the contenta"* — on every screen she checked. It had drifted into five
+different numbers doing the identical job across fourteen call sites: a wrapping
+`flex flex-col gap-2` / `gap-3` / `gap-4` / `gap-6` (7.5px to 22.5px), a `space-y-3`, and a
+`className="mb-4"` handed straight to the row. Four mechanisms, no owner.
+
+**Law.** [R49](../RULES.md) (`toolbar-content-gap`).
+
+### K14: the toolbar stays on top while the rows scroll under it, and the pin is the row's
+
+**The rule.** *"on scroll down, i also want the toolbar to be on top all time visible.
+everywhere."* Every component that owns a collection toolbar wears ONE class,
+`PINNED_TOOLBAR` (`shared/web/pinned-chrome.ts`): sticky against `--pinned-chrome-h`, a
+flex **column** so [K13](#k13-the-gap-under-a-toolbar-is-one-number-and-the-row-pays-it)'s
+trailing gap sits inside a box that actually PAINTS, and a background of `--pinned-ground`,
+the tone it is standing on — published by the ground class itself, so no screen is asked
+which. Nobody writes their own offset.
+
+**What it pins BELOW is a property that defaults to zero** and is raised by whatever pins
+above it: a collection tab strip, a record screen's strip, or the portal's measured header.
+A screen with nothing above its toolbar pins flush at zero and declares nothing.
+
+**The container's own top band pins with the row**, which is her second sentence the same
+day: *"when sticky toolbar, include also the top part of the container above it! if not
+looks weird."* Pin the row alone and the card's top edge and its top inset both leave with
+the scroll, so the bar arrives flush under the tabs, standing on nothing, touching a card
+that no longer has a top. **And the band keeps the container's rounded top corners** —
+her third sentence: *"When pin, I still want it round. That's exactly what I asked for, so
+do whatever you have to do."* A rounded corner is a transparent notch, and the notch is
+filled with what is behind the container, so it shows exactly what the real corners show at
+rest.
+
+**Two costs, both of them things a browser said and no source read could.**
+
+1. **`position: sticky` is bounded by its own containing block.** A row boxed in furniture
+   no taller than itself pins nowhere — 32px of range on the tickets Dashboard, against
+   3,011 on Accounts. When that happens the pin moves OUT to the box; it is not fixed at
+   the row.
+2. **Two pinned toolbars on one collection land in the same band.** A container that
+   already holds a pin stands the nested one down — and zeroes its lead and its side
+   inset with it, because a rounded band of outside ground in the middle of a panel is a
+   hole cut in the paper.
+
+**Law.** [R63](../RULES.md) (`pinned-toolbar`). The one edge radius it draws is R31's own
+value on one edge, which is why [T8](#t8-the-two-radii-are-spelled-the-kits-way) names this
+position rather than treating it as a breach.
+
+### K15: the two zeros look the same; the add button is the only difference
+
+**The rule.** A collection has two empty states and they are different FACTS. **Resting**:
+it holds no rows at all, first run, the screen exists to be filled. **Filtered**: it holds
+rows that a search, a tab or a facet has narrowed to none — nothing is wrong, the reader
+asked a question with no answer. Each front door draws BOTH through ONE component —
+`CollectionEmptyState` (`shared/web/screen-engine/collection-frame.tsx`) on the agency
+door, `PortalEmpty` (`web-portal/components/portal-empty.tsx`) on the portal — which takes
+a `filtered` prop, swaps the words on it, and **withdraws the create action on it**.
+Everything else is drawn identically.
+
+**The subtraction happens inside the component, never at the call site.** A caller hands
+its create action over unconditionally and cannot forget to gate it — the same lesson
+[K11](#k11-an-empty-collection-draws-no-toolbar-at-all-not-even-the-add-button) learned
+about `empty`, one component along. And the title and description are read only at rest,
+because "No accounts yet." is a claim about the collection and it is plainly untrue while
+somebody is searching it.
+
+**Why it exists.** *"the empty because of filters hosul look the same as empty collection
+but the add button."* They did not. The resting zero had a good shared register and the
+filtered one had none: of 113 zero-row render sites in the agency app, 34 drew the real
+register and **43 were bare grey `<p>` tags** — twelve of them literally the same sentence
+copy-pasted into eight files. In every one of those eight the two zeros sat in ONE
+component four lines apart, so a reader flipped between two different-looking screens by
+typing one letter. The kit's own second register differed in four ways nobody had decided:
+a different inset, a different title step, a different body measure — and its fallback
+words were English defaults inside the kit, in no catalogue, translated nowhere.
+
+**And the button was wrong in both directions**: on the door-searched half, a search that
+matched nothing read as "this collection is empty" and drew *"Add the first"* over a list a
+term was hiding.
+
+**Law.** [R62](../RULES.md) (`one-zero-register`).
+
+### K16: on a card that stands for a record, the chip sits above the title
+
+**The rule.** *"in team, adn generlaly in this component write the law, chip on top of
+title & bigger images."* On a card that stands for one record, every `<Badge>` opens
+**before** the title in source order — and in a card, which is a flex column, source order
+IS visual order. The card names its record through the kit's own `<CardTitle>`, not a
+hand-rolled `<span>`.
+
+**Why the title part is not optional.** "Above" is a statement about position, and a title
+rolled into a bare `<span>` has no position anything can read: `members-gallery.tsx` drew
+its member's name exactly that way, so a chip-position census over that file would have
+reported a perfectly ordered card while looking at nothing at all. Same move
+[K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default) made when it
+took the toolbar's slots off `React.ReactNode`.
+
+**Which cards.** A card that stands for a record is one drawn per row of a collection, and
+the test for that is React's own: such a card carries a `key`, and a card that is a panel
+around a section does not. The partition comes from a rule that predates this app and that
+no author here can quietly redefine.
+
+**Why it is a law.** She had to say it twice — the Kanban card was fixed on its own in
+September and the member card shipped the opposite way a day later, green, because nothing
+in the build knew the two were the same question.
+
+**Law.** [R65](../RULES.md) (`chip-above-title`).
 
 ---
 
@@ -826,6 +1245,32 @@ Evidence: `A-4.06.45`. This app currently uses a "Load more" button
 (`web-portal/components/tickets-screen.tsx:88`), which R14's keyset paging supports
 either way. (inferred: adopting the old app's numbered form; both satisfy R14.)
 
+### B10: a module's settings have two entrances and one page behind them
+
+**The rule.** *"Does every module get the gear? Only the ones with something to set."* A
+module that has something to set gets a settings **gear on its own screen** and a row on
+the **Modules tab** in Settings, and those are two doors onto ONE page — because
+*"everything around settings should be under settings screen concentrated (and 'quick
+access' through the gear in each module) but not in random places across the app."*
+
+Three things follow, and none of them is a per-screen decision:
+
+1. every module named in `MODULE_SETTINGS` has **exactly one** gear mounted in `web/`, and
+   every gear mounted names a module that table declares. Both directions, because each
+   failure is invisible on its own: a settings page with no gear is a page nobody standing
+   on that module can find, and a gear on a module with nothing to set renders nothing for
+   ever and looks exactly like a module that has no settings;
+2. the Modules panel on `web/components/screens/settings-screen.tsx` spells no module of
+   its own — its rows are built from the same table, so they cannot be hand-kept;
+3. **the permission is asked once.** `visibleModuleSettings`
+   (`web/components/screens/module-settings-screen.tsx`) is the one expression that decides
+   whether a module has settings THIS reader may open, and the gear, the page and the tab
+   row all ask it. Her sentence, held structurally rather than restated three times: *"a
+   reader who may see tickets but not the vocabulary should not be offered a door that
+   refuses them."*
+
+**Law.** [R61](../RULES.md) (`module-settings-two-doors`).
+
 ---
 
 ## 6. Forms and dialogs
@@ -940,6 +1385,41 @@ a centred `Dialog`. Keep `FormShell` inside it unchanged, which keeps R4 satisfi
 Evidence: `P-4.10.36`, `A-3.58.16`. Both old apps present forms as bottom sheets on a
 phone, with a drag handle.
 
+### F10: a form is a slide-in; a warning is an overlay
+
+**The rule.** The client, over a screenshot of the "New access token" dialog: *"This should
+be a slide-in, like all the other screens. The only ones that are overlays are the
+warnings, such as archive or delete, and so on."*
+
+- A surface that **collects** — a form, an editor, a picker — is the kit's `Sheet`. It
+  slides in from the inline end on desktop and, below 45rem, becomes the bottom sheet
+  capped at 85dvh that [F9](#f9-a-dialog-on-a-phone-is-a-bottom-sheet) asks for.
+- A surface that **asks a yes/no question about something that already exists** is an
+  `AlertDialog`, centred.
+
+**The rule is written the other way round from how you would read it**, and that is
+deliberate: nothing tries to recognise a form, because a pattern that decides what a form
+looks like has a hole the week somebody writes one differently. Instead **every centred
+overlay** in either front door needs a written reason on file (`CENTRED_DIALOG_OK`). A new
+form reaches for a `Dialog`, has no line, and is red on the day it is written. Detecting
+the fault directly was tried first and found four of the five live cases — it missed a
+picker outright, because a radio group and an onClick that writes is a form with no
+`<form>` in it.
+
+**What it costs.** The kit's own `presentation` prop looks like the answer and is not: of
+its four values, `overlay` and `responsive` are both CENTRED on a desktop, `sheet` is a
+bottom sheet on a 1920 monitor, and `fullscreen` is a page. So a centred overlay is a
+finding whatever it carries, and the shape she asked for is a different component.
+
+**And an exemption cannot be used to smuggle the thing back**: an exempt overlay that grows
+form machinery — a `<form>`, a `FormShell`, a `<Field>`, an `<Input>` — turns the build red
+where it stands.
+
+**Two entries are open questions rather than settled exceptions**: a read-only usage panel
+and a record calendar are neither forms nor warnings, and she has ruled on neither.
+
+**Law.** [R59](../RULES.md) (`forms-are-not-overlays`).
+
 ---
 
 ## 7. Typography
@@ -1019,6 +1499,10 @@ Evidence: `styles.css:20-23` names its purpose; no old-app screenshot shows a se
 > **AMENDED by [N9](#n9-two-radii-one-fill-no-shadow) (18 Aug 2026)** with the census: 57
 > of the app's 125 radius classes are off-vocabulary, `rounded-lg` alone 48 of them, and
 > because every step already computes to 24px **changing all 57 is a visual no-op**.
+>
+> **AMENDED AGAIN by [T8](#t8-the-two-radii-are-spelled-the-kits-way) (27 Aug 2026),** when
+> the kit became canon: the two values did not change and the WORDS did. `rounded-xl` is no
+> longer the class you write. Read T8 before you write a corner.
 
 Every Tailwind radius step from `rounded-sm` to `rounded-3xl` resolves to the same
 `var(--radius)` = 24px (`styles.css:261-266`). Pills come from `rounded-full`. Since
@@ -1035,6 +1519,53 @@ panels read too soft beside the marketing site, that is a token change in
 `shared/ui/foundations/tokens/tokens.css`, made once — and since 2026-08-22 that file is in this repo, so
 it is a change this repo makes rather than one it asks for. It is still not a
 per-component override in the host.
+
+### T8: the two radii are spelled the kit's way
+
+**AMENDS [T7](#t7-the-radius-vocabulary-is-two-values-and-the-class-you-write-is-rounded-xl)
+and [N9](#n9-two-radii-one-fill-no-shadow)**, both of which said "write `rounded-xl`". The
+two VALUES are unchanged; the words are the kit's now, and the kit is canon.
+
+**The rule.**
+
+| Shape | Write |
+|---|---|
+| a rectangular surface | `rounded-[var(--radius)]` |
+| a pill | `rounded-pill` |
+| one edge of a rectangular surface | the same word on that edge, e.g. `rounded-t-[var(--radius)]` |
+
+Nothing else. **The law constrains the VALUE, never the position** — a directional variant
+is one value, one token, one edge of it — so no named step (`rounded-lg`, `rounded-md`,
+`rounded-2xl`…) and no bare number that answers to no token may be written in `web/`,
+`web-portal/` or `shared/`. `shadow-*` stays at exactly one use.
+
+**Two positions draw a single-edge radius, and both are written down** so that neither
+reads as a breach: a **sheet** that meets the bottom of the screen, and (2026-09-10) the
+**top band of a pinned toolbar**, which carries its container's own top corners with it
+once the container's real top edge has scrolled away
+([K14](#k14-the-toolbar-stays-on-top-while-the-rows-scroll-under-it-and-the-pin-is-the-rows);
+`shared/web/pinned-chrome.ts` has the measurement).
+
+**The one named exception is `rounded-select` (6px)**, on the mark of a selection control.
+Two numbers cannot draw everything: at the box radius a 16px checkbox is a lozenge, and at
+the pill radius it is a radio button. The kit rules exactly this and calls it *"the ONE
+named exception to the two-radius law: 6px. Nothing else may."* It is data in
+`RADIUS_EXCEPTION` with its reason, rot-checked, so an exception nothing uses turns the
+build red. The kit names a SECOND (4px on a bar, *"a bar is not a box"*) which is
+deliberately **not** defined here until something in this app draws one.
+
+**Bare `rounded` is deliberately outside the rule**: it is 4px here, not 24, doing a
+different job on an inline highlight and a 32px thumbnail.
+
+**A third BOX radius is still forbidden.**
+
+**What it cost to say it this way.** The old spelling was correct by IMPORT ORDER rather
+than by declaration: Tailwind emits `--radius-lg: 0.5rem`, the kit's `tokens.css` emits
+`1.5rem`, and the kit wins on cascade order alone — so 184 corners across both front doors
+were right for a reason no check stood under. Reorder the two stylesheets and every card
+silently becomes 12px with the suite green.
+
+**Law.** [R31](../RULES.md) (`two-radii`).
 
 ---
 
@@ -1216,6 +1747,177 @@ status, work log, reference number.
 "Reply by email", not "Reply By Email". Unchanged from UI-CONVENTIONS.md §5, restated
 because the new menu is a new surface where the habit can slip.
 
+### W6: no emoji in the words, and none in the data behind them
+
+**The rule.** The client has said it four times. *"i said no emojis. why are there still
+emojis? kill them!"* (2026-08-31). *"for type, kill the emojis. this is legacy. in current
+system we use colors"* (2026-09-07). *"also kill emojis!!!"* (2026-09-10). No emoji in a
+sentence a person reads, in any language, **and none in the data a screen draws** — a
+ticket type's mark, a department's mark, a seeded vocabulary row. A mark is data, it sits
+in no catalogue and in no `t(...)`, and that is the half a copy sweep cannot see.
+
+**The one exemption is a CLASS, not a list** — her fourth ruling, 2026-09-10: *"Keep emojis
+for countries and languages only."* A pictograph passes when it is a **flag** naming a real
+region. There is no language pictograph, so a language is drawn by the flag of a country
+that speaks it. A lone regional indicator, a pair naming no country, and every other glyph
+are still refused.
+
+**What is NOT an emoji, and is not caught.** The typographic dingbats this app and the kit
+legitimately draw — a close cross (U+2715), a department's star (U+2605), an arrow
+(U+27A4). The line is drawn by the same door that
+guards the write (`optionalMark` in `shared/workers/validate.ts`), imported rather than
+copied, so the law and the door cannot drift.
+
+**A house rule that comes with it:** in the data files, name a glyph by codepoint
+(`String.fromCharCode(0x26a0, 0xfe0f)`), never paste one. Source COMMENTS are deliberately
+out of scope — most of the pictographs in this repo's source are the client's own words
+quoted beside the change they caused.
+
+**Why it took four rulings.** The August one WAS answered and could not land: every
+back-fill statement in the two migrations was guarded `AND mark IS NULL`, so not one of
+them could ever have replaced a pictograph. They filled the empty marks and stepped over
+exactly the rows the ruling was about.
+
+**Law.** [R66](../RULES.md) (`no-emoji-in-copy`).
+
+### W7: no synonym for a glossary term ever reaches a screen
+
+**EXTENDS [W4](#w4-the-glossary-still-wins)**, which said the glossary wins and was read by
+nobody: the glossary check reads the glossary FILE — term present, definition brief, no
+duplicates — and not one line of copy. So for a year *"use those words in UI copy; never
+invent a synonym"* was enforced by no one, and the app shipped green calling one thing
+"Permissions" on the Roles screen and "access rights" on two others, plus "teammate" for a
+member and "Portal login" for portal access.
+
+**The rule.** Every user-visible English sentence in either front door is read for a known
+synonym of a glossary term. The banned words are DATA (`GLOSSARY_SYNONYMS`), each naming
+the term it competes with; a sentence with a reason to keep one is a written, rot-checked
+line.
+
+**The list is deliberately NARROW, and that is the design.** A word earns a place only when
+it can mean nothing else here — "client" is the relationship, "option" is inside the
+glossary's own definition, "request" is an HTTP call on three screens. A rule that flagged
+ordinary English would be switched off, and a check that is off is worse than none.
+
+**Two words for one thing is not a typo.** A manager reading "Permissions" on one screen
+and "Access right" on the next has to work out whether they are the same thing, every time,
+and the answer is not on the screen.
+
+**Law.** [R34](../RULES.md) (`glossary-in-copy`).
+
+### W8: our own people are named by their first name, and nobody else is
+
+**The rule.** *"upwise, when it's staff who records activity, only use the first name, so
+not Audora Alasa, only Audora. Do this across all the app. We only record name and surname
+for the contacts and the customers."* Two sentences and two populations, and the second is
+what makes this a rule rather than a find-and-replace: a client login is an ordinary team
+member, so a row a CONTACT authored through the portal carries THEIR name in the same
+column ours do — a process comment, a raised ticket, a reply, a completed to-do. Those keep
+their full name.
+
+One seam does it, `shared/staff-name.ts`, and it is called **at the render seam, never in a
+worker**.
+
+**What it costs, and why the trim is late.** The stored full name is also a search term, a
+sort expression and a paging cursor key on work logs, so trimming it in the worker would
+change which rows a search finds and where a page boundary falls. The picker that appends
+an email to disambiguate has to run that de-duplication on the word the reader actually
+sees, because first names collide where full names do not. And the machine surface keeps
+the full name: this ruling is about what a PERSON reads.
+
+**And the sentence is where she actually saw it.** The activity feed's visible line is the
+stored `description`, a sentence with the actor's name inside it. Shortening the actor
+field alone would have changed nothing on the screen she was pointing at — so the seam
+rewrites the sentence against that row's OWN actor snapshot, by exact prefix, which also
+fixes history rather than only what is written from today.
+
+**Two deliberate residues.** A description naming a SECOND person ("X changed Y's role to
+Admin") keeps that person's full name: no column on the row names them, and guessing which
+run of characters in a stored sentence is a surname is prose parsing this seam refuses to
+do. And **initials are untouched** — an initial is a MARK, not a name
+([G5](#g5-a-record-never-appears-without-its-face)), and "AA" is not "Audora Alasa".
+
+**Law.** [R54](../RULES.md) (`staff-names-are-first-names`).
+
+### W9: a savings figure never renders without saying what it is made of
+
+**The rule.** Every screen on either front door that shows a saving renders
+`SAVINGS_CAPTION` from `shared/workers/savings.ts`, **word for word**: the times are
+estimates we agreed with you, the subtraction is arithmetic.
+
+**Why it is not decoration around the feature but half of it.** The owner named what would
+make him abandon this and go back to a spreadsheet — *"the numbers stop being
+believable"*. A client who understands that the inputs are agreed and the arithmetic is
+arithmetic trusts the figure. One who believes we held a stopwatch stops trusting every
+other number in the app the day one of them looks wrong.
+
+**Law.** [R25](../RULES.md) (`savings-caption`).
+
+### W10: every sentence the app says is in the catalogue
+
+**The rule.** `shared/i18n-strings.json` is **exactly** the set of user-visible English
+sentences the two front doors say — no more and no less. English is the key, so a sentence
+MISSING from the catalogue ships in English to somebody who chose German, silently, on a
+screen that looks finished. An entry matching nothing in the app is an ORPHAN: it breaks
+nothing today, which is precisely why it rots into a record of what the app used to say
+while being paid for on every build. Run `npm run lang` before you commit — extract, then
+prune — and both deploy scripts refuse on a stale catalogue.
+
+**Write the whole sentence with a hole in it.** `t("of")` declares a fragment to be copy,
+and the shared definition of "what a person reads" refuses a fragment as a non-sentence, so
+it is translated nowhere. A sentence with a `{hole}` in it is also the only shape a
+translator can reorder.
+
+**What it costs a component author.** A file is walked because a front door **imports** it,
+not because of the folder it sits in — so a file under `web/`, `web-portal/` or `shared/`
+that says something and that nothing imports is UNREACHABLE and turns the build red too.
+That was earned: a relative-time helper in `shared/web/` had been saying "5d ago" in English
+to nine call sites on both front doors, beside a German sentence, for a year.
+
+**Law.** [R28](../RULES.md) (`catalogued-strings`).
+
+### W11: and the place it is said asks for its translation
+
+**The rule.** [W10](#w10-every-sentence-the-app-says-is-in-the-catalogue) makes the
+catalogue match the code; this makes the code READ the catalogue. Every position that walk
+reports must sit inside a `t(...)` call. **Two ways out, and only two.**
+
+1. A `label:` or `helpText:` on an object that spreads a **field config** is translated on
+   the way to the screen by `shared/web/field.tsx`. This one exists because `t` is a hook
+   and a field config is a module-level constant — those words genuinely cannot be wrapped
+   where they are declared. It is held shut by an import ban: no file in either front door
+   may import the kit's `Field` directly, so the seam cannot be walked around.
+2. A copy TABLE read back through `t` somewhere else, written down with the call that reads
+   it and rot-checked.
+
+**Why it exists.** 666 of 2,001 extracted positions were in the catalogue, translated into
+every language the app speaks, on every build — and **never asked for**. Every form field
+label in the app was among them. The catalogue was current and the screens were English.
+
+**Law.** [R33](../RULES.md) (`wrapped-strings`).
+
+### W12: and the asking is answered, up to a ceiling that only falls
+
+**The rule.** The third translation rule, and the one that closes the loop. A string can be
+catalogued ([W10](#w10-every-sentence-the-app-says-is-in-the-catalogue)), wrapped
+([W11](#w11-and-the-place-it-is-said-asks-for-its-translation)), and still have no entry for
+a translated language — which is the stated fallback: English on screen, a sentence rather
+than a bug. So per translated language the count of unanswered strings is **pinned**
+(`TRANSLATION_CEILING`) and recomputed fresh on every build for exact equality: a string
+shipped past the ceiling fails, and a ceiling left ABOVE the true count after a translation
+lands fails too, because a stale pin hides the next regression behind an improvement it
+never recorded.
+
+**The pin can fall, and can never rise without the count behind it rising first.** Raising
+it is the sanctioned move for accepted debt, in the same change, where a reviewer sees it
+move.
+
+**Not a hard zero, on purpose.** A hard zero turns the next ordinary feature branch red the
+moment it adds a label, and a build that fires on unrelated work is a build people route
+around.
+
+**Law.** [R44](../RULES.md) (`translation-ceiling`).
+
 ---
 
 ## 11. Record type glyphs
@@ -1304,6 +2006,63 @@ word, not the pictograph.
 
 Evidence: `A-4.05.42` shows the glyph in the NAME column and the word in the TYPE column
 of the same row.
+
+### G5: a record never appears without its face
+
+**The rule.** Wherever a record or a dropdown value is shown to be **chosen** or
+**scanned** — a picker option, a row in a collection, a row in a nested panel inside
+another record's screen — it is drawn with its visual beside its name, in this order of
+preference:
+
+1. its own picture, where it has one;
+2. its type's glyph ([G1](#g1-a-record-type-carries-a-glyph)), where the type has one;
+3. its initial, where it has neither.
+
+Never nothing. **And never the glyph written INTO the words** — a pictograph inside a
+sentence is the one shape [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them)
+refuses. Two pickers had worked around the missing slot by concatenating an emoji into the
+label, which put a pictograph in the search index and on the trigger.
+
+**Where it is actually held, and why that shape.** There is no honest way to look at a piece
+of markup and say "this is a record row" — `.map(x => <li>` matches attachments, replies,
+comments and steps, none of which are records. So it stands on the three CHOKEPOINTS where
+a face is lost instead: the picker option types must DECLARE the visual fields, so a type
+cannot drop a picture before any component sees it; every list recipe must name its
+`leading` column; and the one shared nested row takes its mark as a **required** prop, with
+`null` a real and visible answer.
+
+**Why it is a rule rather than a fix.** A visual is a key identifier, not decoration — the
+owner said so three times across two rounds, and each time it was applied where he pointed
+and nowhere else. The census then found the real size: **thirty-three** pickers, not one of
+which COULD show a visual, because the option type had no field for one; ten of fourteen
+list recipes naming no leading column; around twenty nested panels drawing bare words for
+records that lead with a glyph on their own screen.
+
+**Law.** [R35](../RULES.md) (`records-carry-their-face`).
+
+### G6: an image fills its box; it is never shrunk to fit inside one
+
+**The rule.** The client, 2026-09-09, blanket and unhedged: *"everywhere for images: do
+fill, not fit!"* Every picture either front door draws is `object-cover` — it fills the box
+it is given and is CROPPED to it. Never `object-contain`, `object-fill`, `object-none` or
+`object-scale-down`, and never a `fit="contain"` handed to the kit's `Image`, which turns
+exactly that value into exactly that class.
+
+**The cost is the law, not a bug in it.** A wide wordmark in a small square loses its ends
+and shows its middle. What that was weighed against is the aggregate, which is the only
+place a fit is ever visible: a contained logo sits smaller, paler and a different SHAPE
+than the filled face beside it and the letter tile below it. On staging only 48 of 134
+accounts hold a picture at all, so most boxes are a solid letter tile either way.
+
+**One exception, and it names the distinction to reason with.** A ticket ATTACHMENT's
+preview, where the picture IS the content — rather than a mark standing for a record whose
+name is written beside it.
+
+**And a default is not a choice.** `RecordMark`, which draws almost every picture in the
+product, may not grow a `fit` prop again. It had one; its square default was `contain`; and
+a default applies to every caller who never made the decision.
+
+**Law.** [R60](../RULES.md) (`image-fills`).
 
 ---
 
@@ -1747,6 +2506,94 @@ to be removed, and none of it needs a library change.
 
 ---
 
+## 13. The kit, and what counts as using it (U1 to U3)
+
+The twelve sections above decide how a screen is arranged. This one is about the lego
+itself: which parts of the kit this app has taken up, and where a part of the app lives
+when you write one. It is the only section here that constrains a FILE rather than a
+pixel — which is why it is short, and why every rule in it is a written decision rather
+than a taste.
+
+Read it beside "Do not do" [#2](#do-not-do) ("do not re-implement a library primitive
+locally"): that line tells you to check before you build, and these three are what make
+"we checked" a thing somebody can verify a year later.
+
+### U1: every part of the kit is either reached or has a written reason
+
+**The rule.** The kit at `shared/ui/` ships a set of components and three foundations
+(icons, tokens, motion), and **every one of them** resolves to one of two things: an
+adoption this app really reaches, or a line saying why not. The owner's instruction:
+*"all 118 components should be imported, and if you're not using some, I understand that,
+but there should be nothing hard-coded."*
+
+**How many there are is DERIVED and written down nowhere** — `kitInventory()` in
+`scripts/kit-coverage.mjs` reads it off the pinned tree, so the number moves with the pin
+instead of rotting in four documents.
+
+**"Reached", not "imported", and the difference cost seven real adoptions.** Counting
+import lines undercounts in one direction, always by dropping a genuine adoption: six kit
+parts reach this app only THROUGH another part it has already adopted (notes through
+Comments, folder through Tabs, progress through the file upload), and `motion` reaches both
+front doors **only through a CSS `@import`** in their own `globals.css` — a reference no
+JavaScript grep can see in either direction, because there is no import line in that
+language to miss. So the walk closes over the kit's own cross-references, in both languages
+the kit speaks.
+
+**What a reason has to be.** One sentence a non-technical reader can check: no surface in
+this app has this shape, or adopting it would break another rule. Each one names a GAP to
+fix upstream. The list is rot-checked both ways, so it can only shrink.
+
+**Law.** [R46](../RULES.md) (`component-coverage`).
+
+### U2: every whole-screen composition the kit ships is DECIDED
+
+**The rule.** U1's sibling, one directory level up: the kit's `compositions/` are its
+screen-shaped assemblies, and each one is either adopted for real or carries a written
+reason — a structural mismatch, a shape this app already assembles from other adopted parts
+under a different name, a real gap it should or should never have, or a question left for
+the owner.
+
+**Two outcomes are acceptable and one is not.** Adopted, or deliberately not used for a
+stated reason. A composition nobody looked at, or hand-rolled screen UI that quietly
+duplicates one, is the unacceptable result. The owner's own words: *"make sure that we get
+47 out of 47 compositions… if there are some compositions that we don't use, I completely
+get that, but flag those… there should be nothing that we have hard-coded unless it's some
+kind of composition that does not exist."*
+
+**Why a check rather than a note.** Two lanes had worked through 37 of the 47 by hand, in
+prose, with nothing behind it — so the count could regress the moment a kit update landed a
+new composition, or the moment somebody hand-rolled a screen that duplicated one, and
+nothing would have said so.
+
+**Law.** [R45](../RULES.md) (`composition-coverage`).
+
+### U3: a new component joins a folder, and the folder says what belongs in it
+
+**The rule.** `web/components/` has **no top-level files**: one folder per MODULE
+(`tickets/`, `work/`, `accounts/`, `team/`, …) or per KIND (`shell/`, `records/`,
+`deep-link/`, `assistant/`, `screens/`). What belongs in each is written **once**, one line
+per folder, in `web/components/README.md` — and the permitted set is derived from that
+file's own rows, so the paragraph a person reads and the rule a build enforces cannot
+disagree, because there is only one of them.
+
+**Three ways to fail**: a component left loose at the top level, a folder nobody described,
+and a described folder nobody has.
+
+**The two axes, because neither pair is guessable** and that is exactly why the words exist
+and not just the check: `tickets-screen.tsx` sits in `tickets/` because it draws a module,
+and `home-screen.tsx` in `screens/` because there is no home module; `collection-heading.tsx`
+sits in `records/` because every collection reuses it, and `collection-content.tsx` in
+`deep-link/` because only the routing shell renders it.
+
+**One practical consequence for everything else in this book.** Name a component by
+BASENAME wherever you can, never by folder path: the source walks recurse, so a law that
+finds a screen by name still finds it after a move, while a literal path in a document or a
+test has to be moved by hand (UI-CONVENTIONS.md §1).
+
+**Law.** [R57](../RULES.md) (`component-folders`).
+
+---
+
 ## What the old app did better
 
 Four things Glide got right that this app currently gets wrong. Each is the reason a
@@ -1884,22 +2731,52 @@ library, not a synthesised weight in the host.
 
 ## Rule index
 
-**95 rules.**
+**122 rules.**
 
 | Section | Rules |
 |---|---|
-| 1. Colour and surface | C1 to C11 (11) |
-| 2. Page layout and width | L1 to L7 (7) |
-| 3. Detail screens | D1 to D10 (10) |
-| 4. Collections | K1 to K9 (9) |
-| 5. Buttons and actions | B1 to B9 (9) |
-| 6. Forms and dialogs | F1 to F9 (9) |
-| 7. Typography | T1 to T7 (7) |
+| 1. Colour and surface | C1 to C12 (12) |
+| 2. Page layout and width | L1 to L9 (9) |
+| 3. Detail screens | D1 to D12 (12) |
+| 4. Collections | K1 to K16 (16) |
+| 5. Buttons and actions | B1 to B10 (10) |
+| 6. Forms and dialogs | F1 to F10 (10) |
+| 7. Typography | T1 to T8 (8) |
 | 8. Spacing and the scale setting | S1 to S6 (6) |
 | 9. Mobile | M1 to M6 (6) |
-| 10. Copy | W1 to W5 (5) |
-| 11. Record type glyphs | G1 to G4 (4) |
+| 10. Copy | W1 to W12 (12) |
+| 11. Record type glyphs | G1 to G6 (6) |
 | 12. Density: the glance budget | N1 to N12 (12) |
+| 13. The kit, and what counts as using it | U1 to U3 (3) |
+
+### Where each enforced UI law is written down
+
+Every law in `shared/rules/registry.ts` carrying `dimension: "ui"` has an entry in this
+book, and `web/test/doc-claims.test.ts` derives that list from the registry and fails the
+build if one is missing — so a UI law minted next month cannot ship undocumented. The map
+below is for finding one; it is not the source, and the R-number in each rule's own
+**Law.** line is what the check reads.
+
+| Law | Rule here | Law | Rule here |
+|---|---|---|---|
+| R2, R3, R8 | [K4](#k4-a-tab-that-reveals-a-collection-carries-the-count-as-a-badge-and-the-heading-stands-down), [N10](#n10-the-control-follows-the-option-count) | R44 | [W12](#w12-and-the-asking-is-answered-up-to-a-ceiling-that-only-falls) |
+| R4 | [F2](#f2-the-dialog-is-a-three-row-grid-and-never-spills), [F9](#f9-a-dialog-on-a-phone-is-a-bottom-sheet) | R45 | [U2](#u2-every-whole-screen-composition-the-kit-ships-is-decided) |
+| R6 | [W4](#w4-the-glossary-still-wins) | R46 | [U1](#u1-every-part-of-the-kit-is-either-reached-or-has-a-written-reason) |
+| R7 | [F8](#f8-the-forms-explanatory-note-is-a-muted-callout-at-the-top-inside-the-scroll-region) | R48 | [K10](#k10-every-collection-screen-shows-a-search-box-and-it-is-not-the-screens-choice) |
+| R16 | [K3](#k3-the-count-lives-in-the-heading-formatted-n-adjective-plural) | R49 | [K13](#k13-the-gap-under-a-toolbar-is-one-number-and-the-row-pays-it) |
+| R25 | [W9](#w9-a-savings-figure-never-renders-without-saying-what-it-is-made-of) | R50 | [K11](#k11-an-empty-collection-draws-no-toolbar-at-all-not-even-the-add-button) |
+| R28 | [W10](#w10-every-sentence-the-app-says-is-in-the-catalogue) | R51 | [L8](#l8-a-panel-that-minimises-collapses-and-a-shut-panel-is-shut-for-the-keyboard-too) |
+| R29 | [N8](#n8-one-width-one-set-of-gutters-and-no-screen-sets-its-own), [L1](#l1-one-page-container-one-cap) | R52 | [D11](#d11-every-detail-screen-wears-the-same-title-treatment-and-it-comes-from-one-constant) |
+| R31 | [T8](#t8-the-two-radii-are-spelled-the-kits-way) | R53 | [K12](#k12-the-toolbars-slots-are-the-rows-in-one-order-and-sort-is-a-default) |
+| R32 | [N5](#n5-the-surface-step-is-measured-not-assumed), [C10](#c10-there-is-one-ink-stepped-by-opacity-not-a-grey-ramp) | R54 | [W8](#w8-our-own-people-are-named-by-their-first-name-and-nobody-else-is) |
+| R33 | [W11](#w11-and-the-place-it-is-said-asks-for-its-translation) | R57 | [U3](#u3-a-new-component-joins-a-folder-and-the-folder-says-what-belongs-in-it) |
+| R34 | [W7](#w7-no-synonym-for-a-glossary-term-ever-reaches-a-screen) | R59 | [F10](#f10-a-form-is-a-slide-in-a-warning-is-an-overlay) |
+| R35 | [G5](#g5-a-record-never-appears-without-its-face) | R60 | [G6](#g6-an-image-fills-its-box-it-is-never-shrunk-to-fit-inside-one) |
+| R38 | [D12](#d12-a-screen-showing-one-record-asks-the-door-for-that-record-never-the-loaded-page) | R61 | [B10](#b10-a-modules-settings-have-two-entrances-and-one-page-behind-them) |
+| R39 | [G1](#g1-a-record-type-carries-a-glyph), [U1](#u1-every-part-of-the-kit-is-either-reached-or-has-a-written-reason) | R62 | [K15](#k15-the-two-zeros-look-the-same-the-add-button-is-the-only-difference) |
+| R63 | [K14](#k14-the-toolbar-stays-on-top-while-the-rows-scroll-under-it-and-the-pin-is-the-rows) | R64 | [L9](#l9-every-section-on-the-team-areas-strip-has-a-door-or-names-the-screen-that-took-its-place) |
+| R65 | [K16](#k16-on-a-card-that-stands-for-a-record-the-chip-sits-above-the-title) | R66 | [W6](#w6-no-emoji-in-the-words-and-none-in-the-data-behind-them) |
+| R67 | [C12](#c12-nothing-stands-on-the-bare-page-ground) | | |
 
 ### The seven files that carry most of it
 

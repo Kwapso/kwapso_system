@@ -36,6 +36,7 @@ import {
 
 import { SCALE_STEPS, scaleFontSize } from "../scale"
 import { useLanguage } from "./language"
+import { SettingsSection } from "./settings-section"
 
 /** Put the size on the document. One place, called by the provider on load and
  * by a click before the save, so the screen and the stored preference can never
@@ -52,12 +53,10 @@ export function ScaleSection({
   save,
   /** which front door's baseline the steps mean */
   door = "agency",
-  className,
 }: {
   value: string | null
   save: (scale: string) => Promise<unknown>
   door?: "agency" | "portal"
-  className?: string
 }) {
   const { t } = useLanguage()
   // The chosen step is local so the buttons answer instantly; the session row
@@ -116,29 +115,29 @@ export function ScaleSection({
   ]
 
   return (
-    <section className={className}>
-      <h2 className="text-lg font-medium">{t("Size")}</h2>
-      <p className="text-muted-foreground mt-1 text-sm">
-        {t("Text and spacing together. It follows you to every device you sign in on.")}
-      </p>
-      {/* R67 — THE OPTION CARDS STAND ON SOFT PAPER, NOT ON THE PAGE.
-       * Client, 2026-09-10: "nothing shoudl sit on the white, everything
-       * contained!" This one is not merely a rule being applied — the kit's
-       * option card is `Card`'s DEFAULT variant (sheet paper), and in LIGHT
-       * `--card`, `--background` and `--surface-raised` are all #FFFEF9, so on
-       * the bare page these cards measured contrast 1.000 and were held up by
-       * their hairline alone. It is the identical pairing
-       * web/components/team/team-panel.tsx documents from the Team tab the day
-       * before. On `--surface-panel` they are 1.103 light / 1.111 dark. */}
-      <div className="mt-4 rounded-[var(--radius)] bg-surface-panel p-4">
-        <AppearanceOptionGroup
-          options={options}
-          value={chosen ?? SCALE_STEPS[1].value}
-          disabled={saving !== null}
-          onValueChange={(next) => void choose(next)}
-          badgeLabel={t("In use")}
-        />
-      </div>
-    </section>
+    <SettingsSection title={t("Size")}>
+      {/* R67, AND NOW THE TITLE WITH IT — client, 2026-09-11: "ticket types
+       * should be on top of the searchbar inside the container without
+       * subtitle, make this. always". Said of a module settings page and
+       * applied here because it is the same shape: a heading and a sentence on
+       * the white above a box that could have held them.
+       *
+       * THIS SECTION WAS HALF-FIXED ON 2026-09-10 and this is the other half.
+       * That pass moved the option cards off `bg-card` — in LIGHT `--card`,
+       * `--background` and `--surface-raised` are all #FFFEF9, so they measured
+       * CONTRAST 1.000 against the page and were held up by their hairline
+       * alone — and left the title block standing on the white, because R67
+       * said prose was not content. The box is now `SettingsSection`'s, the
+       * heading is drawn INSIDE it, and the sentence is DELETED (it said what
+       * the title says). Soft paper on page measures 1.103 light / 1.079 dark;
+       * the raised option cards on it, 1.103 light / 1.111 dark. */}
+      <AppearanceOptionGroup
+        options={options}
+        value={chosen ?? SCALE_STEPS[1].value}
+        disabled={saving !== null}
+        onValueChange={(next) => void choose(next)}
+        badgeLabel={t("In use")}
+      />
+    </SettingsSection>
   )
 }

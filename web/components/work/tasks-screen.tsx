@@ -330,7 +330,23 @@ export function TasksScreen({
   const dueToday = counts.dueToday ?? 0
   const doneToday = counts.dueTodayDone ?? 0
   const progressBar = (
-    <section className="flex flex-col gap-2" aria-label={t("Today's tasks")}>
+    /* THE WHOLE STRIP TAKES PAPER — R67, and the shape of the fix is the
+       decision. This is a `<section>` with NO heading at all (it is named by
+       `aria-label`), so the 2026-09-11 census reached it only because that
+       amendment dropped the heading requirement — and the tempting fix, reading
+       the `<KpiProgress>` label as a title and the caption under it as a
+       subtitle, would have been wrong twice over: the bar is a MEASUREMENT, not
+       a name, and the caption says who the number counts rather than what the
+       section is. So neither is a title block being moved inside a container.
+       The strip is one unit and it stands on one sheet, above the tab strip,
+       which is where it already sat on every tab.
+       `--surface-panel` and not `bg-card`: in light `--card` IS `--background`
+       (#FFFEF9 both), so a card here would have measured contrast 1.000 against
+       the page. Soft paper measures 1.103 light and 1.079 dark. */
+    <section
+      className="flex flex-col gap-2 rounded-[var(--radius)] bg-surface-panel p-4"
+      aria-label={t("Today's tasks")}
+    >
       <KpiProgress
         label={t("Today's tasks")}
         value={

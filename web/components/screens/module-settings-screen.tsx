@@ -149,7 +149,37 @@ type ModuleSettingsSectionBase = {
   gate: { module: string; right: Right }
   /** English; translated at the read, below. */
   title: string
-  description: string
+  /* ── AND THERE IS NO `description`. IT WAS DELETED, 2026-09-11 ────────────
+   *
+   * Client, over a screenshot of Ticket settings: *"ticket types should be on
+   * top of the searchbar inside the container without subtitle, make this.
+   * always"* — her second saying of it (2026-09-10: *"in ticket settings (or
+   * any other module) no subtilte"*).
+   *
+   * SHE RULED THE OTHER WAY ONCE, BETWEEN THE TWO, and it is recorded here
+   * rather than quietly dropped so the next reader knows it was weighed:
+   * *"The section description: no, I want to keep it."* (2026-09-10). It is
+   * OVERRULED — two clearer statements either side of it, the later one made
+   * over a picture of the screen it is about. The `page` doc below already
+   * lost its own subtitle to the first of those rulings and told the next
+   * reader that "the SECTION descriptions below are a different thing and they
+   * stay". They were not a different thing; they were the same sentence one
+   * level down, and she has now said so.
+   *
+   * THE FIELD WENT WITH THE SENTENCES, WHICH IS THE HALF THAT LASTS. A section
+   * that has nowhere to declare a subtitle cannot grow one back — the same
+   * argument the page's own deletion makes one screen up, and the reason
+   * `standalone` was removed rather than left as a prop nobody passes. The
+   * seventeenth section is not stopped by a census; it is stopped by there
+   * being no column.
+   *
+   * NOT ONE OF THE FOURTEEN CARRIED A FACT WORTH MOVING. Seven were a
+   * paraphrase of their own title ("The shelves the brand library is sorted
+   * into", under "Asset categories"); the other seven were the identical
+   * fourteen-word sentence about automations, repeated verbatim on seven
+   * pages. Where a description HAD carried something a person needs at that
+   * moment, the move was onto the control it is about — never a subtitle under
+   * another name. */
 }
 
 /** One block on a module's settings page.
@@ -234,9 +264,14 @@ export type ModuleSettingsPage = {
    * itself is a bare `<Headline as="h1">` with nothing under it
    * (`settings-screen.tsx`), and so is every collection heading; a subtitle
    * here was the one page in the app that explained itself twice, once in its
-   * title and once underneath. The SECTION descriptions below are a different
+   * title and once underneath.
+   *
+   * THIS PARAGRAPH USED TO END "The SECTION descriptions below are a different
    * thing and they stay: they say what a particular vocabulary DOES, which is
-   * not recoverable from its name.
+   * not recoverable from its name." The client overruled that on 2026-09-11
+   * ("without subtitle, make this. always") and the reading was wrong anyway:
+   * thirteen of the fourteen said nothing their own title did not. The section
+   * `description` column is gone with them — see `ModuleSettingsSectionBase`.
    *
    * `sections` follows `title` directly. */
   sections: ModuleSettingsSection[]
@@ -296,7 +331,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // is why renaming one is a rewrite and not a relabel.
         types: ["Ticket type"],
         title: "Ticket types",
-        description: "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.",
         create: true,
         // THE COLOUR, WHICH IS WHAT MAKES THIS SECTION A WALL OF CHIPS — the
         // one map the whole app reads a ticket type's colour from, handed in
@@ -366,7 +400,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "help", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -401,7 +434,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // has the final say and the report puts the alternative in front of her.
         types: ["Department"],
         title: "Departments",
-        description: "The parts of the agency a task is filed under. Meeting purposes use the same words.",
         create: true,
       },
     ],
@@ -416,7 +448,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         kind: "vocabulary",
         types: ["Story type"],
         title: "Story types",
-        description: "The kinds of work a story can be. Each one carries the mark a story is recognised by.",
         create: true,
       },
     ],
@@ -431,7 +462,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         kind: "vocabulary",
         types: ["Sprint type"],
         title: "Sprint types",
-        description: "The kinds of block a sprint runs as, with the mark and the length each one usually takes.",
         create: true,
       },
     ],
@@ -455,7 +485,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // `web/components/README.md` already files the component.
         types: ["App stage", "Deliverable kind"],
         title: "Stages and deliverable kinds",
-        description: "How far an app has got, and what kind of thing we handed over.",
         create: true,
       },
     ],
@@ -472,7 +501,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         // section for the same reason Apps has one.
         types: ["Industry", "Country"],
         title: "Industries and countries",
-        description: "The words an account's industry and country are picked from, so neither is spelled two ways.",
         create: true,
       },
       // THE TWO MESSAGES A CLIENT CONTACT EVER RECEIVES FROM US, and the second
@@ -491,7 +519,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "accounts", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -520,7 +547,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "work", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -536,7 +562,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "meetings", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -554,7 +579,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "knowledge", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -577,7 +601,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "team_members", right: "read" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -617,7 +640,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         gate: { module: "teams", right: "edit" },
         kind: "automations",
         title: "Automations",
-        description: "What this module does on its own. Some can be switched off; the rest say why not.",
       },
     ],
   },
@@ -631,7 +653,6 @@ const MODULE_SETTINGS: ModuleSettingsPage[] = [
         kind: "vocabulary",
         types: ["Brand asset category"],
         title: "Asset categories",
-        description: "The shelves the brand library is sorted into.",
         create: true,
       },
     ],
@@ -775,7 +796,6 @@ export function ModuleSettingsScreen({
               teamId={teamId}
               segment={segment}
               title={t(section.title)}
-              description={t(section.description)}
             />
           ) : (
           <SelectableScreen
@@ -818,7 +838,6 @@ export function ModuleSettingsScreen({
             scope={{
               types: section.types,
               title: t(section.title),
-              description: t(section.description),
               create: section.create,
               // ABSENT ON A GROUP WITH NO PALETTE, which is what turns the
               // section back into a list — see `ModuleSettingsSection.colour`.

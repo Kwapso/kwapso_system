@@ -135,28 +135,31 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
 
   return (
     <section className="motion-panel-in flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-muted-foreground text-micro uppercase">
-          {t("Access tokens")}
-        </h2>
-        {/* R50, ONE LAYER DOWN — client ruling, 2026-09-10, over a screenshot of
-         * this exact section: "in settings the acces tokens with the plus and no
-         * tokens yet?? makes no sense, duplicated. leave only the No tokens yet."
-         * The empty state below already carries the one first-add, so while the
-         * register is empty this heading draws nothing at all — the same sentence
-         * `<ToolbarRow>` has answered since 7 Sep, now asked of the button
-         * itself because a heading row built from a `<div>` and an `<h2>` is not
-         * a toolbar and was outside R50's two censuses by construction. */}
-        <AddButton
-          label={t("New token")}
-          onClick={() => setCreateOpen(true)}
-          empty={tokens.length === 0}
-        />
-      </div>
-      <p className="text-muted-foreground text-sm">
-        {t("Let an outside tool (an AI agent, a script, an automation) work in your team as you, capped by your role, in the team the token was made for.")}
-      </p>
-
+      {/* THE EYEBROW AND THE SENTENCE ARE GONE — client ruling, 2026-09-11, over
+       * a screenshot of this exact section: "i said nothing on white backgorund.
+       * remove this text Access tokens / Let an outside tool (an AI agent, a
+       * script, an automation) work in your team as you, capped by your role, in
+       * the team the token was made for. … remove the text directly on white
+       * background."
+       *
+       * THE FOURTH TIME SHE HAS SAID THIS SENTENCE (Team tab, Integrations,
+       * Settings › Modules, here), and this time she is overruling R67's own
+       * written exemption rather than reporting a gap in it: that law explicitly
+       * declared PROSE "deliberately not content" because "a sentence directly
+       * under a heading is part of the title block". She has looked at that
+       * decision and rejected it, so the LAW moved with this screen — R67
+       * amendment 4, and `web/test/sections-stand-on-paper.test.ts` carries it.
+       *
+       * DELETED RATHER THAN BOXED, which is her own instruction and is the right
+       * one here: the contained register below already titles the section ("No
+       * tokens yet.") and already carries the one first-add, so the eyebrow and
+       * the sentence were a SECOND title for one thing, floating on the page.
+       * A section titled twice is not fixed by giving the spare title a box.
+       *
+       * WHAT THIS COSTS, stated rather than discovered later: nothing on screen
+       * now says what a token IS before you make one. If she wants that sentence
+       * back it belongs in the register's own `description`, INSIDE the panel,
+       * which is the shape the Google card beside it now uses. */}
       {/* ONE BOX, WHATEVER THE SECTION IS SAYING — client ruling, 2026-09-10:
        * "once again, nothing shoudl sit on the white, everything contained!"
        * (and, on the Team tab the day before, "nothing on top of white
@@ -170,6 +173,32 @@ export function AccessTokensSection({ teamName }: { teamName: string | null }) {
        * The inset is on the STATES rather than on the box, because a row
        * already carries its own `p-3` and a box inset would double it. R67. */}
       <div className="flex flex-col rounded-[var(--radius)] bg-surface-panel">
+        {/* THE CREATE BUTTON CAME INSIDE THE BOX WITH THE HEADING'S REMOVAL —
+         * 2026-09-11. It used to ride the header row opposite the eyebrow, and
+         * R67 let it stand on the page because a heading row is a title block
+         * and a lone control is an act. With the eyebrow gone it would have been
+         * a `+` floating alone over a panel on the white, which is the shape she
+         * has now objected to four times; so it takes the panel's own top row,
+         * with the same inset hairline every other row in this list carries.
+         *
+         * R50, ONE LAYER DOWN — client ruling, 2026-09-10, over a screenshot of
+         * this same section: "in settings the acces tokens with the plus and no
+         * tokens yet?? makes no sense, duplicated. leave only the No tokens yet."
+         * The register below already carries the one first-add, so while there
+         * are no tokens this row draws NOTHING — `AddButton` returns null on
+         * `empty`, and the row goes with it rather than leaving an empty band of
+         * padding above the zero. The same sentence `<ToolbarRow>` has answered
+         * since 7 Sep, asked of the button itself, because a create button that
+         * is not in a toolbar was outside R50's two censuses by construction. */}
+        {tokens.length > 0 && (
+          <div className="flex flex-wrap items-center justify-end gap-2 p-3 shadow-[var(--hairline-under)]">
+            <AddButton
+              label={t("New token")}
+              onClick={() => setCreateOpen(true)}
+              empty={tokens.length === 0}
+            />
+          </div>
+        )}
         {tokensQ.error ? (
           <div className="p-4">
             <ShapeStateBody

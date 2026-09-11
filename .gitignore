@@ -169,3 +169,10 @@ glide/r2-manifest.json
 
 # real secrets uploaded locally for this session — never track
 credentials/
+
+# A lane running browser checks out of the primary checkout writes these into
+# web/, which is one of the three directories this repo censuses hardest — the
+# lint and the named-paths census both correctly refuse to walk past a file they
+# cannot parse, and between them they blocked four merges on 11 Sep 2026.
+# Scratch belongs in the lane worktree; this line is the seatbelt, not the rule.
+.scratch-*

@@ -404,7 +404,29 @@ const MIN_VECTOR_SCORE = 0.5
  * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
  * silent change to what "found" means for a caller that never asked for the
  * reader. See `retrieve`'s own comment at the point this is used. */
-const READER_HALLUCINATION_FLOOR = 0.3
+/* RAISED 0.3 -> 0.4 ON 12 SEP 2026, on two measured numbers either side of the
+ * new line, because 0.3 let a reader ANSWER A QUESTION THE BASE HAS NOTHING ON.
+ *
+ *   "What is the capital of France?"   top-1 0.335  MUST refuse
+ *   A-M1 (the exam's own reader canary) top-1 0.444  MUST be rescued
+ *
+ * The strict floor is 0.5, so both were refused before a reader existed. At 0.3
+ * both entered the reader's pool — and the moment the reader became a model that
+ * actually finishes (llama, 11 Sep), it looked at twelve unrelated passages for
+ * the France question and picked one, citing a FluClinic transcript. That is the
+ * exam's refusal ceiling broken: 6/7, on the one tag where a single failure is
+ * worse than any number of content misses.
+ *
+ * 0.4 separates the two measured cases cleanly. It is NOT claimed to be the
+ * right number in general — it is the number that fits the only two points
+ * anybody has measured, and the var (`KNOWLEDGE_READER_MIN_SCORE`) exists so the
+ * next person can move it with more points rather than with an argument.
+ *
+ * WHY A FLOOR AND NOT A BETTER PROMPT: the prompt already says "If NONE of the
+ * candidates bear on the question, say so by returning an empty list". It said
+ * that while this happened. A model's judgment is the thing being bought here,
+ * and buying it does not mean handing it noise and hoping. */
+const READER_HALLUCINATION_FLOOR = 0.4
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
@@ -4021,6 +4043,13 @@ export async function retrieve(
      * safe to expose unjudged. See the point this is used in the function
      * body, and `knowledge-reader.ts`'s own header, for the whole argument. */
     read?: (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
+    /** DO NOT WRITE A REFUSAL ROW if this call refuses — for a PROVISIONAL
+     * first pass, where a refusal is not yet a refusal but a reason to look
+     * again. Without it one refused question writes TWO rows to
+     * `knowledge_refusals` and doubles the count on the screen that exists to
+     * make refusals arguable. The deciding pass logs normally, so every path
+     * still logs exactly once. */
+    quiet?: boolean
   }
 ): Promise<KnowledgeAnswer> {
   const question = requireText(input.question, "Question", TEXT_LIMITS.message)
@@ -4194,7 +4223,7 @@ export async function retrieve(
     // retried and STILL found nothing, `route` above is already the wide one
     // and its reason already says so — this refusal describes exactly what
     // was tried, not just the last attempt.
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
+    if (!input.quiet) await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
     return knowledgeAnswer({
       question,
       compartments: route.compartments,
@@ -4386,7 +4415,7 @@ export async function retrieve(
   // genuinely holds nothing" apart from "something was close" — logged with
   // the FUSED candidates rather than the (empty, by construction) `passages`.
   if (!decided.found)
-    await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
+    if (!input.quiet) await logRefusal(env, cfg, guard, question, route.compartments, route.reason, fused, top1Score)
   if (!input.compose || !decided.found) return decided
   const written = await input.compose(decided.passages, decided.citations)
   // Nothing written (the model was unreachable, or said nothing) is not an error:
@@ -4897,4 +4926,34 @@ async function crossCheck(
     })
   )
   return out
+}
+
+/** THE SECOND LOOK'S WHOLE DECISION, in one function, because the alternative
+ * was a test that MIRRORS this logic rather than runs it — and a mirror keeps
+ * passing for ever after the thing it mirrors has changed
+ * (.session-notes/lanes/NOTE-a-mock-cannot-fail-the-way-the-real-thing-fails.md,
+ * three instances recorded). It lives here rather than beside its one caller
+ * because R23 forbids a ROUTE file assembling an answer, and a route naming
+ * `found` is how that check reads "assembling".
+ *
+ * Three rules, and the third is the one with teeth:
+ *   • an answer that was found stands, and the retry never runs — a question
+ *     that already works costs exactly what it cost before;
+ *   • a second look that also finds nothing leaves the FIRST refusal in place,
+ *     rather than inventing a third shape;
+ *   • a second look that THROWS leaves the first refusal in place too. A role
+ *     without the assistant right cannot spend a unit; turning "we have nothing
+ *     on that" into an error page for that person would be a worse failure than
+ *     the one this exists to fix. */
+export async function secondLook<T extends { found: boolean }>(
+  first: T,
+  retry: () => Promise<T>
+): Promise<T> {
+  if (first.found) return first
+  try {
+    const again = await retry()
+    return again.found ? again : first
+  } catch {
+    return first
+  }
 }

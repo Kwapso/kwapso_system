@@ -1,5 +1,52 @@
 # COSTS.md — what this app costs to run
 
+**THE READER'S MODEL AND ITS TRIGGER BOTH CHANGED ON 11 SEP 2026, AND THE
+SECOND ONE MATTERS MORE THAN THE FIRST.** Everything below about the reader's
+per-call cost was priced against `@cf/moonshotai/kimi-k2.6`. It is no longer
+that model and it is no longer called on every question.
+
+**(1) The model.** kimi could not do this job at all: it emits
+`reasoning_content` before `content`, billed against the same `max_tokens`, and
+the reader's whole answer is a JSON array of ids — so the budget went on
+deliberation the caller never received and `content` came back EMPTY. Measured
+against real twelve-passage shortlists, kimi returned nothing on three questions
+of four, at 30–36 SECONDS each. `@cf/meta/llama-4-scout-17b-16e-instruct`
+answered all four in 1–3 seconds, and on the one question both finished they
+returned the IDENTICAL ids in the identical order. It is now
+`READER_TEXT_MODEL`, which is the same constant `cheapAnswer` already defaults
+to — so the reader's per-call token cost is now the CHEAP model's rate, not the
+frontier one's, roughly an order of magnitude lower per token AND twenty times
+faster.
+
+**(2) The trigger, which is the bigger change.** The reader used to be offered
+only to a caller passing `read=1` — in practice the assistant, never the
+knowledge screen. It is now offered to EVERY question, and SPENT only on the
+ones that would otherwise have been refused: the door searches without a reader
+first, and re-reads only when that comes back with nothing. So the cost model is
+no longer "one unit per question that asks for it". It is:
+
+    a question the floor answers        →  0 reader units   (unchanged)
+    a question the floor would refuse   →  1 reader unit    (new, and the point)
+
+Which way that moves the bill depends entirely on the refusal rate, and that is
+a number this file should carry rather than guess: on the exam's 36 scorable
+rows, 7 are must-refuse and roughly a quarter of the rest were being refused by
+the floor before tonight's fixes. A cap is not needed — `payToRead` meters and
+gates itself exactly as `compose` does, and a team out of units gets an honest
+refusal rather than a bill.
+
+**(3) The meter under-reports this path to ZERO, and that is not fixed.**
+`payToRead` and `payToWrite` call `logUsage` without its optional `tokens`
+argument, so every knowledge-base question writes NULL token counts and
+`scripts/ai-spend.mjs` prices them at nothing. Measured: nine real model calls
+moved that script's total by $0.00. **Until that is wired, read the account's own
+meter** (`aiInferenceAdaptiveGroups { sum { totalNeurons } }`), which on 11 Sep
+2026 over 36 hours said 46,002 neurons = **$0.51** account-wide — kimi $0.45,
+bge-m3 $0.04, llama $0.02. The script is not lying; it says so itself ("read it
+as a FLOOR") and names how many rows carried no counts. It simply cannot see
+this path.
+
+
 **The `read=1` reader figure REPLACED with a real measurement, 11 Sep 2026**
 (kb-reader-token-budget). The "MEASURED, not estimated" block below was, on
 inspection, estimated twice over: `READER_MAX_TOKENS=200` was picked without

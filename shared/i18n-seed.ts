@@ -1243,36 +1243,6 @@ export const SEED: Catalogue = {
     
     
   },
-  "Text and spacing together. It follows you to every device you sign in on.": {
-    de: "Text und Abstände zusammen. Es folgt Ihnen auf jedes Gerät, auf dem Sie sich anmelden.",
-    es: "El texto y los espacios juntos. Te sigue a todos los dispositivos en los que inicias sesión.",
-    ca: "El text i els espais alhora. Et segueix a tots els dispositius on inicies sessió.",
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-  },
   Compact: {
     de: "Kompakt",
     es: "Compacto",
@@ -1789,7 +1759,16 @@ export const SEED: Catalogue = {
   "Colour": { de: "Farbe", es: "Color", ca: "Color"},
   "Compare with": { de: "Vergleichen mit", es: "Comparar con", ca: "Compara amb"},
   "Connect everything": { de: "Alles verbinden", es: "Conectar todo", ca: "Connecta-ho tot"},
-  "Connect your own Google account. {brand} never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.": { de: "Verbinden Sie Ihr eigenes Google-Konto. {brand} nutzt nie das von jemand anderem – der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können, und nicht mehr.", es: "Conecta tu propia cuenta de Google. {brand} nunca usa la de otra persona: el asistente que trabaja para ti ve exactamente lo que tú puedes ver, y nada más.", ca: "Connecta el teu propi compte de Google. {brand} mai no fa servir el d'una altra persona: l'assistent que treballa per a tu veu exactament el que tu pots veure, i res més."},
+  // THE GOOGLE CARD'S OWN TWO SENTENCES, 2026-09-11. They replace "Connect
+  // your own Google account. …", which stood here until the client's fourth
+  // "nothing on white background" ruling folded the section's eyebrow, its
+  // sentence and its connect row into one contained card (R67 amendment 4).
+  // The privacy promise is word-for-word the same promise; the one-approval
+  // fact joined it from the row that is gone. Hand-written here rather than
+  // left to the generator because R44's ceiling is exact and may only fall —
+  // two new English strings with no answer would have pushed it up.
+  "Connect to Google": { de: "Google verbinden", es: "Conectar con Google", ca: "Connecta amb Google"},
+  "Drive, Gmail, Calendar and Chat in one approval, on your own Google account — {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.": { de: "Drive, Gmail, Kalender und Chat mit einer einzigen Freigabe, auf Ihrem eigenen Google-Konto – {brand} nutzt nie das von jemand anderem, und der Assistent, der für Sie arbeitet, sieht genau das, was Sie sehen können. Google speichert nur eine Freigabe pro App: Wenn Sie die Dienste einzeln verbinden, schalten Sie die anderen damit ab.", es: "Drive, Gmail, Calendario y Chat con una sola autorización, en tu propia cuenta de Google: {brand} nunca usa la de otra persona, y el asistente que trabaja para ti ve exactamente lo que tú puedes ver. Google guarda una sola autorización por aplicación, así que conectarlos de uno en uno apaga los demás.", ca: "Drive, Gmail, Calendari i Chat amb una sola autorització, al teu propi compte de Google: {brand} mai no fa servir el d'una altra persona, i l'assistent que treballa per a tu veu exactament el que tu pots veure. Google desa una sola autorització per aplicació, així que connectar-los d'un en un apaga els altres."},
   "Couldn't accept the invite.": { de: "Einladung konnte nicht angenommen werden.", es: "No se pudo aceptar la invitación.", ca: "No s'ha pogut acceptar la invitació."},
   "Couldn't activate that rate.": { de: "Dieser Satz konnte nicht aktiviert werden.", es: "No se pudo activar esa tarifa.", ca: "No s'ha pogut activar aquesta tarifa."},
   "Couldn't attach that.": { de: "Das konnte nicht angehängt werden.", es: "No se pudo adjuntar eso.", ca: "No s'ha pogut adjuntar això."},
@@ -2062,11 +2041,6 @@ export const SEED: Catalogue = {
     de: "Dieser Weg wird gewählt, wenn",
     es: "Este camino se toma cuando",
     ca: "Aquest camí es pren quan",
-  },
-  "Light, dark, or whatever this device is set to. It is remembered on this device.": {
-    de: "Hell, dunkel oder was dieses Gerät eingestellt hat. Es wird auf diesem Gerät gemerkt.",
-    es: "Claro, oscuro o lo que tenga este dispositivo. Se recuerda en este dispositivo.",
-    ca: "Clar, fosc o el que tingui aquest dispositiu. Es recorda en aquest dispositiu.",
   },
   // The flowchart's own line on a step that sends the work back. `{n}` is the
   // step NUMBER a reader can see on the box above, so the hole stays a hole in
@@ -4183,7 +4157,6 @@ export const SEED: Catalogue = {
   "This is everything the assistant is allowed to read. Add a note or a file, and it can start answering from it.": { de: "Das ist alles, was der Assistent lesen darf. Fügen Sie eine Notiz oder eine Datei hinzu, und er kann darauf basierend antworten.", es: "Esto es todo lo que el asistente puede leer. Añade una nota o un archivo, y podrá empezar a responder a partir de ahí.", ca: "Això és tot el que l'assistent pot llegir. Afegeix una nota o un fitxer, i podrà començar a respondre a partir d'aquí." },
   "This is how the work was described when {version} was cut on {date}.": { de: "So wurde die Arbeit beschrieben, als {version} am {date} erstellt wurde.", es: "Así se describió el trabajo cuando se generó {version} el {date}.", ca: "Així es va descriure la feina quan es va generar {version} el {date}." },
   "This is how the work was described when {version} was cut.": { de: "So wurde die Arbeit beschrieben, als {version} erstellt wurde.", es: "Así se describió el trabajo cuando se generó {version}.", ca: "Així es va descriure la feina quan es va generar {version}." },
-  "Three looks for the whole app, not just the rail.": { de: "Drei Looks für die ganze App, nicht nur die Leiste.", es: "Tres estilos para toda la app, no solo la barra lateral.", ca: "Tres estils per a tota l'app, no només la barra lateral." },
   "Tiles": { de: "Kacheln", es: "Mosaico", ca: "Mosaic" },
   "Timeline": { de: "Zeitleiste", es: "Cronología", ca: "Cronologia" },
   "Triage queue": { de: "Sichtungswarteschlange", es: "Cola de clasificación", ca: "Cua de classificació" },
@@ -4365,7 +4338,6 @@ export const SEED: Catalogue = {
    * breaks today, and it becomes a record of what the app USED to say while
    * being carried on every build. */
   "Ticket types": { de: "Ticket-Typen", es: "Tipos de ticket", ca: "Tipus de ticket" },
-  "The kinds a ticket can be raised as. Each one is a tab on the ticket list and a filter beside it.": { de: "Die Arten, als die ein Ticket eröffnet werden kann. Jede ist ein Reiter in der Ticketliste und ein Filter daneben.", es: "Los tipos con los que se puede abrir un ticket. Cada uno es una pestaña en la lista de tickets y un filtro al lado.", ca: "Els tipus amb què es pot obrir un ticket. Cadascun és una pestanya a la llista de tickets i un filtre al costat." },
 
   /* ── THE OTHER SIX MODULES' SETTINGS PAGES (client, 2026-09-10) ───────────
    * *"implement this module settings across app: the goal right now is that you
@@ -4389,22 +4361,16 @@ export const SEED: Catalogue = {
    * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
    * falls and never rises). */
   "Task settings": { de: "To-do-Einstellungen", es: "Ajustes de tareas", ca: "Configuració de les tasques" },
-  "The parts of the agency a task is filed under. Meeting purposes use the same words.": { de: "Die Bereiche der Agentur, denen ein To-do zugeordnet wird. Terminzwecke nutzen dieselben Wörter.", es: "Las partes de la agencia bajo las que se archiva una tarea. Los motivos de reunión usan las mismas palabras.", ca: "Les parts de l'agència sota les quals s'arxiva una tasca. Els motius de reunió fan servir les mateixes paraules." },
   "Story settings": { de: "Aufgaben-Einstellungen", es: "Ajustes de historias", ca: "Configuració de les històries" },
   "Story types": { de: "Aufgaben-Typen", es: "Tipos de historia", ca: "Tipus d'història" },
-  "The kinds of work a story can be. Each one carries the mark a story is recognised by.": { de: "Die Arten von Arbeit, die eine Aufgabe sein kann. Jede trägt das Kürzel, an dem man eine Aufgabe erkennt.", es: "Los tipos de trabajo que puede ser una historia. Cada uno lleva la marca por la que se reconoce una historia.", ca: "Els tipus de feina que pot ser una història. Cadascun porta la marca per la qual es reconeix una història." },
   "Sprint settings": { de: "Sprint-Einstellungen", es: "Ajustes de sprints", ca: "Configuració dels sprints" },
   "Sprint types": { de: "Sprint-Typen", es: "Tipos de sprint", ca: "Tipus de sprint" },
-  "The kinds of block a sprint runs as, with the mark and the length each one usually takes.": { de: "Die Blockarten, als die ein Sprint läuft, mit dem Kürzel und der Dauer, die jede normalerweise braucht.", es: "Los tipos de bloque con los que se ejecuta un sprint, con la marca y la duración que suele tener cada uno.", ca: "Els tipus de bloc amb què s'executa un sprint, amb la marca i la durada que sol tenir cadascun." },
   "App settings": { de: "App-Einstellungen", es: "Ajustes de apps", ca: "Configuració de les apps" },
   "Stages and deliverable kinds": { de: "Phasen und Ergebnisarten", es: "Etapas y tipos de entregable", ca: "Etapes i tipus de lliurable" },
-  "How far an app has got, and what kind of thing we handed over.": { de: "Wie weit eine App ist, und was für ein Ding wir übergeben haben.", es: "Hasta dónde ha llegado una app, y qué tipo de cosa entregamos.", ca: "Fins on ha arribat una app, i quin tipus de cosa hem lliurat." },
   "Account settings": { de: "Kunden-Einstellungen", es: "Ajustes de cuentas", ca: "Configuració dels comptes" },
   "Industries and countries": { de: "Branchen und Länder", es: "Sectores y países", ca: "Sectors i països" },
-  "The words an account's industry and country are picked from, so neither is spelled two ways.": { de: "Die Wörter, aus denen Branche und Land eines Kunden gewählt werden, damit keines von beiden zweimal unterschiedlich geschrieben wird.", es: "Las palabras entre las que se eligen el sector y el país de una cuenta, para que ninguno se escriba de dos formas.", ca: "Les paraules entre les quals es trien el sector i el país d'un compte, perquè cap dels dos s'escrigui de dues maneres." },
   "Brand library settings": { de: "Einstellungen der Markensammlung", es: "Ajustes de la biblioteca de marca", ca: "Configuració de la biblioteca de marca" },
   "Asset categories": { de: "Asset-Kategorien", es: "Categorías de activos", ca: "Categories de recursos" },
-  "The shelves the brand library is sorted into.": { de: "Die Fächer, in die die Markensammlung sortiert ist.", es: "Los estantes en los que se ordena la biblioteca de marca.", ca: "Les lleixes en què s'ordena la biblioteca de marca." },
 
   /* ── The Modules tab's one sentence (client, 2026-09-09) ──────────────────
    * The index on Settings › Modules — *"a tab that says 'Module' or 'Business
@@ -4421,6 +4387,20 @@ export const SEED: Catalogue = {
    * word here. Seeded in all three so TRANSLATION_CEILING stays at 0/0/0
    * (R44 — the pin falls and never rises). */
   "The modules with something to set. Each row opens the same page as the gear on that module's own screen, and a module with nothing to set is not listed.": { de: "Die Module, an denen es etwas einzustellen gibt. Jede Zeile öffnet dieselbe Seite wie das Zahnrad auf der eigenen Seite des Moduls; ein Modul ohne Einstellungen steht nicht in der Liste.", es: "Los módulos con algo que configurar. Cada fila abre la misma página que el engranaje en la pantalla del propio módulo, y un módulo sin nada que configurar no aparece en la lista.", ca: "Els mòduls amb alguna cosa a configurar. Cada fila obre la mateixa pàgina que l'engranatge a la pantalla del mòdul mateix, i un mòdul sense res a configurar no apareix a la llista." },
+  /* ── AND ITS FILTERED ZERO (client, 11 Sep 2026) ───────────────────────────
+   * *"to modules in settings, also add toolbar / no add buton / sort by -
+   * name"*. The toolbar's search can narrow that wall to nothing, and this is
+   * the sentence the wall says when it has — R62's FILTERED register, never the
+   * resting one: a reader with no module settings at all never gets here (the
+   * panel returns its refusal instead), so "nothing matched" is the only zero
+   * this collection can show. Worded off `No members match what you're looking
+   * for.` one tab to the left, word for word with the noun swapped, because the
+   * two walls are the same shape and a reader who searches both should not be
+   * told the same fact two ways. `Search modules…` needs no line here — the
+   * apps module panel already says it and it is already answered.
+   * Seeded in all three so TRANSLATION_CEILING does not move (R44 — the pin
+   * falls and never rises). */
+  "No modules match what you're looking for.": { de: "Keine Module passen zu Ihrer Suche.", es: "Ningún módulo coincide con lo que buscas.", ca: "Cap mòdul coincideix amb el que busques." },
   /* ── WHAT THE MEMBERS WALL LEAVES OUT (client, 2026-09-10) ────────────────
    * *"we should not see cliets in team, no? thats for staff"*. Settings › Team
    * now shows the agency's own staff, and this is the line that keeps the
@@ -4465,7 +4445,6 @@ export const SEED: Catalogue = {
    * "Portal login", which GLOSSARY_SYNONYMS bans by name. Seeded in all three so
    * TRANSLATION_CEILING does not move (R44 — the pin falls and never rises). */
   "Automations": { de: "Automatisierungen", es: "Automatizaciones", ca: "Automatitzacions" },
-  "What this module does on its own. Some can be switched off; the rest say why not.": { de: "Was dieses Modul von selbst tut. Manches lässt sich abschalten, der Rest sagt, warum nicht.", es: "Lo que este módulo hace por su cuenta. Algunas se pueden desactivar; el resto explica por qué no.", ca: "El que aquest mòdul fa pel seu compte. Algunes es poden desactivar; la resta diu per què no." },
   "Time settings": { de: "Zeiterfassungs-Einstellungen", es: "Ajustes de tiempo", ca: "Configuració del temps" },
   "Meeting settings": { de: "Termin-Einstellungen", es: "Ajustes de reuniones", ca: "Configuració de les reunions" },
   "Knowledge base settings": { de: "Wissensdatenbank-Einstellungen", es: "Ajustes de la base de conocimiento", ca: "Configuració de la base de coneixement" },

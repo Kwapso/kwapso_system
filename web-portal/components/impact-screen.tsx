@@ -250,13 +250,42 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
         </p>
       </div>
 
-      {/* THE HEADLINE, BARE ON THE PAGE. It is a label, a number and the
-          sentence that makes the number honest — not a collection of two or more
-          rows and not a form of two or more fields, so it never earned a
-          container (N6). A 3xl figure with `gap-6` round it is found by the eye
-          without a box drawn to point at it, and on the screen a client is most
-          likely to show somebody else, one fewer drawn line is worth having. */}
-      <section className="flex flex-col gap-2">
+      {/* ── THE HEADLINE, AND IT IS CONTAINED NOW. THIS FILE ARGUED ITSELF OUT
+          OF R67 AND WAS OVERRULED ON 2026-09-11. ─────────────────────────────
+
+          THE ARGUMENT IT MADE, KEPT VERBATIM because it is the record of what
+          was traded away and it is not a bad argument:
+
+            "THE HEADLINE, BARE ON THE PAGE. It is a label, a number and the
+             sentence that makes the number honest — not a collection of two or
+             more rows and not a form of two or more fields, so it never earned
+             a container (N6). A 3xl figure with `gap-6` round it is found by
+             the eye without a box drawn to point at it, and on the screen a
+             client is most likely to show somebody else, one fewer drawn line
+             is worth having."
+
+          WHY IT LOSES. Every clause of it is true and none of it is the
+          question. The client has now said one sentence five times in three
+          days — "nothing on top of white background, its a rule!", "once again,
+          nothing shoudl sit on the white, everything contained! (make this a
+          law)", "remember in settings modules card, needs container
+          background.", "remove the text directly on white background.",
+          "inside the container … always" — and what she is buying with it is
+          ONE rule with no local exceptions. A screen that exempts itself in its
+          own comment is exactly the pattern each of those five rulings
+          overturned somewhere else: every one of them was a screen where
+          somebody had decided, locally and reasonably, that this particular
+          thing did not need a box.
+
+          WHAT IT COSTS, STATED RATHER THAN WAVED OFF: one more drawn line on
+          the screen a client is most likely to show somebody else. That is a
+          real cost and it is the price of the rule being a rule.
+
+          MEASURED, BOTH PALETTES, because the portal's page ground is the same
+          #FFFEF9 that has fooled this law once already: soft paper on page is
+          1.103 in light and 1.079 in dark. `bg-card` here would have measured
+          1.000 in light — a container that is not one. */}
+      <section className="flex flex-col gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
         <p className="text-muted-foreground text-sm">{t("Time given back, every month")}</p>
         <p className="text-3xl font-medium">
           {hoursText(data.savedSecondsPerMonth)}
@@ -268,7 +297,12 @@ export function ImpactScreen({ ready }: { ready: PortalReady }) {
 
       {/* WHAT YOU BOUGHT — only when we were sent it. No flag on this side. */}
       {data.prices && (
-        <section className="flex flex-col gap-4">
+        /* CONTAINED, AND THE TITLE IS INSIDE IT — the same ruling as the
+           headline above and the same shape the agency's settings sections took
+           the same day: the heading sits inside the box, above what it names,
+           and there is no sentence under it. This section was an `<h2>` and one
+           line on the page ground. */
+        <section className="flex flex-col gap-4 rounded-[var(--radius)] bg-surface-panel p-4">
           <h2 className="text-lg font-medium">{t("What you bought")}</h2>
           {/* A RATE-CARD PANEL SAT UNDER THIS LINE until 10 Sep 2026 — one row
               per kind of work, the label and what it cost an hour. The card was
