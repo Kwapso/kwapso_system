@@ -203,67 +203,28 @@ export function chunkChat(messages: ChatMessage[]): ChatPiece[] {
  * NULL for an ordinary document chunk." */
 export type GrainPiece = { text: string; speaker: string | null; saidAt: string | null }
 
-/** A NUL byte, twice, bracketing a piece's speaker and time on their own line
- * in front of its text — the one thing `plainText` already strips from
- * anything a person or the tokeniser ever sees (see its own NUL-stripping
- * step above), so a mark that slips past every later step shows nothing
- * rather than a stray character. Never becomes prose: `chunkGrainText`
- * consumes and discards it before a piece's own `text` is handed to a
- * citation, an embedding or a posting, exactly as `chunkChat`'s own comment
- * says a piece's `startAt`/`endAt` must stay real METADATA, "kept OFF the
- * indexed prose on purpose." */
-const GRAIN_MARK = String.fromCharCode(0)
-const GRAIN_MARK_RE = new RegExp(`${GRAIN_MARK}([^${GRAIN_MARK}]*)${GRAIN_MARK}([^${GRAIN_MARK}]*)${GRAIN_MARK}\\n`, "g")
+/** ONE STRUCTURED PIECE, as `knowledge_sources.grain_pieces` (migration 0081)
+ * stores it — `chunkChat`'s own speaker/time, still attached, JSON-parsed off
+ * that column rather than recovered from prose. THE FIRST ATTEMPT encoded
+ * this in `body` itself, behind a NUL-bracketed mark, and could not have
+ * worked: D1 rejects an embedded NUL (`shared/workers/validate.ts` strips one
+ * from every request field for exactly that reason), so a source carrying
+ * one would fail the write or be silently mangled on the way — caught before
+ * merge. The column is what that migration's own header explains at length. */
+export type StoredGrainPiece = { text: string; speaker: string; saidAt: string }
 
-/** WHY THIS EXISTS: `chunkChat`/`chunkMail` already compute a piece's speaker
- * and time, but a chat or mail SOURCE is one row with one `body` — every
- * piece's text is flattened into it, joined on a blank line, before it is
- * ever stored (`chatThreads`/`mailThreadText`, google-read.ts). By the time
- * `indexSource` re-chunks that body, the metadata is gone; there is no
- * second call to Google to get it back. This is what lets it survive the
- * flatten: wrap a piece's text with its speaker and time on the line above
- * it, in a mark `plainText` already treats as invisible, so the ONE string a
- * source stores is still enough to recover both the words and who said them.
- *
- * `speaker`/`saidAt` are written as given — joining several speakers into one
- * string (`chatThreads` already does `voices.join(", ")` for a thread's own
- * title) is the caller's decision, not this function's. */
-export function markGrainPiece(piece: { text: string; speaker: string; saidAt: string }): string {
-  return `${GRAIN_MARK}${piece.speaker}${GRAIN_MARK}${piece.saidAt}${GRAIN_MARK}\n${piece.text}`
-}
-
-/** THE OTHER HALF OF `markGrainPiece`, and `indexSource`'s replacement for a
- * plain `chunkText(body)` call on a grain-bearing source. Recovers each
- * marked piece's own speaker/time, then runs `chunkText` on JUST that
- * piece's text — almost always a no-op (`chunkChat` already keeps a piece
- * under `CHUNK_TARGET_CHARS`) except for an oversized mail message, which
- * still needs the ordinary paragraph/sentence/hard-cut split, with every
- * resulting chunk keeping that ONE piece's speaker and time.
- *
- * TEXT BEFORE THE FIRST MARK (a chat/mail source's own TITLE, joined on the
- * front by `indexableText`) is never dropped — it becomes its own plain
- * piece(s), `speaker`/`saidAt` both null, the same as it would from
- * `chunkText` alone. A body with NO marks at all — any other kind, or a row
- * written before this shipped — falls back to being exactly `chunkText`'s
- * own output, wrapped with two nulls each: this function is a strict
- * superset of the plain chunker, never a different one. */
-export function chunkGrainText(input: string): GrainPiece[] {
-  const marks = [...input.matchAll(GRAIN_MARK_RE)]
-  if (!marks.length) return chunkText(input).map((text) => ({ text, speaker: null, saidAt: null }))
-  const pieces: GrainPiece[] = []
-  const lead = input.slice(0, marks[0].index).trim()
-  if (lead) for (const text of chunkText(lead)) pieces.push({ text, speaker: null, saidAt: null })
-  for (let i = 0; i < marks.length; i++) {
-    const mark = marks[i]
-    const start = mark.index + mark[0].length
-    const end = i + 1 < marks.length ? marks[i + 1].index : input.length
-    const text = input.slice(start, end).trim()
-    if (!text) continue
-    const speaker = mark[1] || null
-    const saidAt = mark[2] || null
-    for (const t of chunkText(text)) pieces.push({ text: t, speaker, saidAt })
-  }
-  return pieces
+/** `indexSource`'s reader for a grain-bearing source — PIECES WIN, AND `seq`
+ * FOLLOWS THEM: called instead of `chunkText(body)` whenever
+ * `knowledge_sources.grain_pieces` parses to a non-empty array, never
+ * alongside it. Almost always one chunk per piece (`chunkChat` already keeps
+ * a piece under `CHUNK_TARGET_CHARS`); `chunkText` only actually runs — and
+ * only on that ONE piece's own text — for an oversized piece (a long mail
+ * message, once that lane is wired), and every chunk it produces keeps that
+ * piece's one speaker and time. */
+export function expandGrainPieces(pieces: StoredGrainPiece[]): GrainPiece[] {
+  const out: GrainPiece[] = []
+  for (const piece of pieces) for (const text of chunkText(piece.text)) out.push({ text, speaker: piece.speaker, saidAt: piece.saidAt })
+  return out
 }
 
 export type MailMessage = { from: string; at: string; text: string }

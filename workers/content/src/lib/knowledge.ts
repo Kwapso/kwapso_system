@@ -131,13 +131,14 @@ import type { Env } from "../env"
 import { contextLineFor } from "./source-readers"
 import {
   CHUNK_TARGET_CHARS,
-  chunkGrainText,
   chunkText,
   contentHash,
   encodeEmbedding,
+  expandGrainPieces,
   type GrainPiece,
   plainText,
   questionTerms,
+  type StoredGrainPiece,
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
@@ -1914,16 +1915,20 @@ async function embed(env: Env, texts: string[]): Promise<(number[] | null)[]> {
  * so a sweep knows whether to come back. */
 export type IndexProgress = { total: number; indexed: number; done: boolean }
 
-/** Which source KINDS carry grain metadata (speaker/said_at) inside their own
- * `body`, via `markGrainPiece` — today, Google Chat only (`"message"`,
- * `knowledge-google.ts`'s `KIND_OF.chat`), because `chatThreads` is the one
- * place that writes the mark. Meeting transcripts are NOT here: nothing
- * extracts a speaker from a transcript today — a separate, larger piece of
- * work (BUILD-5 tracker `a-pieces`), not silently built and not silently
- * skipped. Widening this is a data-shape decision, not a typo: change this
- * one line and say why. */
-function isGrainKind(kind: string): boolean {
-  return kind === "message"
+/** `knowledge_sources.grain_pieces` (migration 0081), read honestly: a row
+ * this app wrote is JSON or NULL, never anything else, but a malformed value
+ * must not fail the whole sweep for one source — same discipline as `embed`'s
+ * own best-effort catch. NULL, missing, or an empty/malformed array all read
+ * as "no structured pieces", which is exactly the safe, generic fallback
+ * `indexSource` already has for every kind that never sets this column. */
+function parseGrainPieces(raw: string | null): StoredGrainPiece[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) && parsed.length ? (parsed as StoredGrainPiece[]) : null
+  } catch {
+    return null
+  }
 }
 
 /** Which source KINDS may spend on a context line (BUILD-5 §2) — a SPEND
@@ -1994,6 +1999,7 @@ export async function indexSource(
       generated_only: number
       shared_with: string
       team_visible: number
+      grain_pieces: string | null
     }
   >(
     cfg,
@@ -2005,9 +2011,12 @@ export async function indexSource(
     // tenth Vectorize label (`labelsFor`) — see knowledge-vectors.ts. `team_visible`
     // rides along so the chunk/term write below can denormalise it — see that
     // write's own comment for why silently defaulting to 0 was a real gap.
+    // `grain_pieces` (0081) rides along so a grain-bearing source can be
+    // chunked from its own structured pieces rather than generically —
+    // see `parseGrainPieces`/`expandGrainPieces` below.
     `SELECT id, kind, title, summary, body, file_url, compartment, account_id, app_id, ticket_id, sprint_id, record_date,
             owner_user_id, content_hash, chunk_count, indexed_chunks, embed_attempts, generated_only, shared_with,
-            team_visible, deactivated_at, created_at
+            team_visible, grain_pieces, deactivated_at, created_at
        FROM knowledge_sources WHERE id = ? LIMIT 1`,
     [sourceId]
   )
@@ -2030,10 +2039,16 @@ export async function indexSource(
   // §4.3). The reader decided this per ROW at ingest, because every mirror kind
   // can also carry words a person typed and only the reader can tell.
   const card = source.generated_only === 1
+  // PIECES WIN, AND `seq` FOLLOWS THEM (migration 0081's own answer to this):
+  // when the source's own reader left structured pieces behind, they are
+  // chunked directly — never re-derived by cutting `body` from scratch — and
+  // only a source with none (every kind but chat today) falls back to the
+  // ordinary generic chunker.
+  const grainPieces = card ? null : parseGrainPieces(source.grain_pieces)
   const pieces: GrainPiece[] = card
     ? []
-    : isGrainKind(source.kind)
-      ? chunkGrainText(text)
+    : grainPieces
+      ? expandGrainPieces(grainPieces)
       : chunkText(text).map((t) => ({ text: t, speaker: null, saidAt: null }))
   const total = Math.min(pieces.length, MAX_CHUNKS_PER_SOURCE)
   // NOT SILENT. A mirrored row bigger than the indexer's ceiling keeps the part
@@ -2154,9 +2169,10 @@ export async function indexSource(
         //
         // SPEAKER/SAID_AT RIDE FROM THE PIECE ITSELF (tracker `a-pieces`) — both
         // null for an ordinary document chunk, both non-null for one that came
-        // out of `chunkGrainText`. This is the fix for the bug that named this
-        // tracker item: the migration added the columns, nothing ever wrote
-        // them, and 3,954 chunks sat with all three grain columns empty.
+        // out of `expandGrainPieces` (`knowledge_sources.grain_pieces`, 0081).
+        // This is the fix for the bug that named this tracker item: the
+        // migration added the columns, nothing ever wrote them, and 3,954
+        // chunks sat with all three grain columns empty.
         // CONTEXT_LINE is computed above, DOCUMENTS ONLY, keyed on the piece's
         // own text so an unchanged chunk never re-spends (see the comment on
         // `priorContextLines` above the loop).

@@ -39,7 +39,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import type { ChatMessage } from "./google-api"
-import { chunkChat, chunkMail, markGrainPiece } from "./knowledge-text"
+import { chunkChat, chunkMail } from "./knowledge-text"
 import type { ReaderEnv } from "./source-readers"
 import {
   chatMessages,
@@ -288,14 +288,22 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  * `chunkChat` hands back that metadata (`speakers`, `startAt`) beside each
  * piece's text, but this thread is ONE row with ONE `body` — the metadata
  * would otherwise die right here, the moment the runs are flattened into a
- * single string. There is no second call to Google later to get it back, so
- * each run is wrapped with `markGrainPiece` before the join: a mark
- * `plainText` already treats as invisible carries the speaker and time on
- * their own line, in front of the SAME `sender: text` prose the join always
- * produced. `chunkGrainText` (knowledge-text.ts), `indexSource`'s reader for
- * a grain-bearing source, is the other half — it strips the mark back out
- * before a chunk's stored `text`, its embedding or its posting are ever
- * written, so it is invisible to a citation exactly as before.
+ * single string, with no second call to Google later to get it back.
+ *
+ * THE FIRST FIX ENCODED IT IN THE PROSE ITSELF — a mark in front of each run,
+ * stripped again before a chunk's stored text — and could not have worked:
+ * D1 rejects an embedded NUL byte (`shared/workers/validate.ts` strips one
+ * from every request field for exactly that reason), and `body` never passes
+ * through that seam, because it arrives from Google, not a request. Caught
+ * before merge.
+ *
+ * SO THE RUNS RIDE ALONGSIDE `text` INSTEAD, on `grainPieces` — the SAME
+ * `chunkChat` call's own pieces, kept rather than thrown away, written by
+ * `knowledge-google.ts`'s chat kind onto `knowledge_sources.grain_pieces`
+ * (migration 0081; that migration's own comment is where "pieces win, and
+ * `seq` follows them" is answered). `body` stays exactly what it always
+ * was — nothing hidden in it, nothing to strip, no interaction with the
+ * hash, the embedding or the FTS postings.
  */
 export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
   const byThread = new Map<string, ChatMessage[]>()
@@ -315,6 +323,9 @@ export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
     // between two people is named by both of them rather than by whoever
     // happened to reply last.
     const voices = [...new Set(ordered.map((m) => m.sender).filter(Boolean))]
+    // COMPUTED ONCE, used for both `text` and `grainPieces` below — never two
+    // separate calls that could disagree about where a run's boundaries are.
+    const runs = chunkChat(ordered.map((m) => ({ speaker: m.sender, at: m.createdAt ?? "", text: m.text })))
     out.push({
       ...first,
       id: thread,
@@ -330,12 +341,16 @@ export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
       senderIsApp: ordered.every((m) => m.senderIsApp),
       // RUNS, joined on a blank line — see the essay above. A run's own line
       // shape is still exactly `sender: text` (chunkChat drops the timestamp
-      // from the prose on purpose); each run is wrapped with its speakers and
-      // start time via `markGrainPiece` first, so `chunkGrainText` can hand
-      // both back to `indexSource` once this body reaches it.
-      text: chunkChat(ordered.map((m) => ({ speaker: m.sender, at: m.createdAt ?? "", text: m.text })))
-        .map((piece) => markGrainPiece({ text: piece.text, speaker: piece.speakers.join(", "), saidAt: piece.startAt }))
-        .join("\n\n"),
+      // from the prose on purpose), byte-for-byte what the flat join has
+      // always produced — `runs` below is computed once and reused for both
+      // `text` and `grainPieces`, so the two can never say something different
+      // about the same conversation.
+      text: runs.map((piece) => piece.text).join("\n\n"),
+      // THE STRUCTURED HALF, alongside `text` rather than folded into it —
+      // `knowledge_sources.grain_pieces` (migration 0081) is what
+      // `indexSource` actually reads; see the essay above for why this is a
+      // separate field and not a mark in the prose.
+      grainPieces: runs.map((piece) => ({ text: piece.text, speaker: piece.speakers.join(", "), saidAt: piece.startAt })),
       // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
       createdAt: last.createdAt,
       // The link opens the thread at its first message, which is where a person
@@ -790,6 +805,10 @@ export async function readGoogleMaterial(
             // Google's own sender type and carried through; the knowledge lane
             // retires on it (lib/knowledge-google.ts, the chat kind).
             appOnly: message.senderIsApp,
+            // THE STRUCTURED RUNS, alongside `text` — tracker `a-pieces`,
+            // migration 0081. `knowledge-google.ts`'s chat kind carries this
+            // onto `grain_pieces`.
+            grainPieces: message.grainPieces,
           })
       }
     // WRITTEN DOWN ONCE, AT THE END. Everything this sweep learned, from every

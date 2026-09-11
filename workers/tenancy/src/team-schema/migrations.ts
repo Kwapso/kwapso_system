@@ -5655,6 +5655,63 @@ DROP INDEX idx_knowledge_sources_identity;
 ALTER TABLE knowledge_sources DROP COLUMN identity_key;
 `,
   },
+  {
+    // GRAIN'S PIECES, GIVEN THEIR OWN COLUMN — the second attempt at tracker
+    // `a-pieces`, and the first one could not have worked. `chunkChat` already
+    // computes a piece's speaker and time (`ChatPiece.speakers`/`startAt`),
+    // but a chat/mail SOURCE is one row with one \`body\`, and that metadata
+    // used to die the moment \`chatThreads\`/\`mailThreadText\` flattened every
+    // piece's text into it — before it was ever stored, let alone reaching
+    // \`indexSource\`'s own INSERT.
+    //
+    // THE FIRST FIX ENCODED A MARK IN THE PROSE ITSELF (a NUL-bracketed tag in
+    // front of each piece, stripped again before a chunk's stored text) and it
+    // is why this migration exists rather than a code-only patch: this repo
+    // already knows D1 rejects an embedded NUL. \`shared/workers/validate.ts\`
+    // says so in its own header ("SQLite (D1) also rejects embedded NUL
+    // bytes") and strips one from every REQUEST field for exactly that
+    // reason. A mark built the same way inside \`knowledge_sources.body\` —
+    // which never passes through that boundary seam, because it arrives from
+    // Google, not a request — would have been rejected at the write or
+    // silently mangled on the way, and every test that proved the mark
+    // "worked" was proving it against an in-memory string that never touched
+    // real SQLite. Caught before merge, not after.
+    //
+    // SO: A SEPARATE COLUMN, following the same habit \`accounts\`/\`apps\`/
+    // \`shared_with\` already keep on this exact table — JSON, computed once,
+    // read back structured. \`grain_pieces\` is a JSON array of
+    // \`{ text, speaker, saidAt }\` when the source's own reader produces
+    // structured pieces (\`chatThreads\` today; \`mailThreadText\` once that
+    // lane is wired — see knowledge.ts's \`isGrainKind\`), and NULL for every
+    // other kind, including a chat source written before this shipped.
+    //
+    // NULL MEANS "GENERIC", NEVER "BROKEN". \`body\` stays exactly what it always
+    // was — the words, hashed, embedded, FTS-indexed, nothing hidden inside
+    // it — and a source with no \`grain_pieces\` re-chunks it the ordinary way,
+    // which is what every document already does and is the only sane fallback
+    // for a row that predates this column or a kind that was never structured
+    // in the first place.
+    //
+    // WHEN BOTH EXIST, THE PIECES WIN AND \`seq\` FOLLOWS THEM — the hub's own
+    // question, answered here so the next reader does not have to re-derive
+    // it: \`indexSource\` chunks from \`grain_pieces\` directly when the column
+    // is non-null (splitting only a single oversized piece further, with the
+    // ordinary chunker, and carrying that ONE piece's speaker/time onto every
+    // resulting chunk), and falls back to chunking \`body\` from scratch —
+    // exactly today's behaviour — only when it is NULL. The generic chunker
+    // never runs a "tie-break" against the structured pieces; there is no tie,
+    // because a grain-bearing source's \`body\` is never chunked directly once
+    // this column is populated for it.
+    //
+    // BOTH ARE WRITTEN TOGETHER, ALWAYS, from the same call to \`chunkChat\` —
+    // so they cannot drift out of sync under ordinary operation, and nothing
+    // here tries to detect a drift that would mean a bug elsewhere, not a
+    // case this column has to defend against.
+    version: "0081_a_piece_gets_its_own_column_not_a_mark_in_the_prose",
+    sql: `
+ALTER TABLE knowledge_sources ADD COLUMN grain_pieces TEXT;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

@@ -919,18 +919,21 @@ export function googleIngestKinds(
       // indexed: 1, caughtUp: true` against five spaces holding fifty messages
       // each.
       //
-      // 4 SINCE 11 SEP 2026 (tracker `a-pieces`) — `chatThreads`' body changed
-      // AGAIN, this time in its own bytes: each run is now wrapped with
-      // `markGrainPiece` so its speaker/time survive being flattened, which is
-      // exactly the kind of body-shape change bullet 2 above rewinds for. UNLIKE
-      // bullet 3's bump, this one is NOT free: the wrapped body's `content_hash`
-      // genuinely differs from what is stored (real bytes changed, not just the
-      // read position), so `indexSource`'s restart check fires for real and every
-      // one of the 105 chat sources on staging re-embeds its ~1.3 chunks — a
-      // small, ordinary re-embed of the kind any edited body already costs today,
-      // not a new spend category. This is what actually delivers speaker/said_at
-      // to material already on file; without the bump the fix only reaches a
-      // conversation from its NEXT reply onward.
+      // 4 SINCE 11 SEP 2026 (tracker `a-pieces`) — `chatThreads` now also
+      // computes `grainPieces` (each run's speaker/time, migration 0081's
+      // `knowledge_sources.grain_pieces`) alongside `body`. `body` ITSELF IS
+      // BYTE-FOR-BYTE UNCHANGED — the first attempt at this bump (since
+      // reverted) wrapped each run in a mark and genuinely changed `body`'s
+      // bytes; this design does not, because the structured half lives in
+      // its own column, not folded into the prose. So this bump is the SAME
+      // FREE SHAPE as bullet 3's: `content_hash` still matches what's
+      // stored, the hash-skip returns before `indexSource`, and the cost is
+      // one upsert per conversation — the write that actually delivers
+      // `grain_pieces` to the 105 chat sources already on file, since
+      // `grain_pieces = excluded.grain_pieces` is unconditional on every
+      // re-visit. Still needed, not decorative: without the rewind a space
+      // producing a steady trickle never re-visits its OLDER threads at all
+      // (bullet 3's own measurement), so those would keep NULL forever.
       textVersion: 4,
       // ONE SOURCE PER CONVERSATION — not per message, and no longer per space.
       //
@@ -972,6 +975,10 @@ export function googleIngestKinds(
             // "Somebody in this space: Somebody in this space:" the moment the
             // reader started doing it properly.
             body: item.text,
+            // THE STRUCTURED HALF, alongside `body` — tracker `a-pieces`,
+            // migration 0081. `chatThreads` computed it; this is the one
+            // place it reaches `knowledge_sources.grain_pieces`.
+            grainPieces: item.grainPieces,
             // AND IT LINKS BACK. This was `null` — so Chat was the one Google
             // kind the assistant could quote and nobody could go and read.
             sourceUrl: item.url,

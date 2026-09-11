@@ -1113,7 +1113,19 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // all, so their upsert runs exactly as it did. A textVersion bump would be
 // actively wrong here for the same reason the notes above give: it would
 // re-embed the whole base to change zero words of anyone's indexed text.
-const SHARED_DIGEST = "f9e9f4c22a7474e8"
+//
+// RE-PINNED AGAIN, 2026-09-11 (tracker `a-pieces`): the same upsert also
+// gained `grain_pieces` — structured pieces (text/speaker/time) alongside
+// `body`, migration 0081, IngestRow.grainPieces' own comment says why a
+// column and not a mark in the prose. Same shape as `accounts` above and
+// the same conclusion: every kind but chat leaves `row.grainPieces`
+// undefined and writes NULL, so 12 of the 13 mirrored kinds' upserts run
+// unchanged. Chat is the one that sets it, and its OWN textVersion bump
+// (knowledge-google.ts, not this file — chat is a Google kind, swept
+// through this same engine from a different call site) is what actually
+// reaches the 105 chat sources already on file; nothing here re-indexes
+// on its own.
+const SHARED_DIGEST = "d3c9ee8cfa2eefcb"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //
