@@ -114,11 +114,17 @@ const MCP_ONLY: McpTool[] = [
   },
   {
     name: "export_dropdown_values_csv",
-    description: "Every dropdown value as CSV (full fields + audit).",
-    inputSchema: obj({}),
+    // R19 — the door grew a `groups` filter on 11 Sep 2026 (each module's
+    // settings page exports its own vocabulary), so this tool exposes AND
+    // forwards it. R27 — every backticked word below is this tool's own
+    // argument or a column the CSV really carries.
+    description:
+      "Every dropdown value as CSV (full fields + audit), one row per option. Narrow it to named groups with `groups`, comma-separated and spelled exactly as the group is (\"Ticket type,Story type\") — leave it out for the team's whole vocabulary. Naming a group the team has no rows in is not an error, it answers with the header and nothing under it. The columns lead with the import format, so a file exported here goes straight back in through the importer.",
+    inputSchema: obj({ groups: S }),
     binding: "TENANCY",
     method: "GET",
     path: "/api/tenancy/selectable/export",
+    buildQuery: (i) => (i.groups ? `?groups=${encodeURIComponent(String(i.groups))}` : ""),
   },
   // The agency's own housekeeping. Each is the READ half of an import target, so
   // a file exported here goes straight back in through the importer — which is
@@ -214,13 +220,17 @@ const MCP_ONLY: McpTool[] = [
   },
   {
     name: "run_import",
+    // R22 — the door grew an optional `groups` scope on 11 Sep 2026, so this
+    // tool offers the door's whole contract rather than a narrower one. R27 —
+    // every backticked word below is this tool's own argument or another tool's
+    // name.
     description:
-      "Run a PLANNED import in dependency order. Writes through the same gated doors the screens use (full audit trail); returns the per-row report.",
-    inputSchema: obj({ batchId: S }, ["batchId"]),
+      "Run a PLANNED import in dependency order. Writes through the same gated doors the screens use (full audit trail); returns the per-row report. `groups` narrows the run to named dropdown groups, which is what a module's own settings page sends when somebody imports from there: a row in any other group is skipped with a reason instead of written, and a file that feeds anything but dropdown values is refused outright. Leave it out to run the plan as `plan_import` built it.",
+    inputSchema: obj({ batchId: S, groups: { type: "array", items: S, maxItems: 8 } }, ["batchId"]),
     binding: "DATAOPS",
     method: "POST",
     path: "/api/data-ops/import/batch/confirm",
-    buildBody: (i) => ({ batchId: i.batchId }),
+    buildBody: (i) => ({ batchId: i.batchId, groups: i.groups }),
   },
   {
     name: "continue_import",
@@ -230,12 +240,12 @@ const MCP_ONLY: McpTool[] = [
     // this door's — so it is described in words and named by the tool that
     // actually carries it.
     description:
-      "Pick up an import that did not finish. A run that dies part way leaves its batch marked running, remembering which table it was inside and how many of that table's rows were done — get_import shows that. This continues from there instead of starting again, which is what re-running the file would do and would write every finished row a second time. It takes the same `batchId` as run_import and answers with the same `report`, covering the whole import rather than this leg. Refused when there is nothing to pick up. Up to eleven rows either side of the interruption may be written twice; the report says where it resumed.",
-    inputSchema: obj({ batchId: S }, ["batchId"]),
+      "Pick up an import that did not finish. A run that dies part way leaves its batch marked running, remembering which table it was inside and how many of that table's rows were done — get_import shows that. This continues from there instead of starting again, which is what re-running the file would do and would write every finished row a second time. It takes the same `batchId` as run_import and answers with the same `report`, covering the whole import rather than this leg, and the same optional `groups` scope — which is NOT remembered from the run being picked up, so a resume that leaves it out finishes the file unnarrowed. Refused when there is nothing to pick up. Up to eleven rows either side of the interruption may be written twice; the report says where it resumed.",
+    inputSchema: obj({ batchId: S, groups: { type: "array", items: S, maxItems: 8 } }, ["batchId"]),
     binding: "DATAOPS",
     method: "POST",
     path: "/api/data-ops/import/batch/continue",
-    buildBody: (i) => ({ batchId: i.batchId }),
+    buildBody: (i) => ({ batchId: i.batchId, groups: i.groups }),
   },
   {
     name: "list_imports",

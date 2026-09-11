@@ -125,16 +125,88 @@ export type SelectableExportRow = {
  * options nobody removed. */
 export async function listSelectableForExport(
   cfg: D1Rest,
-  guard: MemberGuard
+  guard: MemberGuard,
+  /** THE GROUPS THIS EXPORT IS ABOUT, or null for the team's whole vocabulary.
+   *
+   * Added 11 Sep 2026, when each module's settings page grew its own Export CSV
+   * (client: *"each module's settings page gets its own import and export for
+   * its own groups"*). A page titled "Ticket settings" handing back every
+   * Country and every Department the team has is a button that quietly does
+   * more than the page it sits on says it can, so the NARROWING is the door's
+   * and not the screen's — a filtered CSV assembled in a browser would still
+   * have been a whole-vocabulary read over the wire.
+   *
+   * ALREADY VALIDATED when it gets here: `selectableGroupScope` (this file) is
+   * the one place a caller's string becomes this list, and it is called from
+   * inside the handler's own `queryText` check (R20). Passing the raw words
+   * through `sqlString` below is escaping, not validation, and is not relied on
+   * as either. */
+  groups: string[] | null = null
 ): Promise<{ rows: SelectableExportRow[]; complete: boolean }> {
+  // NULL IS "NO SCOPE ASKED FOR" and reads the whole vocabulary. It is the ONLY
+  // way to get there: `selectableGroupScope` below returns null rather than `[]`
+  // for a blank parameter, precisely so that this line has no empty-array case
+  // to guess about — `IN ()` is not valid SQL, and either guess at what an empty
+  // scope means (nothing, or everything) is a guess, and one of them WIDENS a
+  // request that asked to be narrow. So the shape of the answer is decided in
+  // the validator, once, and this expression cannot be reached with an empty
+  // list. Silently widening a narrow request is the one failure mode a scope
+  // must never have.
+  const where = groups === null ? "" : ` WHERE type IN (${groups.map(sqlString).join(", ")})`
   const rows = await d1Query<SelectableExportRow>(
     cfg,
     guard.databaseId,
-    // R14 hard cap (export tier). +1 is how "there was more" is known without a
-    // second query.
-    `SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data ORDER BY type ASC, value ASC LIMIT ${EXPORT_HARD_CAP + 1}`
+    // R14 hard cap (export tier), unchanged by the narrowing — a scope makes the
+    // answer SMALLER and can never lift a cap. +1 is how "there was more" is
+    // known without a second query.
+    `SELECT type, value, is_default, deactivated_at, created_at, creator_name FROM selectable_data${where} ORDER BY type ASC, value ASC LIMIT ${EXPORT_HARD_CAP + 1}`
   )
   return { rows: rows.slice(0, EXPORT_HARD_CAP), complete: rows.length <= EXPORT_HARD_CAP }
+}
+
+/** HOW MANY GROUPS ONE SCOPED CALL MAY NAME. The widest module settings page
+ * declares two (`Industry` + `Country`, `App stage` + `Deliverable kind`), and
+ * the whole vocabulary is eighteen groups — so eight is generous for every
+ * caller that exists and still a bound. It is here so the SQL `IN (…)` list
+ * above has a length a reader can reason about, rather than one a query string
+ * decides. */
+const MAX_SCOPE_GROUPS = 8
+
+/** A caller's `groups=` string → the groups an export is narrowed to, or null.
+ *
+ * THE VALIDATION, POSITIONALLY (R20). The raw string reaches this function
+ * through `queryText` at the door — which type-checks it, strips NUL bytes and
+ * caps its length — and everything after that is this function's:
+ *
+ *   • a missing or blank parameter is NO SCOPE (null), which is the door's
+ *     historic behaviour and what the agent, MCP and a whole-vocabulary export
+ *     still ask for;
+ *   • the string is split on commas and each name trimmed, and a name that is
+ *     empty after trimming is dropped rather than turned into `type = ''`;
+ *   • naming more than `MAX_SCOPE_GROUPS` is a 400 rather than a silent slice,
+ *     because a truncated scope answers a DIFFERENT question from the one asked
+ *     and an export that is quietly missing a group is the exact failure
+ *     `exportTooLarge` exists to refuse one size up;
+ *   • a scope that names nothing real is NOT an error: a team may genuinely have
+ *     no rows in a group yet, and an empty CSV with its header is the honest
+ *     answer to "give me this team's ticket types" when there are none.
+ *
+ * A CAST WOULD NOT BE A CHECK, which is why this returns a NEW array of trimmed
+ * strings rather than asserting a type over the caller's own. */
+export function selectableGroupScope(raw: string | null | undefined): string[] | null {
+  if (raw == null) return null
+  const named = raw
+    .split(",")
+    .map((g) => g.trim())
+    .filter((g) => g.length > 0)
+  if (named.length === 0) return null
+  if (named.length > MAX_SCOPE_GROUPS)
+    throw new GuardError(
+      400,
+      "invalid_input",
+      `An export can name at most ${MAX_SCOPE_GROUPS} groups at a time.`
+    )
+  return named
 }
 
 /** R16: exact server COUNT(*) for the badge — never rows.length. */

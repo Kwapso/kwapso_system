@@ -74,12 +74,21 @@ export const dataOps = {
   batchPlan: (batchId: string) =>
     api<{ batch: ImportBatchView; quota: AgentQuota }>("/api/data-ops/import/batch/plan", post({ batchId })),
   importBatches: () => api<{ batches: ImportBatchSummary[] }>("/api/data-ops/import/batches"),
-  batchConfirm: (batchId: string) =>
-    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/confirm", post({ batchId })),
+  /** `groups` NARROWS THE RUN to named dropdown groups — what a module's own
+   * settings page sends, so an import started from Settings › Tickets adds
+   * ticket types and skips everything else in the file with a reason. Omitted
+   * everywhere else, which is an unscoped run and the door's historic answer.
+   * The door is what enforces it (workers/data-ops/src/routes/import.ts); this
+   * only carries it. */
+  batchConfirm: (batchId: string, groups?: string[]) =>
+    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/confirm", post({ batchId, groups })),
   /** Pick up a run that did not finish, from its last checkpoint. Same answer
-   * shape as `batchConfirm` — the report covers the whole import, not the leg. */
-  batchContinue: (batchId: string) =>
-    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/continue", post({ batchId })),
+   * shape as `batchConfirm` — the report covers the whole import, not the leg —
+   * and the same scope, said again: the door does not remember one from the leg
+   * it is picking up, on purpose, so a resume that dropped it would finish a
+   * narrowed import unnarrowed. */
+  batchContinue: (batchId: string, groups?: string[]) =>
+    api<{ report: ImportBatchReport }>("/api/data-ops/import/batch/continue", post({ batchId, groups })),
   batchGet: (id: string) => api<{ batch: ImportBatchView }>(`/api/data-ops/import/batch?id=${enc(id)}`),
 
   agentUsage: () => api<{ quota: AgentQuota }>("/api/data-ops/agent/usage"),

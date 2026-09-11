@@ -13,6 +13,7 @@ import { brand } from "@shared/brand"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import { recordWorkerError } from "@shared/workers/error-log"
 import type { MemberGuard } from "@shared/workers/gating"
+import { automationOff } from "@shared/workers/automations"
 import { sendBrandedEmail as send, teamName } from "@shared/workers/notify"
 import { audienceOf, clientUserIds, frontDoorOrigin, recordLink } from "@shared/workers/record-link"
 import type { Env } from "../env"
@@ -176,6 +177,12 @@ export async function notifyReplyAndMentions(
   taggedUserIds: string[]
 ): Promise<void> {
   try {
+    // THE TEAM'S OWN SWITCH (R70, `shared/automations.ts`). Read HERE rather
+    // than at the door, and it costs nobody a wait: every call site of this
+    // function rides `afterResponse` (`shared/workers/parallel.ts`), so the
+    // response has already gone by the time this line runs. Absent means ON, so
+    // a team that has never been asked behaves exactly as it did yesterday.
+    if (await automationOff(cfg, guard.databaseId, "tickets.reply-email")) return
     const mentioned = new Set(taggedUserIds.filter((id) => id && id !== author.id))
     const recipients = new Set<string>(mentioned)
     if (ticket.raiserId && ticket.raiserId !== author.id) recipients.add(ticket.raiserId)
@@ -434,6 +441,12 @@ export async function notifyTodoRaised(
   todoId: string
 ): Promise<void> {
   try {
+    // THE TEAM'S OWN SWITCH (R70, `shared/automations.ts`). Read HERE rather
+    // than at the door, and it costs nobody a wait: every call site of this
+    // function rides `afterResponse` (`shared/workers/parallel.ts`), so the
+    // response has already gone by the time this line runs. Absent means ON, so
+    // a team that has never been asked behaves exactly as it did yesterday.
+    if (await automationOff(cfg, guard.databaseId, "accounts.todo-email")) return
     const rows = await d1Query<{
       ref: string | null
       title: string
@@ -593,6 +606,12 @@ export async function notifyTicketResolved(
   resolution: string
 ): Promise<void> {
   try {
+    // THE TEAM'S OWN SWITCH (R70, `shared/automations.ts`). Read HERE rather
+    // than at the door, and it costs nobody a wait: every call site of this
+    // function rides `afterResponse` (`shared/workers/parallel.ts`), so the
+    // response has already gone by the time this line runs. Absent means ON, so
+    // a team that has never been asked behaves exactly as it did yesterday.
+    if (await automationOff(cfg, guard.databaseId, "tickets.resolved-email")) return
     const rows = await d1Query<{
       ref: string | null
       description: string

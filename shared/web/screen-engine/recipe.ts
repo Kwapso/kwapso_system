@@ -322,6 +322,23 @@ export interface ScreenQuery {
   confirm?: string
   id?: string
   tab?: string
+  /** THE DROPDOWN GROUPS A SCOPED IMPORT IS ABOUT — comma-separated, exactly as
+   * the import door reads them, and present on one address only:
+   * `/t/<teamId>/import/selectable_data?groups=Ticket%20type`.
+   *
+   * It is here because a module's settings page has had its own Import CSV
+   * button since 11 Sep 2026 (client: *"each module's settings page gets its own
+   * import and export for its own groups… nothing sits outside Settings"*), and
+   * the wizard it opens is the app's ONE import screen. The page it came from is
+   * not recoverable from the path — `/t/<teamId>/import/selectable_data` is the
+   * same address whichever module sent you — so the scope travels in the
+   * address, which is also what makes it survive a reload and a copied link.
+   *
+   * IT IS NOT THE ENFORCEMENT. `POST /api/data-ops/import/batch/confirm` reads
+   * the same list off the body and refuses out-of-scope rows itself; this is the
+   * screen remembering what to ask for. A narrowing that lived only here would
+   * be a promise kept by the caller. */
+  groups?: string
 }
 
 export function parseScreenQuery(
@@ -342,6 +359,8 @@ export function parseScreenQuery(
   if (id) q.id = id
   const tab = get("tab")
   if (tab) q.tab = tab
+  const groups = get("groups")
+  if (groups) q.groups = groups
   return q
 }
 
@@ -353,6 +372,7 @@ export function buildScreenQuery(state: ScreenQuery): string {
   if (state.confirm) p.set("confirm", state.confirm)
   if (state.id) p.set("id", state.id)
   if (state.tab) p.set("tab", state.tab)
+  if (state.groups) p.set("groups", state.groups)
   const s = p.toString()
   return s ? `?${s}` : ""
 }

@@ -222,7 +222,15 @@ const KIT_TO_RIGHT: Record<PermissionRight, keyof RightSet> = {
  * translated key is the shape the kit's own `initial` prop is there to allow. */
 function capabilities(t: (s: string) => string): PermissionCapability[] {
   return [
-    { id: "see", label: t("See"), initial: "S" },
+    // READ, NOT "SEE" — the client's ruling, 11 Sep 2026, and the glossary was
+    // already on her side: `permission` is defined as "A single thing a role can
+    // do: READ, create, edit, or delete." Three of the four columns already said
+    // the glossary's word and this one did not, so the screen that TEACHES people
+    // what a right is was the one screen using a synonym for it. The kit's own
+    // capability id stays `see` (it is vendored and hash-pinned, and the app maps
+    // `RIGHT_TO_KIT` either way); only the WORD a person reads moves. Owed
+    // upstream: the kit's default label for this capability says "See" too.
+    { id: "see", label: t("Read"), initial: "R" },
     { id: "create", label: t("Create"), initial: "C" },
     { id: "edit", label: t("Edit"), initial: "E" },
     { id: "delete", label: t("Delete"), initial: "D" },

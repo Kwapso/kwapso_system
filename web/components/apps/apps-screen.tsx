@@ -60,6 +60,7 @@ import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recip
 import type { FilterFacet, SortOption } from "@shared/web/screen-engine/config"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { SectionWithCreate, AddButton, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState, CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
@@ -440,7 +441,12 @@ export function AppsScreen({
     // tasks screen's six views, and for the same reason.
     <CountedAbove active={activeBadge !== "" || inactiveBadge !== ""}>
     <div className="flex flex-col gap-6">
-      <CollectionHeading sectionKey="apps" total={total} />
+      {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the app stages
+          (`apps.stage`) and the deliverable kinds (`deliverables.kind`, read on
+          an app's own record, so the app is the module that owns them). The
+          heading's `action` slot and not the toolbar, which R50 removes entirely
+          from a team with no apps yet. */}
+      <CollectionHeading sectionKey="apps" total={total} action={<ModuleSettingsGear teamId={teamId} segment="apps" />} />
 
       <SectionWithCreate
         show={canCreate}

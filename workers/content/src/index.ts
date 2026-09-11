@@ -94,6 +94,7 @@ import { beginRequest, countedDb, logIfSlow, withTiming } from "@shared/workers/
 import { afterResponse, canDefer, deferrerFor } from "@shared/workers/parallel"
 import { identityFor, GuardError } from "@shared/workers/gating"
 import { recordWorkerError, tickId } from "@shared/workers/error-log"
+import { automationOff } from "@shared/workers/automations"
 import { beatCron, reportStaleCrons } from "@shared/workers/cron-heartbeat"
 import { requestId } from "@shared/workers/trace"
 import { postConfirmUpload, postPresignUpload } from "./routes/uploads"
@@ -806,7 +807,19 @@ export default {
         }
         // THE APP ON ITS OWN. Nobody clicked this — the sweep runs on a cron
         // under a system actor, so every activity row it writes says so.
-        const results = await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
+        //
+        // …UNLESS THIS TEAM HAS SWITCHED IT OFF (R70, `shared/automations.ts`).
+        // Read on the cron, where nobody is waiting, and read PER TEAM inside
+        // the loop because that is what a per-team switch means. Absent is ON.
+        // The Google half below has its own two switches: reading somebody's
+        // Drive and writing down a meeting are different automations on
+        // different modules, and `googleAutopilot` asks for them itself.
+        const sweepOff = await automationOff(
+          d1ConfigFrom(env, "automation"),
+          team.database_id,
+          "knowledge.sweep"
+        )
+        const results = sweepOff ? [] : await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0)
         if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 
@@ -948,7 +961,19 @@ async function morningDigest(env: Env, scheduledTime: number): Promise<void> {
         needsTriage(cfg, guard, now),
         teamMemberNames(env, team.id),
       ])
-      const missingTime = isMonday ? await loggedNothingLastWeek(cfg, guard, now, members) : []
+      // THE TEAM'S OWN TWO SWITCHES (R70, `shared/automations.ts`), read on a
+      // cron, where there is no response for them to be on the path of. They
+      // are SEPARATE because the client can want one without the other: the
+      // Monday line is about the agency's own timekeeping and the digest is
+      // about the client's queue. Absent means ON, so a team that has never
+      // been asked gets exactly the mail it got yesterday.
+      const [digestOff, missingTimeOff] = await Promise.all([
+        automationOff(cfg, guard.databaseId, "tickets.triage-digest"),
+        automationOff(cfg, guard.databaseId, "time.nobody-logged-last-week"),
+      ])
+      if (digestOff) continue
+      const missingTime =
+        isMonday && !missingTimeOff ? await loggedNothingLastWeek(cfg, guard, now, members) : []
       // NOTHING CLIENT-FACING — and "every recipient comes off the team's own
       // membership" was NOT the same sentence. A client login is an ordinary team
       // member holding an ordinary role (R21 says so in as many words), so

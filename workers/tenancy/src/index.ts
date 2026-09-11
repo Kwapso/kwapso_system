@@ -88,6 +88,11 @@
 //   POST /api/tenancy/config/screens       -> set a screen override (teams:edit; people only —
 //                                             it is on neither machine catalogue, and the R19
 //                                             census says why)
+//   GET  /api/tenancy/config/automations   -> which automations this team switched OFF (any member)
+//   POST /api/tenancy/config/automations   -> switch one automation on/off (teams:edit; people
+//                                             only, for the same reason as the recipe store above
+//                                             and one more: a model that could silence the emails
+//                                             could make its own next mistake quiet)
 //   POST /api/tenancy/admin/migrate-teams  -> roll team-schema migrations (x-admin-key)
 //   POST /api/tenancy/admin/create-team    -> seed a team (x-admin-key; the user door is closed)
 //   GET  /api/tenancy/admin/db-sizes       -> size every DB (core included) + open alarms
@@ -166,7 +171,7 @@ import {
   postCreateInvite,
   postRevokeInvite,
 } from "./routes/invites"
-import { getScreens, postScreen } from "./routes/config"
+import { getAutomations, getScreens, postAutomation, postScreen } from "./routes/config"
 import {
   getAccountDetail,
   getAccounts,
@@ -321,6 +326,8 @@ export const ROUTES: Record<string, { handler: Handler; kind: RouteKind }> = {
   "POST /api/tenancy/invitations/accept": { handler: postAcceptInvitation, kind: "mutation" },
   "GET /api/tenancy/config/screens": { handler: getScreens, kind: "read" },
   "POST /api/tenancy/config/screens": { handler: postScreen, kind: "mutation" },
+  "GET /api/tenancy/config/automations": { handler: getAutomations, kind: "read" },
+  "POST /api/tenancy/config/automations": { handler: postAutomation, kind: "mutation" },
   "GET /api/tenancy/selectable": { handler: getSelectable, kind: "read" },
   "GET /api/tenancy/selectable/export": { handler: getSelectableExport, kind: "read" },
   "POST /api/tenancy/selectable": { handler: postCreateSelectable, kind: "mutation" },

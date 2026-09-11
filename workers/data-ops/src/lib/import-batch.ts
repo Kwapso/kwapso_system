@@ -213,12 +213,46 @@ export async function confirmBatch(
   cfg: D1Rest,
   guard: MemberGuard,
   actor: Actor,
-  batchId: string
+  batchId: string,
+  /** THE GROUPS THIS RUN IS ALLOWED TO WRITE INTO, or null for "whatever the
+   * plan says" — which is what the generic Import screen, the assistant and
+   * every client written before 11 Sep 2026 ask for.
+   *
+   * IT EXISTS BECAUSE A MODULE'S SETTINGS PAGE NOW HAS AN IMPORT BUTTON. The
+   * client's ruling that retired Settings › Choices: *"each module's settings
+   * page gets its own import and export for its own groups… nothing sits
+   * outside Settings."* Settings › Tickets offers an import, and the promise
+   * that button makes is that it adds TICKET TYPES — so a file that also
+   * carries a hundred countries must not quietly write them from a page whose
+   * title says tickets.
+   *
+   * AND IT IS ENFORCED HERE, AT THE DOOR, rather than by the wizard that sent
+   * it. A browser filtering its own upload would be a promise kept by the
+   * caller, which is the same thing as no promise: the door would still accept
+   * the whole file from anything that asked. This is the only place the plan
+   * meets the rows, so it is the only place the scope can be true. */
+  scope: string[] | null = null
 ): Promise<{ view: ImportBatchView; report: ImportBatchReport; modules: string[] }> {
   const b = await loadBatch(cfg, guard, batchId)
   if (b.overall_status === "complete") throw new GuardError(409, "already_run", "This import has already been run.")
   const plan = planOf(b)
   if (!plan) throw new GuardError(409, "no_plan", "Plan the import before running it.")
+  // A SCOPED RUN IS ABOUT ONE VOCABULARY, AND ONLY THAT. Refused BEFORE the
+  // batch is claimed, so a file the plan sent somewhere else costs nothing and
+  // can still be run from the generic Import screen, which is where a
+  // multi-table file belongs. Checked against the target's own declaration
+  // rather than a string: `scopeColumn` is how a target says "my rows carry the
+  // group they belong to", and a target that does not say it cannot be narrowed
+  // by one.
+  if (scope) {
+    const unscopable = plan.order.filter((k) => !TARGETS[k]?.scopeColumn)
+    if (unscopable.length)
+      throw new GuardError(
+        400,
+        "out_of_scope",
+        `This import was started from one module's settings, so it can only add dropdown values. That file also feeds: ${unscopable.join(", ")}. Run it from the Import screen instead.`
+      )
+  }
   const cursor = b.cursor_json ? (JSON.parse(b.cursor_json) as RunCursor) : null
 
   // IDEMPOTENCY (convention · CONCURRENCY.md): atomically CLAIM the batch before writing,
@@ -367,6 +401,23 @@ export async function confirmBatch(
           const row = i + n + 1
           const { mapped, reject } = scan
           if (reject) return { row, skipped: true as const, reason: reject }
+          // OUT OF THIS RUN'S SCOPE — a row naming a group the page that started
+          // the import does not own. SKIPPED WITH A REASON rather than failing
+          // the run, because that is what the rest of this loop already does
+          // with a row it will not write, and because the reason is the whole
+          // value: the person downloads the rejection list, sees "Country is
+          // not one of this page's groups", and takes that file to Settings ›
+          // Accounts. A silently dropped row would look like an import that
+          // worked.
+          if (scope && def.scopeColumn) {
+            const group = (mapped[def.scopeColumn] ?? "").trim()
+            if (!scope.includes(group))
+              return {
+                row,
+                skipped: true as const,
+                reason: `"${group}" is not one of this page's groups (${scope.join(", ")}). Import it from that module's own settings page.`,
+              }
+          }
           const { refs, error } = resolveRow(mapped, def.references ?? [], resolved)
           if (error) return { row, skipped: true as const, reason: error }
           const out = await writeRow(env, request, def, def.buildBody(mapped, refs))

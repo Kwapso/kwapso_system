@@ -941,7 +941,7 @@ item.
 screen to replace at all — every record-detail file
 (`sprint-detail.tsx`, `story-detail.tsx`, `help-detail.tsx`,
 `app-detail.tsx`, `meeting-detail.tsx`, `task-detail.tsx`,
-`selectable-detail.tsx`, `knowledge-detail.tsx`, and others) hand-rolls its
+`knowledge-detail.tsx`, and others) hand-rolls its
 own `copy={{ emptyTitle: … }}` into its own `CollectionFrame`/
 `ShapeStateBody` call. The register it would replace is scattered across as
 many files as there are record types, all inside `screens_detail_charts`'s

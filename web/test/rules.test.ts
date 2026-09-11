@@ -4458,6 +4458,7 @@ describe("RULES — the laws of the base", () => {
       "no-emoji-in-copy", // R66: the four-target pictograph census at the foot of this file — the catalogue (R28's own set), the two translation files, the vocabulary data (seed + migration ledger + the shared mark tables), and the one file that renders a flag on purpose; the predicate is `optionalMark`'s, imported from the write door
     "pinned-toolbar", // R63: the seam guard + the toolbar-owner census (R53's own list, plus the portal's door-searched rows) + the nobody-hand-rolls-the-offset scan + the four declarations of --pinned-chrome-h, above
       "one-identity-per-source", // R68: workers/content/test/one-identity-per-source.test.ts — 0073's migration SQL for the partial unique index, plus a source census over workers/content/src for any identity_key write missing the identityKey() import
+      "automations-are-visible", // R70: web/test/automations.test.ts — the automation registry against four derivations: R30's own branded-send census (shared/rules/email-sites.ts), every wrangler cron, every export of the files that exist only to act, and every automationOff("…") read in worker source
     ])
     for (const r of RULES_REGISTRY) {
       if (r.status === "enforced")
@@ -5697,15 +5698,113 @@ describe("R64 — a team-area section has a door, or names the screen that took 
     // section with no line is a capability nobody can reach — the 2026-09-09
     // regression, exactly. A line for a section that is NOT subtracted is a
     // stale claim that will one day be read as cover for a real gap.
-    const noHost = subtracted.filter((k) => !(k in SECTION_HOSTED_ELSEWHERE))
+    // ── v · THE CONTEXTUAL SECTIONS, AND THE BLINDNESS THAT EARNED THEM ────
+    //
+    // WHAT THIS LAW COULD NOT SEE UNTIL 11 SEP 2026. Everything above walks
+    // `placement: "tab"` rows against the subtraction literal — so a section is
+    // only ever noticed when somebody TAKES it off the "This team" list. A
+    // `placement: "contextual"` row was never on that list to be taken off, so
+    // it could not be subtracted, could not be counted, and could carry real
+    // capability with nothing linking to it under a permanently green build.
+    //
+    // That is not hypothetical. On 2026-09-01 `dropdowns` was moved from "tab"
+    // to "contextual" on the reasoning that Settings' Choices tab was "the one
+    // place that link is offered now", and `ManageDropdownsLink` was repointed
+    // at `?tab=choices` the same day. From that moment NOTHING in the app
+    // linked to `/t/<teamId>/dropdowns` — a screen with an import door, an
+    // export and a record split — and it sat there for ten days. The law that
+    // exists to catch exactly this shape watched it happen.
+    //
+    // A LINK CENSUS, WHICH THE TAB HALF DELIBERATELY REFUSES — and the reason
+    // the two halves differ is the whole argument. This law's own header says a
+    // link census "cannot see the one real door" for a TAB section, because
+    // that door is written `/t/${teamId}/${item.id}` over a derived list: the
+    // segment is a variable and no static read resolves it. A CONTEXTUAL
+    // section is never in that list by construction, so the objection does not
+    // apply to it, and a literal is the only kind of door it can have.
+    //
+    // ENDS AT THE SEGMENT, which is the clause with the teeth and is R64's own
+    // earned lesson read once more. The 2026-09-09 regression was found by a
+    // census that located exactly ONE link into the team area and it pointed at
+    // a member's RECORD rather than the collection — so a match on
+    // `/dropdowns/${v.id}` must NOT count as a door to `/dropdowns`. The path
+    // has to STOP at the segment: a backtick, a quote, or a `?`.
+    //
+    // THE COST, STATED: this can only see a path written as a literal. A
+    // contextual section reached by a computed segment reads as unreachable and
+    // needs a `SECTION_HOSTED_ELSEWHERE` line saying where a person finds it —
+    // which is the same sentence a genuinely orphaned one needs, and is a
+    // reviewer reading a claim rather than a build going quiet.
+    //
+    // KEY *AND* SEGMENT, because they are two different words doing two
+    // different jobs and this clause needs both: `SECTION_HOSTED_ELSEWHERE` is
+    // keyed by KEY (the tab half above subtracts keys), while the door is an
+    // ADDRESS and an address is built from the SEGMENT. Every row in the table
+    // happens to spell them the same today, which is exactly why reading one
+    // twice would pass its own tests and go wrong the first time a section's
+    // URL differs from its key — this check's first draft did it, and a
+    // deliberately mismatched row is what caught it.
+    const contextual = [...table.matchAll(/\{\s*key:\s*"([a-z0-9-]+)"[^}]*\}/g)]
+      .filter((m) => /placement:\s*"contextual"/.test(m[0]))
+      .map((m) => ({ key: m[1], segment: /segment:\s*"([a-z0-9-]+)"/.exec(m[0])?.[1] ?? "" }))
+    // TRIPWIRE 2b — the contextual parse. Same reason as tripwire 1: a set
+    // relation against an empty set is empty, and a regex that stopped matching
+    // would report every contextual section perfectly doored.
+    expect(
+      contextual.length,
+      `R64 — read no \`placement: "contextual"\` section out of TEAM_SECTIONS. Either every section is on the team area's strip again (a decision, not a green build) or the slice above stopped matching ${PAGES_REL}`
+    ).toBeGreaterThan(0)
+
+    const reached = new Set<string>()
+    let linkFilesScanned = 0
+    for (const f of sourceFiles([join(WEB, "app"), join(WEB, "components"), join(WEB, "lib")], {
+      extensions: [".ts", ".tsx"],
+      relativeTo: ROOT,
+      skipTests: true,
+    })) {
+      linkFilesScanned++
+      // COMMENTS OFF. This law's own account of the `dropdowns` orphan is
+      // written into web/lib/pages.ts beside the row it removed, and it quotes
+      // the very address nothing linked to — a census that read prose would find
+      // the door it exists to prove is missing.
+      const code = stripComments(f.source)
+      for (const c of contextual)
+        if (c.segment && new RegExp(`(?<![\\w-])/${c.segment}(?=[\`"'?])`).test(code)) reached.add(c.key)
+    }
+    // TRIPWIRE 2c — the scan walked files AND found real doors. Without the
+    // second half a broken regex would mark every contextual section orphaned,
+    // which fails loudly; with it, a regex that matched EVERYTHING would be
+    // caught too, because `orphaned` would be empty for the wrong reason.
+    expect(
+      linkFilesScanned,
+      "R64 — the contextual-door census walked no files; the scan is blind (a moved root, a broken sourceFiles call)"
+    ).toBeGreaterThan(100)
+    expect(
+      [...reached].sort(),
+      `R64 — the contextual-door census found no literal door to any contextual section. Either every one of them is orphaned (which this check is about to say, loudly, and which would be a real finding) or the path pattern stopped matching — check it before trusting the list below`
+    ).not.toEqual([])
+
+    // A CONTEXTUAL SECTION WITH NO SEGMENT AT ALL is the team overview's own
+    // shape (`segment: ""`), and it has no address to link to — so it can never
+    // be "reached" and always owes a line. Written as part of the filter rather
+    // than skipped, because skipping it is exactly how a section with no address
+    // would become invisible to the law about addresses.
+    const orphanedContextual = contextual.filter((c) => !reached.has(c.key)).map((c) => c.key)
+
+    // ── vi · ONE LIST, BOTH KINDS OF DOORLESS SECTION ──────────────────────
+    // A subtracted TAB section and an unreached CONTEXTUAL one are the same
+    // fault — a section of the app a person cannot get to — so they answer to
+    // the same registry and the same rot-check.
+    const doorless = [...subtracted, ...orphanedContextual]
+    const noHost = doorless.filter((k) => !(k in SECTION_HOSTED_ELSEWHERE))
     expect(
       noHost,
-      `R64 — these sections were taken off the "This team" list and nothing says where their material went: ${noHost.join(", ")}. Nothing in the app links to /t/<teamId>/<segment> for them, so whatever they carried is unreachable. Build the material into a screen a person can actually reach and add a SECTION_HOSTED_ELSEWHERE line naming that file — never the other way round`
+      `R64 — these sections have no door and nothing says where their material went: ${noHost.join(", ")}. Nothing in the app opens /t/<teamId>/<segment> for them, so whatever they carried is unreachable. Build the material into a screen a person can actually reach and add a SECTION_HOSTED_ELSEWHERE line naming that file — never the other way round`
     ).toEqual([])
-    const stale = Object.keys(SECTION_HOSTED_ELSEWHERE).filter((k) => !subtracted.includes(k))
+    const stale = Object.keys(SECTION_HOSTED_ELSEWHERE).filter((k) => !doorless.includes(k))
     expect(
       stale,
-      `R64 — SECTION_HOSTED_ELSEWHERE names a section that is not subtracted from the "This team" list: ${stale.join(", ")}. It has its own door back, or it stopped existing; either way the line can only shrink this list, so delete it`
+      `R64 — SECTION_HOSTED_ELSEWHERE names a section that HAS a door: ${stale.join(", ")}. It is back on the "This team" list, or something links to it, or it stopped existing; either way the line can only shrink this list, so delete it`
     ).toEqual([])
 
     // …and the sentence is a real one. A path with no explanation is a line the
@@ -5758,7 +5857,7 @@ describe("R64 — a team-area section has a door, or names the screen that took 
     ).toBeGreaterThan(0)
 
     const missing: string[] = []
-    for (const key of subtracted) {
+    for (const key of doorless) {
       const rel = /\(([a-z0-9/.-]+\.tsx?)\)/.exec(SECTION_HOSTED_ELSEWHERE[key])?.[1] ?? ""
       expect(
         rel,

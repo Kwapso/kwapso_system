@@ -45,6 +45,7 @@
 // meeting whose transcript never appears is retried every fifteen minutes
 // forever, and the newest meetings queue behind a backlog that can never drain.
 
+import { automationOff } from "@shared/workers/automations"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { Actor } from "@shared/workers/activity"
 import { causeOf, type MemberGuard } from "@shared/workers/gating"
@@ -146,6 +147,23 @@ export async function googleAutopilot(
   const errors: AutopilotResult["errors"] = []
   let captured = 0
 
+  // THE TEAM'S OWN TWO SWITCHES (R70, `shared/automations.ts`). Read ONCE for
+  // the whole tick rather than per person, because a switch is a fact about the
+  // team and the loop below can run to fifty people — and read on a CRON, where
+  // there is no response for the trip to be on the path of.
+  //
+  // TWO SWITCHES AND NOT ONE, because this function does two different things to
+  // two different modules, and the client's ruling is that an automation is
+  // visible on the module it belongs to: reading somebody's Drive into the
+  // knowledge base is a knowledge automation, and writing down what was said in
+  // a meeting is a meetings one. A team can want either without the other.
+  // Absent means ON for both.
+  const [googleOff, transcriptsOff] = await Promise.all([
+    automationOff(cfg, team.databaseId, "knowledge.google-autopilot"),
+    automationOff(cfg, team.databaseId, "meetings.transcript-capture"),
+  ])
+  if (googleOff && transcriptsOff) return { people: 0, captured, errors }
+
   let people: string[] = []
   try {
     people = await peopleToSweep(cfg, { ...base, userId: "system:google-autopilot" } as MemberGuard)
@@ -165,13 +183,13 @@ export async function googleAutopilot(
       // No `onlyIfStale`: the five-minute floor exists to stop a BROWSER asking
       // twice on one page load, and a tick that already waited fifteen minutes
       // has nothing to be protected from.
-      await sweepGoogle(env, cfg, guard)
+      if (!googleOff) await sweepGoogle(env, cfg, guard)
     } catch (e) {
       errors.push({ userId, where: "google sweep", message: causeOf(e) })
     }
 
     try {
-      for (const meetingId of await meetingsToTry(cfg, guard, now)) {
+      for (const meetingId of transcriptsOff ? [] : await meetingsToTry(cfg, guard, now)) {
         try {
           // A try that finds nothing writes nothing and will be tried again next
           // tick, until the horizon passes. That is the same behaviour the manual

@@ -1299,12 +1299,17 @@ export function HelpFormDialog({
           searchPlaceholder={t("Search types…")}
           // A ROW CANNOT SAY "nothing matched" — there is no search box in it —
           // so this is the state where the team's own `Ticket type` list is
-          // EMPTY, every word deactivated on the Choices screen. The same
+          // EMPTY, every word deactivated on Settings › Tickets (the Choices
+          // screen it used to name was retired on 2026-09-11). The same
           // sentence the triage card's row says about the same vocabulary.
           emptyText={t("Your team has no ticket types set up yet.")}
           disabled={busy}
         />
-        <ManageDropdownsLink teamId={teamId ?? null} />
+        {/* THE SIGNPOST POINTS AT THE MODULE, not at a wall of every group the
+            team has — `tickets`, because the row above it is the `Ticket type`
+            vocabulary and `MODULE_SETTINGS` puts that group on Settings ›
+            Tickets (client, 2026-09-11, retiring the general Choices tab). */}
+        <ManageDropdownsLink teamId={teamId ?? null} segment="tickets" />
       </Field>
       {/* WHAT TO CALL IT, above the paragraph rather than below it: this is the
           line the triage card, the list's title column and the ticket's own

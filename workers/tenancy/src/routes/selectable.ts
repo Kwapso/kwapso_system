@@ -19,6 +19,7 @@ import {
   updateSelectable,
   listSelectableForExport,
   countSelectable,
+  selectableGroupScope,
 } from "../lib/selectable"
 import type { Env } from "../env"
 
@@ -43,14 +44,35 @@ export async function getSelectable(request: Request, env: Env): Promise<Respons
 
 /** GET /api/tenancy/selectable/export — the team's dropdown values as a full-field
  * CSV (EXPORT NEEDS READ; team-bound). Columns lead with the import format
- * (type, value) so the file round-trips through the CSV importer. */
+ * (type, value) so the file round-trips through the CSV importer.
+ *
+ * `?groups=A,B` NARROWS IT TO NAMED GROUPS, since 11 Sep 2026. The client's
+ * ruling when the Choices tab was retired: *"each module's settings page gets
+ * its own import and export for its own groups… nothing sits outside
+ * Settings."* So Settings › Tickets exports ticket types and Settings ›
+ * Accounts exports industries and countries, and the narrowing is the DOOR'S —
+ * filtering a whole-vocabulary answer in the browser would have been a button
+ * that reads more than the page it sits on says it can.
+ *
+ * NO PARAMETER IS THE WHOLE VOCABULARY, unchanged: that is what the agent's own
+ * capability brief, `export_dropdown_values_csv` and any client written before
+ * today ask for, and a scope that defaults to something would be a door whose
+ * answer changed under them. `selectableGroupScope` (lib/selectable.ts) is the
+ * one place the string becomes a list and carries the whole validation
+ * argument (R20). */
 export async function getSelectableExport(request: Request, env: Env): Promise<Response> {
   const { cfg, guard } = await gated(request, env, "selectable_data", "read")
   await refusePortalCaller(cfg, guard)
-  const { rows, complete } = await listSelectableForExport(cfg, guard)
+  // R20, POSITIONALLY: the query value sits in `queryText`'s first argument —
+  // type-checked, NUL-stripped and length-capped there — before anything splits
+  // it. A cast would not be a check, and neither would `sqlString` downstream.
+  const scope = selectableGroupScope(
+    queryText(new URL(request.url).searchParams.get("groups"), "Groups")
+  )
+  const { rows, complete } = await listSelectableForExport(cfg, guard, scope)
   // Whole, or an error — never a short file that looks like the vocabulary.
   if (!complete)
-    return exportTooLarge(EXPORT_HARD_CAP, "dropdown values", "Read the Dropdown values screen instead, or retire the options you no longer offer.")
+    return exportTooLarge(EXPORT_HARD_CAP, "dropdown values", "Narrow it with ?groups=, or retire the options you no longer offer on that module's settings page.")
   const csv = toCsv(
     ["type", "value", "active", "created_at", "created_by"],
     rows.map((r) => [r.type, r.value, r.deactivated_at == null, r.created_at, r.creator_name])

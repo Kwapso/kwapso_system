@@ -28,6 +28,8 @@ import { TabsView, defaultTabsConfig } from "@shared/web/screen-engine/tabs-view
 import { useRemembered } from "@shared/web/remembered"
 import { CaretRight, Palette, PencilSimple } from "@shared/ui/foundations/icons"
 import { Headline } from "@shared/ui/components/typography/typography"
+
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 
 import { LegalDetailsDialog } from "@/components/team/legal-details-dialog"
@@ -115,6 +117,18 @@ export function KwapsoScreen({
             <Button variant="secondary" size="icon" onClick={() => setEditOpen(true)} aria-label={t("Edit")}>
               <PencilSimple className="size-3.5" />
             </Button>
+            {/* HOUSEKEEPING (R61's gear, R70's page) — the installation's own
+                nightly work: the clear-out, the growth alarm, the fault report
+                and the watchdog that notices when the other three have stopped.
+                It is mounted HERE, on the app's own record, because the estate
+                belongs to no module and this is the screen about the thing
+                itself. `/settings/team` is its address for the reason
+                `MODULE_SETTINGS` gives: `teams` is the permission this base
+                already treats as "this team's own settings", and it is the one
+                right that module offers. Nothing on that page is switchable and
+                the page says why — which is the half of the client's ruling
+                that is about SEEING rather than about choosing. */}
+            <ModuleSettingsGear teamId={teamId} segment="team" />
           </div>
         )}
       </div>

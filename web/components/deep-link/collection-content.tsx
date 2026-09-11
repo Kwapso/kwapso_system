@@ -44,6 +44,7 @@ import {
 } from "@/components/team/internal-screens"
 import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
@@ -329,6 +330,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <BrandLibraryScreen
         rows={brandQ.data}
+        teamId={teamId ?? null}
         recipe={recipe}
         rights={rights}
         total={totals.brand_assets}
@@ -405,7 +407,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <CountedAbove active={accountsBadge !== ""}>
       <div className="flex flex-col gap-4">
-        <CollectionHeading sectionKey="accounts" total={totals.accounts} />
+        {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the industries and
+            countries an account is filed under (`accounts.industry`,
+            `accounts.country`). The heading's `action` slot rather than the
+            toolbar, which R50 withdraws entirely from a team with no accounts
+            yet — the exact moment the words matter. */}
+        <CollectionHeading sectionKey="accounts" total={totals.accounts} action={<ModuleSettingsGear teamId={teamId ?? null} segment="accounts" />} />
         {/* THE CANONICAL SHAPE (client, 31 Aug 2026, a reference screenshot of
             the kit's own collection composition — the "mini app" demo at
             verify/, lorem-ipsum data, dark mode): title, then tabs INSIDE the
@@ -635,7 +642,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             counted tab strip wins the arbitration, which leaves the button on
             the band by itself and is still correct. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+          {/* THE GEAR (R61) — the sweep, the Google pass and the two
+              retirement passes are listed on this module's own settings page
+              (R70, client 2026-09-11). */}
+          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} action={<ModuleSettingsGear teamId={teamId ?? null} segment="knowledge" />} />
           {/* Inline on the heading band, so no caption: a toolbar control that
               explains itself in two lines pushes the heading it sits beside out
               of alignment, and this screen's own title already says what the

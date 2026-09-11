@@ -370,6 +370,10 @@ const DIRECT_READDIR: Record<string, string> = {
     "roster read, and the roster IS the law: R58 asks whether a path this repo NAMES resolves, so the set of names it will accept has to be the repository's own top-level folders read off disk. A hand-typed list is the exact fault that was fixed on 9 Sep 2026 — the old pattern's folder list had fallen behind the tree and `db/`, `tools/`, `types/` and `documents/` were invisible to it. It lists the root and never descends; every file it then READS goes through sourceFiles",
   "web/test/backup-covers-r2.test.ts":
     "roster read: the workers with a wrangler.jsonc, to build the src/ roots it then hands to sourceFiles and to find each one's r2_buckets",
+  "shared/rules/email-sites.ts":
+    "roster read, and it is the read `linked-emails.test.ts` already had — the per-worker src/ roots it hands to sourceFiles to find every email-composing function. It moved here on 2026-09-11 so R30 and R70 stand on ONE census of what an email is rather than two that can drift; the walk itself is still sourceFiles",
+  "web/test/automations.test.ts":
+    "roster read, twice, and both are the question R70 asks. The per-worker src/ roots it hands to sourceFiles (every place an `automationOff` flag can be consulted), and the worker directories whose `wrangler.jsonc` declares a cron — a schedule is a deployment fact, so the configs have to be enumerated off disk exactly as `public-surface.test.ts` enumerates them",
 }
 
 describe("no law walks a directory tree by hand", () => {

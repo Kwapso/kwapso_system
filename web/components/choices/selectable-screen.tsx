@@ -1,13 +1,35 @@
 "use client"
 
-// Choices ("selectable data", formerly "Dropdown values") manager — host-composed,
-// the "Choices" tab on the app-level Settings screen (2026-09-01; it used to be a
-// tab on the team area's own strip — `/t/<teamId>/dropdowns` still resolves there,
-// unlinked, for anything that still points at it). Lists the team's values grouped
-// by TYPE (with the standard search + status filter), and lets admins add a value
-// (via the shared form dialog — Law R4, like every other create), rename one, or
-// deactivate/reactivate one. Gated by the selectable_data module; the server
-// re-checks every write. Library primitives only.
+// Choices ("selectable data", formerly "Dropdown values") manager — host-composed.
+// Lists a team's values grouped by TYPE (with the standard search + status filter),
+// and lets admins add a value (via the shared form dialog — Law R4, like every
+// other create), rename one, deactivate/reactivate one, import and export them.
+// Gated by the selectable_data module; the server re-checks every write. Library
+// primitives only.
+//
+// ── IT IS ALWAYS A SECTION OF A MODULE'S SETTINGS PAGE, SINCE 11 SEP 2026 ────
+//
+// It had two mountings for ten days: the WHOLE vocabulary (the "Choices" tab on
+// Settings, and before that `/t/<teamId>/dropdowns` on the team area's own
+// strip), and a narrowed one — `scope` — inside a module's settings page. The
+// client ended the first: *"implement this module settings across app: … End
+// goal: kill the big tab 'choice options'."*
+//
+// So `scope` is REQUIRED and there is no unscoped path left. Three props went
+// with it and each one only ever existed to serve a whole-vocabulary screen:
+//
+//   • `standalone`, which drew the registry's own page-sized heading and count
+//     (R16 ii). A section inside a page is never the page.
+//   • `onOpen`, the row's link to a value's own RECORD screen. That screen was
+//     retired the same day — this link was its only door — and a settings page
+//     does not navigate out of Settings ("Everything should be in different
+//     containers… not taken anywhere else", client, 2026-09-09).
+//   • the unscoped branches of `types`, `values` and the heading, which offered
+//     a FREE GROUP NAME on create. That is the one capability this move loses:
+//     a team can no longer invent a group. It is recorded rather than
+//     discovered, here and in settings-screen.tsx's header — a team-invented
+//     group is unused by construction, because nothing reads a word no module
+//     stores, so what went is the ability to make rows nothing consults.
 
 import * as React from "react"
 import { useRemembered } from "@shared/web/remembered"
@@ -43,8 +65,8 @@ import { useT } from "@shared/web/language"
 import { AddButton, CollectionCard, ToolbarRow } from "@/components/deep-link/screen-bits"
 import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 import { useVirtualRows } from "@shared/ui/components/use-virtual-rows/use-virtual-rows"
+import { safeHref } from "@shared/web/rich-text"
 import { useConfirm } from "@shared/web/use-confirm"
-import { CollectionHeading } from "@/components/records/collection-heading"
 
 /** WHAT A DROPDOWN VALUE MAY BE ORDERED BY. "Value" reorders the words INSIDE
  * one group (the group itself stays put, alphabetical); "Group" reorders the
@@ -63,7 +85,6 @@ const VALUE_SORTS: SortOption[] = [
  * paths cannot draw a value two different ways. */
 interface RowContext {
   teamId: string
-  onOpen?: (id: string) => void
   canEdit: boolean
   canDelete: boolean
   editingId: string | null
@@ -326,7 +347,7 @@ function ValueRow({
   posinset?: number
   setsize?: number
 }) {
-  const { teamId, onOpen, editingId, t } = ctx
+  const { editingId, t } = ctx
   return (
     <li
       ref={rowRef}
@@ -348,29 +369,16 @@ function ValueRow({
               {v.mark}
             </span>
           )}
-          {/* THE WORD OPENS ITS RECORD. A real href so the row can
-              be middle-clicked, copied and opened in a new tab,
-              with the plain left click intercepted into the
-              History-API move — the pattern app-tiles.tsx uses,
-              and the reason it is a pattern rather than a bare
-              anchor is that a bare anchor to an in-app path is a
-              full page reload of the whole shell. */}
-          {onOpen ? (
-            <a
-              href={`/t/${teamId}/dropdowns/${v.id}`}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
-                  return
-                e.preventDefault()
-                onOpen(v.id)
-              }}
-              className="flex-1 text-sm underline-offset-2 hover:underline"
-            >
-              {v.value}
-            </a>
-          ) : (
-            <span className="flex-1 text-sm">{v.value}</span>
-          )}
+          {/* THE WORD, AND IT OPENS NOTHING. It used to be a real anchor to
+              `/t/<teamId>/dropdowns/<id>`, a value's own record screen — and
+              this row was that screen's only door anywhere in the app. Both
+              went on 11 Sep 2026 with the whole-vocabulary screen (see this
+              file's header): a settings page does not navigate out of
+              Settings, and everything the record screen offered to CHANGE is
+              on this row already. What it alone carried — who made the value
+              and when, and its own history — is read in the team's activity
+              feed, which covers `selectable_data` like any other table. */}
+          <span className="flex-1 text-sm">{v.value}</span>
           {!v.active && (
             <Badge variant="secondary" className="shrink-0">
               {t("Inactive")}
@@ -536,28 +544,18 @@ export interface SelectableScope {
 export function SelectableScreen({
   teamId,
   onImport,
-  onOpen,
-  standalone = true,
   scope,
 }: {
   teamId: string
-  /** Host-provided soft-nav to the import wizard (pre-targeted to dropdown values). */
+  /** Host-provided soft-nav to the import wizard, pre-targeted to dropdown
+   * values AND to this section's own groups. The host owns the URL shape; this
+   * screen knows there is an importer and not where it lives. */
   onImport?: () => void
-  /** Host-provided soft-nav to ONE value's record (Overview + Activity, Law R2).
-   * The host owns the URL shape, exactly as it does for the import wizard above —
-   * this screen knows a value has a record and not where the record lives. */
-  onOpen?: (id: string) => void
-  /** Whether this is a whole page (`/t/<teamId>/dropdowns`, still resolves for
-   * anything unlinked that points at it — module-content.tsx) or one tab of the
-   * Settings screen (settings-screen.tsx, "Choices"). A page names and counts
-   * itself through the registry's own `CollectionHeading` (R16 ii); a tab
-   * already has its own name on the strip above it, so a second, page-sized
-   * heading inside the panel would be the count and the title said twice. */
-  standalone?: boolean
-  /** Present when this editor is one section of a module's own settings page —
-   * see `SelectableScope` above. Absent everywhere else, which is the team's
-   * whole vocabulary and exactly what this screen has always shown. */
-  scope?: SelectableScope
+  /** WHICH GROUPS THIS MOUNTING IS ABOUT — see `SelectableScope` above.
+   * REQUIRED since 11 Sep 2026: every mounting is one section of one module's
+   * settings page, because the whole-vocabulary screen is gone (this file's
+   * header carries the ruling and what it cost). */
+  scope: SelectableScope
 }) {
   const t = useT()
   const { can } = usePermissions(teamId)
@@ -569,7 +567,7 @@ export function SelectableScreen({
   // Both have to say yes: a right the caller does not hold, and a vocabulary
   // with nothing to add, are two different reasons for the same absent button
   // and neither one may be inferred from the other.
-  const canCreate = can("selectable_data", "create") && (scope?.create ?? true)
+  const canCreate = can("selectable_data", "create") && scope.create
   const canEdit = can("selectable_data", "edit")
   const canDelete = can("selectable_data", "delete")
 
@@ -614,14 +612,14 @@ export function SelectableScreen({
   // `selectable:<teamId>` cache key (R56 — a component asks a door once). A
   // per-scope key would fetch the same rows a second time and then hold two
   // copies that a rename on either screen could leave disagreeing.
-  const values = (valuesQ.data ?? []).filter((v) => !scope || scope.types.includes(v.type))
+  const values = (valuesQ.data ?? []).filter((v) => scope.types.includes(v.type))
   // WHAT THE CREATE DIALOG OFFERS AS A GROUP. Unscoped, that is every type the
   // team already has (not just the filtered ones), so you can always add to any
   // existing group. Scoped, it is the page's OWN declared types rather than the
   // ones that happen to have a row today — a module settings page that has
   // never had a single "Ticket status" would otherwise offer no way to make the
   // first one, which is the one moment the offer matters most.
-  const types = scope ? [...scope.types].sort() : Array.from(new Set(values.map((v) => v.type))).sort()
+  const types = [...scope.types].sort()
   // The list is the filtered set, grouped by type.
   const q = query.trim().toLowerCase()
   const filtered = values.filter(
@@ -733,34 +731,26 @@ export function SelectableScreen({
   // Bundled once so `GroupValues`/`ValueRow` take one prop instead of
   // fourteen — every group reads the SAME state and handlers, never its own.
   const rowCtx: RowContext = {
-    teamId, onOpen, canEdit, canDelete, editingId, editValue, editMark, savingId,
+    teamId, canEdit, canDelete, editingId, editValue, editMark, savingId,
     setEditingId, setEditValue, setEditMark, saveRename, setDefault, setActive,
-    colour: scope?.colour, t,
+    colour: scope.colour, t,
   }
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        {/* THE REGISTRY'S OWN HEADING, standalone only (R16 ii) — the "Choices"
-            page names and counts itself here; the "Choices" TAB on Settings
-            already carries that name on the strip above this panel, so a
-            second, page-sized title inside it would say the name and the
-            count twice (R16). Embedded, only the description line stays. */}
-        {standalone ? (
-          <CollectionHeading sectionKey="dropdowns" total={values.length} />
-        ) : (
-          /* SCOPED, THE SECTION SAYS WHICH SLICE IT IS. A module settings page
-             stacks several sections on one screen, so "Choices" as a heading
-             would name the mechanism rather than the subject and would be the
-             same word over each of them. `scope.title` is the section's own
-             name, supplied by the page (see `SelectableScope`). */
-          <Headline as="h2" size="h4">{scope ? scope.title : t("Choices")}</Headline>
-        )}
-        <p className="text-muted-foreground mt-1 text-sm">
-          {scope
-            ? scope.description
-            : t("The options behind your team's dropdowns. Ticket types, Sprint types and more. Pick a group, or start a new one.")}
-        </p>
+        {/* THE SECTION SAYS WHICH SLICE IT IS. A module settings page stacks
+            several sections on one screen, so "Choices" as a heading would name
+            the mechanism rather than the subject and would be the same word
+            over each of them. `scope.title` is the section's own name, supplied
+            by the page (see `SelectableScope`).
+
+            NO `CollectionHeading` AND NO COUNT (R16 ii). This used to branch on
+            `standalone`, because the whole-vocabulary SCREEN named and counted
+            itself through the registry; a section inside a page is never the
+            page, and the page above already carries the title. */}
+        <Headline as="h2" size="h4">{scope.title}</Headline>
+        <p className="text-muted-foreground mt-1 text-sm">{scope.description}</p>
       </div>
 
       {canCreate && (
@@ -838,18 +828,41 @@ export function SelectableScreen({
             }
             actions={
               <>
-                {/* THE CSV DOORS ARE THE WHOLE VOCABULARY'S, SO A SLICE DOES NOT
-                    OFFER THEM. `/api/tenancy/selectable/export` writes every
-                    group the team has and the importer reads the same shape
-                    back; hanging either off a page titled "Ticket settings"
-                    would be a button that quietly does more than the page it
-                    sits on says it can. Both stay on Settings › Choices, which
-                    is the screen that is about all of them. (`onImport` is
-                    host-provided and the module settings page passes none — the
-                    export is the half this component owns, so it asks here.) */}
-                {!scope && values.length > 0 && (
+                {/* ── THE CSV DOORS, NARROWED — 11 SEP 2026 ────────────────
+                    THIS BLOCK USED TO WITHHOLD EXPORT FROM A SCOPED MOUNTING,
+                    and the reason it gave was true when it was written: the
+                    doors acted on the WHOLE vocabulary, so "hanging either off
+                    a page titled 'Ticket settings' would be a button that
+                    quietly does more than the page it sits on says it can."
+                    THAT REASON IS OBSOLETE, and it is recorded here rather than
+                    deleted because the argument is what makes the new shape
+                    right. The client ruled the whole-vocabulary screen away and
+                    said where its two doors went: *"each module's settings page
+                    gets its own import and export for its own groups… nothing
+                    sits outside Settings."*
+
+                    SO THE DOORS THEMSELVES NARROWED, rather than this component
+                    filtering what they hand back. `?groups=` on the export door
+                    reads only these groups out of the database, and the import
+                    door refuses a row in any other group — so the button no
+                    longer does more than the page says, because the DOOR no
+                    longer does. A filter applied here would have been the same
+                    button with a promise this file was keeping on its own.
+
+                    UNSCOPED IS UNCHANGED and is still the whole vocabulary:
+                    that is what the agent's capability brief, MCP's
+                    `export_dropdown_values_csv` and any saved link already ask
+                    for. */}
+                {values.length > 0 && (
                   <a
-                    href="/api/tenancy/selectable/export"
+                    // THROUGH THE SEAM, like every other bound URL in the app
+                    // (`safeHref`, shared/web/rich-text.ts). The groups come
+                    // from `MODULE_SETTINGS`, a code constant, so nothing a
+                    // person typed is in this string — and that is exactly the
+                    // argument every unchecked href has ever been defended
+                    // with, which is why the census reads the EXPRESSION and
+                    // not the argument.
+                    href={safeHref(tenancy.selectableExportHref(scope.types)) ?? ""}
                     className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
                   >
                     <Download className="size-4" aria-hidden /> {t("Export CSV")}

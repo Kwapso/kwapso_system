@@ -5,6 +5,7 @@
 // deactivate) live here.
 
 import type { TeamMember, TeamRole } from "@shared/types"
+import { automationOff } from "@shared/workers/automations"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { AccountScope } from "@shared/workers/account-scope"
@@ -263,6 +264,13 @@ export async function changeMemberRole(
   // back to their membership at all: a client login is an ordinary team member
   // holding an ordinary role, so this path reaches both kinds of person, and the
   // portal has no members screen to send one of them to.
+  // THE TEAM'S OWN SWITCH (R70, `shared/automations.ts`). ON THE RESPONSE PATH,
+  // and that is a decision rather than an oversight: this send is AWAITED on
+  // purpose (the screen reports whether it went), so the flag has to be read
+  // here too. What it costs is one bounded SELECT by primary key, on an
+  // administrative act a team performs a handful of times a month, inside a
+  // handler that already makes several database trips. Absent means ON.
+  if (await automationOff(cfg, guard.databaseId, "members.role-changed-email")) return
   const clients = await clientUserIds(cfg, guard.databaseId, [targetUserId])
   await notifyRoleChanged(env, guard.teamId, t.email, actor.name, roles[0].title, {
     userId: targetUserId,
@@ -315,5 +323,8 @@ export async function removeMember(
   })
 
   // Tell the removed member — they didn't make this change but it affects them.
+  // The team's own switch (R70), read here for the same reason as the role
+  // notice above: this send is awaited, so this is where the question lives.
+  if (await automationOff(cfg, guard.databaseId, "members.removed-email")) return
   await notifyRemoved(env, guard.teamId, t.email, actor.name)
 }

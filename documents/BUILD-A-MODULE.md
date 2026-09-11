@@ -999,6 +999,22 @@ again, which is the only property that matters here.
   `googleIdentity()`/`uploadIdentity()`/`identityKey()`, the one seam, or the
   check that reads every write of `identity_key` in `workers/content/src/`
   will find yours missing the import.
+- **R70 `automations-are-visible`** — if your module does ANYTHING without being
+  asked — sends a message, runs on a cron, changes a record from inside somebody
+  else's click — that behaviour is an entry in `AUTOMATIONS`
+  (`shared/automations.ts`) naming the `MODULE_SETTINGS` segment whose page
+  carries its row, with a name and a sentence a person reads. Then answer
+  `switchable`. **`true`** means you also READ the flag at the automation itself
+  (`automationOff(cfg, guard.databaseId, "<your key>")`, from
+  `shared/workers/automations.ts`) — a switch nothing consults is the fault this
+  law exists for, and the check proves the read off your worker's own source.
+  **`false`** means you write `helpText`: the reason, in one sentence, SHOWN on
+  the page under the place the switch would have been. Absent means ON, so
+  nothing you add here changes what an existing team gets; and the word stored
+  is `"off"`, never `false`, so a deliberate silence and a forgotten setting can
+  never look alike. Four censuses hold it: every branded send, every
+  `triggers.crons` entry in your `wrangler.jsonc`, every export of a file whose
+  whole job is acting by itself, and every flag read.
 
 **The words** (the ones that catch every new module, every time)
 

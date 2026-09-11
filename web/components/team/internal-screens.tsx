@@ -21,6 +21,7 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { SectionWithCreate } from "@/components/deep-link/screen-bits"
 import { shapeBrandList, shapePurposesList } from "@/components/deep-link/shape"
 import { withDataDrivenCollection } from "@/lib/screens"
@@ -99,14 +100,34 @@ function InternalCollection({
   )
 }
 
-export function BrandLibraryScreen(props: InternalScreenProps<BrandAsset>) {
-  const { rows, ...rest } = props
+/** THE BRAND LIBRARY, and the one of the two that has settings.
+ *
+ * `teamId` IS ITS OWN PROP RATHER THAN A FIELD ON `InternalScreenProps`, because
+ * the bundle above is "the same screen twice" and this is the half where the two
+ * stop being the same: a brand asset's CATEGORY is stored on
+ * `brand_assets.category` (`shared/selectable-homes.ts`), so this module owns a
+ * vocabulary and Meeting purposes does not. Putting the prop on the shared type
+ * would hand `PurposesScreen` a value it has nothing to do with. */
+export function BrandLibraryScreen(
+  props: InternalScreenProps<BrandAsset> & { teamId: string | null }
+) {
+  const { rows, teamId, ...rest } = props
   return (
     <InternalCollection
       {...rest}
       createLabel="New asset"
       data={shapeBrandList(rows)}
-      heading={<CollectionHeading sectionKey="brand" total={props.total} />}
+      heading={
+        /* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the categories the
+           library is shelved by. In the heading's `action` slot and never the
+           toolbar: `SectionWithCreate` below draws nothing at all over an empty
+           collection (R50), which is exactly when the shelves matter. */
+        /* ONE LINE, and R16's own census is why: it looks for the literal
+           `<CollectionHeading sectionKey="brand"` to prove this collection
+           names itself, and a prettier break after the tag makes that substring
+           vanish while the screen renders identically. */
+        <CollectionHeading sectionKey="brand" total={props.total} action={<ModuleSettingsGear teamId={teamId} segment="brand" />} />
+      }
     />
   )
 }

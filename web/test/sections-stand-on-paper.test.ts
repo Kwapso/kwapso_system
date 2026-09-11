@@ -94,7 +94,7 @@ import { fileURLToPath } from "node:url"
 import { describe, expect, it } from "vitest"
 
 import ts from "typescript"
-import { sourceFiles } from "@shared/rules/source-scan"
+import { sourceFiles, stripComments } from "@shared/rules/source-scan"
 import { UNCONTAINED_SECTION_OK } from "@shared/rules/registry"
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -109,9 +109,85 @@ const KIT_DIR = join(ROOT, "shared", "ui")
 
 const TOKENS = join(ROOT, "shared", "ui", "foundations", "tokens", "tokens.css")
 
+/** EVERY TOKEN RESOLVED TO A LITERAL, ONCE PER PALETTE — which is what lets the
+ * ground be a COLOUR rather than a name (see `containerFills`). Light is the
+ * `:root` block; dark is everything from the file's first dark selector on, so
+ * both of the kit's dark blocks (`@media (prefers-color-scheme: dark)` and
+ * `[data-theme="dark"]`) are read and the later wins. The kit requires the two
+ * to agree — its own comment says a token defined in only one of them "renders
+ * differently for 'system dark' than for 'I picked dark', and that bug is
+ * miserable to find by eye" — so reading them as one block is reading what the
+ * kit promises, and the tripwire below fails if the split ever stops finding a
+ * real dark palette. A `var()` chain is followed to its literal; a token dark
+ * never overrides falls through to its light value, which is the cascade. */
+function palettes() {
+  // COMMENTS FIRST, and this is not tidiness. `tokens.css` is two-thirds prose:
+  // it quotes declarations inside its own explanations (`--surface-panel:
+  // var(--kw-soft-paper)` appears in three comments), and it discusses
+  // `[data-theme="dark"]` in prose well before the block that declares it. Read
+  // raw, the palette split lands inside a comment and the light map fills up
+  // with sentences — which produces a plausible-looking family that is wrong,
+  // i.e. exactly the silent pass this file's tripwire exists to refuse.
+  //
+  // THROUGH THE ONE SHARED STRIPPER, never a regex typed here: `source-scan`'s
+  // own law (`there is exactly one comment stripper`) caught the two-line
+  // version this originally carried, and it is right to — a hand-rolled
+  // `/\*[\s\S]*?\*/` is blind to a comment marker inside a string, which
+  // `tokens.css` has in its `content:` values. `keepLength` blanks each comment
+  // in place, so the index the dark-block split lands on still means what it
+  // means in the file on disk.
+  const css = stripComments(readFileSync(TOKENS, "utf8"), { keepLength: true })
+  const darkAt = css.search(/@media \(prefers-color-scheme: dark\)|\[data-theme="dark"\]/)
+  const light = new Map<string, string>()
+  const dark = new Map<string, string>()
+  const read = (text: string, into: Map<string, string>) => {
+    for (const m of text.matchAll(/^\s*--([a-z0-9-]+):\s*([^;]+);/gm)) into.set(m[1], m[2].trim())
+  }
+  read(css.slice(0, darkAt), light)
+  read(css.slice(darkAt), dark)
+  const resolve = (which: "light" | "dark", name: string, depth = 0): string => {
+    if (depth > 12) return `?${name}`
+    const v = (which === "dark" ? (dark.get(name) ?? light.get(name)) : light.get(name)) ?? null
+    if (!v) return `?${name}`
+    const m = /^var\(--([a-z0-9-]+)/.exec(v)
+    if (m) return resolve(which, m[1], depth + 1)
+    return v.split("/*")[0].trim().toUpperCase()
+  }
+  return { resolve }
+}
+
 /** THE PAPER FAMILY, off the kit's own tokens. Every `--surface-*` property and
  * every variable one points at; `--surface-page` and `--background` are the
- * GROUND and are the one thing a container is defined against. */
+ * GROUND and are the one thing a container is defined against.
+ *
+ * ── AMENDMENT 1 (2026-09-11): THE GROUND IS A VALUE, NOT A NAME ─────────────
+ *
+ * The version above subtracted the ground by NAME — `--surface-page` and
+ * `--background`, the two tokens that say "ground" in their spelling. Every
+ * other `--surface-*` was a container. But FOUR of them resolve to the page's
+ * own colour: in LIGHT `--card`, `--surface-raised`, `--surface-lift` and
+ * `--surface-selected` are all #FFFEF9, and so is `--background`. Two more
+ * collide in DARK: `--surface-idle` and `--surface-record-footer` are both
+ * #141310, and so is the dark page. So a body painted `bg-card` and standing on
+ * the page was answering "I am contained" at CONTRAST 1.000 — which is not a
+ * near-miss of this law, it IS this law's own worked example. The registry's
+ * own `why` for R67 says it: "in LIGHT `--card`, `--background` and
+ * `--surface-raised` are all #FFFEF9 — so those cards measured contrast 1.000
+ * against the page". The law described the bug in prose and then blessed it in
+ * code.
+ *
+ * So a fill is a container only where it DIFFERS FROM THE GROUND IN BOTH
+ * PALETTES. Both, not either: a container that is invisible in one theme is the
+ * bug this law exists to stop, and half a container is not a cheaper container.
+ * Derived, so the day the kit moves a token's value the family moves with it —
+ * and a token that becomes the page colour leaves the family on its own.
+ *
+ * WHAT THIS DOES NOT SAY. It does not say `bg-card` is never a container: a
+ * raised card on soft paper is the kit's own §2.6 pairing and is exactly right.
+ * It says `bg-card` cannot contain something standing on the PAGE — and by the
+ * time this set is consulted, nothing above has painted, so the page is the
+ * ground. The ancestor walk visits parents before children, so the first
+ * painter it meets is the outermost one, whose ground is the page. */
 function containerFills(): string[] {
   const css = readFileSync(TOKENS, "utf8")
   const family = new Set<string>()
@@ -136,7 +212,31 @@ function containerFills(): string[] {
   family.delete("background")
   // `--kw-*` are the RAW ramp underneath the semantic tokens; nothing in the
   // app may name one (R32 forbids it), so they are not spellable fills.
-  return [...family].filter((n) => !n.startsWith("kw-")).sort()
+  const named = [...family].filter((n) => !n.startsWith("kw-")).sort()
+  // …AND NOW BY VALUE (amendment 1 above). A fill that resolves to the page's
+  // own colour in either palette cannot contain anything standing on the page.
+  const { resolve } = palettes()
+  const groundLight = resolve("light", "background")
+  const groundDark = resolve("dark", "background")
+  return named.filter((n) => resolve("light", n) !== groundLight && resolve("dark", n) !== groundDark)
+}
+
+/** The fills the derivation THREW OUT, kept so the tripwire can prove the
+ * subtraction did something and the failure message can say what it dropped. */
+function groundColoured(): string[] {
+  const css = readFileSync(TOKENS, "utf8")
+  const family = new Set<string>()
+  const aliasedBy = new Map<string, Set<string>>()
+  for (const m of css.matchAll(/^\s*--(surface-[a-z0-9-]+):\s*var\(--([a-z0-9-]+)\)/gm)) {
+    family.add(m[1])
+    if (!aliasedBy.has(m[2])) aliasedBy.set(m[2], new Set())
+    aliasedBy.get(m[2])!.add(m[1])
+  }
+  for (const [alias, sources] of aliasedBy) if (sources.size > 1) family.add(alias)
+  family.delete("surface-page")
+  family.delete("background")
+  const kept = new Set(containerFills())
+  return [...family].filter((n) => !n.startsWith("kw-") && !kept.has(n)).sort()
 }
 
 type Parsed = { rel: string; path: string; tree: ts.SourceFile }
@@ -295,10 +395,134 @@ describe("R67 — a titled section stands on paper", () => {
     return hit
   }
 
+  // ── AMENDMENT 2 (2026-09-11): A COMPONENT PAINTS WHAT THE CALL SITE PICKED ─
+  //
+  // `componentPaints` answers off the component's TEXT, and a `cva` carries
+  // every variant's classes in that text whether or not a caller reaches for
+  // them. So `<CardGrid>` — whose `tone` DEFAULTS to `bare`, which paints
+  // nothing at all — answered "I paint", because the same `cva` two lines down
+  // declares `panel: "… bg-surface-panel …"`. The wall the client reported was
+  // that exact call: a `CardGrid` with no `tone`, holding `Card variant="raised"`
+  // cells, on the bare page. The law looked at it and saw soft paper that was
+  // never on the screen.
+  //
+  // So where a component's fill comes from a `cva`, the VARIANT THE CALL SITE
+  // SELECTS decides — the literal it passes, or `defaultVariants` when it passes
+  // nothing. A prop that is not a literal (`variant={tone ?? "default"}`) cannot
+  // be resolved here and is treated as "may paint" if ANY of that key's options
+  // do, so the walk keeps under-reaching rather than inventing offenders: this
+  // law's stated direction, and the reason a `cva` a component does not actually
+  // call is never read at all.
+  type Cva = { base: string; variants: Map<string, Map<string, string>>; defaults: Map<string, string> }
+  const cvaCache = new Map<string, Cva | null>()
+  function cvaOf(name: string): Cva | null {
+    if (cvaCache.has(name)) return cvaCache.get(name)!
+    cvaCache.set(name, null)
+    const d = declText.get(name)
+    if (!d) return null
+    const file = all.find((f) => f.rel === d.rel)
+    if (!file) return null
+    let found: Cva | null = null
+    const strings = (n: ts.Node): string => {
+      let s = ""
+      const collect = (x: ts.Node) => {
+        if (ts.isStringLiteral(x) || ts.isNoSubstitutionTemplateLiteral(x)) s += ` ${x.text}`
+        ts.forEachChild(x, collect)
+      }
+      collect(n)
+      return s
+    }
+    const visit = (n: ts.Node) => {
+      if (found) return
+      if (
+        ts.isVariableDeclaration(n) &&
+        ts.isIdentifier(n.name) &&
+        n.initializer &&
+        ts.isCallExpression(n.initializer) &&
+        n.initializer.expression.getText() === "cva" &&
+        // ONLY THE `cva` THIS COMPONENT ACTUALLY CALLS. A file may declare
+        // several (card.tsx has one per part); reading a sibling's would answer
+        // about a box this element is not.
+        new RegExp(`\\b${n.name.text}\\s*\\(`).test(d.text)
+      ) {
+        const args = n.initializer.arguments
+        const variants = new Map<string, Map<string, string>>()
+        const defaults = new Map<string, string>()
+        if (args[1] && ts.isObjectLiteralExpression(args[1]))
+          for (const p of args[1].properties) {
+            if (!ts.isPropertyAssignment(p)) continue
+            const key = p.name.getText().replace(/['"]/g, "")
+            if (key === "variants" && ts.isObjectLiteralExpression(p.initializer))
+              for (const vp of p.initializer.properties) {
+                if (!ts.isPropertyAssignment(vp) || !ts.isObjectLiteralExpression(vp.initializer)) continue
+                const opts = new Map<string, string>()
+                for (const op of vp.initializer.properties)
+                  if (ts.isPropertyAssignment(op))
+                    opts.set(op.name.getText().replace(/['"]/g, ""), strings(op.initializer))
+                variants.set(vp.name.getText().replace(/['"]/g, ""), opts)
+              }
+            if (key === "defaultVariants" && ts.isObjectLiteralExpression(p.initializer))
+              for (const dp of p.initializer.properties)
+                if (ts.isPropertyAssignment(dp))
+                  defaults.set(
+                    dp.name.getText().replace(/['"]/g, ""),
+                    dp.initializer.getText().replace(/['"]/g, "")
+                  )
+          }
+        found = { base: args[0] ? strings(args[0]) : "", variants, defaults }
+        return
+      }
+      ts.forEachChild(n, visit)
+    }
+    visit(file.tree)
+    cvaCache.set(name, found)
+    return found
+  }
+
+  /** A string prop's literal value at this call site; `ABSENT` when the prop is
+   * not written at all (so `defaultVariants` decides) and `null` when it is
+   * written but is not a literal (so nothing here can decide). */
+  const ABSENT = Symbol("absent")
+  function literalProp(node: ts.Node, name: string): string | typeof ABSENT | null {
+    const a = ts.isJsxElement(node)
+      ? node.openingElement.attributes
+      : ts.isJsxSelfClosingElement(node)
+        ? node.attributes
+        : null
+    if (!a) return ABSENT
+    for (const p of a.properties) {
+      if (ts.isJsxSpreadAttribute(p)) return null // `{...props}` could carry it
+      if (!ts.isJsxAttribute(p) || p.name.getText() !== name) continue
+      const init = p.initializer
+      if (!init) return "true"
+      if (ts.isStringLiteral(init)) return init.text
+      if (ts.isJsxExpression(init) && init.expression && ts.isStringLiteral(init.expression))
+        return init.expression.text
+      return null
+    }
+    return ABSENT
+  }
+
   const paints = (n: ts.Node): boolean => {
     if (FILL.test(classNameOf(n))) return true
     const t = tagName(n)
-    return !!t && /^[A-Z]/.test(t) && componentPaints(t.split(".")[0])
+    if (!t || !/^[A-Z]/.test(t)) return false
+    const name = t.split(".")[0]
+    const cva = cvaOf(name)
+    // No `cva` to read — the component's own classes are the whole answer, as
+    // they were before this amendment.
+    if (!cva) return componentPaints(name)
+    if (FILL.test(cva.base)) return true
+    for (const [key, opts] of cva.variants) {
+      const passed = literalProp(n, key)
+      if (passed === null) {
+        if ([...opts.values()].some((v) => FILL.test(v))) return true
+        continue
+      }
+      const chosen = passed === ABSENT ? cva.defaults.get(key) : passed
+      if (chosen !== undefined && opts.has(chosen) && FILL.test(opts.get(chosen)!)) return true
+    }
+    return false
   }
   const subtreePaints = (n: ts.Node): boolean => {
     let hit = false
@@ -328,7 +552,7 @@ describe("R67 — a titled section stands on paper", () => {
    * with the teeth. A ternary's two arms, a `&&`'s right-hand side and a
    * `.map()`'s row are each their own body, so a section cannot pass on the
    * strength of the one branch that happens to have a panel in it. */
-  function bodies(node: ts.JsxElement): ts.Node[] {
+  function bodies(node: ts.JsxElement | ts.ArrowFunction | ts.FunctionExpression): ts.Node[] {
     const out: ts.Node[] = []
     const fromChild = (n: ts.Node) => {
       if (ts.isJsxText(n)) return
@@ -383,12 +607,25 @@ describe("R67 — a titled section stands on paper", () => {
         }
       }
     }
-    for (const c of node.children) fromChild(c)
+    // A RENDER PROP's bodies are every expression it can RETURN — the same
+    // per-branch question asked of a different shape of source. A nested
+    // callback's block-bodied `return` is picked up too, which is the `.map()`
+    // row clause read from the other end.
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+      if (ts.isBlock(node.body)) {
+        const walk = (x: ts.Node) => {
+          if (ts.isReturnStatement(x) && x.expression) fromExpr(x.expression)
+          ts.forEachChild(x, walk)
+        }
+        walk(node.body)
+      } else fromExpr(node.body)
+    } else for (const c of node.children) fromChild(c)
     return out
   }
 
   type Finding = { where: string; bare: string[] }
   const titled: Finding[] = []
+  const panelCensus = { hosts: 0, boxed: 0 }
 
   for (const f of app) {
     const visit = (node: ts.Node) => {
@@ -418,6 +655,110 @@ describe("R67 — a titled section stands on paper", () => {
     visit(f.tree)
   }
 
+  // ── AMENDMENT 3 (2026-09-11): A TAB PANEL IS A TITLED SECTION ─────────────
+  //
+  // THE CLIENT, A THIRD TIME, 2026-09-10: "remember in settings modules card,
+  // needs container background." Settings › Modules — a wall of cards on the
+  // bare page. The law above was already written, already enforced, already
+  // green, and could not see it.
+  //
+  // IT COULD NOT SEE IT BY CONSTRUCTION, not by accident. The subject above is
+  // a `<section>` CARRYING A HEADING OF ITS OWN, and a tab panel has no heading
+  // of its own — it is titled by the strip above it, which is the whole point of
+  // a tab strip. So every settings tab, and every record detail's sub-tab, was
+  // outside the law's subject the day the law was written: 14 `renderPanel`
+  // hosts and 70 bodies that no clause here could reach. Two of the client's
+  // three rulings were about a settings TAB. A law that answers her second
+  // sentence and cannot see the screen of her third is not a law that got
+  // unlucky.
+  //
+  // THE SUBJECT IS THE BODY, AND THE SHAPES ARE THE SAME TWO. A panel body is
+  // what `renderPanel` returns, per branch, through exactly the walk the
+  // sections above use. And it passes the same two ways: the `<TabsView>` MOUNT
+  // is boxed by an ancestor — which is what a record detail does, handing its
+  // whole strip to `RecordScreen`'s card, and is why 11 of the 14 hosts ask
+  // nothing further — or every body it draws stands on paper. Without the
+  // ancestor walk at the mount this clause reports 18 offenders and 14 of them
+  // are the record chrome's own container seen from inside; with it, 4. A law
+  // that cannot see the box a screen is already standing in would have been
+  // answered by wrapping every panel in a second one, which is the "container
+  // inside a container" the client rejected by name on the Overview tab.
+  //
+  // EXEMPTIONS ARE KEYED PER PANEL, `path#value`, and that granularity is
+  // load-bearing rather than tidy: `settings-screen.tsx` holds the tab this
+  // ruling is about AND another tab that is mid-retirement in a different lane.
+  // A file-level key would have let the second one's exemption excuse the
+  // first, which is the "passes on the strength of the branch that happens to
+  // have a panel in it" failure this law already names — moved up one level,
+  // from a branch to a tab. The value is read off the panel's own dispatch
+  // (`panel.value === "modules"`), so it is the word the tab strip uses, and a
+  // panel reached by fall-through is `#default`.
+  const panels: Finding[] = []
+  /** The tab this body belongs to, read off the enclosing dispatch — the same
+   * `value` the strip draws. A body under no comparison is the fall-through. */
+  const panelValueOf = (body: ts.Node, fn: ts.Node): string => {
+    for (let p: ts.Node | undefined = body; p && p !== fn.parent; p = p.parent) {
+      const test = ts.isIfStatement(p)
+        ? p.expression
+        : ts.isConditionalExpression(p)
+          ? p.condition
+          : null
+      if (!test) continue
+      const m = /\.value\s*===\s*["'`]([A-Za-z0-9_-]+)["'`]/.exec(test.getText())
+      if (m) return m[1]
+    }
+    return "default"
+  }
+
+  for (const f of app) {
+    const visit = (node: ts.Node) => {
+      if (
+        ts.isJsxAttribute(node) &&
+        node.name.getText() === "renderPanel" &&
+        node.initializer &&
+        ts.isJsxExpression(node.initializer) &&
+        node.initializer.expression &&
+        (ts.isArrowFunction(node.initializer.expression) ||
+          ts.isFunctionExpression(node.initializer.expression))
+      ) {
+        const fn = node.initializer.expression
+        // (a) THE MOUNT IS BOXED — the record-chrome shape. The `<TabsView>`
+        // carrying this prop, or any JSX ancestor of it, paints.
+        let mount: ts.Node | undefined = node
+        while (mount && !ts.isJsxElement(mount) && !ts.isJsxSelfClosingElement(mount)) mount = mount.parent
+        let boxed = false
+        for (let p: ts.Node | undefined = mount; p && !boxed; p = p.parent)
+          if ((ts.isJsxElement(p) || ts.isJsxSelfClosingElement(p)) && paints(p)) boxed = true
+        if (!boxed) {
+          // (b) …or EVERY BODY stands on paper, per branch, with the same four
+          // things that are deliberately not content.
+          const byPanel = new Map<string, string[]>()
+          const lineOf = new Map<string, number>()
+          for (const b of bodies(fn)) {
+            const t = tagName(b)
+            const value = panelValueOf(b, fn)
+            const line = f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1
+            if (!lineOf.has(value)) lineOf.set(value, line)
+            if (carriesHeading(b)) continue
+            if (t && PROSE.test(t)) continue
+            if (t && /^[A-Z]/.test(t) && isOverlay(t.split(".")[0])) continue
+            if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
+            if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
+            if (subtreePaints(b)) continue
+            if (!byPanel.has(value)) byPanel.set(value, [])
+            byPanel.get(value)!.push(`<${t}> at line ${line}`)
+          }
+          for (const [value, bare] of byPanel)
+            panels.push({ where: `${f.rel}#${value}:${lineOf.get(value)}`, bare })
+        }
+        panelCensus.hosts++
+        if (boxed) panelCensus.boxed++
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(f.tree)
+  }
+
   // ── THE BLINDNESS TRIPWIRE ────────────────────────────────────────────────
   // Three ways this check could report a clean app while measuring nothing: the
   // token derivation could come back empty (every fill unspellable, so every
@@ -426,7 +767,7 @@ describe("R67 — a titled section stands on paper", () => {
   // sections at all. Each fails LOUDLY here rather than passing quietly, which
   // is the failure mode this repository keeps re-earning.
   it("the census measures something (a blind scan reports all clear exactly like a passing one)", () => {
-    expect(fills.length, "no container fill was derived from the kit's tokens — the paper family moved").toBeGreaterThan(5)
+    expect(fills.length, "no container fill was derived from the kit's tokens — the paper family moved").toBeGreaterThan(3)
     expect(fills, "the ground is not a container and must never be in the derived family").not.toContain("surface-page")
     expect(fills, "the ground is not a container and must never be in the derived family").not.toContain("background")
     expect(app.length, "the front-door walk found nothing").toBeGreaterThan(150)
@@ -435,17 +776,52 @@ describe("R67 — a titled section stands on paper", () => {
     // …and the two shapes are both really represented, so a rule that only ever
     // sees one of them is not silently enforcing half of itself.
     expect(titled.filter((s) => s.bare.length === 0).length, "no section passes — the definition has drifted").toBeGreaterThan(10)
+
+    // AMENDMENT 1's OWN TRIPWIRE. The subtraction by VALUE is the half of this
+    // law that has no other symptom: if the palette split stops finding a dark
+    // block, every token resolves light-only, nothing collides, and the family
+    // silently goes back to blessing `bg-card` on the page at contrast 1.000 —
+    // passing exactly like a law that works. So the two palettes must really
+    // differ, and the subtraction must really have dropped the fills that are
+    // the page's own colour.
+    const { resolve } = palettes()
+    expect(
+      resolve("dark", "background"),
+      "light and dark resolved --background to the same literal — the palette split found no dark block, " +
+        "so every 'is this fill the ground?' question is being answered against one palette"
+    ).not.toEqual(resolve("light", "background"))
+    expect(
+      groundColoured(),
+      "no surface token resolves to the page colour any more. Either the kit re-toned them (delete this " +
+        "tripwire and amendment 1 with it) or the resolver stopped resolving — and the second one looks " +
+        "identical to a clean app:"
+    ).toContain("card")
+    for (const n of fills)
+      for (const which of ["light", "dark"] as const)
+        expect(resolve(which, n), `--${n} did not resolve to a literal in ${which}`).toMatch(/^#|^rgb|^oklch|^hsl/)
+
+    // AMENDMENT 3's. A panel census that finds no hosts, or that boxes ALL of
+    // them, enforces nothing and reports success for it.
+    expect(panelCensus.hosts, "no <TabsView renderPanel> host was found — the panel census has gone blind").toBeGreaterThan(10)
+    expect(panelCensus.boxed, "no panel host is boxed by its mount — the ancestor walk has stopped resolving").toBeGreaterThan(5)
+    expect(
+      panelCensus.hosts - panelCensus.boxed,
+      "every panel host is boxed, so the per-body clause judged nothing at all"
+    ).toBeGreaterThan(0)
   })
 
-  it("sections-stand-on-paper: every titled section is contained, or says why not (R67)", () => {
-    const offenders = titled.filter((s) => s.bare.length > 0)
+  it("sections-stand-on-paper: every titled section and every tab panel is contained, or says why not (R67)", () => {
+    // ONE CENSUS, TWO SUBJECTS. A titled `<section>` is keyed by its file; a tab
+    // panel by `file#value`, because one file's tabs are not one decision.
+    const offenders = [...titled, ...panels].filter((s) => s.bare.length > 0)
     const unexplained = offenders.filter((s) => !(s.where.split(":")[0] in UNCONTAINED_SECTION_OK))
     expect(
       unexplained.map((s) => `${s.where} — on the bare page ground: ${s.bare.join(", ")}`),
-      "R67 — a titled section either IS a container or draws every one of its bodies inside one. " +
-        "Put the section's content on `--surface-panel` (the shape `CollectionFrame` and " +
-        "`web/components/team/team-panel.tsx` both use), or name the file in " +
-        "UNCONTAINED_SECTION_OK with the real reason:"
+      "R67 — a titled section, or a tab panel, either IS a container or draws every one of its bodies " +
+        "inside one. Put the content on `--surface-panel` (the shape `CollectionFrame`, " +
+        "`web/components/team/team-panel.tsx` and `CardGrid tone=\"panel\"` all use — and note that " +
+        "`bg-card` is NOT one against the page: it is the page's own colour in light), or name the " +
+        "file (a section) or `file#tabValue` (a panel) in UNCONTAINED_SECTION_OK with the real reason:"
     ).toEqual([])
 
     // ROT-CHECKED, so the list can only shrink: a file whose sections are all

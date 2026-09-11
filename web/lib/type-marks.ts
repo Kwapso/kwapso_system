@@ -46,14 +46,34 @@ export const MARK_GROUP = {
    *
    * THE OTHER THREE GROUPS ARE UNAFFECTED and still draw their glyphs: stories
    * (stories-screen.tsx, sprint-detail.tsx, help-detail.tsx's story panel,
-   * app-detail.tsx), sprints (app-detail.tsx) and the sprint STATUS labels. Her
+   * app-detail.tsx) and sprints (app-detail.tsx). The sprint STATUS labels were
+   * a third at the time this was written and are no longer read at all — see the
+   * block below this one. Her
    * ruling names tickets and stops there, so this stops there too. */
   story: "Story type",
   sprint: "Sprint type",
-  /** The three states a sprint is IN, as opposed to the kind of block it is. A
-   * `"labels"` group: the code derives the state and this only supplies the word
-   * a person reads and the glyph beside it (shared/selectable-homes.ts). */
-  sprintStatus: "Sprint status",
+  /* NO `sprintStatus` HERE EITHER, SINCE 11 SEP 2026, and its absence is a
+   * different argument from the one above — that one is a display ruling, this
+   * one is a broken join.
+   *
+   * It named `"Sprint status"`, a `"labels"` group: a sprint's state is DERIVED
+   * from its dates (`sprintState`, web/components/work/sprints-screen.tsx), so
+   * the table has no status column and those rows stored nothing at all. They
+   * carried a display word nothing ever read, and a MARK that ONE expression
+   * read — `markMap(…, MARK_GROUP.sprintStatus)` — looked up by the row's own
+   * WORD against `STATE_HEADING`, a constant in that file. So the join key was a
+   * word a person could retype on a dropdown screen and a word the code spells,
+   * and nothing held the two together: renaming "Coming up" dropped the glyph
+   * off the sprint board silently and changed nothing a person could see,
+   * because the heading is `t(STATE_HEADING[state])` and never came from the
+   * row. A setting where one half works and the other half quietly breaks it is
+   * a tripwire, not a setting.
+   *
+   * THE GLYPHS MOVED TO CODE, beside the words they key off (`STATE_MARK`, same
+   * file, same three values the seed shipped). With this key deleted there is no
+   * group name to look a sprint state's mark up under and `MarkGroup` is a
+   * closed union, so a screen that tries fails its own type check — the same
+   * reason the `ticket` key above is deleted rather than left unused. */
 } as const
 
 export type MarkGroup = (typeof MARK_GROUP)[keyof typeof MARK_GROUP]

@@ -36,8 +36,6 @@ import { TaskDetailScreen } from "@/components/work/task-detail"
 import { MeetingDetailScreen } from "@/components/meetings/meeting-detail"
 import { ImportScreen } from "@/components/screens/import-screen"
 import { MemberScreen } from "@/components/team/member-screen"
-import { SelectableScreen } from "@/components/choices/selectable-screen"
-import { SelectableDetailScreen } from "@/components/choices/selectable-detail"
 import { NoAccess, NotFound, LoadError } from "@/components/deep-link/screen-bits"
 import { Button } from "@shared/ui/components/button/button"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -215,7 +213,7 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     teamId,
     canImport,
     can,
-    go,
+    query,
     overridesQ,
 
     membersQ,
@@ -306,24 +304,40 @@ export function renderModuleContent(ctx: ModuleContentCtx): React.ReactNode {
     // the MODULE_PERMISSION lookup, which would otherwise NotFound it.
     if (module === "import") {
       if (!canImport) return <NoAccess />
-      return <ImportScreen teamId={teamId as string} initialTarget={recordId || undefined} />
-    }
-
-    if (module === "dropdowns") {
-      if (!can("selectable_data", "read")) return <NoAccess />
-      // THE LIST/DETAIL SPLIT, by hand, because this module is handled above the
-      // generic one (it has no recipe — the vocabulary screen is host-composed).
-      // Same shape the engine applies below: an id in the path is a record.
-      if (recordId)
-        return <SelectableDetailScreen teamId={teamId as string} valueId={recordId} />
+      // `?groups=` — WHICH DROPDOWN GROUPS A SCOPED IMPORT IS ABOUT, when the
+      // reader arrived from a module's own settings page (client, 11 Sep 2026:
+      // *"each module's settings page gets its own import and export for its
+      // own groups"*). It rides in the address because the path cannot carry
+      // it: `/t/<teamId>/import/selectable_data` is the same address whichever
+      // module sent you. The screen only forwards it; the confirm door refuses
+      // the out-of-scope rows.
       return (
-        <SelectableScreen
+        <ImportScreen
           teamId={teamId as string}
-          onImport={() => go(`/t/${teamId}/import/selectable_data`)}
-          onOpen={(id) => go(`/t/${teamId}/dropdowns/${id}`)}
+          initialTarget={recordId || undefined}
+          groups={query.groups}
         />
       )
     }
+
+    // THE `dropdowns` MODULE STOOD HERE and was retired on 11 Sep 2026 with the
+    // client's ruling that ended Settings › Choices: *"implement this module
+    // settings across app … end goal kill the big tab 'choice options'."* It
+    // resolved two addresses — `/t/<teamId>/dropdowns`, the team's WHOLE
+    // vocabulary on one screen, and `/t/<teamId>/dropdowns/<id>`, one value's
+    // own record — and by then nothing in the app linked to either: the screen
+    // had had no in-app door since `ManageDropdownsLink` was repointed on
+    // 2026-09-01, and the record's only door was a row link on the screen
+    // above it.
+    //
+    // WHERE THE MATERIAL IS NOW. Every vocabulary group a record actually
+    // stores is edited on its own module's settings page (`MODULE_SETTINGS`,
+    // web/components/screens/module-settings-screen.tsx), which is where the
+    // import and the export live too. What did NOT survive is a value's own
+    // RECORD screen, and its history with it — that is written up in the
+    // report on this change, and the history itself is still in the team's
+    // activity feed, which reads `selectable_data` like any other table
+    // (`ACTIVITY_GATE_MAP`).
 
     const permKey = module ? MODULE_PERMISSION[module] : undefined
     if (!permKey) return <NotFound />

@@ -32,11 +32,24 @@
 //     enum the server validates). The dropdown row supplies only the display word
 //     and the mark, which is already a lookup, so a rename reaches every screen
 //     with nothing to rewrite.
-//   • `"unused"` — the group backs nothing at all. Five of the seventeen do: they
-//     are legacy Glide vocabularies whose module never came, plus one retired by
-//     a migration. They are recorded rather than deleted so the next person to
-//     find them knows they were looked at, and so the check can tell "nothing
-//     stores this" from "nobody has written the entry yet".
+//   • `"unused"` — the group backs nothing at all. SIX of the EIGHTEEN do (the
+//     two figures were "five of the seventeen" until 11 Sep 2026 and had been
+//     wrong since `Company size` was added below without them being re-counted;
+//     the prose is a census and a census that is not recounted is a comment):
+//     four are legacy Glide vocabularies whose module never came, one is a group
+//     made for a field nobody ever built, and one was retired by a migration.
+//     They are recorded rather than deleted so the next person to find them
+//     knows they were looked at, and so the check can tell "nothing stores this"
+//     from "nobody has written the entry yet".
+//
+// AND A GROUP'S HOME IS ALSO ITS SETTINGS ADDRESS, since 11 Sep 2026. The table
+// a group's words are stored on names the MODULE that owns them, and that module
+// is where the group is edited: `MODULE_SETTINGS`
+// (`web/components/screens/module-settings-screen.tsx`) is derived off this map
+// rather than off anybody's opinion, which is why moving a group between modules
+// is a change to the line below and to nothing else. The three `"labels"` groups
+// and the six `"unused"` ones reach no module for the same reason they reach no
+// table, and so get no settings section anywhere.
 
 export type VocabularyHome =
   | { columns: { table: string; column: string }[] }
@@ -100,10 +113,42 @@ export const VOCABULARY_HOMES: Record<string, VocabularyHome> = {
   // deactivates its rows; the entry stays so the check can tell a retired group
   // from an undeclared one.
   "Account status": "unused",
+  // A GROUP MADE FOR A FIELD NOBODY BUILT, and it is listed apart from the four
+  // below because it is not the same story told a fifth time. The five size
+  // bands WERE seeded (`INTERNAL_VOCABULARY`, workers/tenancy/src/team-schema/
+  // seed.ts) — the owner ruled for a group rather than a free-typed field, for
+  // the same reason `Country` is one — and then no column was ever added to
+  // `accounts` to hold the answer. So every newborn team was handed five rows
+  // nothing could ever be filed under. It sat under the "four legacy Glide"
+  // comment below until 11 Sep 2026, which is how that comment came to say FOUR
+  // with five entries after it.
+  //
+  // THE SEED ROWS WENT THE SAME DAY, out of `INTERNAL_VOCABULARY` (and therefore
+  // out of migration 0018, which generates its statements from it) — a team born
+  // after that date is never handed them. THE ENTRY STAYS, and that is the whole
+  // point of this file's `"unused"` answer: it lets the check beside it tell a
+  // group that WAS looked at and found to back nothing from a group nobody has
+  // written the entry for yet. Teams that already exist keep their rows, so the
+  // group is still a real group in real databases and still needs a home
+  // declared here.
+  "Company size": "unused",
   // FOUR LEGACY GLIDE VOCABULARIES WHOSE MODULE NEVER CAME. Each is a list an
   // owner can edit on the Dropdown values screen today, and editing it changes
   // nothing anywhere, which is worse than the list not being there.
-  "Company size": "unused",
+  //
+  // `File type` WAS SEEDED TOO — six rows, deleted on 11 Sep 2026 with the five
+  // `Company size` bands above and for the reason written there. It was never in
+  // a MIGRATION, so a newborn team is the only team it ever reached and every
+  // existing team keeps what it was born with. The entry stays for the same
+  // reason `Company size`'s does: the group is still real in real databases, and
+  // `"unused"` is how this file says it was looked at.
+  //
+  // The six rows are a near-miss worth naming, and it is why they lasted: a
+  // knowledge upload DOES record a file type, but it stores the browser's own
+  // content type through `requireText(body.contentType, "File type", …)`
+  // (workers/content/src/routes/knowledge.ts) — a validation LABEL that happens
+  // to spell the same two words, not a read of this vocabulary. Grepping the
+  // string finds it; nothing looks a row up.
   "File type": "unused",
   "Learning category": "unused",
   "Marketing channel": "unused",

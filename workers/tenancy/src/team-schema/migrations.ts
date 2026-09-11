@@ -5805,6 +5805,45 @@ ALTER TABLE google_sources ADD COLUMN chat_backfill_error TEXT;
 ALTER TABLE google_sources ADD COLUMN chat_backfill_error_at TEXT;
 `,
   },
+  {
+    // THE TEAM'S OWN ANSWER ABOUT ITS AUTOMATIONS — one row per settings
+    // SEGMENT, holding only the switches this team has deliberately turned OFF.
+    //
+    // A COPY OF `screens` (0002), on purpose and nearly line for line: keyed by
+    // module, one opaque JSON column the worker stores whole, two audit blocks,
+    // and NO `deactivated_at`. The shape carries the whole design decision —
+    //
+    //   AN ABSENT ROW *IS* THE DEFAULT, AND THE DEFAULT IS ON. Nothing is
+    //   migrated, nothing is back-filled, and every team that exists tonight
+    //   behaves tomorrow exactly as it does today. A settings store that had to
+    //   be seeded would make "we have never been asked" and "somebody chose the
+    //   default" the same row, and then the day the default changes there is no
+    //   way to tell which teams meant it.
+    //
+    //   AND "OFF" IS A VALUE. `settings` holds `{"<automation key>": "off"}` and
+    //   nothing else — a key present means somebody switched that automation
+    //   off on purpose, a key absent means nobody has been asked. It is the
+    //   same discipline `OPS_DIGEST_OFF` already runs on `ALERT_TO`
+    //   (workers/tenancy/src/lib/ops-alert.ts): a deliberate silence and a
+    //   forgotten config must never look alike, which is why switching one back
+    //   ON deletes the key rather than writing a second word beside it.
+    //
+    // WHY A SECOND TABLE AND NOT A COLUMN ON `screens`. A recipe describes what
+    // a screen DRAWS and is authored by whoever lays screens out; this describes
+    // what the software DOES when nobody is looking, and it is read by the
+    // content worker on a cron with no screen anywhere near it. One row holding
+    // both would mean the 15-minute sweep reading a screen recipe to find out
+    // whether it may run.
+    version: "0083_the_team_says_which_automations_are_off",
+    sql: `
+CREATE TABLE automations (
+  module TEXT PRIMARY KEY,          -- the settings SEGMENT, e.g. "tickets" | "knowledge"
+  settings TEXT NOT NULL,           -- {"<automation key>": "off"} — only the ones switched OFF
+  created_at TEXT NOT NULL, creator_id TEXT, creator_email TEXT, creator_name TEXT,
+  updated_at TEXT, editor_id TEXT, editor_email TEXT, editor_name TEXT
+);
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

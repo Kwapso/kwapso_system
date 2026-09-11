@@ -40,6 +40,7 @@ import { ClipboardText } from "@shared/ui/foundations/icons"
 import { defaultTabsConfig } from "@shared/web/screen-engine/tabs-view"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CountedAbove } from "@/components/records/counted-tabs"
 import { RecordCalendar, type CalendarEntry } from "@/components/records/record-calendar"
 import {
@@ -449,7 +450,13 @@ export function TasksScreen({
       {/* R16: the count lives in ONE place. The strip below badges all six views,
           so the heading stands down through the arbitration context rather than
           saying the same number twice. */}
-      <CollectionHeading sectionKey="tasks" total={total} />
+      {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the departments a task
+          is filed under. In the heading's `action` slot and never the toolbar:
+          `<ToolbarRow>` draws nothing at all on an empty collection (R50), which
+          is exactly when somebody goes looking for the words. The gear draws
+          itself or nothing — it asks `visibleModuleSettings` for both the page
+          and the reader's right, so there is no permission spelled here. */}
+      <CollectionHeading sectionKey="tasks" total={total} action={<ModuleSettingsGear teamId={teamId} segment="tasks" />} />
 
       <SectionWithCreate
         show={canCreate}

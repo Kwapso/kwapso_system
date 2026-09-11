@@ -244,32 +244,56 @@ describe("team schema", () => {
   })
 })
 
-// THE SIXTEEN UNGROUPED LEGACY VALUES, AND THE OWNER'S RULING ABOUT THEM.
+// THE SIXTEEN UNGROUPED LEGACY VALUES, AND WHAT IS LEFT OF THE OWNER'S RULING.
 //
 // Sixteen of the legacy app's 154 dropdown values carried no group at all: ten
 // country names, five company-size bands and one stray hyphen. The reconciliation
 // recommended making them two FIELDS on the account; the owner overruled it and
-// asked for two GROUPS, and the reason holds up — a country typed free into an
-// address is a country spelled five ways by five people, which is the exact
-// failure the dropdown module exists to prevent.
+// asked for two GROUPS, and for COUNTRY the reason holds up — a country typed
+// free into an address is a country spelled five ways by five people, which is
+// the exact failure the dropdown module exists to prevent.
+//
+// ── THE SECOND GROUP WAS RETIRED ON 11 SEP 2026, AND THIS BLOCK IS THE RECORD ─
+//
+// `Company size` was ruled for the same way and then never built: no column was
+// added to `accounts` to hold the answer, so the five bands appeared in no
+// picker, on no screen, and could never be filed under. This file used to assert
+// them into existence in two places — the seed and 0018 — which is precisely the
+// shape that kept them alive: a claim about data, locked by a green test, for a
+// field nobody ever wrote.
+//
+// SO THE ASSERTION IS INVERTED RATHER THAN DELETED, and that is the point. A
+// deleted test leaves nothing behind; the seed simply gets shorter, and the next
+// person with a spreadsheet of size bands adds them back without ever learning
+// why they went. This block now says, in a failing message, that the group needs
+// a COLUMN before it needs rows.
+//
+// EXISTING TEAMS ARE UNTOUCHED, which is the other half and the reason the 0018
+// assertion below changed shape too: the migration runner applies a version once
+// and records it, so a team that already ran 0018 has its five rows and keeps
+// them. What this locks is what a team born TOMORROW is handed.
 //
 // A group is not a row: the table holds (type, value) pairs, so a group EXISTS
 // only once it has a value. That is why this is testable at all, and why it has
-// to be: "we created two groups" is a claim about DATA, and the way a claim about
+// to be: "we created a group" is a claim about DATA, and the way a claim about
 // data gets quietly undone is somebody tidying a seed list.
-describe("the two dropdown groups the legacy migration lands in", () => {
+describe("the dropdown group the legacy migration lands in", () => {
   const groups = new Set(DEFAULT_SELECTABLE.map((v) => v.type))
 
-  it("a new team starts with both groups, so the picker is never empty", () => {
+  it("a new team starts with the Country group, so the picker is never empty", () => {
     expect(groups, "the owner ruled for a Country GROUP, not a field on the account").toContain("Country")
-    expect(groups, "the owner ruled for a Company size GROUP, not a field on the account").toContain(
-      "Company size"
-    )
   })
 
-  it("the size bands are the five the legacy data has", () => {
-    const bands = DEFAULT_SELECTABLE.filter((v) => v.type === "Company size")
-    expect(bands.length, "five bands, as the legacy data has").toBe(5)
+  it("…and with NO group nothing can be filed under", () => {
+    // THE TWO THE 11 SEP 2026 CLEAN-UP REMOVED, named rather than counted, so
+    // this reads as the decision it is. Both are `"unused"` in
+    // shared/selectable-homes.ts, which is the file that says WHERE a group's
+    // words are stored and is the oracle behind this assertion.
+    for (const dead of ["Company size", "File type"])
+      expect(
+        groups,
+        `a newborn team is being handed the "${dead}" vocabulary again, and nothing in the product can file a record under it — ${dead === "Company size" ? "no column on `accounts` holds a size band" : "a knowledge upload records the BROWSER's content type, not a row of this group"}. If the field has finally been built, delete this line in the same change that builds it; do not seed the rows first and hope`
+      ).not.toContain(dead)
   })
 
   it("the stray hyphen is NOT carried across — it is a typo, not a value", () => {
@@ -280,11 +304,19 @@ describe("the two dropdown groups the legacy migration lands in", () => {
     expect(junk, `a blank or dash value is not a value: ${JSON.stringify(junk)}`).toEqual([])
   })
 
-  it("an EXISTING team gets the same two groups, and gets them idempotently", () => {
+  it("an EXISTING team gets the Country group, and gets it idempotently", () => {
     const sql = TEAM_MIGRATIONS.find((m) => m.version === "0018_agency_internal")?.sql ?? ""
     expect(sql, "the agency-internal migration has moved or been renamed").not.toBe("")
     expect(sql, "existing teams need the Country group too").toContain("'Country'")
-    expect(sql, "existing teams need the Company size group too").toContain("'Company size'")
+    // AND NOT THE BANDS. 0018's statements are generated from
+    // INTERNAL_VOCABULARY, so this is the same deletion read from the other end:
+    // a team that already applied 0018 keeps the rows it was given, and a team
+    // created after 11 Sep 2026 runs the ledger from empty and is never offered
+    // them at all.
+    expect(
+      sql,
+      "0018 hands the Company size bands to a team running the ledger from empty — the group is `unused` and the rows are unfileable; see INTERNAL_VOCABULARY in workers/tenancy/src/team-schema/seed.ts"
+    ).not.toContain("'Company size'")
     // Idempotent: the migration runner applies a version once, but a team that
     // already types its own country values must not end up with duplicates when
     // the legacy import arrives on top.

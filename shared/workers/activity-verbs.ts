@@ -190,6 +190,14 @@ export const VERB_BY_PHRASE: Record<string, ActivityVerb> = {
   // Ends on the adverb "off". A module switched off is out of use and can be
   // switched back on — the archive shape, said in the app's own words.
   "module switched off": "archived",
+  // Ends on the adverbs "off" and "on". An AUTOMATION switched off (R70, client
+  // 2026-09-11) is the same shape as the module one line up: it is out of use
+  // and can be switched back on, so `archived` and `restored` are the pair —
+  // and they are TWO sentences rather than one "configured", because "who
+  // stopped the resolution emails, and when" is the question somebody asks
+  // three weeks later when a client says they heard nothing.
+  "automation switched off": "archived",
+  "automation switched on": "restored",
   // Ends on the noun "role" / the adverb "off". Attaching a person to a client
   // role creates the link; taking them off ends it.
   "person attached to role": "created",

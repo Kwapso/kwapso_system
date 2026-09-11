@@ -58,7 +58,23 @@ vi.mock("@shared/web/store", async (importOriginal) => {
 
 describe("the dropdown-values screen windows a group that has grown", () => {
   it("renders far fewer than 400 rows for the big group, and every row for the small one", () => {
-    render(<SelectableScreen teamId="t1" />)
+    // SCOPED, because there is no other kind of mounting since 11 Sep 2026:
+    // the whole-vocabulary screen was retired with the Choices tab and `scope`
+    // is required. Both synthetic groups are declared here, which is exactly
+    // what a real module settings page does when one module owns two groups
+    // (Accounts: Industry + Country) — so the windowing is still proved across
+    // a group boundary, which is the property this file is about.
+    render(
+      <SelectableScreen
+        teamId="t1"
+        scope={{
+          types: ["Big group", "Small group"],
+          title: "Groups",
+          description: "Two groups, one big.",
+          create: true,
+        }}
+      />
+    )
 
     // THE SMALL GROUP IS UNTOUCHED. Every one of its three values is a real
     // row — proof that windowing is a per-group decision, not a global one.
