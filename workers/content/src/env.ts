@@ -136,6 +136,16 @@ export type Env = {
    * silently pin this too. Unset means `READER_HALLUCINATION_FLOOR`
    * (lib/knowledge.ts). */
   KNOWLEDGE_READER_MIN_SCORE?: string
+  /** WHICH MODEL RE-READS THE SHORTLIST, and how many tokens it may spend
+   * doing it. Both default to the constants in `knowledge-reader.ts` and both
+   * exist so the choice can be MEASURED rather than argued — the same property
+   * `kb-bench.mjs` already gives the writer. The reader's model was pinned to
+   * a reasoning model on the untested sentence "a shortlist judgment is a
+   * harder read"; measured 11 Sep 2026, that model cannot finish the job on a
+   * real twelve-passage shortlist, because its chain of thought is billed
+   * against the same ceiling as its answer. */
+  KNOWLEDGE_READER_MODEL?: string
+  KNOWLEDGE_READER_MAX_TOKENS?: string
 
   /** The embedding model id, so swapping it is config rather than a deploy of
    * new code. Whatever it is, it must be the SAME model that wrote the vectors
