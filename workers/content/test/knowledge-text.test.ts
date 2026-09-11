@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest"
 import {
   CHUNK_TARGET_CHARS,
   chunkChat,
+  chunkGrainText,
   chunkMail,
   chunkSheetTab,
   chunkText,
@@ -19,6 +20,7 @@ import {
   decodeEmbedding,
   encodeEmbedding,
   freshnessOf,
+  markGrainPiece,
   plainText,
   questionTerms,
   relevancyDate,
@@ -241,6 +243,64 @@ describe("chunkChat — a piece is a run of messages, with who and when", () => 
     expect(pieces).toHaveLength(1)
     expect(pieces[0].text).toContain("Still here.")
     expect(pieces[0].text).not.toContain("Jane Doe")
+  })
+})
+
+describe("markGrainPiece / chunkGrainText — a piece's speaker and time survive being flattened into one source's body", () => {
+  it("round-trips a single marked piece exactly: text, speaker and time all come back", () => {
+    const body = markGrainPiece({ text: "Jane Doe: hello\nJohn Smith: hi", speaker: "Jane Doe, John Smith", saidAt: "2026-09-10T10:02:00Z" })
+    const pieces = chunkGrainText(body)
+    expect(pieces).toHaveLength(1)
+    expect(pieces[0].text).toBe("Jane Doe: hello\nJohn Smith: hi")
+    expect(pieces[0].speaker).toBe("Jane Doe, John Smith")
+    expect(pieces[0].saidAt).toBe("2026-09-10T10:02:00Z")
+  })
+
+  it("round-trips several pieces joined the same way chatThreads joins them", () => {
+    const body = [
+      markGrainPiece({ text: "Ana: first thing said", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" }),
+      markGrainPiece({ text: "Bob: second thing said", speaker: "Bob", saidAt: "2026-09-10T09:05:00Z" }),
+    ].join("\n\n")
+    const pieces = chunkGrainText(body)
+    expect(pieces).toHaveLength(2)
+    expect(pieces[0]).toEqual({ text: "Ana: first thing said", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" })
+    expect(pieces[1]).toEqual({ text: "Bob: second thing said", speaker: "Bob", saidAt: "2026-09-10T09:05:00Z" })
+  })
+
+  it("keeps a leading unmarked segment (the title, joined on front by indexableText) as its own plain piece", () => {
+    const body = ["A conversation about renewals", markGrainPiece({ text: "Ana: hi", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" })].join(
+      "\n\n"
+    )
+    const pieces = chunkGrainText(body)
+    expect(pieces).toHaveLength(2)
+    expect(pieces[0]).toEqual({ text: "A conversation about renewals", speaker: null, saidAt: null })
+    expect(pieces[1].speaker).toBe("Ana")
+  })
+
+  it("falls back to plain chunkText, with null speaker and time, when nothing is marked", () => {
+    const body = "Just an ordinary document with no chat pieces in it at all."
+    expect(chunkGrainText(body)).toEqual(chunkText(body).map((text) => ({ text, speaker: null, saidAt: null })))
+  })
+
+  it("splits an oversized marked piece into several chunks that all keep its one speaker and time", () => {
+    const long = "word ".repeat(400) // well past CHUNK_TARGET_CHARS
+    const body = markGrainPiece({ text: long, speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" })
+    const pieces = chunkGrainText(body)
+    expect(pieces.length).toBeGreaterThan(1)
+    for (const p of pieces) {
+      expect(p.speaker).toBe("Ana")
+      expect(p.saidAt).toBe("2026-09-10T09:00:00Z")
+    }
+    expect(pieces.map((p) => p.text).join(" ")).toContain(long.trim().slice(0, 20))
+  })
+
+  it("never leaks the mark itself into a piece's own text", () => {
+    const body = markGrainPiece({ text: "Ana: hello there", speaker: "Ana", saidAt: "2026-09-10T09:00:00Z" })
+    for (const p of chunkGrainText(body)) expect(p.text).not.toContain(String.fromCharCode(0))
+  })
+
+  it("returns nothing for empty text, never one empty piece", () => {
+    expect(chunkGrainText("")).toEqual([])
   })
 })
 

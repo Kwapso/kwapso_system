@@ -913,7 +913,20 @@ export function googleIngestKinds(
       // a hundred while reporting itself caught up. Measured live: `read: 1,
       // indexed: 1, caughtUp: true` against five spaces holding fifty messages
       // each.
-      textVersion: 3,
+      //
+      // 4 SINCE 11 SEP 2026 (tracker `a-pieces`) — `chatThreads`' body changed
+      // AGAIN, this time in its own bytes: each run is now wrapped with
+      // `markGrainPiece` so its speaker/time survive being flattened, which is
+      // exactly the kind of body-shape change bullet 2 above rewinds for. UNLIKE
+      // bullet 3's bump, this one is NOT free: the wrapped body's `content_hash`
+      // genuinely differs from what is stored (real bytes changed, not just the
+      // read position), so `indexSource`'s restart check fires for real and every
+      // one of the 105 chat sources on staging re-embeds its ~1.3 chunks — a
+      // small, ordinary re-embed of the kind any edited body already costs today,
+      // not a new spend category. This is what actually delivers speaker/said_at
+      // to material already on file; without the bump the fix only reaches a
+      // conversation from its NEXT reply onward.
+      textVersion: 4,
       // ONE SOURCE PER CONVERSATION — not per message, and no longer per space.
       //
       // PER MESSAGE was wrong for the reason this comment has always given: a

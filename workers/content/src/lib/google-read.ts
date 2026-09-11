@@ -39,7 +39,7 @@ import { LIST_HARD_CAP } from "@shared/workers/limits"
 import { type MemberGuard } from "@shared/workers/gating"
 import type { GoogleItem, GoogleService } from "@shared/types"
 import type { ChatMessage } from "./google-api"
-import { chunkChat, chunkMail } from "./knowledge-text"
+import { chunkChat, chunkMail, markGrainPiece } from "./knowledge-text"
 import type { ReaderEnv } from "./source-readers"
 import {
   chatMessages,
@@ -262,8 +262,21 @@ async function meetingEventIds(cfg: D1Rest, guard: MemberGuard): Promise<Set<str
  * (KB-AUDIT.md §4.9: "one thread is one ~348-char blob… per-turn or
  * per-topic segmentation… is the obvious direction"). The per-line
  * `sender: text` attribution is UNCHANGED — `google-ingest.test.ts` asserts
- * that literal shape, and the run's own speaker/time span is carried as
- * `chunkChat`'s structured metadata rather than folded into the prose.
+ * that literal shape.
+ *
+ * ── AND THE RUN'S SPEAKER/TIME SURVIVE THE JOIN TOO (tracker `a-pieces`) ────
+ *
+ * `chunkChat` hands back that metadata (`speakers`, `startAt`) beside each
+ * piece's text, but this thread is ONE row with ONE `body` — the metadata
+ * would otherwise die right here, the moment the runs are flattened into a
+ * single string. There is no second call to Google later to get it back, so
+ * each run is wrapped with `markGrainPiece` before the join: a mark
+ * `plainText` already treats as invisible carries the speaker and time on
+ * their own line, in front of the SAME `sender: text` prose the join always
+ * produced. `chunkGrainText` (knowledge-text.ts), `indexSource`'s reader for
+ * a grain-bearing source, is the other half — it strips the mark back out
+ * before a chunk's stored `text`, its embedding or its posting are ever
+ * written, so it is invisible to a citation exactly as before.
  */
 export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
   const byThread = new Map<string, ChatMessage[]>()
@@ -298,10 +311,11 @@ export function chatThreads(messages: ChatMessage[]): ChatMessage[] {
       senderIsApp: ordered.every((m) => m.senderIsApp),
       // RUNS, joined on a blank line — see the essay above. A run's own line
       // shape is still exactly `sender: text` (chunkChat drops the timestamp
-      // from the prose on purpose), so a short thread's body is byte-for-byte
-      // what the flat join used to produce.
+      // from the prose on purpose); each run is wrapped with its speakers and
+      // start time via `markGrainPiece` first, so `chunkGrainText` can hand
+      // both back to `indexSource` once this body reaches it.
       text: chunkChat(ordered.map((m) => ({ speaker: m.sender, at: m.createdAt ?? "", text: m.text })))
-        .map((piece) => piece.text)
+        .map((piece) => markGrainPiece({ text: piece.text, speaker: piece.speakers.join(", "), saidAt: piece.startAt }))
         .join("\n\n"),
       // AS RECENT AS ITS LAST REPLY, which is what the sweep's cursor orders by.
       createdAt: last.createdAt,

@@ -15,6 +15,7 @@
 import { describe, expect, it } from "vitest"
 
 import { chatThreads } from "../src/lib/google-read"
+import { chunkGrainText } from "../src/lib/knowledge-text"
 
 /** One message, shaped exactly as `chatMessages` returns one — the fields
  * `chatThreads` actually reads. */
@@ -36,9 +37,15 @@ describe("chatThreads — the body is runs, not one blob", () => {
       msg("m1", "t1", "Ana", "2026-09-07T10:00:00Z", "first thing said"),
       msg("m2", "t1", "Aurora", "2026-09-07T10:01:00Z", "second thing said"),
     ])
-    // BYTE FOR BYTE what the old flat join produced for a short thread — the
-    // exact assertion google-ingest.test.ts already makes on this shape.
-    expect(folded.text).toBe("Ana: first thing said\nAurora: second thing said")
+    // `folded.text` itself now carries a grain mark in front of the run (tracker
+    // `a-pieces`, so the run's speaker/time survive being flattened into this
+    // one field) — `google-ingest.test.ts` asserts the RAW body with `.toContain`,
+    // which the mark doesn't disturb. What must still hold BYTE FOR BYTE is the
+    // prose a citation would actually show, which is what `chunkGrainText`
+    // recovers.
+    const [piece] = chunkGrainText(folded.text)
+    expect(piece.text).toBe("Ana: first thing said\nAurora: second thing said")
+    expect(piece.speaker).toBe("Ana, Aurora")
   })
 
   it("cuts a long thread into runs separated by a blank line, never mid-message", () => {
@@ -46,13 +53,20 @@ describe("chatThreads — the body is runs, not one blob", () => {
       msg(`m${i}`, "t1", i % 2 === 0 ? "Ana" : "Aurora", `2026-09-07T10:${String(i).padStart(2, "0")}:00Z`, `line number ${i}`)
     )
     const [folded] = chatThreads(messages)
-    const runs = folded.text.split("\n\n")
-    expect(runs.length).toBeGreaterThan(1)
+    const pieces = chunkGrainText(folded.text)
+    expect(pieces.length).toBeGreaterThan(1)
     // Nothing is lost, and nothing is fused across a run boundary mid-message:
     // every "line number N" appears whole, exactly once.
-    for (let i = 0; i < 20; i++) expect(folded.text.match(new RegExp(`line number ${i}\\b`, "g"))?.length).toBe(1)
-    // Each run is still attributed, never re-attributed by anything upstream.
-    for (const run of runs) expect(run).toMatch(/^(Ana|Aurora): /)
+    const joined = pieces.map((p) => p.text).join(" ")
+    for (let i = 0; i < 20; i++) expect(joined.match(new RegExp(`line number ${i}\\b`, "g"))?.length).toBe(1)
+    // Each run is still attributed, both in its own prose and in its recovered
+    // `speaker` field — never re-attributed by anything upstream. A run can mix
+    // both voices (alternating messages, one run of up to six), so `speaker`
+    // is one name or a comma-joined few, never something outside that set.
+    for (const p of pieces) {
+      expect(p.text).toMatch(/^(Ana|Aurora): /)
+      expect(p.speaker?.split(", ").every((s) => s === "Ana" || s === "Aurora")).toBe(true)
+    }
   })
 
   it("still folds to the newest message's time and every voice, run-cutting aside", () => {
