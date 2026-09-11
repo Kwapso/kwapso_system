@@ -272,7 +272,17 @@ export async function extractLink(url: string): Promise<ExtractedFile> {
     ? capToRow(text)
     : {
         text: null,
-        note: `We couldn't find any words at this ${kind.label} — it may have no caption track, or we couldn't reach it just now. It is kept here, but the assistant can't answer from it.`,
+        // "CAPTION TRACK" WAS ACCURATE FOR YOUTUBE AND WRONG FOR LOOM/TELLA —
+        // neither has a caption track at all, so the honest, general reason is
+        // "no public transcript". Leads with what a person can DO about it
+        // (add the transcript below) rather than only the diagnosis — this
+        // note is rendered raw on the record's screen (R28's own structural
+        // gap for a worker-only file: appFiles() only walks what a front
+        // door imports, so this string cannot enter the i18n catalogue
+        // however it is written — flagged to the hub 11 Sep 2026, ruled a
+        // real but structurally unfixable debt from here, matching the
+        // existing UNREADABLE_REASON sentences beside it).
+        note: `We couldn't read the words in this ${kind.label} — it may not have a public transcript, or we couldn't reach it just now. It's kept here as a source either way; add the transcript yourself in the note below if you want the assistant to read it.`,
       }
 }
 
