@@ -111,6 +111,7 @@ import { countCollection } from "@shared/workers/count"
 import { brand } from "@shared/brand"
 import { d1ExecScript, d1Query, likeLiteral, sqlString, type D1Rest } from "@shared/workers/d1-rest"
 import { GuardError, type MemberGuard } from "@shared/workers/gating"
+import { isRareAccountToken } from "@shared/workers/account-rarity"
 import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
@@ -2811,58 +2812,14 @@ async function sourceTitles(
 }
 
 /** IS THIS TOKEN RARE ENOUGH TO NAME AN ACCOUNT ON ITS OWN — c-hijack, 11 Sep
- * 2026. This USED to ask the same question `EXACT_TERM_MAX_CHUNKS` answers for
- * the lexical arm's rare-token bypass, on the theory that one number could
- * serve two questions. It could not: `EXACT_TERM_MAX_CHUNKS` (100) was
- * measured against DIGIT-BEARING reference terms — ticket numbers, years — a
- * population where "how many chunks mention this" tracks "how distinctive is
- * this" reasonably well. Account-name tokens are ORDINARY WORDS, and that
- * correlation does not hold: measured against every one of the 26 staging
- * accounts whose canonical name collapses to a single surviving token —
- *
- *     0  Natalya · Sadia · Sandra (person accounts, no material yet)
- *     1  bergman   ← Bergman S.A.        — an ordinary surname, HIJACKS
- *     2  klaus, 5 manuel, 7 markus (person accounts)
- *    35  green     ← re-green            — an ordinary word, HIJACKS
- *    56  pickl     ← Pickl               — UNCERTAIN, see below
- *    72  demo      ← DEMO                — an ordinary word, HIJACKS
- *    79  solutions ← VU Solutions        — an ordinary word, HIJACKS (KB-AUDIT §4.2)
- *   106  larissa   ← Larissa Grün        — a rare surname, safe
- *   115  aws       ← aWs                 — a common tech acronym, LIKELY HIJACKS
- *   115  nareyka   ← Björn Nareyka       — a rare surname, safe
- *   116+ looom, safety4you, 196+, PLATINUM, fluclinic, assecuranz,
- *        amstella, padelbase, kwapso, confia, hogo, alaap — brand names and
- *        real client names, all safe, up to 4,860 (the owner's own name)
- *
- * — no single ceiling separates every hijack from every safe name. "aws" and
- * "nareyka" tie at 115: one is a common acronym, the other a rare surname,
- * and corpus frequency cannot tell them apart. PLATINUM (246, an ordinary
- * word) sits BELOW several genuinely safe real client names. This ceiling is
- * therefore set to close the THREE proven cases (green, demo, solutions — all
- * ≥35) while preserving every person-account name measured (≤7) — bergman (1)
- * is not closeable by any positive threshold, and "aws"/"platinum" are not
- * closeable without also excluding legitimately safe, higher-count real
- * client names. Both are named, tracked residuals (c-hijack's own report),
- * not silently accepted. Pickl (56) falls on the excluded side as an HONEST
- * side effect — its own count is high enough to look exactly like the
- * three proven hijacks from corpus frequency alone, and nothing here can
- * tell whether that is coincidence or the same defect wearing a fourth name;
- * see the same report before assuming either way.
- *
- * UNFENCED (whole-team chunk count over FTS5), because this runs BEFORE the
- * compartment is known — narrowing to a compartment is the very question
- * this function exists to answer. */
-const ACCOUNT_TOKEN_MAX_CHUNKS = 30
-
-async function isRareAccountToken(cfg: D1Rest, guard: MemberGuard, term: string): Promise<boolean> {
-  const rows = await d1Query<{ n: number }>(
-    cfg,
-    guard.databaseId,
-    "SELECT COUNT(*) AS n FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?",
-    [`"${term}"`]
-  )
-  return (rows[0]?.n ?? 0) <= ACCOUNT_TOKEN_MAX_CHUNKS
-}
+ * 2026, moved to `@shared/workers/account-rarity` (0085, c-hijack B) so the
+ * account write door can reuse the SAME check rather than a second one hand-
+ * copied beside it: a declared `alt_names` spelling on a common word is exactly
+ * as dangerous as an undeclared single-token name, and it needs the same
+ * rarity floor before `name_narrows_alone` is allowed to bypass it. The full
+ * measured distribution and why one ceiling cannot close every case (Bergman
+ * at 1 chunk; "aws"/"platinum"-shaped ties with safe names) lives on
+ * `ACCOUNT_TOKEN_MAX_CHUNKS` at its new home. */
 
 /** The account a question names, or null. Reads `knowledge_names` (0073)
  * rather than the raw `accounts` table — see `rebuildNameIndex` for why.
@@ -2933,9 +2890,14 @@ export async function accountsNamedIn(
 ): Promise<{ id: string; name: string; fragile: boolean }[]> {
   const terms = questionTerms(question, 8)
   if (!terms.length) return []
-  const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
+  const clauses = terms.map(() => `LOWER(kn.name) LIKE ? ESCAPE '\\'`)
   const params = terms.map((t) => `%${likeLiteral(t)}%`)
-  const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
+  const candidates = await d1Query<{
+    ref_id: string
+    name: string
+    alias_of: string | null
+    name_narrows_alone: number
+  }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: NAMED_ACCOUNTS_CAP × 2, not NAMED_ACCOUNTS_CAP itself — a
@@ -2948,9 +2910,18 @@ export async function accountsNamedIn(
     // below (a token-subset check, a rarity check), so fetching exactly the
     // target count would silently under-fill again the first time one
     // candidate failed to confirm.
-    `SELECT ref_id, name, alias_of FROM knowledge_names
-      WHERE kind = 'account' AND (${clauses.join(" OR ")})
-      ORDER BY LENGTH(name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
+    //
+    // JOINED against `accounts` for `name_narrows_alone` (0085, c-hijack B) —
+    // every row here is `kind = 'account'` (the WHERE clause below), so
+    // `knowledge_names.ref_id` is always an `accounts.id`. No schema change to
+    // `knowledge_names` itself: the flag lives once, on the account it
+    // declares something about, and is read at match time rather than
+    // denormalised into a table `rebuildNameIndex` fully deletes and
+    // reinserts on every run.
+    `SELECT kn.ref_id, kn.name, kn.alias_of, COALESCE(a.name_narrows_alone, 0) AS name_narrows_alone
+       FROM knowledge_names kn JOIN accounts a ON a.id = kn.ref_id
+      WHERE kn.kind = 'account' AND (${clauses.join(" OR ")})
+      ORDER BY LENGTH(kn.name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
     params
   )
   const asked = new Set(terms)
@@ -2997,7 +2968,13 @@ export async function accountsNamedIn(
       continue
     }
     // THE COLLAPSED CASE — one surviving token, held back for the second pass.
-    if (await isRareAccountToken(cfg, guard, nameTerms[0])) {
+    // `name_narrows_alone` (0085, c-hijack B) bypasses the RARITY gate exactly
+    // as `code` bypasses it above — a person decided, so corpus frequency
+    // stops being the question — but NOT the second pass below: a declared
+    // token shared by two accounts is still evidence about the WORD, not
+    // either company, so A2 still resolves it to neither. Short-circuited so
+    // a declared account never pays for the FTS rarity query at all.
+    if (c.name_narrows_alone === 1 || (await isRareAccountToken(cfg, guard, nameTerms[0]))) {
       const token = nameTerms[0]
       const list = pendingByToken.get(token) ?? []
       list.push({ id: c.ref_id, name: c.name })

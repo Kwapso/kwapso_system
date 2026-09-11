@@ -1204,6 +1204,18 @@ export type Account = {
   /** may this account see money figures on its own work? `null` on the way OUT
    * to a client login — the agency's own switch ABOUT them, never for them. */
   commercialsVisible: boolean | null
+  /** DECLARED spellings of this account's own name (0083, c-misspell) — a
+   * person's own list, never a generated variant, read by the knowledge
+   * base's name matcher exactly like the account's `code`: an exact match,
+   * no rarity gate. `[]` on the way out to a client login, the same
+   * reasoning as `commercialsVisible`: this is a staff judgement about how
+   * the corpus is searched, not the account's own record. */
+  altNames: string[]
+  /** DECLARED (0085, c-hijack B): may this account's collapsed single-token
+   * name narrow a knowledge-base search on its own, bypassing the corpus
+   * rarity gate the way `code` already does. `false` on the way out to a
+   * client login, for the same reason `altNames` is `[]` there. */
+  nameNarrowsAlone: boolean
   /** WHERE THIS PERSON WORKS, AND WHAT THEY DO THERE — the contacts table's two
    * middle columns (client, 2026-09-09: "for contacts lets do view table, also
    * add column role after account").

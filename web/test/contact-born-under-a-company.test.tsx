@@ -44,6 +44,8 @@ const BERGMAN: Account = {
   locale: null,
   timezone: null,
   commercialsVisible: null,
+  altNames: [],
+  nameNarrowsAlone: false,
   active: true,
   createdAt: "2026-08-18T09:00:00.000Z",
   createdByName: null,

@@ -1079,6 +1079,111 @@ describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed 
   })
 })
 
+// c-hijack (B): a person's OWN declaration that a single-token name may
+// narrow a search alone — 0085, built after A/A2/A3 because the owner's
+// ruling ("if you know how to fix it, fix it") replaced the 1.5-day estimate
+// in NOTE-c-hijack-B-declared-safety.md with "one hour, not 1.5 days."
+//
+// THE DECLARED FLAG IS AN ADDITIONAL BYPASS, NEVER A REQUIREMENT — `OR`, not
+// `AND`, in `accountsNamedIn`'s own condition. An already-rare name (Bergman
+// S.A.'s surname, 1 chunk) keeps narrowing exactly as A already made it,
+// undeclared; what the flag adds is a SECOND way in, for a name that is NOT
+// rare (an ordinary word with real chunk volume — the "aws"/"platinum"
+// shape A's own header names as unclosable by any threshold).
+describe("c-hijack (B): a declared name_narrows_alone bypasses the rarity gate, never the A2 ambiguity check", () => {
+  const PREMIUM = "A_HIJACK_B_PREMIUM"
+  const RARE = "A_HIJACK_B_RARE"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${PREMIUM}', 'entity', 'Premium', NULL, '2026-01-01'),
+         ('${RARE}', 'entity', 'Vandenbroucke', NULL, '2026-01-01');`
+    )
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_FILLER_B', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    // 50 — well over ACCOUNT_TOKEN_MAX_CHUNKS (30): "premium" is an ordinary
+    // word this corpus already talks about a lot, the same shape as the real
+    // "aws"/"platinum" ties A's own header names as unclosable by rarity alone.
+    const rows: string[] = []
+    for (let i = 0; i < 50; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_PREM_${i}', 'S_FILLER_B', 'agency', ${i}, 'we offer a premium tier on request', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_FILLER_B';"
+    )
+    // Real material under Premium's OWN compartment, so a successful narrow
+    // finds something rather than tripping A3's retry — these tests are about
+    // WHETHER it narrows, not what happens when a narrow finds nothing.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_PREMIUM_OWN', 'note', 'Renewal notes', 'account:${PREMIUM}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_PREMIUM_OWN', 'S_PREMIUM_OWN', 'account:${PREMIUM}', 0, 'Premium renewal status: approved for another year', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_PREMIUM_OWN';`
+    )
+  })
+
+  it("an ordinary, non-rare single-token name does NOT narrow while undeclared", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.reason).toContain("named no client")
+  })
+
+  it("the SAME name narrows once a person declares name_narrows_alone", async () => {
+    db().exec(`UPDATE accounts SET name_narrows_alone = 1 WHERE id = '${PREMIUM}'`)
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([`account:${PREMIUM}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("an already-rare name keeps narrowing UNDECLARED — the flag adds a bypass, it is never a requirement", async () => {
+    // Vandenbroucke: a genuinely rare surname, no filler chunks at all —
+    // exactly Bergman S.A.'s own shape (A's header: 1 chunk, undeclared,
+    // hijacks today). If the `OR` had silently become an `AND`, this is the
+    // test that would catch it — every one of the three proven A fixes
+    // (green, demo, solutions) is this same undeclared-but-rare shape.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_RARE_OWN', 'note', 'Contract notes', 'account:${RARE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_RARE_OWN', 'S_RARE_OWN', 'account:${RARE}', 0, 'The Vandenbroucke renewal finally happened this week', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_RARE_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what happened with the Vandenbroucke renewal?")
+    expect(answer.compartments).toEqual([`account:${RARE}`, "agency"])
+    expect(answer.found).toBe(true)
+  })
+
+  it("A2 still wins over TWO declared accounts sharing the same token — resolves to neither", async () => {
+    // A second account declares the SAME collapsed token "premium" — two real
+    // companies both claiming one ordinary word is evidence about the WORD,
+    // never either company, exactly as A2 already established for undeclared
+    // matches. "re-premium" collapses to "premium" the same way A2's own
+    // "re-rosewood" collapses to "rosewood" — a dropped short prefix.
+    const PREMIUM_2 = "A_HIJACK_B_PREMIUM_2"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${PREMIUM_2}', 'entity', 're-premium', NULL, '2026-01-01', 1);
+       UPDATE accounts SET name_narrows_alone = 1 WHERE id = '${PREMIUM}';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the premium renewal?")
+    expect(answer.compartments).toEqual([])
+    expect(answer.compartments).not.toContain(`account:${PREMIUM}`)
+    expect(answer.compartments).not.toContain(`account:${PREMIUM_2}`)
+  })
+})
+
 // c-misspell. The owner asked the live assistant "What is happening with
 // Paddlebase?" (his own spelling — the real account is Padelbase) and it
 // answered "the question named no client", off a brute search rather than the

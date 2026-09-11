@@ -91,6 +91,8 @@ const PERSON: AccountFormValues = {
   logoUrl: "",
   coverUrl: "",
   locale: "",
+  altNames: "",
+  nameNarrowsAlone: false,
 }
 
 describe("the account form no longer asks what kind of account it is making", () => {
