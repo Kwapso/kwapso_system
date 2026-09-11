@@ -54,7 +54,7 @@ describe("accountsNamedIn, reused on a Drive folder / Chat space NAME (b-filing)
     // and rarity rules entirely (accountsNamedIn's own header).
     nameCandidates = [{ ref_id: "ACC-HOGO", name: "HOGO", alias_of: "Hogo Health Systems" }]
     const matches = await accountsNamedIn(CFG, GUARD, "HOGO Q3 Project Files")
-    expect(matches).toEqual([{ id: "ACC-HOGO", name: "Hogo Health Systems" }])
+    expect(matches).toEqual([{ id: "ACC-HOGO", name: "Hogo Health Systems", fragile: false }])
     // The rarity door was never even asked — an alias match doesn't need it.
     expect(sent.some((s) => s.sql.includes("knowledge_chunks_fts"))).toBe(false)
   })
@@ -62,7 +62,7 @@ describe("accountsNamedIn, reused on a Drive folder / Chat space NAME (b-filing)
   it("a two-token canonical name matches without needing the rarity gate either", async () => {
     nameCandidates = [{ ref_id: "ACC-BERG", name: "Bergman Logistics", alias_of: null }]
     const matches = await accountsNamedIn(CFG, GUARD, "Bergman Logistics — Shared Drive")
-    expect(matches).toEqual([{ id: "ACC-BERG", name: "Bergman Logistics" }])
+    expect(matches).toEqual([{ id: "ACC-BERG", name: "Bergman Logistics", fragile: false }])
   })
 
   it("an ordinary folder name that happens to share ONE common word with an account is refused — the anti-hijack gate KB-AUDIT.md §4.2 exists for", async () => {
@@ -70,16 +70,16 @@ describe("accountsNamedIn, reused on a Drive folder / Chat space NAME (b-filing)
     // account name. A folder called "Client Solutions Archive" must not
     // silently match VU Solutions on the strength of one common word.
     nameCandidates = [{ ref_id: "ACC-VU", name: "solutions", alias_of: null }]
-    rarityChunkCount = 5000 // common across the corpus — over EXACT_TERM_MAX_CHUNKS
+    rarityChunkCount = 5000 // common across the corpus — over ACCOUNT_TOKEN_MAX_CHUNKS
     const matches = await accountsNamedIn(CFG, GUARD, "Client Solutions Archive")
     expect(matches).toEqual([])
   })
 
-  it("a genuinely rare single-token name still resolves — the gate narrows, it does not silence", async () => {
+  it("a genuinely rare single-token name still resolves — the gate narrows, it does not silence — and is marked FRAGILE for c-hijack A3", async () => {
     nameCandidates = [{ ref_id: "ACC-PAD", name: "paddlebase", alias_of: null }]
-    rarityChunkCount = 2 // rare — under the corpus-wide EXACT_TERM_MAX_CHUNKS floor
+    rarityChunkCount = 2 // rare — under the corpus-wide ACCOUNT_TOKEN_MAX_CHUNKS floor
     const matches = await accountsNamedIn(CFG, GUARD, "Paddlebase Onboarding")
-    expect(matches).toEqual([{ id: "ACC-PAD", name: "paddlebase" }])
+    expect(matches).toEqual([{ id: "ACC-PAD", name: "paddlebase", fragile: true }])
   })
 
   it("a folder name that matches nothing on file returns empty, not a guess", async () => {

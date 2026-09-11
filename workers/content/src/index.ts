@@ -257,7 +257,7 @@ import {
   postGoogleSourceActive,
 } from "./routes/google"
 import { googleAutopilot } from "./lib/google-autopilot"
-import { revisitUnhealthySources } from "./lib/knowledge"
+import { rebuildNameIndex, revisitUnhealthySources } from "./lib/knowledge"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { clientUserIds } from "@shared/workers/record-link"
@@ -837,6 +837,24 @@ export default {
         const revisit = sweepOff
           ? null
           : await revisitUnhealthySources(env, d1ConfigFrom(env, "automation"), guard)
+        // THE NAME INDEX RIDES THIS TICK TOO, AND THE SAME SWITCH. Three lines
+        // met here, not two. `postKnowledgeSync` has rebuilt the name index
+        // since the day it shipped, under a comment saying the sweep keeps
+        // `accountsNamedIn`'s router current — true of that DOOR, and that door
+        // is pressed by a person. This is the sweep that runs when nobody does,
+        // and it did not: a client created, renamed, deactivated or given a
+        // declared alternate spelling (`alt_names`, 0083) stayed invisible to
+        // the router until somebody happened to press the button, and the
+        // failure has no symptom — the question still answers, it just answers
+        // without narrowing to the client the person named.
+        //
+        // BEHIND `sweepOff` BY THE OTHER LINE'S OWN ARGUMENT, and by R70's: an
+        // automation that runs anyway despite its switch is exactly the
+        // invisible automation that law was written to forbid. A team that
+        // turned the sweep off still gets a current router the moment somebody
+        // presses "bring it up to date", which is the same place every other
+        // switched-off sweep behaviour remains available.
+        if (!sweepOff) await rebuildNameIndex(d1ConfigFrom(env, "automation"), guard)
         const indexed = results.reduce((n, r) => n + r.indexed, 0) + (revisit?.recovered ?? 0)
         if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 

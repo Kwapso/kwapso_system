@@ -30,17 +30,49 @@ export type CheapTextEnv = {
  * to when no Anthropic key is set. Named once so the two callers cannot drift. */
 export const CHEAP_TEXT_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct"
 
-/** THE READER'S MODEL — BUILD-5-knowledge-rebuild.md §5: "the reader re-reads
- * the shortlist (Kimi K2.6 on Workers AI)". The same engine `workers/data-ops`
- * pins for the assistant's own turn (`AGENT_MODEL`,
- * `workers/data-ops/wrangler.jsonc`), reused rather than re-chosen: a
- * shortlist judgment is a harder read than a one-paragraph write (`cheapText`'s
- * job), and the owner's own trade — priced in COSTS.md — is staying on
- * Cloudflare rather than reaching for a frontier model outside it. NOT the
- * default for `cheapAnswer`/`cheapText`: those stay on the cheap model for
- * every existing caller, and a reader call names this model explicitly via
- * `opts.model`. */
-export const READER_TEXT_MODEL = "@cf/moonshotai/kimi-k2.6"
+/** THE READER'S MODEL — the one that re-reads a knowledge shortlist and replies
+ * with a JSON array of passage ids.
+ *
+ * IT WAS `@cf/moonshotai/kimi-k2.6` UNTIL 11 SEP 2026, on this sentence and
+ * nothing else: "a shortlist judgment is a harder read than a one-paragraph
+ * write". Plausible, never tested, and load-bearing for months — the reader had
+ * never once produced a verdict in production.
+ *
+ * THE REASON A REASONING MODEL CANNOT DO THIS JOB, and it is not about how hard
+ * the judgment is. kimi emits `reasoning_content` BEFORE `content`, billed
+ * against the SAME `max_tokens`. The answer here is a dozen ids; the
+ * deliberation is the whole budget. So the reply comes back
+ * `finish_reason:"length"` with empty `content`, `parseIds` returns null, and
+ * `retrieve()` reads null as NO EVIDENCE. A small output is not a cheap job for
+ * such a model — it is the reason no ceiling works. 200 clipped it; 1500
+ * clipped it; 3000 did not return inside sixty seconds.
+ *
+ * MEASURED, same shipped prompt, same real twelve-passage shortlists off
+ * staging:
+ *
+ *   question                                 kimi-k2.6          llama-4-scout
+ *   chemist reimbursed for a jab             NULL  32,636ms     2 ids 1,243ms
+ *   Asekurans extraction transcript          NULL  36,396ms     2 ids 1,906ms
+ *   what is happening with Paddlebase        NULL  34,503ms     5 ids 2,833ms
+ *   who organises our monthly get-together   2 ids 30,380ms     2 ids 1,576ms
+ *
+ * THE LAST ROW IS THE ARGUMENT. The one question kimi finished, both models
+ * returned the IDENTICAL ids in the IDENTICAL order. Not a cheaper model doing a
+ * worse job — the same judgment, twenty times faster, and the only one that
+ * produces a judgment at all on three questions of four.
+ *
+ * AND THE EXAM, three columns over 36 scorable rows (kb_E, 11 Sep 2026): no
+ * reader 27/36 · kimi 27/36 · llama 29/36, paraphrase 81% -> 90%, refusals 7/7
+ * on all three, and ZERO rows moved backward. A-M1 and A-M2 — both refused
+ * without a reader — answer citing their own keyed sources.
+ *
+ * SO IT IS THE CHEAP MODEL NOW, and the value is the same constant
+ * `cheapAnswer` already defaults to. A reader call still names it explicitly
+ * via `opts.model` rather than falling through to the default, because WHICH
+ * model reads is a decision this file should keep making out loud.
+ * `KNOWLEDGE_READER_MODEL` overrides it per deployment — the point of which is
+ * that the next person to doubt this can measure instead of arguing. */
+export const READER_TEXT_MODEL = CHEAP_TEXT_MODEL
 
 /** What one cheap call came back with: the model's words, and whether the
  * provider CUT THEM OFF rather than the model finishing its sentence.

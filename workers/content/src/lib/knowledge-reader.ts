@@ -78,6 +78,14 @@ export const READER_SHORTLIST_CAP = 12
  * guard beside it in knowledge-reader.test.ts. */
 export const READER_MAX_TOKENS = 1500
 
+/** A var that must be a positive number to count. Anything else — unset, empty,
+ * a typo — falls back, because a mis-typed ceiling silently becoming zero is the
+ * same silent-clip failure this constant's own history is about. */
+function numberOr(raw: string | undefined, fallback: number): number {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
 /** ONE PASSAGE, ONE STABLE ID — `<sourceId>:<seq>`, the same shape
  * `chunkVectorId` already uses for a chunk's own identity, so a reader
  * reply and a passage list agree on what "id" means without a third
@@ -164,8 +172,17 @@ export async function readShortlist(
   if (!shortlist.length) return { relevant: [] }
   try {
     const { text } = await cheapAnswer(env, readerSystemPrompt(), readerUserPrompt(question, shortlist), {
-      maxTokens: READER_MAX_TOKENS,
-      model: READER_TEXT_MODEL,
+      maxTokens: numberOr(env.KNOWLEDGE_READER_MAX_TOKENS, READER_MAX_TOKENS),
+      // WHICH MODEL READS, AS A VAR — so the choice can be MEASURED rather than
+      // argued, the same property `kb-bench.mjs` already gives the WRITER
+      // (`KB_COMPOSE_MODEL`). `READER_TEXT_MODEL` picked kimi-k2.6 on the
+      // stated reasoning that "a shortlist judgment is a harder read", and
+      // that sentence was never tested: measured 11 Sep 2026, kimi cannot
+      // finish this job at all on a real twelve-passage shortlist, because it
+      // writes `reasoning_content` into the same budget as its answer. A
+      // model is now a deployment decision somebody can change and re-measure
+      // in one line, instead of a constant with an argument attached.
+      model: env.KNOWLEDGE_READER_MODEL || READER_TEXT_MODEL,
     })
     const ids = parseIds(text)
     if (ids === null) {
