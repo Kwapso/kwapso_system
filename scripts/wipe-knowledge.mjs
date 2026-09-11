@@ -35,6 +35,16 @@
 //
 // The cursors go too (`knowledge_ingest`). Leaving them would tell the next
 // sweep it had already read everything, and the base would stay empty.
+//
+// THE BOOKKEEPING IS NULLED BEFORE A SINGLE VECTOR GOES, not after — see the
+// comment on that UPDATE below for the 2026-09-11 incident that earned it. A
+// wipe that dies mid-way used to leave source rows whose `content_hash` and
+// `indexed_chunks` still matched a hash that no longer had a vector behind
+// it, and both re-embed gates (the sweep's own skip and `indexSource`'s
+// restart check) read that as "already done" — a knowledge base that
+// silently stopped answering vector search while every counter said it was
+// healthy. Nulling the hash first makes a mid-run crash recoverable BY THE
+// NEXT SWEEP rather than by a human noticing.
 
 // The account, DERIVED rather than carried: `expectedAccount()` reads the ten
 // `CF_ACCOUNT_ID` declarations in the workers' own wrangler configs and requires
@@ -133,6 +143,30 @@ if (!GO) {
 }
 
 for (const { team, db } of plan) {
+  /* THIS UPDATE RUNS FIRST, BEFORE THE VECTOR DELETE BELOW — load-bearing,
+     not tidiness. 2026-09-11: a wipe on live staging died with
+     `[TypeError: fetch failed] cause: Error: read ETIMEDOUT` after deleting
+     all 10,064 Vectorize entries but before a single D1 DELETE in this loop
+     had run. Every `knowledge_sources` row survived with its `content_hash`
+     still matching its own text and `indexed_chunks >= chunk_count` — the
+     exact two fields BOTH re-embed gates read as "already fully indexed,
+     nothing to do" (the sweep's own skip, knowledge-ingest.ts, and
+     `indexSource`'s restart check, knowledge.ts). Neither gate can see
+     Vectorize, so every affected source reported perfect health on every
+     counter a screen or the sweep would show, answered lexical/FTS search
+     normally (its D1 rows were untouched), and never surfaced a vector
+     again — silently and permanently, with nothing anywhere saying so.
+     Nulling the hash HERE, before the vector delete that can fail, makes
+     the crash-prone window recoverable BY THE NEXT SWEEP instead of by a
+     human noticing: die on the very next line and a NULL hash can never
+     match, so the sweep re-embeds every source on its own within fifteen
+     minutes. Die before this UPDATE and nothing has been touched yet.
+     There is no longer a failure point that leaves a row believing it is
+     fine. DO NOT MOVE THIS DOWN NEXT TO THE OTHER D1 WRITES BELOW — sitting
+     it beside `knowledge_sources`'s own DELETE is the bug, re-introduced;
+     the whole point is that it runs before the step that can fail, not
+     after it. (scripts/test/wipe-order.test.mjs pins the order.) */
+  await d1(db, "UPDATE knowledge_sources SET content_hash = NULL, indexed_chunks = 0, indexed_at = NULL")
   /* The vector ids, READ BEFORE THE ROWS GO. A chunk's id is its vector's id. */
   const ids = (await d1(db, "SELECT id FROM knowledge_chunks")).map((r) => r.id)
   if (ids.length) {
