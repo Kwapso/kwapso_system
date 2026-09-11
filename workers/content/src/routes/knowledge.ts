@@ -296,10 +296,6 @@ export async function getKnowledgeShape(request: Request, env: Env): Promise<Res
   return json(await buildShape(cfg, guard, { compartment: compartment ?? null, readable }))
 }
 
-/** The reader `retrieve()` accepts — named here because this door now builds one
- * and passes it twice (once not at all, once for the second look below). */
-type RetrieveRead = (question: string, shortlist: KnowledgePassage[]) => Promise<{ relevant: string[] } | null>
-
 export async function getKnowledgeAsk(request: Request, env: Env): Promise<Response> {
   const { cfg, guard, actor } = await gated(request, env, "knowledge", "read")
   await refusePortalCaller(cfg, guard)
@@ -334,8 +330,8 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
     .split(",")
     .map((k) => k.trim())
     .filter((k) => SOURCE_CHIP_KEYS.includes(k))
-  const ask = (read: RetrieveRead | undefined) =>
-    retrieve(env, cfg, guard, {
+  return json(
+    await retrieve(env, cfg, guard, {
       question,
       accountId: queryText(url.searchParams.get("accountId"), "Account") ?? null,
       kinds: kindsForChips(chips),
@@ -349,65 +345,9 @@ export async function getKnowledgeAsk(request: Request, env: Env): Promise<Respo
       // The reader is only ever REACHED once there is a shortlist worth
       // reading — `retrieve` calls it after widening its own floor, and it
       // gates and meters itself exactly as the writer does.
-      read,
+      read: reread ? (q, shortlist) => payToRead(env, cfg, guard, actor, q, shortlist) : undefined,
     })
-
-  const reader: RetrieveRead = (q, shortlist) => payToRead(env, cfg, guard, actor, q, shortlist)
-  const answer = await ask(reread ? reader : undefined)
-
-  // A SECOND LOOK BEFORE SAYING "I DON'T KNOW" — the same shape as c-hijack's
-  // A3 retry, for the same reason: the expensive branch runs only once the
-  // cheap one has come back with nothing, so a question that already works
-  // costs exactly what it cost before.
-  //
-  // WHY IT IS WORTH A UNIT. The three paraphrases the owner complained about —
-  // who organises the monthly get-together, what horsepower do we have, how
-  // does a chemist get reimbursed for a jab — are refused by the floor alone
-  // and answered with receipts once something re-reads the shortlist. That is
-  // the whole point of the reader, and until now the SCREEN never asked for
-  // it: only a caller who passed `read=1` did, which in practice meant the
-  // assistant and nobody else. The screen's own refusals were the reader's
-  // best case and it was never called on them.
-  //
-  // GATED ON THE REFUSAL, NOT ON A FLAG, so there is no new setting to get
-  // wrong and no per-question cost on the questions that already answer.
-  // `payToRead` meters and gates itself exactly as before — and a caller
-  // WITHOUT the assistant right must still get the honest refusal rather than
-  // a 403, so the retry's failure is caught and the first answer stands. That
-  // is the one thing this must never do: turn "we have nothing on that" into
-  // an error page for somebody whose role simply cannot spend a unit.
-  return json(reread ? answer : await secondLook(answer, () => ask(reader)))
-}
-
-/** THE SECOND LOOK'S WHOLE DECISION, in one exported function, because the
- * alternative was a test that MIRRORS this logic rather than runs it — and a
- * mirror passes for ever after the thing it mirrors has changed
- * (.session-notes/lanes/NOTE-a-mock-cannot-fail-the-way-the-real-thing-fails.md,
- * three instances and counting). Exported for the suite; it has no other
- * caller and needs none.
- *
- * Three rules, and the third is the one with teeth:
- *   • an answer that was found stands, and the retry never runs — a question
- *     that already works costs exactly what it cost before;
- *   • a second look that finds nothing leaves the FIRST refusal in place,
- *     rather than inventing a third shape;
- *   • a second look that THROWS leaves the first refusal in place too. A role
- *     without the assistant right cannot spend a unit and `payToRead` says so
- *     by throwing, and that person asked an ordinary question the base has
- *     nothing on. Turning "we have nothing on that" into an error page for
- *     somebody whose role simply cannot pay is a worse failure than the one
- *     this exists to fix. */
-export async function secondLook<T extends { found: boolean }>(
-  first: T,
-  retry: () => Promise<T>
-): Promise<T> {
-  if (first.found) return first
-  try {
-    const again = await retry()
-    return again.found ? again : first
-  } catch {
-    return first
-  }
+  )
 }
 
 /** GET /api/content/knowledge/sync — how far the sweep has got with each kind of
