@@ -552,6 +552,8 @@ export function KnowledgeDetailScreen({
           .map((a) => ({ id: a.id, name: a.name }))}
         textOwnedElsewhere={textOwnedElsewhere}
         titleOwnedElsewhere={mirrored}
+        mirrored={mirrored}
+        sightingsCount={item.sightingsCount}
         textOwnedNote={
           item.fileUrl
             ? "These words were read out of the file, so they are corrected by adding the file again rather than typed over here. You can still rename it, change where it is filed and who can use it."

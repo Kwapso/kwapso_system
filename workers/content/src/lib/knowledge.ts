@@ -1151,6 +1151,28 @@ export type SourceInput = {
    * pass — and a person's decision about who may read something cannot live in a
    * column a background job overwrites. */
   visibleToAppId?: unknown
+  /** WHICH CLIENTS this concerns (BUILD-5 §1's "filing", not "fencing" — the
+   * hub's own words). Additive to `accountId`: a source stays filed under its
+   * one compartment either way, this is the wider "also relevant to" list a
+   * reader falls back away from once it carries anything (`toSource`'s own
+   * comment). Verified before this was wired: no `WHERE` clause anywhere reads
+   * this array, only `visible_to_app_id`/`owner_user_id` fence a read — so
+   * writing it can only ever change what a card SAYS, never who a search
+   * ADMITS. */
+  accounts?: unknown
+  /** WHICH APPS this concerns — same filing/fencing split as `accounts` above,
+   * and unlike it there is no singular column to fall back to: `appId` names
+   * what a MIRRORED source is ABOUT (the sweep's own field, rewritten every
+   * pass), never a person's filing decision, so an empty `apps[]` has always
+   * meant exactly what it says. */
+  apps?: unknown
+}
+
+/** Every element of an ALREADY-CHECKED array through the text validator, so a
+ * number or an object inside the list is a clean 400 rather than something
+ * that reaches a statement (R20 — positional, same as `client-org.ts`'s `ids`). */
+function idArray(list: unknown[], field: string): string[] {
+  return list.map((v) => requireText(v, field, TEXT_LIMITS.short))
 }
 
 /** The fields a create and an edit share, validated identically so the two can't
@@ -1168,6 +1190,8 @@ function readInput(input: SourceInput): {
   accountId: string | null
   privateToMe: boolean
   visibleToAppId: string | null
+  accountIds: string[]
+  appIds: string[]
 } {
   const privateToMe = input.visibility === "private"
   const body = optionalDocument(input.body, "The material") ?? null
@@ -1220,6 +1244,13 @@ function readInput(input: SourceInput): {
     visibleToAppId: privateToMe
       ? null
       : (optionalText(input.visibleToAppId, "App", TEXT_LIMITS.short) ?? null),
+    // FILING, ASKED THE SAME WAY THE FENCE FIELDS ABOVE ARE (R20: positional,
+    // every element through a real checker) — but never narrowed by
+    // `privateToMe`, because "who may read it" and "which clients this
+    // concerns" are unrelated questions and a private source can still be
+    // filed under three of them.
+    accountIds: Array.isArray(input.accounts) ? idArray(input.accounts, "Accounts") : [],
+    appIds: Array.isArray(input.apps) ? idArray(input.apps, "Apps") : [],
   }
 }
 
@@ -1297,6 +1328,11 @@ export async function createSource(
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
   if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
+  // Same existence + access check the edit door runs — see updateSource's own
+  // comment on why this is honesty (what a card may SAY) rather than a fence
+  // (what a search may ADMIT).
+  const accountsFiled = await Promise.all(v.accountIds.map((aid) => requireAccount(cfg, guard, aid)))
+  const appsFiled = await Promise.all(v.appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1310,8 +1346,8 @@ export async function createSource(
     cfg,
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes, source_url,
-       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, visible_to_app_id, accounts, apps, record_date, created_at, creator_id, creator_email, creator_name)
+     VALUES (?, 'note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -1323,6 +1359,8 @@ export async function createSource(
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
       v.visibleToAppId,
+      JSON.stringify(accountsFiled.map((a) => a.id)),
+      JSON.stringify(appsFiled.map((a) => a.id)),
       now,
       now,
       actor.id,
@@ -1456,6 +1494,18 @@ export async function updateSource(
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
   if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
+  // accounts[]/apps[] (0073's arrays, BUILD-5 §1's FILING half) go through the
+  // same existence + access checks as the singular `accountId`/`visibleToAppId`
+  // above, for the same reason: a compartment or an app id nobody's caller can
+  // reach is a slice of the knowledge base nothing can ever find again. Neither
+  // array is read by any fence (`appClause` reads only `visible_to_app_id`,
+  // verified before this was written), so this validation is honesty, not
+  // access control — a card that says "Dispatch, Confia" should not be able to
+  // say the name of an app or account this caller was never shown.
+  const accountsFiled = await Promise.all(v.accountIds.map((aid) => requireAccount(cfg, guard, aid)))
+  const appsFiled = await Promise.all(v.appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
+  const accountsJson = JSON.stringify(accountsFiled.map((a) => a.id))
+  const appsJson = JSON.stringify(appsFiled.map((a) => a.id))
   // WHOSE WORDS ARE THESE? Two families answer "not this form's": a MIRRORED
   // source, whose row the sweep would overwrite an edit from; and an UPLOADED
   // FILE, whose truth is the file — its body is a READING of it, and a form is
@@ -1480,20 +1530,35 @@ export async function updateSource(
   // the stored body alone rather than writing an excerpt over the document.
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
   const owner = v.privateToMe ? guard.userId : null
-  // WHO MAY READ IT is one decision with three answers, and all three families
-  // below carry it — a MIRRORED source's filing is exactly the thing that stays
-  // editable when its words do not, and limiting a file to one app's people is
-  // the commonest reason anybody opens this form at all.
+  // WHO MAY READ IT is one decision with three answers, and the ACCOUNT/APP half
+  // of it is editable on all three families — a MIRRORED source's filing is
+  // exactly the thing that stays editable when its words do not, and limiting a
+  // file to one app's people is the commonest reason anybody opens this form at
+  // all. The "only me" half is NOT one of the three, and that is new: for a
+  // FILE-BACKED or NOTE source, owner_user_id below IS the decision, nothing
+  // else ever touches that row, and this write is the only place it can come
+  // from. For a MIRRORED source it is a live Google sweep's `writeSightings` +
+  // `teamVisibleRecomputeSql` that own that column (knowledge-google.ts), and
+  // the generic ingest engine's unconditional `owner_user_id =
+  // excluded.owner_user_id` (knowledge-ingest.ts) means a value written HERE
+  // would already be gone by the next tick — so the mirrored branch does not
+  // write it at all, rather than promise something the sweep silently takes
+  // back. That was a real bug, not a hypothetical: this form let somebody pick
+  // "only me" on a mirrored source, said it saved, and lost the setting within
+  // one sweep window with no error anywhere. The screen no longer offers that
+  // choice on a mirrored source (knowledge-form-dialog.tsx); the door refuses to
+  // write it either way, because a screen can drift and a door is the last
+  // place this can be caught.
   const visibleToApp = v.visibleToAppId
   const now = new Date().toISOString()
   if (mirrored) {
     await d1Query(
       cfg,
       guard.databaseId,
-      `UPDATE knowledge_sources SET account_id = ?, compartment = ?, owner_user_id = ?,
-         visible_to_app_id = ?, updated_at = ?,
+      `UPDATE knowledge_sources SET account_id = ?, compartment = ?,
+         visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
-      [v.accountId, compartment, owner, visibleToApp, now, actor.id, actor.email, actor.name, id]
+      [v.accountId, compartment, visibleToApp, accountsJson, appsJson, now, actor.id, actor.email, actor.name, id]
     )
   } else if (fileBacked) {
     // Everything but the words. The body and its summary are left exactly as the
@@ -1502,7 +1567,7 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, source_url = ?, account_id = ?, compartment = ?,
-         owner_user_id = ?, visible_to_app_id = ?, updated_at = ?,
+         owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?, updated_at = ?,
          editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
@@ -1511,6 +1576,8 @@ export async function updateSource(
         compartment,
         owner,
         visibleToApp,
+        accountsJson,
+        appsJson,
         now,
         actor.id,
         actor.email,
@@ -1523,8 +1590,8 @@ export async function updateSource(
       cfg,
       guard.databaseId,
       `UPDATE knowledge_sources SET title = ?, body = ?, body_bytes = ?, summary = ?, source_url = ?,
-         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, updated_at = ?,
-         editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
+         account_id = ?, compartment = ?, owner_user_id = ?, visible_to_app_id = ?, accounts = ?, apps = ?,
+         updated_at = ?, editor_id = ?, editor_email = ?, editor_name = ? WHERE id = ?`,
       [
         title,
         v.body,
@@ -1535,6 +1602,8 @@ export async function updateSource(
         compartment,
         owner,
         visibleToApp,
+        accountsJson,
+        appsJson,
         now,
         actor.id,
         actor.email,
@@ -1547,14 +1616,26 @@ export async function updateSource(
   // arms narrow on them without a join), so a re-filing has to travel down or
   // the index would answer for a client whose material this no longer is.
   await indexOneSource(env, cfg, guard, id, { force: true })
+  // For a MIRRORED source `owner` above was never written (see the comment on
+  // it), so "to" has to be read the same way `before.visibility` itself was —
+  // off whatever owner_user_id the row actually holds now, not off the form's
+  // "only me" choice — or this line would tell a mirrored source's editor their
+  // private-to-me pick took effect when the door just refused to write it.
+  const visibilityAfter = mirrored
+    ? before.visibility === "private"
+      ? "private"
+      : visibleToApp
+        ? "app"
+        : "team"
+    : owner
+      ? "private"
+      : visibleToApp
+        ? "app"
+        : "team"
   const changes = describeChanges([
     { label: "Title", from: before.title, to: title },
     { label: "Filed under", from: before.compartment, to: compartment },
-    {
-      label: "Visible to",
-      from: before.visibility,
-      to: owner ? "private" : visibleToApp ? "app" : "team",
-    },
+    { label: "Visible to", from: before.visibility, to: visibilityAfter },
     {
       label: "Body",
       from: before.body,

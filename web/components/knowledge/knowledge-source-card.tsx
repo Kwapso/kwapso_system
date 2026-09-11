@@ -98,12 +98,18 @@ function piecesLabel(source: KnowledgeSource, t: Translate): string {
  * words, never the schema's own term for it ("sighting" was ruled out
  * entirely, not merely undefined: it names an internal modelling concept no
  * person needs, unlike "passage", which named a real product idea and is now
- * a glossary term). Returns `null` at zero — the true state of every row
- * today, since nothing writes a sighting yet — because a zero here is a fact
- * about this BUILD, not about the material, and a card that says so reads as
- * broken on every row in the base. `null` means the line is not drawn at
- * all, not drawn empty. */
-function sightingsLine(source: KnowledgeSource, t: Translate): string | null {
+ * a glossary term). Returns `null` at zero — a note nobody has typed a
+ * sighting onto, or a source whose Google sweep has not run since the
+ * fold-writer shipped — because a zero here is a fact about THIS row, not
+ * about every row in the base, and a card that says so reads as broken on
+ * one that has simply never been swept. `null` means the line is not drawn
+ * at all, not drawn empty.
+ *
+ * EXPORTED because `knowledge-form-dialog.tsx`'s mirrored-source edit form
+ * says the same fact, on purpose — reusing the one function that decided the
+ * wording is what keeps the two from drifting into two different sentences
+ * for one number. */
+export function sightingsLine(source: Pick<KnowledgeSource, "sightingsCount">, t: Translate): string | null {
   if (source.sightingsCount === 0) return null
   if (source.sightingsCount === 1) return t("Reached us through one person")
   return t("Reached us through {count} people", { count: String(source.sightingsCount) })

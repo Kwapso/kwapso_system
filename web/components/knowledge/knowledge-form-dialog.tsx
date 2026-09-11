@@ -22,6 +22,19 @@
 // with the reason said out loud — the sweep would overwrite an edit on its next
 // pass, and a form that silently loses your typing is worse than one that says
 // it will. Library primitives, FormShell, per-session draft (R4 + R7).
+//
+// "ONLY YOU" IS NOT OFFERED ON A MIRRORED SOURCE, and that is a correction, not
+// a simplification: it used to be, the door wrote it, and the very next Google
+// sweep silently put it back — a live `writeSightings` + `teamVisibleRecomputeSql`
+// own `owner_user_id` on a mirrored row now (knowledge-google.ts), the same
+// column this form used to write directly. A choice that never survives the next
+// tick is not a choice, so `mirrored` drops the option rather than keep offering
+// one the door has quietly stopped honouring. What replaces it is `sightingsLine`
+// — read-only, derived from who has actually sighted the thing — because whether
+// a mirrored source reads private today is a FACT about who has seen it, not a
+// setting anyone here picks. Wanting it kept off the team's answers entirely is a
+// different want than "only me", and it already has a door: take the source away
+// (`setSourceActive`), not a third mechanism invented here.
 
 import * as React from "react"
 
@@ -48,6 +61,7 @@ import { ApiFailure } from "@/lib/api"
 import { useFormDraft } from "@shared/web/use-form-draft"
 import { isVideoLink } from "@shared/media-links"
 import { useT } from "@shared/web/language"
+import { sightingsLine } from "@/components/knowledge/knowledge-source-card"
 
 const titleField = { ...defaultFieldConfig, label: "What is it called?", required: true }
 const bodyField = { ...defaultFieldConfig, label: "What should the assistant know?", required: false }
@@ -81,6 +95,8 @@ export function KnowledgeFormDialog({
   textOwnedElsewhere,
   textOwnedNote,
   titleOwnedElsewhere,
+  mirrored,
+  sightingsCount,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -112,6 +128,13 @@ export function KnowledgeFormDialog({
    * read-only. Defaults to `textOwnedElsewhere`, which is what a mirrored source
    * has always meant. */
   titleOwnedElsewhere?: boolean
+  /** true when a live sweep, not this form, decides whether this source reads
+   * private — drops "Only me" from the "Who can use it" choices and shows the
+   * derived reach line instead. See the file header. */
+  mirrored?: boolean
+  /** how many people's own sight of this source is what the "private" fact
+   * above is derived from — meaningless, and unused, unless `mirrored`. */
+  sightingsCount?: number
 }) {
   const t = useT()
   const isEdit = !!initial
@@ -270,7 +293,13 @@ export function KnowledgeFormDialog({
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
         <Select
-          value={values.visibility}
+          // A MIRRORED source has no "Only me" item below, so its currently
+          // derived-private state has nowhere to render as a selected item —
+          // Radix shows a blank trigger rather than guess. "Team" is the honest
+          // fallback: submitting it changes nothing about that derived state
+          // either, since the door no longer writes owner_user_id for a mirrored
+          // source at all (see the file header).
+          value={mirrored && values.visibility === "private" ? "team" : values.visibility}
           onValueChange={(visibility) =>
             setValues((v) => ({
               ...v,
@@ -291,9 +320,21 @@ export function KnowledgeFormDialog({
             {appOptions.length > 0 && (
               <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
             )}
-            <SelectItem value="private">{t("Only me")}</SelectItem>
+            {/* NOT OFFERED ON A MIRRORED SOURCE. See the file header — a choice
+                the next sweep silently erases is not a choice. */}
+            {!mirrored && <SelectItem value="private">{t("Only me")}</SelectItem>}
           </SelectContent>
         </Select>
+        {/* No line at all when nobody has sighted it yet (sweep hasn't run since
+            the fold-writer shipped, or never will for this kind) — the same
+            "null means undrawn, not drawn empty" rule `sightingsLine`'s own
+            comment states, so this form never says a new, unreviewed sentence
+            about a state the rest of the app stays silent on too. */}
+        {mirrored && sightingsLine({ sightingsCount: sightingsCount ?? 0 }, t) && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            {sightingsLine({ sightingsCount: sightingsCount ?? 0 }, t)}
+          </p>
+        )}
       </Field>
       {values.visibility === "app" && (
         <Field config={appField} htmlFor="knowledge-app" className={fieldSpacing}>
