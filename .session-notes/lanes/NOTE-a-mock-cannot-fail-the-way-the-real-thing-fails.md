@@ -7,6 +7,16 @@ service, and the hub's own words are the header this note keeps: *"a mock
 cannot fail the way the thing it replaces fails, so an integration test built
 on one proves the integration and never the boundary."*
 
+**A second instance below (kb_CD, same day) widens the claim.** kb_A's finding
+is about a mock that stands in for a call it cannot faithfully reproduce —
+this repo's own second instance is about a FIXTURE NUMBER seeded to be
+"clearly" on the right side of a threshold rather than measured against the
+real one. Different mechanism, same shape: a test that can only ever pass,
+built without noticing, and a green tick standing in for a measurement
+nobody took.
+
+## Instance 1 — the reader's "proved end to end" test
+
 ## What happened
 
 `READER_MAX_TOKENS` was set to 200, picked without measurement. In production
@@ -87,3 +97,54 @@ visible from asking, for a given external seam, "has anything, anywhere,
 ever actually called the real thing?" — and that question is worth asking
 again the next time a model-shaped bug (a truncation, a schema change, a
 rate limit) is hard to explain from the mocked tests alone.
+
+## Instance 2 — c-hijack's fixture, seeded above the wrong ceiling
+
+Found by kb_CD, 2026-09-11, while re-measuring c-hijack after it had already
+been ticked fixed once and staging was still hijacking on both of KB-AUDIT
+§4.2's own proof questions.
+
+`the account router is not hijacked by a name that is also an ordinary
+word (§4.2)`'s own test (`workers/content/test/knowledge.test.ts`) seeded
+"solutions" at 120 filler chunks to prove the rarity gate refuses an
+ordinary word. 120 was picked to be clearly over `EXACT_TERM_MAX_CHUNKS`
+(100) — the ceiling the code compared against, reused from a different
+population (digit-bearing reference terms like ticket numbers and years)
+and never validated against ordinary account-name words. Staging's REAL
+count for "solutions" was 79 — UNDER that same ceiling. So the test's own
+fixture sat on the safe side of a line the real corpus sat on the wrong
+side of, by construction, before a single assertion ran. The test could
+only ever have gone green. It did, the row was ticked fixed, and the base
+kept hijacking on the exact two questions the audit named.
+
+No mock involved this time — the fixture was a real SQLite table, queried
+for real. The shape is still the same one instance 1 names: a number
+chosen to be "clearly" on the right side of whatever the code currently
+checks against, rather than measured against what the real system actually
+produces. Fixed by re-measuring the real distribution (26 real accounts,
+their real corpus counts — `ACCOUNT_TOKEN_MAX_CHUNKS`'s own header in
+`workers/content/src/lib/knowledge.ts` has the full table) and reseeding
+every fixture at the REAL number, not a round one chosen for convenience.
+
+## The shape, stated once, across both instances
+
+A fixture — mocked or seeded — that is easier to satisfy than the real case
+it stands in for is not a smaller version of the real test, it is a
+different, weaker claim wearing the real test's name. The tell in both
+instances: the number (120 filler chunks; an injected callback standing in
+for a real model call) was picked for convenience or to "clearly"
+demonstrate the shape, never measured against what the real system actually
+does. **Measure the real value first, seed or mock at that number, and only
+then decide whether the mechanism holds.**
+
+Before trusting a test that mocks a call or seeds a threshold, ask:
+
+- Is the seeded/injected value MEASURED against the real system, or picked
+  to be "clearly" on the right side of whatever number the code currently
+  uses?
+- If the real ceiling or the real call's behaviour ever moves, does the
+  fixture move with it, or does it sit at a fixed distance that could land
+  on the wrong side silently?
+- Would this test have gone red on the ACTUAL bug, run against the ACTUAL
+  measured data or the actual real call, before the fix — not just on a
+  constructed worst case?

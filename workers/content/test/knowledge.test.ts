@@ -722,6 +722,20 @@ describe("the account router is not hijacked by a name that is also an ordinary 
       `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
          VALUES ('S_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
     )
+    // A REAL source about Paddlebase, filed under its own compartment — c-hijack
+    // A3's own retry-on-empty fires whenever a fragile single-token narrow
+    // finds nothing, and a fixture with no real material behind the narrow
+    // would trigger it every time, silently changing what this test proves
+    // from "the rarity gate lets a real name through" to "A3 widens past an
+    // empty fixture" — a different claim. Real content keeps the two questions
+    // separate.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_PADELBASE', 'note', 'Paddlebase migration notes', 'account:${RARE_NAMED}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_PADELBASE', 'S_PADELBASE', 'account:${RARE_NAMED}', 0, 'the Paddlebase migration status is on track for next month', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_PADELBASE';`
+    )
     // MAKE "solutions" COMMON — over EXACT_TERM_MAX_CHUNKS (100) chunks say
     // it, the same shape as the audit's own real corpus, where "solutions"
     // is an everyday word said across hundreds of chunks that have nothing
@@ -885,6 +899,111 @@ describe("c-hijack (A2): an ambiguous shared token resolves to NEITHER account, 
     expect(answer.compartments).toEqual([])
     expect(answer.compartments).not.toContain(`account:${ROSEWOOD_1}`)
     expect(answer.compartments).not.toContain(`account:${ROSEWOOD_2}`)
+  })
+})
+
+// c-hijack (A3). Weighed before building (the hub's own three questions,
+// answered in the branch's commit): a fragile narrow that finds nothing bets
+// on a compartment that just cost nothing to protect, so the search widens
+// once, unnarrowed, rather than refusing outright. THE POPULATION THIS COSTS
+// A SECOND ROUND TRIP ON is countable, not open-ended: the 26 staging
+// accounts whose canonical name collapses to one surviving token
+// (`ACCOUNT_TOKEN_MAX_CHUNKS`'s own header has the full list) — every other
+// account (an alias/code match, a multi-token match, or standing on a record)
+// never retries at all.
+describe("c-hijack (A3): a fragile narrow that finds nothing retries unnarrowed — never after an alias or code match", () => {
+  const LUMEN = "A_HIJACK_LUMEN"
+  const HOGO_STYLE = "A_HIJACK_HOGOSTYLE"
+  // A THIRD account, unrelated to either — its own compartment is reachable
+  // ONLY by a full, unnarrowed search. `agency` is deliberately not used for
+  // this: it is part of EVERY single-account narrow already (`deriveCompartment`'s
+  // own `[account, AGENCY_COMPARTMENT]` shape), so content filed there would
+  // be found on the FIRST pass regardless of whether A3 ever ran — proving
+  // nothing about the retry specifically.
+  const ELSEWHERE = "A_HIJACK_ELSEWHERE"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${LUMEN}', 'entity', 'Lumen', NULL, '2026-01-01'),
+         ('${HOGO_STYLE}', 'entity', 'Praxis Health', 'PRAXIS', '2026-01-01'),
+         ('${ELSEWHERE}', 'entity', 'Delaval Marine', NULL, '2026-01-01');`
+    )
+  })
+
+  it("finds nothing under the narrowed compartment, widens once, and the reason sentence says so honestly", async () => {
+    // "Lumen" is a real, single-token, rare name — fragile by c-hijack's own
+    // definition — with no material of its own. The ONLY matching material
+    // sits under a completely different account's compartment, reachable
+    // only once the search is genuinely unnarrowed.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_LUMEN_MENTION', 'note', 'Team update', 'account:${ELSEWHERE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_LUMEN_MENTION', 'S_LUMEN_MENTION', 'account:${ELSEWHERE}', 0, 'the Lumen relocation review moved to next quarter', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_LUMEN_MENTION';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the Lumen relocation?")
+    // THE RECEIPT — a person must be able to read that a guess was made, that
+    // it paid nothing, and that the search widened because of it.
+    expect(answer.reason).toBe(
+      "The question names Lumen, so I first searched Lumen's material — found nothing there, so I searched the whole knowledge base instead."
+    )
+    expect(answer.compartments).toEqual([])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Team update")
+  })
+
+  it("NEVER retries after an alias/code match — a real answer about the account, not a bad guess to retry past", async () => {
+    // Praxis Health's own code, PRAXIS, matches exactly and has NO material of
+    // its own. Material that WOULD be found if this incorrectly retried sits
+    // under a third, unrelated account's compartment — reachable only by a
+    // full unnarrow, which an alias match must never trigger.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_PRAXIS_ELSEWHERE', 'note', 'Reading list', 'account:${ELSEWHERE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_PRAXIS_ELSEWHERE', 'S_PRAXIS_ELSEWHERE', 'account:${ELSEWHERE}', 0, 'the praxis relocation of good management theory is discussed in this book', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_PRAXIS_ELSEWHERE';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the PRAXIS relocation?")
+    // Narrowed, found nothing THERE, and STAYS narrowed — the compartment is
+    // still Praxis Health's own, never widened to pick up the unrelated hit.
+    expect(answer.compartments).toEqual([`account:${HOGO_STYLE}`, "agency"])
+    expect(answer.found).toBe(false)
+    expect(answer.reason).toContain("Praxis Health")
+    expect(answer.reason).not.toContain("found nothing there")
+  })
+
+  // NAMED, ACCEPTED RISK — spelled out here rather than left to a commit
+  // message, per the hub's own instruction. The weighing's third question,
+  // answered concretely: yes, this can happen, and it is the SAME risk an
+  // ordinary "named no client" question already carries every day, behind
+  // the SAME floors, now also reached through this second door. "Lumen" the
+  // CLIENT and "lumen" the unit of luminous flux are a real homonym — the
+  // exact shape of coincidence c-hijack has been about throughout, here at
+  // the CONTENT level rather than the account-name level.
+  it("ACCEPTED RISK: when the wider corpus has UNRELATED material that clears the same floors, A3 can answer from the wrong material — same risk the unnarrowed path already carries daily", async () => {
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_LUMEN_UNIT', 'note', 'Lighting spec sheet', 'account:${ELSEWHERE}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_LUMEN_UNIT', 'S_LUMEN_UNIT', 'account:${ELSEWHERE}', 0, 'the office lighting relocation measured 800 Lumen, well within spec', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_LUMEN_UNIT';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the Lumen relocation?")
+    // This IS what ships: the retry finds the unrelated note (about a unit of
+    // light, not the client) and answers from it. The mitigation is not
+    // silence — it is R23's citations (a reader checking the source would see
+    // it is a lighting spec sheet, not Lumen's own material) and the reason
+    // sentence, which still says plainly that Lumen's own material had
+    // nothing and the search widened past it.
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Lighting spec sheet")
+    expect(answer.reason).toContain("found nothing there")
   })
 })
 

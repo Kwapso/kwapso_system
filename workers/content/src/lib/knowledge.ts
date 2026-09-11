@@ -2591,13 +2591,24 @@ export type CompartmentChoice = {
    * ANSWER and never the ranking (see §3 in the header) — a wrong guess here is
    * something a reader can disagree with, not something that hid the passage. */
   records: { sourceId: string; title: string }[]
+  /** c-hijack (A3). Present ONLY when the narrow came from a single
+   * FRAGILE collapsed token (`accountsNamedIn`'s own flag) — never from an
+   * alias/code match, never from a multi-token match, never from standing on
+   * a record, and never when more than one account was named. Those are all
+   * real answers about a real account; a fragile match is a bet, and
+   * `retrieve` reads this to decide whether an empty result is worth
+   * retrying unnarrowed rather than refusing outright. `accountName` is
+   * carried separately from `reason` so the retry can build its OWN honest
+   * sentence rather than string-surgery a sentence built for a different
+   * outcome. */
+  retryIfEmpty?: { accountName: string }
 }
 
 async function deriveCompartment(
   cfg: D1Rest,
   guard: MemberGuard,
   input: { question: string; accountId?: string | null }
-): Promise<{ compartments: string[]; reason: string }> {
+): Promise<{ compartments: string[]; reason: string; retryIfEmpty?: { accountName: string } }> {
   // 1. THE RECORD THEY ARE STANDING ON wins. If the caller asked from a client's
   //    screen (or a tool passed that client's id), that is not a guess.
   if (input.accountId) {
@@ -2619,6 +2630,11 @@ async function deriveCompartment(
     return {
       compartments: [accountCompartment(named[0].id), AGENCY_COMPARTMENT],
       reason: `The question names ${named[0].name}, so I searched ${named[0].name}'s material and the agency's own.`,
+      // c-hijack (A3) — see CompartmentChoice's own comment for the boundary:
+      // only a fragile (single-collapsed-token) match sets this. An alias/code
+      // match or a multi-token match never does; an empty result under either
+      // is a real answer, not a bad guess.
+      ...(named[0].fragile ? { retryIfEmpty: { accountName: named[0].name } } : {}),
     }
   if (named.length > 1) {
     const names = named.map((a) => a.name)
@@ -2867,7 +2883,7 @@ export async function accountsNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
   question: string
-): Promise<{ id: string; name: string }[]> {
+): Promise<{ id: string; name: string; fragile: boolean }[]> {
   const terms = questionTerms(question, 8)
   if (!terms.length) return []
   const clauses = terms.map(() => `LOWER(name) LIKE ? ESCAPE '\\'`)
@@ -2905,25 +2921,31 @@ export async function accountsNamedIn(
   // `named.length > 1`) is for a question that names several DIFFERENT
   // entities by their OWN distinct terms (BERG, HOGO — each its own alias or
   // multi-token match), never for one ambiguous word standing in for several.
-  const found: { id: string; name: string }[] = []
+  const found: { id: string; name: string; fragile: boolean }[] = []
   const seen = new Set<string>()
   const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
     // AN ALIAS ROW (today, always the account's code) — exact match or nothing,
     // no token-count/rarity gate. `alias_of` carries the canonical name back.
+    // NEVER fragile (c-hijack A3's own boundary): a code is a deliberate,
+    // declared handle, and a search that finds nothing under it is a real
+    // answer about that account, not a bad guess to retry past.
     if (c.alias_of) {
       if (asked.has(c.name.toLowerCase()) && !seen.has(c.ref_id)) {
         seen.add(c.ref_id)
-        found.push({ id: c.ref_id, name: c.alias_of })
+        found.push({ id: c.ref_id, name: c.alias_of, fragile: false })
       }
       continue
     }
     const nameTerms = [...tokenise(c.name).keys()]
     if (!nameTerms.length || !nameTerms.every((t) => asked.has(t))) continue
     if (nameTerms.length >= 2) {
+      // NEVER fragile either — two specific words appearing together is not
+      // a coincidence the way one common word is, the same reasoning that
+      // exempts it from the rarity gate above.
       if (!seen.has(c.ref_id)) {
         seen.add(c.ref_id)
-        found.push({ id: c.ref_id, name: c.name })
+        found.push({ id: c.ref_id, name: c.name, fragile: false })
       }
       continue
     }
@@ -2936,14 +2958,16 @@ export async function accountsNamedIn(
     }
   }
   // THE SECOND PASS. A token naming exactly one account is real evidence,
-  // kept; a token naming more than one is evidence about the token, not
-  // either account, and neither is added.
+  // kept and marked FRAGILE — c-hijack A3 reads this to decide whether an
+  // empty narrowed search is worth retrying unnarrowed. A token naming more
+  // than one is evidence about the token, not either account, and neither
+  // is added.
   for (const list of pendingByToken.values()) {
     if (list.length !== 1) continue
     const only = list[0]
     if (!seen.has(only.id)) {
       seen.add(only.id)
-      found.push(only)
+      found.push({ ...only, fragile: true })
     }
   }
   // R14: the cap applies to the FINAL set, after ambiguous tokens are
@@ -4003,29 +4027,19 @@ export async function retrieve(
   const want = Math.max(1, Math.min(input.limit ?? DEFAULT_PASSAGES, 20))
 
   const [asked] = await embed(env, [question])
-  const route = await deriveRoute(env, cfg, guard, {
+  // MUTABLE — c-hijack (A3) may replace this once, below, with a wider route
+  // when the narrow one came from a fragile match and found nothing. Every
+  // reference to `route` after that point (there are several) reads whichever
+  // one is active without needing to know a retry happened; that is the whole
+  // point of reassigning rather than threading a second variable through the
+  // rest of this function.
+  let route = await deriveRoute(env, cfg, guard, {
     question,
     accountId: input.accountId ?? null,
     asked,
   })
 
-  // THE TWO ARMS, SIDE BY SIDE. Neither narrows the other; that was the bug.
   const terms = questionTerms(question, MAX_QUESTION_TERMS)
-  const hits =
-    asked && hasVectorStore(env)
-      ? await searchVectors(env, guard, asked, {
-          level: "chunk",
-          ...compartmentFilter(route.compartments),
-          ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
-        })
-      : []
-  // THE RAW NEAREST-NEIGHBOUR SCORE, BEFORE ANY FLOOR — kept for the refusal
-  // log alone (KB-AUDIT.md §3: "log every refusal with its top-1 score"),
-  // never for ranking or for the floor decision itself, both of which read
-  // `vector` below. `searchVectors` returns matches ordered best-first
-  // (Vectorize's own contract), so this is genuinely the nearest neighbour and
-  // not an arbitrary row.
-  const top1Score = hits[0]?.score ?? null
   // NOT EVERY NEAREST NEIGHBOUR IS EVIDENCE. There is always a closest thing;
   // below the floor it is merely the least unlike, and letting it through is how
   // a knowledge base answers a question about parental leave out of a note about
@@ -4047,76 +4061,126 @@ export async function retrieve(
   const floor = input.read
     ? numberVar(env.KNOWLEDGE_READER_MIN_SCORE, READER_HALLUCINATION_FLOOR)
     : numberVar(env.KNOWLEDGE_MIN_SCORE, MIN_VECTOR_SCORE)
-  const vector = hits.filter((h) => h.score >= floor)
 
+  // THE TWO ARMS, SIDE BY SIDE, FOR ONE COMPARTMENT SET. Neither narrows the
+  // other; that was the bug. Factored out (c-hijack A3) so it can run TWICE —
+  // once for the narrow route, once for a wider one — without duplicating the
+  // fuse logic or risking the two copies drifting apart. Everything it reads
+  // besides `r` (`env`, `guard`, `question`, `terms`, `floor`, `input`) is the
+  // same for both calls; only the compartment set differs.
+  const searchArms = async (r: CompartmentChoice) => {
+    const hits =
+      asked && hasVectorStore(env)
+        ? await searchVectors(env, guard, asked, {
+            level: "chunk",
+            ...compartmentFilter(r.compartments),
+            ...(input.kinds?.length ? { kind: { $in: input.kinds } } : {}),
+          })
+        : []
+    // THE RAW NEAREST-NEIGHBOUR SCORE, BEFORE ANY FLOOR — kept for the refusal
+    // log alone (KB-AUDIT.md §3: "log every refusal with its top-1 score"),
+    // never for ranking or for the floor decision itself, both of which read
+    // `vector` below. `searchVectors` returns matches ordered best-first
+    // (Vectorize's own contract), so this is genuinely the nearest neighbour and
+    // not an arbitrary row.
+    const top1Score = hits[0]?.score ?? null
+    const vector = hits.filter((h) => h.score >= floor)
 
-
-  // WHEN THE WORD MATCH RUNS — and the answer turns on a distinction the old
-  // version of this comment did not draw.
-  //
-  // BESIDE THE VECTOR ARM it is easy: the question contains something EXACT (a
-  // reference, an invoice number), so it runs quietly at a tenth of a vote,
-  // because "exactly this string" is the one thing an embedding is indifferent
-  // to. Nothing below changes that case.
-  //
-  // ── WHEN THE VECTOR ARM CAME BACK EMPTY, WHICH IS TWO SENTENCES ───────────
-  //
-  // This used to be one condition (`!vector.length`) covering four situations it
-  // called identical: no store bound, the question could not be embedded, the
-  // material has no vector because it was indexed while the model was down, or
-  // nothing in the base cleared the floor. The first three are IGNORANCE — we
-  // did not look, so the word match really is everything we have. The fourth is
-  // an ANSWER: a semantic search ran over the whole compartment and reported
-  // that nothing in it is about this. Treating an answer as ignorance let the
-  // word match overturn it, on shared common words, into a confident reply.
-  //
-  // MEASURED, 27 Aug 2026, over the agency's own material. Asked "what is our
-  // parental leave policy and how much notice does it need?" — a policy the base
-  // does not hold and nobody has ever written down — the vector arm topped out
-  // at 0.451 against a floor of 0.5 and correctly found nothing. The word arm
-  // then ran as sole evidence, cleared the proportional floor on "policy",
-  // "notice" and "leave", and answered out of a page of Gemini meeting notes.
-  // That is precisely the failure R23 exists to prevent, arriving through the
-  // one door that was left open for it.
-  //
-  // So a search that LOOKED and found nothing stands, with one exception, and it
-  // is the same exception the word match exists for: a rare exact token. An
-  // embedding is indifferent to "3144" and the inverted index is not, so that
-  // one case may still speak. Everything else — a question of ordinary words the
-  // semantic search has already answered — is a refusal.
-  //
-  // The strict floor (`termFloor`'s `sole` branch — a short question present in
-  // FULL) still applies whenever the word match stands alone, and is now the
-  // second line rather than the only one.
-  const role: LexicalRole = vector.length
-    ? "beside"
-    : !asked || !hasVectorStore(env) || !hits.length
-      ? "blind"
-      : "overruling"
-  const lexical =
-    role !== "beside" || hasExactTerm(question)
-      ? await lexicalArm(cfg, guard, terms, exactTerms(question), route.compartments, role)
+    // WHEN THE WORD MATCH RUNS — and the answer turns on a distinction the old
+    // version of this comment did not draw.
+    //
+    // BESIDE THE VECTOR ARM it is easy: the question contains something EXACT (a
+    // reference, an invoice number), so it runs quietly at a tenth of a vote,
+    // because "exactly this string" is the one thing an embedding is indifferent
+    // to. Nothing below changes that case.
+    //
+    // ── WHEN THE VECTOR ARM CAME BACK EMPTY, WHICH IS TWO SENTENCES ───────────
+    //
+    // This used to be one condition (`!vector.length`) covering four situations it
+    // called identical: no store bound, the question could not be embedded, the
+    // material has no vector because it was indexed while the model was down, or
+    // nothing in the base cleared the floor. The first three are IGNORANCE — we
+    // did not look, so the word match really is everything we have. The fourth is
+    // an ANSWER: a semantic search ran over the whole compartment and reported
+    // that nothing in it is about this. Treating an answer as ignorance let the
+    // word match overturn it, on shared common words, into a confident reply.
+    //
+    // MEASURED, 27 Aug 2026, over the agency's own material. Asked "what is our
+    // parental leave policy and how much notice does it need?" — a policy the base
+    // does not hold and nobody has ever written down — the vector arm topped out
+    // at 0.451 against a floor of 0.5 and correctly found nothing. The word arm
+    // then ran as sole evidence, cleared the proportional floor on "policy",
+    // "notice" and "leave", and answered out of a page of Gemini meeting notes.
+    // That is precisely the failure R23 exists to prevent, arriving through the
+    // one door that was left open for it.
+    //
+    // So a search that LOOKED and found nothing stands, with one exception, and it
+    // is the same exception the word match exists for: a rare exact token. An
+    // embedding is indifferent to "3144" and the inverted index is not, so that
+    // one case may still speak. Everything else — a question of ordinary words the
+    // semantic search has already answered — is a refusal.
+    //
+    // The strict floor (`termFloor`'s `sole` branch — a short question present in
+    // FULL) still applies whenever the word match stands alone, and is now the
+    // second line rather than the only one.
+    const role: LexicalRole = vector.length
+      ? "beside"
+      : !asked || !hasVectorStore(env) || !hits.length
+        ? "blind"
+        : "overruling"
+    const lexical =
+      role !== "beside" || hasExactTerm(question)
+        ? await lexicalArm(cfg, guard, terms, exactTerms(question), r.compartments, role)
+        : []
+    // THE NAME ARM RUNS ON EVERY QUESTION, and it is its own gate: it returns
+    // nothing unless one of the question's terms begins a colleague's name. So it
+    // costs one bounded read on a question about parental leave and speaks only on
+    // a question about a person — which is also why it may speak when the vector
+    // arm found nothing, the case that refused the owner outright.
+    const named = await nameArm(cfg, guard, terms, r.compartments, input.kinds ?? null)
+    // THE RECENCY ARM RUNS ONLY ON INTENT (KB-AUDIT.md §4.5) — gated the same
+    // way the name arm is unconditional and this is not: "what changed this
+    // week?" needs it, "capital expenditure?" must never be nudged by it, so a
+    // bounded read only happens on the question shape that asked for one.
+    const recency = hasRecencyIntent(question)
+      ? await recencyArm(cfg, guard, r.compartments, input.kinds ?? null)
       : []
-  // THE NAME ARM RUNS ON EVERY QUESTION, and it is its own gate: it returns
-  // nothing unless one of the question's terms begins a colleague's name. So it
-  // costs one bounded read on a question about parental leave and speaks only on
-  // a question about a person — which is also why it may speak when the vector
-  // arm found nothing, the case that refused the owner outright.
-  const named = await nameArm(cfg, guard, terms, route.compartments, input.kinds ?? null)
-  // THE RECENCY ARM RUNS ONLY ON INTENT (KB-AUDIT.md §4.5) — gated the same
-  // way the name arm is unconditional and this is not: "what changed this
-  // week?" needs it, "capital expenditure?" must never be nudged by it, so a
-  // bounded read only happens on the question shape that asked for one.
-  const recency = hasRecencyIntent(question)
-    ? await recencyArm(cfg, guard, route.compartments, input.kinds ?? null)
-    : []
 
-  const fused = fuse(vector, lexical, named, recency)
+    return { fused: fuse(vector, lexical, named, recency), top1Score }
+  }
+
+  let { fused, top1Score } = await searchArms(route)
+
+  // c-hijack (A3). Only when the narrow came from a FRAGILE match (never an
+  // alias/code match, never a multi-token match, never standing on a record —
+  // `route.retryIfEmpty`'s own header has the full boundary) and it found
+  // NOTHING: the bet paid nothing, so the compartment it guessed is worth
+  // exactly nothing to protect. Retried ONCE, unnarrowed — never a loop, and
+  // never for any other reason a search comes back empty (a genuinely empty
+  // corpus for a real client is not this).
+  if (!fused.length && route.retryIfEmpty) {
+    const accountName = route.retryIfEmpty.accountName
+    route = {
+      compartments: [],
+      // THE THIRD SENTENCE SHAPE — the load-bearing half of A3. Not "searched
+      // the whole knowledge base" (that erases the guess) and not the narrow
+      // sentence unchanged (that hides the retry): a person reading this must
+      // be able to see that a guess was made, that it paid nothing, and that
+      // the search widened because of it — the receipt this whole rebuild
+      // keeps insisting on, applied to A3's own retry rather than assumed.
+      reason: `The question names ${accountName}, so I first searched ${accountName}'s material — found nothing there, so I searched the whole knowledge base instead.`,
+      records: route.records,
+    }
+    ;({ fused, top1Score } = await searchArms(route))
+  }
 
   if (!fused.length) {
     // No fused candidates at all — the shortlist worth logging is empty, and
     // that emptiness is itself the fact: nothing narrowed by compartment or
-    // touched by any arm, not "something close that fell short".
+    // touched by any arm, not "something close that fell short". If A3 just
+    // retried and STILL found nothing, `route` above is already the wide one
+    // and its reason already says so — this refusal describes exactly what
+    // was tried, not just the last attempt.
     await logRefusal(env, cfg, guard, question, route.compartments, route.reason, [], top1Score)
     return knowledgeAnswer({
       question,
