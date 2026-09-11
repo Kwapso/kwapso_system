@@ -9,17 +9,22 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import {
+  applyKeys,
   classify,
+  enforceRefusalCeiling,
   findExamFile,
   grade,
   KNOWN_TAGS,
   loadExam,
+  loadKeys,
   MANDATORY_CANARIES,
   OVERRIDES,
   parseExam,
+  scoreExam,
   shortlistFromAnswer,
   summarize,
   validateExam,
+  validateKeys,
 } from "../kb-exam.mjs"
 
 const FIXTURE = `
@@ -259,4 +264,129 @@ test("fence coverage is enumerable by tag — exactly the five rows the hub name
   // A-X8's persona split is untouched — still struck, still carrying its
   // own reason, not silently reinterpreted now that other rows are tagged.
   assert.equal(byId.get("A-X8").disposition, "struck")
+})
+
+/* ------------------------- the keying mechanism (empty) ------------------------- */
+
+test("loadKeys returns {} when the file does not exist — the mechanism works before any row is ever keyed", () => {
+  assert.deepEqual(loadKeys("/tmp/kb-exam-keys-does-not-exist.json"), {})
+})
+
+test("the shipped scripts/kb-exam-keys.json is empty — nothing is keyed until the post-reindex pass runs", () => {
+  assert.deepEqual(loadKeys(), {}, "if this fails, someone started keying — update this test, don't delete it")
+})
+
+test("applyKeys: a row absent from the keys file is untouched — grades exactly as it does today", () => {
+  const rows = [{ id: "A-O1", disposition: "keyed", sourceIds: null }]
+  assert.deepEqual(applyKeys(rows, {}), rows)
+})
+
+test("applyKeys: a row present in the keys file gets sourceIds from it, nothing else changed", () => {
+  const rows = [{ id: "A-O1", disposition: "keyed", sourceIds: null, question: "q" }]
+  const [result] = applyKeys(rows, { "A-O1": ["src_real_1"] })
+  assert.deepEqual(result.sourceIds, ["src_real_1"])
+  assert.equal(result.question, "q")
+})
+
+test("validateKeys catches a key naming a row that doesn't exist, one on a non-keyable disposition, and an empty array", () => {
+  const rows = [
+    { id: "A-O1", disposition: "keyed" },
+    { id: "A-X6", disposition: "refusal" },
+  ]
+  const problems = validateKeys(rows, { "A-GHOST": ["x"], "A-X6": ["x"], "A-O1": [] })
+  assert.ok(problems.some((p) => p.includes("A-GHOST does not exist")))
+  assert.ok(problems.some((p) => p.includes('A-X6 is disposition "refusal"')))
+  assert.ok(problems.some((p) => p.includes("A-O1 must key to a non-empty array")))
+})
+
+test("validateKeys is clean against the real, empty keys file", () => {
+  const { rows } = loadExam()
+  assert.deepEqual(validateKeys(rows, loadKeys()), [])
+})
+
+/* ------------------- MUTATION PROOF — the keying mechanism actually grades ------------------- */
+//
+// The hub's own bar: "If you cannot make it fail, the grader is not
+// reading the keys and the whole mechanism is theatre." A FABRICATED row
+// (never added to the real exam) and a FABRICATED retrieval result (no
+// model call, no network — Half One needs neither) exercised through the
+// real, shipped `applyKeys` + `grade` path, not a hand-rolled stand-in.
+
+test("MUTATION PROOF — keyed to an absent source: FAILS", () => {
+  const fakeRow = { id: "FAKE-1", disposition: "keyed", sourceIds: null }
+  const keys = { "FAKE-1": ["src_definitely_absent_999"] }
+  const [keyedRow] = applyKeys([fakeRow], keys)
+  const fabricatedRetrieval = { found: true, shortlistIds: ["src_present_1", "src_present_2"] }
+  const result = grade(keyedRow, fabricatedRetrieval)
+  console.log("MUTATION PROOF (absent key):", JSON.stringify(result))
+  assert.equal(result.scored, true)
+  assert.equal(result.correct, false)
+})
+
+test("MUTATION PROOF — same row, keyed to a present source: PASSES", () => {
+  const fakeRow = { id: "FAKE-1", disposition: "keyed", sourceIds: null }
+  const keys = { "FAKE-1": ["src_present_1"] }
+  const [keyedRow] = applyKeys([fakeRow], keys)
+  const fabricatedRetrieval = { found: true, shortlistIds: ["src_present_1", "src_present_2"] }
+  const result = grade(keyedRow, fabricatedRetrieval)
+  console.log("MUTATION PROOF (present key):", JSON.stringify(result))
+  assert.equal(result.scored, true)
+  assert.equal(result.correct, true)
+})
+
+/* --------------------------- the refusal ceiling (tracker item e-refusals) --------------------------- */
+
+test("scoreExam: a partial run (no results yet) reports the ceiling as vacuously met, never a phantom failure", () => {
+  const rows = [{ id: "A-X6", disposition: "refusal", tags: ["absent"] }]
+  const score = scoreExam(rows, {})
+  assert.equal(score.scored, 0)
+  assert.equal(score.refusalGraded, 0)
+  assert.equal(score.refusalCeilingMet, true)
+})
+
+test("scoreExam: every refusal row correct — ceiling met, enforceRefusalCeiling does not throw", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-X5", disposition: "refusal", tags: ["absent"] },
+  ]
+  const results = { "A-X4": { found: false, shortlistIds: [] }, "A-X5": { found: false, shortlistIds: [] } }
+  const score = scoreExam(rows, results)
+  assert.equal(score.refusalGraded, 2)
+  assert.equal(score.refusalCeilingMet, true)
+  assert.doesNotThrow(() => enforceRefusalCeiling(score))
+})
+
+test("MUTATION PROOF — one refusal row answers instead of refusing: the gate goes red", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-X5", disposition: "refusal", tags: ["absent"] },
+  ]
+  // A-X5 "answers" — found: true — instead of refusing. Tracker item
+  // e-refusals: this must fail the row AND fail the build, not average
+  // out to "50%, mostly fine".
+  const results = {
+    "A-X4": { found: false, shortlistIds: [] },
+    "A-X5": { found: true, shortlistIds: ["hallucinated_src"] },
+  }
+  const score = scoreExam(rows, results)
+  console.log("MUTATION PROOF (refusal ceiling):", JSON.stringify(score))
+  assert.equal(score.refusalCeilingMet, false)
+  assert.deepEqual(score.refusalFailures, ["A-X5"])
+  assert.throws(() => enforceRefusalCeiling(score), /refusal ceiling breached: 1\/2.*A-X5/)
+})
+
+test("scoreExam computes per-tag pass rates across mixed dispositions", () => {
+  const rows = [
+    { id: "A-X4", disposition: "refusal", tags: ["absent"] },
+    { id: "A-O1", disposition: "keyed", tags: ["para"], sourceIds: ["src_1"] },
+  ]
+  const results = {
+    "A-X4": { found: false, shortlistIds: [] },
+    "A-O1": { found: true, shortlistIds: ["src_1"] },
+  }
+  const score = scoreExam(rows, results)
+  assert.deepEqual(score.byTag.absent, { pass: 1, total: 1 })
+  assert.deepEqual(score.byTag.para, { pass: 1, total: 1 })
+  assert.equal(score.passed, 2)
+  assert.equal(score.scored, 2)
 })

@@ -306,10 +306,42 @@ export function classify(row) {
   return { ...row, ...decided, mandatory: MANDATORY_CANARIES.has(row.id) }
 }
 
-export function loadExam(path = findExamFile()) {
+/** THE KEYING MECHANISM. `.plans/KB-EXAM.md`'s own words: "key every row to
+ * the source id(s) that answer it... [until then] a row is graded by
+ * hand." Real ids cannot exist before Lane A/C's re-index runs, so this
+ * file starts EMPTY — `{}` — and is edited only during the post-reindex
+ * keying pass, one row id to one array of real source ids. It is
+ * DELIBERATELY SEPARATE from KB-EXAM-UNION.md: the union is the questions
+ * and their editorial classification (tags → disposition), which the hub
+ * rules on; the keys are a fact about the re-indexed database, which
+ * nobody can state until it exists. Keeping them apart means a keying
+ * pass is a diff to ONE small JSON file, never a hand-edit of the
+ * generated union markdown that scripts/kb-exam-merge.mjs would then
+ * flag as drifted. */
+const KEYS_PATH = join(HERE, "kb-exam-keys.json")
+
+export function loadKeys(path = KEYS_PATH) {
+  if (!existsSync(path)) return {}
+  return JSON.parse(readFileSync(path, "utf8"))
+}
+
+/** A row with NO entry in `keys` is untouched — its `sourceIds` stays
+ * whatever `classify()` set it to (null for `keyed`/`gap`), which is
+ * exactly today's behaviour: ungraded, reported only in the structural
+ * summary, "by hand" until the keying pass reaches it. A row WITH an
+ * entry gets `sourceIds` set from the file, so `grade()` can score it the
+ * moment a real (or, for the mutation proof, a fabricated) retrieval
+ * result exists. Applying this to every disposition uniformly is
+ * harmless — `grade()` only ever reads `sourceIds` for `keyed`/`gap`. */
+export function applyKeys(rows, keys) {
+  return rows.map((row) => (row.id in keys ? { ...row, sourceIds: keys[row.id] } : row))
+}
+
+export function loadExam(path = findExamFile(), keysPath = KEYS_PATH) {
   const markdown = readFileSync(path, "utf8")
   const rows = parseExam(markdown).map(classify)
-  return { path, rows: [...rows, ...DERIVED_ROWS.map((r) => ({ ...r }))] }
+  const all = [...rows, ...DERIVED_ROWS.map((r) => ({ ...r }))]
+  return { path, rows: applyKeys(all, loadKeys(keysPath)) }
 }
 
 /* ------------------------------- validation ------------------------------ */
@@ -332,6 +364,28 @@ export function validateExam({ rows }) {
       problems.push(`${row.id}: ${row.disposition} with no reason`)
   }
   for (const id of MANDATORY_CANARIES) if (!seen.has(id)) problems.push(`mandatory canary ${id} is missing from the exam`)
+  return problems
+}
+
+/** Catches a stale or typo'd key BEFORE it silently grades nothing (a key
+ * naming a row that no longer exists) or grades something it can't (a key
+ * on a `refusal`/`tool`/`struck` row, none of which read `sourceIds`). Run
+ * against the raw `keys` object, separately from `validateExam`, because
+ * a keys-file problem is a fact about the keying pass, not about the
+ * exam's own editorial structure. */
+export function validateKeys(rows, keys) {
+  const problems = []
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  for (const [id, sourceIds] of Object.entries(keys)) {
+    const row = byId.get(id)
+    if (!row) {
+      problems.push(`kb-exam-keys.json: ${id} does not exist in the loaded exam`)
+      continue
+    }
+    if (row.disposition !== "keyed" && row.disposition !== "gap")
+      problems.push(`kb-exam-keys.json: ${id} is disposition "${row.disposition}", which never reads sourceIds`)
+    if (!Array.isArray(sourceIds) || sourceIds.length === 0) problems.push(`kb-exam-keys.json: ${id} must key to a non-empty array of source ids`)
+  }
   return problems
 }
 
@@ -385,6 +439,63 @@ export function grade(row, result) {
  * only reduces it to what `grade` needs. */
 export function shortlistFromAnswer(answer) {
   return [...new Set((answer.passages ?? []).map((p) => p.sourceId).filter(Boolean))]
+}
+
+/* ---------------------------------- scoring --------------------------------- */
+
+/** THE ACTUAL GRADING RUN, over whatever retrieval results exist —
+ * fabricated (the mutation proof below, and every unit test), or real
+ * (Half Two's prepared retrieval-only pass, once the hub authorises it).
+ * `resultsByRowId` may be partial: a row with no result yet is skipped,
+ * never scored as a failure, so this can run against an in-progress pass
+ * without reporting phantom zeros. `tracker item e-refusals` requires
+ * every refusal-disposition row to score 100% — `refusalCeilingMet` is
+ * that assertion made checkable, not just a number a person has to eyeball
+ * in a percentage column. */
+export function scoreExam(rows, resultsByRowId) {
+  const graded = []
+  for (const row of rows) {
+    const result = resultsByRowId[row.id]
+    if (!result) continue
+    graded.push(grade(row, result))
+  }
+  const scored = graded.filter((g) => g.scored)
+  const byTag = {}
+  for (const g of scored) {
+    for (const t of g.row.tags) {
+      byTag[t] ??= { pass: 0, total: 0 }
+      byTag[t].total++
+      if (g.correct) byTag[t].pass++
+    }
+  }
+  const refusalGraded = scored.filter((g) => g.row.disposition === "refusal")
+  const refusalFailures = refusalGraded.filter((g) => !g.correct).map((g) => g.row.id)
+  return {
+    attempted: graded.length,
+    scored: scored.length,
+    passed: scored.filter((g) => g.correct).length,
+    byTag,
+    refusalGraded: refusalGraded.length,
+    refusalFailures,
+    // The gate tracker item e-refusals actually cares about: true only
+    // when every graded refusal row passed. Vacuously true (and reported
+    // as such) if none were graded yet — a partial run must not read as
+    // "the ceiling holds" when it never checked.
+    refusalCeilingMet: refusalFailures.length === 0,
+  }
+}
+
+/** THE BUILD-FAILING FORM of the assertion above. Exits nonzero and names
+ * every failing refusal row the moment one exists — this is what turns
+ * "the refusal tag scores 100%" from a number in a report into something
+ * that can actually fail a run. Called by Half Two's prepared script once
+ * real results exist; exercised now, with fabricated results, by the
+ * mutation proof in scripts/test/kb-exam.test.mjs. */
+export function enforceRefusalCeiling(score) {
+  if (score.refusalCeilingMet) return
+  throw new Error(
+    `refusal ceiling breached: ${score.refusalFailures.length}/${score.refusalGraded} refusal row(s) failed — ${score.refusalFailures.join(", ")}`
+  )
 }
 
 /* ---------------------------------- report --------------------------------- */
@@ -483,7 +594,7 @@ function statusLine(s) {
 function main() {
   const args = process.argv.slice(2)
   const { path, rows } = loadExam()
-  const problems = validateExam({ rows })
+  const problems = [...validateExam({ rows }), ...validateKeys(rows, loadKeys())]
   if (problems.length) {
     console.error(`kb-exam: ${problems.length} structural problem(s):`)
     for (const p of problems) console.error(`  ${p}`)
