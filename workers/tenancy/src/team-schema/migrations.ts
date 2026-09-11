@@ -5584,6 +5584,56 @@ CREATE TABLE knowledge_refusals (
 CREATE INDEX idx_knowledge_refusals_created ON knowledge_refusals (created_at);
 `,
   },
+  {
+    // R68 REPOINTED, NOT DROPPED. 0073 built \`identity_key\` to enforce "one
+    // identity per real-world thing, reader stripped" — the exact fault
+    // BUILD-5-knowledge-rebuild.md exists to close, where the same Drive
+    // folder shared with two colleagues used to file as two rows. That
+    // sentence is correct. The column was not: 0012's
+    // \`idx_knowledge_sources_origin\`, a UNIQUE PARTIAL index on
+    // \`(origin_table, origin_row_id)\`, already enforces it, sixty-one
+    // migrations earlier, and the real fold
+    // (\`workers/content/src/lib/knowledge-ingest.ts\`'s
+    // \`ON CONFLICT (origin_table, origin_row_id)\`) has been keying on THAT
+    // pair since it landed — never on \`identity_key\`, which no code has ever
+    // written outside a comment (\`grep -rn "identity_key" workers/content/src/\`:
+    // two hits, both prose). \`identityKey()\`'s own input IS \`origin_table\` +
+    // \`origin_row_id\` — it only ever joined them into one string — so the
+    // column and its index were a SECOND mechanism enforcing ONE invariant
+    // 0012 already owned.
+    //
+    // Measured, not assumed, before this migration was written: the census in
+    // workers/content/test/one-identity-per-source.test.ts (R68's own check)
+    // had a population of ZERO for the clause this column existed to serve —
+    // pinned against an empty set is the exact failure this rebuild
+    // catalogued the same night this column was added. Verified independently
+    // twice (kb_A's investigation, the hub's own re-check of the 0012 index
+    // before ruling) before touching the ledger.
+    //
+    // So: DROP the column and its index, never edit 0073 (append-only —
+    // 0073's own SQL is untouched, and this is why the fold that already
+    // matched a fresh reader could not see this coming: the redundant
+    // mechanism was inert from the day it landed). R68 itself is NOT retired
+    // — its registry entry now points at 0012's real index and at the fold's
+    // own ON-CONFLICT contract instead. \`identityKey()\` is deleted too
+    // (workers/content/src/lib/knowledge-identity.ts): its sibling functions
+    // (\`googleIdentity\`, \`uploadIdentity\`, \`recordIdentity\`) stay, because
+    // they build the \`{ originTable, originRowId }\` pair the real fold
+    // actually consumes (\`knowledge-google.ts\`'s \`rowId()\` calls
+    // \`googleIdentity()\` today); \`identityKey()\` had no purpose beyond
+    // joining that pair into the string this column no longer holds.
+    //
+    // NULL on every row that has ever existed — confirmed by the same grep
+    // above, since nothing has ever written it — so this loses no data.
+    // DROP INDEX before DROP COLUMN: measured against real SQLite, dropping
+    // the column first throws ("error in index … after drop column: no such
+    // column") because the partial index still names it.
+    version: "0080_identity_key_retired_the_fold_was_never_on_it",
+    sql: `
+DROP INDEX idx_knowledge_sources_identity;
+ALTER TABLE knowledge_sources DROP COLUMN identity_key;
+`,
+  },
 ]
 
 /** 0068's SQL, WRITTEN OUT OF THE KIND MAP RATHER THAN TYPED SEVEN TIMES.

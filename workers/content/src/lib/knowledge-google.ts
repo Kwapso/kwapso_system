@@ -273,11 +273,16 @@ function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: str
  * sources. `googleIdentity` refuses an empty external id rather than letting
  * one bad item collide every unidentifiable row of a service into one. */
 function rowId(item: GoogleItem): string {
-  // The bare id — `origin_row_id`'s own value — never `identityKey`'s composite
-  // "table id" string, which is what the (separate) `identity_key` COLUMN is
-  // for. Writing the composite here was the first draft's own bug: it reads as
-  // correct (both come out of `googleIdentity`) and is caught only by
-  // `origin_row_id` visibly carrying a table name inside it.
+  // The bare id — `origin_row_id`'s own value — never a composite "table id"
+  // string. An earlier draft joined `originTable`/`originRowId` into one
+  // string and wrote THAT here, which reads as correct (both come out of
+  // `googleIdentity`) and is caught only by `origin_row_id` visibly carrying
+  // a table name inside it. The joined-string column that draft was aiming
+  // at (`identity_key`, 0073) was retired in 0080: 0012's own
+  // `idx_knowledge_sources_origin`, a unique partial index on exactly
+  // `(origin_table, origin_row_id)`, already enforced the fact that column
+  // was built to enforce — the fold here has always keyed on those two plain
+  // columns, never on a joined string.
   return googleIdentity(item.service, item.externalId).originRowId
 }
 
