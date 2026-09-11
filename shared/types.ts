@@ -2704,6 +2704,15 @@ export type GoogleItem = {
    * folder it came out of), and asking again downstream would be guessing at
    * text instead of reading a decision. Null = the agency's own compartment. */
   accountId: string | null
+  /** EVERY account this item concerns, when the read that fetched it could tell
+   * more than one — GMAIL and CALENDAR only, off the same address/attendee
+   * match `accountId` uses, kept instead of discarded past the first hit
+   * (google-read.ts's `matchedAccounts`). Undefined on Drive and Chat, whose
+   * account is a human filing decision made once, at connect time, and is
+   * never more than one by construction — there is nothing to collect.
+   * Additive to `accountId` (migration 0073): the compartment stays the one
+   * value it has to be, this is the wider "also concerns" list. */
+  accounts?: string[]
   /** TRUE WHEN NO PERSON EVER SPOKE IN IT — every voice was an app. Chat only,
    * and absent (undefined) on every other service, which read as "a person was
    * involved" and is the safe default for a kind that cannot tell.

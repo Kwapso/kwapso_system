@@ -5019,11 +5019,32 @@ ALTER TABLE meetings ADD COLUMN superseded_transcript_ids TEXT;
     // ── accounts[] / apps[] (KB-AUDIT.md §1, "one copy tagged with every
     //    account/app it concerns") ─────────────────────────────────────────
     //
-    // `account_id` (0012) and `app_id` (0020) are each ONE reference — right for
-    // a mirrored record, wrong for a shared Drive file or a chat thread that
-    // concerns several accounts or apps at once. `accounts`/`apps` are JSON
-    // arrays of ids, additive: the singular columns are untouched, and reading
-    // either shape is Lane B/C's decision, not this migration's.
+    // CORRECTED 11 Sep 2026 (d-ingest-filing). This comment's examples were
+    // wrong and the ruling that reads it should not repeat them: a shared
+    // Drive file and a Chat thread are filed under ONE account each, by a
+    // human decision made once at connect time — there is no multi-account
+    // signal to collect for either, and `account_id` is "right for a mirrored
+    // record" (this migration's own next sentence) for them too. The kinds
+    // that actually concern several accounts at once are GMAIL and CALENDAR:
+    // a mail thread can have three clients CC'd on it, an event three
+    // attendees from three different companies, and `account_id` already
+    // resolves that against the contacts table — it just keeps only the
+    // first match, on purpose, because the compartment it feeds has to be one
+    // value. `accounts[]` is the wider "also concerns" list built from the
+    // exact same match, kept instead of discarded (google-read.ts's
+    // `matchedAccounts`). The 13 kinds this app mirrors off its own tables
+    // (tickets, stories, sprints, …) have no plural relationship in the
+    // schema at all — one account, one app, full stop — so `accounts[]`/
+    // `apps[]` stay empty for every one of them, by decision, not by gap.
+    // `apps[]` stays empty everywhere for now: no app-resolution signal
+    // exists anywhere in the Google ingest path (a chat thread has no
+    // column, header or attendee list that names a built system), and
+    // building one is new design work, not wiring.
+    //
+    // `account_id` (0012) and `app_id` (0020) are each ONE reference. `accounts`/
+    // `apps` are JSON arrays of ids, additive: the singular columns are
+    // untouched, and reading either shape is the ingest lane's decision, not
+    // this migration's.
     //
     // ── shared_with, separate from owner_user_id ───────────────────────────
     //

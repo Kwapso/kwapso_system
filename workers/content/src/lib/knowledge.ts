@@ -1190,7 +1190,7 @@ export type SourceInput = {
 /** Every element of an ALREADY-CHECKED array through the text validator, so a
  * number or an object inside the list is a clean 400 rather than something
  * that reaches a statement (R20 — positional, same as `client-org.ts`'s `ids`). */
-function idArray(list: unknown[], field: string): string[] {
+export function idArray(list: unknown[], field: string): string[] {
   return list.map((v) => requireText(v, field, TEXT_LIMITS.short))
 }
 
@@ -1433,6 +1433,13 @@ export async function createFileSource(
     /** 12.3: limit it to the people on one app. Ignored when `privateToMe` — the
      * narrower answer wins, exactly as it does for a typed note. */
     visibleToAppId?: string | null
+    // FILING, the same fields and the same door `createSource` takes them
+    // through (d-ingest-filing) — a file can concern more than one client just
+    // as a typed note can, and the third way into the base was the only one
+    // that never asked. R20: positional, validated below via `idArray`, never
+    // trusted as already an array of ids.
+    accounts?: unknown
+    apps?: unknown
     file: { url: string; name: string; type: string; bytes: number }
     extract: { text: string | null; note: string | null }
   }
@@ -1440,6 +1447,13 @@ export async function createFileSource(
   const account = input.accountId ? await requireAccount(cfg, guard, input.accountId) : null
   const visibleToAppId = input.privateToMe ? null : (input.visibleToAppId ?? null)
   if (visibleToAppId) await requireOpenableApp(cfg, guard, visibleToAppId)
+  const accountIds = Array.isArray(input.accounts) ? idArray(input.accounts, "Accounts") : []
+  const appIds = Array.isArray(input.apps) ? idArray(input.apps, "Apps") : []
+  // Same existence + access check createSource runs — see its own comment on
+  // why this is honesty (what a card may SAY) rather than a fence (what a
+  // search may ADMIT).
+  const accountsFiled = await Promise.all(accountIds.map((aid) => requireAccount(cfg, guard, aid)))
+  const appsFiled = await Promise.all(appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1457,8 +1471,9 @@ export async function createFileSource(
     guard.databaseId,
     `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
-       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
+       accounts, apps)
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       compartment,
@@ -1479,6 +1494,8 @@ export async function createFileSource(
       actor.id,
       actor.email,
       actor.name,
+      JSON.stringify(accountsFiled.map((a) => a.id)),
+      JSON.stringify(appsFiled.map((a) => a.id)),
     ]
   )
   await indexOneSource(env, cfg, guard, id)

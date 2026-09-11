@@ -257,13 +257,18 @@ function afterCursor(rows: IngestRow[], cursor: { at: string; id: string } | nul
 
 /** The fence and the filing, off one item. Two lines, in one place, because they
  * are the two things this whole module is for. */
-function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: string | null } {
+function fencing(item: GoogleItem): { ownerUserId: string | null; accountId: string | null; accounts: string[] } {
   return {
     // 'team' means NOBODY owns it — which is what a null owner means to every
     // read in lib/knowledge.ts. 'private' names the person whose connection it
     // came through, and only their questions can ever be answered from it.
     ownerUserId: item.shelf === "team" ? null : item.ownerUserId,
     accountId: item.accountId,
+    // ABSENT (Drive, Chat) READS AS EMPTY, never as `[item.accountId]` — a
+    // redundant wrap of the singular value is not new information (d-ingest-filing:
+    // the migration calls the singular column "right for a mirrored record",
+    // and the same reasoning holds for a source with only ever one account).
+    accounts: item.accounts ?? [],
   }
 }
 
