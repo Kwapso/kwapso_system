@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest"
 import { READER_TEXT_MODEL, TOOL_RESULT_TAG } from "@shared/workers/model-text"
 import type { KnowledgePassage } from "@shared/types"
 import type { Env } from "../src/env"
-import { passageId, readShortlist, READER_SHORTLIST_CAP } from "../src/lib/knowledge-reader"
+import { passageId, readShortlist, READER_SHORTLIST_CAP, READER_MAX_TOKENS } from "../src/lib/knowledge-reader"
 
 const passage = (sourceId: string, title: string, text: string, seq = 0): KnowledgePassage => ({
   sourceId,
@@ -168,5 +168,37 @@ describe("readShortlist — null on any failure it cannot recover from", () => {
 describe("READER_SHORTLIST_CAP", () => {
   it("matches BUILD-5's own fan-out number (12) rather than a second one invented here", () => {
     expect(READER_SHORTLIST_CAP).toBe(12)
+  })
+})
+
+// MIGRATION kb-reader-token-budget, 11 Sep 2026. THE CHEAP HALF OF A TWO-PART
+// GUARD — see knowledge-reader-real-model.test.ts for the expensive half that
+// can actually SEE a truncation. This half cannot: it
+// never calls a real model, so it cannot catch a ceiling that is too low for
+// the real prompt. What it CAN catch, for free, on every `npm run check`, is
+// the regression most likely to actually happen — somebody looking at a
+// four-digit READER_MAX_TOKENS next to a short JSON-array answer and
+// "optimising" it back down without re-measuring. That is exactly how it
+// broke last time: READER_MAX_TOKENS=200 was picked without measurement, cut
+// every real call off mid-reasoning (finish_reason:"length", empty content),
+// and collapsed the exam's `para` category 81%->0% in production, silently,
+// under a green build — because nothing here asserted a floor.
+describe("READER_MAX_TOKENS — a floor derived from a real measurement, not a guess", () => {
+  // MEASURED 11 Sep 2026 against the real @cf/moonshotai/kimi-k2.6, the real
+  // shipped readerSystemPrompt/readerUserPrompt, and a real, full 12-passage
+  // shortlist (see documents/COSTS.md's `read=1` section for the full
+  // writeup). Five real calls this session: completion_tokens 465, 521, 530,
+  // 670, 729 (all finish_reason:"stop"); an earlier same-day informal probe
+  // at widths 1/6/12 saw completion_tokens as high as 880. Observed max: 880.
+  const MEASURED_MAX_COMPLETION_TOKENS = 880
+
+  it("stays above the measured worst case, with real headroom — never tighten this without a fresh real-model measurement", () => {
+    expect(
+      READER_MAX_TOKENS,
+      `READER_MAX_TOKENS (${READER_MAX_TOKENS}) must stay comfortably above the highest completion_tokens ` +
+        `actually observed against the real model (${MEASURED_MAX_COMPLETION_TOKENS}, see this file and COSTS.md) — ` +
+        `a ceiling that clips at or near the measured max reproduces the exact silent-truncation bug this test exists to catch. ` +
+        `max_tokens is a ceiling, not a purchase (Workers AI bills per token generated), so there is no cost reason to shave it.`
+    ).toBeGreaterThanOrEqual(MEASURED_MAX_COMPLETION_TOKENS * 1.1)
   })
 })
