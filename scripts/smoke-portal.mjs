@@ -1079,9 +1079,20 @@ section("the agency's own books (R24)")
 
 const INTERNAL = internalMoneyDoors()
 console.log(`  derived ${INTERNAL.length} doors that read the agency's own cost: ${INTERNAL.join(", ")}`)
+// THE NAMED CANARY, RE-POINTED ON 11 SEP 2026. It used to name
+// `internal-rates` and `margin` — and both doors were DELETED on 10 Sep on the
+// owner's ruling ("kill the whole internal rates thing"), so from that moment
+// this line asserted the presence of two doors the product no longer has. The
+// retirement re-pointed R24's suites and missed this script; nothing caught it
+// because a smoke runs against DEPLOYED workers, and staging still carried the
+// pre-retirement build until the 11 Sep deploy. A source check is not a deploy
+// check. `app-money` is the one money door left, and the point of naming it
+// out loud is unchanged: `doors.length < 1` above catches a walk that derives
+// NOTHING, and this catches a walk that still derives something while having
+// quietly stopped finding the door the law exists for.
 ok(
-  "the derivation still finds the two doors this law is named for",
-  INTERNAL.includes("GET /api/tenancy/internal-rates") && INTERNAL.includes("GET /api/tenancy/margin"),
+  "the derivation still finds the door this law is named for",
+  INTERNAL.includes("GET /api/tenancy/app-money"),
   INTERNAL.join(", ")
 )
 
