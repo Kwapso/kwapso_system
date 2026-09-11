@@ -118,7 +118,39 @@ export const GLOSSARY = {
   // are a migration and a door change for zero benefit, and the same ruling
   // CLAUDE.md records for `help`/Tickets applies: the human-facing word moves,
   // the identifier stays.
-  protectedChoice: { term: "Protected", def: "A choice that can't be switched off. The ones we set up for you start protected; take the protection off first if you want one gone." },
+  //
+  // ── THE WORD NOW COVERS TWO THINGS (client, 2026-09-11) ───────────────────
+  //
+  // Shown the automations list (R70), she named the concept this entry already
+  // holds: *"ah ok, i like it. like we have protected choices to have protected
+  // automations! Still have the visibility, but cannot change it"*. A module's
+  // settings page carries Choices and Automations one above the other, and the
+  // second half had no word at all for a row with no switch. So the word moves
+  // onto it rather than a second one being invented, and the unswitchable rows
+  // wear THIS badge, drawn from the same kit part as the Choices row
+  // (`web/components/screens/module-automations.tsx`, held there by R70).
+  //
+  // AND THE DEFINITION HAD TO BROADEN, which is the whole of the work. The old
+  // one ended "take the protection off first if you want one gone" — one click
+  // on a choice, and IMPOSSIBLE on an automation: the sign-in code email can
+  // never become switchable, at the door as well as on the screen. The
+  // paragraph above rejected "Locked" for a choice precisely because the
+  // protection comes off; one badge making two different promises on one page
+  // is that same fault committed a second time, in the gap between two
+  // sections, where a reader learns the word on one half and carries it wrong
+  // to the other. So the definition says the shared thing FIRST — "you can see
+  // it and you can't switch it off", which is her own sentence — and then says
+  // the difference out loud instead of leaving it to be discovered.
+  //
+  // THE KEY STAYS `protectedChoice` though the term now covers two things.
+  // Nothing reads a glossary key as a word: every consumer walks
+  // `Object.values(GLOSSARY)` for `term` and `def` (the assistant's brief, the
+  // knowledge composer, the translator's context), and no check or deny-list
+  // names this key — `GLOSSARY_SYNONYMS.term` names `member`, `account`,
+  // `ticket`, `story`, `task`, `workLog`, `source`, `meeting`, `permission`
+  // and `portalAccess`, and none of them this one. Same ruling as the paragraph
+  // above: the human-facing word moves, the identifier stays.
+  protectedChoice: { term: "Protected", def: "Something you can see but not switch off. You can take the protection off a choice yourself; on an automation it never comes off." },
   importCsv: { term: "Import", def: "Bring rows in from a spreadsheet (CSV) instead of typing them one by one." },
   exportCsv: { term: "Export", def: "Download what you can see as a spreadsheet (CSV) file." },
   sampleFile: { term: "Sample file", def: "A downloadable example that shows what a good import file looks like." },

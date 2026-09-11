@@ -25,9 +25,7 @@ import {
   CollectionEmptyState,
 } from "@shared/web/screen-engine/collection-frame"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
-import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Download, Graph, ListBullets, UploadSimple, Plus } from "@shared/ui/foundations/icons"
-import { cn } from "@shared/ui/lib/utils"
 
 import { WavesScreen } from "@/components/work/waves-screen"
 import { ProcessesScreen } from "@/components/process/processes-screen"
@@ -42,8 +40,9 @@ import {
   BrandLibraryScreen,
   PurposesScreen,
 } from "@/components/team/internal-screens"
-import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton } from "@/components/deep-link/screen-bits"
+import { NotFound, LoadError, SectionWithCreate, CollectionCard, AddButton, ToolbarAction } from "@/components/deep-link/screen-bits"
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { KnowledgeShape } from "@/components/knowledge/knowledge-shape"
 import { KnowledgeSourceCard } from "@/components/knowledge/knowledge-source-card"
 import { ContactsScreen } from "@/components/accounts/contacts-screen"
@@ -329,6 +328,7 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <BrandLibraryScreen
         rows={brandQ.data}
+        teamId={teamId ?? null}
         recipe={recipe}
         rights={rights}
         total={totals.brand_assets}
@@ -405,7 +405,12 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
     return (
       <CountedAbove active={accountsBadge !== ""}>
       <div className="flex flex-col gap-4">
-        <CollectionHeading sectionKey="accounts" total={totals.accounts} />
+        {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the industries and
+            countries an account is filed under (`accounts.industry`,
+            `accounts.country`). The heading's `action` slot rather than the
+            toolbar, which R50 withdraws entirely from a team with no accounts
+            yet — the exact moment the words matter. */}
+        <CollectionHeading sectionKey="accounts" total={totals.accounts} action={<ModuleSettingsGear teamId={teamId ?? null} segment="accounts" />} />
         {/* THE CANONICAL SHAPE (client, 31 Aug 2026, a reference screenshot of
             the kit's own collection composition — the "mini app" demo at
             verify/, lorem-ipsum data, dark mode): title, then tabs INSIDE the
@@ -485,24 +490,27 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
                   machine could export the customer book and a person could
                   not. Export needs READ, which is implied by seeing the
                   list at all. */}
+              {/* ── THE TWO WORDS FOLD WHEN THE ROW IS TIGHT — 11 SEP 2026,
+                  measured on staging. This row is the SECOND toolbar the two
+                  CSV buttons broke, and it broke differently: its search slot
+                  has one tenant, so the slot's floor held the field at a
+                  readable width and the TRACK gave instead — 104px at 1100 and
+                  at 900, two lines, against the client's own "one row, always".
+                  Same cause, same fix, decided once in `ToolbarAction`
+                  (screen-bits.tsx) rather than here. */}
               {(totals.accounts ?? 0) > 0 && (
-                <a
+                <ToolbarAction
+                  label={t("Export CSV")}
+                  icon={<Download className="size-4" />}
                   href={`/api/tenancy/accounts/export${queryString}`}
-                  className={cn(buttonVariants({ variant: "secondary" }), "gap-1")}
-                >
-                  <Download className="size-4" />
-                  {t("Export CSV")}
-                </a>
+                />
               )}
               {canCreateAccount && (
-                <Button
-                  variant="secondary"
+                <ToolbarAction
+                  label={t("Import CSV")}
+                  icon={<UploadSimple className="size-4" />}
                   onClick={() => go(`/t/${teamId}/import/accounts`)}
-                  className="gap-1"
-                >
-                  <UploadSimple className="size-4" />
-                  {t("Import CSV")}
-                </Button>
+                />
               )}
               {canCreateAccount && (
                 <AddButton
@@ -635,7 +643,10 @@ export function renderCollection(ctx: ModuleContentCtx): React.ReactNode {
             counted tab strip wins the arbitration, which leaves the button on
             the band by itself and is still correct. */}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} />
+          {/* THE GEAR (R61) — the sweep, the Google pass and the two
+              retirement passes are listed on this module's own settings page
+              (R70, client 2026-09-11). */}
+          <CollectionHeading sectionKey="knowledge" total={totals.knowledge} action={<ModuleSettingsGear teamId={teamId ?? null} segment="knowledge" />} />
           {/* Inline on the heading band, so no caption: a toolbar control that
               explains itself in two lines pushes the heading it sits beside out
               of alignment, and this screen's own title already says what the

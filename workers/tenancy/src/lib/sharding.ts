@@ -33,6 +33,7 @@ import {
   RETENTION_DELETE_CAP,
 } from "@shared/workers/limits"
 import { sendBrandedEmail } from "@shared/workers/notify"
+import { OPS_DIGEST_OFF } from "./ops-alert"
 import type { Env } from "../env"
 
 /** D1's hard per-database ceiling (Cloudflare's published D1 limits, checked
@@ -484,6 +485,34 @@ export async function alertNewAlarms(
   alerted: string[]
 ): Promise<{ mailed: number; recipients: number }> {
   if (!alerted.length) return { mailed: 0, recipients: 0 }
+
+  // ── ONE WORD, TWO MEANINGS, AND THIS SEND WAS READING THE WRONG ONE ───────
+  //
+  // `ALERT_TO` is `"off"` on staging AND on production (workers/tenancy/
+  // wrangler.jsonc), which is the owner's own decision, 8 Sep 2026: "I don't
+  // really give a fuck about the emails; they do nothing but fill up my inbox."
+  // `sendOpsDigest` beside this file understands that word and returns quietly;
+  // this function only ever checked for an EMPTY list, so `"off"` survived the
+  // split as a one-element recipient list and every night this tried to email an
+  // address literally called `off`. The send failed, `mailed` stayed 0, and the
+  // `if (!mailed) throw` at the foot of this function turned a normal night into
+  // a recorded cron failure — nightly, on both environments, for as long as the
+  // word has been set.
+  //
+  // OFF IS A VALUE; ABSENCE IS STILL A FAULT. The two answers below are kept
+  // deliberately apart, exactly as `sendOpsDigest` keeps them: an unset
+  // `ALERT_TO` still THROWS, because "somebody forgot to wire the alarm" must
+  // never be silent. A blank string and the word `off` are different states and
+  // this function now says so.
+  //
+  // AND THE ALARM IS STILL RECORDED. `checkDatabaseSizes` has already written
+  // the `db_alerts` row before this is called — that row is the record, this is
+  // only the envelope — and the console line above names how many crossed
+  // tonight. The rows are read on purpose (OPERATIONS.md, Growth watch), which
+  // is the whole of what the owner asked for when he chose the word.
+  if ((env.ALERT_TO ?? "").trim().toLowerCase() === OPS_DIGEST_OFF)
+    return { mailed: 0, recipients: 0 }
+
   const to = (env.ALERT_TO ?? "")
     .split(",")
     .map((a) => a.trim())

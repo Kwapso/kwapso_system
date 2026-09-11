@@ -43,6 +43,8 @@ function callsFor(name: string): { label: string; input: Record<string, unknown>
 const TEAM_IMPLICIT_PATHS: Record<string, string> = {
   "/kwapso":
     "the agency's own Details page — it titles itself with the ACTIVE team's name and carries the name/logo edit, which is what the deleted team overview used to do",
+  "/settings":
+    "the four dropdown-value writes, since 11 Sep 2026. They used to land on /t/<team>/dropdowns — the one screen that held the team's WHOLE vocabulary — and the client retired that screen with the Choices tab (\"end goal kill the big tab 'choice options'\"). A group is edited on its own module's settings page now, and this trace deliberately does NOT resolve which one: the group→module map lives in a React file agent-trace.ts may not import (it is kept DOM-free so this very suite can read it), and these tools take a FREE `type`, so a value can be written into a group no module owns and for which no page exists at all. Settings' Modules index is the one answer that is right for every one of those writes, and it is the client's own \"find the module once\". Like /kwapso it resolves against the ACTIVE team rather than naming one.",
 }
 
 describe("screen-trace parity: the co-pilot can show every write on a real screen", () => {

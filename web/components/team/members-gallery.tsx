@@ -164,6 +164,8 @@ import { Badge } from "@shared/ui/components/badge/badge"
 import { Card, CardContent, CardTitle } from "@shared/ui/components/card/card"
 import { CardGrid } from "@shared/ui/components/card-grid/card-grid"
 import { Headline } from "@shared/ui/components/typography/typography"
+
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { SearchInput } from "@shared/ui/components/search-input/search-input"
 import { Skeleton } from "@shared/ui/components/skeleton/skeleton"
 import { ShapeStateBody } from "@shared/ui/compositions/states/states"
@@ -371,9 +373,19 @@ export function MembersGallery({
        would be the 1.000 all over again. team-panel.tsx carries the argument
        and the measured contrast in both palettes. */
     <TeamPanel>
-      <Headline as="h2" size="h4">
-        {t("Members")}
-      </Headline>
+      {/* THE GEAR (R61), beside the heading rather than in a toolbar — this
+          wall has none, and R50 would draw no toolbar on an empty team anyway,
+          which is exactly when somebody goes looking for the settings. What is
+          on the page is this module's seven emails (R70, client 2026-09-11:
+          *"I want no automation without visibility"*), three of which are the
+          SIGN-IN messages, which belong to no module and are filed here because
+          this is the module about the people they are sent to. */}
+      <div className="flex items-center justify-between gap-2">
+        <Headline as="h2" size="h4">
+          {t("Members")}
+        </Headline>
+        <ModuleSettingsGear teamId={teamId} segment="members" />
+      </div>
 
       {membersError ? (
         <ShapeStateBody

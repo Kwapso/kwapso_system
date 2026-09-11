@@ -256,6 +256,23 @@ export const tenancy = {
 
   /** The team's dropdown values ("selectable data"), ordered for grouping by type. */
   selectable: () => api<{ values: SelectableValue[]; total: number }>("/api/tenancy/selectable"),
+
+  /** THE FULL-FIELD CSV EXPORT, NARROWED TO NAMED GROUPS — the href behind a
+   * module settings page's Export CSV button.
+   *
+   * A SEAM AND NOT A TEMPLATE AT THE CALL SITE, for the reason
+   * `dataOps.importSampleHref` is one: an `href={…}` built out of an expression
+   * is a URL reaching an attribute unchecked, which `web/test/rich-text.test.ts`
+   * turns red — and the reason it does is that a URL assembled at a call site is
+   * a URL assembled differently at the next one. The encoding lives here, once.
+   *
+   * NO ARGUMENT IS THE WHOLE VOCABULARY, which is the door's own historic
+   * answer and what the agent and MCP still ask for
+   * (`workers/tenancy/src/routes/selectable.ts` carries the argument). */
+  selectableExportHref: (groups?: string[]) =>
+    groups && groups.length
+      ? `/api/tenancy/selectable/export?groups=${encodeURIComponent(groups.join(","))}`
+      : "/api/tenancy/selectable/export",
   /** One dropdown value by id (the row-level live re-pull) — same door, ?id= filter. */
   selectableOne: (id: string) =>
     api<{ values: SelectableValue[] }>(`/api/tenancy/selectable?id=${encodeURIComponent(id)}`).then(
@@ -414,6 +431,22 @@ export const tenancy = {
     api<{ screens: Record<string, string> }>("/api/tenancy/config/screens", {
       method: "POST",
       body: JSON.stringify({ module, recipe }),
+    }),
+
+  /** WHICH AUTOMATIONS THIS TEAM HAS SWITCHED OFF — `{ segment: settingsJSON }`,
+   * and ONLY the ones switched off. An absent segment, and an absent key inside
+   * one, both mean the automation is ON: the registry (`shared/automations.ts`)
+   * is what exists, this is a team's overrides of it (R70). Any member. */
+  automationSettings: () =>
+    api<{ automations: Record<string, string> }>("/api/tenancy/config/automations"),
+
+  /** Switch one automation off, or back on. Needs teams:edit, and the door
+   * refuses a key the registry says cannot be switched — the sign-in code is
+   * unswitchable AT THE DOOR and not only on the screen. */
+  setAutomation: (key: string, on: boolean) =>
+    api<{ automations: Record<string, string> }>("/api/tenancy/config/automations", {
+      method: "POST",
+      body: JSON.stringify({ key, on }),
     }),
 
   /* ---- the customer spine: accounts, their people, their logins ---- */

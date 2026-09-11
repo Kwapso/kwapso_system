@@ -36,6 +36,7 @@ import { ShapeStateBody } from "@shared/ui/compositions/states/states"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 import type { CollectionConfig } from "@shared/web/screen-engine/config"
 
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
 import { CountedAbove } from "@/components/records/counted-tabs"
@@ -490,7 +491,9 @@ export function MeetingsScreen({
       {/* R16: the strip below badges two exact server counts, so the heading
           stands down through the arbitration context rather than saying a
           number twice. */}
-      <CollectionHeading sectionKey="meetings" total={total} />
+      {/* THE GEAR (R61) — the transcript capture and the billable time it
+          writes are listed on this module's own settings page (R70). */}
+      <CollectionHeading sectionKey="meetings" total={total} action={<ModuleSettingsGear teamId={teamId} segment="meetings" />} />
 
       {/* R14's other half: the meetings list pages, and the meeting somebody digs for is
           the OLD one — so the search box is answered by the door, over the whole

@@ -146,7 +146,7 @@ function Numbers({ summary }: { summary: WorkLogSummary }) {
       id: "entries",
       label: t("Entries"),
       value: formatCount(summary.total) || "0",
-      icon: <Icon name={CONCEPT_ICON.dropdowns as IconName} className="size-4" aria-hidden />,
+      icon: <Icon name={CONCEPT_ICON.entries as IconName} className="size-4" aria-hidden />,
     },
     {
       id: "people",

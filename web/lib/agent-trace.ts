@@ -129,12 +129,35 @@ export function traceFor(
       return { path: `${seg(teamId, "roles")}/${str(input, "roleId")}`, highlight: "main" }
 
     /* ------------------------------ dropdowns ------------------------------ */
-    // Any dropdown write → the Dropdown values screen (one screen, no per-value URL).
+    // Any dropdown write → SETTINGS, and specifically the Modules index rather
+    // than one module's page. It used to be `/t/<teamId>/dropdowns`, the one
+    // screen that held the team's whole vocabulary; the client retired that
+    // screen on 11 Sep 2026 ("end goal kill the big tab 'choice options'") and
+    // each group is edited on its own module's settings page now.
+    //
+    // WHY THE INDEX AND NOT THE PAGE, which is a narrowing and is written down
+    // rather than discovered. Two reasons, and the second is the one that
+    // settles it:
+    //
+    //   • THE MAP IS IN A REACT FILE. Which module owns which group is
+    //     `MODULE_SETTINGS` (web/components/screens/module-settings-screen.tsx),
+    //     and this file is deliberately DOM-free so the trace-parity suite in
+    //     workers/data-ops can import it. A copy of that map here would be a
+    //     second answer to a question R61 exists to keep singular, and the copy
+    //     is the one that goes stale.
+    //   • NOT EVERY GROUP HAS A PAGE. These tools take a free `type`, so the
+    //     assistant can create a value in a group no module owns — and for
+    //     exactly those writes there IS no page to land on. The index is the
+    //     only answer that is right for all of them, and it is the client's own
+    //     "find the module once".
+    //
+    // The cost is one click: the reader lands on the list of modules with
+    // settings instead of on the section holding the word that just changed.
     case "create_dropdown_value":
     case "update_dropdown_value":
     case "set_dropdown_default":
     case "set_dropdown_active":
-      return { path: seg(teamId, "dropdowns"), highlight: "main" }
+      return { path: "/settings", highlight: "main" }
 
     /* -------------------------------- tickets ------------------------------- */
     // Raise → the Tickets list (the new ticket appears live). Reply / edit / status

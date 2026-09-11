@@ -67,6 +67,21 @@ export type TargetDef = {
   references?: ReferenceDef[]
   /** the column that identifies a row so a CHILD can resolve to it by natural key. */
   naturalKey?: string
+  /** THE COLUMN THAT SAYS WHICH GROUP A ROW BELONGS TO — present only on a target
+   * whose rows are a VOCABULARY, which today is `selectable_data` alone.
+   *
+   * It is how a target declares that it CAN be narrowed. A module's settings page
+   * imports only its own groups (client, 11 Sep 2026: *"each module's settings
+   * page gets its own import and export for its own groups"*), and
+   * `confirmBatch`'s `scope` reads this column off each mapped row to decide
+   * whether the row is one this run promised to write. A target that does not
+   * declare it cannot be scoped at all, and a scoped run that meets one is
+   * REFUSED rather than run unnarrowed — the door says so in `confirmBatch`.
+   *
+   * A DECLARATION AND NOT A LITERAL, because `"selectable_data"` written into the
+   * run loop would be the engine knowing about one table. The next vocabulary
+   * target adds this line and is covered; nothing in the loop changes. */
+  scopeColumn?: string
   /** ONLY needed for a target that is referenced by a `mode:"id"` child: how to read
    * back its rows to build naturalKey→newId after import. Base targets omit it (the
    * base's one dependency is value-mode); an app adds it to be an id-parent. */
@@ -117,6 +132,11 @@ export const TARGETS: Record<string, TargetDef> = {
     endpoint: { binding: "TENANCY", path: "/api/tenancy/selectable" },
     exportPath: "/api/tenancy/selectable/export",
     naturalKey: "value",
+    // A ROW SAYS WHICH GROUP IT IS IN, and that is the column a scoped run reads
+    // — see `TargetDef.scopeColumn`. The export door narrows by the same word
+    // through `?groups=`, so a module settings page's Export and its Import are
+    // two halves of one sentence rather than two ideas.
+    scopeColumn: "type",
     sample: { type: "Ticket type", value: "Question" },
     buildBody: (r) => ({ type: r.type, value: r.value }),
   },

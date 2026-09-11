@@ -66,6 +66,7 @@
 // straight. `knowledge-identity.ts`'s own header has the full account of
 // what the old interpolation cost and why the fence moved with it.
 
+import { automationOff } from "@shared/workers/automations"
 import { sqlString, d1Query, type D1Rest } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { ulid } from "@shared/workers/id"
@@ -1949,6 +1950,16 @@ async function retireVanished(
   guard: MemberGuard,
   seen: Map<GoogleService, Map<string, GoogleShelf>>
 ): Promise<void> {
+  // THE TEAM'S OWN SWITCH (R70, `shared/automations.ts`). A team that would
+  // rather keep answering out of material it can no longer see in Google — and
+  // decide for itself, on each source's own screen, when to take one away —
+  // switches this off, and the sweep that calls it still runs. Absent means ON,
+  // and this is a cron path, so the trip costs nobody a wait.
+  //
+  // OFF LEAVES THE SOURCES EXACTLY AS THEY ARE; it never revives one. The
+  // revival branch in `knowledge-ingest.ts` is careful about whose retirement it
+  // may undo (a machine's, never a person's), and a SETTING is neither.
+  if (await automationOff(cfg, guard.databaseId, "knowledge.retire-vanished")) return
   // CHAT FIRST, because it asks Google nothing.
   //
   // A chat source is keyed on a THREAD since 20 Aug 2026, and the thread name

@@ -42,10 +42,23 @@ describe("traceFor — write tools land on the RESULT screen, never an input for
     }
   })
 
-  it("dropdown writes → the one dropdown-values screen (no per-value URL)", () => {
+  it("dropdown writes → Settings' Modules index, not a per-value or per-module URL", () => {
+    // RETARGETED 11 SEP 2026. It was `/t/<TEAM>/dropdowns`, the one screen that
+    // held the team's whole vocabulary, and the client retired that screen with
+    // the Choices tab. The trace does NOT resolve the group to its own module
+    // page, and both reasons are in agent-trace.ts: the group→module map lives
+    // in a React file this DOM-free module may not import, and these tools take
+    // a free `type`, so a value can be written into a group no module owns —
+    // for which there is no page at all. The index is the one answer that is
+    // right for every one of these writes.
     for (const tool of ["create_dropdown_value", "update_dropdown_value", "set_dropdown_active"]) {
       expect(traceFor(tool, { id: "d1", type: "Ticket type", value: "Bug" }, TEAM)?.path).toBe(
-        `/t/${TEAM}/dropdowns`
+        "/settings"
+      )
+      // …including for a group no module settings page declares, which is the
+      // case a per-module trace could not have answered at all.
+      expect(traceFor(tool, { id: "d2", type: "Something a team typed", value: "x" }, TEAM)?.path).toBe(
+        "/settings"
       )
     }
   })

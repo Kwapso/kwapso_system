@@ -172,3 +172,91 @@ describe("the dropdown-value export refuses rather than truncating", () => {
     expect(body.message).toContain("dropdown values")
   })
 })
+
+// ── `?groups=` — THE MODULE SETTINGS PAGE'S OWN EXPORT ───────────────────────
+//
+// Added 11 Sep 2026 with the client's ruling that retired Settings › Choices:
+// *"each module's settings page gets its own import and export for its own
+// groups… nothing sits outside Settings."* The whole point is that the door
+// narrows, not the screen — a browser filtering a whole-vocabulary answer would
+// still have READ the whole vocabulary, and a page titled "Ticket settings"
+// would still have been able to hand somebody every country the team has.
+//
+// EVERY CASE BELOW IS A WAY A SCOPE CAN SILENTLY WIDEN, which is the one failure
+// mode a narrowing must not have: a blank parameter, a scope nobody matched, a
+// group named with spaces around it, and a list longer than the door accepts.
+describe("the dropdown-value export narrows to the groups a caller names", () => {
+  function seedThreeGroups() {
+    db().exec(
+      [
+        `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G1', 'Ticket type', 'Question', 0, '2026-01-01');`,
+        `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G2', 'Country', 'Spain', 0, '2026-01-01');`,
+        `INSERT INTO selectable_data (id, type, value, is_default, created_at) VALUES ('G3', 'Industry', 'Retail', 0, '2026-01-01');`,
+      ].join("\n")
+    )
+  }
+
+  it("one group — and nothing from the others", async () => {
+    seedThreeGroups()
+    const res = await worker.fetch(
+      req("GET /api/tenancy/selectable/export?groups=Ticket%20type"),
+      env()
+    )
+    expect(res.status).toBe(200)
+    const csv = await res.text()
+    expect(csv).toContain("Question")
+    expect(csv, "a scoped export handed back a group the caller did not ask for").not.toContain("Spain")
+    expect(csv).not.toContain("Retail")
+  })
+
+  it("two groups, comma-separated, with the spaces a person leaves in", async () => {
+    seedThreeGroups()
+    const res = await worker.fetch(
+      req("GET /api/tenancy/selectable/export?groups=Industry%2C%20Country"),
+      env()
+    )
+    expect(res.status).toBe(200)
+    const csv = await res.text()
+    expect(csv).toContain("Retail")
+    expect(csv).toContain("Spain")
+    expect(csv).not.toContain("Question")
+  })
+
+  it("no parameter is still the WHOLE vocabulary — the door's historic answer", async () => {
+    seedThreeGroups()
+    const res = await worker.fetch(req("GET /api/tenancy/selectable/export"), env())
+    const csv = await res.text()
+    for (const v of ["Question", "Spain", "Retail"])
+      expect(csv, `an unscoped export lost ${v} — every caller written before the filter existed reads this door`).toContain(v)
+  })
+
+  it("a blank parameter is no scope, not an empty one", async () => {
+    seedThreeGroups()
+    const res = await worker.fetch(req("GET /api/tenancy/selectable/export?groups=%20%2C%20"), env())
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain("Question")
+  })
+
+  it("a group the team has no rows in answers with a header and nothing under it", async () => {
+    seedThreeGroups()
+    const res = await worker.fetch(
+      req("GET /api/tenancy/selectable/export?groups=Brand%20asset%20category"),
+      env()
+    )
+    expect(res.status).toBe(200)
+    const csv = await res.text()
+    expect(csv, "the header is what makes an empty answer readable rather than blank").toContain("type")
+    for (const v of ["Question", "Spain", "Retail"])
+      expect(csv, "an unmatched scope fell back to the whole vocabulary — the one thing a narrowing must never do").not.toContain(v)
+  })
+
+  it("naming more groups than the door accepts is a 400, never a silent slice", async () => {
+    seedThreeGroups()
+    const many = Array.from({ length: 9 }, (_, i) => `G${i}`).join(",")
+    const res = await worker.fetch(
+      req(`GET /api/tenancy/selectable/export?groups=${encodeURIComponent(many)}`),
+      env()
+    )
+    expect(res.status, "a truncated scope answers a different question from the one asked").toBe(400)
+  })
+})

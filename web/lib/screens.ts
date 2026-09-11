@@ -107,7 +107,14 @@ export const MODULE_PERMISSION: Record<string, string> = {
   members: "team_members",
   roles: "member_roles",
   invites: "team_members",
-  dropdowns: "selectable_data",
+  // `dropdowns: "selectable_data"` STOOD HERE. The segment was retired on
+  // 11 Sep 2026 with the screen it addressed — the team's whole vocabulary —
+  // at the client's ruling ("end goal kill the big tab 'choice options'"). The
+  // MODULE is very much alive: `selectable_data` still gates the four doors
+  // that write a value and the module settings pages that edit them
+  // (`MODULE_SETTINGS`, web/components/screens/module-settings-screen.tsx).
+  // What went is the ADDRESS, because there is no longer a screen at
+  // /t/<teamId>/dropdowns for a segment to name.
   // The address bar says `tickets` because that is the word for the thing; the
   // right the server enforces is still `help` — the string already written into
   // every role's permission sheet in every team database. This line is the only

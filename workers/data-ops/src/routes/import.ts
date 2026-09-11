@@ -119,6 +119,48 @@ export async function postBatchPlan(request: Request, env: Env): Promise<Respons
   return json({ batch: await planBatch(env, cfg, guard, batchId), quota: c.quota })
 }
 
+/** THE GROUPS A SCOPED IMPORT MAY WRITE INTO, off the request body, or null.
+ *
+ * WHY THE DOOR TAKES ONE AT ALL. A module's settings page has had its own
+ * Import CSV button since 11 Sep 2026 (client: *"each module's settings page
+ * gets its own import and export for its own groups… nothing sits outside
+ * Settings"*), and the promise a button on Settings › Tickets makes is that it
+ * adds ticket types. `confirmBatch` is where that promise is kept — this is only
+ * where the wire turns into a list it can trust.
+ *
+ * R20, POSITIONALLY, AND A CAST IS NOT A CHECK. `body.groups` sits inside
+ * `Array.isArray` before anything indexes it, and every element then sits in
+ * `requireText`'s first argument — type-checked, NUL-stripped and length-capped
+ * there — so a `["Ticket type", 7]` is a clean 400 rather than a `7` reaching
+ * the run loop's `.trim()`. The body is read field by field and never
+ * destructured, which is what keeps R22's census able to see it.
+ *
+ * ABSENT IS NOT AN EMPTY SCOPE. No field means an UNSCOPED run, which is the
+ * generic Import screen, the assistant and every caller written before today;
+ * an empty array would be a run allowed to write nothing, which nobody can mean
+ * on purpose, so it is refused rather than silently treated as either one. */
+function importGroupScope(body: { groups?: unknown }): string[] | null {
+  if (body.groups === undefined || body.groups === null) return null
+  if (!Array.isArray(body.groups))
+    throw new GuardError(400, "invalid_input", "Groups must be a list of group names.")
+  if (body.groups.length === 0)
+    throw new GuardError(400, "invalid_input", "A scoped import has to name at least one group.")
+  if (body.groups.length > MAX_IMPORT_SCOPE_GROUPS)
+    throw new GuardError(
+      400,
+      "invalid_input",
+      `An import can be scoped to at most ${MAX_IMPORT_SCOPE_GROUPS} groups at a time.`
+    )
+  return body.groups.map((g) => requireText(g, "Group", TEXT_LIMITS.short))
+}
+
+/** The widest module settings page declares two groups; eight is generous for
+ * every caller that exists and is still a bound. It mirrors the export door's
+ * own `MAX_SCOPE_GROUPS` (workers/tenancy/src/lib/selectable.ts) on purpose —
+ * the two halves of one sentence should not disagree about how long a scope may
+ * be. */
+const MAX_IMPORT_SCOPE_GROUPS = 8
+
 /** POST /api/data-ops/import/batch/confirm — run the plan in dependency order. Gates
  * `create` on every target in the plan up front (fail fast), then publishes one
  * coarse ping per changed module. */
@@ -127,12 +169,13 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
   // The one batch door that does not open with requireAnyImportRight (it gates
   // per target instead) — so it says the other half of that guard itself.
   await refusePortalCaller(cfg, guard)
-  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown; groups?: unknown }
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
+  const scope = importGroupScope(body)
   const view = await getBatchView(cfg, guard, batchId)
   if (!view.plan) return fail(409, "no_plan", "Plan the import before running it.")
   for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
-  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId)
+  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId, scope)
   for (const m of modules) await publishChange(env, guard.teamId, m)
   return json({ report })
 }
@@ -155,7 +198,7 @@ export async function postBatchConfirm(request: Request, env: Env): Promise<Resp
 export async function postBatchContinue(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard } = await teamContext(request, env)
   await refusePortalCaller(cfg, guard)
-  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { batchId?: unknown; groups?: unknown }
   const batchId = requireText(body.batchId, "Batch", TEXT_LIMITS.short)
   const view = await getBatchView(cfg, guard, batchId)
   if (!view.plan) return fail(409, "no_plan", "Plan the import before running it.")
@@ -165,7 +208,14 @@ export async function postBatchContinue(request: Request, env: Env): Promise<Res
   if (view.status !== "running" || !view.progress)
     return fail(409, "nothing_to_continue", "There's no unfinished run to pick up on this import.")
   for (const m of planModules(view.plan)) await requireRight(cfg, guard, m, "create")
-  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId)
+  // THE SAME SCOPE, SAID AGAIN. A resume is the same work as the run it picks
+  // up, so it is gated the same, validated the same — and narrowed the same. The
+  // scope is NOT stored on the batch row: a scope remembered from a first leg
+  // would be a promise the second caller never made and cannot see, and the
+  // wizard that started the run still has it in its own address. Continuing a
+  // scoped run from the generic Import screen therefore widens it, visibly, by
+  // somebody choosing to.
+  const { report, modules } = await confirmBatch(env, request, cfg, guard, actor, batchId, importGroupScope(body))
   for (const m of modules) await publishChange(env, guard.teamId, m)
   return json({ report })
 }

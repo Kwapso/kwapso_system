@@ -27,7 +27,9 @@
 // looks to you and which words it says), and language was on the wrong side of
 // it. It is the fourth card in the Appearance tab now; nothing else moved.
 //
-// A FIFTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a fifth section.
+// THE FOURTH TAB, "MODULES", 2026-09-09 — and it is an INDEX, not a section.
+// (It was the FIFTH of five until 11 Sep 2026, when Choices was retired in front
+// of it; the paragraphs below record that move where it happened.)
 // The client, the same day she asked for the gear on each module's own screen:
 // *"somewhere in the settings, we have a tab that says 'Module' or 'Business
 // Logic' (or whatever you define as a good word) to find the module once"*, and
@@ -49,21 +51,36 @@
 // screen, which is the kind of drift the rest of this file's header is a record
 // of undoing.
 //
-// PLACED FIFTH, IMMEDIATELY BEFORE CHOICES, and nothing above it moved. Two
-// reasons and they agree. Modules is the tab Choices is eventually folded INTO
-// — *"the choices: yes, this would survive, but not as a general thing, but
-// inside each module"* — so the two live next to each other until that move is
-// scoped and reviewed, and the move is then a deletion rather than a
-// re-ordering. And Appearance stays first because a tab strip with nothing
-// remembered opens on the tab to the left (her rule, 2026-09-06), and the tab
-// somebody lands on by default should not be the rarest one.
+// IT WAS PLACED IMMEDIATELY BEFORE CHOICES, AND IT OUTLIVED IT — 11 SEP 2026.
+// The note here used to say the two lived next to each other "until that move
+// is scoped and reviewed, and the move is then a deletion rather than a
+// re-ordering", and that is exactly what happened: the client asked for the
+// rest of it in one sentence — *"implement this module settings across app:
+// the goal right now is that you identify the choice components where they
+// belong to a module and create the settings there in the module and in
+// settings the module. End goal: kill the big tab 'choice options'."*
 //
-// NOT ABSORBING CHOICES YET, deliberately. She wants it eventually; it is a
-// larger move (the general Choices editor holds every group in the team, most
-// of which belong to no module that has a settings page today), and the pilot
-// this tab indexes is still being reviewed. Doing both at once would put a
-// reorganisation of the team's whole vocabulary inside the change that adds a
-// list of one row.
+// SO THE CHOICES TAB IS GONE, and so is the whole-vocabulary screen behind it
+// (`/t/<teamId>/dropdowns`, which by then nothing in the app linked to). Every
+// group whose words a record actually stores has a module home, and the import
+// and the export went with it: each module settings page carries its own,
+// narrowed to its own groups at the DOOR (`?groups=` on the export,
+// `groups` on the import confirm). Her words for that half: *"each module's
+// settings page gets its own import and export for its own groups… nothing
+// sits outside Settings."*
+//
+// WHAT THE MOVE COST, recorded here because the next reader will look for it:
+// a team can no longer INVENT a group. The retired screen's create dialog
+// offered a free group name; a module settings page can only add values to the
+// groups it declares. A team-invented group is unused by construction — nothing
+// reads a word no module stores — so what is lost is the ability to make rows
+// nothing consults. The three `"labels"` groups (Ticket status, Story status,
+// Sprint status) have no page for the same reason and by the client's own
+// ruling: *"labels are not in settings, you cannot adjust them from the app."*
+//
+// And Appearance stays first because a tab strip with nothing remembered opens
+// on the tab to the left (her rule, 2026-09-06), and the tab somebody lands on
+// by default should not be the rarest one.
 //
 // REBUILT INTO A REAL TAB STRIP, 2026-09-01 — the flat one-page-with-headings
 // shape above gave way to one once the design kit's own Settings composition
@@ -112,13 +129,11 @@
 //                        own account, which is what the word means here.
 //   4. Modules        — the index; see the paragraph above for the word, the
 //                        position and the ruling.
-//   5. Choices        — formerly "Dropdown values", formerly its own tab on
-//                        the team area's strip
-//                        (web/components/choices/selectable-screen.tsx
-//                        explains the rename and the move). This
-//                        is the one door to it now; ManageDropdownsLink and
-//                        every other in-app shortcut open straight to it via
-//                        `?tab=choices`.
+//                        A FIFTH TAB, "Choices", stood after this one and was
+//                        retired on 11 Sep 2026 — see the paragraph above.
+//                        `ManageDropdownsLink` used to open it via
+//                        `?tab=choices` and now points at the module settings
+//                        page that owns the group the form is asking about.
 //
 // NOTIFICATIONS IS GONE, on purpose (client ruling, 2026-09-01) — it was never
 // live content in this app, only a tab named in the design kit's own reference
@@ -175,7 +190,6 @@ import { MembersGallery } from "@/components/team/members-gallery"
 import { moduleSettingsIndex } from "@/components/screens/module-settings-screen"
 import { RolesMatrix } from "@/components/team/roles-matrix"
 import { useScreenData } from "@/lib/use-screen-data"
-import { SelectableScreen } from "@/components/choices/selectable-screen"
 
 /** THE NARROWEST A MODULE CARD MAY BE before the Modules wall drops a column.
  *
@@ -196,8 +210,12 @@ export function SettingsScreen({
   active: ActiveTeam
   /** From the URL's `?tab=` (deep-link-screen.tsx) — the same mechanism
    * `KwapsoScreen`'s own `initialTab` uses, so a link can open Settings
-   * straight onto one tab (`ManageDropdownsLink` → `?tab=choices`). An
-   * explicit link always wins over whatever tab a previous visit remembered. */
+   * straight onto one tab. An explicit link always wins over whatever tab a
+   * previous visit remembered. (`ManageDropdownsLink` was this prop's one
+   * caller, via `?tab=choices`; since 11 Sep 2026 it opens `/settings/<segment>`
+   * instead, which is a screen rather than a tab. The mechanism stays — it is
+   * the same one `KwapsoScreen`'s own `initialTab` uses, and a saved
+   * `?tab=team` link is still somebody's bookmark.) */
   initialTab?: string
 }) {
   const { t } = useLanguage()
@@ -277,7 +295,8 @@ export function SettingsScreen({
       { value: "team", label: t("Team"), icon: "users-three", badge: "", badgeVariant: "" as const },
       { value: "integrations", label: t("Integrations"), icon: "key", badge: "", badgeVariant: "" as const },
       // THE INDEX (client, 2026-09-09) — see this file's header for the word,
-      // the position and why Choices is not folded in yet. The glyph is NOT a
+      // the position, and for the Choices tab that stood after it until
+      // 11 Sep 2026 and has now been folded INTO it. The glyph is NOT a
       // choice made here: `modules` is already a key in `TAB_ICONS`
       // (shared/web/screen-engine/tabs-view.tsx, drawn as `cube` for a tool
       // record's own Modules tab), and that table WINS over anything a call
@@ -285,7 +304,14 @@ export function SettingsScreen({
       // than by accident — the same word draws the same glyph everywhere,
       // which is the whole reason that table exists.
       { value: "modules", label: t("Modules"), icon: "cube", badge: "", badgeVariant: "" as const },
-      { value: "choices", label: t("Choices"), icon: "git-commit", badge: "", badgeVariant: "" as const },
+      // THE "CHOICES" TAB STOOD HERE AND WAS RETIRED ON 11 SEP 2026, at the
+      // client's ruling: *"implement this module settings across app … end goal
+      // kill the big tab 'choice options'."* It held the team's WHOLE
+      // vocabulary — eighteen groups, most of which belong to no module a
+      // reader was thinking about — and that is the thing she was ending.
+      // Every group whose words a record actually stores is edited on that
+      // module's own settings page, reached from the Modules tab beside this
+      // line or from the gear on the module's own screen (R61's two doors).
     ],
   }
 
@@ -508,11 +534,24 @@ export function SettingsScreen({
             const modules = moduleSettingsIndex(can)
 
             // NOTHING TO SHOW AND NOTHING TO EXPLAIN. The same answer the
-            // Choices tab gives a reader it refuses, and for the same reason —
+            // module settings PAGE gives a reader it refuses (`NoAccess` on
+            // `/settings/<segment>`), and for the same reason —
             // "no module has settings you may change" and "no module has
             // settings" are not worth telling apart on screen, and telling them
             // apart would disclose which modules this team has configured.
-            if (modules.length === 0) return <NoAccess />
+            // ON PAPER, LIKE THE WALL IT STANDS IN PLACE OF (R67). The refusal
+            // is this tab's other branch, and the branch with nothing in it is
+            // the one the law was earned by: `access-tokens.tsx` drew its rows
+            // on soft paper and its zero on the page, so "is there a panel on
+            // this tab" answered yes and described the screen nobody was
+            // looking at. Same inset as the wall, so a reader who is refused
+            // and a reader who is not are standing on the same sheet.
+            if (modules.length === 0)
+              return (
+                <div className="rounded-[var(--radius)] bg-surface-panel p-6 lg:p-[var(--space-7)]">
+                  <NoAccess />
+                </div>
+              )
 
             return (
               <div className="flex flex-col gap-4">
@@ -572,8 +611,51 @@ export function SettingsScreen({
                     vocabulary has never heard of falls back to the gear, which
                     is what a settings page is; R61 (ii) is untouched because
                     nothing here spells a segment. */}
+                {/* THE GROUND THE WALL STANDS ON — client, 2026-09-10:
+                    *"remember in settings modules card, needs container
+                    background."* Her third saying of one sentence (the Team
+                    tab, then Settings › Integrations, which became R67), and
+                    the first one R67 could not see: the law's subject is a
+                    `<section>` carrying a heading, and a TAB PANEL has no
+                    heading of its own — it is titled by the strip above it.
+                    Every settings tab was invisible to the law by
+                    construction. R67 is widened to the panel body in the same
+                    change as this fix; the comment in
+                    `web/test/sections-stand-on-paper.test.ts` carries the
+                    argument.
+
+                    `tone="panel"` IS THE KIT'S OWN ANSWER, NOT A WRAPPER WE
+                    BUILT. `CardGrid` already has the variant, and its source
+                    describes this exact failure: "`panel` is for a wall
+                    standing on the PAGE, where a `--card` cell measures 1.000
+                    against the page tone and would be held up by its shadow
+                    alone." That is not a risk here, it is what was shipping:
+                    the cells are `Card variant="raised"` (`bg-card`), and in
+                    LIGHT `--card`, `--surface-raised` and `--background` are
+                    all #FFFEF9 — the identical 1.000 the Team tab measured
+                    before `team-panel.tsx` was written, one tab over.
+
+                    THE TWO TONES STAY TWO. §2.6 gives the app two paper tones
+                    and no third, so the container takes the PANEL tone
+                    (`--surface-panel`) and the cards keep `raised` — soft
+                    paper under off-beige, which is the same pairing
+                    `CollectionFrame` and `TeamPanel` draw. A third tone here,
+                    or panelling the cards instead of the ground, would
+                    collapse the pair and the cards would stop reading as
+                    cards. Measured on the running page, both palettes:
+                    light  panel #F7F2EB on page #FFFEF9 1.103, raised card
+                    #FFFEF9 on panel 1.103; dark  panel #1C1B18 on page
+                    #141310 1.079, raised card #26241F on panel 1.111.
+
+                    THE SENTENCE ABOVE STAYS OUTSIDE THE BOX. It is the
+                    panel's caption, the same position the heading takes on
+                    the Team tab's "This team" section and the same shape
+                    `CollectionFrame` draws everywhere — title out, content on
+                    paper. R67 excludes prose from containment for exactly
+                    this reason. */}
                 <CardGrid
                   fluid
+                  tone="panel"
                   minItemWidth={MIN_MODULE_CARD}
                   label={t("Modules")}
                 >
@@ -626,19 +708,6 @@ export function SettingsScreen({
                   ))}
                 </CardGrid>
               </div>
-            )
-          }
-
-          if (panel.value === "choices") {
-            if (!can("selectable_data", "read")) return <NoAccess />
-            if (!teamId) return null
-            return (
-              <SelectableScreen
-                teamId={teamId}
-                onImport={() => softNavigate(`/t/${teamId}/import/selectable_data`)}
-                onOpen={(id) => softNavigate(`/t/${teamId}/dropdowns/${id}`)}
-                standalone={false}
-              />
             )
           }
 

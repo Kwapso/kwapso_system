@@ -122,6 +122,10 @@ const TOOLLESS_DOORS: Record<string, string> = {
     "the same bundle, content's half — sprints, stories, to-dos, tickets, meetings and a ticket's files. Same reason, and the same list of tools that already answer it one at a time with the narrowing of the caller's choosing: `list_sprints`, `list_stories`, `list_todos`, `list_help_tickets`, `list_meetings`.",
   "GET /api/tenancy/config/screens":
     "the screen-engine recipe store — which blocks the AGENCY APP renders on a module's screen. It describes an interface, not the team's data, and an MCP client has no screen to render it on.",
+  "GET /api/tenancy/config/automations":
+    "which of the software's own automatic behaviours this team has switched off. It answers about the APP rather than about the team's data, and every fact in it already ships in the code a machine client could read (`shared/automations.ts`); what a token would gain is the team's stored overrides of a registry it cannot act on anyway, since the write below is off this surface.",
+  "POST /api/tenancy/config/automations":
+    "silencing an automation is the one setting a machine must not be able to change, and it is a stronger case than the recipe store below it. Every switchable automation here TELLS SOMEBODY SOMETHING — a client that their ticket was answered, a member that their role changed, whoever is on triage what is waiting. A model that could switch those off could make its own next mistake quiet, and the person who would have caught it is exactly the person who stops being told. The decision belongs to somebody holding `teams:edit` who is looking at the page that says what each one does (R70).",
   "POST /api/tenancy/config/screens":
     "authoring a screen recipe changes what every person on the team sees, and the only way to judge one is to look at the screen it draws — which a machine client has not got. (The route table used to call this door 'agent-callable' while it sat on neither catalogue; the comment was the thing that was wrong, and it has been corrected rather than the door quietly opened.)",
 

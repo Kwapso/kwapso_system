@@ -98,6 +98,19 @@ describe("a to-do is aimed at the client", () => {
     expect(row.completed_at).toBe(null)
     void id
 
+    // THE SEND IS DEFERRED, SO WAIT FOR IT. `postCreateTodo` hands the notice to
+    // `afterResponse` (shared/workers/parallel.ts) precisely so it does not sit
+    // between the write and the answer — and with no ExecutionContext registered
+    // here, that is a floating promise nobody awaits. Until 2026-09-11 this
+    // assertion happened to pass on microtask ordering alone: the deferred chain
+    // was short enough to finish inside the ticks that `await call(...)` spends.
+    // Adding ONE more database trip to it (R70's automation switch, read at the
+    // top of `notifyTodoRaised`) was enough to push the send past the assertion,
+    // which is a race this test always had rather than a behaviour that changed.
+    // One macrotask is the honest wait, and it is what `sessions.test.ts` and
+    // `sync-lease.test.ts` already do for the same reason.
+    await new Promise((r) => setTimeout(r, 0))
+
     // ONE OF ONLY TWO THINGS THAT EMAIL A CLIENT (BUILD-1 §7), and it reaches the
     // people at THAT company who can sign in — nobody at another client, and
     // nobody on the agency's side.

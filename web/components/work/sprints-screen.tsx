@@ -44,6 +44,7 @@ import type { FilterFacet } from "@shared/web/screen-engine/config"
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 // The picture comes from pulse.tsx, which holds the agency shell's ONE lazy
 // boundary onto the chart module — a second dynamic() here would be a second
 // loader for one library, and the shell is the chunk every page in the app pays
@@ -61,17 +62,16 @@ import {
   type SprintTypeOption,
 } from "@/components/work/sprint-form-dialog"
 import { sprintLine, sprintLineInKindGroup } from "@/components/work/work-panels"
-import { content as contentApi, tenancy } from "@/lib/api"
+import { content as contentApi } from "@/lib/api"
 import { appsKey, listFetch, sprintsKey } from "@/lib/live-resources"
 import { CONCEPT_ICON } from "@/lib/pages"
 import { withDataDrivenCollection } from "@/lib/screens"
-import type { AppRow, SelectableValue, Sprint } from "@shared/types"
+import type { AppRow, Sprint } from "@shared/types"
 import { RecordMark } from "@shared/web/record-mark"
 import { RecordRef, REF_LEADS_NAME } from "@shared/web/record-ref"
 import { type Translate } from "@shared/web/format"
 import { formatCount } from "@shared/web/format-count"
 import { invalidate, useCached } from "@shared/web/store"
-import { MARK_GROUP, markMap } from "@/lib/type-marks"
 import { useLanguage } from "@shared/web/language"
 import type { Language } from "@shared/i18n"
 
@@ -91,6 +91,45 @@ const STATE_HEADING: Record<SprintState, string> = {
   running: "Running now",
   upcoming: "Coming up",
   wrapped: "Wrapped",
+}
+
+/** THE MARK BESIDE EACH STATE HEADING — in CODE, beside the words it belongs to,
+ * since 11 Sep 2026.
+ *
+ * WHAT IT USED TO BE, AND WHY THAT WAS A TRAP. These three glyphs were read off
+ * the team's `Sprint status` vocabulary with `markMap(selectableQ.data,
+ * MARK_GROUP.sprintStatus)`, and looked up BY THE ROW'S OWN WORD against
+ * `STATE_HEADING` above — a constant in this file. So the join key was a word a
+ * person could edit on a dropdown screen and a word the code spells, and the two
+ * were held together by nothing. Renaming "Coming up" to "Next up" there dropped
+ * the glyph off this board SILENTLY and changed no word on screen, because the
+ * heading itself is `t(STATE_HEADING[state])` and has never come from the row.
+ * One control that works (the mark) and one that quietly breaks the other (the
+ * rename), on the same row, is not a setting — it is a tripwire.
+ *
+ * A SPRINT'S STATE IS DERIVED (`sprintState`, above): the table has no status
+ * column at all, so there was never anything for that vocabulary to store. It
+ * supplied a display word nothing read and a glyph read by this one expression.
+ * With the glyph here, `Sprint status` stores nothing and is read by nothing —
+ * which is exactly what `shared/selectable-homes.ts` already calls a `"labels"`
+ * group, and is why that group, like `Ticket status` and `Story status`, gets no
+ * settings section anywhere (`MODULE_SETTINGS`).
+ *
+ * THE SAME THREE VALUES THE SEED SHIPPED ("RN" / "CU" / "WR"), so a team that
+ * never touched them sees exactly what it saw yesterday. A team that DID retype
+ * one loses its edit — the honest cost of taking the control away, and the
+ * report on this change says so. Editing it now is a deploy, which is the right
+ * weight for a glyph the code keys off its own constant.
+ *
+ * NOT IN THE CATALOGUE, and it should not be: a mark is `aria-hidden` beside the
+ * word it marks (UI-CONVENTIONS §5), so it is a GLYPH rather than a sentence —
+ * the same reason the marks on `shared/departments.ts` and `shared/app-stages.ts`
+ * are not translated either. A short word or an initial, never a pictograph
+ * (R66). */
+const STATE_MARK: Record<SprintState, string> = {
+  running: "RN",
+  upcoming: "CU",
+  wrapped: "WR",
 }
 
 /** Today, as the day it is where the READER is sitting, in the shape a stored
@@ -338,12 +377,12 @@ export function SprintsScreen({
   // same cache the start-a-sprint form reads, so the picker and these rows can
   // never show two different pictures for one word.
   const kinds = useSprintTypes(teamId)
-  // The SAME cache key `useSprintTypes` reads, so this is free — it wants the
-  // raw rows rather than the sprint-type projection, because the state glyphs
-  // live in a different group of the same vocabulary.
-  const selectableQ = useCached<SelectableValue[]>(`selectable:${teamId}`, () =>
-    tenancy.selectable().then((r) => r.values)
-  )
+  // A SECOND READ OF THE WHOLE VOCABULARY STOOD HERE, for the STATE glyphs
+  // alone — the same `selectable:<teamId>` key `useSprintTypes` already holds,
+  // asked for the raw rows rather than the sprint-type projection. It is gone
+  // with the lookup it fed (`STATE_MARK`, above): the three glyphs are code
+  // now, so this screen no longer needs the `Sprint status` group and no
+  // longer reads it.
   // Remembered with the screen — see web/lib/nav-memory.ts.
   const [view, setView] = useRemembered("view", "overview")
   // ONE search+filter question, shared by Overview and Calendar (see the note
@@ -432,9 +471,11 @@ export function SprintsScreen({
   const sprints = sprintsQ.data ?? []
   // The same map the Overview groups read, in the shape `RecordMark` wants.
   const kindMarks = new Map(kinds.filter((k) => k.mark).map((k) => [k.value, k.mark as string]))
-  // The glyph for the STATE a sprint is in, keyed by the heading word itself —
-  // which is why the vocabulary holds exactly the three `STATE_HEADING` words.
-  const stateMarks = markMap(selectableQ.data, MARK_GROUP.sprintStatus)
+  // THE GLYPH FOR THE STATE A SPRINT IS IN is `STATE_MARK`, in code, beside the
+  // headings it belongs to. It used to be a `markMap` over the team's
+  // `Sprint status` rows keyed by the heading WORD — see `STATE_MARK`'s own note
+  // for why a lookup keyed on an editable word against a code constant is a trap
+  // rather than a setting.
   const data = shapeSprints(sprints, today, lang, kindMarks)
   const listRecipe = withDataDrivenCollection(recipe, data.rows)
   const askingSprints = sprintQueryIsActive(sprintQuery)
@@ -599,13 +640,14 @@ export function SprintsScreen({
             <h2 className="flex items-center gap-2 text-lg font-medium">
                   {/* AURORA'S ASK: a mark on the state, not the bare word. It is
                       `aria-hidden` with the heading right beside it — the pair
-                      UI-CONVENTIONS §5 requires — and it comes from the Dropdown
-                      values screen, so changing it is two clicks and no deploy. */}
-                  {stateMarks.get(STATE_HEADING[state]) && (
-                    <span aria-hidden className="text-base leading-none">
-                      {stateMarks.get(STATE_HEADING[state])}
-                    </span>
-                  )}
+                      UI-CONVENTIONS §5 requires. IT COMES FROM CODE since 11 Sep
+                      2026 (`STATE_MARK`, which carries the whole argument): it
+                      used to be read off a `Sprint status` dropdown row by the
+                      heading word, so changing it was two clicks — and renaming
+                      that row was two clicks that silently removed it. */}
+                  <span aria-hidden className="text-base leading-none">
+                    {STATE_MARK[state]}
+                  </span>
                   {t(STATE_HEADING[state])}
                 </h2>
             {groupByKind(inState, byKind, lang, t("No type said")).map((group) => (
@@ -668,7 +710,16 @@ export function SprintsScreen({
         {/* R16: the strip below badges all three views, so the heading stands
             down through the arbitration context rather than saying the same
             number twice. */}
-        <CollectionHeading sectionKey="sprints" total={total} />
+        {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the sprint TYPES
+            (`sprints.sprint_type`), and deliberately not the three sprint
+            STATES: a state is DERIVED from the sprint's dates, so there is
+            nothing about it a team could set. There is nothing to READ there
+            either since 11 Sep 2026 — the glyph beside each heading is
+            `STATE_MARK`, in this file, and the `Sprint status` vocabulary it
+            used to be looked up in is now stored by nothing and read by
+            nothing. `MODULE_SETTINGS` carries the whole argument. In the
+            heading's `action` slot, never the toolbar (R50). */}
+        <CollectionHeading sectionKey="sprints" total={total} action={<ModuleSettingsGear teamId={teamId} segment="sprints" />} />
 
         <SectionWithCreate
           show={canCreate}

@@ -61,7 +61,11 @@ function segments(): string[] {
 /** Segments that never carry a record id, with the reason each. Data, and
  * rot-checked below, so the list can only shrink. */
 const NO_RECORD_BEHIND_IT: Record<string, string> = {
-  dropdowns: "a settings screen for the team's own vocabulary — the values are edited in place, none of them has a screen of its own.",
+  // `dropdowns` STOOD HERE and went on 11 Sep 2026 with its section: the
+  // whole-vocabulary screen and a value's own record were retired together at
+  // the client's ruling ("end goal kill the big tab 'choice options'"), so there
+  // is no segment left for a line to excuse. The rot-check below is what
+  // required this deletion rather than allowing the line to sit on.
   time: "the work-log collection. A log is read on the record it was booked against, never at /time/<id>.",
   import: "the CSV importer — a workflow, not a collection. Nothing under it has an id.",
   brand: "brand assets open in a panel on the section itself rather than at an address of their own.",

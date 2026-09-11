@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
+import { OPS_DIGEST_OFF } from "../src/lib/ops-alert"
 import { CRON_ALERT_CAP, D1_MAX_BOUND_PARAMS } from "@shared/workers/limits"
 import { alertNewAlarms } from "../src/lib/sharding"
 import type { Env } from "../src/env"
@@ -177,6 +178,30 @@ describe("the trend rides inside the alarm mail", () => {
 })
 
 describe("a delivery that fails is never silent", () => {
+  // ── "OFF" IS A VALUE; ABSENCE IS A FAULT. THE TWO ARE DIFFERENT ANSWERS ──
+  //
+  // THE BUG THIS PAIR PINS, found 2026-09-11 and live in BOTH environments.
+  // `ALERT_TO` is the literal word `"off"` on staging and on production
+  // (workers/tenancy/wrangler.jsonc), which is the owner's own decision of
+  // 8 Sep 2026: "I don't really give a fuck about the emails; they do nothing
+  // but fill up my inbox." `sendOpsDigest` understands that word and returns
+  // quietly. This function, beside it, only ever checked for an EMPTY list —
+  // so `"off"` survived the `.split(",").filter(Boolean)` as a ONE-ELEMENT
+  // recipient list, and every night the growth alarm tried to email an address
+  // literally called `off`. The send failed, `mailed` stayed 0, and the
+  // `if (!mailed) throw` at the foot of the function turned an ordinary night
+  // into a recorded cron failure. One word, two meanings, one send broken.
+  //
+  // BOTH HALVES ARE ASSERTED, because a fix that made "off" quiet by ALSO
+  // making an unset variable quiet would destroy the check that catches a
+  // genuinely forgotten address — which is the whole of `OPS_DIGEST_OFF`'s own
+  // argument, one file over, and why it is imported here rather than retyped.
+  it("says nothing at all when ALERT_TO is the word off — a silence somebody chose", async () => {
+    const h = env({ "team-a": { size: 8.4 * GB, prev: 8.0 * GB, prevDays: 1 } }, OPS_DIGEST_OFF)
+    await expect(alertNewAlarms(h.env, ["team-a"])).resolves.toEqual({ mailed: 0, recipients: 0 })
+    expect(h.sent, "a recipient literally called `off` was emailed").toEqual([])
+  })
+
   it("throws when ALERT_TO is unset, naming the databases nobody heard about", async () => {
     const h = env({ "team-a": { size: 8.1 * GB, prev: 8 * GB, prevDays: 1 } }, undefined)
     await expect(alertNewAlarms(h.env, ["team-a"])).rejects.toThrow(/ALERT_TO is not set/)

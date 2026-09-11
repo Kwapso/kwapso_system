@@ -16,6 +16,7 @@
 // which is a screen the engine has no block for — the same reason the story
 // detail is host-composed.
 
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { CollectionHeading } from "@/components/records/collection-heading"
 import { HoursByWeekCard } from "@/components/screens/pulse"
 import { TimePanel } from "@/components/work/time-panel"
@@ -38,7 +39,10 @@ export function TimeScreen({
     <div className="flex flex-col gap-6">
       {/* R16: a sidebar page has no tab strip to badge, so the count lives in the
           heading — and it is the door's exact COUNT(*). */}
-      <CollectionHeading sectionKey="time" total={total} />
+      {/* THE GEAR (R61) — this module's quick access to its own settings
+          page, which since 2026-09-11 is where its three automations are
+          listed. `ModuleSettingsGear` draws itself or nothing. */}
+      <CollectionHeading sectionKey="time" total={total} action={<ModuleSettingsGear teamId={teamId} segment="time" />} />
       {/* THE SHAPE OF THE LAST TWO MONTHS, above the rows it is summed from.
           A timesheet answers "what did I log"; it has never answered "are we
           busier or quieter than we were", which is the question a week of rows

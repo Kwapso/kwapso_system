@@ -179,7 +179,11 @@ export type TeamSection = {
     | "members"
     | "roles"
     | "invites"
-    | "dropdowns"
+    // "dropdowns" WAS HERE — the team's whole vocabulary on one screen, and its
+    // Choices tab on Settings. Both retired 11 Sep 2026 at the client's ruling
+    // ("end goal kill the big tab 'choice options'"): a group is edited on the
+    // settings page of the module whose records store its words
+    // (`MODULE_SETTINGS`, web/components/screens/module-settings-screen.tsx).
     // "internal-rates" WAS HERE — the agency's own cost card, a tab on the team
     // area. Retired 10 Sep 2026 with the rest of the internal rates. What an
     // ACCOUNT is charged was never here and still is not: that card lives on the
@@ -265,18 +269,26 @@ export const TEAM_SECTIONS: TeamSection[] = [
   { key: "members", title: "Members", module: "team_members", segment: "members", placement: "tab", countCacheKey: "members" },
   { key: "roles", title: "Member roles", module: "member_roles", segment: "roles", placement: "tab", countCacheKey: "member_roles" },
   { key: "invites", title: "Invites", module: "team_members", segment: "invites", placement: "tab", countCacheKey: "invites" },
-  // Choices ("selectable data", formerly "Dropdown values") — the team's own
-  // vocabulary. It lived as a tab beside the other admin sections until
-  // Settings grew real tabs of its own (2026-09-01): it is now the "Choices"
-  // tab on Settings, and `placement: "contextual"` (not "tab") is what takes
-  // it OFF the team area's own strip — the same treatment Import already
-  // gets, and for the same reason: this section is reached from a specific
-  // destination rather than switched to from every other team page. The
-  // segment/module/route stay exactly as they were (`/t/<teamId>/dropdowns`
-  // still resolves — a value's own detail address does not move under it),
-  // so nothing that already links here breaks; Settings' Choices tab is
-  // simply the one place that link is offered now.
-  { key: "dropdowns", title: "Choices", module: "selectable_data", segment: "dropdowns", placement: "contextual", countCacheKey: "selectable" },
+  // ── THE "CHOICES" ROW STOOD HERE, AND IT IS THE CASE R64 COULD NOT SEE ─────
+  //
+  // It was `placement: "contextual"` from 2026-09-01, which took it off the team
+  // area's tab strip on the reasoning that Settings' Choices tab was "the one
+  // place that link is offered now". On the same day `ManageDropdownsLink` was
+  // repointed at `?tab=choices`, and from that moment NOTHING in the app linked
+  // to `/t/<teamId>/dropdowns` at all. The screen kept resolving, with its
+  // import door, its export and its record split intact, for ten days.
+  //
+  // R64 did not catch it and could not: it walks `placement: "tab"` rows
+  // subtracted from the "This team" list, and a contextual row is not on that
+  // list to be subtracted FROM. The law has been widened to reach contextual
+  // sections as part of this change (RULES.md R64, clause v) — a contextual
+  // section is now REACHED by a literal navigation to its own address or it
+  // names its host.
+  //
+  // The section itself went on 11 Sep 2026 with the screen and the tab, at the
+  // client's ruling: *"implement this module settings across app … end goal kill
+  // the big tab 'choice options'."* Every vocabulary group a record stores is
+  // edited on that module's own settings page.
   // The Internal rates row stood here, gated on `commercials`, and was the last
   // section this table offered that the "This team" list did not subtract. It
   // went on 10 Sep 2026 with the card behind it, so that list now renders
@@ -459,7 +471,16 @@ export const CONCEPT_ICON = {
   members: "users",
   roles: "shield-check",
   invites: "envelope",
-  dropdowns: "list-bullets",
+  // RENAMED FROM `dropdowns` ON 11 SEP 2026. The concept it named — the team's
+  // whole vocabulary as a destination — went with the screen and the section,
+  // and a vocabulary entry nothing spells is a word the app no longer says (the
+  // `rates` note below is the same deletion, one ruling earlier). The GLYPH
+  // stays, under the name of the thing still drawing it: a count of rows in a
+  // panel (`work-logs-panel.tsx`'s "Entries"), which is what `list-bullets` was
+  // being borrowed for anyway. Renaming rather than deleting is what keeps that
+  // call site inside the one icon vocabulary instead of reaching for a glyph of
+  // its own.
+  entries: "list-bullets",
   // THE MONEY had a key here — `rates`, drawn as `money` — reused at page, tab
   // and button level (UI-CONVENTIONS §4) by the two rate cards and then by the
   // one that outlived them. Both rulings of 10 Sep 2026 landed on it: the

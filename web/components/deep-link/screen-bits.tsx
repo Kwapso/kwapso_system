@@ -61,6 +61,7 @@ import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collec
 import { type FolderTabStrip, renderFolderTabs } from "@shared/web/screen-engine/tabs-view"
 
 import { PINNED_INSET_MARK, PINNED_TOOLBAR } from "@shared/web/pinned-chrome"
+import { safeHref } from "@shared/web/rich-text"
 import { useT } from "@shared/web/language"
 
 /** A state with nothing in it still gets a face. One glyph in the leading slot,
@@ -296,6 +297,152 @@ export function AddButton({
         <Button size="icon" onClick={onClick} aria-label={label} disabled={disabled}>
           {icon ?? <Plus className="size-4" />}
         </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** THE GROWING SLOT'S OWN CLASS STRING — AND THE FLOOR IS ON THE FIELD, NOT ON
+ * THE BOX AROUND IT.
+ *
+ * MEASURED, 11 SEP 2026, on staging's `/settings/tickets` at six widths: the
+ * search input rendered 603px at 1680, 203 at 1280 and **23 at 1100**, with the
+ * placeholder clipped to "Sea". That screen's toolbar had just grown two
+ * buttons (Export CSV / Import CSV, which arrived when the whole-vocabulary
+ * Choices tab was retired and the two doors moved onto each module's own page),
+ * and the row's one growing slot absorbed all of it.
+ *
+ * THE FLOOR WAS ALREADY HERE AND IT COULD NOT BITE. `min-w-[10rem]` below is
+ * the SLOT's floor, and the slot is a CONTAINER a call site fills with as many
+ * controls as it likes — `search` is still a `React.ReactNode`, the one slot
+ * R53 left as a node. On this screen the call site hands it a `SearchInput`
+ * AND a `w-40` status `Select`, so 160 of the slot's floor belongs to the
+ * Select and the field's share of it is zero. The measurement says it exactly:
+ * at 1100 the slot was **253** wide — above its own floor, never clamped — of
+ * which the Select took 160, the gap 8, and the search pill the remaining 85,
+ * which is 36 of inline padding, a 16 glyph, a 10 gap and 23 of text.
+ *
+ * So `flex-1` is `flex: 1 1 0%`, a zero-basis item has zero shrink WEIGHT, and
+ * every pixel of the slot's shortfall comes out of the one item that has no
+ * minimum of its own. A floor on the SLOT is a no-op against that; only a floor
+ * on the FIELD can bite.
+ *
+ * THE NUMBER AND THE ARGUMENT ARE BOTH THE KIT'S. Its own `ToolbarRow`
+ * (`shared/ui/components/toolbar-row/toolbar-row.tsx`) already writes
+ * `min-w-[var(--space-11)] flex-1` around the search node itself, with the same
+ * reasoning spelled out beside it and the same conclusion about `flex: 1 1 0%`.
+ * 8rem is "the narrowest a glyph, a placeholder and a clear control still read
+ * as a search field", and it RESCALES with the text-size control instead of
+ * pinning a pixel. This app's three bespoke rows copied the `flex-1` and put
+ * the floor one box too far out. **OWED UPSTREAM:** the kit's row is the right
+ * component and these three are a divergence R63 already wrote down; retiring
+ * them in its favour is the real fix and is not this lane's.
+ *
+ * REACHED THE `PINNED_TOOLBAR_IN_KIT_PANEL` WAY — a rule declared by the
+ * element the app owns, landing on the kit's own `data-slot`, because
+ * `shared/ui/` is vendored and hash-pinned and a hand-edit there turns
+ * `web/test/vendored-kit.test.ts` red. Nothing is asked of a call site and no
+ * screen passes anything different (R53): the slot set is unchanged, and what
+ * changed is a guarantee the ROW now makes about whatever is put in it. */
+export const TOOLBAR_SEARCH_SLOT = cn(
+  "flex min-w-[10rem] flex-1 flex-wrap items-center gap-2",
+  "[&_[data-slot=search-input]]:min-w-[var(--space-11)]"
+)
+
+/** A LABELLED ACTION IN A TOOLBAR'S `actions` SLOT, THAT FOLDS TO ITS GLYPH
+ * WHEN THE ROW IS TIGHT — and the two halves of that sentence are two rulings
+ * that were never made to meet.
+ *
+ * B3 (UI-RULEBOOK) made the create button a bare `Plus` with its label as the
+ * accessible name and the tooltip — that is `AddButton` above, at EVERY width.
+ * B4 kept import and export labelled, because they are "rare, consequential and
+ * not guessable from a glyph", and that reasoning is still good. But B4 was
+ * written about a toolbar that did not yet carry both of them, and on
+ * `/settings/tickets` the pair costs the row ~230px it does not have: the
+ * search field fell to 23px at 1100 (see `TOOLBAR_SEARCH_SLOT`), and on
+ * Accounts — same two buttons, PagedFind's own row — the track already breaks
+ * the client's "one row, always" and wraps to 104px at 1100 and at 900.
+ *
+ * CLAUDE.md's own sentence is the carve-out, and it is the only one that does
+ * not need a fresh design ruling: "Keep the icon-for-action mapping consistent
+ * across the app; **on narrow screens icon-only is acceptable.**" So the word
+ * stays wherever the word fits, and below `xl` the button becomes exactly the
+ * square glyph pill `AddButton` already is beside it — same height, same
+ * shape, same treatment, so the fold is the row agreeing with itself rather
+ * than a second appearance for the same control.
+ *
+ * THE ACCESSIBLE NAME SURVIVES THE FOLD, and it does not change across it: the
+ * name is `aria-label`, present at every width, and the tooltip carries the
+ * same word — `AddButton`'s own mechanism one component along. The visible
+ * label is `hidden xl:inline`, so folded it is not in the layout at all rather
+ * than clipped, and unfolded it matches the accessible name exactly (WCAG
+ * 2.5.3, label in name).
+ *
+ * ROW-OWNED ON PURPOSE. This lives in the row's own module beside `AddButton`,
+ * so the NEXT action added to a toolbar folds without anyone remembering to
+ * make it — the whole reason the bug was the row's and not the settings
+ * screen's. A call site says only which word and which glyph.
+ *
+ * WHAT IT DOES NOT SOLVE: `xl` is a VIEWPORT breakpoint and the room the row
+ * actually has depends on the shell's rail too, so the fold is keyed to a
+ * proxy rather than to the measurement. A container query is the honest
+ * instrument and is a bigger change than this; written down rather than left
+ * implicit. */
+export function ToolbarAction({
+  label,
+  icon,
+  onClick,
+  href,
+}: {
+  /** The word. The accessible name and the tooltip at every width; the visible
+   * label from `xl` up. Already translated by the call site (R33). */
+  label: string
+  /** The glyph, `size-4`, from `@shared/ui/foundations/icons` (R39). Always
+   * drawn — it is the whole control below `xl`. */
+  icon: React.ReactNode
+  /** A button action (import opens the importer). Exactly one of this and
+   * `href`. */
+  onClick?: () => void
+  /** A DOWNLOAD action (export): a plain link, so the browser saves the file
+   * rather than the app navigating to it. **Handed over RAW** — the check is
+   * this component's, not the caller's, and that is the point: the attribute
+   * exists here and only here, so `safeHref` is asked once where the URL
+   * actually reaches the DOM instead of at every call site that might forget.
+   * The same shape R50 gave `empty` and R53 gave `sort` — a rule a call site
+   * can forget is not a rule. */
+  href?: string
+}) {
+  const folding =
+    // Square at the standing control height below `xl`, the shape `size="icon"`
+    // draws; a padded pill with its word from `xl` up. Spelled as `w-*` rather
+    // than `size-*` so the media rule overrides one property and tailwind-merge
+    // has nothing to collapse.
+    "h-[var(--control-height-button)] w-[var(--control-height-button)] justify-center p-0 gap-0 " +
+    "xl:w-auto xl:px-5 xl:gap-1"
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {href !== undefined ? (
+          <a
+            // THROUGH THE SEAM, like every other bound URL in the app
+            // (`safeHref`, shared/web/rich-text.ts). `rich-text.test.ts`'s own
+            // census reads the EXPRESSION and never the argument, which is
+            // exactly right: "nothing a person typed is in this string" is the
+            // argument every unchecked href has ever been defended with.
+            href={safeHref(href)}
+            aria-label={label}
+            className={cn(buttonVariants({ variant: "secondary" }), folding)}
+          >
+            {icon}
+            <span className="hidden xl:inline">{label}</span>
+          </a>
+        ) : (
+          <Button variant="secondary" onClick={onClick} aria-label={label} className={folding}>
+            {icon}
+            <span className="hidden xl:inline">{label}</span>
+          </Button>
+        )}
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
@@ -697,9 +844,7 @@ export function ToolbarRow({
               the same way `filters` below already normalizes a `w-full` child –
               see PagedFind's note on why a wrapped `w-full` child sizes to the
               wrapper and not the row). */}
-          {search && (
-            <div className="flex min-w-[10rem] flex-1 flex-wrap items-center gap-2">{search}</div>
-          )}
+          {search && <div className={TOOLBAR_SEARCH_SLOT}>{search}</div>}
           {/* `useFilterBar`'s own `pill` (`shared/web/screen-engine/filter-bar.tsx`)
               renders inline here — a normal flex child, wrapped in its own
               non-growing box internally, same as every other slot on this row.

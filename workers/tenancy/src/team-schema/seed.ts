@@ -30,10 +30,34 @@ import { DELIVERABLE_KINDS, SELECTABLE_GROUPS } from "@shared/selectable-groups"
 import { TEAM_MODULES } from "@shared/team-modules"
 export { TEAM_MODULES, TEAM_MODULE_CATALOG } from "@shared/team-modules"
 
-/** The two groups the legacy app never had, as data rather than as a UNION ALL
- * chain — see the comment in 0018. Countries are the ones the customer records
+/** The group the legacy app never had, as data rather than as a UNION ALL chain
+ * — see the comment in 0018. Countries are the ones the customer records
  * themselves evidence; the ten legacy labels pick-or-create into the same group
- * when the choices import runs. */
+ * when the choices import runs.
+ *
+ * ── IT WAS TWO GROUPS UNTIL 11 SEP 2026 ─────────────────────────────────────
+ *
+ * `Company size` was the second, five bands wide, and NOTHING COULD EVER BE
+ * FILED UNDER IT. The owner ruled for a group rather than a free-typed field
+ * (the same reason `Country` is one) and then no column was ever added to
+ * `accounts` to hold the answer — so every team born since has been handed five
+ * rows, in a picker that appears on no screen, in a vocabulary a person can edit
+ * to no effect. `shared/selectable-homes.ts` has called the group `"unused"` for
+ * as long as that file has existed.
+ *
+ * A SEED CHANGE, NOT A MIGRATION, and the difference is what happens to teams
+ * that already exist: the migration runner applies a version ONCE and records
+ * it, so a team that has already run 0018 has its five rows and keeps them —
+ * nothing here deletes anybody's data, and if a team has quietly started using
+ * the group for something of its own, that keeps working. What changes is the
+ * team born TOMORROW: it runs this ledger from empty, and 0018 no longer offers
+ * it a vocabulary nothing reads. Retiring the rows that already exist is a
+ * migration and a decision about a team's own data, which is the client's to
+ * take and not one to fold into a tidy-up.
+ *
+ * THE SIX `File type` ROWS WENT THE SAME DAY, out of `DEFAULT_SELECTABLE` below,
+ * for the same reason and with the same treatment — that one was never in a
+ * migration at all, so a newborn team is the only team it ever reached. */
 export const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
   { type: "Country", value: "Germany" },
   { type: "Country", value: "Austria" },
@@ -41,11 +65,6 @@ export const INTERNAL_VOCABULARY: { type: string; value: string }[] = [
   { type: "Country", value: "Spain" },
   { type: "Country", value: "Andorra" },
   { type: "Country", value: "United Kingdom" },
-  { type: "Company size", value: "1–10" },
-  { type: "Company size", value: "11–50" },
-  { type: "Company size", value: "51–200" },
-  { type: "Company size", value: "201–500" },
-  { type: "Company size", value: "More than 500" },
 ]
 
 /** The vocabulary a COMPANY record picks from — the industry it is in. Ordinary
@@ -130,12 +149,24 @@ export type DefaultSelectable = {
 }
 
 export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
-  { type: "File type", value: "Image file" },
-  { type: "File type", value: "Image link" },
-  { type: "File type", value: "Video file" },
-  { type: "File type", value: "Video link" },
-  { type: "File type", value: "Other file" },
-  { type: "File type", value: "Other link" },
+  // SIX `File type` ROWS STOOD HERE and were deleted on 11 Sep 2026, together
+  // with the five `Company size` bands further down. Eleven rows handed to every
+  // newborn team that nothing in the product could ever file anything under.
+  //
+  // `File type` IS A NEAR-MISS, which is why it survived so long: a knowledge
+  // upload really does record a file type — and it stores the BROWSER's own
+  // content type, through `requireText(body.contentType, "File type", …)` in
+  // workers/content/src/routes/knowledge.ts. That is a validation LABEL that
+  // happens to spell the same two words. Grepping the string finds it; nothing
+  // has ever looked a row up. `shared/selectable-homes.ts` records the group as
+  // `"unused"` and says so in full.
+  //
+  // NOTHING IS DELETED FROM A TEAM THAT EXISTS. This list is the seed a team
+  // runs once, at birth, and `File type` was never in a migration at all — so a
+  // newborn team is the only team it ever reached, and every team already
+  // standing keeps the six rows it was born with. Retiring those is a migration
+  // and a decision about somebody's own data; `INTERNAL_VOCABULARY` above
+  // carries the same paragraph for the `Company size` half.
   // THE FIVE WORDS THE AGENCY ACTUALLY USES (CHECKLIST 2.1), each carrying the
   // mark it is recognised by (11.8, UI-RULEBOOK G2). "Feedback" and "Bug" are
   // gone from the starting vocabulary: Aurora retired them, and a "bug" is an
@@ -240,11 +271,9 @@ export const DEFAULT_SELECTABLE: DefaultSelectable[] = [
   { type: "Country", value: "Spain" },
   { type: "Country", value: "Andorra" },
   { type: "Country", value: "United Kingdom" },
-  { type: "Company size", value: "1–10" },
-  { type: "Company size", value: "11–50" },
-  { type: "Company size", value: "51–200" },
-  { type: "Company size", value: "201–500" },
-  { type: "Company size", value: "More than 500" },
+  // THE FIVE `Company size` BANDS STOOD HERE, deleted 11 Sep 2026 — see
+  // `INTERNAL_VOCABULARY` at the top of this file, which carries the whole
+  // account and the other half of the same deletion (0018's copy of them).
   // The company record's other two vocabularies, written once in
   // COMPANY_VOCABULARY so a NEW team's seed and an EXISTING team's migration
   // (0024) can never offer two different starting sets.

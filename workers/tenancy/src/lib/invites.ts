@@ -4,6 +4,7 @@
 // sent THROUGH the auth worker (it owns the Resend key). All guards live here.
 
 import { brand } from "@shared/brand"
+import { automationOff } from "@shared/workers/automations"
 import { recordWorkerError } from "@shared/workers/error-log"
 import { logActivity, type Actor } from "@shared/workers/activity"
 import { d1ExecScript, d1Query, sqlString, type D1Rest } from "@shared/workers/d1-rest"
@@ -327,7 +328,13 @@ export async function revokeInvite(
       relatedTable: "invite_logs",
       relatedRowId: row?.invite_row_id,
     })
-    // Tell the invitee their pending invite was withdrawn (best-effort).
-    await notifyInviteRevoked(env, guard.teamId, row?.email ?? "", actor.name)
+    // Tell the invitee their pending invite was withdrawn (best-effort) —
+    // unless the team has switched this one off (R70, `shared/automations.ts`).
+    // Read here rather than inside the notifier because that function takes no
+    // team database; one bounded SELECT on a rare administrative act. Absent
+    // means ON. The INVITATION itself is not switchable and says why: the only
+    // way into the team is the link in that message.
+    if (!(await automationOff(cfg, guard.databaseId, "members.invite-revoked-email")))
+      await notifyInviteRevoked(env, guard.teamId, row?.email ?? "", actor.name)
   }
 }

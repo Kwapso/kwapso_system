@@ -26,7 +26,18 @@ export const SELECTABLE_GROUPS = {
    * account; the owner ruled for a group, because a country typed free into an
    * address is a country spelled five ways by five people. */
   country: "Country",
-  /** HOW BIG AN ACCOUNT IS. The second ungrouped set — five size bands. */
+  /** HOW BIG AN ACCOUNT IS. The second ungrouped set — five size bands.
+   *
+   * NOTHING READS THIS KEY, and nothing ever has: the owner ruled for a group
+   * rather than a field and no column was ever added to `accounts` to hold the
+   * answer, so no door pick-or-creates into it and no screen offers it. Its seed
+   * rows were deleted on 11 Sep 2026 (`INTERNAL_VOCABULARY`,
+   * workers/tenancy/src/team-schema/seed.ts), so a team born after that date has
+   * no such group at all. The NAME stays here because teams that already exist
+   * still have the group and `shared/selectable-homes.ts` still has to declare a
+   * home for it — and because this file is the one place the string may be said,
+   * which is the property that stops the eventual `accounts.company_size` column
+   * inventing a second spelling of it. */
   companySize: "Company size",
   /** WHERE AN APP HAS GOT TO. It was a free-typed text field until 17 Aug 2026,
    * which is how one inventory carried "live", "Live" and "in dev" for the same

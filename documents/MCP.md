@@ -250,9 +250,13 @@ Today it covers:
   So the census is now every non-admin door on tenancy, content, data-ops and auth,
   filtered or not, GET or POST. Each one has a tool on some machine surface or is a
   named, reasoned line in the check's `TOOLLESS_DOORS`, and a door that is neither is a
-  red build. Today: **271 doors, 207 with a tool, 64 with a written reason**, the
+  red build. Today: **273 doors, 207 with a tool, 66 with a written reason**, the
   reasons being the team-pin doors (item 2 of the reasoned exclusions below), the
   client-portal standing doors (item 3), the sign-in and personal-identity doors on auth, the screen-recipe store,
+  the AUTOMATION SWITCH STORE beside it (added 2026-09-11 with R70: silencing an
+  automation is the one setting a machine must not be able to change, because
+  every switchable one TELLS SOMEBODY SOMETHING and a model that could switch
+  those off could make its own next mistake quiet),
   the THREE doors of the direct upload (permission to PUT a file, which hands
   back a URL its caller must then make an HTTP request to, and the two that
   acknowledge the PUT afterwards — what all three need is a browser rather than

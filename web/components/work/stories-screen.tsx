@@ -29,6 +29,7 @@ import {
 import type { ScreenRecipe, ScreenRights } from "@shared/web/screen-engine/recipe"
 
 import { CollectionHeading } from "@/components/records/collection-heading"
+import { ModuleSettingsGear } from "@/components/screens/module-settings-screen"
 import { LoadMore } from "@/components/records/load-more"
 import { PagedFind } from "@/components/records/paged-find"
 import { COLLECTION_SORTS, translatedSorts } from "@/lib/collection-sorts"
@@ -286,7 +287,11 @@ export function StoriesScreen({
       {/* R16: the count lives in the heading (a sidebar page has no tab strip to
           badge), and it is the door's exact COUNT(*) — never the loaded page's
           length, which on a paged list is just "50" for ever. */}
-      <CollectionHeading sectionKey="stories" total={total} />
+      {/* THE MODULE'S OWN DOOR INTO ITS SETTINGS (R61) — the story types, which
+          are stored on `stories.story_type` and so belong here. The heading's
+          `action` slot and not the toolbar: R50 draws no toolbar over an empty
+          collection, which is the moment somebody goes looking for the words. */}
+      <CollectionHeading sectionKey="stories" total={total} action={<ModuleSettingsGear teamId={teamId} segment="stories" />} />
 
       {/* R14's other half: 3,677 stories arrived from the previous system on day
           one, so a search box filtering the loaded page would answer "among the

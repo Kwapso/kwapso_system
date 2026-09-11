@@ -228,13 +228,23 @@ export function RolePanel({
           ) : summary ? (
             <>
               <p className="text-muted-foreground text-sm">
-                {t("Sees {count} of {total} areas", {
+                {/* THREE SYNONYMS LIVED IN THESE TWO SENTENCES, and the matrix
+                    beside them used the right word for all three. "Sees" against
+                    the glossary's `read`; "change" against its `edit`, which is
+                    also the label on the column this number counts; and "areas",
+                    which appeared in exactly these two strings in the whole app
+                    and nowhere else, against `module` — the word every other
+                    screen, every permission key and the glossary itself use. The
+                    client asked for the first and the other two came with it:
+                    they are the same fault, and leaving two of three would have
+                    left the summary disagreeing with the grid it summarises. */}
+                {t("Can read {count} of {total} modules", {
                   count: String(summary.sees),
                   total: String(summary.total),
                 })}
               </p>
               <p className="text-muted-foreground text-sm">
-                {t("Can change {count} of {total} areas", {
+                {t("Can edit {count} of {total} modules", {
                   count: String(summary.changes),
                   total: String(summary.total),
                 })}

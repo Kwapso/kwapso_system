@@ -80,7 +80,25 @@ function downloadRejections(rows: Rejection[], filename: string) {
   URL.revokeObjectURL(a.href)
 }
 
-export function ImportScreen({ teamId, initialTarget }: { teamId: string; initialTarget?: string }) {
+export function ImportScreen({
+  teamId,
+  initialTarget,
+  groups,
+}: {
+  teamId: string
+  initialTarget?: string
+  /** THE DROPDOWN GROUPS THIS IMPORT IS ABOUT, comma-separated, off the address
+   * (`?groups=`). Present only when somebody arrived from a module's own
+   * settings page — client, 11 Sep 2026: *"each module's settings page gets its
+   * own import and export for its own groups… nothing sits outside Settings."*
+   *
+   * IT IS CARRIED, NOT ENFORCED. `POST /api/data-ops/import/batch/confirm` reads
+   * the same list off the body and skips every row in another group with a
+   * reason; this screen's job is to ask for the same narrowing on the run and on
+   * a resume, and to say on screen what it asked for. A filter applied here and
+   * nowhere else would be a promise kept by the caller, which is no promise. */
+  groups?: string
+}) {
   const t = useT()
   const { perms, loading: permsLoading } = usePermissions(teamId)
   const canImport = perms ? Object.values(perms).some((m) => m?.create) : false
@@ -111,6 +129,14 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
   const allTargets = targetsQ.data ?? []
   const scoped = initialTarget ? allTargets.filter((x) => x.tableKey === initialTarget) : []
   const samples = scoped.length ? scoped : allTargets
+  /** The scope as the door wants it: a list, trimmed, or undefined for an
+   * unscoped run. Undefined and an empty list are DIFFERENT answers at the door
+   * (an empty one is refused there as a run allowed to write nothing), so a
+   * blank `?groups=` reads as no scope here rather than being sent on. */
+  const groupScope = React.useMemo(() => {
+    const named = (groups ?? "").split(",").map((g) => g.trim()).filter(Boolean)
+    return named.length ? named : undefined
+  }, [groups])
 
   const files = batch?.files ?? []
   const plan = batch?.plan ?? null
@@ -181,7 +207,13 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
       }
     }, 4_000)
     try {
-      const r = pickUp ? await dataOps.batchContinue(batch.id) : await dataOps.batchConfirm(batch.id)
+      // THE SCOPE GOES ON BOTH, and a resume is the half that matters: the door
+      // deliberately does not remember one from the leg it is picking up, so a
+      // `batchContinue` without it would finish a narrowed import unnarrowed —
+      // on the leg nobody is watching.
+      const r = pickUp
+        ? await dataOps.batchContinue(batch.id, groupScope)
+        : await dataOps.batchConfirm(batch.id, groupScope)
       setReport(r.report)
       setStep("report")
       toast.success(t("Imported {count} row(s).", { count: r.report.created }))
@@ -343,6 +375,20 @@ export function ImportScreen({ teamId, initialTarget }: { teamId: string; initia
                 </a>
               ))}
             </div>
+          )}
+          {/* WHAT THIS IMPORT WILL ACCEPT, said before the file is picked
+              rather than in the rejection list afterwards. A person who arrived
+              from Settings › Tickets is on the app's one generic Import screen,
+              which looks exactly the same as the unscoped one — so without this
+              line the narrowing is invisible until a hundred rows come back
+              skipped. The DOOR is what enforces it (`batchConfirm`'s `groups`);
+              this is the screen saying what it is about to ask for. */}
+          {groupScope && (
+            <p className="text-muted-foreground text-xs">
+              {t("This import adds values to {groups} only. Rows in any other group are skipped.", {
+                groups: groupScope.join(", "),
+              })}
+            </p>
           )}
           {files.length === 0 && <PastImports teamId={teamId} />}
         </div>

@@ -881,20 +881,16 @@ export function accountKey(accountId: string): string {
   return `account:${accountId}`
 }
 
-/** ONE DROPDOWN VALUE'S OWN CACHE — the opened record, read through the
- * single-row door rather than found inside the vocabulary list.
+/* `selectableOneKey` STOOD HERE — one dropdown value's own cache, read through
+ * the single-row door for the value's RECORD screen. That screen was retired on
+ * 11 Sep 2026 with the whole-vocabulary screen that was its only door (client:
+ * "end goal kill the big tab 'choice options'"), so the key had no reader and
+ * the `selectable_data` resource's `deps` had nothing to refresh with it.
  *
- * Keyed by TEAM as well as by row for the same reason `accountKey` is keyed by
- * record: a ULID says which row and never which fence it was read under, so a
- * team switch would otherwise hand the new team a row the old one's session
- * fetched. It is a SECOND key beside `selectable:<teamId>` on purpose — the list
- * door selects the vocabulary, the detail door also selects the audit block, so
- * the two answers are genuinely different rows and neither can stand in for the
- * other. R15 keeps both live: the `selectable_data` resource patches the list by
- * id and names this key in its `deps`. */
-export function selectableOneKey(teamId: string, valueId: string): string {
-  return `selectable:one:${teamId}:${valueId}`
-}
+ * THE SINGLE-ROW DOOR IS STILL CALLED and is not affected: `fetchOne` below is
+ * the row-level live patch that keeps a vocabulary LIST current when a teammate
+ * renames a value, which is the reason the door was narrowed to one row in the
+ * first place. */
 
 /** The knowledge-source list's cache key. */
 export function knowledgeKey(teamId: string): string {
@@ -1474,7 +1470,14 @@ export const TEAM_RESOURCES: Record<
     // list row the patch above replaces — so a teammate renaming a value while
     // somebody has it open would leave that screen stale, which is the exact
     // deafness this resource was written to fix one level up.
-    deps: (t, id) => [selectableOneKey(t, id), `activity:record:selectable_data:${id}`],
+    // NO OPEN RECORD TO REFRESH ANY MORE. This used to name `selectableOneKey`
+    // and the value's own activity feed beside it, because a value had a record
+    // screen that read both; the screen went on 11 Sep 2026 with the
+    // whole-vocabulary screen that was its only door. A dep naming a key nothing
+    // reads is a refresh of nothing — the deafness R15 exists to catch, in its
+    // harmless direction. The LIST patch above is what a teammate's rename moves
+    // now, and every module settings page reads that same list.
+    deps: () => [],
   },
   // THE CUSTOMER SPINE — three resources, one row-level target. `accounts` pings
   // carry the account id, and so do `account_links` / `portal_users`: a contact
@@ -1972,6 +1975,14 @@ export const SIMPLE_INVALIDATIONS: Record<string, (teamId: string) => string[]> 
   team: (t) => [`team-meta:${t}`],
   // Per-team screen-recipe overrides (was a deaf publisher before R15).
   screens: (t) => [`screens:${t}`],
+  // WHICH AUTOMATIONS THIS TEAM HAS SWITCHED OFF (R70, client 2026-09-11). A
+  // COARSE drop, like the recipe store above it and for the same two reasons:
+  // the whole answer is one small object read whole by the settings page, so a
+  // row-level patch would save nothing a re-read does not; and the resource the
+  // door publishes is the KEY that moved (`publishChange(…, "automations", key)`)
+  // while the screen reads them all at once. Two admins on the same page see the
+  // switch move rather than one of them saving over the other's answer.
+  automations: (t) => [`automations:${t}`],
   // `internal_rates` and `role_rates` had two coarse team-wide entries here, for
   // the agency's own two cost cards. Both retired 10 Sep 2026 — no worker
   // publishes either resource any more, and an invalidation for a resource
