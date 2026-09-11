@@ -404,7 +404,29 @@ const MIN_VECTOR_SCORE = 0.5
  * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
  * silent change to what "found" means for a caller that never asked for the
  * reader. See `retrieve`'s own comment at the point this is used. */
-const READER_HALLUCINATION_FLOOR = 0.3
+/* RAISED 0.3 -> 0.4 ON 12 SEP 2026, on two measured numbers either side of the
+ * new line, because 0.3 let a reader ANSWER A QUESTION THE BASE HAS NOTHING ON.
+ *
+ *   "What is the capital of France?"   top-1 0.335  MUST refuse
+ *   A-M1 (the exam's own reader canary) top-1 0.444  MUST be rescued
+ *
+ * The strict floor is 0.5, so both were refused before a reader existed. At 0.3
+ * both entered the reader's pool — and the moment the reader became a model that
+ * actually finishes (llama, 11 Sep), it looked at twelve unrelated passages for
+ * the France question and picked one, citing a FluClinic transcript. That is the
+ * exam's refusal ceiling broken: 6/7, on the one tag where a single failure is
+ * worse than any number of content misses.
+ *
+ * 0.4 separates the two measured cases cleanly. It is NOT claimed to be the
+ * right number in general — it is the number that fits the only two points
+ * anybody has measured, and the var (`KNOWLEDGE_READER_MIN_SCORE`) exists so the
+ * next person can move it with more points rather than with an argument.
+ *
+ * WHY A FLOOR AND NOT A BETTER PROMPT: the prompt already says "If NONE of the
+ * candidates bear on the question, say so by returning an empty list". It said
+ * that while this happened. A model's judgment is the thing being bought here,
+ * and buying it does not mean handing it noise and hoping. */
+const READER_HALLUCINATION_FLOOR = 0.4
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
