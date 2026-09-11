@@ -132,6 +132,25 @@ const member = members.find((m) => canRead.has(m.role_id))
 if (!member) throw new Error("no member of this team may read the knowledge base")
 
 const guard = { userId: member.user_id, teamId: team.id, roleId: member.role_id, databaseId: TEAM_DB }
+
+/** X8-notowner's own words are the persona: "Aurora asking: refuse (private-shelf event)."
+ * The `member` above is whichever reader `created_at` picks first — on 2026-09-11 that
+ * resolved to the owner, and a row built to test "anyone but the owner" cannot be graded
+ * honestly under the owner's own guard (see the hub report, 2026-09-11). Ask as her by name,
+ * the same name the row already carries, rather than "the first non-owner reader" — a
+ * generic pick would silently stop meaning "Aurora" the moment team membership changes. */
+const PERSONA_OVERRIDES = { "X8-notowner": "aurora@kwapso.com" }
+async function guardFor(email) {
+  const [user] = await sql(CORE, "SELECT id FROM users WHERE email = ?", [email])
+  if (!user) throw new Error(`kb-exam-run: persona override wants ${email}, no such user in core`)
+  const [asMember] = await sql(CORE, "SELECT role_id FROM team_members WHERE team_id = ? AND user_id = ? AND deactivated_at IS NULL", [team.id, user.id])
+  if (!asMember) throw new Error(`kb-exam-run: ${email} is not an active member of ${TEAM_NAME}`)
+  if (!canRead.has(asMember.role_id)) throw new Error(`kb-exam-run: ${email}'s role cannot read the knowledge base`)
+  return { userId: user.id, teamId: team.id, roleId: asMember.role_id, databaseId: TEAM_DB }
+}
+const personaGuards = {}
+for (const [rowId, email] of Object.entries(PERSONA_OVERRIDES)) personaGuards[rowId] = await guardFor(email)
+
 const env = {
   AI,
   WORKERS_AI_MODEL: FULL_LOOP ? productionComposeModel() : undefined,
@@ -150,7 +169,9 @@ if (structural.length) {
   process.exit(1)
 }
 
-console.log(`kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${FULL_LOOP ? ", FULL-LOOP (reader + writer)" : ", retrieval-only"}\n`)
+console.log(`kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${FULL_LOOP ? ", FULL-LOOP (reader + writer)" : ", retrieval-only"}`)
+for (const [rowId, email] of Object.entries(PERSONA_OVERRIDES)) console.log(`  persona override: ${rowId} asks as ${email}, not the default reader`)
+console.log()
 
 const resultsByRowId = {}
 let notYetKeyed = 0
@@ -162,7 +183,7 @@ for (const row of rows) {
   }
   let answer
   try {
-    answer = await retrieve(env, { accountId: ACCOUNT, apiToken: TOKEN }, guard, {
+    answer = await retrieve(env, { accountId: ACCOUNT, apiToken: TOKEN }, personaGuards[row.id] ?? guard, {
       question: row.question,
       compose: FULL_LOOP ? (material, sources) => writeAnswer(env, row.question, material, sources) : undefined,
     })

@@ -266,14 +266,26 @@ test("fence coverage is enumerable by tag — exactly the five rows the hub name
   assert.equal(byId.get("A-X8").disposition, "struck")
 })
 
-/* ------------------------- the keying mechanism (empty) ------------------------- */
+/* ------------------------- the keying mechanism ------------------------- */
 
 test("loadKeys returns {} when the file does not exist — the mechanism works before any row is ever keyed", () => {
   assert.deepEqual(loadKeys("/tmp/kb-exam-keys-does-not-exist.json"), {})
 })
 
-test("the shipped scripts/kb-exam-keys.json is empty — nothing is keyed until the post-reindex pass runs", () => {
-  assert.deepEqual(loadKeys(), {}, "if this fails, someone started keying — update this test, don't delete it")
+// The rebuild landed 2026-09-11 (~4,400 sources). The first keying pass ran
+// straight after: every row here was matched by a `meeting`-kind title (never
+// Google-derived — the backfill was still walking backward) AND corroborated
+// by an exact chunk-count match against the source's own annotated piece
+// count, both checked by hand before this file was written. It is a
+// deliberate under-count, not an exhaustive one: title punctuation (en-dashes,
+// colons, emoji) broke several real matches, left unkeyed rather than guessed.
+test("the shipped scripts/kb-exam-keys.json holds only real, corroborated matches", () => {
+  const keys = loadKeys()
+  assert.ok(Object.keys(keys).length > 0, "if this fails, every key was reverted — check that on purpose")
+  for (const [rowId, sourceIds] of Object.entries(keys)) {
+    assert.ok(Array.isArray(sourceIds) && sourceIds.length > 0, `${rowId} must key to a non-empty array`)
+    for (const id of sourceIds) assert.match(id, /^[0-9A-Z]{26}$/, `${rowId}: "${id}" doesn't look like a knowledge_sources ulid`)
+  }
 })
 
 test("applyKeys: a row absent from the keys file is untouched — grades exactly as it does today", () => {
@@ -299,7 +311,7 @@ test("validateKeys catches a key naming a row that doesn't exist, one on a non-k
   assert.ok(problems.some((p) => p.includes("A-O1 must key to a non-empty array")))
 })
 
-test("validateKeys is clean against the real, empty keys file", () => {
+test("validateKeys is clean against the real keys file", () => {
   const { rows } = loadExam()
   assert.deepEqual(validateKeys(rows, loadKeys()), [])
 })
