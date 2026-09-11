@@ -144,6 +144,7 @@ import {
   tokenise,
 } from "./knowledge-text"
 import { buildSummary } from "./knowledge-summary"
+import { uploadIdentity } from "./knowledge-identity"
 import { passageId, READER_SHORTLIST_CAP } from "./knowledge-reader"
 import {
   chunkVectorId,
@@ -1478,6 +1479,28 @@ export async function createFileSource(
   // search may ADMIT).
   const accountsFiled = await Promise.all(accountIds.map((aid) => requireAccount(cfg, guard, aid)))
   const appsFiled = await Promise.all(appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
+  // R68 IDENTITY, FINALLY WIRED IN. `uploadIdentity()` has existed since the
+  // identity rebuild and was never called from here — every INSERT below left
+  // `origin_table`/`origin_row_id` NULL, so the same file uploaded twice made
+  // two rows, silently (tracker b-upload-dup). "An upload IS its bytes" — its
+  // own header — so a file with no readable text has nothing to be identical
+  // BY, and is deliberately left uncompared here rather than colliding every
+  // unreadable file with every other one on the hash of an empty string.
+  const identity = input.extract.text ? uploadIdentity(contentHash(input.extract.text)) : null
+  if (identity) {
+    const dupe = await d1Query<{ id: string; title: string; created_at: string }>(
+      cfg,
+      guard.databaseId,
+      `SELECT id, title, created_at FROM knowledge_sources WHERE origin_table = ? AND origin_row_id = ? LIMIT 1`,
+      [identity.originTable, identity.originRowId]
+    )
+    if (dupe[0])
+      throw new GuardError(
+        409,
+        "already_in_library",
+        `"${dupe[0].title}" is already in the library, added on ${dupe[0].created_at.slice(0, 10)}. Nothing new was saved.`
+      )
+  }
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1493,13 +1516,15 @@ export async function createFileSource(
   await d1Query(
     cfg,
     guard.databaseId,
-    `INSERT INTO knowledge_sources (id, kind, compartment, account_id, title, summary, body, body_bytes,
+    `INSERT INTO knowledge_sources (id, kind, origin_table, origin_row_id, compartment, account_id, title, summary, body, body_bytes,
        file_url, file_name, file_type, file_bytes, file_note,
        owner_user_id, visible_to_app_id, record_date, created_at, creator_id, creator_email, creator_name,
        accounts, apps)
-     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, 'file', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
+      identity?.originTable ?? null,
+      identity?.originRowId ?? null,
       compartment,
       input.accountId,
       input.title,
