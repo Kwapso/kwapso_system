@@ -11,7 +11,6 @@ import { describe, expect, it } from "vitest"
 
 import {
   googleIdentity,
-  identityKey,
   liveSightings,
   recordIdentity,
   sightedExternalId,
@@ -29,27 +28,33 @@ const ALEX = "01J8ZZALEX00000000000000AA"
 
 describe("the person is never in the identity", () => {
   it("gives two people who named the same Drive folder ONE identity", () => {
+    // Compared as the { originTable, originRowId } pair the real fold keys
+    // on (0012's idx_knowledge_sources_origin, ON CONFLICT (origin_table,
+    // origin_row_id)) — not through a joined string. identityKey() used to
+    // be that string; it was retired in 0080 once the fold turned out to
+    // have never read it, and this comparison is exactly what it was a
+    // shortcut for.
     const hers = googleIdentity("drive", "1AbCdEfGhIjKlMnOpQrStUvWxYz")
     const his = googleIdentity("drive", "1AbCdEfGhIjKlMnOpQrStUvWxYz")
-    expect(identityKey(hers)).toBe(identityKey(his))
+    expect(hers).toEqual(his)
     expect(hers.originRowId).not.toContain(AURORA)
     expect(hers.originRowId).not.toContain(ALEX)
   })
 
   it("does the same for a calendar event and a chat thread", () => {
-    expect(identityKey(googleIdentity("calendar", "742htcuo_20260904T100000Z"))).toBe(
-      identityKey(googleIdentity("calendar", "742htcuo_20260904T100000Z"))
+    expect(googleIdentity("calendar", "742htcuo_20260904T100000Z")).toEqual(
+      googleIdentity("calendar", "742htcuo_20260904T100000Z")
     )
-    expect(identityKey(googleIdentity("chat", "spaces/AAA/threads/BBB"))).toBe(
-      identityKey(googleIdentity("chat", "spaces/AAA/threads/BBB"))
+    expect(googleIdentity("chat", "spaces/AAA/threads/BBB")).toEqual(
+      googleIdentity("chat", "spaces/AAA/threads/BBB")
     )
   })
 
   it("keeps the four Google services apart under one external id", () => {
-    const keys = new Set(
-      (["drive", "gmail", "calendar", "chat"] as const).map((s) => identityKey(googleIdentity(s, "same")))
+    const tables = new Set(
+      (["drive", "gmail", "calendar", "chat"] as const).map((s) => googleIdentity(s, "same").originTable)
     )
-    expect(keys.size).toBe(4)
+    expect(tables.size).toBe(4)
   })
 
   it("refuses an empty external id rather than filing everything under one row", () => {
@@ -60,15 +65,21 @@ describe("the person is never in the identity", () => {
 
 describe("an upload is its bytes", () => {
   it("gives the same bytes the same identity, so a second upload is a duplicate", () => {
-    expect(identityKey(uploadIdentity("9f2b1c0d4e5a6b7c"))).toBe(identityKey(uploadIdentity("9f2b1c0d4e5a6b7c")))
+    expect(uploadIdentity("9f2b1c0d4e5a6b7c")).toEqual(uploadIdentity("9f2b1c0d4e5a6b7c"))
   })
 
   it("gives different bytes different identities", () => {
-    expect(identityKey(uploadIdentity("9f2b1c0d4e5a6b7c"))).not.toBe(identityKey(uploadIdentity("0000000000000000")))
+    expect(uploadIdentity("9f2b1c0d4e5a6b7c").originRowId).not.toBe(uploadIdentity("0000000000000000").originRowId)
   })
 
   it("never collides with a Google row that happens to carry the same string", () => {
-    expect(identityKey(uploadIdentity("abc"))).not.toBe(identityKey(googleIdentity("drive", "abc")))
+    // Same originRowId ("abc") on purpose — the collision this proves does
+    // NOT happen lives in originTable, which the old identityKey() string
+    // comparison also caught, just less directly.
+    const upload = uploadIdentity("abc")
+    const drive = googleIdentity("drive", "abc")
+    expect(upload.originRowId).toBe(drive.originRowId)
+    expect(upload.originTable).not.toBe(drive.originTable)
   })
 })
 
