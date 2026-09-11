@@ -1,5 +1,19 @@
 # COSTS.md — what this app costs to run
 
+**The `read=1` reader figure REPLACED with a real measurement, 11 Sep 2026**
+(kb-reader-token-budget). The "MEASURED, not estimated" block below was, on
+inspection, estimated twice over: `READER_MAX_TOKENS=200` was picked without
+measurement (it truncated the model mid-reasoning in production, collapsing
+the exam's `para` category 81%→0%), AND the input-token figure it was priced
+against (2,537 tok) was a character-count guess, never checked against the
+API's own `usage.prompt_tokens`. Both are now real: the real model, called
+with the real shipped prompt-building code and a real 12-passage shortlist,
+reports `prompt_tokens: 1,221` (the character-count guess was ~2× too high)
+and `completion_tokens` in the 465–880 range (the 200-token ceiling was ~3×
+too low). The two errors partly offset — see §2 for the corrected total, now
+`READER_MAX_TOKENS = 1500` with the measurement in its own comment
+(`workers/content/src/lib/knowledge-reader.ts`).
+
 **§2's "One knowledge question" revised 2026-09-10** (owner tracker item `g-costs`) —
 BUILD-5-knowledge-rebuild.md's Stage 2 added a SECOND optional spender to the door
 (`read`, the reader that re-reads a shortlist before deciding what is evidence — Kimi
@@ -229,24 +243,42 @@ Vectorize, two-stage      2,048 dims × $0.01/M        = $0.0000205
                                     ALWAYS-ON TOTAL  ≈ $0.00002
 ```
 
-**`read=1` — the reader (BUILD-5 §5-6, Kimi K2.6). MEASURED, not estimated**: the
-system prompt and a 12-passage shortlist (`READER_SHORTLIST_CAP`, the fan-out's own
-ceiling) built from the SHIPPED prompt functions
-(`workers/content/src/lib/knowledge-reader.ts`), character-counted with no model call —
-the same method `scripts/measure-preamble.mjs` uses for the assistant's own preamble,
-at this file's own chars-per-token ratio (§2's preamble measurement, 3.82):
+**`read=1` — the reader (BUILD-5 §5-6, Kimi K2.6). MEASURED FOR REAL, 11 Sep 2026**:
+called the real model with the real shipped prompt functions
+(`workers/content/src/lib/knowledge-reader.ts`) and a real, full 12-passage shortlist
+(`READER_SHORTLIST_CAP`) over five real calls, reading both token counts straight off
+the API's own `usage` object — no character-count estimate on either side this time:
 
 ```
-system prompt          1,261 chars  (~330 tok)
-12-passage shortlist   8,430 chars  (~2,207 tok)   — READER_SHORTLIST_CAP × up to READER_PASSAGE_CHARS (600) each
-                                          INPUT   ≈ 2,537 tok
-output ceiling                              200 tok   (READER_MAX_TOKENS)
+INPUT (measured, API's own usage.prompt_tokens, all 5 calls identical)   1,221 tok
+                          — the earlier character-count guess here was 2,537 tok, ~2× too high
 
-cost   2,537 × $0.950/M + 200 × $4.000/M = $0.002410 + $0.000800 = $0.0032   (worst case, full shortlist)
+OUTPUT (measured completion_tokens, this run's 5 calls): 465, 521, 530, 670, 729
+  — all finish_reason:"stop" (the model finished on its own, never truncated)
+  — an earlier same-day informal probe at widths 1/6/12 (not separately logged)
+    saw completion_tokens as high as 880 — combined observed range 465-880 tok
+  — reasoning_content (billed, emitted BEFORE the id-list answer) is nearly all
+    of this; the id-list itself is short. Shortlist width did not predict length.
+
+cost, this run's mean (583 tok out)   1,221 × $0.950/M + 583 × $4.000/M  = $0.0012 + $0.0023 = $0.0035
+cost, measured range                  $0.0030 (465 tok out)  to  $0.0047 (880 tok out, widest observed)
+cost, worst case (near-full READER_MAX_TOKENS = 1500, never actually observed)
+                                       1,221 × $0.950/M + 1500 × $4.000/M = $0.0012 + $0.0060 = $0.0072
 ```
 
-A thinner shortlist costs proportionally less — a typical 6-passage read is roughly
-half the input, ≈$0.0018.
+**The OLD figure here, $0.0032, was two estimates stacked**: a 200-token OUTPUT
+ceiling picked without measurement (this is the token-budget bug —
+`finish_reason:"length"` at exactly 200, empty `content`, a `para`-category exam
+collapse of 81%→0% in production), priced against a 2,537-token INPUT that was
+itself a character-count guess, never checked against a real call. The two errors
+happened to roughly cancel: the real input is about half the guess, the real
+output is 2-4× the old ceiling, so the REAL typical cost (**≈$0.0035**) sits only
+~9% above the old $0.0032 figure, not the multiple you would expect from the
+output number alone — the worst case (**≈$0.0072** at a full 1500-token ceiling,
+not observed in any of the measured calls) is where the real gap shows up.
+A thinner shortlist costs less on the output side (nothing here scaled cleanly
+with width in the real measurement) but the INPUT figure above is already the
+full 12-passage shape; a 6-passage read's input is roughly proportionally lower.
 
 **`compose=1` — the writer (R23, `llama-4-scout`). Unchanged from the prior figure**:
 
@@ -260,18 +292,18 @@ composed answer (ANSWER_MAX_TOKENS = 900):
 | shape | spend | cost |
 |---|---|---|
 | retrieval only (neither flag) | 0 AI units | ≈ $0.00002 |
-| `read=1` alone | 1 unit | ≈ $0.0032 |
+| `read=1` alone | 1 unit | ≈ $0.0035 (measured range $0.0030-$0.0047; up to $0.0072 at the ceiling, not observed) |
 | `compose=1` alone (today's Knowledge tab, and every MCP call before 10 Sep) | 1 unit | ≈ $0.0018 |
-| `read=1` AND `compose=1` (a full "re-read, then write" turn) | **2 units** | ≈ $0.0050 |
+| `read=1` AND `compose=1` (a full "re-read, then write" turn) | **2 units** | ≈ $0.0053 |
 
 **TWO UNITS IS CORRECT, NOT A BUG TO FIX.** The allowance is metered in REQUESTS
 (`shared/workers/credits.ts`'s own opening line: "allowance of AI requests"), and
 reading the shortlist
 and writing the answer are two separate model calls whichever door reaches them —
 charging one for both would be under-metering, the exact hole this cost file exists to
-close. Still **2.6× cheaper than an agent turn** even at the most expensive shape
-(`$0.0050` vs `$0.0368`), which is what the two-model design intended and remains true
-with the reader added.
+close. Still **6.9× cheaper than an agent turn** even at the most expensive shape
+(`$0.0053` vs `$0.0368`), which is what the two-model design intended and remains true
+with the reader's real (not estimated) cost.
 
 ### With the planner — ESTIMATED, not measured, and not yet built
 
@@ -283,20 +315,20 @@ because the shape of the number is a design input, not a report card.
 ```
 IF every question ran the planner:
   read + compose + plan  = 3 AI units/question
-  at the $0.0050 two-unit figure above, a THIRD model call of similar
+  at the $0.0053 two-unit figure above, a THIRD model call of similar
   size to the reader's system-prompt-only overhead (no shortlist to read yet —
   the planner sees only the question) — call it ~400 in / 150 out tokens:
     400 × $0.950/M + 150 × $4.000/M = $0.00038 + $0.00060 = $0.0010
-  THREE-UNIT TURN  ≈ $0.0060                                    (+20% over two units)
+  THREE-UNIT TURN  ≈ $0.0063                                    (+19% over two units)
 ```
 
-**That 20% is the number that matters, and it is why the planner ships with a
+**That ~19% is the number that matters, and it is why the planner ships with a
 heuristic fast path (hub condition, 10 Sep 2026): an ordinary, single-topic question
 must never pay for a decomposition it did not need.** Most questions — the whole
 measured corpus of "chatty near-miss" questions this suite's own fixtures use — are one
 topic, one search; only a genuinely multi-hop or ambiguous question needs more than one
 branch. **If the fast path holds, the planner's real-world cost is closer to 0% of
-questions paying the third unit than 100%**, and the $0.0060 figure above is a CEILING
+questions paying the third unit than 100%**, and the $0.0063 figure above is a CEILING
 a caller almost never actually pays — the same shape `MAX_STEPS`'s worst-case agent-turn
 figure ($0.174) already is against the typical one ($0.0368). Re-measure this the day
 the planner ships and the heuristic's real hit rate is known; until then, treat the
@@ -309,11 +341,15 @@ already uses, three ways:**
 |---|---|---|
 | retrieval only | $0.40 | −99% (the old figure priced `compose` as always-on; a caller asking for neither flag was never actually this cheap in the old arithmetic) |
 | `compose=1` only (today's real usage) | $36 | −5% (rounding — this is the shape the old figure actually described) |
-| `read=1` + `compose=1`, every question | $100 | **2.6× the old figure** |
-| …if the planner's ceiling were paid by every question too | $120 | **3.2× the old figure** |
+| `read=1` + `compose=1`, every question | $107 | **2.8× the old figure** |
+| …if the planner's ceiling were paid by every question too | $127 | **3.3× the old figure** |
 
-**The 2.6×/3.2× multipliers are the headline finding of this section.** They are not a
-reason to withhold the reader (KB-AUDIT.md §3's own measured case — a paraphrase
+**The 2.8×/3.3× multipliers are the headline finding of this section** — barely moved
+from the earlier 2.6×/3.2× estimate, because the reader's real per-question cost
+(≈$0.0035 typical) turned out close to the old, wrong $0.0032 estimate: the real INPUT
+token count is about half the character-count guess, which happens to roughly offset
+the real OUTPUT token count being 2-4× the unmeasured 200-token ceiling. They are not
+a reason to withhold the reader (KB-AUDIT.md §3's own measured case — a paraphrase
 refused with the right document as the #1 nearest neighbour — is the more expensive
 failure), but they are the number that should be in front of whoever sets `read=1`'s
 default and decides whether the assistant's own knowledge-base calls should ask for it
@@ -323,12 +359,12 @@ found later in a bill.
 
 **Still cheaper than an agent turn at every shape, though the margin is no longer
 one number.** Against the typical 3-step turn (`$0.0368`): retrieval alone is ~1,840×
-cheaper, `compose` or `read` alone are 11-20× cheaper, and the most expensive shape —
-`read` AND `compose` together — is still **7.4× cheaper** (`$0.0050` vs `$0.0368`), or
-**6.1×** even at the planner's own estimated ceiling (`$0.0060`). The two-model design's
-core saving holds throughout; what has changed is that "a knowledge question" is no
-longer one number, it is four (five once the planner ships), and the caller's own query
-parameters pick which one applies.
+cheaper, `compose` alone is ~20× cheaper, `read` alone is ~10.5× cheaper, and the most
+expensive shape — `read` AND `compose` together — is still **6.9× cheaper** (`$0.0053`
+vs `$0.0368`), or **5.8×** even at the planner's own estimated ceiling (`$0.0063`). The
+two-model design's core saving holds throughout; what has changed is that "a knowledge
+question" is no longer one number, it is four (five once the planner ships), and the
+caller's own query parameters pick which one applies.
 
 ### A month, per tenant
 

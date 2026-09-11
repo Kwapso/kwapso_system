@@ -106,13 +106,14 @@ describe("no statement can bind more parameters than D1 accepts", () => {
       // each alongside one or two dates, so the ceiling is its length plus 2.
       "tenancy/src/lib/ops-alert.ts: MEASUREMENT_SOURCES":
         "the literal list of measurement recording seams in shared/workers/error-log.ts (1 today); grows only by hand-editing that constant",
-      // The digit-bearing SUBSET of that same list, bound a second time so the
-      // exact-term bypass can name it. A subset of a list capped at 24 is capped
-      // at 24, so the lexical statement's worst case is 24 + 24 + 1 owner + the
-      // compartments — see the arithmetic asserted below, which is now a doubling
-      // rather than a single list.
-      "content/src/lib/knowledge.ts: rare":
-        "the question's exact (digit-bearing) terms — a subset of `terms`, so MAX_QUESTION_TERMS (24) bounds it too",
+      // The digit-bearing SUBSET of one BATCH's terms (d-lexical-branch-limit —
+      // lexicalArm now runs one query per ≤LEXICAL_MAX_BRANCHES (5) terms, not
+      // one for the whole question), bound a second time so the exact-term
+      // bypass can name it within that batch. A subset of a list capped at 5 is
+      // capped at 5 — tighter than the old MAX_QUESTION_TERMS (24) bound, since
+      // batching means no single statement ever sees more than 5 terms at once.
+      "content/src/lib/knowledge.ts: rareInBatch":
+        "the digit-bearing terms within ONE lexicalArm batch — a subset of that batch's own terms, so LEXICAL_MAX_BRANCHES (5) bounds it, tighter than MAX_QUESTION_TERMS ever did",
       "content/src/lib/knowledge.ts: compartments":
         "the compartments searched — the agency's plus at most one client",
       // NOT proven, ADMITTED — and now with the number that makes it survivable.
@@ -234,12 +235,16 @@ describe("no statement can bind more parameters than D1 accepts", () => {
     const src = readFileSync(join(SRC, "lib", "knowledge.ts"), "utf8")
     const maxTerms = Number(/const MAX_QUESTION_TERMS = (\d+)/.exec(src)?.[1] ?? "0")
     expect(maxTerms, "MAX_QUESTION_TERMS must stay under D1's parameter cap").toBeGreaterThan(0)
-    // TWICE, because the lexical statement binds the term list AND its exact
-    // subset. It was one list until the exact-term bypass; asserting the single
-    // bound would now be asserting half the statement.
+    // d-lexical-branch-limit: the lexical arm no longer binds one statement for
+    // the WHOLE question — it batches at LEXICAL_MAX_BRANCHES (5, the measured
+    // D1 compound-SELECT ceiling, not the parameter one), so no single
+    // statement ever sees more than 5 terms. TWICE, because each batch's
+    // statement binds that batch's own term list AND its exact subset.
+    const maxBranches = Number(/const LEXICAL_MAX_BRANCHES = (\d+)/.exec(src)?.[1] ?? "0")
+    expect(maxBranches, "LEXICAL_MAX_BRANCHES must stay under D1's parameter cap too").toBeGreaterThan(0)
     expect(
-      2 * maxTerms,
-      "the lexical arm binds MAX_QUESTION_TERMS twice — the terms and their exact subset"
+      2 * maxBranches,
+      "one lexicalArm batch binds LEXICAL_MAX_BRANCHES twice — that batch's terms and their exact subset"
     ).toBeLessThan(D1_MAX_BOUND_PARAMS)
     expect(
       PORTAL_ROOTS_CAP,

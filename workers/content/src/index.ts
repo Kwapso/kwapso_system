@@ -257,6 +257,7 @@ import {
   postGoogleSourceActive,
 } from "./routes/google"
 import { googleAutopilot } from "./lib/google-autopilot"
+import { revisitUnhealthySources } from "./lib/knowledge"
 import { sweepAll } from "./lib/knowledge-ingest"
 import { sendTriageDigest, teamMemberNames } from "./lib/notify"
 import { clientUserIds } from "@shared/workers/record-link"
@@ -820,7 +821,23 @@ export default {
           "knowledge.sweep"
         )
         const results = sweepOff ? [] : await sweepAll(env, d1ConfigFrom(env, "automation"), guard)
-        const indexed = results.reduce((n, r) => n + r.indexed, 0)
+        // THE REVISIT PASS RIDES THE SAME TICK, deliberately not `catchUp`'s:
+        // `catchUp` runs on every question asked, and a bounded query plus
+        // possible re-embeds on every question is a cost this sweep's own
+        // fifteen-minute cadence can carry and a per-question path should
+        // not. This is what actually closes the gap a forward-only cursor
+        // opens — see `revisitUnhealthySources`'s own header.
+        //
+        // IT IS PART OF THE SWEEP, SO IT IS BEHIND THE SAME SWITCH. The two
+        // lines met here on 11 Sep 2026 — one added the revisit, the other
+        // added the switch. Revisiting for a team that has turned the sweep
+        // off would be half-off: the cursor would keep moving and the
+        // passages the assistant quotes would keep changing, for an owner who
+        // asked for neither.
+        const revisit = sweepOff
+          ? null
+          : await revisitUnhealthySources(env, d1ConfigFrom(env, "automation"), guard)
+        const indexed = results.reduce((n, r) => n + r.indexed, 0) + (revisit?.recovered ?? 0)
         if (indexed > 0) await publishChange(traced, team.id, "knowledge")
 
         // AND GOOGLE BRINGS ITSELF IN (owner, 19 Aug 2026). This cannot run under

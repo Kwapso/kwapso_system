@@ -115,7 +115,7 @@ import { ulid } from "@shared/workers/id"
 import { decodeCursor, keysetAfter, PAGE_SIZE, toPage, type Page } from "@shared/workers/paging"
 import { orderBy, resolveOrdering, type Ordering, type SortMenu } from "@shared/workers/sorting"
 import { isVideoLink } from "@shared/media-links"
-import { numberVar } from "@shared/workers/limits"
+import { EMBED_ATTEMPT_CAP, INDEX_REVISIT_LIMIT, numberVar } from "@shared/workers/limits"
 import {
   DOCUMENT_LIMIT_BYTES,
   optionalDocument,
@@ -241,6 +241,27 @@ export const accountCompartment = (accountId: string): string => `account:${acco
  * a ticket reference, an invoice number, an error code. */
 const LEXICAL_TOP_K = 10
 const LEXICAL_WEIGHT = 0.1
+
+/** HOW MANY UNION-ALL BRANCHES ONE D1 STATEMENT MAY HOLD — d-lexical-branch-
+ * limit, 11 Sep 2026, and this is the number to re-derive against, never
+ * MAX_QUESTION_TERMS (24, `shared/workers/limits.ts`, which governs the
+ * PARAMETER budget and is a different ceiling guarding a different thing).
+ *
+ * MEASURED, not assumed, against the live REST door, staging, harmless
+ * `SELECT 1 AS x` branches, no table touched:
+ *   4 branches → success   ·   5 branches → success
+ *   6 branches → refused, every time:
+ *   {"code":7500,"message":"too many terms in compound SELECT: SQLITE_ERROR"}
+ *
+ * THIS IS A CLOUDFLARE D1 PLATFORM CEILING, not a SQLite default — SQLite's
+ * own documented `SQLITE_MAX_COMPOUND_SELECT` is 500. Nobody who tuned
+ * MAX_QUESTION_TERMS against the 100-parameter budget ever measured this one,
+ * because it is two orders of magnitude below what SQLite itself allows and
+ * nothing about compiling against SQLite's own docs would have surfaced it.
+ * `lexicalArm`'s old single UNION ALL of one branch per term threw, uncaught,
+ * on every question that tokenised to 6+ distinct terms — see its own header
+ * for the batched shape this cap now bounds. */
+const LEXICAL_MAX_BRANCHES = 5
 
 /** WHAT A CHUNK IS WORTH WHEN IT LITERALLY CONTAINS THE REFERENCE SOMEBODY TYPED.
  *
@@ -2344,7 +2365,7 @@ export async function indexSource(
  * be told about. The failing case chooses honestly between them without anybody
  * having to enumerate error codes.
  *
- * ── AND IT CANNOT LOOP FOR EVER ─────────────────────────────────────────────
+ * ── AND IT CANNOT LOOP FOR EVER — EXCEPT FOR THE ONE FAILURE THAT MUST NOT COUNT ──
  *
  * It bumps `embed_attempts`, the counter the loop below ALREADY consults against
  * `EMBED_ATTEMPT_CAP`, so a source that fails repeatably is given up on and
@@ -2352,6 +2373,20 @@ export async function indexSource(
  * again the moment its text changes, because the upsert clears the counter. It
  * also blanks `content_hash`, so a source that threw halfway through is re-read
  * rather than skipped as unchanged.
+ *
+ * BUT NOT WHEN GOOGLE'S ANSWER WAS "TOO MANY REQUESTS" (`isVectorizeRateLimited`
+ * below). Measured on staging: 38 sources from one burst during the mass
+ * rebuild, `VECTOR_UPSERT_ERROR`/`VECTOR_DELETE_ERROR (code = 40041)`, every
+ * one of them Cloudflare rate-limiting THIS ACCOUNT, none of them the text
+ * being unembeddable. `EMBED_ATTEMPT_CAP` exists to stop paying for a
+ * document the model will never accept; a burst of 429s is a fact about the
+ * INFRASTRUCTURE at that instant, not about any one of the 38 documents, and
+ * counting it toward the same budget means five unlucky seconds during one
+ * rebuild can permanently give up on a source that was never actually asked
+ * a question it couldn't answer. The five-year backfill (migration 0082) is
+ * exactly this shape of burst and there will be another one — a rate-limited
+ * attempt must cost nothing toward the give-up counter, for ever, not just
+ * for today's 38.
  *
  * Returns whether the source was indexed, so the caller's count stays true. */
 export async function indexOneSource(
@@ -2367,15 +2402,113 @@ export async function indexOneSource(
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
     console.error(`knowledge source ${sourceId} failed to index: ${reason}`)
+    const bumpAttempts = isVectorizeRateLimited(e) ? "embed_attempts" : "embed_attempts + 1"
     await d1Query(
       cfg,
       guard.databaseId,
-      `UPDATE knowledge_sources SET index_error = ?, content_hash = NULL, embed_attempts = embed_attempts + 1
+      `UPDATE knowledge_sources SET index_error = ?, content_hash = NULL, embed_attempts = ${bumpAttempts}
         WHERE id = ?`,
       [reason.slice(0, 300), sourceId]
     )
     return false
   }
+}
+
+/** GOOGLE — no, CLOUDFLARE — IS BUSY RIGHT NOW, not "this document is broken".
+ * Narrow on purpose: only the exact signature Vectorize sends for its own
+ * rate limit (code 40041, seen on both `upsertVectors` and `deleteVectors`
+ * — `knowledge-vectors.ts`'s `twice()` already retries once with no backoff,
+ * which does nothing against a sustained burst, so this is the failure that
+ * reaches here after that retry has already been spent). A genuine
+ * unembeddable-text failure, a network timeout, a malformed response — every
+ * other shape — still counts toward `EMBED_ATTEMPT_CAP` exactly as before. */
+export function isVectorizeRateLimited(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : String(e)
+  return message.includes("code = 40041") || /too many requests/i.test(message)
+}
+
+/** THE ONE EXPRESSION THAT DECIDES "IS THIS SOURCE ACTUALLY BROKEN" —
+ * measured against the raw `index_error IS NOT NULL` count and found to
+ * overstate it roughly twelve to one (38 raw vs. 3 real, staging, 11 Sep
+ * 2026): most rows that ever hit a Vectorize 429 finished chunking and
+ * embedding in full either before or after the one call that threw (see
+ * `clearIndex`'s own header for the DELETE-before-chunk-count-write ordering
+ * that makes a fully-embedded row able to carry a leftover error at all), so
+ * `index_error IS NOT NULL` alone answers "did an attempt ever fail", not
+ * "is anything actually missing".
+ *
+ * A row is unhealthy if it has an error AND (it produced no chunks at all)
+ * OR (fewer chunks are embedded than exist) OR (it is a card whose only
+ * vector — the record/summary one that makes it ROUTABLE — never landed).
+ * `deactivated_at` is deliberately NOT checked here — the caller decides
+ * whether a retired row should count, because the count on a screen and the
+ * revisit pass want different answers to that (a retired row needs no more
+ * attempts; a badge should not carry it as unread work at all).
+ *
+ * USED IN EXACTLY THREE PLACES, on purpose, per the hub's own condition: the
+ * revisit pass's SELECT, the housekeeping clear below (as `NOT (…)`), and
+ * `unhealthySourceCount` for the sweep's own status line. A fourth place
+ * that re-derives this OR by hand is the bug this constant exists to make
+ * impossible. */
+export const UNHEALTHY_INDEX_SQL = `index_error IS NOT NULL AND (
+  chunk_count = 0
+  OR indexed_chunks < chunk_count
+  OR (generated_only = 1 AND summary_embedding IS NULL)
+)`
+
+/** THE COUNT A SCREEN OR A STATUS LINE SHOWS — never the raw `index_error`
+ * tally, which is the number this whole law exists to stop anyone reading
+ * again. Excludes deactivated rows: a retired source has nothing left to
+ * fix and showing it as outstanding work is its own small dishonesty. */
+export async function unhealthySourceCount(cfg: D1Rest, guard: MemberGuard): Promise<number> {
+  const rows = await d1Query<{ n: number }>(
+    cfg,
+    guard.databaseId,
+    `SELECT COUNT(*) AS n FROM knowledge_sources WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL})`
+  )
+  return rows[0]?.n ?? 0
+}
+
+/** THE REVISIT PASS — what a forward-only cursor can never do on its own.
+ * Two housekeeping jobs, in order, because they need different oracles and
+ * one of them costs nothing:
+ *
+ *   1. CLEAR THE FALSE ALARMS, no Vectorize call, no model call — a source
+ *      with an error that `UNHEALTHY_INDEX_SQL` does not recognise as broken
+ *      is, by definition, fully chunked and fully embedded (or a card with
+ *      its record vector already in place). There is nothing left to write,
+ *      so the honest fix is a bare UPDATE, not a wasted re-index.
+ *   2. RETRY THE REAL ONES, bounded (`INDEX_REVISIT_LIMIT`, R14) and
+ *      respecting `EMBED_ATTEMPT_CAP` exactly as the ordinary sweep does —
+ *      `isVectorizeRateLimited` failures never advanced that counter, so a
+ *      row sitting at the cap here genuinely failed for a reason unrelated
+ *      to a burst, and revisiting it would spend a model call on a document
+ *      already shown five times to be one the model will not accept. Oldest
+ *      `updated_at` first, so one dense burst cannot starve an older one. */
+export async function revisitUnhealthySources(
+  env: Env,
+  cfg: D1Rest,
+  guard: MemberGuard,
+  limit = INDEX_REVISIT_LIMIT
+): Promise<{ cleared: number; revisited: number; recovered: number }> {
+  const cleared = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    `UPDATE knowledge_sources SET index_error = NULL
+      WHERE index_error IS NOT NULL AND NOT (${UNHEALTHY_INDEX_SQL})
+      RETURNING id`
+  )
+  const rows = await d1Query<{ id: string }>(
+    cfg,
+    guard.databaseId,
+    // R14: bounded by INDEX_REVISIT_LIMIT.
+    `SELECT id FROM knowledge_sources
+      WHERE deactivated_at IS NULL AND (${UNHEALTHY_INDEX_SQL}) AND embed_attempts < ${EMBED_ATTEMPT_CAP}
+      ORDER BY updated_at ASC LIMIT ${limit}`
+  )
+  let recovered = 0
+  for (const row of rows) if (await indexOneSource(env, cfg, guard, row.id)) recovered++
+  return { cleared: cleared.length, revisited: rows.length, recovered }
 }
 
 /** THE LABELS ON EVERY VECTOR A SOURCE PRODUCES — the notebook it belongs to,
@@ -2754,12 +2887,23 @@ export async function accountsNamedIn(
  * independently-tested route to colleagues (`knowledge_sources kind='person'`
  * directly), so nothing in this build regresses by their absence here.
  *
- * ALIASES ARE DELIBERATELY THIN: an account's own `code` (BERG, HOGO) is the
- * only one generated, because it is DATA the app already holds, not a guess.
- * Misspelling/nickname GENERATION — 0073's own migration comment says that is
- * "Lane C's job, not this table's" — needs a model call this build has not
- * been cleared to spend (BUILD-5 §3 prices it at $0.10, and the lane's cost
- * rule is ask first). A canonical name with no alias is still fully usable:
+ * ALIASES: an account's own `code` (BERG, HOGO) is one, generated, because it
+ * is DATA the app already holds, not a guess. `alt_names` (0083, c-misspell)
+ * is the second — a JSON array of spellings a PERSON declared, never a
+ * generated variant. This supersedes the assumption this comment used to
+ * make: that misspelling coverage needed a model call to GUESS variants
+ * (BUILD-5 §3's $0.10 price for exactly that). Measured on staging, 11 Sep
+ * 2026: "Paddlebase"/"Asekurans" are not typos a distance metric would catch
+ * near "Padelbase"/"Assecuranz" — they are the owner's own STABLE spelling of
+ * a word, and the hub ruled a curated alias beats a fuzzy one: an
+ * edit-distance or phonetic net would also catch unrelated words (this
+ * codebase already refuses that shape twice elsewhere, by name), where a
+ * declared spelling can never match anything it wasn't written for. Both
+ * kinds of alias row are read identically below (exact match, no rarity
+ * gate — a human already decided this one), and both are SINGLE TOKENS only:
+ * the confirmation match is `asked.has(alias)` against the question's own
+ * tokenised words, so a multi-word alias could never appear as one of them.
+ * A canonical name with no alias at all is still fully usable:
  * `accountsNamedIn`'s multi-token and rare-single-token rules both read it
  * alone, and a client whose accepted name IS a single ordinary word (the
  * audit's own "green"/"solutions" cases) still resolves once it clears the
@@ -2771,12 +2915,12 @@ export async function accountsNamedIn(
  * which cannot express a RENAME, because the old name is part of the key an
  * upsert would leave behind as an orphan row. */
 export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise<{ written: number }> {
-  const accounts = await d1Query<{ id: string; name: string; code: string | null }>(
+  const accounts = await d1Query<{ id: string; name: string; code: string | null; alt_names: string | null }>(
     cfg,
     guard.databaseId,
     // R14 hard cap: bounded by how many accounts this team holds — an
     // agency's own client roster, not a growing log.
-    "SELECT id, name, code FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
+    "SELECT id, name, code, alt_names FROM accounts WHERE deactivated_at IS NULL AND name IS NOT NULL LIMIT 2000"
   )
   const apps = await d1Query<{ id: string; name: string; account_id: string | null }>(
     cfg,
@@ -2799,6 +2943,13 @@ export async function rebuildNameIndex(cfg: D1Rest, guard: MemberGuard): Promise
     rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.name, alias_of: null, compartment })
     if (a.code)
       rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: a.code.toLowerCase(), alias_of: a.name, compartment })
+    // c-misspell. Declared, never generated (see this function's own doc
+    // comment) — one row per spelling a person chose, read identically to
+    // `code` above: exact match, no rarity gate.
+    for (const spelling of parseIdList(a.alt_names ?? "[]")) {
+      const clean = spelling.trim().toLowerCase()
+      if (clean) rows.push({ id: ulid(), kind: "account", ref_id: a.id, name: clean, alias_of: a.name, compartment })
+    }
   }
   for (const app of apps) {
     if (!app.name) continue
@@ -2974,7 +3125,7 @@ const OVERRULE_TERM_SHARE = 0.75
 /** WHY THE WORD MATCH IS RUNNING — three situations, and it may claim something
  * different in each. It used to be a boolean, and the two cases it collapsed
  * together are opposites. */
-type LexicalRole =
+export type LexicalRole =
   /** The vector arm has evidence. This is a tenth of a vote on a list somebody
    * else decided the shape of, and cannot turn a refusal into an answer. */
   | "beside"
@@ -3064,6 +3215,44 @@ function termFloor(terms: number, role: LexicalRole): number {
  * enormous document ever makes a real reference look common, sources is the
  * upgrade, and this comment is where to start. */
 const EXACT_TERM_MAX_CHUNKS = 100
+
+/** A DIGIT-BEARING TOKEN THAT IS CALENDAR ARITHMETIC, NOT AN IDENTIFIER —
+ * an ordinal day, a bare year, or a time of day. This is exactly the shape
+ * the rare-exact bypass was never built for: `EXACT_TERM_MAX_CHUNKS`
+ * measures STATISTICAL rarity (how many chunks mention it), and a bare
+ * ordinal day is rare by CHANCE, not by MEANING — measured 11 Sep 2026 on
+ * this team's own corpus, all 31 of "1st" through "31st", all 19 bare years
+ * in use, and all 13 times of day sit comfortably under the 100-chunk
+ * ceiling, so any one of them could singlehandedly drag an unrelated chunk
+ * into an answer.
+ *
+ * Found the hard way: "What did Alaap discuss at dinner on the 14th?"
+ * answered out of a FluClinic sprint note that happens to say "by the 14th
+ * and 16th of September" — nothing else in that chunk is about a dinner, or
+ * about Alaap discussing anything.
+ *
+ * EXCLUDED ENTIRELY, rather than required to CO-OCCUR with another question
+ * term — the first fix proposed and rejected, because a co-occurrence rule
+ * is defeated by exactly this shape of question: a PERSON'S OWN NAME
+ * trivially co-occurs across every transcript chunk where they speak (each
+ * line is prefixed "<Name>: ..."), so "alaap" would have satisfied a
+ * co-occurrence requirement in every one of the six chunks that caused this
+ * failure, fixing nothing. Co-occurrence also breaks a real case that must
+ * keep working (`c-exact`): "task 3144" finds "Handover note" (body "3144
+ * is pending gravity forms confirmation.") though the word "task" never
+ * appears in it at all — the label word is semantically empty and its
+ * absence must not cost the reference its bypass.
+ *
+ * A genuine identifier ("3144", a ticket or invoice number) is untouched:
+ * it matches none of these shapes, and the existing rarity cap keeps
+ * protecting it exactly as before. */
+function isCalendarFragment(token: string): boolean {
+  return (
+    /^\d{1,2}(st|nd|rd|th)$/.test(token) ||
+    /^(19|20)\d{2}$/.test(token) ||
+    /^\d{1,2}(am|pm)$/.test(token)
+  )
+}
 
 /** THE TOKENS SOMEBODY TYPED EXACTLY — the digit-bearing subset of the question,
  * which is the definition `questionTerms` itself already sorts by ("rarer-looking
@@ -3297,36 +3486,72 @@ async function recencyArm(
  * hands back, so nothing downstream had to change to accept a bm25 number in
  * place of a weight sum.
  *
- * ONE TERM, ONE BRANCH. FTS5 has no "how many of these N terms does this row
- * contain" primitive the way a `GROUP BY chunk_id` over a term-postings table
- * did, so `scoped` is a UNION ALL of one `MATCH` per term. Each term is
- * double-quoted in its MATCH string so a token that happens to collide with an
- * FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal search rather
- * than a syntax error — `tokenise()` already drops the ordinary stopwords that
- * would otherwise raise this, but a quoted term costs nothing and closes the
- * case a future stopword list forgets.
+ * ONE TERM, ONE BRANCH — BATCHED, not a single UNION ALL any more (d-lexical-
+ * branch-limit). FTS5 has no "how many of these N terms does this row contain"
+ * primitive the way a `GROUP BY chunk_id` over a term-postings table did, so
+ * each batch of `scoped` is still a UNION ALL of one `MATCH` per term. Each
+ * term is double-quoted in its MATCH string so a token that happens to
+ * collide with an FTS5 operator keyword (AND/OR/NOT/NEAR) is still a literal
+ * search rather than a syntax error — `tokenise()` already drops the ordinary
+ * stopwords that would otherwise raise this, but a quoted term costs nothing
+ * and closes the case a future stopword list forgets.
  *
- * THE FENCE IS APPLIED ONCE, on the union's output, not once per branch —
- * per-branch fencing would multiply the fence's own parameters by up to 24
- * terms and blow the budget below for nothing: every branch shares the same
- * owner and compartment.
+ * WHY BATCHED. Measured against the live REST door, staging, 11 Sep 2026,
+ * harmless `SELECT 1 AS x` branches, no table touched:
+ *   4 branches OK · 5 branches OK · 6 branches REFUSED, every time:
+ *   {"code":7500,"message":"too many terms in compound SELECT: SQLITE_ERROR"}
+ * That is a D1 PLATFORM ceiling on compound SELECTs — UNION ALL, INTERSECT,
+ * EXCEPT all count — and it is unrelated to and far below SQLite's own
+ * documented default (`SQLITE_MAX_COMPOUND_SELECT` = 500). This arm's OLD
+ * comment budgeted only against D1's *parameter* ceiling (~76/100 at
+ * MAX_QUESTION_TERMS=24) and never mentioned this one, so every question
+ * tokenising to 6+ distinct terms threw — uncaught, all the way out of
+ * `retrieve` — discarding the vector arm's already-completed work with it.
+ * `LEXICAL_MAX_BRANCHES` below is that measured 5, not a nearby round number:
+ * see its own header for the same probe recorded beside the cap it justifies.
  *
- * THE PARAMETER BUDGET, same discipline as the ceiling this arm used to
- * document. Worst case is MAX_QUESTION_TERMS (24) terms, every one of them
- * digit-bearing (all 24 "rare"): the branches bind 2 params each (48), the
- * fence binds one owner id plus a handful of compartments, the rare-term
- * filter binds at most 24 more, and the combined MATCH for `bm25()` binds 1 —
- * about 76 against D1's ceiling of 100. Higher than the old arm's 53 because
- * this one binds two params per term-branch instead of one, and still well
- * inside the ceiling MAX_QUESTION_TERMS was chosen to respect.
+ * THE FLOOR/RARITY DECISION ITSELF DID NOT MOVE. `termFloor` and
+ * `EXACT_TERM_MAX_CHUNKS` are unchanged, called exactly as they were — this
+ * arm's anti-hijack-adjacent precision gate is correctness-critical and
+ * reimplementing it was refused on purpose (KB-CD hub ruling, 11 Sep 2026).
+ * What moved is WHERE a chunk's total hit-count across ALL of `terms` is
+ * summed: each batch's own `counted` CTE (below) is *itself* unchanged SQL,
+ * it just cannot apply the real floor — a floor computed against the FULL
+ * term count would wrongly reject a chunk that only clears it once every
+ * batch's partial hits are added together. So each batch returns its own
+ * UNFILTERED `(row_id, hits, exact)` — no `HAVING`, nothing dropped — and the
+ * SUMMATION across batches (a `Map` accumulator: `hits += `, `exact += `,
+ * pure arithmetic, nothing a SQL `GROUP BY … COUNT(*)` would not have
+ * produced) plus the ONE `termFloor(...)` comparison happen after. The
+ * threshold and its formula are untouched; only the addition that feeds it
+ * now happens once in JS instead of once in a `HAVING`.
+ *
+ * THE FENCE IS APPLIED ONCE PER BATCH, on that batch's own union output —
+ * every batch shares the same owner and compartment, so this is the same
+ * "not once per branch" discipline the old comment described, now one level
+ * up.
+ *
+ * NOTHING IS DROPPED BEFORE THE FLOOR SEES IT. Each batch's query carries no
+ * `LIMIT` — every row that matched any of that batch's terms ships back, so
+ * the floor (which needs the TRUE total) never loses a candidate to an
+ * intermediate cut. The cost is real and stated rather than hidden: worst
+ * case (24 terms, 5 batches) ships more rows over five round trips than the
+ * old single compound SELECT shipped over one — bounded by how many chunks
+ * match ANY of a batch's five terms, not by term count. If that ever shows up
+ * as a real latency problem, the upgrade is the two-phase design this
+ * function's own commit message describes and rejects for now (a new
+ * multi-statement capability in shared/workers/d1-rest.ts, which every
+ * worker touches — the wrong blast radius for one function today). Measure
+ * it before building it.
  *
  * bm25() IS ASCENDING — SQLite's convention is a MORE NEGATIVE number for a
  * BETTER match (measured against this exact table: a chunk repeating both
  * query terms scored more negative than one containing them once each), the
- * opposite of the old `SUM(weight)`. That is why the final `ORDER BY` reads
- * `ASC` where the old one read `DESC`; the array POSITION `fuse` reads is
- * unchanged — the exact bypass still leads, relevance still breaks the tie. */
-async function lexicalArm(
+ * opposite of the old `SUM(weight)`. The final sort (now in JS — see below)
+ * reads `exact` DESC then `lex` ASC for the same reason the old `ORDER BY`
+ * did; the array POSITION `fuse` reads is unchanged — the exact bypass still
+ * leads, relevance still breaks the tie. */
+export async function lexicalArm(
   cfg: D1Rest,
   guard: MemberGuard,
   terms: string[],
@@ -3366,66 +3591,107 @@ async function lexicalArm(
     fenceParams.push(...compartments)
   }
 
-  // ONE UNION-ALL BRANCH PER TERM. `?` for the term's own label (read back as
-  // `scoped.term`) and `?` for the MATCH query, quoted — see the header.
-  const branches = terms
-    .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
-    .join(" UNION ALL ")
-  const branchParams: string[] = []
-  for (const t of terms) branchParams.push(t, `"${t}"`)
-
   // THE ONE CLAUSE THAT LETS AN EXACT TERM PAST THE PROPORTIONAL FLOOR, and it
   // is absent — statement for statement, parameter for parameter — from a
   // question that has no exact term in it. The floor's measured behaviour on
   // every other question is therefore untouched by this, which is the whole of
   // what the no-exact-term case is promised.
-  const rare = exact.filter((t) => terms.includes(t))
+  //
+  // CALENDAR ARITHMETIC IS NOT AN IDENTIFIER (see `isCalendarFragment`'s own
+  // header): a date is filtered out here, before it ever reaches `rareTerms`
+  // below, so it falls back to the ordinary proportional floor like any other
+  // common word rather than waiving it alone.
+  const rare = exact.filter((t) => terms.includes(t) && !isCalendarFragment(t))
   // THE COMBINED QUERY, for `bm25()` alone — every branch's row set is by
   // construction a subset of what this OR-of-all-terms query matches, so the
-  // join below can never drop a row `scoped` found.
+  // read-back below can never miss a row a batch found. ONE MATCH expression,
+  // however many terms — this never branches and never touches the ceiling.
   const combinedMatch = terms.map((t) => `"${t}"`).join(" OR ")
 
-  const rows = await d1Query<CandidateRow>(
+  // ONE BATCH PER ≤LEXICAL_MAX_BRANCHES TERMS. In parallel — each batch is an
+  // independent read with no data dependency on any other.
+  const batches: string[][] = []
+  for (let i = 0; i < terms.length; i += LEXICAL_MAX_BRANCHES) batches.push(terms.slice(i, i + LEXICAL_MAX_BRANCHES))
+
+  const batchResults = await Promise.all(
+    batches.map((batchTerms) => {
+      const branches = batchTerms
+        .map(() => `SELECT rowid AS row_id, ? AS term FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?`)
+        .join(" UNION ALL ")
+      const branchParams: string[] = []
+      for (const t of batchTerms) branchParams.push(t, `"${t}"`)
+      const rareInBatch = rare.filter((t) => batchTerms.includes(t))
+
+      // NO `HAVING`, NO `LIMIT` — this batch cannot know the TRUE floor
+      // (computed against every term across every batch, not just its own
+      // five), so it hands back every row it found, unfiltered, and the
+      // floor is applied once the batches are summed. See this function's
+      // own header for why that summation is arithmetic, not a
+      // reimplementation of the floor itself.
+      return d1Query<{ row_id: number; hits: number; exact: number }>(
+        cfg,
+        guard.databaseId,
+        `WITH scoped AS (
+           SELECT u.row_id, u.term FROM (${branches}) u
+           JOIN knowledge_chunks k ON k.rowid = u.row_id
+           WHERE ${fenceWhere.join(" AND ")}
+         )${
+           rareInBatch.length
+             ? `, rareTerms AS (
+           SELECT term FROM scoped WHERE term IN (${rareInBatch.map(() => "?").join(", ")})
+            GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
+         )`
+             : ""
+         }
+         SELECT row_id, COUNT(*) AS hits,
+           ${rareInBatch.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
+         FROM scoped GROUP BY row_id`,
+        [...branchParams, ...fenceParams, ...(rareInBatch.length ? rareInBatch : [])]
+      )
+    })
+  )
+
+  // THE SUM, ACROSS BATCHES — a `Map` accumulator, nothing a single SQL
+  // `GROUP BY row_id, COUNT(*)` would not have produced over the same rows.
+  const merged = new Map<number, { hits: number; exact: number }>()
+  for (const rows of batchResults)
+    for (const r of rows) {
+      const m = merged.get(r.row_id) ?? { hits: 0, exact: 0 }
+      m.hits += r.hits
+      m.exact += r.exact
+      merged.set(r.row_id, m)
+    }
+
+  // THE FLOOR, APPLIED ONCE, AGAINST THE TRUE TOTAL — `termFloor` itself is
+  // untouched; only where its `>=` is evaluated moved.
+  const floor = termFloor(terms.length, role)
+  const survivors = new Map<number, number>() // row_id → exact
+  for (const [rowId, m] of merged) if (m.hits >= floor || m.exact > 0) survivors.set(rowId, m.exact)
+  if (!survivors.size) return []
+
+  // THE RANK, unbatched — bm25() over the combined MATCH never branches, so
+  // it was never at risk and does not need batching. Unfenced on purpose, as
+  // it always was: only rows already fenced by surviving a batch above are
+  // ever read out of this by the join in JS below.
+  const ranked = await d1Query<{ chunk_id: string; row_id: number; lex: number }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: LIMIT ${LEXICAL_TOP_K} at the statement, same as before.
-    //
-    // THE FLOOR IS A `HAVING`, NOT A FILTER ON WHAT CAME BACK — the same reason
-    // as before: filtering afterwards would let the LIMIT choose loudest first
-    // and throw the floor's own candidates away before it ever saw them.
-    // `termFloor(...)` is a derived integer, interpolated like every other
-    // server-owned value (CONVENTIONS), never bound.
-    `WITH scoped AS (
-       SELECT u.row_id, u.term FROM (${branches}) u
-       JOIN knowledge_chunks k ON k.rowid = u.row_id
-       WHERE ${fenceWhere.join(" AND ")}
-     )${
-       rare.length
-         ? `, rareTerms AS (
-       SELECT term FROM scoped WHERE term IN (${rare.map(() => "?").join(", ")})
-        GROUP BY term HAVING COUNT(*) <= ${EXACT_TERM_MAX_CHUNKS}
-     )`
-         : ""
-     },
-     counted AS (
-       SELECT row_id, COUNT(*) AS hits,
-         ${rare.length ? "SUM(CASE WHEN term IN (SELECT term FROM rareTerms) THEN 1 ELSE 0 END)" : "0"} AS exact
-       FROM scoped GROUP BY row_id
-        HAVING hits >= ${termFloor(terms.length, role)} ${rare.length ? "OR exact > 0" : ""}
-     ),
-     ranked AS (
-       SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
-       FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
-     )
-     SELECT k.id AS chunk_id, ranked.rel AS lex, counted.exact AS exact
-       FROM counted
-       JOIN ranked ON ranked.row_id = counted.row_id
-       JOIN knowledge_chunks k ON k.rowid = counted.row_id
-      ORDER BY counted.exact DESC, ranked.rel ASC
-      LIMIT ${LEXICAL_TOP_K}`,
-    [...branchParams, ...fenceParams, ...(rare.length ? rare : []), combinedMatch]
+    `SELECT k.id AS chunk_id, ranked.row_id, ranked.rel AS lex
+       FROM (
+         SELECT rowid AS row_id, bm25(knowledge_chunks_fts) AS rel
+         FROM knowledge_chunks_fts WHERE knowledge_chunks_fts MATCH ?
+       ) ranked
+       JOIN knowledge_chunks k ON k.rowid = ranked.row_id`,
+    [combinedMatch]
   )
-  return rows
+
+  // THE JOIN AND THE ORDER, now in JS — the same `ORDER BY exact DESC, lex
+  // ASC` the old single query ran, and the same `LIMIT LEXICAL_TOP_K` (R14).
+  return ranked
+    .filter((r) => survivors.has(r.row_id))
+    .map((r) => ({ chunk_id: r.chunk_id, lex: r.lex, exact: survivors.get(r.row_id) as number }))
+    .sort((a, b) => b.exact - a.exact || a.lex - b.lex)
+    .slice(0, LEXICAL_TOP_K)
 }
 
 type ScoredRow = {

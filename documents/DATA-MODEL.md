@@ -972,11 +972,21 @@ Purpose: every company and every person kwapso works with, in **one** table
 `parent_account_id` (a **self-pointer**: a holding company's businesses, a
 business's divisions, nesting is deep, but not unlimited; the two ceilings are
 below), `name`, `email`, `phone`, `address`, `code`,
-`currency`, `locale`, `timezone`, `commercials_visible`. **`code` is a REFERENCE,
+`currency`, `locale`, `timezone`, `commercials_visible`, `alt_names` (0083).
+**`code` is a REFERENCE,
 never an identifier**, staff assign it when work starts (BERG), it is unique-when-present
 (a partial unique index, so two people can't mint the same one at the same
 instant) and nullable, and every route addresses a row by its ULID `id`. Re-coding
-an account therefore re-points nothing. **The loop guard is the write itself**: a
+an account therefore re-points nothing. **`alt_names` (0083, c-misspell) is a
+JSON array of spellings a PERSON declared** — never a generated variant —
+`rebuildNameIndex` (`workers/content/src/lib/knowledge.ts`) writes one
+`knowledge_names` alias row per entry, read identically to `code`'s own alias:
+exact match, no rarity gate. Empty (`'[]'`) means what it always meant: no
+declared alternate spelling, the canonical name is the only one the router
+knows. As of 11 Sep 2026 nothing in the app writes to this column at all — no
+door reads it as a body field yet, so today it can only be set by a direct
+data write; the write door and a screen to edit it are proposed, not built,
+see the commit for the c-misspell ruling. **The loop guard is the write itself**: a
 move rides a recursive `WITH … UPDATE … WHERE NOT EXISTS (ancestors)`, so two
 admins re-parenting at the same instant cannot co-operate their way into a ring
 (CONCURRENCY rule 1); zero rows changed is the refusal, reported as a plain 409.
