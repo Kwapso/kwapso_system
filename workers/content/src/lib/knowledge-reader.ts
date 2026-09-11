@@ -51,9 +51,32 @@ const READER_PASSAGE_CHARS = 600
  * same shortlist a 12-wide fan-out would produce. */
 export const READER_SHORTLIST_CAP = 12
 
-/** The reader's output ceiling. A list of ids is short; this is generous room
- * for one per candidate plus punctuation, never an essay. */
-const READER_MAX_TOKENS = 200
+/** The reader's output ceiling.
+ *
+ * MEASURED 11 Sep 2026 against the real @cf/moonshotai/kimi-k2.6, the real
+ * prompt, and a real 12-passage shortlist: natural completion_tokens ranged
+ * 540-880 across widths 1/6/12 (all finish_reason:"stop"), because this model
+ * emits an extended `reasoning_content` BEFORE the id-list answer, billed
+ * against the SAME budget — the id list itself is short. Width did NOT
+ * predict length, so that range is reasoning variance, not a function of
+ * shortlist size, and the tail is not tightly bounded.
+ *
+ * The old value here was 200 — picked without measurement — which cut every
+ * one of those trials off mid-reasoning: `finish_reason:"length"`, empty
+ * `content`, parseIds() returning null, every read treated as "the reader
+ * could not run". On the exam this collapsed the `para` category 81% -> 0%.
+ *
+ * `max_tokens` is a CEILING, not a purchase: Workers AI bills per token
+ * actually generated, so a generous ceiling costs nothing when a reply
+ * finishes short of it (every measured trial did). The only real costs of
+ * raising it are latency on a pathological run (bounded elsewhere by
+ * `withTimeout`) and a runaway generation — never the ordinary case. So do
+ * NOT "optimise" this back down without a fresh real-model measurement: a
+ * ceiling that clips at, say, the 95th percentile fails exactly as silently
+ * and identically as the 200 it replaces. See knowledge-reader-token-budget
+ * regression test (real-model, flag-gated) and the cheap always-on floor
+ * guard beside it in knowledge-reader.test.ts. */
+export const READER_MAX_TOKENS = 1500
 
 /** ONE PASSAGE, ONE STABLE ID — `<sourceId>:<seq>`, the same shape
  * `chunkVectorId` already uses for a chunk's own identity, so a reader
