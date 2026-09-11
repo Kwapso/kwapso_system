@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { stripComments } from "@shared/rules/source-scan"
 import { NO_TOKENS } from "@shared/workers/credits"
 
+import { chunkText } from "../src/lib/knowledge-text"
 import {
   LINK_TYPES,
   SOURCE_TYPES,
@@ -30,6 +31,7 @@ import {
   contextLineFor,
   declaredUnreadable,
   readLink,
+  readSource,
   readersFor,
   readersForLink,
   youtubeVideoId,
@@ -37,7 +39,7 @@ import {
 } from "../src/lib/source-readers"
 
 const SRC = join(__dirname, "..", "src", "lib")
-const READERS: ReaderName[] = ["markdown", "office-zip", "plain"]
+const READERS: ReaderName[] = ["markdown", "office-zip", "plain", "csv-grain"]
 
 describe("R42 — the table is complete and every reader in it is real", () => {
   it("every declared type names at least one reader, and only real ones", () => {
@@ -305,5 +307,40 @@ describe("contextLineFor", () => {
   it("a reply with no usage block at all reports NO_TOKENS, not zeroes that look measured", async () => {
     env.AI.run.mockResolvedValue({ choices: [{ message: { content: "About the renewal." } }] })
     expect((await contextLineFor(env as never, { sourceTitle: "x", piece: "y" })).usage).toEqual(NO_TOKENS)
+  })
+})
+
+// ── SHEET GRAIN — BUILD-5 §2: "sheet tab = a source with the header line
+// prepended to every piece". `chunkSheetTab` (knowledge-text.ts) already does
+// the cutting; nothing has ever called it — the CSV/Spreadsheet readers
+// convert to one flat blob of prose and hand it to the generic paragraph
+// cutter, which has no idea a header line exists at all. A row somewhere in
+// the middle of a long sheet loses its columns the moment it lands in a piece
+// that does not happen to include row 1.
+//
+// PROVEN END TO END, the way the hub's exact scenario reads: a real reader
+// output run through the SAME downstream chunker (`chunkText`,
+// knowledge-text.ts) production uses, checking the chunk that actually holds
+// a row from deep in the sheet — not `chunkSheetTab` in isolation, which
+// already had its own unit tests and was never the part that was missing.
+describe("readSource — a CSV's header rides every piece, even deep in the sheet", () => {
+  /** A synthetic sheet: a header row and `n` data rows, RFC-4180 text — the
+   * exact shape `readSource` receives as file bytes. */
+  const syntheticCsv = (n: number) => {
+    const header = "Client,Plan,Renews\n"
+    const rows = Array.from({ length: n }, (_, i) => `Client ${i},Pro,2026-11-0${i % 9}`).join("\n")
+    return header + rows + "\n"
+  }
+
+  it("a chunk from deep in a 300-row sheet still carries the header", async () => {
+    const csv = syntheticCsv(300)
+    const text = await readSource(
+      { AI: {} as never },
+      { bytes: new TextEncoder().encode(csv), name: "clients.csv", mime: "text/csv" }
+    )
+    const chunks = chunkText(text)
+    const chunkWithRow200 = chunks.find((c) => c.includes("Client 200"))
+    expect(chunkWithRow200, "row 200 must land in some chunk").toBeTruthy()
+    expect(chunkWithRow200).toContain("Client | Plan | Renews")
   })
 })

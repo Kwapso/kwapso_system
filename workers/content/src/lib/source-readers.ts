@@ -46,10 +46,11 @@
 import type { Ai } from "@cloudflare/workers-types"
 
 import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
+import { parseCsv } from "@shared/workers/csv"
 import { queryText } from "@shared/workers/validate"
 
 import { looksLikeProse, officeText, readsLikeWords } from "./file-text"
-import { contextLinePrompt } from "./knowledge-text"
+import { chunkSheetTab, contextLinePrompt } from "./knowledge-text"
 
 /** Everything a reader needs from the worker. Narrow on purpose: a reader has no
  * business with a database, a guard or a token. */
@@ -68,6 +69,13 @@ export type ReaderName =
   | "office-zip"
   /** The bytes ARE the words. No call, no cost. */
   | "plain"
+  /** BUILD-5 §2: "sheet tab = a source with the header line prepended to
+   * every piece." Parses the CSV itself (`chunkSheetTab`, knowledge-text.ts)
+   * rather than handing it to the converter or the bytes as-is — the only
+   * reader here that pre-chunks, because a header is a per-PIECE fact the
+   * generic paragraph cutter downstream has no way to know. No call, no
+   * cost: deterministic and free, same as `plain`. */
+  | "csv-grain"
   /** YouTube's unauthenticated captions endpoint. First-class per BUILD-5 —
    * see the essay above `LINK_TYPES`. */
   | "youtube-captions"
@@ -174,12 +182,14 @@ export const SOURCE_TYPES: readonly SourceType[] = [
     label: "Comma-separated values",
     mimes: ["text/csv"],
     extensions: ["csv"],
-    readers: ["markdown", "plain"],
-    // Its own entry rather than plain text, because the door has always
-    // converted it and the converter turns a sheet into a table a reader can
-    // follow. `plain` behind it is the free fallback the old door had no room
-    // for: a CSV whose conversion fails is still perfectly readable as itself.
-    why: "the converter makes a table; the bytes are a true fallback when it cannot",
+    // csv-grain FIRST, not the converter — BUILD-5 §2's own grain rule for a
+    // sheet is a property of how it is CUT, not of what turns its bytes into
+    // prose, and only a reader that knows the file is a table of rows can
+    // give every piece its header. `markdown`/`plain` stay as the fallback
+    // for a CSV `parseCsv` cannot make sense of (e.g. it is not really
+    // comma-separated at all) — the free fallback the old door always had.
+    readers: ["csv-grain", "markdown", "plain"],
+    why: "the sheet's own grain (a header on every piece) comes first; the converter and the bytes are fallbacks for a file that turns out not to parse as rows",
   },
 ]
 
@@ -277,6 +287,24 @@ function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
   ])
 }
 
+/** THE SHEET'S OWN GRAIN — BUILD-5 §2, "sheet tab = a source with the header
+ * line prepended to every piece." Cut with `chunkSheetTab` (knowledge-text.ts)
+ * and joined on a blank line, for the same reason chat's runs and mail's
+ * pieces are: `chunkText` downstream prefers that boundary over any other, so
+ * its own cuts land BETWEEN the pieces this reader already made rather than
+ * splitting one apart and losing the header it carried.
+ *
+ * Empty for anything `parseCsv` cannot turn into at least a header and one
+ * row — a "CSV" that is not really comma-separated falls through to the next
+ * declared reader (the converter, then the bytes as-is) rather than this one
+ * filing an empty table with confidence. */
+function csvGrainText(bytes: Uint8Array): string {
+  const text = new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(bytes)
+  const { headers, rows } = parseCsv(text)
+  if (!headers.length || !rows.length) return ""
+  return chunkSheetTab(headers, rows).join("\n\n")
+}
+
 /** Run one named reader. Nothing here decides WHETHER to run; that is the
  * table's job and this is the doing.
  *
@@ -292,6 +320,7 @@ export async function runReader(
   if (reader === "plain")
     return { text: new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(file.bytes).trim() }
   if (reader === "office-zip") return { text: await officeText(file.bytes) }
+  if (reader === "csv-grain") return { text: csvGrainText(file.bytes) }
   const out = await withTimeout(
     env.AI.toMarkdown(
       { name: file.name, blob: new Blob([file.bytes as unknown as ArrayBuffer], { type: file.mime }) },
