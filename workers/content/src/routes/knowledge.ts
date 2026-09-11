@@ -508,6 +508,8 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     accountId?: unknown
     visibility?: unknown
     visibleToAppId?: unknown
+    accounts?: unknown
+    apps?: unknown
   }>(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
 
@@ -570,6 +572,11 @@ export async function postUploadKnowledgeFile(request: Request, env: Env): Promi
     // 12.3: limit it to one app's people. The lib refuses an app this caller
     // cannot open, so a person cannot file something into a room they are not in.
     visibleToAppId: optionalText(body.visibleToAppId, "App", TEXT_LIMITS.short) ?? null,
+    // R20 at the read site: `createFileSource` re-validates every element
+    // itself (idArray), but the census wants the check positioned where the
+    // field is READ, not only where it is eventually used.
+    accounts: Array.isArray(body.accounts) ? body.accounts : [],
+    apps: Array.isArray(body.apps) ? body.apps : [],
     file: {
       url: `/media/internal/${key}`,
       name: fileName,
@@ -653,6 +660,18 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
   // comparison bounds what the value MEANS, never what it COSTS to carry here.
   const privateToMe =
     queryText(url.searchParams.get("visibility"), "Visibility", TEXT_LIMITS.short) === "private"
+  // FILING, as a comma list — the same shape `sources` already takes on this
+  // door's own sibling (getKnowledgeAsk). Every element re-validated by
+  // `createFileSource` itself (via `idArray`), same as the two body-carrying
+  // upload doors; the split here only gets it off the query string.
+  const accounts = (queryText(url.searchParams.get("accounts"), "Accounts") ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+  const apps = (queryText(url.searchParams.get("apps"), "Apps") ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
 
   // The declared type is checked for SHAPE, exactly as the buffered door checks
   // it — and, exactly as there, it is never what the bytes are stored under.
@@ -692,6 +711,8 @@ export async function postStreamKnowledgeFile(request: Request, env: Env): Promi
     accountId,
     privateToMe,
     visibleToAppId,
+    accounts,
+    apps,
   })
   await publishChange(env, guard.teamId, "knowledge", id, "add")
   return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
@@ -749,6 +770,11 @@ export async function postConfirmKnowledgeFile(request: Request, env: Env): Prom
     accountId,
     privateToMe,
     visibleToAppId,
+    // R20 at the read site: `createFileSource` re-validates every element
+    // itself (idArray), but the census wants the check positioned where the
+    // field is READ, not only where it is eventually used.
+    accounts: Array.isArray(body.accounts) ? body.accounts : [],
+    apps: Array.isArray(body.apps) ? body.apps : [],
   })
   await publishChange(env, guard.teamId, "knowledge", id, "add")
   return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
@@ -772,6 +798,12 @@ async function indexStoredFile(
     accountId: string | null
     privateToMe: boolean
     visibleToAppId: string | null
+    // d-ingest-filing. Already an array of ids by the time it reaches here —
+    // both callers split/validate it at their own boundary (the query string
+    // for one, the body for the other) — but `createFileSource` re-validates
+    // every element anyway (R20: never trust a shape, check it where it lands).
+    accounts?: unknown
+    apps?: unknown
   }
 ): Promise<string> {
   const { key, bytes, fileName, contentType } = file
@@ -803,6 +835,8 @@ async function indexStoredFile(
     accountId: file.accountId,
     privateToMe: file.privateToMe,
     visibleToAppId: file.visibleToAppId,
+    accounts: file.accounts,
+    apps: file.apps,
     file: { url: `/media/internal/${key}`, name: fileName, type: contentType, bytes },
     extract,
   })

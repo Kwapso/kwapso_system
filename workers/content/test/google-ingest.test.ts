@@ -41,6 +41,11 @@ const holder = vi.hoisted(() => ({
    * notices. Null by default, so every other test sees the fixture's own
    * subject and every count in this file stays what it was. */
   mailSubject: null as string | null,
+  /** MAIL_1's `To` header, when a test needs a SECOND known contact on the
+   * thread (d-ingest-filing: accounts[] holds every match, account_id keeps
+   * the first). Null by default, so every other test sees the fixture's own
+   * single recipient and every count in this file stays what it was. */
+  mailTo: null as string | null,
   /** Extra chat messages one test wants and the others must not see. Empty by
    * default, so every count in this file stays what it was. */
   chat: [] as Record<string, unknown>[],
@@ -109,7 +114,7 @@ vi.mock("../src/lib/google-api", async (importOriginal) => {
         id: "MAIL_1",
         threadId: "TH_1",
         from: "Luis Vera <luis@bergman.example>",
-        to: "me@kwapso.app",
+        to: holder.mailTo ?? "me@kwapso.app",
         subject: holder.mailSubject ?? "Re: the dispatch screen — Ãlaap Kanchawala",
         snippet: "a snippet",
         date: "Tue, 4 Aug 2026 10:04:00 +0000",
@@ -201,6 +206,11 @@ const OTHER_STAFF = "U_STAFF_2"
  * proves "mail with Marta is BERGMAN's material, not Marta's". */
 const CONTACT = "A_BERG_CONTACT"
 
+/** A SECOND contact, under the fixture's OTHER account (Delaval Group,
+ * IDS.burglarAccount) — d-ingest-filing's own fixture, for a thread that
+ * genuinely concerns two clients at once. */
+const CONTACT_2 = "A_DELAVAL_CONTACT"
+
 function fakeVector(text: string): number[] {
   const v = Array.from({ length: 64 }, () => 0)
   for (const [term, weight] of tokenise(text)) {
@@ -247,12 +257,13 @@ type SourceRow = {
   title: string
   body: string
   source_url: string | null
+  accounts: string
 }
 
 const sources = (): SourceRow[] =>
   db()
     .prepare(
-      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url
+      `SELECT id, kind, origin_table, origin_row_id, compartment, account_id, owner_user_id, title, body, source_url, accounts
          FROM knowledge_sources WHERE origin_table LIKE 'google_%' ORDER BY origin_table, origin_row_id`
     )
     .all() as SourceRow[]
@@ -295,13 +306,16 @@ beforeEach(() => {
   holder.binned.clear()
   holder.events = []
   holder.mailSubject = null
+  holder.mailTo = null
   holder.chat = []
   holder.driveText.clear()
   db().exec(
     `INSERT INTO users (id, email, first_name, current_team_id) VALUES ('${OTHER_STAFF}', 'aurora@kwapso.app', 'Aurora', '${IDS.team}');
      INSERT INTO team_members (id, team_id, user_id, role_id, created_at) VALUES ('m5', '${IDS.team}', '${OTHER_STAFF}', '${IDS.adminRole}', '2026-01-01');
      INSERT INTO accounts (id, account_type, parent_account_id, name, email, created_at, creator_id)
-       VALUES ('${CONTACT}', 'individual', '${IDS.victimAccount}', 'Luis Vera', 'luis@bergman.example', '2026-01-01', '${IDS.staffUser}');`
+       VALUES ('${CONTACT}', 'individual', '${IDS.victimAccount}', 'Luis Vera', 'luis@bergman.example', '2026-01-01', '${IDS.staffUser}');
+     INSERT INTO accounts (id, account_type, parent_account_id, name, email, created_at, creator_id)
+       VALUES ('${CONTACT_2}', 'individual', '${IDS.burglarAccount}', 'Priya Shah', 'priya@delaval.example', '2026-01-01', '${IDS.staffUser}');`
   )
   // BOTH roles hold every knowledge and Google right, so a refusal below is the
   // DOOR's and never the role's.
@@ -414,6 +428,44 @@ describe("the compartment is decided, not guessed", () => {
     expect(byTitle("Quarterly review")?.account_id, "an event with a client on the invitation is theirs").toBe(
       IDS.victimAccount
     )
+  })
+})
+
+describe("d-ingest-filing: accounts[] holds every client a thread concerns, account_id keeps the first", () => {
+  it("an ordinary single-client thread still files itself in accounts[], not just account_id", async () => {
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+    expect(mail.account_id).toBe(IDS.victimAccount)
+    expect(JSON.parse(mail.accounts)).toEqual([IDS.victimAccount])
+  })
+
+  it("a thread with two different clients on it files BOTH in accounts[], while account_id stays the single first match", async () => {
+    // Luis Vera (Bergman) is still the `from`; Priya Shah (Delaval Group) is
+    // added as a second recipient — a real shape, not a contrived one: a CC'd
+    // introduction, or a thread that grew a second client over time.
+    holder.mailTo = "me@kwapso.app, priya@delaval.example"
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    const mail = byTitle("Re: the dispatch screen") as SourceRow
+
+    // THE COMPARTMENT DOES NOT MOVE. `accountForAddresses` was not touched —
+    // this is the same single value the ordinary case above asserts, proving
+    // the two questions really are independent.
+    expect(mail.account_id, "the search partition stays the one it always was").toBe(IDS.victimAccount)
+
+    // BOTH CLIENTS ARE IN accounts[], order-independent, no duplicates, no
+    // stray third id — the shape a "the column is written" test would miss.
+    const accounts = JSON.parse(mail.accounts) as string[]
+    expect(new Set(accounts), "exactly Bergman and Delaval Group, nothing else").toEqual(
+      new Set([IDS.victimAccount, IDS.burglarAccount])
+    )
+    expect(accounts, "no duplicate entries").toHaveLength(2)
+  })
+
+  it("a Drive file and a Chat conversation stay singly-filed — no signal to collect for either", async () => {
+    // Ruling, 11 Sep 2026: Drive/Chat's account is a human filing decision made
+    // once, not a text match, so there is nothing for accounts[] to add.
+    await call(IDS.staffUser, "POST /api/content/knowledge/sync-google", {})
+    expect(JSON.parse(byTitle("Bergman dispatch rollout")!.accounts)).toEqual([])
   })
 })
 
