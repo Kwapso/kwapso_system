@@ -1,15 +1,24 @@
 # c-hijack (B) — the declared-safety write door, named but not built
 
-Written 11 Sep 2026, after (A) a re-measured rarity threshold and (A2) the
-ambiguous-shared-token refusal both shipped (`fix/kb-hijack-single-token-collapse`
-or wherever this lands — see that branch's commit for the full account).
+Written 11 Sep 2026, after (A) a re-measured rarity threshold, (A2) the
+ambiguous-shared-token refusal, and (A3) the retry-on-empty-narrow all
+shipped. A3 was proposed here as "separately proposed, not this" when this
+note was first written; it has since been weighed, approved, and built
+(`fix/kb-hijack-a3-retry-on-empty`) — updated below to say so.
 
-**One sentence for the owner**: after A and A2, the router can still be
-wrongly narrowed by **a single ordinary word that names exactly one account
-and happens to be rare in the team's own material so far** — "Bergman S.A."
-is a live example on staging today (the surname appears in only one chunk,
-which is as rare as a real word can measure, and it is still an ordinary
-Swedish surname a completely unrelated question could use).
+**One sentence for the owner**: after A, A2 and A3, the router can still be
+WRONGLY NARROWED — narrowed WITHOUT going on to refuse outright, which is
+the one thing A3 does not touch — by **a single ordinary word that names
+exactly one account, is rare in the team's own material so far, AND has
+some real content of its own for the narrow to (wrongly) succeed on**.
+"Bergman S.A." is a live example on staging today (the surname appears in
+only one chunk, which is as rare as a real word can measure, and it is
+still an ordinary Swedish surname a completely unrelated question could
+use) — A3 repairs the WORST outcome of asking about it (an outright refusal
+on a corpus that had the answer, R23's own worst case), but if Bergman S.A.
+ever has real material of its own, a genuinely unrelated question sharing
+its surname would still narrow to it and find something there, correctly
+by A3's own rules and wrongly by what the person actually meant.
 
 ## Why A and A2 don't close this
 
@@ -60,17 +69,27 @@ who has looked at it, or it doesn't get the unsupervised bypass.
   account's own settings, next to `alt_names` once THAT door exists too —
   the two probably want to be one door, not two).
 
-## What's separately proposed, not this
+## What's now built, and what it does and does not close
 
-A3 (weighed, not built, same investigation): when a narrow came from a
-single collapsed token and the narrowed search finds nothing, search again
-unnarrowed rather than refusing outright. This repairs the Bergman-shaped
-case from the OUTCOME side rather than the word side — it doesn't need to
-know "bergman" is an ordinary word, only that betting on it paid nothing.
-Real costs named in the investigation's own report (an extra round trip on
-every legitimately-empty single-token question; a route-sentence rewrite to
-stay honest about the retry; a real, if pre-existing, risk that the wider
-search surfaces off-topic material once the fence lifts). Complements B
-rather than replacing it — A3 catches the WORST outcome of a hijack even
-before a person has ever reviewed the name; B is what stops the narrow from
-happening in the first place.
+**A3 shipped** (`fix/kb-hijack-a3-retry-on-empty`): when a narrow came from a
+single FRAGILE collapsed token (never an alias/code match, never a
+multi-token match, never standing on a record) and the narrowed search finds
+nothing, it searches again unnarrowed rather than refusing outright — the
+route sentence says so honestly ("I first searched X's material — found
+nothing there, so I searched the whole knowledge base instead"), which is
+the receipt that keeps the residual risk visible rather than silent.
+
+**What A3 does NOT touch, on the record, tested and named rather than
+discovered later**: if the fragile-matched account genuinely HAS material —
+Bergman S.A. gets real content indexed one day — a completely unrelated
+question sharing its surname still narrows to it and finds something there.
+A3 only fires on EMPTY; a wrong narrow that succeeds was never its target.
+That is still exactly what B closes: a person reviewing the name before it
+gets the unsupervised bypass at all, regardless of whether material exists
+yet.
+
+A3's own test suite has this named explicitly too (a homonym case — "Lumen"
+the account and "lumen" the unit of light) as an ACCEPTED risk: the retry can
+answer from genuinely unrelated material once the fence lifts, mitigated by
+R23's citations and the honest reason sentence, never by pretending it can't
+happen.
