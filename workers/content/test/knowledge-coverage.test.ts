@@ -1125,16 +1125,16 @@ const READER_DIGESTS: Record<string, { version: number; digest: string }> = {
 // through this same engine from a different call site) is what actually
 // reaches the 105 chat sources already on file; nothing here re-indexes
 // on its own.
-// RE-PINNED, 2026-09-11 (the NUL correction): COMMENT-ONLY. This digest hashes
-// the shared helpers' source TEXT, comments included — which is the point of it,
-// and why a prose fix moves it. Seven files asserted that "D1 rejects an embedded
-// NUL". It does not: measured against the live REST door, a bound `A\0B\0C`
-// returns HTTP 200 and `hex()` gives back `4100420043`, every byte intact. Every
-// SQLite TEXT function simply stops at the first NUL, so `length()` answers 1.
-// Correcting that sentence changed no SQL, no chunker, no reader and nothing any
-// kind SAYS — every per-kind digest below is unmoved, which is the evidence. A
-// textVersion bump would re-embed the whole base to change zero words.
-const SHARED_DIGEST = "d43c48ae8025321f"
+//
+// RE-PINNED AGAIN, SAME DAY: the hub's own correction landed — D1 does not
+// reject an embedded NUL (measured; the real fault was a SQLite TEXT
+// FUNCTION truncating at one), so IngestRow.grainPieces' comment was
+// rewritten to say the true reason. A DOCUMENTATION edit inside this file's
+// own text moves this digest exactly as a behaviour change would (the walk
+// hashes the file, not a diff of meaning), and that is the correct,
+// conservative failure mode: the alternative is a check that trusts a
+// human's claim that "only a comment changed" instead of verifying it.
+const SHARED_DIGEST = "5d3f8dc8b4364fe6"
 
 // ── A MEETING THAT HAS NOT HAPPENED AND SAYS NOTHING ────────────────────────
 //

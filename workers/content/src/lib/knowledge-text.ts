@@ -58,13 +58,17 @@ export function contentHash(text: string): string {
  * that quoted `<p class="x">` back at them would be a bug you can see. */
 export function plainText(input: string): string {
   return input
-    // A NUL byte is a 500 on the way into SQLite, and the boundary seam that
-    // strips them (shared/workers/validate.ts) only ever sees a REQUEST — a
-    // mirrored source's words come from a row that was written long ago, by an
-    // import or a migration or an older version of a door. One that carried a
-    // NUL would fail the sweep, get recorded, and fail again every fifteen
-    // minutes forever. Cheapest possible insurance, at the one place every piece
-    // of indexable text passes through.
+    // A NUL byte is NOT rejected by D1 — measured, 11 Sep 2026: it stores and
+    // reads back byte-perfect. What it breaks is quieter: every SQLite TEXT
+    // FUNCTION (`substr`, `length`, …) stops at the first one, so
+    // knowledge.ts's own detail-screen excerpt (`substr(body, 1, N)`) would
+    // read as empty past a stored NUL while the row's real value sat there
+    // intact — a blank panel, not an error. The boundary seam that strips a
+    // NUL from a REQUEST (shared/workers/validate.ts) never sees a mirrored
+    // source's words — those come from a row written long ago, by an import,
+    // a migration, or an older version of a door — so this is the one place
+    // every piece of indexable text passes through regardless of where it
+    // came from. Cheapest possible insurance.
     .split(String.fromCharCode(0)).join("")
     .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -207,11 +211,13 @@ export type GrainPiece = { text: string; speaker: string | null; saidAt: string 
  * stores it — `chunkChat`'s own speaker/time, still attached, JSON-parsed off
  * that column rather than recovered from prose. THE FIRST ATTEMPT encoded
  * this in `body` itself, behind a NUL-bracketed mark, and could not have
- * worked: an embedded NUL truncates every SQLite text function at the first
- * one, and D1 stores it without complaint (`shared/workers/validate.ts` strips one
- * from every request field for exactly that reason), so a source carrying
- * one would fail the write or be silently mangled on the way — caught before
- * merge. The column is what that migration's own header explains at length. */
+ * worked — not because D1 rejects a NUL (it doesn't; measured, 11 Sep 2026:
+ * stores and reads back byte-perfect), but because every SQLite TEXT
+ * FUNCTION stops at the first one, and the source detail screen reads its
+ * body excerpt through exactly one (`knowledge.ts`'s `substr(body, 1, N)`) —
+ * a marked body would have rendered every chat source's detail panel BLANK,
+ * silently. Caught before merge. The column is what migration 0081's own
+ * header explains at length. */
 export type StoredGrainPiece = { text: string; speaker: string; saidAt: string }
 
 /** `indexSource`'s reader for a grain-bearing source — PIECES WIN, AND `seq`

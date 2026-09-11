@@ -5665,29 +5665,28 @@ ALTER TABLE knowledge_sources DROP COLUMN identity_key;
     // \`indexSource\`'s own INSERT.
     //
     // THE FIRST FIX ENCODED A MARK IN THE PROSE ITSELF (a NUL-bracketed tag in
-    // front of each piece, stripped again before a chunk's stored text) and it
-    // is why this migration exists rather than a code-only patch: this repo
-    // already strips NULs at its request boundary. WHY it does was recorded
-    // WRONGLY across seven files until this migration landed, and the true
-    // reason is the sharper one: D1 does NOT reject an embedded NUL. Measured
-    // 2026-09-11 against the live REST door — a bound \`A\\0B\\0C\` returns HTTP
-    // 200 and \`hex()\` hands back \`4100420043\`, every byte intact. But every
-    // SQLite TEXT function stops at the first NUL, so \`length()\` on that same
-    // value answers 1. There is no error to catch; the value simply reads back
-    // short. A mark built the same way inside \`knowledge_sources.body\` —
-    // which never passes through that boundary seam, because it arrives from
-    // Google, not a request — would have been rejected at the write or
-    // silently mangled on the way, and every test that proved the mark
-    // "worked" was proving it against an in-memory string that never touched
-    // real SQLite. Caught before merge, not after.
+    // front of each piece, stripped again before a chunk's stored text), and
+    // it is why this migration exists rather than a code-only patch — though
+    // not for the reason first suspected. D1 does NOT reject an embedded NUL:
+    // measured, 11 Sep 2026, against a real write — it stores and reads back
+    // byte-perfect. The real fault is quieter and worse: every SQLite TEXT
+    // FUNCTION (\`substr\`, \`length\`, …) stops at the first NUL, and
+    // knowledge.ts's own source detail screen reads its body excerpt through
+    // exactly one, \`substr(body, 1, N)\` (\`DETAIL_COLS\`). A chat body starting
+    // with the mark would have made every chat source's detail panel render
+    // BLANK — no error, no failing test, a screen nobody in this rebuild had
+    // opened. Caught before merge, not after; \`shared/workers/validate.ts\`'s
+    // own header carried the same wrong "D1 rejects it" claim and is corrected
+    // alongside this migration.
     //
     // SO: A SEPARATE COLUMN, following the same habit \`accounts\`/\`apps\`/
     // \`shared_with\` already keep on this exact table — JSON, computed once,
     // read back structured. \`grain_pieces\` is a JSON array of
     // \`{ text, speaker, saidAt }\` when the source's own reader produces
     // structured pieces (\`chatThreads\` today; \`mailThreadText\` once that
-    // lane is wired — see knowledge.ts's \`isGrainKind\`), and NULL for every
-    // other kind, including a chat source written before this shipped.
+    // lane is wired — see knowledge.ts's \`parseGrainPieces\`/
+    // \`expandGrainPieces\`), and NULL for every other kind, including a chat
+    // source written before this shipped.
     //
     // NULL MEANS "GENERIC", NEVER "BROKEN". \`body\` stays exactly what it always
     // was — the words, hashed, embedded, FTS-indexed, nothing hidden inside

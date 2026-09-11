@@ -17,7 +17,20 @@ const holder = vi.hoisted(() => ({
   /** How many times the model was asked for a CONTEXT LINE — never an
    * embedding, which the fake AI binding below tells apart by shape. */
   contextLineCalls: 0,
+  /** Every logUsage call — the hub's ruling: a spend that never reaches
+   * agent_usage_log is a spend nobody can audit. */
+  usageLogged: [] as unknown[][],
 }))
+
+vi.mock("@shared/workers/credits", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@shared/workers/credits")>()
+  return {
+    ...actual,
+    logUsage: async (...args: unknown[]) => {
+      holder.usageLogged.push(args)
+    },
+  }
+})
 
 vi.mock("../src/lib/knowledge-vectors", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/knowledge-vectors")>()
@@ -77,6 +90,7 @@ beforeEach(() => {
   holder.existingChunks = []
   holder.writes.length = 0
   holder.contextLineCalls = 0
+  holder.usageLogged.length = 0
 })
 
 const TITLE = "The dispatch handbook"
@@ -154,5 +168,50 @@ describe("indexSource — context lines, documents only, keyed on the piece's ow
     expect(holder.contextLineCalls).toBe(1)
     expect(holder.writes.join("\n")).toContain("A generated sentence of context.")
     expect(holder.writes.join("\n")).not.toContain("Stale line, must not survive.")
+  })
+})
+
+describe("indexSource — context-line spend is logged, once per call, with zero metered credits", () => {
+  it("logs one row for a document that actually spent, tokens summed, credits zero", async () => {
+    holder.sourceRow = sourceRow()
+    await indexSource(fakeEnv(), cfg, guard, "SRC1")
+    expect(holder.usageLogged).toHaveLength(1)
+    const [_env, teamId, actor, credits, source, summary, kind, tokens] = holder.usageLogged[0] as [
+      unknown,
+      string,
+      { id: string; name: string },
+      number,
+      string,
+      string,
+      string,
+      { input: number; output: number },
+    ]
+    expect(teamId).toBe("t")
+    // NO SIGNED-IN ACTOR — a scheduled tick has nobody logged in.
+    expect(actor.id).not.toBe("")
+    expect(actor.name).toBeTruthy()
+    // ZERO METERED UNITS — this is infrastructure spend, not a team's own
+    // allowance draw (see indexSource's own comment for the doctrine).
+    expect(credits).toBe(0)
+    expect(source).toBe("free")
+    expect(summary).toContain(TITLE)
+    expect(kind).toBe("action")
+    // Real tokens, summed across every chunk this call actually spent on —
+    // never omitted, never a lie of zeroes for a real attempt.
+    expect(tokens.input).toBeGreaterThan(0)
+    expect(tokens.output).toBeGreaterThan(0)
+  })
+
+  it("logs nothing when every chunk reused its existing line — no attempt, no row", async () => {
+    holder.sourceRow = sourceRow({ content_hash: "STALE", chunk_count: 1, indexed_chunks: 1 })
+    holder.existingChunks = [{ id: "SRC1:00000", text: ONLY_CHUNK, context_line: "The old, already-paid-for line." }]
+    await indexSource(fakeEnv(), cfg, guard, "SRC1")
+    expect(holder.usageLogged).toHaveLength(0)
+  })
+
+  it("logs nothing for a non-document kind, which never attempts a context line at all", async () => {
+    holder.sourceRow = sourceRow({ kind: "message", title: "Ana, Bob" })
+    await indexSource(fakeEnv(), cfg, guard, "SRC1")
+    expect(holder.usageLogged).toHaveLength(0)
   })
 })

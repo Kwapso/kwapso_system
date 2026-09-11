@@ -1,6 +1,10 @@
 // tracker `a-pieces`, take two. The first attempt encoded a piece's speaker
-// and time as a mark inside `body` itself and could not have worked — D1
-// truncates every SQLite text function at an embedded NUL (validate.ts says so).
+// and time as a mark inside `body` itself and could not have worked — not
+// because D1 rejects an embedded NUL (measured, 11 Sep 2026: it doesn't,
+// storing and reading one back byte-perfect), but because a SQLite TEXT
+// FUNCTION stops at the first NUL, and knowledge.ts's own source detail
+// screen reads its body excerpt through exactly one (substr(body, 1, N)) — a
+// marked chat body would have rendered every detail panel blank, silently.
 // The hub's ruling: a separate column, `knowledge_sources.grain_pieces`
 // (migration 0081), read by `indexSource` INSTEAD of re-chunking `body` when
 // it is present. This is that: PIECES WIN, AND seq FOLLOWS THEM, proven
