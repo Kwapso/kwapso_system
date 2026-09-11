@@ -52,6 +52,7 @@ import { GoogleSourceDialog } from "@/components/knowledge/google-source-dialog"
 import { GoogleSyncButton } from "@/components/knowledge/google-sync"
 import { useT } from "@shared/web/language"
 import { brand } from "@shared/brand"
+import { CollectionEmptyState } from "@shared/web/screen-engine/collection-frame"
 
 /** THE APP'S OWN NAME, THROUGH THE SEAM THAT OWNS IT. `shared/brand.ts` calls
  * itself "THE one place to brand this app" and twenty-three files read it; the
@@ -210,39 +211,61 @@ export function GoogleConnectionsSection({ teamId }: { teamId: string | null }) 
 
   return (
     <section className="motion-panel-in flex flex-col gap-4">
-      <h2 className="text-muted-foreground text-micro uppercase">{t("Google")}</h2>
-      <p className="text-muted-foreground text-sm">
-        {t("Connect your own Google account. {brand} never uses anyone else's, the assistant working for you sees exactly what you can see, and nothing more.", BRAND)}
-      </p>
-
-      {/* ONE BUTTON, ALL FOUR, AND IT IS THE LEAD ACTION FOR A REASON.
+      {/* THE EYEBROW AND THE SENTENCE ARE GONE, AND THE INVITATION IS A CARD —
+        * client ruling, 2026-09-11, over a screenshot of this tab: "i said
+        * nothing on white backgorund. … for google replicate the no tokens yet,
+        * sth like "connect to google" and the button to do so. remove the text
+        * directly on white background."
         *
-        * Connecting the services one at a time did not work — not "was tedious",
-        * did not work. Google keeps ONE approval per person per app, so each
-        * consent replaced the last: connecting Gmail silently killed the Drive
-        * connection made ten minutes before, and only the service connected most
-        * recently could answer anything. Four green rows, one working token, no
-        * message anywhere.
+        * "REPLICATE THE NO TOKENS YET" IS AN INSTRUCTION ABOUT A COMPONENT, not
+        * about a look, so this draws the neighbour's own register rather than a
+        * second thing shaped like it: `CollectionEmptyState`, the one body the
+        * app's zeros are drawn with (R62), on the same soft paper, with the same
+        * `px-4` inset the tokens panel gives it. Two cards that mean the same
+        * thing must not be two components. The only thing this call site asks
+        * for that a collection does not is the WORD on the button — you do not
+        * "add the first" Google connection, you approve one — which is a prop on
+        * that component now (`createLabel`), defaulted so no other caller moves.
         *
-        * So this asks once, for everything, and writes all four. The per-service
-        * buttons below still exist for somebody who genuinely wants Drive alone,
-        * but they are no longer the path anybody is led down. Reported by the
-        * owner as "this whole mechanism of scoping also should be optional, with
-        * one button to just sync everything instead of selecting one thing" —
-        * which turned out to describe the fix as well as the feature. */}
-      {q.data?.ready && (
-        <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius)] bg-surface-panel p-3">
-          <Button
-            onClick={() => {
+        * WHAT THE SENTENCE UNDERNEATH HAD TO KEEP, because both halves are
+        * load-bearing and neither survives on the page ground:
+        *   · WHOSE ACCOUNT IT IS. The privacy promise this screen exists to
+        *     make — your own account, nobody else's, and the assistant working
+        *     for you sees exactly what you can see.
+        *   · ONE APPROVAL, ALL FOUR. Google keeps ONE approval per person per
+        *     app, so each consent REPLACES the last: connecting Gmail silently
+        *     killed the Drive connection made ten minutes before, and only the
+        *     most recent service could answer anything — four green rows, one
+        *     working token, no message anywhere. That is why the lead act is
+        *     "Connect everything" and the per-service buttons in the rows below
+        *     are the path nobody is led down. Reported by the owner as "this
+        *     whole mechanism of scoping also should be optional, with one button
+        *     to just sync everything instead of selecting one thing".
+        *
+        * IT STANDS DOWN WHEN THERE IS NOTHING LEFT TO CONNECT. "Connect to
+        * Google" over four live connections is a false title, and the old
+        * always-drawn row could get away with saying it because it was a
+        * toolbar rather than a claim. Somebody reconnecting one service has the
+        * button on that service's own row; somebody who has disconnected one
+        * gets this card back. */}
+      {q.data?.ready && GOOGLE_SERVICES.some((service) => !liveFor(service)) && (
+        <div className="rounded-[var(--radius)] bg-surface-panel px-4">
+          <CollectionEmptyState
+            title={t("Connect to Google")}
+            description={t(
+              // "YOUR OWN GOOGLE ACCOUNT", never "your own account": `account`
+              // is a glossary term in this product — the client company we do
+              // the work for — and R34 is the law that the screens speak the
+              // glossary. The old sentence said "your own Google account" for
+              // the same reason; the word Google is doing work, not repeating.
+              "Drive, Gmail, Calendar and Chat in one approval, on your own Google account — {brand} never uses anyone else's, and the assistant working for you sees exactly what you can see. Google keeps one approval per app, so connecting them one at a time switches the others off.",
+              BRAND
+            )}
+            createLabel={t("Connect everything")}
+            onCreate={() => {
               window.location.href = "/api/content/google/start?service=all"
             }}
-            className="gap-1"
-          >
-            <Plus className="size-3.5" aria-hidden /> {t("Connect everything")}
-          </Button>
-          <span className="text-muted-foreground min-w-0 flex-1 text-xs">
-            {t("Drive, Gmail, Calendar and Chat in one approval. Google keeps one approval per app, so connecting them one at a time switches the others off.")}
-          </span>
+          />
         </div>
       )}
 

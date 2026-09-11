@@ -26,6 +26,7 @@ import { describe, expect, it } from "vitest"
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs"
 import { join, sep } from "node:path"
 
+import { RULES_REGISTRY } from "@shared/rules/registry"
 import { sourceFiles } from "@shared/rules/source-scan"
 
 const ROOT = join(__dirname, "..", "..")
@@ -357,6 +358,91 @@ describe("docs agree with the roster on disk", () => {
       `A doc names a Laws range that disagrees with shared/rules/registry.ts. A reader who ` +
         `trusts the range never learns the newest laws exist — fix the sentence, and say what ` +
         `the new laws are while you are there:\n` + wrong.join("\n")
+    ).toEqual([])
+  })
+
+  // A UI LAW NOBODY CAN READ IS A UI LAW NOBODY FOLLOWS.
+  //
+  // The sibling of the range check above, and it closes the same shape one level
+  // in. That one stops a document UNDER-STATING how many laws there are; this
+  // one stops the laws existing only where a machine reads them.
+  //
+  // Earned on 2026-09-11, at the client's own instruction — "dont forget about
+  // writing the rules in ui ux" — when the count was taken: the registry
+  // declared 37 laws with `dimension: "ui"` and UI-RULEBOOK.md named TEN of
+  // them. Twenty-seven were enforced by a check and described nowhere a
+  // designer or a new developer would look, including every ruling the client
+  // herself had made over the preceding fortnight: the toolbar defaults, the
+  // empty-collection rule, the two radii, the closed palette, images that fill,
+  // the pinned toolbar, the chip above the title, no emoji, nothing on the
+  // white. Every one of those was written into `registry.ts` and RULES.md on
+  // the day it was ruled — the law books were never the problem. The book a
+  // PERSON opens before building a screen was, and nothing checked it, which is
+  // exactly how the gap opened silently and stayed open.
+  //
+  // WHY UI-RULEBOOK AND NOT UI-CONVENTIONS. Both are human-facing and both
+  // carry UI law, and requiring an entry in both would make the pair one
+  // document with two names. UI-RULEBOOK is the one whose stated job is "every
+  // rule has an id you can cite in a pull request", it has a rule index keyed by
+  // R-number, and it is the book a designer is sent to. UI-CONVENTIONS keeps its
+  // §3 table of the same laws; that table is not asserted here because the
+  // assertion that matters is that the law reaches a reader, and a second
+  // required copy is a second thing to forget.
+  //
+  // DELIBERATELY A NAME CHECK, NOT A PROSE CHECK, for the reason this file's own
+  // header gives about the worker counts: a check that grades sentences gets
+  // switched off, and a check that is off is worse than no check at all. This
+  // asks only that the R-number is NAMED. A reader who follows it lands on a
+  // rule; a lane that adds a UI law is stopped and made to write one.
+  //
+  // AND BOTH DIRECTIONS, because an R-number in the book that the registry no
+  // longer has is rot of the same kind — it sends a reader to a law that is not
+  // there, which is the failure `named-paths` (R58) exists to stop for paths.
+  //
+  // NOT A NEW LAW, and that is an argument rather than a shortcut. A law cannot
+  // be added without its check (`registry-integrity`) and a new R-number costs a
+  // RULES.md row, a registry entry and a checkId in the known-checks list — and
+  // what this asserts is not a property of the PRODUCT. It is a property of the
+  // canon, exactly like "no doc understates the Laws range" above it, which is
+  // also unregistered and sits four lines away. This is that check, asked of a
+  // named document rather than of a range.
+  it("every UI law in the registry is named in UI-RULEBOOK.md", () => {
+    const ui = RULES_REGISTRY.filter((r) => r.dimension === "ui").map((r) => r.id)
+
+    // THE TRIPWIRE, the same one every scan in this file carries. A census that
+    // comes back empty passes an "everything is documented" assertion perfectly,
+    // and that is precisely the failure mode being closed — the gap this check
+    // was written for was invisible for weeks because nothing was counting.
+    expect(
+      ui.length,
+      "the registry reported almost no UI laws — the dimension field or the import has changed " +
+        "shape. Fix the derivation, never this number: a scan over nothing reports all clear"
+    ).toBeGreaterThan(20)
+
+    const book = read(join(ROOT, "documents", "UI-RULEBOOK.md"))
+    const named = (id: string) => new RegExp(`\\b${id}\\b`).test(book)
+
+    const undocumented = ui.filter((id) => !named(id))
+    expect(
+      undocumented,
+      `these laws carry dimension: "ui" in shared/rules/registry.ts and are named nowhere in ` +
+        `documents/UI-RULEBOOK.md: ${undocumented.join(", ")}\n` +
+        `A UI law that only a check can read is a law nobody building a screen will follow. ` +
+        `Write it an entry in the section it belongs to — what to do, what it costs where the ` +
+        `law has a cost, and the R-number — and add it to that file's rule index. Derive the ` +
+        `words from the law's own \`law\` and \`why\` text and from RULES.md; do not invent a ` +
+        `rule and do not soften one.`
+    ).toEqual([])
+
+    // …AND THE OTHER WAY. An R-number the book cites that the registry no longer
+    // holds sends a reader after a law that is not there.
+    const known = new Set(RULES_REGISTRY.map((r) => r.id))
+    const dangling = [...new Set(book.match(/\bR\d+\b/g) ?? [])].filter((id) => !known.has(id))
+    expect(
+      dangling,
+      `documents/UI-RULEBOOK.md cites ${dangling.join(", ")}, which shared/rules/registry.ts ` +
+        `does not declare. Either the law was retired — say so in the past tense, the way the ` +
+        `canon narrates every other retirement — or the number is wrong.`
     ).toEqual([])
   })
 

@@ -143,7 +143,11 @@ for the module it serves (`tickets/`, `work/`, `accounts/`, `apps/`, `process/`,
 it is (`shell/` the chrome, `records/` the parts every record screen reuses,
 `deep-link/` the one client-resolved host, `assistant/` the agent column,
 `screens/` the whole-page screens with no module of their own). A new component
-joins the folder its module already has; a new module gets a folder. Basenames are
+joins the folder its module already has; a new module gets a folder. **This is law R57**
+(`component-folders`): the permitted set is DERIVED from `web/components/README.md`'s own
+rows, so the paragraph a person reads and the rule a build enforces cannot disagree —
+a component left loose at the top level, a folder nobody described, or a described folder
+nobody has all turn the build red (UI-RULEBOOK U3). Basenames are
 unchanged and still kebab-case — `<module>-detail.tsx`, `<module>-form-dialog.tsx`,
 `<module>s-screen.tsx` — so every census that finds a screen by its NAME still
 finds it (R2's `*-detail.tsx` walk among them).
@@ -359,6 +363,51 @@ code. The UI laws:
 | **R6** | Product terms live in **ONE glossary**, the app speaks one dictionary. | `glossary-wellformed` |
 | **R7** | Every form dialog persists its draft per session (**`useFormDraft`**). | `forms-persist-drafts` |
 | **R8** | Every tab that reveals a collection carries its count, the **team** strip (a `countCacheKey`) *and* a **record's own** tabs. | `tab-counts-derived` |
+
+The seven above are the ones this document works through at length, below. They are not
+the whole list. **Every law in the registry carrying `dimension: "ui"` is here**, and this
+table is derived from nothing — it is kept honest by the row above it being wrong turning
+the build red, and by `web/test/doc-claims.test.ts`, which reads the registry and fails if
+a UI law is missing from UI-RULEBOOK.md:
+
+| ID | Law (plain English) | Check id |
+|----|---------------------|----------|
+| **R16** | Every collection shows its count **exactly once**: a server `COUNT(*)` through `formatCount`, the tab badge winning and the heading standing down. | `counted-collections` |
+| **R25** | A savings figure never renders without `SAVINGS_CAPTION` beside it, word for word. | `savings-caption` |
+| **R28** | Every sentence either front door says is in `shared/i18n-strings.json`, and the catalogue says nothing the app does not. | `catalogued-strings` |
+| **R29** | Each front door owns **one** page container; no screen sets its own width. | `one-page-width` |
+| **R31** | Two radii and no third, spelled the kit's way: `rounded-[var(--radius)]` and `rounded-pill`. | `two-radii` |
+| **R32** | Every colour resolves through a token. No Tailwind ramp, no hex literal. | `closed-palette` |
+| **R33** | Every extracted position asks for its translation — `t(...)`, or a field config rendered through `shared/web/field.tsx`. | `wrapped-strings` |
+| **R34** | The glossary is the dictionary the **screens** speak: no known synonym reaches a sentence. | `glossary-in-copy` |
+| **R35** | A record never appears without its face — its picture, else its type's glyph, else its initial. | `records-carry-their-face` |
+| **R38** | A screen showing one record of a **paged** collection reads it **by id**, never by `find` over the loaded page. | `details-ask-the-door` |
+| **R39** | The kit supplies the UI and nothing else does: no file in `web/`, `web-portal/` or `shared/web/` imports a UI package. | `kit-supplies-the-ui` |
+| **R44** | A catalogued string must be **answered**, up to a per-language ceiling that only falls. | `translation-ceiling` |
+| **R45** | Every kit composition is decided: adopted, or exempt with a written reason. | `composition-coverage` |
+| **R46** | Every kit component and foundation is **reached**, or exempt with a written reason. | `component-coverage` |
+| **R48** | The toolbar, search included, is a **default** — never a per-screen choice. | `toolbar-shows-search` |
+| **R49** | The gap under a toolbar row is one number, paid by the row itself. | `toolbar-content-gap` |
+| **R50** | Never a toolbar on an empty collection — not even the create button. | `empty-toolbar` |
+| **R51** | A panel that minimises **collapses**: still mounted, and `inert` once shut. | `aside-collapse` |
+| **R52** | Every path that draws a record detail wears the same title treatment, from one constant. | `record-title-treatment` |
+| **R53** | The toolbar's five slots are the row's, in one order, and `sort` is a default. | `toolbar-slot-set` |
+| **R54** | The agency's own people are named by their **first name**, and nobody else is. | `staff-names-are-first-names` |
+| **R57** | `web/components` is one folder per module or kind, and `web/components/README.md` says what belongs in each. | `component-folders` |
+| **R59** | A form is a slide-in; a warning is an overlay. A centred `<DialogContent>` needs a written reason. | `forms-are-not-overlays` |
+| **R60** | An image **fills** its box (`object-cover`); it is never shrunk to fit inside one. | `image-fills` |
+| **R61** | A module's settings have two doors (a gear, the Modules tab) and one derivation. | `module-settings-two-doors` |
+| **R62** | The two zeros are one register; the add button is the only difference between them. | `one-zero-register` |
+| **R63** | The collection toolbar stays on top while the rows scroll, and the pin is the row's. | `pinned-toolbar` |
+| **R64** | A section taken off the team area's strip names the screen that carries its material — and that screen makes its acts' door calls. | `sections-have-a-door` |
+| **R65** | On a card that stands for a record, the chip sits **above** the title. | `chip-above-title` |
+| **R66** | A pictograph is not a word and not a mark: no emoji in the copy or in the data, country and language flags aside. | `no-emoji-in-copy` |
+| **R67** | A titled section — or a tab panel — stands on paper. Nothing is drawn on the bare page ground. | `sections-stand-on-paper` |
+
+**Each of these is written out for a designer in [UI-RULEBOOK.md](UI-RULEBOOK.md)**, in the
+section it belongs to, with what it costs where the law has a cost. That book's *Rule
+index* maps every R-number to its entry. This table is the law; that book is the one to
+read before you build a screen.
 
 (`R1` and `R5` are the arch/data laws, mutations publish a live change; activity is
 read through one generic path, covered in CACHING.md / DATA-MODEL.md. `R5`'s web half
@@ -999,9 +1048,18 @@ not one picture everywhere:
 
 | The record is… | Shape | Its picture | With no picture |
 |---|---|---|---|
-| a **person** (a contact, a member, a staff profile) | `rounded-full` | `object-cover` — a face fills a circle | their initial |
-| a **company**, an **app**, an **asset** | `rounded-xl` | `object-contain` — a wordmark is shown WHOLE | the type's own glyph, else its initial |
-| anything with no picture concept | `rounded-xl` | — | the type's own glyph, else its initial |
+| a **person** (a contact, a member, a staff profile) | `rounded-pill` | `object-cover` — a face fills a circle | their initial |
+| a **company**, an **app**, an **asset** | `rounded-[var(--radius)]` | `object-cover` — it FILLS the box (R60) | the type's own glyph, else its initial |
+| anything with no picture concept | `rounded-[var(--radius)]` | — | the type's own glyph, else its initial |
+
+**The middle row said `object-contain` — "a wordmark is shown WHOLE" — until the client
+overruled it on 2026-09-09: *"everywhere for images: do fill, not fit!"*** The cost is real
+and is the law rather than a bug in it: a wide wordmark in a small square now loses its ends
+and shows its middle. It was weighed against the aggregate, which is the only place a fit is
+ever visible — a contained logo sits smaller, paler and a different SHAPE than the filled
+face beside it. `RecordMark` no longer takes a `fit` prop at all, because its square default
+was `contain` and a default applies to every caller who never made the choice (R60,
+UI-RULEBOOK G6). The radius spellings in this table are R31's (UI-RULEBOOK T8).
 
 **Four sizes, each one decided once, and none hand-rolled:** `choice` (a checklist's
 own checkbox row, 24px — the kit's own `--avatar-sm`), `row` (the leading slot of an
@@ -1025,11 +1083,15 @@ seam, exactly ONE component in either front end had an `onError` fallback.
 a component both doors render is the same defect twice over. The prop is called
 `picture`, not `src`, so a component prop is never mistaken for a DOM attribute.
 
-**Where a mark still cannot go:** a **recipe-driven** row. `ScreenRenderer.renderList`
-builds `{ id, title, subtitle }` and passes no `leading` (UI-GAPS #16), so the four
-recipe lists whose rows arrive carrying a picture — accounts, apps, members, the
-brand library — render as text. The workaround, a glyph inside the title string, is
-the one shape §5 refuses. And the library's `RecordDetail` draws a circular
+**Where a mark could not go, until R35 closed it:** a **recipe-driven** row.
+`ScreenRenderer.renderList` used to build `{ id, title, subtitle }` and pass no `leading`
+(UI-GAPS #16), so the four recipe lists whose rows arrive carrying a picture — accounts,
+apps, members, the brand library — rendered as text. The renderer fills that slot now, and
+**R35 is what holds it open**: every list recipe must NAME its `leading` column, a picker
+option type must DECLARE its visual fields, and the one shared nested row takes its mark as
+a required prop (UI-RULEBOOK G5). The workaround that was reached for meanwhile — a glyph
+inside the title string — is the one shape §5 refuses, and two pickers really did it, which
+put a pictograph in the search index and on the trigger. And the library's `RecordDetail` draws a circular
 initials avatar on every recipe detail whether the record is a person or not
 (UI-GAPS #25). Both are one-line changes in `shared/ui/`, which this repo now owns —
 so neither is a wait on anybody, and neither is worked around with a second copy of a

@@ -124,7 +124,15 @@ export function StartTimerStrip({ teamId, canCreate }: { teamId: string; canCrea
   if (mine.length === 0 && runaways.length === 0) return null
 
   return (
-    <section className="flex flex-col gap-2">
+    /* ON PAPER — R67. The start buttons and the runaway prompts were a bare
+       `<ul>` and a bare list on the page ground, and they are the whole of what
+       this strip draws: there is no title block here to move inside anything,
+       which is why the 2026-09-11 census wrote this file down rather than
+       fixing it in the Integrations lane. The strip IS the unit, so the strip
+       takes the box. Soft paper on the page measures 1.103 in light and 1.079
+       in dark; on `bg-card` it would have measured 1.000 in light, which is the
+       trap this law was widened to catch. */
+    <section className="flex flex-col gap-2 rounded-[var(--radius)] bg-surface-panel p-4">
       {canCreate && mine.length > 0 && (
         <ul className="flex flex-wrap gap-2">
           {mine.map((s) => (
@@ -297,13 +305,22 @@ export function TimePanel({
       {/* THE HOURS, above the toolbar rather than inside it: it is a second,
           different number from whatever the search box below is narrowing —
           the collection's own count (the heading above says that) is a third —
-          and none of the three should read as an answer to the others. */}
-      <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
-        <Clock className="size-3.5" />
-        {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
-      </p>
+          and none of the three should read as an answer to the others.
+          THEY ARE ON PAPER NOW (R67) AND THE TWO OF THEM SHARE ONE BOX. The
+          line and the prompts were both on the page ground above a contained
+          toolbar. This strip is NOT a title block — there is no heading here to
+          move inside the collection's own container, and pretending there was
+          one would have put a lone summary figure above the search box as if it
+          named the list. The strip is its own unit and takes its own box; the
+          `<PagedFind>` below keeps its. */}
+      <div className="flex flex-col gap-6 rounded-[var(--radius)] bg-surface-panel p-4">
+        <p className="text-muted-foreground flex flex-wrap items-center gap-1 text-sm">
+          <Clock className="size-3.5" />
+          {totalSeconds ? `${clockFrom(totalSeconds)} ${t("logged")}` : t("Nothing logged yet")}
+        </p>
 
-      <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
+        <RunawayPrompts runaways={runaways} onAnswer={answerRunaway} />
+      </div>
 
       {/* SEARCH, FILTER, SORT AND "LOG TIME" — the same real pattern every
           other growing, paged main-screen collection draws through (tickets,

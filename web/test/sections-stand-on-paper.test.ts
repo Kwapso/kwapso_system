@@ -37,13 +37,22 @@
 // without editing this file; a token it renames turns the derivation red rather
 // than quietly shrinking the census.
 //
-// ── WHAT A TITLED SECTION IS, AND WHAT WAS DELIBERATELY LEFT OUT ────────────
+// ── WHAT A SECTION IS, AND WHAT WAS DELIBERATELY LEFT OUT ───────────────────
 //
-// The subject is a `<section>` element that carries a HEADING of its own — an
-// `<h1>`…`<h4>`, the kit's `<Headline>`, or `<CollectionHeading>`. That is the
-// smallest unit that is unambiguously "a titled section of content", which is
-// exactly what she pointed at both times, and it is a unit the source states
-// rather than one a regex infers.
+// The subject is a `<section>` ELEMENT. It used to be a `<section>` that
+// carries a HEADING of its own — an `<h1>`…`<h4>`, the kit's `<Headline>`, or
+// `<CollectionHeading>` — on the reasoning that a heading is what makes a unit
+// unambiguously "a titled section of content".
+//
+// THE HEADING REQUIREMENT WAS DROPPED ON 2026-09-11 BY THE SAME RULING THAT
+// NARROWED THE PROSE EXEMPTION (amendment 4, at `PROSE` below), and the reason
+// is the sharpest argument this file has for deriving a subject rather than
+// picking one. She asked for two headings to be DELETED — "remove this text
+// Access tokens", and Google's eyebrow with it — and under the old subject that
+// silently took both sections out of the law on the same commit that answered
+// her about them. A law you leave by deleting your title is a law that rewards
+// exactly the wrong fix. `<section>` is the source's own statement that this is
+// a section of content; the heading was only ever a proxy for it.
 //
 // FOUR THINGS ARE DELIBERATELY NOT CONTENT, and each exclusion is a decision
 // rather than a convenience:
@@ -51,10 +60,9 @@
 //   · THE TITLE BLOCK. Any child that itself contains the heading — the heading
 //     and the create button beside it ride the section's own header row, and a
 //     heading is not something that stands ON anything.
-//   · PROSE. `<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>`. A
-//     sentence directly under a heading is part of the title block. Every
-//     settings section in this app is heading + sentence + control, and boxing
-//     the sentence would be a different design, not this rule.
+//   · PROSE, BUT ONLY `<a>` AND `<br>` SINCE AMENDMENT 4. This exclusion used
+//     to cover every readable tag and the client has overruled it; the whole
+//     account is at `PROSE` below, where the narrowing is made.
 //   · AN OVERLAY. A component whose declaring file renders through a portal
 //     (a Radix `.Portal`, a `createPortal`) is not in the section's flow at
 //     all — a `<Sheet>` or an `<AlertDialog>` declared inside a section paints
@@ -282,7 +290,103 @@ function classNameOf(node: ts.Node): string {
 }
 
 const HEADING = /^(h[1-4]|Headline|CollectionHeading)$/
-const PROSE = /^(p|span|small|em|strong|a|br)$/
+
+// ── AMENDMENT 4 (2026-09-11): PROSE IS CONTENT WHEN IT IS NOT INSIDE THE THING
+//    IT DESCRIBES. THE CLIENT OVERRULED THIS FILE'S OWN WRITTEN EXEMPTION. ────
+//
+// THE CLIENT, A FOURTH TIME, 2026-09-11, over a screenshot of Settings ›
+// Integrations:
+//
+//   "i said nothing on white backgorund. remove this text Access tokens / Let
+//    an outside tool (an AI agent, a script, an automation) work in your team
+//    as you, capped by your role, in the team the token was made for. for
+//    google replicate the no tokens yet, sth like "connect to google" and the
+//    button to do so. remove the text directly on white background."
+//
+// THIS IS NOT A GAP IN THE LAW. IT IS THE LAW'S OWN EXEMPTION, REJECTED BY THE
+// PERSON IT WAS WRITTEN FOR. The header above used to read, in full:
+//
+//   "PROSE. `<p>`, `<span>`, `<small>`, `<em>`, `<strong>`, `<a>`, `<br>`. A
+//    sentence directly under a heading is part of the title block. Every
+//    settings section in this app is heading + sentence + control, and boxing
+//    the sentence would be a different design, not this rule."
+//
+// Every clause of that is a true description of the app and the last one is a
+// PREDICTION about what she wanted, made on her behalf, in a lane she was not
+// in. She has now looked at the screen that sentence blessed — twice: the third
+// ruling was one tab over, and this is the tab itself — and said remove it. The
+// exemption was the reason three amendments in one day could each widen the
+// law and still leave the reported sentence standing on the white.
+//
+// SO THE EXEMPTION IS NARROWED RATHER THAN DELETED, and the narrowing is one
+// sentence: prose is part of the title block when it is IN the title block, and
+// content everywhere else. Both halves of that are already clauses in the walk
+// below and neither needed writing:
+//
+//   · A `<p>` inside the child that carries the heading is skipped by
+//     `carriesHeading(b)` one line above this exemption — the title block is
+//     exempt as a UNIT, which is what "part of the title block" actually means.
+//   · A `<p>` inside a body that paints is skipped by `subtreePaints(b)` — a
+//     sentence on paper was never the complaint.
+//
+// What is left, and what now fails, is precisely the shape she pointed at: a
+// sentence that is its OWN body, standing on the page ground BESIDE the box it
+// describes. That is the one case the tag-based skip was covering, and it is
+// the case she has now ruled on four times.
+//
+// TWO TAGS SURVIVE THE NARROWING, each for a reason that is not "it is prose":
+//
+//   · `<br>` draws nothing a person can read and cannot sit on anything, the
+//     same reasoning `hidden`/`sr-only` already get.
+//   · `<a>` is an ACT. "A control is pressed, not read" is this file's own
+//     sentence about a lone `<Button>`, and a link is a button in a different
+//     hat; letting the `<button>` through and catching the `<a>` beside it
+//     would be the law disagreeing with itself about one decision.
+//
+// THE COST, AND IT IS PAID IN `UNCONTAINED_SECTION_OK` RATHER THAN HIDDEN: the
+// heading+sentence+control shape really is everywhere, and on 2026-09-10 she
+// ruled the OTHER WAY about the module settings pages' own descriptions — "The
+// section description: no, I want to keep it." Keep the words and stop leaving
+// them on the white are reconcilable; which of the two she means for each
+// screen is hers to say. So the screens this amendment newly reaches are
+// written down as reasoned exemptions, rot-checked, awaiting her ruling on a
+// picture — a census that fails the build the day one is quietly "fixed" in the
+// wrong direction, instead of a list in a report nothing reads.
+//
+// ── WHAT THIS AMENDMENT STILL CANNOT SEE, MEASURED RATHER THAN ASSUMED ──────
+//
+// THE BIGGEST HEADING+SENTENCE-ON-THE-GROUND SURFACE IN THE APP IS THE SEVEN
+// MODULE SETTINGS PAGES, and not one of them is reachable by this walk. Ticket
+// settings draws `<Headline as="h2">Ticket types</Headline>` with "The kinds a
+// ticket can be raised as…" under it, on the page, above a contained toolbar —
+// the exact shape of the two sections this ruling was about. TWO independent
+// reasons, and closing either one alone changes nothing:
+//
+//   (i)  THE ROOT IS A `<div>`. `selectable-screen.tsx` and
+//        `module-settings-screen.tsx` compose with `<div className="flex flex-col
+//        gap-6">`, so the subject — a `<section>` ELEMENT — never reaches them.
+//   (ii) THE WORDS ARE PROPS. `scope.title` / `scope.description` arrive from
+//        `MODULE_SETTINGS`, a table of data; the sentence a person reads is not
+//        a literal at the position that draws it, and the heading+prose sit
+//        together in one wrapper `<div>` that the TITLE BLOCK clause skips as a
+//        unit anyway.
+//
+// A VERSION THAT ALSO JUDGED PROSE INSIDE THE TITLE BLOCK WAS WRITTEN AND
+// MEASURED ON 2026-09-11, and it is not here because it found exactly nothing:
+// the census came back byte-identical, 8 offenders either way. Every title
+// block in this repo that pairs a heading with a sentence lives in a
+// `<div>`-rooted component, so the clause would have been a paragraph of law
+// enforcing nothing — and a clause that measures zero is the failure mode this
+// file's tripwire exists to refuse, not a free safety net.
+//
+// SO THE MODULE SETTINGS PAGES ARE OUT OF THIS LAW, DELIBERATELY AND IN
+// WRITING, and they are also the screens the client ruled the OTHER WAY about
+// on 2026-09-10 ("The section description: no, I want to keep it"). Reaching
+// them means judging a component by the PROPS it is handed rather than the JSX
+// it writes, which is a different check with a different oracle; it is worth
+// building the day she says which way those pages go, and it is not worth
+// guessing at before then.
+const PROSE = /^(a|br)$/
 
 describe("R67 — a titled section stands on paper", () => {
   const fills = containerFills()
@@ -503,15 +607,126 @@ describe("R67 — a titled section stands on paper", () => {
     return ABSENT
   }
 
+  // ── AMENDMENT 5 (2026-09-11): A COMPONENT PAINTS WHAT ITS OWN ROOT PAINTS ──
+  //
+  // THIS IS THE UNDER-REACH THAT PUNISHES THE RIGHT FIX, and it turned red on
+  // the commit that made it. `componentPaints` reads a component's own TEXT and
+  // the constants its own FILE declares, and deliberately does NOT follow the
+  // components it renders — "`CollectionEmptyState` renders a headline, a
+  // sentence and a button, one of which resolves to a fill two files away, so
+  // every uncontained zero register in the app came back green". That sentence
+  // is still true and that version is still thrown away.
+  //
+  // BUT IT COUNTED A COMPONENT AS UNPAINTED THE MOMENT ITS BOX MOVED INTO A
+  // SHARED COMPONENT. On 2026-09-11 the client ruled that a settings section's
+  // title sits INSIDE its container ("ticket types should be on top of the
+  // searchbar inside the container without subtitle, make this. always"), and
+  // the answer to a fault said five times is a chokepoint rather than a sixth
+  // repair: `shared/web/settings-section.tsx` owns the box AND draws the
+  // heading, so a call site has no position left to put one in the wrong place.
+  // `ThemeSection`, `ScaleSection`, `SpineSection` and `LanguageSection` each
+  // stopped spelling `bg-surface-panel` in their own text the instant they
+  // started standing in one — and Settings › Appearance, which had passed this
+  // law since the day the law was written, reported as a bare `<div>` on the
+  // page ground. A law that reddens when four screens are fixed by one
+  // component is measuring the WRITING and not the SCREEN.
+  //
+  // SO THE WALK FOLLOWS ONE EDGE AND ONLY ONE: THE ROOT. A component paints if
+  // its own classes do, if its own `cva` does — or if the single element it
+  // RETURNS paints, resolved the same way, transitively. `ThemeSection` roots
+  // at `<SettingsSection>` roots at `<section className="… bg-surface-panel …">`,
+  // three files, one edge each.
+  //
+  // WHY THIS IS NOT THE VERSION THAT WAS THROWN AWAY, and it is a difference in
+  // kind rather than in degree: that one followed every component a component
+  // RENDERS, so a fill anywhere in the subtree answered for the whole of it.
+  // This follows the one element that IS the component — the box it stands in,
+  // which is the only thing a caller of it is standing in too.
+  // `CollectionEmptyState` roots at `<div data-slot="collection-empty-body"
+  // className="flex min-w-0 flex-col items-start gap-3 …">`, which paints
+  // nothing, so it still does not paint and an uncontained zero register is
+  // still a finding. That is asserted in the tripwire below rather than
+  // asserted here in prose, because it is the exact regression this amendment
+  // could reintroduce.
+  //
+  // EVERY RETURN, NOT THE LAST ONE. A component with an early `return
+  // <ErrorPanel/>` has more than one root, and they are not interchangeable:
+  // this file's own foundational finding is that a section can draw paper on
+  // one branch and the page on another ("she was looking at the branch with
+  // nothing in it"). So ALL of a component's returned elements must paint, or
+  // it does not — the per-branch clause read one level down, and the same
+  // under-reaching direction the rest of this file keeps.
+  const rootDecl = new Map<string, ts.Node>()
+  for (const f of all)
+    for (const st of f.tree.statements) {
+      if (ts.isVariableStatement(st))
+        for (const d of st.declarationList.declarations)
+          if (ts.isIdentifier(d.name) && /^[A-Z]/.test(d.name.text) && !rootDecl.has(d.name.text))
+            rootDecl.set(d.name.text, d)
+      if (ts.isFunctionDeclaration(st) && st.name && /^[A-Z]/.test(st.name.text) && !rootDecl.has(st.name.text))
+        rootDecl.set(st.name.text, st)
+    }
+  /** The JSX elements a component can RETURN — one per `return`, unwrapped
+   * through parentheses and through a ternary's two arms, which is `bodies()`'s
+   * own shape asked about roots instead of children. A fragment is not a root
+   * (there is no one box to stand in) and neither is `null`. */
+  function rootElements(decl: ts.Node): ts.Node[] {
+    const out: ts.Node[] = []
+    let fragment = false
+    const fromExpr = (e: ts.Expression) => {
+      if (ts.isParenthesizedExpression(e)) return fromExpr(e.expression)
+      if (ts.isConditionalExpression(e)) {
+        fromExpr(e.whenTrue)
+        fromExpr(e.whenFalse)
+        return
+      }
+      if (ts.isJsxFragment(e)) {
+        fragment = true
+        return
+      }
+      if (ts.isJsxElement(e) || ts.isJsxSelfClosingElement(e)) out.push(e)
+    }
+    const walk = (x: ts.Node) => {
+      // A nested component's or a callback's own `return` is not this
+      // component's root, so arrow/function bodies below the top are skipped.
+      if (x !== decl && (ts.isArrowFunction(x) || ts.isFunctionExpression(x) || ts.isFunctionDeclaration(x))) return
+      if (ts.isReturnStatement(x) && x.expression) fromExpr(x.expression)
+      ts.forEachChild(x, walk)
+    }
+    // An expression-bodied arrow (`const X = () => <div/>`) returns without a
+    // `return` at all.
+    if (ts.isVariableDeclaration(decl) && decl.initializer) {
+      const init = decl.initializer
+      if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && !ts.isBlock(init.body)) fromExpr(init.body)
+      else ts.forEachChild(decl, walk)
+    } else ts.forEachChild(decl, walk)
+    return fragment ? [] : out
+  }
+  let rootsFollowed = 0
+  const rootCache = new Map<string, boolean>()
+  function rootPaints(name: string): boolean {
+    const cached = rootCache.get(name)
+    if (cached !== undefined) return cached
+    rootCache.set(name, false) // recursion guard
+    const decl = rootDecl.get(name)
+    if (!decl) return false
+    const roots = rootElements(decl)
+    if (roots.length === 0) return false
+    const hit = roots.every((r) => paints(r))
+    if (hit) rootsFollowed++
+    rootCache.set(name, hit)
+    return hit
+  }
+
   const paints = (n: ts.Node): boolean => {
     if (FILL.test(classNameOf(n))) return true
     const t = tagName(n)
     if (!t || !/^[A-Z]/.test(t)) return false
     const name = t.split(".")[0]
     const cva = cvaOf(name)
-    // No `cva` to read — the component's own classes are the whole answer, as
-    // they were before this amendment.
-    if (!cva) return componentPaints(name)
+    // No `cva` to read — the component's own classes, and then its own ROOT
+    // (amendment 5), are the whole answer.
+    if (!cva) return componentPaints(name) || rootPaints(name)
     if (FILL.test(cva.base)) return true
     for (const [key, opts] of cva.variants) {
       const passed = literalProp(n, key)
@@ -626,10 +841,21 @@ describe("R67 — a titled section stands on paper", () => {
   type Finding = { where: string; bare: string[] }
   const titled: Finding[] = []
   const panelCensus = { hosts: 0, boxed: 0 }
+  /** AMENDMENT 4's OWN COUNTERS, so its two halves can be proved to measure
+   * something rather than trusted to. `headless` is how many `<section>`s the
+   * dropped heading requirement admitted — zero means the widening is a no-op
+   * and the two sections the client's ruling un-titled are back outside the law
+   * without anybody noticing. `proseBare` is how many bare bodies are the
+   * SENTENCE she pointed at rather than a widget — zero means the narrowed
+   * exemption is catching nothing and the law has quietly reverted to what it
+   * said before she overruled it. Both are asserted in the tripwire below. */
+  const amendment4 = { headless: 0, proseBare: 0 }
+  const READABLE_PROSE = /^(p|span|small|em|strong)$/
 
   for (const f of app) {
     const visit = (node: ts.Node) => {
-      if (ts.isJsxElement(node) && tagName(node) === "section" && carriesHeading(node)) {
+      if (ts.isJsxElement(node) && tagName(node) === "section") {
+        if (!carriesHeading(node)) amendment4.headless++
         const where = `${f.rel}:${f.tree.getLineAndCharacterOfPosition(node.getStart()).line + 1}`
         // (a) the team-panel shape — the section IS the box, or stands in one.
         let boxed = false
@@ -646,6 +872,7 @@ describe("R67 — a titled section stands on paper", () => {
             if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
             if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
             if (subtreePaints(b)) continue
+            if (t && READABLE_PROSE.test(t)) amendment4.proseBare++
             bare.push(`<${t}> at line ${f.tree.getLineAndCharacterOfPosition(b.getStart()).line + 1}`)
           }
         titled.push({ where, bare })
@@ -745,6 +972,7 @@ describe("R67 — a titled section stands on paper", () => {
             if (t && /^[A-Z]/.test(t) && isAct(t.split(".")[0])) continue
             if (/(^|\s)(hidden|sr-only)(\s|$)/.test(classNameOf(b))) continue
             if (subtreePaints(b)) continue
+            if (t && READABLE_PROSE.test(t)) amendment4.proseBare++
             if (!byPanel.has(value)) byPanel.set(value, [])
             byPanel.get(value)!.push(`<${t}> at line ${line}`)
           }
@@ -772,7 +1000,7 @@ describe("R67 — a titled section stands on paper", () => {
     expect(fills, "the ground is not a container and must never be in the derived family").not.toContain("background")
     expect(app.length, "the front-door walk found nothing").toBeGreaterThan(150)
     expect(kit.length, "the kit walk found nothing — nothing could be asked what it paints").toBeGreaterThan(50)
-    expect(titled.length, "no titled <section> was found on either front door — the census has gone blind").toBeGreaterThan(20)
+    expect(titled.length, "no <section> was found on either front door — the census has gone blind").toBeGreaterThan(20)
     // …and the two shapes are both really represented, so a rule that only ever
     // sees one of them is not silently enforcing half of itself.
     expect(titled.filter((s) => s.bare.length === 0).length, "no section passes — the definition has drifted").toBeGreaterThan(10)
@@ -807,6 +1035,45 @@ describe("R67 — a titled section stands on paper", () => {
     expect(
       panelCensus.hosts - panelCensus.boxed,
       "every panel host is boxed, so the per-body clause judged nothing at all"
+    ).toBeGreaterThan(0)
+
+    // AMENDMENT 4's. Both halves of it are SUBTRACTIONS from what used to be
+    // waved through, and a subtraction that stops subtracting is invisible: the
+    // census comes back the size it was, every screen passes, and the law reads
+    // exactly as it did before the client overruled it. So each half must prove
+    // it still reaches something.
+    expect(
+      amendment4.headless,
+      "no <section> without a heading of its own was found, so dropping the heading requirement admitted " +
+        "nothing. That requirement was dropped because the client's ruling DELETED two headings — if this " +
+        "is really zero, the subject has drifted back and those sections are outside the law again"
+    ).toBeGreaterThan(0)
+    // AMENDMENT 5's, AND IT IS TWO ASSERTIONS THAT PULL IN OPPOSITE DIRECTIONS
+    // ON PURPOSE. The root walk is a WIDENING of what counts as painted, so its
+    // failure modes are a no-op in one direction and the thrown-away version in
+    // the other, and each is invisible on its own.
+    expect(
+      rootsFollowed,
+      "no component was found to paint through its own ROOT, so amendment 5 admitted nothing. It exists " +
+        "because `ThemeSection` and its three neighbours stand in `SettingsSection`'s box rather than " +
+        "spelling a fill themselves — if this is zero, either that chokepoint has been unpicked or the " +
+        "root walk has stopped resolving, and the second one looks exactly like a law that works"
+    ).toBeGreaterThan(0)
+    expect(
+      rootPaints("CollectionEmptyState"),
+      "`CollectionEmptyState` now counts as PAINTING, which is the version of this walk that was written " +
+        "and thrown away: it renders a headline, a sentence and a button, one of which resolves to a fill " +
+        "two files away, and following that edge turned every uncontained zero register in the app green — " +
+        "an uncontained zero register being precisely what the client reported. Amendment 5 follows ONE " +
+        "edge, the component's own ROOT, and this register's root is a bare `<div>`"
+    ).toBe(false)
+
+    expect(
+      amendment4.proseBare,
+      "no bare body in the whole census is a readable sentence, so the narrowed PROSE exemption is catching " +
+        "nothing at all. A sentence on the page ground is the exact shape the client ruled on four times " +
+        "(the fourth overruled this file's own exemption); a zero here means the law has reverted to the " +
+        "version she rejected while still passing"
     ).toBeGreaterThan(0)
   })
 

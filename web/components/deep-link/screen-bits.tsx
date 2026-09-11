@@ -55,6 +55,7 @@ import { Button, buttonVariants } from "@shared/ui/components/button/button"
 import { Card, CardContent } from "@shared/ui/components/card/card"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@shared/ui/components/tooltip/tooltip"
 import { Plus, Envelope, UploadSimple, Download, Lock, MagnifyingGlass, Warning } from "@shared/ui/foundations/icons"
+import { Headline } from "@shared/ui/components/typography/typography"
 import { SortControl, type SortOption } from "@shared/ui/components/sort-control/sort-control"
 import { ViewSwitch, type CollectionViewOption } from "@shared/ui/components/collection-frame/view-switch"
 import { CollectionCreateActionProvider } from "@shared/web/screen-engine/collection-frame"
@@ -615,6 +616,7 @@ export type ToolbarViewSlot = {
  * differently, each with its own reason on file. */
 export function ToolbarRow({
   empty,
+  title,
   search,
   filters,
   toolbarPanel,
@@ -633,6 +635,42 @@ export function ToolbarRow({
    * cannot pass `empty={false}` by omission the way an optional prop would
    * let it. See this function's own header comment for why. */
   empty: boolean
+  /** THE SECTION'S OWN NAME, DRAWN BY THIS ROW, INSIDE THE CONTAINER, ABOVE
+   * THE PILL — client, 2026-09-11, over a screenshot of Settings › Ticket
+   * settings: *"ticket types should be on top of the searchbar inside the
+   * container without subtitle, make this. always"*.
+   *
+   * A STRING AND NEVER A NODE, which is the whole of what this slot buys. The
+   * heading it replaced was written at the call site
+   * (`<Headline as="h2">{scope.title}</Headline>` in a `<div>` above the card),
+   * and a heading a call site PLACES is a heading a call site can place on the
+   * page ground — which it did, on fourteen settings sections, through four
+   * rulings. There is no position left to get wrong: the row draws the words
+   * and the call site hands them over. Exactly the move `sort` one slot along
+   * already made (R53 — "the row draws the control and the call site hands it
+   * the answers"), for exactly the same reason.
+   *
+   * IT GOES IN THE PINNED BAND, NOT ABOVE IT (R63). `--pinned-lead` is "the
+   * band of container that pins ABOVE a toolbar", and `pinned-chrome.ts` names
+   * this exact day in writing: *"the toolbar is the panel's FIRST child, so the
+   * panel's top inset is the whole distance above it … The day one [fills the
+   * band] its toolbar's lead is the band's height too, and this is the line
+   * that says so."* A title drawn as the card's first child instead would push
+   * the pinned box's top edge DOWN into the middle of the title block, where
+   * its `::before`'s rounded corners cut two page-coloured notches into the
+   * card's sides at rest — a real artifact, not a near-miss. Drawn INSIDE the
+   * pinned column the lead is untouched, the box still starts at the card's own
+   * top edge, the corners still round the corners a reader is looking at, and
+   * the title pins with the toolbar it titles.
+   *
+   * AND IT SURVIVES R50. `empty` takes the whole row away — "not even the
+   * create button" — but a title is not a control: it is pressed by nobody and
+   * a section that loses its name exactly when it has nothing in it is the
+   * Access-tokens fault one property along (R67: "she was looking at the branch
+   * with nothing in it"). So an empty collection draws the title alone, and
+   * NOT pinned: there is nothing under it to occlude, and a sticky box over an
+   * empty register is machinery doing no work. */
+  title?: string
   /** A search box, or any other left-aligned control. Omitted where the tab
    * body has none (Sprints' Overview/Calendar, Tasks' Calendar, Tickets'
    * Triage) — the row is then the actions alone. */
@@ -698,11 +736,44 @@ export function ToolbarRow({
   // of the same control was a per-screen decision. Called ABOVE the `empty`
   // return below, because a hook cannot sit after one.
   const t = useT()
+  // THE SECTION'S NAME (client, 2026-09-11 — see the `title` prop). Built once
+  // and drawn by BOTH exits below, because the one thing this heading may never
+  // do is disappear on a branch: a section that loses its title exactly when
+  // its collection is empty is R67's own Access-tokens finding said about a
+  // heading instead of a register.
+  // ONE NODE, BOTH EXITS AND THE BAND. `heading` is the ONLY thing either early
+  // return below can give back, which is what keeps R50's sentence true while
+  // the shape changes: the row still draws no TOOLBAR on an empty collection,
+  // and a title is not a toolbar. Written as a const rather than inline at
+  // three positions so there is exactly one answer to "what can this component
+  // render when `empty`" — see `empty-toolbar` in web/test/rules.test.ts, which
+  // reads this shape rather than the old `return null` literal.
+  const heading = title ? (
+    <div className="mb-4">
+      <Headline as="h2" size="h4">
+        {title}
+      </Headline>
+    </div>
+  ) : null
+
   // NEVER TOOLBAR ON EMPTY COLLECTION (R50) — checked FIRST and unconditionally,
   // before any slot is even looked at, so a truthy `actions` (the one slot every
   // recurrence of this bug shared) cannot keep the row alive on its own.
-  if (empty) return null
-  if (!search && !filters && !sort && !view && !actions) return null
+  //
+  // IT RETURNS `heading` RATHER THAN `null` SINCE 2026-09-11, and `heading` is
+  // `null` unless a `title` was passed — so for every call site that passes no
+  // title (seventeen of the eighteen) this line is byte-for-byte the behaviour
+  // it always had. What changed is the one case R50 never had a view on: a
+  // section whose NAME is drawn by its toolbar. Taking the name away with the
+  // controls is R67's own Access-tokens finding — "she was looking at the
+  // branch with nothing in it" — and a section that loses its title exactly
+  // when it has nothing in it is the worse half of that.
+  //
+  // NOT PINNED HERE, deliberately: `PINNED_TOOLBAR` exists to occlude rows
+  // sliding under it and an empty collection has none, and its `::before` would
+  // cut the container's top corners out over an empty register for nobody.
+  if (empty) return heading
+  if (!search && !filters && !sort && !view && !actions) return heading
 
   // ── ONE CONTAINER, GROWING — CLIENT RULING, 2026-09-03, SUPERSEDING THE
   // "COLUMN" SHAPE ABOVE. Verbatim: "what this is doing is creating a new
@@ -772,6 +843,24 @@ export function ToolbarRow({
     // raises it for the subtree, and a screen with nothing above pins at zero.
     // See shared/web/pinned-chrome.ts.
     <div data-slot="toolbar-row-pin" className={PINNED_TOOLBAR}>
+      {/* THE TITLE IS THE BAND'S FIRST CHILD — R63 part 3's own `band`, filled
+          for the first time. It sits INSIDE the pinned box (above the pill,
+          below the `pt-[var(--pinned-lead)]` the box already pays), so three
+          things stay exactly as they were and one changes:
+            · `--pinned-lead` is untouched — still the container's own top inset
+              and nothing else, published by `CollectionCard` in this file;
+            · the pinned box's top edge at rest is still the container's border
+              box, so `::before`'s `rounded-t` still rounds the corners a reader
+              is actually looking at rather than cutting two notches into the
+              card's sides halfway down;
+            · `--pinned-inset-x` and `--pinned-behind` are untouched with it.
+          What changes is the pill's resting position: it moves down by this
+          heading plus the gap below it, which is the design she asked for
+          ("ticket types should be on top of the searchbar inside the
+          container"), and the title now pins with the toolbar it titles.
+          MEASURED at 1440 and 375 in both palettes before and after — the
+          numbers are in this lane's report. */}
+      {heading}
       <div
         data-slot="toolbar-row-column"
         className={cn(
