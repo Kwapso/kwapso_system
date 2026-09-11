@@ -762,6 +762,40 @@ describe("the account router is not hijacked by a name that is also an ordinary 
   })
 })
 
+// tracker item d-fanout: "Fan-out is visible and capped at 12 — the step line
+// shows the count, never more than 12." BUILD-5's own fan-out ceiling
+// (NAMED_ACCOUNTS_CAP, lib/knowledge.ts) is exercised here directly — 13 real
+// accounts, all matching the same question, must never widen the compartment
+// search past 12 of them (+ agency).
+describe("fan-out is capped at 12, enforced rather than merely documented (d-fanout)", () => {
+  const ACCOUNT_COUNT = 13
+
+  beforeEach(() => {
+    const rows = Array.from(
+      { length: ACCOUNT_COUNT },
+      (_, i) =>
+        `INSERT INTO accounts (id, account_type, name, created_at) VALUES ('A_FANOUT_${i}', 'entity', 'Zorbex Company', '2026-01-01');`
+    )
+    db().exec(rows.join("\n"))
+  })
+
+  it("13 real, equally-matching accounts widen to EXACTLY 12 compartments — the cap both binds and is actually reached", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what does Zorbex Company want from this rollout?")
+    const accountCompartments = answer.compartments.filter((c) => c.startsWith("account:"))
+    // NOT `toBeLessThanOrEqual(12)` — that assertion would pass just as well if
+    // the true ceiling were silently 5, or 10, or anything under 12, which is
+    // exactly what an unenforced-but-documented cap looks like from outside.
+    // 13 real, equally-matching accounts exist; the correct answer is EXACTLY
+    // twelve, not "at most twelve".
+    expect(
+      accountCompartments.length,
+      `named ${accountCompartments.length} of ${ACCOUNT_COUNT} real, equally-matching accounts — NAMED_ACCOUNTS_CAP (12) did not bind at its own number`
+    ).toBe(12)
+    expect(answer.compartments).toContain("agency")
+  })
+})
+
 describe("the personal fence — material that came through one person's own sight of it", () => {
   it("is answerable for its owner and invisible to everyone else", async () => {
     await addSource(IDS.staffUser, {
