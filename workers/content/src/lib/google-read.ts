@@ -777,7 +777,30 @@ export async function readGoogleMaterial(
     const fresh = new Map<string, string>()
     if (token)
       for (const space of (await listNamedSources(cfg, guard, "chat")).filter((s) => s.active)) {
-        const page = await chatMessages(token, space.externalId, known)
+        // ONE SPACE'S REFUSAL IS ONE SPACE'S — the same reasoning Drive's own
+        // per-file try/catch (above) and Gmail's `Promise.allSettled`
+        // (google-api.ts) give, applied here for the first time. Before this,
+        // a space that became unreadable (deleted, access revoked) threw
+        // straight out of this loop and silently took every space named
+        // AFTER it with it, in every tick from then on — and `sweepKinds`'
+        // own per-kind catch (knowledge-ingest.ts) swallowed the whole thing
+        // and reported success. Found while building migration 0081's
+        // backfill; fixed on its own first, because it is a live defect
+        // independent of that work.
+        let page: { messages: ChatMessage[]; learned: Map<string, string> }
+        try {
+          page = await chatMessages(token, space.externalId, known)
+        } catch (e) {
+          // A DEAD TOKEN IS EVERY SPACE'S FAILURE, not this one's — same
+          // guard as the Drive and Gmail loops above: retrying it space by
+          // space would multiply one real problem into N silent skips
+          // instead of the one clear "reconnect" this already surfaces.
+          if (isConnectionLost(e)) throw e
+          const reason = e instanceof Error ? e.message : String(e)
+          console.error(`google chat space "${space.name}" (${space.externalId}) skipped: ${reason}`)
+          skipped.push({ title: space.name, reason })
+          continue
+        }
         // WHAT THIS SPACE TAUGHT US IS AVAILABLE TO THE NEXT ONE, in this same
         // sweep, before anything is written down.
         for (const [id, name] of page.learned) { known.set(id, name); fresh.set(id, name) }
