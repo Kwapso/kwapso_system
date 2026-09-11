@@ -6,8 +6,24 @@
 // why these .mjs copies were free to drift.
 
 /** R11: never hang on an external service. Generous enough for a cold Worker start
- * on a fresh deploy, short enough that a wedged host fails the run instead of the day. */
-export const REQUEST_TIMEOUT_MS = 30_000
+ * on a fresh deploy, short enough that a wedged host fails the run instead of the day.
+ *
+ * OVERRIDABLE, added 11 Sep 2026, for exactly one shape of caller. 30s is right for
+ * a smoke check, where a door that has not answered in half a minute IS the finding.
+ * It is wrong for `knowledge-backfill.mjs` immediately after a wipe: a slice there
+ * re-reads and re-EMBEDS 25 sources per kind from nothing, and the first ticks
+ * legitimately run past 30s. Measured that day — three slices aborted client-side at
+ * 30s while the worker carried on and finished the work, so the script reported
+ * failure over a door that was succeeding, which is the worst way to be wrong.
+ *
+ * The default does not move. A caller that knows its own work is long says so:
+ * `REQUEST_TIMEOUT_MS=180000 node scripts/knowledge-backfill.mjs staging`. Anything
+ * unset, unparseable or non-positive falls back to 30s, so the smoke path cannot be
+ * weakened by a stray environment variable. */
+const TIMEOUT_DEFAULT_MS = 30_000
+const timeoutOverride = Number(process.env.REQUEST_TIMEOUT_MS)
+export const REQUEST_TIMEOUT_MS =
+  Number.isFinite(timeoutOverride) && timeoutOverride > 0 ? timeoutOverride : TIMEOUT_DEFAULT_MS
 
 /** How many times a request that never got an ANSWER is tried again, and how long
  * the pauses between attempts are. Short, and it doubles: a slow moment is over
