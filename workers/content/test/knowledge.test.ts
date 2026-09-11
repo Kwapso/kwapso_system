@@ -935,6 +935,62 @@ describe("the app fence — material kept to the people on one app (12.3)", () =
       .get() as { o: string | null; a: string | null }
     expect({ owner: row.o, app: row.a }).toEqual({ owner: IDS.staffUser, app: null })
   })
+
+  /** THE THIRD BRANCH OF `appClause`, never exercised by any test above it. Every
+   * role this file grants — `IDS.adminRole`, `IDS.clientRole`, and the shared
+   * fixture's own roles — is inserted by `spine-harness.ts`'s `grantAll` with
+   * `is_default = 0`, so `OTHER_STAFF` failing to see an app-restricted source
+   * has never once touched the `OR EXISTS (... is_default = 1 ...)` clause; it
+   * fails on `app_staff` alone. Found by adversarial review, 11 Sep 2026: with
+   * the clause deleted, every test in this file — 65 of them — stayed green. */
+  describe("the admin/default-role bypass, appClause's third branch", () => {
+    /** `is_default = 1` is the mark production's locked Admin role carries
+     * (`workers/tenancy/src/team-schema/seed.ts`); a fresh role here rather
+     * than reusing `IDS.adminRole`, since that fixture role is deliberately
+     * NOT the default one this branch is about. */
+    const DEFAULT_ROLE_USER = "U_DEFAULT_ROLE"
+
+    beforeEach(() => {
+      db().exec(`
+        INSERT INTO users (id, email, first_name, current_team_id)
+          VALUES ('${DEFAULT_ROLE_USER}', 'default-role@kwapso.app', 'Dana', '${IDS.team}');
+        INSERT INTO member_roles (id, title, is_default, created_at)
+          VALUES ('R_DEFAULT_TEST', 'Owner', 1, '2026-01-01');
+        INSERT INTO role_permissions (id, role_id, module, can_read, can_create, can_edit, can_delete)
+          VALUES ('RP_DEFAULT_TEST_knowledge', 'R_DEFAULT_TEST', 'knowledge', 1, 1, 1, 1);
+        INSERT INTO team_members (id, team_id, user_id, role_id, created_at)
+          VALUES ('m_default_role', '${IDS.team}', '${DEFAULT_ROLE_USER}', 'R_DEFAULT_TEST', '2026-01-01');
+      `)
+    })
+
+    it("admits a caller whose role is the account's default role, even off the app's staff list", async () => {
+      staffOnApp(IDS.staffUser)
+      await addSource(IDS.staffUser, {
+        title: "Dispatch rollout postmortem — default-role bypass",
+        body: "The dispatch rollout was paused because the invoice run kept timing out.",
+        visibleToAppId: IDS.victimApp,
+      })
+
+      // DEFAULT_ROLE_USER is never staffed on the app — the bypass, not
+      // app_staff, is what has to let them through.
+      const answer = await ask(DEFAULT_ROLE_USER, "why was the dispatch rollout paused?")
+      expect(titles(answer)).toContain("Dispatch rollout postmortem — default-role bypass")
+    })
+
+    it("still refuses a colleague who holds every knowledge right but neither the default role nor a staffing row", async () => {
+      staffOnApp(IDS.staffUser)
+      await addSource(IDS.staffUser, {
+        title: "Dispatch rollout postmortem — ordinary colleague still refused",
+        body: "The dispatch rollout was paused because the invoice run kept timing out.",
+        visibleToAppId: IDS.victimApp,
+      })
+
+      // OTHER_STAFF holds IDS.adminRole, which grantAll marks is_default = 0 —
+      // the ordinary case the bypass must not swallow.
+      const answer = await ask(OTHER_STAFF, "why was the dispatch rollout paused?")
+      expect(answer.found).toBe(false)
+    })
+  })
 })
 
 describe("taking a source away really takes it away", () => {
