@@ -64,3 +64,80 @@ export function exportTooLarge(cap: number, noun: string, narrow: string): Respo
     `That's more than ${cap.toLocaleString("en-GB")} ${noun}, which is more than one file can carry. ${narrow}`
   )
 }
+
+/** THE OTHER DIRECTION — a small, dependency-free CSV parser (RFC-4180-ish):
+ * handles quoted fields, embedded commas/newlines, "" escaped quotes, CRLF,
+ * and a leading BOM. MOVED HERE from workers/data-ops (the import's own
+ * reader for an uploaded spreadsheet exported as CSV) so a second reader —
+ * workers/content's knowledge-base sheet grain (BUILD-5 §2: "sheet tab = a
+ * source with the header line prepended to every piece") — can use the same
+ * parser instead of a second hand-rolled one. A worker's own `src/lib` is not
+ * shared across workers; this file already is. */
+export type ParsedCsv = { headers: string[]; rows: string[][] }
+
+export function parseCsv(input: string): ParsedCsv {
+  let text = input
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1) // strip BOM
+
+  const all: string[][] = []
+  let cell = ""
+  let row: string[] = []
+  let inQuotes = false
+  let i = 0
+  const endField = () => {
+    row.push(cell)
+    cell = ""
+  }
+  const endRow = () => {
+    endField()
+    all.push(row)
+    row = []
+  }
+
+  while (i < text.length) {
+    const c = text[i]
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"'
+          i += 2
+          continue
+        }
+        inQuotes = false
+        i++
+        continue
+      }
+      cell += c
+      i++
+      continue
+    }
+    if (c === '"') {
+      inQuotes = true
+      i++
+      continue
+    }
+    if (c === ",") {
+      endField()
+      i++
+      continue
+    }
+    if (c === "\r") {
+      i++
+      continue
+    }
+    if (c === "\n") {
+      endRow()
+      i++
+      continue
+    }
+    cell += c
+    i++
+  }
+  // flush the trailing field/row when the file doesn't end in a newline
+  if (cell.length > 0 || row.length > 0) endRow()
+
+  // drop fully-blank rows (e.g. trailing empty lines)
+  const nonEmpty = all.filter((r) => r.some((c) => c.trim() !== ""))
+  const headers = (nonEmpty.shift() ?? []).map((h) => h.trim())
+  return { headers, rows: nonEmpty }
+}

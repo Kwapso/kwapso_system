@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest"
 
-import { csvResponse, toCsv } from "@shared/workers/csv"
+import { csvResponse, parseCsv, toCsv } from "@shared/workers/csv"
 
 describe("toCsv — RFC-4180 quoting", () => {
   it("quotes commas, quotes and newlines; doubles internal quotes", () => {
@@ -46,5 +46,40 @@ describe("toCsv — RFC-4180 quoting", () => {
     const res = csvResponse("learning.csv", "a\r\n")
     expect(res.headers.get("Content-Type")).toContain("text/csv")
     expect(res.headers.get("Content-Disposition")).toContain('filename="learning.csv"')
+  })
+})
+
+// MOVED HERE from workers/data-ops (its own import reader) so
+// workers/content's knowledge sheet grain can use the same parser — a
+// worker's own src/lib is not shared across workers, this file already is.
+describe("parseCsv — the other direction, RFC-4180-ish", () => {
+  it("splits the header from the rows, trimming header whitespace", () => {
+    expect(parseCsv("Client, Plan\nAcme,Pro\nBergman,Starter\n")).toEqual({
+      headers: ["Client", "Plan"],
+      rows: [
+        ["Acme", "Pro"],
+        ["Bergman", "Starter"],
+      ],
+    })
+  })
+
+  it("handles quoted fields with embedded commas, newlines, and doubled quotes", () => {
+    const csv = 'Name,Note\n"Say ""hi""","line one\nline two"\n'
+    expect(parseCsv(csv)).toEqual({
+      headers: ["Name", "Note"],
+      rows: [['Say "hi"', "line one\nline two"]],
+    })
+  })
+
+  it("strips a leading UTF-8 BOM and tolerates CRLF line endings", () => {
+    expect(parseCsv("﻿a,b\r\n1,2\r\n")).toEqual({ headers: ["a", "b"], rows: [["1", "2"]] })
+  })
+
+  it("flushes a trailing row with no final newline", () => {
+    expect(parseCsv("a,b\n1,2")).toEqual({ headers: ["a", "b"], rows: [["1", "2"]] })
+  })
+
+  it("drops fully-blank trailing lines rather than filing an empty row", () => {
+    expect(parseCsv("a,b\n1,2\n\n\n")).toEqual({ headers: ["a", "b"], rows: [["1", "2"]] })
   })
 })
