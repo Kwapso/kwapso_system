@@ -2408,8 +2408,17 @@ const NAMED_ACCOUNTS_CAP = 12
  * entity in it ("compare what we agreed in March to what we agreed in July")
  * — that case needs either a heuristic nobody has measured yet or a real
  * model call, and is deliberately left alone here rather than shipped on a
- * guess (see `retrieve`'s own header for where that stands). */
-async function accountsNamedIn(
+ * guess (see `retrieve`'s own header for where that stands).
+ *
+ * EXPORTED (10 Sep 2026, tracker `b-filing`) FOR A SECOND CALLER: a Drive
+ * folder or Chat space's own NAME is free text exactly like a question is —
+ * `tokenise`/`questionTerms` already say so ("the SAME function reads a
+ * question, which is the point") — so naming an account from it reuses this
+ * function rather than a second matcher. The parameter is still called
+ * `question` because renaming it to satisfy a caller that doesn't ask one
+ * would be the tail wagging the dog; what matters is that a name is text and
+ * this reads text. */
+export async function accountsNamedIn(
   cfg: D1Rest,
   guard: MemberGuard,
   question: string

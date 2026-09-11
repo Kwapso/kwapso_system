@@ -44,6 +44,7 @@ import {
   type GoogleSourceKind,
 } from "@shared/types"
 import { forgetGoogleKind, rewindGoogleLane } from "../lib/knowledge-google"
+import { accountsNamedIn } from "../lib/knowledge"
 import { publishChange } from "@shared/workers/realtime"
 import { refusePortalCaller } from "@shared/workers/account-scope"
 import { gated, gatedBody } from "@shared/workers/route"
@@ -359,6 +360,25 @@ export async function getGooglePick(request: Request, env: Env): Promise<Respons
           hasThumbnail: f.hasThumbnail,
         }))
   return json({ options })
+}
+
+/** TRACKER `b-filing`, 10 Sep 2026: "naming a Drive folder or Chat space asks
+ * you to confirm its account once." Reuses `accountsNamedIn` (knowledge.ts) —
+ * built for BUILD-5's question fan-out, and text is text, so a folder or
+ * space's own NAME goes through the same matcher a question does rather than
+ * a second one built to do the same job. Same gate as the picker right above
+ * it: this only ever runs while somebody is in the middle of sharing
+ * something, which needs `google:create` already.
+ *
+ * NEVER A GUESS THAT LANDS ON ITS OWN — this door only ANSWERS "does this
+ * name match an account", it does not decide anything. The caller (the share
+ * dialog) shows what it found and asks; nothing here writes a row. */
+export async function getGoogleAccountMatch(request: Request, env: Env): Promise<Response> {
+  const { cfg, guard } = await gated(request, env, "google", "create")
+  await refusePortalCaller(cfg, guard)
+  const url = new URL(request.url)
+  const name = requireText(queryText(url.searchParams.get("name"), "Name", TEXT_LIMITS.short), "Name", TEXT_LIMITS.short)
+  return json({ matches: await accountsNamedIn(cfg, guard, name) })
 }
 
 /** THE CALENDARS OR THE LABELS THIS PERSON COULD NAME, in the picker's own
