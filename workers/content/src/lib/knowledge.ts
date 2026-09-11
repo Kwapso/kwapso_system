@@ -2421,11 +2421,19 @@ async function accountsNamedIn(
   const candidates = await d1Query<{ ref_id: string; name: string; alias_of: string | null }>(
     cfg,
     guard.databaseId,
-    // R14 hard cap: a question can only ever pull back a handful of candidates,
-    // however many indexed names happen to contain one of its (at most 8) words.
+    // R14 hard cap: NAMED_ACCOUNTS_CAP × 2, not NAMED_ACCOUNTS_CAP itself — a
+    // real bug, found by a mutation-proof test (d-fanout) rather than assumed
+    // fixed by the loop below: this statement's own LIMIT used to be a bare
+    // 10, predating NAMED_ACCOUNTS_CAP (12), which made the cap UNREACHABLE —
+    // the candidate ROWS ran out two short of the cap's own number, silently,
+    // on every question naming that many real accounts. Doubled rather than
+    // set to exactly 12: not every candidate row passes the match-confirmation
+    // below (a token-subset check, a rarity check), so fetching exactly the
+    // target count would silently under-fill again the first time one
+    // candidate failed to confirm.
     `SELECT ref_id, name, alias_of FROM knowledge_names
       WHERE kind = 'account' AND (${clauses.join(" OR ")})
-      ORDER BY LENGTH(name) DESC LIMIT 10`,
+      ORDER BY LENGTH(name) DESC LIMIT ${NAMED_ACCOUNTS_CAP * 2}`,
     params
   )
   const asked = new Set(terms)
