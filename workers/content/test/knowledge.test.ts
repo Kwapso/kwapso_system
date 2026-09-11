@@ -1311,6 +1311,43 @@ describe("an exact reference is found however long the question around it is", (
     )
     expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
   })
+
+  // `c-exact`'s OWN CLAIM, restated at the boundary the fix touches: a real
+  // reference ("3144") still waives the floor alone, with no other question
+  // term anywhere in the chunk — "task" never appears in "Handover note"'s
+  // body. Written first, before the regression test below, because a fix for
+  // the calendar-fragment failure that also cost this its bypass would be a
+  // trade nobody agreed to, not a fix.
+  it("a genuine reference still waives the floor alone, exactly as before", async () => {
+    const answer = await ask(IDS.staffUser, LONG_QUESTION, undefined, NOTHING_CLOSE_ENOUGH)
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Ticket 3144 handover note")
+  })
+
+  // THE FAILURE ITSELF (kb_review, 11 Sep 2026): "What did Alaap discuss at
+  // dinner on the 14th?" answered on staging out of a FluClinic sprint note
+  // that happens to say "by the 14th and 16th of September" — nothing else in
+  // that chunk is about a dinner, and it only mentions Alaap because every
+  // line of a Gemini transcript is prefixed with its speaker's name. A
+  // co-occurrence rule ("the bypass needs one other question term in the same
+  // chunk") was proposed and rejected for exactly this reason: "alaap" would
+  // have satisfied it in every candidate chunk, fixing nothing. This fixture
+  // reproduces the same shape — a person's name prefixing an unrelated
+  // sentence that happens to name a day of the month — deliberately smaller
+  // than staging's real transcript, to isolate the one mechanism.
+  it("a bare ordinal day does not waive the floor, even naming a real colleague", async () => {
+    await addSource(IDS.staffUser, {
+      title: "FluClinic sprint note",
+      body: "Alaap Kanchwala: I just want to give you a little bit of insight — by the 14th and 16th of September, one more project milestone is due.",
+    })
+    const answer = await ask(
+      IDS.staffUser,
+      "What did Alaap discuss at dinner on the 14th?",
+      undefined,
+      NOTHING_CLOSE_ENOUGH
+    )
+    expect(answer.found, `answered out of ${titles(answer).join(", ")}`).toBe(false)
+  })
 })
 
 // ── AN EMPTY VECTOR ARM IS TWO OPPOSITE SENTENCES ───────────────────────────

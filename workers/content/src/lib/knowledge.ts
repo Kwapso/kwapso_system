@@ -3104,6 +3104,44 @@ function termFloor(terms: number, role: LexicalRole): number {
  * upgrade, and this comment is where to start. */
 const EXACT_TERM_MAX_CHUNKS = 100
 
+/** A DIGIT-BEARING TOKEN THAT IS CALENDAR ARITHMETIC, NOT AN IDENTIFIER —
+ * an ordinal day, a bare year, or a time of day. This is exactly the shape
+ * the rare-exact bypass was never built for: `EXACT_TERM_MAX_CHUNKS`
+ * measures STATISTICAL rarity (how many chunks mention it), and a bare
+ * ordinal day is rare by CHANCE, not by MEANING — measured 11 Sep 2026 on
+ * this team's own corpus, all 31 of "1st" through "31st", all 19 bare years
+ * in use, and all 13 times of day sit comfortably under the 100-chunk
+ * ceiling, so any one of them could singlehandedly drag an unrelated chunk
+ * into an answer.
+ *
+ * Found the hard way: "What did Alaap discuss at dinner on the 14th?"
+ * answered out of a FluClinic sprint note that happens to say "by the 14th
+ * and 16th of September" — nothing else in that chunk is about a dinner, or
+ * about Alaap discussing anything.
+ *
+ * EXCLUDED ENTIRELY, rather than required to CO-OCCUR with another question
+ * term — the first fix proposed and rejected, because a co-occurrence rule
+ * is defeated by exactly this shape of question: a PERSON'S OWN NAME
+ * trivially co-occurs across every transcript chunk where they speak (each
+ * line is prefixed "<Name>: ..."), so "alaap" would have satisfied a
+ * co-occurrence requirement in every one of the six chunks that caused this
+ * failure, fixing nothing. Co-occurrence also breaks a real case that must
+ * keep working (`c-exact`): "task 3144" finds "Handover note" (body "3144
+ * is pending gravity forms confirmation.") though the word "task" never
+ * appears in it at all — the label word is semantically empty and its
+ * absence must not cost the reference its bypass.
+ *
+ * A genuine identifier ("3144", a ticket or invoice number) is untouched:
+ * it matches none of these shapes, and the existing rarity cap keeps
+ * protecting it exactly as before. */
+function isCalendarFragment(token: string): boolean {
+  return (
+    /^\d{1,2}(st|nd|rd|th)$/.test(token) ||
+    /^(19|20)\d{2}$/.test(token) ||
+    /^\d{1,2}(am|pm)$/.test(token)
+  )
+}
+
 /** THE TOKENS SOMEBODY TYPED EXACTLY — the digit-bearing subset of the question,
  * which is the definition `questionTerms` itself already sorts by ("rarer-looking
  * words, and anything with a digit in it — a reference, a date, an invoice
@@ -3446,7 +3484,12 @@ export async function lexicalArm(
   // question that has no exact term in it. The floor's measured behaviour on
   // every other question is therefore untouched by this, which is the whole of
   // what the no-exact-term case is promised.
-  const rare = exact.filter((t) => terms.includes(t))
+  //
+  // CALENDAR ARITHMETIC IS NOT AN IDENTIFIER (see `isCalendarFragment`'s own
+  // header): a date is filtered out here, before it ever reaches `rareTerms`
+  // below, so it falls back to the ordinary proportional floor like any other
+  // common word rather than waiving it alone.
+  const rare = exact.filter((t) => terms.includes(t) && !isCalendarFragment(t))
   // THE COMBINED QUERY, for `bm25()` alone — every branch's row set is by
   // construction a subset of what this OR-of-all-terms query matches, so the
   // read-back below can never miss a row a batch found. ONE MATCH expression,
