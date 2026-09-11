@@ -292,39 +292,57 @@ export function KnowledgeFormDialog({
         </p>
       </Field>
       <Field config={visibilityField} htmlFor="knowledge-visibility" className={fieldSpacing}>
-        <Select
-          // A MIRRORED source has no "Only me" item below, so its currently
-          // derived-private state has nowhere to render as a selected item —
-          // Radix shows a blank trigger rather than guess. "Team" is the honest
-          // fallback: submitting it changes nothing about that derived state
-          // either, since the door no longer writes owner_user_id for a mirrored
-          // source at all (see the file header).
-          value={mirrored && values.visibility === "private" ? "team" : values.visibility}
-          onValueChange={(visibility) =>
-            setValues((v) => ({
-              ...v,
-              visibility:
-                visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
-            }))
-          }
-          disabled={busy}
-        >
-          <SelectTrigger id="knowledge-visibility">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
-            {/* THE MIDDLE ANSWER (12.3). Offered only when this caller is on an
-                app, the door refuses any other, so a picker with nothing in it
-                would be an option that can only end in a refusal. */}
-            {appOptions.length > 0 && (
-              <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
-            )}
-            {/* NOT OFFERED ON A MIRRORED SOURCE. See the file header — a choice
-                the next sweep silently erases is not a choice. */}
-            {!mirrored && <SelectItem value="private">{t("Only me")}</SelectItem>}
-          </SelectContent>
-        </Select>
+        {/* A MIRRORED source that is CURRENTLY private (nobody else has seen it
+            yet) used to be shown here as "Anyone who can read the knowledge
+            base" — a display coercion, because Radix has nothing to label a
+            "private" value with when that item is not offered below, and
+            "team" was picked as a harmless-looking fallback. It was not
+            harmless: the trigger read as an open source that was, in fact,
+            readable by nobody but its connector. Tracker `b-gmail`, caught by
+            testing the actual door rather than trusting the screen — a real
+            teammate, signed in as themselves, could not read a source this
+            control displayed as "anyone can". Say the true word instead, and
+            say why nothing here can change it — the state is a FACT about who
+            has seen it (see the file header), never a choice this form makes
+            for a mirrored source, so there is nothing to offer a control for. */}
+        {mirrored && values.visibility === "private" ? (
+          <div>
+            <p className="text-sm">{t("Only me")}</p>
+            <p className="text-muted-foreground mt-1 text-xs">
+              {t("Who can read this follows who has already seen it — it isn't set here.")}
+            </p>
+          </div>
+        ) : (
+          <Select
+            value={values.visibility}
+            onValueChange={(visibility) =>
+              setValues((v) => ({
+                ...v,
+                visibility:
+                  visibility === "private" ? "private" : visibility === "app" ? "app" : "team",
+              }))
+            }
+            disabled={busy}
+          >
+            <SelectTrigger id="knowledge-visibility">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="team">{t("Anyone who can read the knowledge base")}</SelectItem>
+              {/* THE MIDDLE ANSWER (12.3). Offered only when this caller is on an
+                  app, the door refuses any other, so a picker with nothing in it
+                  would be an option that can only end in a refusal. */}
+              {appOptions.length > 0 && (
+                <SelectItem value="app">{t("Only the members on one app")}</SelectItem>
+              )}
+              {/* NOT OFFERED ON A MIRRORED SOURCE. See the file header — a choice
+                  the next sweep silently erases is not a choice. (A mirrored
+                  source already sitting at "private" never reaches this branch
+                  at all — see above.) */}
+              {!mirrored && <SelectItem value="private">{t("Only me")}</SelectItem>}
+            </SelectContent>
+          </Select>
+        )}
         {/* No line at all when nobody has sighted it yet (sweep hasn't run since
             the fold-writer shipped, or never will for this kind) — the same
             "null means undrawn, not drawn empty" rule `sightingsLine`'s own

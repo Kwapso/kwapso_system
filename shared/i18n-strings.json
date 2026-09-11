@@ -1909,6 +1909,7 @@
   "Which system this is about. It is what routes the request and who gets told when it is answered.",
   "Which type is this?",
   "Who actually uses it, in their words.",
+  "Who can read this follows who has already seen it — it isn't set here.",
   "Who can use it",
   "Who does it",
   "Who does it, when, and what it's for.",
