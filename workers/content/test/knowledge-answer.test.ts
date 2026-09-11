@@ -395,6 +395,77 @@ describe("stripTrailingSourceList — matched on how the heading ENDS", () => {
   })
 })
 
+// ── BARE LINES, NO BULLET, NO HEADING — THE MODEL OBEYED THE LETTER OF THE
+// PROMPT AND NOT ITS POINT ─────────────────────────────────────────────────
+//
+// Real answer, measured live: the model was told never to write a "Sources:"
+// heading or a bulleted list, so it wrote neither — and then invented four
+// reference codes that appear in NONE of the citations it was handed, one bare
+// `CODE, Title, Date` line per source, with no heading and no bullet above
+// them. The two earlier strips both assumed a LIST (bulleted items, or one
+// colon-headed line) and this is neither: no bullet makes `LIST_ITEM` blind to
+// every line, and there are four of them, not the one line the colon-headed
+// case handles. `stripTrailingSourceList` returned the text with the invented
+// codes still in it.
+describe("stripTrailingSourceList — bare `CODE, Title, Date` lines, no heading at all", () => {
+  const TITLES = [
+    "FluClinic: Testing the stripe webhook workflow",
+    "FluClinic: Changing the Stripe Webhook",
+    "FluClinic: August sprint planning",
+  ]
+
+  it("takes off the real, measured shape — four bare lines, invented codes and all", () => {
+    const answer =
+      "The Stripe webhook was fixed on 27 August.\n\n" +
+      "BERG-T0412, FluClinic: Testing the stripe webhook workflow, August 26, 2026\n" +
+      "BERG-T0411, FluClinic: Changing the Stripe Webhook, August 25, 2026\n" +
+      "BERG-T0415, FluClinic: Testing the stripe webhook workflow - retry, August 27, 2026\n" +
+      "BERG-T0414, FluClinic: August sprint planning - review, August 10, 2026"
+    expect(stripTrailingSourceList(answer, TITLES)).toBe("The Stripe webhook was fixed on 27 August.")
+  })
+
+  it("still refuses when the bare lines are not our own titles — a coincidence, not a sign-off", () => {
+    const answer =
+      "The webhook was fixed on 27 August.\n\n" +
+      "ACME-001, Unrelated invoice, September 1, 2026\n" +
+      "ACME-002, Another invoice, September 2, 2026"
+    expect(stripTrailingSourceList(answer, TITLES)).toBe(answer)
+  })
+
+  // THE MUTATION GUARD THE HUB ASKED FOR BY NAME: a widened matcher's failure
+  // mode is eating a real sentence, so prove a sentence that LOOKS like the
+  // shape (two commas, mentions a real title, a date at the end) but reads
+  // like prose and ends like one is left alone.
+  it("never eats an ordinary sentence that happens to carry a title, a date and two commas", () => {
+    const prose =
+      "According to FluClinic: Testing the stripe webhook workflow, filed on August 26, 2026, the fix already shipped."
+    expect(stripTrailingSourceList(`The webhook was fixed.\n\n${prose}`, TITLES)).toBe(
+      `The webhook was fixed.\n\n${prose}`
+    )
+  })
+
+  // THE SAME GUARD, PINNED ON THE OTHER CODE PATH. Only one comma here — too
+  // few to reach `isBareCitationLine`'s own two-comma gate — so this exercises
+  // the one-line form's OWN `ENDS_LIKE_PROSE` check in isolation, the same bug
+  // that already existed in the shipped one-liner before tonight (a title with
+  // a colon in it made any sentence naming it look like a `Source: A, B, C`
+  // sign-off, full stop and all).
+  it("never eats an ordinary sentence via the one-line form either — one comma, a colon, a full stop", () => {
+    const prose = "The FluClinic: Testing the stripe webhook workflow ticket, closed on August 26."
+    expect(stripTrailingSourceList(`The webhook was fixed.\n\n${prose}`, TITLES)).toBe(
+      `The webhook was fixed.\n\n${prose}`
+    )
+  })
+
+  it("never eats a real bare list that IS the answer, not a sign-off", () => {
+    const answer =
+      "The August tickets, in order:\n" +
+      "BERG-T0411, opened first, still unresolved\n" +
+      "BERG-T0412, opened second, closed the same day"
+    expect(stripTrailingSourceList(answer, TITLES)).toBe(answer)
+  })
+})
+
 // ── TIME, AND WHAT MAY NOT BE CLAIMED ABOUT IT ─────────────────────────────
 //
 // "Latest", "since last week" and "yesterday" are words with no referent unless
