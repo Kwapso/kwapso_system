@@ -200,7 +200,7 @@ describe("classifyLink / readersForLink", () => {
   it("names YouTube, Loom and Tella, each with their own reader", () => {
     expect(readersForLink("https://www.youtube.com/watch?v=x")).toEqual(["youtube-captions"])
     expect(readersForLink("https://loom.com/share/abc")).toEqual(["loom-best-effort"])
-    expect(readersForLink("https://www.tella.tv/video/abc")).toEqual(["tella-best-effort"])
+    expect(readersForLink("https://www.tella.tv/video/abc")).toEqual(["tella-transcript"])
   })
 
   it("matches a subdomain, not just the bare host", () => {
@@ -216,6 +216,22 @@ describe("classifyLink / readersForLink", () => {
     for (const t of LINK_TYPES) expect(t.why.length, `${t.label} has no reason`).toBeGreaterThan(20)
   })
 })
+
+// A TRIMMED COPY OF THE REAL SHAPE — measured live, 12 Sep 2026, against the
+// owner's own recording (content.kwapso.com/video/hogo-cv-upload-optimised-5snm,
+// 1,884 words). The array is embedded as a STRING inside the page's own
+// serialized props, so its own quotes appear ESCAPED in the raw bytes
+// (`\"text\":\"...\"`, not `"text":"..."`) — reproduced exactly here, because
+// a fixture that "cleans up" the escaping would test a shape Tella's page
+// never actually sends. One word (`redact`) is `hidden: true`, on purpose —
+// see the test that reads this fixture for why.
+const TELLA_TRANSCRIPT_FIXTURE =
+  '<html><body><script>self.__next_f.push([1,"...\\"transcriptionWords\\":[' +
+  '{\\"end_\\":2.5,\\"start\\":2.1,\\"text\\":\\"Alright,\\",\\"hidden\\":false,\\"index\\":0},' +
+  '{\\"end_\\":3.0,\\"start\\":2.6,\\"text\\":\\"let\'s\\",\\"hidden\\":false,\\"index\\":1},' +
+  '{\\"end_\\":3.3,\\"start\\":3.0,\\"text\\":\\"redact\\",\\"hidden\\":true,\\"index\\":2},' +
+  '{\\"end_\\":3.6,\\"start\\":3.3,\\"text\\":\\"this.\\",\\"hidden\\":false,\\"index\\":3}' +
+  ']...\\"duration\\":5000}"])</script></body></html>'
 
 describe("readLink", () => {
   const realFetch = globalThis.fetch
@@ -265,21 +281,66 @@ describe("readLink", () => {
     expect(await readLink("https://www.loom.com/share/abc123")).toBe("Q3 planning walkthrough")
   })
 
-  it("Tella best-effort, same shape as Loom", async () => {
+  // NOT "best-effort" ANY MORE (12 Sep 2026 correction) — Tella's own page
+  // embeds the real, word-level transcript it captions the player with, found
+  // by fetching a real Tella recording rather than by reading Tella's public
+  // docs. `TELLA_TRANSCRIPT_FIXTURE` below is a trimmed copy of that real
+  // shape (see the "custom domain" describe block further down for the exact
+  // live measurement: 1,884 words, opening "Alright, let's have a quick
+  // look..."). One word here is marked `hidden`, on purpose — that is the
+  // shape a person redacting part of a transcript before sharing actually
+  // produces, and it must never appear in what gets read.
+  it("reads Tella's own embedded transcript — the real words, not the oEmbed title", async () => {
     const calls: string[] = []
     globalThis.fetch = vi.fn(async (input: unknown) => {
       calls.push(String(input))
-      return new Response(JSON.stringify({ title: "Onboarding demo" }), { status: 200 })
+      return new Response(TELLA_TRANSCRIPT_FIXTURE, { status: 200 })
     }) as unknown as typeof fetch
-    expect(await readLink("https://www.tella.tv/video/xyz")).toBe("Onboarding demo")
-    // MEASURED LIVE, 11 Sep 2026: the bare `/oembed` path 404s against a real
-    // Tella account; `/api/oembed` is the real, working path. Pinned here so a
-    // reader that regresses back to the bare path fails loudly rather than
-    // silently, the way it shipped the first time with nothing to catch it.
-    expect(calls[0]).toContain("/api/oembed")
+    expect(await readLink("https://www.tella.tv/video/xyz")).toBe("Alright, let's this.")
+    // The video URL itself is fetched — never an oEmbed endpoint, because
+    // there is nothing left for Tella that oEmbed can give this table that
+    // its own page does not already give in full.
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).not.toContain("oembed")
   })
 
-  it("a Loom/Tella oEmbed that 404s is an honest empty, never a throw", async () => {
+  it("drops a redacted word wherever it falls, not just at the edges", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(TELLA_TRANSCRIPT_FIXTURE, { status: 200 })) as unknown as typeof fetch
+    const text = await readLink("https://www.tella.tv/video/xyz")
+    expect(text, "the hidden word must never appear in what gets read").not.toContain("redact")
+  })
+
+  // MEASURED against the owner's own recording: 11 of its 1,884 words carry
+  // `text: ""` (not hidden — a pause Tella's own timing model marks with no
+  // word). Joining one in as-is is a silent double space in the middle of a
+  // sentence; this is the fixture-level proof that empty entries are dropped
+  // rather than joined as nothing.
+  it("an empty-text entry (a timing pause, not a redaction) never becomes a double space", async () => {
+    const html =
+      '<html><body><script>self.__next_f.push([1,"...\\"transcriptionWords\\":[' +
+      '{\\"end_\\":1,\\"start\\":0,\\"text\\":\\"One\\",\\"hidden\\":false,\\"index\\":0},' +
+      '{\\"end_\\":2,\\"start\\":1,\\"text\\":\\"\\",\\"hidden\\":false,\\"index\\":1},' +
+      '{\\"end_\\":3,\\"start\\":2,\\"text\\":\\"two.\\",\\"hidden\\":false,\\"index\\":2}' +
+      ']...\\"duration\\":1000}"])</script></body></html>'
+    globalThis.fetch = vi.fn(async () => new Response(html, { status: 200 })) as unknown as typeof fetch
+    expect(await readLink("https://www.tella.tv/video/xyz")).toBe("One two.")
+  })
+
+  it("a Tella page with no transcript payload at all is an honest empty, never the oEmbed title", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response("<html><body>no payload here</body></html>", { status: 200 })
+    ) as unknown as typeof fetch
+    expect(await readLink("https://www.tella.tv/video/nopayload")).toBe("")
+  })
+
+  it("a Tella fetch that fails outright is the same honest empty", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("network down")
+    }) as unknown as typeof fetch
+    expect(await readLink("https://www.tella.tv/video/gone")).toBe("")
+  })
+
+  it("a Loom oEmbed that 404s is an honest empty, never a throw", async () => {
     globalThis.fetch = vi.fn(async () => new Response("not found", { status: 404 })) as unknown as typeof fetch
     expect(await readLink("https://loom.com/share/gone")).toBe("")
   })
@@ -305,9 +366,21 @@ describe("resolveLinkType / readLink — a Tella (or Loom) custom domain, discov
     globalThis.fetch = realFetch
   })
 
+  // CARRIES BOTH THE OEMBED DISCOVERY TAG (so `resolveLinkType` still learns
+  // "this is Tella" from a custom domain no host list can name) AND the real
+  // transcript payload (12 Sep 2026 correction) — a real Tella page carries
+  // both at once, and `discoverLinkTypeByOEmbed` only ever reads the `<link>`
+  // TAG's href, never the transcript beside it, so this fixture is one honest
+  // page rather than two different ones stitched together.
   const TELLA_PAGE_HTML =
     '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=https%3A%2F%2Fcontent.kwapso.com%2Fvideo%2Fx" ' +
-    'title="A recording" type="application/json+oembed"/></head><body></body></html>'
+    'title="A recording" type="application/json+oembed"/></head><body><script>self.__next_f.push([1,"...' +
+    '\\"transcriptionWords\\":[' +
+    '{\\"end_\\":1,\\"start\\":0,\\"text\\":\\"Hogo:\\",\\"hidden\\":false,\\"index\\":0},' +
+    '{\\"end_\\":2,\\"start\\":1,\\"text\\":\\"CV\\",\\"hidden\\":false,\\"index\\":1},' +
+    '{\\"end_\\":3,\\"start\\":2,\\"text\\":\\"Upload\\",\\"hidden\\":false,\\"index\\":2},' +
+    '{\\"end_\\":4,\\"start\\":3,\\"text\\":\\"Optimised.\\",\\"hidden\\":false,\\"index\\":3}' +
+    ']...\\"duration\\":1000}"])</script></body></html>'
 
   it("resolveLinkType discovers Tella behind an unrecognised custom domain", async () => {
     globalThis.fetch = vi.fn(async () => new Response(TELLA_PAGE_HTML, { status: 200 })) as unknown as typeof fetch
@@ -318,20 +391,23 @@ describe("resolveLinkType / readLink — a Tella (or Loom) custom domain, discov
   it("readLink discovers AND reads a Tella custom domain end to end", async () => {
     const calls: string[] = []
     globalThis.fetch = vi.fn(async (input: unknown) => {
-      const url = String(input)
-      calls.push(url)
-      if (url.includes("/video/")) return new Response(TELLA_PAGE_HTML, { status: 200 })
-      return new Response(JSON.stringify({ title: "Hogo: CV Upload Optimised" }), { status: 200 })
+      calls.push(String(input))
+      return new Response(TELLA_PAGE_HTML, { status: 200 })
     }) as unknown as typeof fetch
 
     expect(await readLink("https://content.kwapso.com/video/hogo-cv-upload-optimised-5snm")).toBe(
-      "Hogo: CV Upload Optimised"
+      "Hogo: CV Upload Optimised."
     )
-    // The page is fetched ONCE for discovery, then the oEmbed API is called
-    // separately for the title — never a second discovery fetch of the page
-    // by the reader itself.
-    expect(calls.filter((c) => c.includes("/video/"))).toHaveLength(1)
-    expect(calls.filter((c) => c.includes("/api/oembed"))).toHaveLength(1)
+    // TWO fetches of the SAME page now, never an oEmbed call — one to
+    // DISCOVER the type (`discoverLinkTypeByOEmbed`, reading the `<link>`
+    // tag), one to READ it (`readTellaTranscript`, reading the transcript
+    // beside it). Left as a real, accepted duplicate fetch rather than
+    // threading the already-fetched HTML through `resolveLinkType`'s return
+    // shape — a one-time source-creation call paying for one extra page
+    // fetch is a smaller cost than that refactor's ripple through every
+    // caller of `resolveLinkType`.
+    expect(calls.filter((c) => c.includes("/video/"))).toHaveLength(2)
+    expect(calls.filter((c) => c.includes("/api/oembed"))).toHaveLength(0)
   })
 
   it("never fetches an ordinary, non-video link on the chance it might be one", async () => {
@@ -371,17 +447,20 @@ describe("resolveLinkType / readLink — a Tella (or Loom) custom domain, discov
     expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(1)
   })
 
-  it("readLink accepts a pre-resolved type and never re-fetches the page to find it", async () => {
+  it("readLink accepts a pre-resolved type and never re-fetches the page to DISCOVER it — one read fetch only", async () => {
     const kind = LINK_TYPES.find((t) => t.label === "Tella recording") ?? null
     globalThis.fetch = vi.fn(async (input: unknown) => {
-      // Only the oEmbed call itself — never the page, because the type was
-      // already handed in.
-      expect(String(input)).toContain("/api/oembed")
-      return new Response(JSON.stringify({ title: "Hogo: CV Upload Optimised" }), { status: 200 })
+      // The video page itself — never an oEmbed endpoint, because the type
+      // was already handed in AND Tella's own reader never asks oEmbed for
+      // anything any more.
+      expect(String(input)).not.toContain("oembed")
+      return new Response(TELLA_PAGE_HTML, { status: 200 })
     }) as unknown as typeof fetch
     expect(
       await readLink("https://content.kwapso.com/video/hogo-cv-upload-optimised-5snm", kind)
-    ).toBe("Hogo: CV Upload Optimised")
+    ).toBe("Hogo: CV Upload Optimised.")
+    // ONE fetch, not two: passing `knownType` skips discovery entirely, so
+    // only the READ itself fetches the page.
     expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(1)
   })
 })

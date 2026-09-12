@@ -363,6 +363,38 @@ describe("extractLink: a video link, kept either way", () => {
     expect(out.read, "nothing was read — read must be null, not a guess").toBeNull()
   })
 
+  // NOT best-effort ANY MORE (12 Sep 2026 correction, measured against the
+  // owner's own real recording): Tella's own page embeds the real,
+  // word-level transcript beside the oEmbed tag, so `kind` here is
+  // "transcript" — never "description" — because a real transcript came
+  // through, not a four-word title standing in for one.
+  it("reads Tella's own embedded transcript, not the oEmbed title", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(
+        '<html><body><script>self.__next_f.push([1,"...\\"transcriptionWords\\":[' +
+          '{\\"end_\\":1,\\"start\\":0,\\"text\\":\\"Hogo:\\",\\"hidden\\":false,\\"index\\":0},' +
+          '{\\"end_\\":2,\\"start\\":1,\\"text\\":\\"CV\\",\\"hidden\\":false,\\"index\\":1},' +
+          '{\\"end_\\":3,\\"start\\":2,\\"text\\":\\"Upload\\",\\"hidden\\":false,\\"index\\":2},' +
+          '{\\"end_\\":4,\\"start\\":3,\\"text\\":\\"Optimised.\\",\\"hidden\\":false,\\"index\\":3}' +
+          ']...\\"duration\\":1000}"])</script></body></html>',
+        { status: 200 }
+      )
+    ) as unknown as typeof fetch
+    expect(await extractLink("https://www.tella.tv/video/xyz")).toEqual({
+      text: "Hogo: CV Upload Optimised.",
+      note: null,
+      read: { provider: "Tella", kind: "transcript", words: 4 },
+    })
+  })
+
+  it("a Tella page with no transcript payload is an honest refusal, never the oEmbed title standing in", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<html><body>nothing here</body></html>", { status: 200 })) as unknown as typeof fetch
+    const out = await extractLink("https://www.tella.tv/video/nopayload")
+    expect(out.text).toBeNull()
+    expect(out.note).toContain("kept here")
+    expect(out.read, "no transcript came through — never a title reported as if it had").toBeNull()
+  })
+
   it("reads a Loom title as best-effort words, and says the video is still kept when there are none", async () => {
     globalThis.fetch = vi.fn(async () =>
       new Response(JSON.stringify({ title: "Q3 planning walkthrough" }), { status: 200 })

@@ -2446,21 +2446,24 @@ describe("a video link is read, and a plain link still needs its material pasted
   })
 
   // THE GATE WAS THE EMPTY BODY, NOT THE HOST — and this is the case that
-  // moved the original rule, then moved it again. The owner's own Tella
-  // recording behind his own domain, `content.kwapso.com/video/…`, walked
-  // past every hostname on the old list; now it is resolved by the page's own
-  // oEmbed discovery tag (source-readers.ts, `resolveLinkType`) and accepted,
-  // same as a listed host.
-  it("a Tella recording behind the owner's own domain is accepted too, discovered by oEmbed", async () => {
-    globalThis.fetch = vi.fn(async (input: unknown) => {
-      const url = String(input)
-      if (url.includes("/video/"))
-        return new Response(
-          '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=x" title="A recording" type="application/json+oembed"/></head></html>',
-          { status: 200 }
-        )
-      return new Response(JSON.stringify({ title: "Testing application loading speed" }), { status: 200 })
-    }) as unknown as typeof fetch
+  // moved the original rule, then moved it again, then (12 Sep 2026) turned
+  // out to hold the real thing rather than a title standing in for it. The
+  // owner's own Tella recording behind his own domain,
+  // `content.kwapso.com/video/…`, walked past every hostname on the old
+  // list; it is resolved by the page's own oEmbed discovery tag
+  // (source-readers.ts, `resolveLinkType`), and READ from the same page's
+  // embedded `transcriptionWords` payload — not the oEmbed title, which this
+  // table no longer treats as a successful read at all.
+  it("a Tella recording behind the owner's own domain is read in full, discovered by oEmbed and read from its own embedded transcript", async () => {
+    const TELLA_PAGE =
+      '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=x" title="A recording" type="application/json+oembed"/></head>' +
+      '<body><script>self.__next_f.push([1,"...\\"transcriptionWords\\":[' +
+      '{\\"end_\\":1,\\"start\\":0,\\"text\\":\\"Testing\\",\\"hidden\\":false,\\"index\\":0},' +
+      '{\\"end_\\":2,\\"start\\":1,\\"text\\":\\"application\\",\\"hidden\\":false,\\"index\\":1},' +
+      '{\\"end_\\":3,\\"start\\":2,\\"text\\":\\"loading\\",\\"hidden\\":false,\\"index\\":2},' +
+      '{\\"end_\\":4,\\"start\\":3,\\"text\\":\\"speed.\\",\\"hidden\\":false,\\"index\\":3}' +
+      ']...\\"duration\\":1000}"])</script></body></html>'
+    globalThis.fetch = vi.fn(async () => new Response(TELLA_PAGE, { status: 200 })) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Tella 1",
       sourceUrl: "https://content.kwapso.com/video/testing-application-loading-speed-cbfo",
@@ -2469,11 +2472,13 @@ describe("a video link is read, and a plain link still needs its material pasted
     const row = db().prepare("SELECT body AS b FROM knowledge_sources WHERE title = ?").get("Tella 1") as
       | { b: string }
       | undefined
-    expect(row?.b, "best-effort is the title, honestly, not nothing").toBe("Testing application loading speed")
-    // "description", never "captions" — best-effort is a NAME for the
-    // recording, not its words, and the loading UX must say so honestly.
+    expect(row?.b, "the real transcript is the body, not a four-word title").toBe(
+      "Testing application loading speed."
+    )
+    // "transcript", never "description" — a real transcript came through,
+    // and the loading UX must say so, not undersell it as best-effort.
     const out = (await res.json()) as { read: { provider: string; kind: string; words: number } | null }
-    expect(out.read).toEqual({ provider: "Tella", kind: "description", words: 4 })
+    expect(out.read).toEqual({ provider: "Tella", kind: "transcript", words: 4 })
   })
 
   it("and an ordinary, non-video link with nothing to read is still refused, in different words", async () => {

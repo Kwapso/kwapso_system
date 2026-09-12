@@ -81,10 +81,19 @@ export type ReaderName =
    * see the essay above `LINK_TYPES`. */
   | "youtube-captions"
   /** Loom's public oEmbed title. Best-effort: there is no public transcript
-   * endpoint, so this is a name, not the recording's content. */
+   * endpoint, so this is a name, not the recording's content. NOT the same
+   * shape as Tella below any more — see that reader's own comment for why a
+   * title alone stopped being an acceptable "read" for a real recording. */
   | "loom-best-effort"
-  /** Tella's public oEmbed title. Same shape and the same honesty as Loom. */
-  | "tella-best-effort"
+  /** Tella's OWN PAGE embeds the real, word-level transcript it captions the
+   * player with — `transcriptionWords`, found by fetching a real Tella
+   * recording (BUILD-5, 12 Sep 2026, the owner's own recording) rather than
+   * by reading Tella's public API docs, which say nothing about it. Retired
+   * `tella-best-effort` (the oEmbed title) as a SUCCESS outcome for exactly
+   * this reason: a 4-word title reported as "read" is worse than an honest
+   * refusal, because it tells the person their video was read when nothing
+   * of substance was. */
+  | "tella-transcript"
 
 /** A KIND OF THING SOMEBODY BRINGS, and the readers to try for it in order. */
 export type SourceType = {
@@ -459,10 +468,10 @@ export const LINK_TYPES: readonly LinkType[] = [
   {
     label: "Tella recording",
     provider: "Tella",
-    kind: "description",
+    kind: "transcript",
     hosts: ["tella.tv", "tella.video"],
-    readers: ["tella-best-effort"],
-    why: "same shape as Loom — the oEmbed title only, no public transcript access exists",
+    readers: ["tella-transcript"],
+    why: "NOT the same shape as Loom (12 Sep 2026 correction) — Tella's own page embeds the real, word-level transcript (`transcriptionWords`) it captions the player with, found by fetching a real recording rather than by reading Tella's docs, which say nothing about it",
   },
 ]
 
@@ -579,10 +588,14 @@ async function readYouTubeCaptions(videoId: string): Promise<string> {
   return captionXml ? captionsFromTimedText(captionXml) : ""
 }
 
-/** THE ONLY WORDS EITHER PLATFORM PUBLISHES WITHOUT AUTH — a title, through
- * the oEmbed endpoint every embeddable video service is expected to answer.
- * Not a transcript; see the essay above `LINK_TYPES` for why this is still
- * "best-effort" rather than nothing. */
+/** THE ONLY WORDS LOOM PUBLISHES WITHOUT AUTH — a title, through the oEmbed
+ * endpoint every embeddable video service is expected to answer. Not a
+ * transcript; see `LINK_TYPES`'s own entry for why this is still
+ * "best-effort" rather than nothing. Tella USED to share this reader too,
+ * until its own page turned out to embed the real thing — see
+ * `readTellaTranscript` below for why that changed and this did not: nobody
+ * has yet found an equivalent payload on a real Loom page, so "best-effort"
+ * stays the honest word for Loom specifically until somebody does. */
 async function readOEmbedTitle(oembedUrl: string, videoUrl: string): Promise<string> {
   const json = await fetchLinkText(`${oembedUrl}?url=${encodeURIComponent(videoUrl)}`)
   if (!json) return ""
@@ -594,20 +607,114 @@ async function readOEmbedTitle(oembedUrl: string, videoUrl: string): Promise<str
   }
 }
 
+/** ONE WORD OF A TELLA TRANSCRIPT, exactly the shape Tella's own page embeds
+ * it in — punctuation already attached to the word it follows. */
+type TellaTranscriptWord = { text: string; hidden?: boolean }
+
+/** THE ANCHOR — the one thing that makes this safe to parse. A "text" key is
+ * not unique to this array in a page this size (a few hundred KB of a real
+ * app's own React payload); scanning the whole document for `"text":"..."`
+ * would also match unrelated keys elsewhere and either miss the transcript or
+ * mangle it. This is the literal bytes Tella's own markup uses for the key —
+ * escaped, because the array is itself embedded as a STRING inside the page's
+ * own serialized props (see `parseTellaTranscriptPayload`'s own comment for
+ * what that means for parsing it). */
+const TELLA_TRANSCRIPT_MARKER = '\\"transcriptionWords\\":['
+
+/** TELLA'S OWN PAGE embeds the real, word-level transcript it captions the
+ * player with — an array of `{text, start, end_, hidden, index}` objects
+ * under `transcriptionWords` — found by fetching a real Tella recording
+ * (BUILD-5, 12 Sep 2026, the owner's own video,
+ * `content.kwapso.com/video/hogo-cv-upload-optimised-5snm`: 1,884 words,
+ * opening "Alright, let's have a quick look at the complete re engineering of
+ * the candidate CV upload...") rather than by reading Tella's public API
+ * docs, which say nothing about this at all. This is why `tella-best-effort`
+ * (the oEmbed title, four words for that same video) was retired rather than
+ * kept as a fallback: a title reported as a successful "read" is worse than
+ * an honest refusal, because it tells the person their video WAS read when
+ * nothing of substance was — R42's own reader table can name that outcome
+ * "transcript" or refuse, and it may not lie by calling four words either.
+ *
+ * PARSED DELIBERATELY, never a hand-rolled backslash replace — this table was
+ * bitten once already this week by a "should be equivalent" hand
+ * transformation of something a real parser already exists for
+ * (`discoverLinkTypeByOEmbed`'s own attribute-order regex history). The array
+ * text between the anchor's brackets is the JSON `transcriptionWords` value
+ * AS IT WAS ORIGINALLY SERIALIZED, then escaped a second time to become a
+ * string inside the page's own outer payload — so wrapping that exact
+ * substring in a fresh pair of real quotes turns it back into a valid JSON
+ * STRING literal, and asking `JSON.parse` to read that literal does the
+ * un-escaping correctly (backslashes, unicode, all of it) rather than a regex
+ * guessing at which characters were escaped. The result of THAT parse is
+ * plain JSON text, parsed a second time into the actual array.
+ *
+ * `hidden: true` WORDS ARE DROPPED. Tella lets a person redact part of a
+ * recording's transcript before sharing the link — a hidden word is a door
+ * that person closed on purpose, and filing it anyway would be reading past
+ * that choice rather than respecting it.
+ *
+ * THE CANARY IS THE WHOLE POINT: the marker missing, the brackets never
+ * closing, either `JSON.parse` throwing, or an empty result all end in the
+ * same "" this whole file already treats as "no reader found anything" —
+ * which sends the caller to the ordinary honest-refusal sentence rather than
+ * ever inventing a partial scrape and calling it a transcript.
+ *
+ * NO SEPARATE LENGTH CAP HERE, ON PURPOSE: whatever this returns is bounded
+ * the same way an uploaded file's text already is, by `capToRow`
+ * (`DOCUMENT_LIMIT_BYTES`, knowledge-files.ts) once `extractLink` receives
+ * it — a second ceiling here would be the same rule enforced twice in two
+ * places for no reason, which is exactly what R42 exists to prevent about
+ * READERS and is just as true of a byte limit. */
+function parseTellaTranscriptPayload(html: string): string {
+  const at = html.indexOf(TELLA_TRANSCRIPT_MARKER)
+  if (at === -1) return ""
+  const start = at + TELLA_TRANSCRIPT_MARKER.indexOf("[")
+  let depth = 0
+  let end = -1
+  // `[`/`]` ARE NEVER ESCAPED BY JSON — only quotes, backslashes and control
+  // characters are — so counting them literally, byte by byte, finds the
+  // array's real close even though everything INSIDE it is escaped text.
+  for (let i = start; i < html.length; i++) {
+    if (html[i] === "[") depth++
+    else if (html[i] === "]") {
+      depth--
+      if (depth === 0) {
+        end = i
+        break
+      }
+    }
+  }
+  if (end === -1) return ""
+  try {
+    const unescaped = JSON.parse(`"${html.slice(start, end + 1)}"`) as string
+    const words = JSON.parse(unescaped) as TellaTranscriptWord[]
+    if (!Array.isArray(words) || !words.length) return ""
+    // A NON-EMPTY STRING, not just a string — measured against the owner's
+    // own recording: 11 of its 1,884 words carry `text: ""` (likely a pause
+    // Tella's own timing model marks with no word), and joining an empty one
+    // in with the rest is a silent double space in the middle of a sentence
+    // for no reason at all.
+    return words
+      .filter((w) => !w.hidden && typeof w.text === "string" && w.text.length > 0)
+      .map((w) => w.text)
+      .join(" ")
+  } catch {
+    return ""
+  }
+}
+
+async function readTellaTranscript(url: string): Promise<string> {
+  const html = await fetchLinkText(url)
+  return html ? parseTellaTranscriptPayload(html) : ""
+}
+
 async function runLinkReader(reader: ReaderName, url: string): Promise<string> {
   if (reader === "youtube-captions") {
     const id = youtubeVideoId(url)
     return id ? await readYouTubeCaptions(id) : ""
   }
   if (reader === "loom-best-effort") return readOEmbedTitle("https://www.loom.com/v1/oembed", url)
-  // MEASURED LIVE, 11 Sep 2026, against the owner's own recording
-  // (content.kwapso.com/video/hogo-cv-upload-optimised-5snm): the bare
-  // `/oembed` path 404s — a real Next.js not-found page, not a redirect —
-  // and the page's OWN oEmbed discovery tag names `/api/oembed`, which
-  // answers 200 with the real title. Never smoke-tested against a live
-  // account before that night, exactly as this table's own header always
-  // said it hadn't been.
-  if (reader === "tella-best-effort") return readOEmbedTitle("https://www.tella.tv/api/oembed", url)
+  if (reader === "tella-transcript") return readTellaTranscript(url)
   return ""
 }
 
