@@ -2163,6 +2163,21 @@ async function sweepKind(
                      -- comment), so re-deciding it on every sweep costs nothing a
                      -- read could ever notice; it only keeps a descriptive label honest.
                      shared_with = excluded.shared_with,
+                     -- AND THE CHUNKS WILL LAG IT. The clause below clears
+                     -- content_hash -- which is what triggers a re-embed, and so
+                     -- what refreshes the chunk-level copy and the Vectorize
+                     -- shared label -- ONLY when owner_user_id moved. A row whose
+                     -- shared_with changes while its owner does not keeps a stale
+                     -- copy at the chunk level until something else re-embeds that
+                     -- source. Left that way DELIBERATELY: nothing reads either
+                     -- copy, so widening the trigger would buy a re-embed of the
+                     -- whole base to correct a label no read consults.
+                     --
+                     -- SO THIS IS THE PRECISE SHAPE OF THE BACKFILL somebody will
+                     -- owe the day this label is first consumed: not a re-index of
+                     -- everything, only the rows where the two facts have drifted
+                     -- apart since. Whoever adds that first filter reads this
+                     -- comment before believing the chunk-level value.
                      content_hash = CASE WHEN knowledge_sources.owner_user_id IS excluded.owner_user_id
                                          THEN knowledge_sources.content_hash ELSE NULL END,
                      -- THE GIVE-UP COUNTER IS PER TEXT, NOT PER SOURCE. It resets
