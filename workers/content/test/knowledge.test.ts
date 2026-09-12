@@ -1390,6 +1390,34 @@ describe("a-names: a contact narrows a search the same way a client name does", 
     expect(direct.compartments).not.toContain(`account:${ORDINAIRE}`)
   })
 
+  it("a contact is never BLOCKED by the company's own DENY either — a rare surname still narrows", async () => {
+    // "Blockco" declares its OWN name must never narrow alone — that is a
+    // fact about Blockco's name, not about a contact filed under it. "Nkeme"
+    // is a genuinely rare surname (no filler chunks at all), so a DENY
+    // leaking onto a contact row would silently refuse a narrow the rarity
+    // gate alone would have granted.
+    const BLOCKCO = "A_NAMES_BLOCKCO"
+    const PERSON_TN = "A_NAMES_TARA_NKEME"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${BLOCKCO}', 'entity', 'Blockco', NULL, '2026-01-01', 2);
+       INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${PERSON_TN}', 'individual', 'Tara Nkeme', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_TN', '${BLOCKCO}', '${PERSON_TN}', '2026-01-01');
+       INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_BLOCKCO_OWN', 'note', 'Case notes', 'account:${BLOCKCO}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_BLOCKCO_OWN', 'S_BLOCKCO_OWN', 'account:${BLOCKCO}', 0, 'Nkeme raised a question about the Blockco case', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_BLOCKCO_OWN';`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what question did Nkeme raise about the case?")
+    expect(answer.compartments).toEqual([`account:${BLOCKCO}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Case notes")
+  })
+
   it("a QA account-switcher fixture is never seeded, by name", async () => {
     const QA_CO = "A_NAMES_QA_CO"
     const QA_PERSON = "A_NAMES_QA_PERSON"
