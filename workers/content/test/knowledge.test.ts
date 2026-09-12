@@ -39,6 +39,7 @@ import { buildSpineDb, IDS, makeEnv } from "../../tenancy/test/spine-harness"
 import { tokenise } from "../src/lib/knowledge-text"
 import { diversify, hasRecencyIntent, rebuildNameIndex, retrieve } from "../src/lib/knowledge"
 import { passageId } from "../src/lib/knowledge-reader"
+import { d1Query } from "@shared/workers/d1-rest"
 import type { MemberGuard } from "@shared/workers/gating"
 import { INGEST_KINDS } from "../src/lib/knowledge-ingest"
 import type { KnowledgeAnswer, KnowledgeSource } from "@shared/types"
@@ -1227,6 +1228,186 @@ describe("c-hijack (B): a declared name_narrows_alone bypasses the rarity gate, 
     const answer = await ask(IDS.staffUser, "what happened with the WEXFORD shipment?")
     expect(answer.compartments).toEqual([])
     expect(answer.reason).toContain("named no client")
+  })
+})
+
+// a-names. A contact is an INDIVIDUAL account linked to a company through
+// `account_links` — "contact" is a role on that link, not an account_type
+// (the table's own header comment). `ref_id` on a contact's `knowledge_names`
+// row is the LINKED COMPANY's id, never the contact's own: nothing is ever
+// indexed under a real contact's own individual-account id (measured before
+// this was built — 119 sources filed that way, all five real chunks a QA
+// fixture's own notification emails, against 3,235 under real client
+// accounts), so a compartment built from a contact's own id would search
+// nothing.
+describe("a-names: a contact narrows a search the same way a client name does", () => {
+  const NKEMCO = "A_NAMES_NKEMCO"
+  const PERSON_JN = "A_NAMES_JAMES_NKEMELU"
+
+  beforeEach(() => {
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${NKEMCO}', 'entity', 'Nkemco', NULL, '2026-01-01'),
+         ('${PERSON_JN}', 'individual', 'James Nkemelu', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_JN', '${NKEMCO}', '${PERSON_JN}', '2026-01-01');`
+    )
+    // "james" is an ordinary English word this corpus already talks about a
+    // lot — the exact shape a first name must NEVER be seeded alone for.
+    // "nkemelu" is a genuinely rare surname (zero filler chunks).
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_JAMES_FILLER', 'note', 'Filler', 'agency', '2026-01-01');`
+    )
+    const rows: string[] = []
+    for (let i = 0; i < 40; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_JAMES_${i}', 'S_JAMES_FILLER', 'agency', ${i}, 'james said the room was ready', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_JAMES_FILLER';"
+    )
+    // Real material under Nkemco's own compartment, so a successful narrow
+    // finds something rather than tripping A3's retry.
+    db().exec(
+      `INSERT INTO knowledge_sources (id, kind, title, compartment, created_at)
+         VALUES ('S_NKEMCO_OWN', 'note', 'Renewal notes', 'account:${NKEMCO}', '2026-01-01');
+       INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+         VALUES ('C_NKEMCO_OWN', 'S_NKEMCO_OWN', 'account:${NKEMCO}', 0, 'Nkemelu renewal status: approved for another year', '2026-01-01');
+       INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE source_id = 'S_NKEMCO_OWN';`
+    )
+  })
+
+  it("the full name narrows to the linked company, via the existing multi-token bypass", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the James Nkemelu renewal?")
+    expect(answer.compartments).toEqual([`account:${NKEMCO}`, "agency"])
+    expect(answer.reason).toContain("James Nkemelu")
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("the surname alone narrows too, once it clears the rarity gate", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const answer = await ask(IDS.staffUser, "what is the status of the Nkemelu renewal?")
+    expect(answer.compartments).toEqual([`account:${NKEMCO}`, "agency"])
+    expect(answer.found).toBe(true)
+    expect(titles(answer)).toContain("Renewal notes")
+  })
+
+  it("the first name is NEVER seeded alone, however ordinary or rare it is", async () => {
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [NKEMCO]
+    )
+    expect(rows.map((r) => r.name.toLowerCase())).not.toContain("james")
+    // And a question naming ONLY the first name does not narrow — "james" is
+    // exactly ordinary enough that if it HAD been seeded alone, this would
+    // hijack every question anybody ever asked containing the word.
+    const answer = await ask(IDS.staffUser, "is james back from leave yet?")
+    expect(answer.compartments).not.toContain(`account:${NKEMCO}`)
+  })
+
+  it("a contact linked to more than one company narrows to NEITHER — never fanned out", async () => {
+    const SECOND = "A_NAMES_SECOND_CO"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES ('${SECOND}', 'entity', 'Secondco', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at) VALUES ('L_JN_2', '${SECOND}', '${PERSON_JN}', '2026-01-01');`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND (ref_id = ? OR ref_id = ?)",
+      [NKEMCO, SECOND]
+    )
+    // Not seeded under EITHER company — the ambiguity is caught before a row
+    // is even written, not resolved later at match time.
+    expect(rows).toEqual([])
+    const answer = await ask(IDS.staffUser, "did James Nkemelu confirm the renewal?")
+    expect(answer.compartments).not.toContain(`account:${NKEMCO}`)
+    expect(answer.compartments).not.toContain(`account:${SECOND}`)
+  })
+
+  it("a contact never bypasses rarity through the COMPANY's own name_narrows_alone", async () => {
+    // "Ordinaire" declares its OWN collapsed name safe — that says nothing
+    // about a contact filed under it. "Regular" is the surname, deliberately
+    // as ordinary as "premium" (c-hijack B's own proven case), with the same
+    // shape of filler chunks well over the ceiling.
+    const ORDINAIRE = "A_NAMES_ORDINAIRE"
+    const PERSON_PR = "A_NAMES_PAT_REGULAR"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at, name_narrows_alone) VALUES
+         ('${ORDINAIRE}', 'entity', 'Ordinaire', NULL, '2026-01-01', 1),
+         ('${PERSON_PR}', 'individual', 'Pat Regular', NULL, '2026-01-01', 0);
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_PR', '${ORDINAIRE}', '${PERSON_PR}', '2026-01-01');`
+    )
+    const rows: string[] = []
+    for (let i = 0; i < 40; i++)
+      rows.push(
+        `INSERT INTO knowledge_chunks (id, source_id, compartment, seq, text, created_at)
+           VALUES ('C_REG_${i}', 'S_JAMES_FILLER', 'agency', ${100 + i}, 'this is a regular occurrence around here', '2026-01-01');`
+      )
+    db().exec(rows.join("\n"))
+    db().exec(
+      "INSERT INTO knowledge_chunks_fts(rowid, text) SELECT rowid, text FROM knowledge_chunks WHERE id LIKE 'C_REG_%';"
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const seeded = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [ORDINAIRE]
+    )
+    // "pat regular" (2 tokens) is seeded via the multi-token bypass; "regular"
+    // alone is NOT, because it fails the live rarity check and the company's
+    // OWN name_narrows_alone flag must not rescue it — the SEED-TIME half of
+    // the guard.
+    expect(seeded.map((r) => r.name.toLowerCase())).toContain("pat regular")
+    expect(seeded.map((r) => r.name.toLowerCase())).not.toContain("regular")
+    const answer = await ask(IDS.staffUser, "was this a regular occurrence?")
+    expect(answer.compartments).not.toContain(`account:${ORDINAIRE}`)
+
+    // THE MATCH-TIME HALF, proven directly: a 'contact' row naming "regular"
+    // alone, inserted straight into `knowledge_names` (never through the
+    // seeder — this is `accountsNamedIn`'s OWN refusal under test, not
+    // `contactNameRows`'s, so a future seeder that got the seed-time gate
+    // wrong could not silently make this pass). If the `kind === "account"`
+    // guard on `name_narrows_alone` were ever dropped, ORDINAIRE's own
+    // declared flag would rescue this row and the question below would
+    // wrongly narrow.
+    db().exec(
+      `INSERT INTO knowledge_names (id, kind, ref_id, name, alias_of, compartment, created_at)
+         VALUES ('KN_REGULAR_DIRECT', 'contact', '${ORDINAIRE}', 'regular', NULL, 'account:${ORDINAIRE}', '2026-01-01');`
+    )
+    const direct = await ask(IDS.staffUser, "was this a regular occurrence?")
+    expect(direct.compartments).not.toContain(`account:${ORDINAIRE}`)
+  })
+
+  it("a QA account-switcher fixture is never seeded, by name", async () => {
+    const QA_CO = "A_NAMES_QA_CO"
+    const QA_PERSON = "A_NAMES_QA_PERSON"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, code, created_at) VALUES
+         ('${QA_CO}', 'entity', 'Qaco', NULL, '2026-01-01'),
+         ('${QA_PERSON}', 'individual', 'Alaap Kanchwala (portal test 1)', NULL, '2026-01-01');
+       INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_QA', '${QA_CO}', '${QA_PERSON}', '2026-01-01');`
+    )
+    await rebuildNameIndex({} as never, { databaseId: "db" } as never)
+    const rows = await d1Query<{ name: string }>(
+      {} as never,
+      "db",
+      "SELECT name FROM knowledge_names WHERE kind = 'contact' AND ref_id = ?",
+      [QA_CO]
+    )
+    expect(rows).toEqual([])
   })
 })
 
