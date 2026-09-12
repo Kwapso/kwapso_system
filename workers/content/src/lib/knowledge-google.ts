@@ -87,6 +87,7 @@ import { BACKFILL_SLICE_DAYS, BACKFILL_YEARS_BACK } from "./meetings"
 import { accountsNamedIn, execKnowledgeScript, indexSource, teamVisibleRecomputeSql } from "./knowledge"
 import { googleIdentity, stillLive, type Sighting } from "./knowledge-identity"
 import { withSyncLease } from "./sync-lease"
+import { recordWorkerError } from "@shared/workers/error-log"
 import { brand } from "@shared/brand"
 import {
   INGEST_SOURCES_PER_TICK,
@@ -745,7 +746,7 @@ export function risingBackfillWindow(now: Date, state: BackfillState): { from: s
  * FILE read as "complete" and this function advanced past it, silently,
  * every time. The caller now passes the wider signal; nothing in the
  * function's own logic needed to change once it is telling the truth. */
-function advanceRisingBackfill(
+export function advanceRisingBackfill(
   now: Date,
   window: { from: string; to: string },
   incomplete: boolean,
@@ -754,7 +755,17 @@ function advanceRisingBackfill(
   let next = window.to
   if (incomplete) {
     const at = Date.parse(lastEntryAt ?? "")
-    if (Number.isFinite(at) && at > Date.parse(window.from)) next = new Date(at).toISOString()
+    // A TRUSTED BOUNDARY is the only thing that earns partial credit (12 Sep
+    // 2026 fix's own reasoning). `lastEntryAt` reads null exactly when
+    // `incomplete` is true AND nothing survived to be filed at all — Google
+    // handed back more than this tick's cap could hold, and every one of
+    // them still fell out before a `sortAt` reached `boundary` (this file's
+    // own doc on `backfillRows`' `boundary`). Falling through to `window.to`
+    // there is the SAME bug the 12 Sep fix closed wearing a different coat:
+    // it credits the window as covered when the tick filed nothing from it.
+    // So an untrustworthy boundary means STAY — resume at `window.from`, the
+    // exact window this tick already held, and let the next tick try again.
+    next = Number.isFinite(at) && at > Date.parse(window.from) ? new Date(at).toISOString() : window.from
   }
   return Date.parse(next) >= now.getTime() ? { done: true } : { done: false, through: next }
 }
@@ -791,7 +802,7 @@ function fallingBackfillWindow(now: Date, state: BackfillState): { from: string;
  * that could ever walk backward and quietly recover what a falling tick
  * skipped — every window this advanced past on the old, narrower signal was
  * gone for good. */
-function advanceFallingBackfill(
+export function advanceFallingBackfill(
   now: Date,
   window: { from: string; to: string },
   incomplete: boolean,
@@ -800,7 +811,13 @@ function advanceFallingBackfill(
   let next = window.from
   if (incomplete) {
     const at = Date.parse(firstEntryAt ?? "")
-    if (Number.isFinite(at) && at < Date.parse(window.to)) next = new Date(at).toISOString()
+    // THE MIRROR OF `advanceRisingBackfill`'s SAME GUARD — see its own header
+    // for the full reasoning. `firstEntryAt` reads null exactly when this
+    // tick's cap bit hard enough that nothing survived to be filed, and
+    // falling through to `window.from` here is the 12 Sep 2026 bug again:
+    // crediting an uncovered window as covered. An untrustworthy boundary
+    // means STAY — resume at `window.to`, the same window, next tick.
+    next = Number.isFinite(at) && at < Date.parse(window.to) ? new Date(at).toISOString() : window.to
   }
   const floor = new Date(now.getTime() - BACKFILL_YEARS_BACK * 365 * 24 * 60 * 60 * 1000)
   return Date.parse(next) <= floor.getTime() ? { done: true } : { done: false, through: next }
@@ -1206,6 +1223,27 @@ export function googleIngestKinds(
     if (!window) return []
     const { rows, incomplete } = await slice(service, null, limit, toRows, hydrate, window, !rising)
     const boundary = rows.map((r) => r.sortAt).filter(Boolean).sort()
+    const edge = rising ? boundary[boundary.length - 1] : boundary[0]
+    // THE SILENCE THIS CLOSES (12 Sep 2026, round two). `incomplete` says
+    // Google handed back more than this tick could file; `edge` reads
+    // undefined exactly when NONE of it survived to a usable `sortAt` — the
+    // same gap that let the ORIGINAL watermark-undercount hide for months
+    // under a green build with nothing in error_logs to find it by.
+    // advanceRisingBackfill/advanceFallingBackfill now REFUSE to advance past
+    // this window when that happens (see their own headers), which stops the
+    // data loss — it does not explain WHY nothing was filed, and the tick
+    // will retry the identical window every fifteen minutes until it does.
+    // That retry is silent everywhere except here; `recordWorkerError`'s own
+    // per-hour ceiling is what keeps a stuck window from flooding the table.
+    if (incomplete && edge === undefined)
+      await recordWorkerError(
+        env.DB,
+        "content",
+        `knowledge/backfill-stalled (${stateKey})`,
+        new Error(
+          `The ${service} backfill read material for ${window.from} .. ${window.to} but filed none of it with a usable date, so the watermark is staying put and retrying the same window rather than advancing past ground it never covered.`
+        )
+      )
     const next = rising
       ? advanceRisingBackfill(now, window, incomplete, boundary[boundary.length - 1] ?? null)
       : advanceFallingBackfill(now, window, incomplete, boundary[0] ?? null)
