@@ -1411,9 +1411,17 @@ export const TRANSLATION_CEILING: Record<string, number> = {
   // hint, the two word-count sentences, and the three kind words) — none
   // translated yet, accepted debt in the same change that added them,
   // exactly as R44 asks.
-  de: 33,
-  es: 33,
-  ca: 33,
+  //
+  // RAISED 33 -> 34 in all three, same day: the hub's own review of this
+  // branch found that "null-safe is not honest" — a bare video link whose
+  // door reply carried neither `read` nor `refusedBecause` (a door that
+  // hasn't landed the feature yet, or genuinely found nothing to say) was
+  // falling through to the generic "assistant can now use it" toast, a
+  // promise the source's empty body would not keep. One more sentence for
+  // that third state, said plainly instead.
+  de: 34,
+  es: 34,
+  ca: 34,
 }
 
 /** R46 — the reviewed exemptions. A component or foundation here is not

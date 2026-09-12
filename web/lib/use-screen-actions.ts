@@ -34,6 +34,7 @@ import type { AccountFormValues } from "@/components/accounts/account-form-dialo
 import type { KnowledgeFormValues } from "@/components/knowledge/knowledge-form-dialog"
 import type { KnowledgeSource } from "@shared/types"
 import type { KnowledgeLinkRead } from "@/lib/api/content"
+import { isVideoLink } from "@shared/media-links"
 import { recordActivityKey } from "@/lib/use-record-activity"
 
 /** The four agency-internal record kinds, keyed by their URL segment (which is
@@ -107,6 +108,40 @@ function linkReadSentence(read: KnowledgeLinkRead, t: Translate): string {
   return read.words === 1
     ? t("Read 1 word of {kind} from {provider}.", { kind, provider: read.provider })
     : t("Read {words} words of {kind} from {provider}.", { words: String(read.words), kind, provider: read.provider })
+}
+
+/** WHICH OF THE THREE-PLUS-ONE THINGS TO SAY, after `createKnowledge`'s door
+ * call comes back — pulled out as a pure function (no hook, no `toast`) so it
+ * can be checked directly rather than through a rendered component, the same
+ * way `linkReadSentence` beside it is.
+ *
+ * FOUR OUTCOMES, not three: `read` (a warm, specific toast), `refused` (handed
+ * back to the dialog, never shown here — a toast disappears and this must
+ * not), the ordinary case (the ordinary toast), and a fourth the hub's own
+ * review of this branch found missing — a bare video link whose reply
+ * carried NEITHER field. `read`/`refusedBecause` both null-safe is not the
+ * same as both HONEST: that shape means the door read nothing and said
+ * nothing about the link, the source saved with an empty body exactly as
+ * unreadable as before this feature existed, and the ORDINARY toast would be
+ * a promise the source cannot keep — the same shape as a door answering 200
+ * while the thing a person wanted never happened. Said plainly instead, via
+ * `toast.warning` — the same idiom `uploadKnowledgeFile`'s own `fileNote`
+ * already uses for "saved, but here is the honest catch." */
+export function knowledgeCreateOutcome(
+  res: { read?: KnowledgeLinkRead | null; refusedBecause?: string | null },
+  values: Pick<KnowledgeFormValues, "title" | "sourceUrl" | "body">,
+  t: Translate
+): { kind: "refused"; refusedBecause: string } | { kind: "read" | "silent-video" | "ordinary"; message: string } {
+  if (res.refusedBecause) return { kind: "refused", refusedBecause: res.refusedBecause }
+  if (res.read) return { kind: "read", message: linkReadSentence(res.read, t) }
+  if (isVideoLink((values.sourceUrl ?? "").trim()) && !values.body?.trim())
+    return {
+      kind: "silent-video",
+      message: t(
+        "Saved, but we didn't read anything from the link — the assistant won't know what this video says yet."
+      ),
+    }
+  return { kind: "ordinary", message: t('The assistant can now use "{title}".', { title: values.title }) }
 }
 
 export function useScreenActions(teamId: string | null) {
@@ -270,10 +305,10 @@ export function useScreenActions(teamId: string | null) {
         visibleToAppId: values.visibleToAppId || null,
       })
       primeCache(knowledgeKey(teamId), await listFetch.knowledge(teamId))
-      if (res.refusedBecause) return { refusedBecause: res.refusedBecause }
-      toast.success(
-        res.read ? linkReadSentence(res.read, t) : t('The assistant can now use "{title}".', { title: values.title })
-      )
+      const outcome = knowledgeCreateOutcome(res, values, t)
+      if (outcome.kind === "refused") return { refusedBecause: outcome.refusedBecause }
+      if (outcome.kind === "silent-video") toast.warning(outcome.message)
+      else toast.success(outcome.message)
     },
     [teamId, t]
   )
