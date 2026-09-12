@@ -40,6 +40,30 @@
 // report to the hub). Neither is ever the default; each needs its own flag
 // every time, on purpose.
 //
+// ── WHICH DOOR EACH COLUMN MODELS — read this before quoting a number ──────
+//
+// The plain default (no flag) and `--reader` are USEFUL FOR ATTRIBUTION —
+// each isolates one half of the mechanism, plain retrieval vs. the reader
+// unconditionally applied — but NEITHER is what a person asking a real
+// question gets, and for an hour on 2026-09-11/12 both were reported as if
+// they were. The shipped door (`GET /api/content/knowledge/ask`,
+// `routes/knowledge.ts`) is a TWO-PASS shape: `secondLook(ask({quiet:true}),
+// () => ask({read: reader}))` — search the cheap way first, and only pay
+// for a re-read if that pass found nothing. A row the plain pass already
+// answers is never handed to the reader at all, and never should be:
+// `--reader` runs the reader on every scored row unconditionally, which
+// pays for a re-read that row never needed and can let the reader's own
+// judgement overrule a result the strict floor had already accepted —
+// measured 2026-09-12: B-M16 and A-H7 looked like reader regressions this
+// way and were not; `secondLook` never invoked the reader on either one.
+//
+// `--real` is the column that answers "what does a person actually get" —
+// `secondLook` imported straight from `workers/content/src/lib/knowledge.ts`,
+// not reimplemented here, so this can never quietly drift from the door the
+// next time somebody changes it. THIS is the column `gate-exam` should be
+// judged on; `--reader` and the plain default stay useful only for saying
+// WHICH mechanism produced a given row's result.
+//
 // ── HOW IT MEASURES A BRANCH WITHOUT DEPLOYING, same as scripts/kb-bench.mjs ──
 //
 // `retrieve` is imported straight from the working tree
@@ -52,6 +76,7 @@
 //   node --experimental-transform-types scripts/kb-exam-run.mjs
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --verbose
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --reader
+//   node --experimental-transform-types scripts/kb-exam-run.mjs --real
 //   node --experimental-transform-types scripts/kb-exam-run.mjs --full-loop
 //
 // KB_INDEX / KB_CORE / KB_TEAM point it at another environment, same as
@@ -71,14 +96,15 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const REPO = join(HERE, "..")
 const VERBOSE = process.argv.includes("--verbose")
 const FULL_LOOP = process.argv.includes("--full-loop")
-const READER = FULL_LOOP || process.argv.includes("--reader")
+const REAL = process.argv.includes("--real")
+const READER = FULL_LOOP || REAL || process.argv.includes("--reader")
 
 const { account: ACCOUNT, token: TOKEN } = cloudflareCredentials()
 const CORE = process.env.KB_CORE || "1df02340-fc91-4cac-8ccb-d19528dcd9f7" // kwapso-core-staging
 const INDEX = process.env.KB_INDEX || "kwapso-knowledge-staging"
 const TEAM_NAME = process.env.KB_TEAM || "Kwapso"
 
-const { retrieve } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
+const { retrieve, secondLook } = await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge.ts"))
 const { writeAnswer } = FULL_LOOP ? await importTs(join(REPO, "workers", "content", "src", "lib", "knowledge-compose.ts")) : { writeAnswer: undefined }
 const { payToRead } = READER ? await importTs(join(REPO, "workers", "content", "src", "routes", "knowledge.ts")) : { payToRead: undefined }
 
@@ -253,7 +279,17 @@ if (structural.length) {
   process.exit(1)
 }
 
-console.log(`kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${FULL_LOOP ? ", FULL-LOOP (reader + writer)" : READER ? ", READER ON (retrieval + reader, no writer)" : ", retrieval-only (reader OFF)"}`)
+console.log(
+  `kb-exam-run — ${rows.length} rows against ${INDEX} (team ${team.id})${
+    FULL_LOOP
+      ? ", FULL-LOOP (reader + writer)"
+      : REAL
+        ? ", REAL DOOR (secondLook — the shipped GET /api/content/knowledge/ask shape, no writer)"
+        : READER
+          ? ", READER ON (retrieve() called with `read` unconditionally — NOT the shipped door's shape, see header)"
+          : ", retrieval-only (retrieve() called with no `read` at all — NOT the shipped door's shape either, see header)"
+  }`
+)
 for (const [rowId, email] of Object.entries(PERSONA_OVERRIDES)) console.log(`  persona override: ${rowId} asks as ${email}, not the default reader`)
 console.log()
 
@@ -271,13 +307,29 @@ for (const row of rows) {
   // never graded, so reading its shortlist would spend the allowance and
   // teach us nothing this harness can act on.
   const useReader = READER && !notScored
+  // A READER THAT NEVER THROWS — the route's own `reader` closure
+  // (`routes/knowledge.ts`), copied rather than approximated: a role with
+  // no `agent:create` right would otherwise turn a refusal into a crash.
+  const readerFn = (q, shortlist) =>
+    payToRead(env, CFG, rowGuard, actor, q, shortlist).catch(() => null)
   let answer
   try {
-    answer = await retrieve(env, CFG, rowGuard, {
-      question: row.question,
-      compose: FULL_LOOP ? (material, sources) => writeAnswer(env, row.question, material, sources) : undefined,
-      read: useReader ? (q, shortlist) => payToRead(env, CFG, rowGuard, actor, q, shortlist) : undefined,
-    })
+    if (REAL && !notScored) {
+      // THE SHIPPED DOOR, EXACTLY — `secondLook` imported from the same
+      // lib the route calls, not reimplemented here, so this can never
+      // drift from the door the next time somebody changes it. Pass one
+      // is quiet (no refusal-log row for a provisional refusal, same as
+      // the route); the retry only runs if pass one found nothing, and a
+      // row pass one already answers pays for no reader at all.
+      const ask = (opts) => retrieve(env, CFG, rowGuard, { question: row.question, ...opts })
+      answer = await secondLook(await ask({ quiet: true }), () => ask({ read: readerFn }))
+    } else {
+      answer = await retrieve(env, CFG, rowGuard, {
+        question: row.question,
+        compose: FULL_LOOP ? (material, sources) => writeAnswer(env, row.question, material, sources) : undefined,
+        read: useReader ? readerFn : undefined,
+      })
+    }
   } catch (e) {
     console.log(`${row.id.padEnd(14)} FAIL  threw: ${String(e).slice(0, 120)}`)
     continue
