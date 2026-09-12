@@ -34,6 +34,7 @@ import {
   readSource,
   readersFor,
   readersForLink,
+  resolveLinkType,
   youtubeVideoId,
   type ReaderName,
 } from "../src/lib/source-readers"
@@ -132,6 +133,36 @@ describe("R42 — no door chooses its own reader", () => {
     const table = stripComments(readFileSync(join(SRC, "source-readers.ts"), "utf8"))
     expect(table).toMatch(/\benv\.AI\.toMarkdown\b/)
     expect(table).toMatch(/\bofficeText\(/)
+  })
+})
+
+// ── R42's OTHER GAP: PRESENT IN THE TABLE IS NOT THE SAME AS REACHED ────────
+//
+// The census above proves a door never picks its OWN reader. It says nothing
+// about the opposite failure: a type sitting in the table with a real reader,
+// asked by no door at all. `extractLink` (knowledge-files.ts) was exactly
+// that from the day it was written until BUILD-5 (11 Sep 2026) wired it into
+// `createSource` — every `LINK_TYPES` reader (youtube-captions,
+// loom-best-effort, tella-best-effort) was complete, tested and real, and the
+// function that turns a link into a call to `readLink`/`resolveLinkType` had
+// zero callers anywhere in the app. A reader nothing calls is
+// indistinguishable from a reader that does not exist, and neither the table
+// nor a unit test of `extractLink` in isolation can see that about it — only
+// walking the actual DOOR can, which is why this is censused off
+// `knowledge.ts` itself, comments stripped, the same discipline as the
+// census above.
+//
+// THE MUTATION THIS EXISTS FOR: `createSource` loses its call to
+// `extractLink` — exactly the state this app shipped in for two weeks,
+// silently, under a green build, because nothing ever asked "is this called"
+// rather than "does this exist and pass its own tests".
+describe("R42 — extractLink, the link table's one funnel, is called by a real door", () => {
+  it("createSource's door (knowledge.ts) calls extractLink — not merely defines and tests it", () => {
+    const doorSrc = stripComments(readFileSync(join(SRC, "knowledge.ts"), "utf8"))
+    expect(
+      doorSrc,
+      "extractLink must be CALLED from a real door (knowledge.ts), not just exported from knowledge-files.ts"
+    ).toMatch(/\bextractLink\(/)
   })
 })
 
@@ -235,10 +266,17 @@ describe("readLink", () => {
   })
 
   it("Tella best-effort, same shape as Loom", async () => {
-    globalThis.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ title: "Onboarding demo" }), { status: 200 })
-    ) as unknown as typeof fetch
+    const calls: string[] = []
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      calls.push(String(input))
+      return new Response(JSON.stringify({ title: "Onboarding demo" }), { status: 200 })
+    }) as unknown as typeof fetch
     expect(await readLink("https://www.tella.tv/video/xyz")).toBe("Onboarding demo")
+    // MEASURED LIVE, 11 Sep 2026: the bare `/oembed` path 404s against a real
+    // Tella account; `/api/oembed` is the real, working path. Pinned here so a
+    // reader that regresses back to the bare path fails loudly rather than
+    // silently, the way it shipped the first time with nothing to catch it.
+    expect(calls[0]).toContain("/api/oembed")
   })
 
   it("a Loom/Tella oEmbed that 404s is an honest empty, never a throw", async () => {
@@ -251,6 +289,100 @@ describe("readLink", () => {
       throw new Error("must not be called")
     }) as unknown as typeof fetch
     expect(await readLink("https://vimeo.com/1")).toBe("")
+  })
+})
+
+// ── A CUSTOM DOMAIN, RESOLVED BY WHAT ITS OWN PAGE SAYS, NOT BY ITS HOST ────
+//
+// The real gap: content.kwapso.com is the owner's OWN domain in front of a
+// genuine Tella recording — confirmed live, 11 Sep 2026, via the page's own
+// oEmbed discovery tag pointing at www.tella.tv/api/oembed. No host list can
+// ever enumerate a customer's own CNAME, so this is resolved by reading the
+// one thing every oEmbed provider is expected to publish on its own page.
+describe("resolveLinkType / readLink — a Tella (or Loom) custom domain, discovered rather than listed", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
+  const TELLA_PAGE_HTML =
+    '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=https%3A%2F%2Fcontent.kwapso.com%2Fvideo%2Fx" ' +
+    'title="A recording" type="application/json+oembed"/></head><body></body></html>'
+
+  it("resolveLinkType discovers Tella behind an unrecognised custom domain", async () => {
+    globalThis.fetch = vi.fn(async () => new Response(TELLA_PAGE_HTML, { status: 200 })) as unknown as typeof fetch
+    const kind = await resolveLinkType("https://content.kwapso.com/video/hogo-cv-upload-optimised-5snm")
+    expect(kind?.label).toBe("Tella recording")
+  })
+
+  it("readLink discovers AND reads a Tella custom domain end to end", async () => {
+    const calls: string[] = []
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      calls.push(url)
+      if (url.includes("/video/")) return new Response(TELLA_PAGE_HTML, { status: 200 })
+      return new Response(JSON.stringify({ title: "Hogo: CV Upload Optimised" }), { status: 200 })
+    }) as unknown as typeof fetch
+
+    expect(await readLink("https://content.kwapso.com/video/hogo-cv-upload-optimised-5snm")).toBe(
+      "Hogo: CV Upload Optimised"
+    )
+    // The page is fetched ONCE for discovery, then the oEmbed API is called
+    // separately for the title — never a second discovery fetch of the page
+    // by the reader itself.
+    expect(calls.filter((c) => c.includes("/video/"))).toHaveLength(1)
+    expect(calls.filter((c) => c.includes("/api/oembed"))).toHaveLength(1)
+  })
+
+  it("never fetches an ordinary, non-video link on the chance it might be one", async () => {
+    // NOT "throws if called" — `fetchLinkText` swallows any thrown error into
+    // an honest empty, so a mock that throws proves nothing here. The call
+    // COUNT is the only real proof, exactly like the host-recognised case
+    // below.
+    globalThis.fetch = vi.fn(async () => new Response("should never be requested", { status: 200 })) as unknown as typeof fetch
+    expect(await resolveLinkType("https://example.com/blog/my-post")).toBeNull()
+    expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(0)
+    expect(await readLink("https://example.com/blog/my-post")).toBe("")
+    expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(0)
+  })
+
+  it("a /video/ path on an unrecognised host with no oEmbed tag at all is an honest empty, not a throw", async () => {
+    globalThis.fetch = vi.fn(
+      async () => new Response("<html><head><title>Just a page</title></head></html>", { status: 200 })
+    ) as unknown as typeof fetch
+    expect(await resolveLinkType("https://example.com/video/family-holiday")).toBeNull()
+    expect(await readLink("https://example.com/video/family-holiday")).toBe("")
+  })
+
+  it("a /video/ path whose page fetch fails outright is the same honest empty", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("network down")
+    }) as unknown as typeof fetch
+    expect(await readLink("https://example.com/video/whatever")).toBe("")
+  })
+
+  it("a host ALREADY in the table never triggers discovery at all", async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ title: "Q3 planning walkthrough" }), { status: 200 })
+    ) as unknown as typeof fetch
+    // loom.com is host-recognised directly; if discovery ran too, this would
+    // be TWO fetches (the page, then the oEmbed call) instead of one.
+    await readLink("https://loom.com/share/abc")
+    expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(1)
+  })
+
+  it("readLink accepts a pre-resolved type and never re-fetches the page to find it", async () => {
+    const kind = LINK_TYPES.find((t) => t.label === "Tella recording") ?? null
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      // Only the oEmbed call itself — never the page, because the type was
+      // already handed in.
+      expect(String(input)).toContain("/api/oembed")
+      return new Response(JSON.stringify({ title: "Hogo: CV Upload Optimised" }), { status: 200 })
+    }) as unknown as typeof fetch
+    expect(
+      await readLink("https://content.kwapso.com/video/hogo-cv-upload-optimised-5snm", kind)
+    ).toBe("Hogo: CV Upload Optimised")
+    expect(vi.mocked(globalThis.fetch).mock.calls).toHaveLength(1)
   })
 })
 

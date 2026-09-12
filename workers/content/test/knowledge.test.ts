@@ -23,7 +23,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { DatabaseSync } from "node:sqlite"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const holder = vi.hoisted(() => ({ db: null as DatabaseSync | null }))
 
@@ -2052,19 +2052,29 @@ describe("an envelope does not take a slot from something that says more", () =>
   // padded" below.
 })
 
-// ── A LINK TO A VIDEO IS NOT A SOURCE — IT IS A LINK TO ONE ────────────────
+// ── A VIDEO LINK IS READ, NOT REFUSED — BUILD-5, 11 SEP 2026 ────────────────
 //
-// Every unreadable thing that ever reached this knowledge base failed the same
-// way: accepted, stored, quietly never read, and the person never told. 131
-// files of logo artwork got in that way; every PDF scored 0.000 on letter-shaped
-// tokens that way; `image/*` has been opaque since the beginning that way.
+// The owner ruled on 27 Aug 2026 that a video link with nothing pasted beside
+// it was REFUSED — "we don't open the page for you" — because every
+// unreadable thing that ever reached this base before that got in by being
+// silently accepted: 131 files of logo artwork, every PDF at 0.000
+// letter-shaped tokens, `image/*` opaque since the beginning.
 //
-// The owner ruled on 27 Aug 2026 that a video link is REFUSED instead, and that
-// the refusal carries the fix: paste the transcript and the source is welcome.
-// The form says so while somebody is typing; this is the door, which is what
-// holds when the request comes from the assistant, from MCP, or from a screen
-// that has drifted.
-describe("a video link is refused unless its transcript comes with it", () => {
+// He reversed himself, deliberately, on 11 Sep 2026: "For YouTube, Loom,
+// Tella, and any other video URLs where we can extract a transcription...
+// Let's build it." A video link with nothing pasted is now ACCEPTED and READ
+// through the one declared reader table (R42, source-readers.ts) — real words
+// become the body, and where there are none, the SAME honest-refusal sentence
+// becomes the body instead of a 400, so "paste it yourself" is text already
+// sitting in the box rather than a toast that vanished. An ordinary,
+// non-video link with nothing pasted is still refused exactly as before —
+// nothing here is built to fetch it.
+describe("a video link is read, and a plain link still needs its material pasted", () => {
+  const realFetch = globalThis.fetch
+  afterEach(() => {
+    globalThis.fetch = realFetch
+  })
+
   const video = (body?: string) =>
     call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Bergman cutover walkthrough",
@@ -2072,20 +2082,38 @@ describe("a video link is refused unless its transcript comes with it", () => {
       ...(body ? { body } : {}),
     })
 
-  it("refuses it, and says what would fix it", async () => {
+  it("finds a real transcript and stores it as the body — never a 400 for having nothing pasted", async () => {
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      if (url.includes("type=list"))
+        return new Response('<transcript_list><track lang_code="en"/></transcript_list>', { status: 200 })
+      return new Response(
+        "<transcript><text>Marta walked the cutover to the first Monday of April.</text></transcript>",
+        { status: 200 }
+      )
+    }) as unknown as typeof fetch
     const res = await video()
-    expect(res.status).toBe(400)
-    const out = (await res.json()) as { error: string; message: string }
-    expect(out.error).toBe("video_needs_transcript")
-    expect(out.message, "the refusal must carry the remedy, not just the no").toMatch(/transcript/i)
+    expect(res.status).toBe(200)
+    // Real words are the MATERIAL, chunked and searchable like any other
+    // source — asserted on the index rather than on an answer, same reasoning
+    // as the pasted-transcript test below.
+    const row = db()
+      .prepare(
+        `SELECT chunk_count AS n, body AS b FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
+      )
+      .get("Bergman cutover walkthrough") as { n: number; b: string } | undefined
+    expect(row?.b, "the caption text must be the body").toMatch(/first Monday of April/)
+    expect(row?.n, "a real transcript is chunked, not merely stored").toBeGreaterThan(0)
   })
 
-  it("and stores NOTHING — a refused source is not a row that answers nothing", async () => {
-    await video()
-    const rows = db()
-      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
-      .get("Bergman cutover walkthrough") as { n: number }
-    expect(rows.n).toBe(0)
+  it("finds nothing, and the honest note becomes the visible, editable body — still never a 400", async () => {
+    globalThis.fetch = vi.fn(async () => new Response("<transcript_list></transcript_list>", { status: 200 })) as unknown as typeof fetch
+    const res = await video()
+    expect(res.status).toBe(200)
+    const row = db()
+      .prepare(`SELECT body AS b FROM knowledge_sources WHERE title = ?`)
+      .get("Bergman cutover walkthrough") as { b: string } | undefined
+    expect(row?.b, "the remedy sits in the box, not in a sentence that vanished").toMatch(/transcript/i)
   })
 
   it("accepts it the moment the transcript is pasted, and indexes what was said", async () => {
@@ -2093,10 +2121,11 @@ describe("a video link is refused unless its transcript comes with it", () => {
       "Marta walked the cutover: the invoice run moves to the first Monday of April and Ana sends the supplier list."
     )
     expect(res.status).toBe(200)
-    // The transcript is the MATERIAL, not a note beside the link — so it is
-    // chunked and searchable like any other source. Asserted on the index rather
-    // than on an answer: what a stand-in embedding model ranks is a different
-    // subject, and this one is about the row existing with its words in it.
+    // The pasted transcript is the MATERIAL, not a note beside the link — so it
+    // is chunked and searchable like any other source. Asserted on the index
+    // rather than on an answer: what a stand-in embedding model ranks is a
+    // different subject, and this one is about the row existing with its
+    // words in it.
     const row = db()
       .prepare(
         `SELECT chunk_count AS n FROM knowledge_sources WHERE title = ? AND body LIKE '%first Monday of April%'`
@@ -2105,34 +2134,49 @@ describe("a video link is refused unless its transcript comes with it", () => {
     expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
   })
 
-  // THE GATE IS THE EMPTY BODY, NOT THE HOST — and this is the case that moved
-  // it. The owner pasted a Tella recording behind his OWN domain,
-  // `content.kwapso.com/video/…`, which walked past all fifteen hostnames and
-  // became a source with a title, a link and no body: the exact shape the rule
-  // exists to prevent, produced by the rule meant to prevent it.
-  it("refuses ANY link with nothing to read, including one no list could name", async () => {
+  // THE GATE WAS THE EMPTY BODY, NOT THE HOST — and this is the case that
+  // moved the original rule, then moved it again. The owner's own Tella
+  // recording behind his own domain, `content.kwapso.com/video/…`, walked
+  // past every hostname on the old list; now it is resolved by the page's own
+  // oEmbed discovery tag (source-readers.ts, `resolveLinkType`) and accepted,
+  // same as a listed host.
+  it("a Tella recording behind the owner's own domain is accepted too, discovered by oEmbed", async () => {
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input)
+      if (url.includes("/video/"))
+        return new Response(
+          '<html><head><link rel="alternate" href="https://www.tella.tv/api/oembed?url=x" title="A recording" type="application/json+oembed"/></head></html>',
+          { status: 200 }
+        )
+      return new Response(JSON.stringify({ title: "Testing application loading speed" }), { status: 200 })
+    }) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Tella 1",
       sourceUrl: "https://content.kwapso.com/video/testing-application-loading-speed-cbfo",
     })
-    expect(res.status).toBe(400)
-    const rows = db().prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?").get("Tella 1") as {
-      n: number
-    }
-    expect(rows.n, "and stores nothing — a row that looks filed and holds nothing is the defect").toBe(0)
+    expect(res.status).toBe(200)
+    const row = db().prepare("SELECT body AS b FROM knowledge_sources WHERE title = ?").get("Tella 1") as
+      | { b: string }
+      | undefined
+    expect(row?.b, "best-effort is the title, honestly, not nothing").toBe("Testing application loading speed")
   })
 
-  it("and an ordinary link with nothing to read is refused too, in different words", async () => {
+  it("and an ordinary, non-video link with nothing to read is still refused, in different words", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called — a non-video link is refused before extraction is ever tried")
+    }) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "The dispatch runbook",
       sourceUrl: "https://docs.example.com/runbook",
     })
     expect(res.status).toBe(400)
     const out = (await res.json()) as { error: string; message: string }
-    // The DETECTOR still runs — it just chooses the sentence now rather than the
-    // outcome. A person who pasted a document link is not told we cannot watch it.
     expect(out.error).toBe("link_needs_material")
     expect(out.message).not.toMatch(/watch a video/i)
+    const rows = db()
+      .prepare("SELECT count(*) AS n FROM knowledge_sources WHERE title = ?")
+      .get("The dispatch runbook") as { n: number }
+    expect(rows.n, "a refused source is not a row that answers nothing").toBe(0)
   })
 
   it("and a link is welcome the moment there is something to read beside it", async () => {
@@ -2144,12 +2188,22 @@ describe("a video link is refused unless its transcript comes with it", () => {
     expect(res.status).toBe(200)
   })
 
-  it("a direct link to an .mp4 is refused too, wherever it is hosted", async () => {
+  // No host, no `/video/` path segment — resolveLinkType never even fetches —
+  // so this is the "recognised as a video, no reader for it yet" honest note,
+  // accepted and kept exactly like the no-caption-track case above.
+  it("a direct link to an .mp4 is accepted too, with the honest note as its body", async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error("must not be called — no host and no /video/ path segment to discover")
+    }) as unknown as typeof fetch
     const res = await call(IDS.staffUser, "POST /api/content/knowledge", {
       title: "Standup recording",
       sourceUrl: "https://files.bergman.example/standup-2026-03-04.mp4",
     })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    const row = db().prepare("SELECT body AS b FROM knowledge_sources WHERE title = ?").get("Standup recording") as
+      | { b: string }
+      | undefined
+    expect(row?.b, "kept as a source either way, never silently dropped").toMatch(/can't read this link/i)
   })
 })
 

@@ -48,6 +48,7 @@ import type { Ai } from "@cloudflare/workers-types"
 import { NO_TOKENS, type TokenUsage } from "@shared/workers/credits"
 import { parseCsv } from "@shared/workers/csv"
 import { queryText } from "@shared/workers/validate"
+import { hasVideoPathSegment } from "@shared/media-links"
 
 import { looksLikeProse, officeText, readsLikeWords } from "./file-text"
 import { chunkSheetTab, contextLinePrompt } from "./knowledge-text"
@@ -578,15 +579,72 @@ async function runLinkReader(reader: ReaderName, url: string): Promise<string> {
     return id ? await readYouTubeCaptions(id) : ""
   }
   if (reader === "loom-best-effort") return readOEmbedTitle("https://www.loom.com/v1/oembed", url)
-  if (reader === "tella-best-effort") return readOEmbedTitle("https://www.tella.tv/oembed", url)
+  // MEASURED LIVE, 11 Sep 2026, against the owner's own recording
+  // (content.kwapso.com/video/hogo-cv-upload-optimised-5snm): the bare
+  // `/oembed` path 404s — a real Next.js not-found page, not a redirect —
+  // and the page's OWN oEmbed discovery tag names `/api/oembed`, which
+  // answers 200 with the real title. Never smoke-tested against a live
+  // account before that night, exactly as this table's own header always
+  // said it hadn't been.
+  if (reader === "tella-best-effort") return readOEmbedTitle("https://www.tella.tv/api/oembed", url)
   return ""
+}
+
+/** A KNOWN PROVIDER'S OWN OEMBED DISCOVERY TAG, read off a page whose HOST
+ * `classifyLink` does not recognise — the standard oEmbed mechanism, not a
+ * scrape: a provider a customer can put behind their OWN domain (Tella's own
+ * custom-domain feature, which is exactly what exposed this gap — the
+ * owner's `content.kwapso.com` is a real Tella recording, confirmed live)
+ * advertises its real API host in `<link type="application/json+oembed"
+ * href="...">`, and THAT href's host is what tells us which reader applies —
+ * never the domain the link was shared from, which by definition can be
+ * anything a customer points a CNAME at.
+ *
+ * BOUNDED BY `hasVideoPathSegment` (shared/media-links.ts) so this never
+ * fetches an ORDINARY link on the chance it might be a video — the same
+ * measured signal (891 real links, one match, zero false positives)
+ * `isVideoLink` uses for its own loosest check, asked directly here rather
+ * than through it: `isVideoLink` would also fire for a plain `vimeo.com`
+ * link this table has no reader for at all, which is not this question. */
+async function discoverLinkTypeByOEmbed(url: string): Promise<LinkType | null> {
+  if (!hasVideoPathSegment(url)) return null
+  const html = await fetchLinkText(url)
+  if (!html) return null
+  // EVERY `<link>` TAG, THEN FILTERED BY ATTRIBUTE — never one regex assuming
+  // an order. Measured against the real page: Tella's own markup writes
+  // `href` BEFORE `type` (`<link rel="alternate" href="…" title="…"
+  // type="application/json+oembed"/>`), and HTML attribute order is never a
+  // contract in the first place.
+  const tag = (html.match(/<link\b[^>]*>/gi) ?? []).find((t) =>
+    /type=["']application\/json\+oembed["']/i.test(t)
+  )
+  const href = tag?.match(/href=["']([^"']+)["']/i)?.[1]
+  if (!href) return null
+  const host = hostOf(decodeXmlEntities(href))
+  if (!host) return null
+  return LINK_TYPES.find((t) => t.hosts.some((h) => host === h || host.endsWith(`.${h}`))) ?? null
+}
+
+/** THE LINK'S TYPE, host-based first and discovered second — computed ONCE so
+ * a caller that needs to know WHY a link could not be read (`extractLink`'s
+ * honest refusal) is never guessing at something `readLink` already worked
+ * out, and never re-fetching the same page to ask the same question twice. */
+export async function resolveLinkType(url: string): Promise<LinkType | null> {
+  return classifyLink(url) ?? (await discoverLinkTypeByOEmbed(url))
 }
 
 /** ONE LINK'S WORDS, by the same table shape as `readSource`. A reader that
  * yields nothing or throws is the next one's turn, exactly as above; empty at
- * the end is the honest "there are no words we could read here". */
-export async function readLink(url: string): Promise<string> {
-  for (const reader of readersForLink(url)) {
+ * the end is the honest "there are no words we could read here".
+ *
+ * `knownType` LETS A CALLER THAT ALREADY RESOLVED THE TYPE (`extractLink`,
+ * which needs it anyway for the refusal sentence) HAND IT STRAIGHT IN —
+ * `undefined` (the default, and every existing caller's shape) means resolve
+ * it here exactly as before. Passing `null` explicitly still means "no type,
+ * no readers, honest empty" and is never confused with "not supplied". */
+export async function readLink(url: string, knownType?: LinkType | null): Promise<string> {
+  const type = knownType !== undefined ? knownType : await resolveLinkType(url)
+  for (const reader of type?.readers ?? []) {
     let text = ""
     try {
       text = await runLinkReader(reader, url)

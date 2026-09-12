@@ -45,7 +45,7 @@
 
 import { causeOf, recordWorkerError } from "@shared/workers/error-log"
 import { GuardError } from "@shared/workers/gating"
-import { classifyLink, readLink, readersFor, runReader, type ReaderName } from "./source-readers"
+import { readLink, readersFor, resolveLinkType, runReader, type ReaderName } from "./source-readers"
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import type { Env } from "../env"
 
@@ -261,13 +261,19 @@ export async function extractFile(
  * whose video has no caption track, is a true and useful answer, the same way
  * an unreadable file is. */
 export async function extractLink(url: string): Promise<ExtractedFile> {
-  const kind = classifyLink(url)
+  // HOST-BASED FIRST, DISCOVERED SECOND (`resolveLinkType`, source-readers.ts)
+  // — a custom domain (the owner's own `content.kwapso.com`, a real Tella
+  // recording no host list can ever see) is resolved by reading its OWN
+  // oEmbed discovery tag rather than refused for not matching a name. The
+  // resolved type is handed straight into `readLink` below so the page is
+  // never fetched twice to ask the same question.
+  const kind = await resolveLinkType(url)
   if (!kind)
     return {
       text: null,
       note: "We can't read this link, so it is kept here but the assistant can't answer from it. Anything you type into the note below IS searchable.",
     }
-  const text = await readLink(url)
+  const text = await readLink(url, kind)
   return text
     ? capToRow(text)
     : {

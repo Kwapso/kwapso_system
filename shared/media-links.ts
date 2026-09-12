@@ -76,6 +76,30 @@ const MEDIA_EXTENSIONS = [
   ".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg",
 ]
 
+/** A `/video/` PATH SEGMENT — the one signal that catches a custom domain no
+ * host list can ever see, pulled out on its own because two callers need
+ * exactly this signal and nothing wider.
+ *
+ * The link that exposed all of this was `content.kwapso.com/video/…` — the
+ * owner's OWN domain in front of a Tella recording, which no host list can
+ * ever see. Measured against the 891 links already in his base: `/video/`
+ * appears in exactly one of them, and it is that link. Zero false positives.
+ *
+ * `isVideoLink` folds this in as its last, loosest check — "is this ANY
+ * video, so which sentence does the person read". `source-readers.ts`'s own
+ * question is narrower: NOT already a host it knows by name, and does its
+ * OWN page carry an oEmbed discovery tag naming a provider it does know —
+ * so it asks this signal directly rather than through `isVideoLink`, whose
+ * host list would also fire for a plain `vimeo.com` link this app has no
+ * reader for at all. */
+export function hasVideoPathSegment(url: string): boolean {
+  try {
+    return new URL(url).pathname.toLowerCase().split("/").includes("video")
+  } catch {
+    return false
+  }
+}
+
 /** IS THIS A LINK TO SOMETHING WE CANNOT READ BY FOLLOWING IT?
  *
  * False for anything that is not a URL at all: this decides whether to offer the
@@ -95,17 +119,10 @@ export function isVideoLink(url: string): boolean {
   if (VIDEO_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return true
   const path = parsed.pathname.toLowerCase()
   if (MEDIA_EXTENSIONS.some((ext) => path.endsWith(ext))) return true
-  // A `/video/` SEGMENT, which is the only thing that catches a custom domain.
-  //
-  // The link that exposed all of this was `content.kwapso.com/video/…` — the
-  // owner's OWN domain in front of a Tella recording, which no host list can ever
-  // see. Measured against the 891 links already in his base: `/video/` appears in
-  // exactly one of them, and it is that link. Zero false positives.
-  //
   // IT IS SAFE TO BE LOOSE HERE NOW, and it would not have been before. This
   // predicate no longer decides whether a source is REFUSED — the empty-body rule
   // does that, and it does not care what the host is. All this decides is which
   // sentence the person reads. A wrong guess costs a slightly-off sentence about
   // a source that was being refused anyway.
-  return path.split("/").includes("video")
+  return hasVideoPathSegment(raw)
 }

@@ -132,6 +132,7 @@ import type {
 } from "@shared/types"
 import type { Env } from "../env"
 import { contextLineFor } from "./source-readers"
+import { extractLink } from "./knowledge-files"
 import {
   CHUNK_TARGET_CHARS,
   chunkText,
@@ -1287,16 +1288,25 @@ function readInput(input: SourceInput): {
   // nobody was told. Paste what it says and the source is welcome; paste nothing
   // and there is no row pretending to hold an answer.
   //
-  // NOTHING IS FETCHED. There is no reader for a web page yet, and a network call
-  // with a timeout on every paste would be a lot of machinery to decide something
-  // this line already decides correctly without it.
-  if (sourceUrl && !plainText(body ?? "").trim())
+  // THE OWNER REVERSED THIS FOR VIDEO LINKS, 11 Sep 2026, DELIBERATELY — the
+  // comment above stood as "we don't open the page for you" for two weeks and
+  // is wrong for exactly the shape it was written about. His own words: "For
+  // YouTube, Loom, Tella, and any other video URLs where we can extract a
+  // transcription... Let's build it... Whether I paste Tella, Loom, or
+  // YouTube doesn't matter." So a VIDEO link with no pasted material is no
+  // longer refused here — `createSource` below now calls `extractLink`
+  // (source-readers.ts, R42's table) and either finds real words or an
+  // honest note explaining why not, the same two-promise shape `extractFile`
+  // already gives an unreadable upload. NOTHING ELSE CHANGED: a link this
+  // table does not know how to read at all (`isVideoLink` false — an
+  // ordinary web page, not a video) still has no reader here and is still
+  // refused exactly as before, because there genuinely is nothing built to
+  // fetch it.
+  if (sourceUrl && !plainText(body ?? "").trim() && !isVideoLink(sourceUrl))
     throw new GuardError(
       400,
-      isVideoLink(sourceUrl) ? "video_needs_transcript" : "link_needs_material",
-      isVideoLink(sourceUrl)
-        ? "We can't watch a video, so a link on its own gives the assistant nothing to read. Paste the transcript into the material and this source is good to go."
-        : "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
+      "link_needs_material",
+      "A link on its own gives the assistant nothing to read — we don't open the page for you. Paste or write what it says into the material and this source is good to go."
     )
   return {
     title: requireText(input.title, "Title", TEXT_LIMITS.short),
@@ -1400,6 +1410,24 @@ export async function createSource(
   // (what a search may ADMIT).
   const accountsFiled = await Promise.all(v.accountIds.map((aid) => requireAccount(cfg, guard, aid)))
   const appsFiled = await Promise.all(v.appIds.map((aid) => requireOpenableApp(cfg, guard, aid)))
+  // THE VIDEO LINK IS READ HERE, ONCE, BEFORE ANY ROW EXISTS — the owner's
+  // reversal (readInput's own comment says the words). `readInput` already
+  // let a video link with no pasted material past its refusal; this is where
+  // that promise is kept. R42: `extractLink` is the one table both doors ask,
+  // never a reader chosen here.
+  //
+  // TWO OUTCOMES, NEVER A THIRD. Real words become the body, exactly as if
+  // the person had pasted them. No words becomes `extract.note` AS the body —
+  // visible, and still an ordinary editable note, so "paste the transcript
+  // yourself" (the owner's own fallback, unchanged) is the text already
+  // sitting in the box rather than a sentence in a toast that vanishes. This
+  // is never a 400: a video link is accepted and kept either way, the same
+  // two promises `extractFile` already makes an unreadable upload.
+  let body = v.body
+  if (v.sourceUrl && !plainText(body ?? "").trim() && isVideoLink(v.sourceUrl)) {
+    const extract = await extractLink(v.sourceUrl)
+    body = extract.text ?? extract.note
+  }
   const id = ulid()
   const now = new Date().toISOString()
   const compartment = account ? accountCompartment(account.id) : AGENCY_COMPARTMENT
@@ -1407,7 +1435,7 @@ export async function createSource(
     noun: "note",
     title: v.title,
     accountName: account?.name ?? null,
-    detail: v.body ?? "",
+    detail: body ?? "",
   })
   await d1Query(
     cfg,
@@ -1421,8 +1449,8 @@ export async function createSource(
       v.accountId,
       v.title,
       summary,
-      v.body,
-      byteLength(v.body),
+      body,
+      byteLength(body),
       v.sourceUrl,
       v.privateToMe ? guard.userId : null,
       v.visibleToAppId,
