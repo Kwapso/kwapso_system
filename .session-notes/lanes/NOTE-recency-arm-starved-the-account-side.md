@@ -80,3 +80,40 @@ either way. Whether that needs a wider window for `agency` specifically, a diffe
 retrieval strategy for agency-filed material, or something else entirely was not opened
 the night this was found — it is a real, harder, and separate question for whoever picks
 it up next.
+
+## Addendum, same night: a gentler vote was tried on A-H14, and thrown away
+
+A-H14 ("what's the newest thing we know about Padelbase's workflows") looked like the
+kind of row a gate might fix without a wider window: `fuse()` was changed so recency
+only contributes a candidate's score if that same candidate also appears in the vector
+or lexical arm's own list (`fix/kb-recency-fuses-with-relevance`, never merged, never
+committed past a working-tree diff on `knowledge.ts`). The hub authorised it for A-H14
+specifically. It was reverted the same night, and the reasoning is worth keeping because
+the row itself is closed but the underlying question is not:
+
+- **It didn't do the job it was authorised for.** A-H14 didn't flip. Traced to why: the
+  wrong winners that beat the real answer today pass the new gate on their own merits —
+  they're already relevant by vector/lexical score, recency was never their only
+  credential — and the *right* source for A-H14 lives in `agency` and never reaches that
+  compartment's own recency top-8 in the first place, gate or no gate. The fix addressed
+  a vote recency wasn't the deciding factor in.
+- **It bought nothing measured.** 36/47, `byTag` identical to the digit, before and after.
+- **It cost a documented guarantee for nothing in return.** Two tests encode KB-AUDIT
+  §4.5's canonical case — a recency question recovering a source that shares *zero*
+  vocabulary with the question, which is the entire reason the recency arm exists as a
+  separate arm rather than leaning on vector/lexical alone. Gating recency's vote on
+  vector/lexical agreement is a direct, structural conflict with that guarantee: the
+  fixture the tests use (older client material, fresher unrelated `agency` traffic, and a
+  question with no shared words) is exactly the shape the gate would now refuse to
+  surface. Updating the tests to match the new code was the wrong move here — it would
+  have quietly deleted the guarantee rather than admitted the trade-off.
+- **The actual finding survives the revert.** A separate experiment (recency arm removed
+  entirely from the fused result) *did* surface the right document for A-H14's question
+  shape. So the honest statement isn't "the vote needs to be gentler" — it's that **the
+  recency arm actively harms this specific question class** (a client-named "what's
+  newest" question whose real answer lives in a compartment the recency arm's own window
+  can't reach), and the open question is not how recency should vote once it's in the
+  race, but **whether it should be entered into this race at all** for a question shaped
+  like A-H14/A-O3. That is a bigger design question than a fusion tweak, and it sits
+  beside the still-open "agency volume" problem two sections up — they may turn out to be
+  the same question asked two ways.
