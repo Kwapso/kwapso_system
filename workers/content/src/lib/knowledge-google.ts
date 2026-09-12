@@ -997,18 +997,75 @@ async function writeChatSpaceBackfillError(
  * sweep's chat kind, below, and `refileChatSources`'s backfill. A live
  * thread and an already-filed one can never disagree about what a space
  * means, because there is exactly one place that decides it. */
+/** A MATCH THAT NAMES A PERSON, NOT A COMPANY, REDIRECTED OR REFUSED
+ * (defect found in review, 12 Sep 2026, live staging dry run: "Hannah
+ * Thallinger" and "Paras Maroo" — direct-message spaces named after a
+ * person — resolved 489 sources onto the PERSON'S OWN account_type =
+ * 'individual' row). This is the exact mistake a-names' own contact design
+ * already refused once: nothing in the base is ever filed under a person's
+ * own individual-account id, which is why a contact's `knowledge_names` row
+ * carries the LINKED COMPANY's id as `ref_id`, never the contact's own —
+ * `accountsNamedIn` returning an individual id at all means either a stale
+ * index (seeded before that fix) or some other row this function was never
+ * meant to trust blindly. Checked here rather than assumed away, so a
+ * one-on-one with a CLIENT's contact still resolves to that client's own
+ * material — a DM with Hannah about HOGO business is plausibly HOGO's — and
+ * a one-on-one with a COLLEAGUE resolves to nobody, the same as it always
+ * did: a colleague has no company of their own and agency material has no
+ * business being filed under one person's name. */
+async function accountBehindMatch(cfg: D1Rest, guard: MemberGuard, matchedId: string): Promise<string | null> {
+  const [account] = await d1Query<{ account_type: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT account_type FROM accounts WHERE id = ? LIMIT 1",
+    [matchedId]
+  )
+  if (!account || account.account_type !== "individual") return matchedId
+  const links = await d1Query<{ account_id: string }>(
+    cfg,
+    guard.databaseId,
+    "SELECT DISTINCT account_id FROM account_links WHERE person_account_id = ? AND deactivated_at IS NULL",
+    [matchedId]
+  )
+  // Exactly one company, the same ambiguity rule as everywhere else in this
+  // module: a colleague (no link at all) or a person linked to more than one
+  // company resolves to neither, never a guess.
+  return links.length === 1 ? links[0].account_id : null
+}
+
 export async function resolveChatSpaceAccounts(
   cfg: D1Rest,
   guard: MemberGuard
 ): Promise<Map<string, string | null>> {
+  // ONE SPACE, POSSIBLY SEVERAL ROWS (defect found in review, 12 Sep 2026,
+  // live staging dry run): `google_sources` carries one row per time a
+  // person named or re-named a space, so 37 real rows on staging name only
+  // 11 distinct spaces. Resolving per ROW meant the same conversation could
+  // be visited — and, since two rows for one space can carry DIFFERENT
+  // names, RESOLVED — more than once, non-deterministically, whichever row
+  // the loop happened to reach last. Grouped by `externalId` (Google's own
+  // space id, the only thing that is genuinely one-per-space) so every row
+  // sharing one space gets the exact same answer.
+  const spaces = await listNamedSources(cfg, guard, "chat")
+  const byExternalId = new Map<string, (typeof spaces)[number][]>()
+  for (const space of spaces) byExternalId.set(space.externalId, [...(byExternalId.get(space.externalId) ?? []), space])
+
   const resolved = new Map<string, string | null>()
-  for (const space of await listNamedSources(cfg, guard, "chat")) {
-    if (space.accountId) {
-      resolved.set(space.id, space.accountId)
-      continue
+  for (const rows of byExternalId.values()) {
+    // THE LIVE ROW WINS, on the same argument a declared filing already wins
+    // over a name match: a row Google still lists is this person's CURRENT
+    // naming of the space, and a deactivated duplicate is history. Among
+    // ties (more than one live row, or none), the most recently created row
+    // is the closest thing to "what Google calls it now".
+    const authoritative = [...rows].sort((a, b) =>
+      a.active !== b.active ? (a.active ? -1 : 1) : b.createdAt.localeCompare(a.createdAt)
+    )[0]
+    let accountId: string | null = authoritative.accountId
+    if (!accountId) {
+      const matches = await accountsNamedIn(cfg, guard, authoritative.name)
+      accountId = matches.length === 1 ? await accountBehindMatch(cfg, guard, matches[0].id) : null
     }
-    const matches = await accountsNamedIn(cfg, guard, space.name)
-    resolved.set(space.id, matches.length === 1 ? matches[0].id : null)
+    for (const row of rows) resolved.set(row.id, accountId)
   }
   return resolved
 }
@@ -1065,12 +1122,24 @@ export async function refileChatSources(
   toAgency: number
   moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[]
 }> {
+  // DISTINCT SPACES, NOT ROWS (defect found in review, 12 Sep 2026, live
+  // staging dry run): `google_sources` carries one row per time a space was
+  // named or renamed, so 37 real rows on staging name 11 distinct spaces.
+  // Processing per ROW visited (and moved, and counted) the same
+  // conversation once per duplicate — 741 × ~4 ≈ the 2,985 the dry run
+  // actually reported. `resolveChatSpaceAccounts` already resolves per
+  // DISTINCT `externalId` (its own header says why); this walks the same
+  // distinct set, once each, using whichever row's externalId this loop
+  // reaches first as the lookup key — the resolution behind it is identical
+  // for every row sharing that id, so it does not matter which one.
   const spaces = await listNamedSources(cfg, guard, "chat")
   const resolved = await resolveChatSpaceAccounts(cfg, guard)
+  const distinct = new Map<string, (typeof spaces)[number]>()
+  for (const space of spaces) if (!distinct.has(space.externalId)) distinct.set(space.externalId, space)
   const byAccount: Record<string, number> = {}
   const moves: { sourceId: string; fromAccountId: string | null; toAccountId: string | null }[] = []
   let toAgency = 0
-  for (const space of spaces) {
+  for (const space of distinct.values()) {
     const accountId = resolved.get(space.id) ?? null
     const compartment = accountId ? accountCompartment(accountId) : AGENCY_COMPARTMENT
     const current = await d1Query<{ id: string; account_id: string | null; compartment: string }>(

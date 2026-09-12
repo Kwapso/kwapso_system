@@ -773,6 +773,100 @@ describe("fix/kb-chat-backfill: refileChatSources brings stale rows in line, ide
     expect(row.compartment).toBe("agency")
     expect(chunkCompartment("SRC_BF5")).toBe("agency")
   })
+
+  // TWO DEFECTS FOUND IN REVIEW, 12 Sep 2026 — the hub's own live dry run
+  // against real staging, invisible to every case above because both are
+  // properties of REAL data a synthetic fixture had no reason to contain:
+  // duplicate `google_sources` rows for one space, and a person's name
+  // resolving to their own individual account.
+
+  it("a space named or renamed more than once is resolved and moved ONCE, not once per duplicate row", async () => {
+    seedName("dupspacename", IDS.victimAccount)
+    // Two rows, ONE space, DIFFERENT names: an earlier capture (deactivated —
+    // Google's own history of a rename, resolving to NOTHING on its own
+    // stale name) and the live one (resolves to Bergman). Same shape as the
+    // 37-rows/11-spaces ratio measured on real staging.
+    nameSpace("S_DUP_OLD", "spaces/DUP", "OldSpaceName")
+    db().exec(`UPDATE google_sources SET deactivated_at = '2026-06-01' WHERE id = 'S_DUP_OLD';`)
+    nameSpace("S_DUP_NEW", "spaces/DUP", "DupSpaceName")
+    staleSource("SRC_DUP", "spaces/DUP", null, "agency")
+
+    // DRY RUN, deliberately — the shape the real defect actually surfaced in:
+    // nothing is written between visits to the same space's duplicate rows,
+    // so a loop that does not deduplicate finds the SAME "needs to move" row
+    // again on the second visit and counts it twice. A real (non-dry) run
+    // would silently hide this the second time, because the first visit
+    // would already have fixed the row — which is exactly why the hub's
+    // dry run caught it and a live run would not have.
+    const result = await refileChatSources(cfg, guard, { dryRun: true })
+    // ONE move, not two: the row this LIKE query finds is one real source,
+    // and it must be counted once whichever of the two google_sources rows
+    // the loop reaches — the inflation the dry run actually measured (37
+    // rows visited instead of 11 spaces, ~4x on every count).
+    expect(result.moved).toBe(1)
+    expect(result.byAccount, "the LIVE row's name resolved this, not the deactivated one").toEqual({
+      [IDS.victimAccount]: 1,
+    })
+    const dryRow = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DUP'`).get() as {
+      account_id: string | null
+    }
+    expect(dryRow.account_id, "the dry run counted the move — it did not make it").toBeNull()
+
+    // FOR REAL, now — the live row's resolution is what actually lands.
+    const real = await refileChatSources(cfg, guard)
+    expect(real.moved).toBe(1)
+    const row = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DUP'`).get() as {
+      account_id: string | null
+    }
+    expect(row.account_id, "the LIVE row's name won, not the deactivated one").toBe(IDS.victimAccount)
+  })
+
+  it("a DM space named after a CLIENT'S CONTACT files to that client's company, never the contact's own account", async () => {
+    // Luis Vera — this file's own shared fixture (`parent_account_id`, a
+    // different column with a different job: general hierarchy, not the
+    // contact relationship `account_links` is). The link this function
+    // actually reads is written explicitly here, the same way a-names'
+    // own tests do it.
+    db().exec(
+      `INSERT INTO account_links (id, account_id, person_account_id, created_at)
+         VALUES ('L_LUIS_BF', '${IDS.victimAccount}', '${CONTACT}', '2026-01-01');`
+    )
+    seedName("Luis Vera", CONTACT)
+    nameSpace("S_DM_CONTACT", "spaces/DMC", "Luis Vera")
+    staleSource("SRC_DM_CONTACT", "spaces/DMC", null, "agency")
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved).toBe(1)
+    expect(result.byAccount, "Bergman's own id, never Luis's individual account id").toEqual({
+      [IDS.victimAccount]: 1,
+    })
+    const row = db().prepare(`SELECT account_id FROM knowledge_sources WHERE id = 'SRC_DM_CONTACT'`).get() as {
+      account_id: string
+    }
+    expect(row.account_id).toBe(IDS.victimAccount)
+    expect(row.account_id).not.toBe(CONTACT)
+  })
+
+  it("a DM space named after a COLLEAGUE (no company link at all) stays agency, never files to a person", async () => {
+    const COLLEAGUE_PERSON = "A_NAMES_COLLEAGUE_PERSON"
+    db().exec(
+      `INSERT INTO accounts (id, account_type, name, created_at, creator_id)
+         VALUES ('${COLLEAGUE_PERSON}', 'individual', 'Aurora Thalassa', '2026-01-01', '${IDS.staffUser}');`
+    )
+    seedName("Aurora Thalassa", COLLEAGUE_PERSON)
+    nameSpace("S_DM_COLLEAGUE", "spaces/DMCOL", "Aurora Thalassa")
+    staleSource("SRC_DM_COLLEAGUE", "spaces/DMCOL", COLLEAGUE_PERSON, `account:${COLLEAGUE_PERSON}`)
+
+    const result = await refileChatSources(cfg, guard)
+    expect(result.moved, "moved OUT of the wrong filing, back to agency").toBe(1)
+    expect(result.toAgency).toBe(1)
+    const row = db().prepare(`SELECT account_id, compartment FROM knowledge_sources WHERE id = 'SRC_DM_COLLEAGUE'`).get() as {
+      account_id: string | null
+      compartment: string
+    }
+    expect(row.account_id).toBeNull()
+    expect(row.compartment).toBe("agency")
+  })
 })
 
 describe("d-ingest-filing: accounts[] holds every client a thread concerns, account_id keeps the first", () => {
