@@ -646,7 +646,15 @@ function main() {
     console.error("  if the drift is intentional (a row re-tagged, struck, added, or keyed), re-run with --update-baseline and commit the new file.")
     process.exit(1)
   }
-  console.log(`kb-exam: structure OK — ${summary.total} rows (${statusLine(summary)})`)
+  // Said explicitly, every time, because kb-exam-merge.mjs's own count (the
+  // UNION file's row count alone, no derived rows) will always read 1 lower
+  // than this one — same reason a `git log` count and a `git log --all`
+  // count disagree without either being wrong. Two different questions
+  // ("how many rows did the editors write" vs "how many rows can this
+  // harness grade") sharing one number would be the bug, not this gap.
+  console.log(
+    `kb-exam: structure OK — ${summary.total} rows (KB-EXAM-UNION.md's own ${summary.total - DERIVED_ROWS.length} + ${DERIVED_ROWS.length} derived) — ${statusLine(summary)}`
+  )
   process.exit(0)
 }
 

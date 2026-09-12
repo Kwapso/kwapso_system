@@ -332,11 +332,17 @@ function main() {
       console.error("  re-run without --check to regenerate, then commit the result.")
       process.exit(1)
     }
-    console.log(`kb-exam-merge: KB-EXAM-UNION.md is current (${built.unionRows.length} rows).`)
+    // This is the UNION's own count — the editors' 100 questions, not
+    // scripts/kb-exam.mjs's 101 (which adds one derived, harness-only row,
+    // X8-notowner, that lives in kb-exam.mjs and never in this file). Two
+    // different counters answering two different questions, on purpose.
+    console.log(`kb-exam-merge: KB-EXAM-UNION.md is current (${built.unionRows.length} rows — kb-exam.mjs reports 101, +1 derived row it adds itself).`)
     process.exit(0)
   }
   writeFileSync(UNION_PATH, rendered)
-  console.log(`kb-exam-merge: wrote ${UNION_PATH} — ${built.unionRows.length} rows (${built.matchedA} shared, ${built.aTotal - built.matchedA} A-only, ${built.bTotal - built.matchedB} B-only)`)
+  console.log(
+    `kb-exam-merge: wrote ${UNION_PATH} — ${built.unionRows.length} rows (${built.matchedA} shared, ${built.aTotal - built.matchedA} A-only, ${built.bTotal - built.matchedB} B-only; kb-exam.mjs reports 101, +1 derived row it adds itself)`
+  )
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main()
