@@ -2943,7 +2943,7 @@ export async function accountsNamedIn(
   const seen = new Set<string>()
   const pendingByToken = new Map<string, { id: string; name: string }[]>()
   for (const c of candidates) {
-    // A DENY (0086, c-hijack B's second half) BEATS EVERYTHING BELOW, INCLUDING
+    // A DENY (c-hijack B's second half) BEATS EVERYTHING BELOW, INCLUDING
     // AN ALIAS/CODE MATCH. The spec error this closes: the ALLOW half of
     // `name_narrows_alone` is an `OR` against the rarity gate, so it can only
     // ever ADD a narrow — it does nothing for an already-rare name like
