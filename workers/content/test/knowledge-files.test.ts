@@ -351,6 +351,7 @@ describe("extractLink: a video link, kept either way", () => {
     expect(await extractLink("https://www.youtube.com/watch?v=abc123")).toEqual({
       text: "Hello there",
       note: null,
+      read: { provider: "YouTube", kind: "captions", words: 2 },
     })
   })
 
@@ -359,6 +360,7 @@ describe("extractLink: a video link, kept either way", () => {
     const out = await extractLink("https://www.youtube.com/watch?v=nocaps")
     expect(out.text).toBeNull()
     expect(out.note).toContain("kept here")
+    expect(out.read, "nothing was read — read must be null, not a guess").toBeNull()
   })
 
   it("reads a Loom title as best-effort words, and says the video is still kept when there are none", async () => {
@@ -368,6 +370,10 @@ describe("extractLink: a video link, kept either way", () => {
     expect(await extractLink("https://www.loom.com/share/abc123")).toEqual({
       text: "Q3 planning walkthrough",
       note: null,
+      // "description", never "captions" — a title is a name for the
+      // recording, not a real transcript, and the loading UX must not
+      // overclaim what best-effort actually produced.
+      read: { provider: "Loom", kind: "description", words: 3 },
     })
   })
 
@@ -378,5 +384,6 @@ describe("extractLink: a video link, kept either way", () => {
     const out = await extractLink("https://vimeo.com/12345")
     expect(out.text).toBeNull()
     expect(out.note).toContain("kept here")
+    expect(out.read, "a host we cannot even classify never carries a fabricated read").toBeNull()
   })
 })

@@ -45,7 +45,7 @@
 
 import { causeOf, recordWorkerError } from "@shared/workers/error-log"
 import { GuardError } from "@shared/workers/gating"
-import { readLink, readersFor, resolveLinkType, runReader, type ReaderName } from "./source-readers"
+import { readLink, readersFor, resolveLinkType, runReader, type ReaderName, type ReadKind } from "./source-readers"
 import { DOCUMENT_LIMIT_BYTES } from "@shared/workers/validate"
 import type { Env } from "../env"
 
@@ -247,6 +247,25 @@ export async function extractFile(
  * conversion itself: the ceiling belongs to the reader, so the sweep gets it too
  * rather than only the door that happened to be written first. */
 
+/** What a link's extraction found, for the loading UX kb_review builds on
+ * `postCreateKnowledge`'s response (hub's spec, 12 Sep 2026): "show me what
+ * kind of transcript it's extracting, and then tell me when it's done." One
+ * field per outcome, same discipline as `ExtractedFile`'s own `text`/`note`
+ * pair — `read` and `refusedBecause` are never both non-null, and never both
+ * null: a link is either read or refused, honestly, one sentence either way. */
+export type LinkExtraction = ExtractedFile & {
+  read: { provider: string; kind: ReadKind; words: number } | null
+}
+
+/** How many words a person would say came out — the count `read.words`
+ * reports. Whitespace-split on the trimmed text: exact for prose, and the
+ * only thing worth being exact about here is "did we get SOMETHING or
+ * nothing," not a publishing-grade word count. */
+function wordCount(text: string): number {
+  const trimmed = text.trim()
+  return trimmed ? trimmed.split(/\s+/).length : 0
+}
+
 /**
  * READ A LINK — the third way words come into this door, and the newest
  * (BUILD-5 §1: YouTube captions first-class, Loom/Tella best-effort, no
@@ -260,7 +279,7 @@ export async function extractFile(
  * gave me nothing" version of a link — a link nothing here can read, or one
  * whose video has no caption track, is a true and useful answer, the same way
  * an unreadable file is. */
-export async function extractLink(url: string): Promise<ExtractedFile> {
+export async function extractLink(url: string): Promise<LinkExtraction> {
   // HOST-BASED FIRST, DISCOVERED SECOND (`resolveLinkType`, source-readers.ts)
   // — a custom domain (the owner's own `content.kwapso.com`, a real Tella
   // recording no host list can ever see) is resolved by reading its OWN
@@ -272,23 +291,26 @@ export async function extractLink(url: string): Promise<ExtractedFile> {
     return {
       text: null,
       note: "We can't read this link, so it is kept here but the assistant can't answer from it. Anything you type into the note below IS searchable.",
+      read: null,
     }
   const text = await readLink(url, kind)
-  return text
-    ? capToRow(text)
-    : {
-        text: null,
-        // "CAPTION TRACK" WAS ACCURATE FOR YOUTUBE AND WRONG FOR LOOM/TELLA —
-        // neither has a caption track at all, so the honest, general reason is
-        // "no public transcript". Leads with what a person can DO about it
-        // (add the transcript below) rather than only the diagnosis — this
-        // note is rendered raw on the record's screen (R28's own structural
-        // gap for a worker-only file: appFiles() only walks what a front
-        // door imports, so this string cannot enter the i18n catalogue
-        // however it is written — flagged to the hub 11 Sep 2026, ruled a
-        // real but structurally unfixable debt from here, matching the
-        // existing UNREADABLE_REASON sentences beside it).
-        note: `We couldn't read the words in this ${kind.label} — it may not have a public transcript, or we couldn't reach it just now. It's kept here as a source either way; add the transcript yourself in the note below if you want the assistant to read it.`,
-      }
+  if (!text)
+    return {
+      text: null,
+      // "CAPTION TRACK" WAS ACCURATE FOR YOUTUBE AND WRONG FOR LOOM/TELLA —
+      // neither has a caption track at all, so the honest, general reason is
+      // "no public transcript". Leads with what a person can DO about it
+      // (add the transcript below) rather than only the diagnosis — this
+      // note is rendered raw on the record's screen (R28's own structural
+      // gap for a worker-only file: appFiles() only walks what a front
+      // door imports, so this string cannot enter the i18n catalogue
+      // however it is written — flagged to the hub 11 Sep 2026, ruled a
+      // real but structurally unfixable debt from here, matching the
+      // existing UNREADABLE_REASON sentences beside it).
+      note: `We couldn't read the words in this ${kind.label} — it may not have a public transcript, or we couldn't reach it just now. It's kept here as a source either way; add the transcript yourself in the note below if you want the assistant to read it.`,
+      read: null,
+    }
+  const capped = capToRow(text)
+  return { ...capped, read: { provider: kind.provider, kind: kind.kind, words: wordCount(capped.text ?? "") } }
 }
 

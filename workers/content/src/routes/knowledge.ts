@@ -496,15 +496,27 @@ export async function postKnowledgeSyncGoogle(request: Request, env: Env): Promi
   })
 }
 
-/** POST /api/content/knowledge — add a source the assistant may read. */
+/** POST /api/content/knowledge — add a source the assistant may read.
+ *
+ * `read`/`refusedBecause` (BUILD-5, hub's spec 12 Sep 2026) are ONLY ever
+ * populated when `createSource` actually read a video link on the caller's
+ * behalf — both stay null for an ordinary note, a file, or a video link that
+ * arrived WITH its transcript already pasted (nothing to read). Longhand in
+ * this literal on purpose: R27 derives real response fields off exactly this
+ * `json({…})` call. */
 export async function postCreateKnowledge(request: Request, env: Env): Promise<Response> {
   const { actor, cfg, guard, body } = await gatedBody<SourceInput>(request, env, "knowledge", "create")
   await refusePortalCaller(cfg, guard)
   requireText(body.title, "Title", TEXT_LIMITS.short)
-  const id = await createSource(env, cfg, guard, actor, body)
+  const { id, read, refusedBecause } = await createSource(env, cfg, guard, actor, body)
   // Row-level: carry the new source's id so open lists patch just that row.
   await publishChange(env, guard.teamId, "knowledge", id, "add")
-  return json({ source: await getSource(cfg, guard, id), total: await countSources(cfg, guard) })
+  return json({
+    source: await getSource(cfg, guard, id),
+    total: await countSources(cfg, guard),
+    read,
+    refusedBecause,
+  })
 }
 
 /** POST /api/content/knowledge/upload — hand the knowledge base a FILE.

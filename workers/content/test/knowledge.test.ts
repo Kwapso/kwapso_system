@@ -2104,6 +2104,12 @@ describe("a video link is read, and a plain link still needs its material pasted
       .get("Bergman cutover walkthrough") as { n: number; b: string } | undefined
     expect(row?.b, "the caption text must be the body").toMatch(/first Monday of April/)
     expect(row?.n, "a real transcript is chunked, not merely stored").toBeGreaterThan(0)
+    // THE LOADING UX'S OWN CONTRACT (kb_review builds the screen on web/; this
+    // is the door's half). "done — read N words of YouTube captions", off one
+    // synchronous call, no streaming.
+    const out = (await res.json()) as { read: { provider: string; kind: string; words: number } | null; refusedBecause: string | null }
+    expect(out.read).toEqual({ provider: "YouTube", kind: "captions", words: 10 })
+    expect(out.refusedBecause, "a real read is never ALSO a refusal").toBeNull()
   })
 
   it("finds nothing, and the honest note becomes the visible, editable body — still never a 400", async () => {
@@ -2114,6 +2120,9 @@ describe("a video link is read, and a plain link still needs its material pasted
       .prepare(`SELECT body AS b FROM knowledge_sources WHERE title = ?`)
       .get("Bergman cutover walkthrough") as { b: string } | undefined
     expect(row?.b, "the remedy sits in the box, not in a sentence that vanished").toMatch(/transcript/i)
+    const out = (await res.json()) as { read: unknown; refusedBecause: string | null }
+    expect(out.read, "nothing was read — never a guessed provider/kind").toBeNull()
+    expect(out.refusedBecause, "the same sentence that became the body, also in its own field").toMatch(/transcript/i)
   })
 
   it("accepts it the moment the transcript is pasted, and indexes what was said", async () => {
@@ -2132,6 +2141,11 @@ describe("a video link is read, and a plain link still needs its material pasted
       )
       .get("Bergman cutover walkthrough") as { n: number } | undefined
     expect(row?.n, "the pasted transcript must be indexed, not merely stored").toBeGreaterThan(0)
+    // Material already came WITH the request — createSource never touches
+    // extractLink, so both fields are null exactly as on an ordinary note.
+    const out = (await res.json()) as { read: unknown; refusedBecause: unknown }
+    expect(out.read).toBeNull()
+    expect(out.refusedBecause).toBeNull()
   })
 
   // THE GATE WAS THE EMPTY BODY, NOT THE HOST — and this is the case that
@@ -2159,6 +2173,10 @@ describe("a video link is read, and a plain link still needs its material pasted
       | { b: string }
       | undefined
     expect(row?.b, "best-effort is the title, honestly, not nothing").toBe("Testing application loading speed")
+    // "description", never "captions" — best-effort is a NAME for the
+    // recording, not its words, and the loading UX must say so honestly.
+    const out = (await res.json()) as { read: { provider: string; kind: string; words: number } | null }
+    expect(out.read).toEqual({ provider: "Tella", kind: "description", words: 4 })
   })
 
   it("and an ordinary, non-video link with nothing to read is still refused, in different words", async () => {
@@ -2186,6 +2204,12 @@ describe("a video link is read, and a plain link still needs its material pasted
       body: "The runbook says to check the session cookie before restarting the dispatch worker.",
     })
     expect(res.status).toBe(200)
+    // An ordinary note (pasted material, no extraction attempted) carries
+    // neither field — the loading UX has nothing to show and nothing to
+    // explain, because nothing here was ever read on the caller's behalf.
+    const out = (await res.json()) as { read: unknown; refusedBecause: unknown }
+    expect(out.read).toBeNull()
+    expect(out.refusedBecause).toBeNull()
   })
 
   // No host, no `/video/` path segment — resolveLinkType never even fetches —
@@ -2204,6 +2228,9 @@ describe("a video link is read, and a plain link still needs its material pasted
       | { b: string }
       | undefined
     expect(row?.b, "kept as a source either way, never silently dropped").toMatch(/can't read this link/i)
+    const out = (await res.json()) as { read: unknown; refusedBecause: string | null }
+    expect(out.read, "no reader for a host we don't even recognise").toBeNull()
+    expect(out.refusedBecause).toMatch(/can't read this link/i)
   })
 })
 

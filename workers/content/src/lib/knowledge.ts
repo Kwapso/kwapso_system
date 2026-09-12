@@ -131,7 +131,7 @@ import type {
   KnowledgeSource,
 } from "@shared/types"
 import type { Env } from "../env"
-import { contextLineFor } from "./source-readers"
+import { contextLineFor, type ReadKind } from "./source-readers"
 import { extractLink } from "./knowledge-files"
 import {
   CHUNK_TARGET_CHARS,
@@ -1386,8 +1386,21 @@ async function requireAccount(
   return rows[0]
 }
 
+/** What `createSource` reports about a video link it read on the caller's
+ * behalf — the contract `postCreateKnowledge`'s response carries so the
+ * loading UX (kb_review's, on `web/`) can say "done — read 1,240 words of
+ * YouTube captions" or the honest refusal, off one synchronous call and no
+ * streaming. Never both non-null, never both null: a video link with nothing
+ * pasted is always either read or refused, one sentence either way — the
+ * same discipline `LinkExtraction` already keeps one file down. */
+export type CreateSourceResult = {
+  id: string
+  read: { provider: string; kind: ReadKind; words: number } | null
+  refusedBecause: string | null
+}
+
 /** Write a source a PERSON typed, and index it in the same call so the assistant
- * knows about it before they have finished reading the toast. Returns its id.
+ * knows about it before they have finished reading the toast.
  *
  * THE BODY GOES IN AS A BOUND PARAMETER, not through `sqlString`. D1 refuses a
  * SQL statement over 100 KB, so the interpolated write this used to do put a
@@ -1401,7 +1414,7 @@ export async function createSource(
   guard: MemberGuard,
   actor: Actor,
   input: SourceInput
-): Promise<string> {
+): Promise<CreateSourceResult> {
   const v = readInput(input)
   const account = v.accountId ? await requireAccount(cfg, guard, v.accountId) : null
   if (v.visibleToAppId) await requireOpenableApp(cfg, guard, v.visibleToAppId)
@@ -1424,9 +1437,17 @@ export async function createSource(
   // is never a 400: a video link is accepted and kept either way, the same
   // two promises `extractFile` already makes an unreadable upload.
   let body = v.body
+  let read: CreateSourceResult["read"] = null
+  let refusedBecause: string | null = null
   if (v.sourceUrl && !plainText(body ?? "").trim() && isVideoLink(v.sourceUrl)) {
     const extract = await extractLink(v.sourceUrl)
     body = extract.text ?? extract.note
+    read = extract.read
+    // `refusedBecause` mirrors `extract.note`, but ONLY when nothing was
+    // read — `note` also carries a non-refusal "this was cut to fit" message
+    // on a huge success (`capToRow`), which is not a refusal and must never
+    // read as one.
+    refusedBecause = extract.text ? null : extract.note
   }
   const id = ulid()
   const now = new Date().toISOString()
@@ -1470,7 +1491,7 @@ export async function createSource(
     relatedTable: "knowledge_sources",
     relatedRowId: id,
   })
-  return id
+  return { id, read, refusedBecause }
 }
 
 /** How big a piece of material really is, measured the way the database

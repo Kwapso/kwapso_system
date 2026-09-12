@@ -412,10 +412,25 @@ export async function readSource(
 // this ships, the same way a real PDF was what found the subsetted-font gap
 // in the reader above it.
 
+/** WHAT KIND OF WORDS A LINK READER ACTUALLY PRODUCES — the honest half of the
+ * `read` object the create-source door hands back (BUILD-5, hub's own spec,
+ * 12 Sep 2026): "captions" for a real caption/subtitle track, "description"
+ * for an oEmbed title (a name for the recording, not its words), "transcript"
+ * reserved for a reader this table does not have yet (real audio
+ * transcription) so the door's contract does not need to change the day one
+ * is added. */
+export type ReadKind = "captions" | "transcript" | "description"
+
 /** A KIND OF LINK, resolved by host rather than by mime/extension. */
 export type LinkType = {
-  /** What a person calls it. */
+  /** What a person calls it, used in a sentence ("this YouTube video"). */
   label: string
+  /** The service's own name, for the `read.provider` field the door reports —
+   * distinct from `label`, which carries "video"/"recording" for a sentence
+   * this is never dropped into. */
+  provider: string
+  /** What KIND of words this type's reader(s) actually produce — see `ReadKind`. */
+  kind: ReadKind
   /** Matched on the registrable host, same rule as `isVideoLink` — `www.` and
    * any subdomain are covered without a wildcard that would also catch an
    * unrelated domain sharing the suffix. */
@@ -427,18 +442,24 @@ export type LinkType = {
 export const LINK_TYPES: readonly LinkType[] = [
   {
     label: "YouTube video",
+    provider: "YouTube",
+    kind: "captions",
     hosts: ["youtube.com", "youtu.be"],
     readers: ["youtube-captions"],
     why: "YouTube's timedtext endpoint answers for any video that has a caption track, manual or auto-generated, with no auth — first-class per BUILD-5",
   },
   {
     label: "Loom recording",
+    provider: "Loom",
+    kind: "description",
     hosts: ["loom.com"],
     readers: ["loom-best-effort"],
     why: "no public transcript endpoint exists; the oEmbed title is the only words available without auth, so this is best-effort rather than a real transcript",
   },
   {
     label: "Tella recording",
+    provider: "Tella",
+    kind: "description",
     hosts: ["tella.tv", "tella.video"],
     readers: ["tella-best-effort"],
     why: "same shape as Loom — the oEmbed title only, no public transcript access exists",
