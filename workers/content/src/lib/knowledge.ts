@@ -406,29 +406,52 @@ const MIN_VECTOR_SCORE = 0.5
  * reader) sees `MIN_VECTOR_SCORE` exactly as before — this is additive, not a
  * silent change to what "found" means for a caller that never asked for the
  * reader. See `retrieve`'s own comment at the point this is used. */
-/* RAISED 0.3 -> 0.4 ON 12 SEP 2026, on two measured numbers either side of the
- * new line, because 0.3 let a reader ANSWER A QUESTION THE BASE HAS NOTHING ON.
+/* PUT BACK TO 0.3 ON 12 SEP 2026, hours after I raised it, because the raise
+ * broke a question nobody was watching and FOUR measured points now show that
+ * no floor can do the job at all.
  *
- *   "What is the capital of France?"   top-1 0.335  MUST refuse
- *   A-M1 (the exam's own reader canary) top-1 0.444  MUST be rescued
+ *   "What is the capital of France?"                    top-1 0.335  MUST refuse
+ *   "what horsepower do we have and what is
+ *    everyone specialised in?"  (d-paraphrase's third)  top-1 0.399  MUST answer
+ *   A-M1 (the exam's own reader canary)                 top-1 0.444  MUST answer
+ *   A-X9 ("...at dinner on the 14th")                   top-1 0.466  MUST refuse
  *
- * The strict floor is 0.5, so both were refused before a reader existed. At 0.3
- * both entered the reader's pool — and the moment the reader became a model that
- * actually finishes (llama, 11 Sep), it looked at twelve unrelated passages for
- * the France question and picked one, citing a FluClinic transcript. That is the
- * exam's refusal ceiling broken: 6/7, on the one tag where a single failure is
- * worse than any number of content misses.
+ * A question that must be REFUSED sits BELOW one that must be ANSWERED, and
+ * another sits ABOVE both. There is no line through that set. The raise to 0.4
+ * was fitted to the first and third points alone, which is why it looked clean:
+ * the second point is not in the exam, so nothing went red when 0.399 fell one
+ * thousandth on the wrong side of it and d-paraphrase silently lost a question
+ * that had been proven working the day before.
  *
- * 0.4 separates the two measured cases cleanly. It is NOT claimed to be the
- * right number in general — it is the number that fits the only two points
- * anybody has measured, and the var (`KNOWLEDGE_READER_MIN_SCORE`) exists so the
- * next person can move it with more points rather than with an argument.
+ * SO THE FLOOR GOES BACK TO BEING WHAT ITS NAME SAYS — a guard against pure
+ * noise — and the DECISION moves to the reader, which now has to quote the
+ * words it is relying on (`knowledge-reader.ts`, cite-or-drop). Measured at 0.3
+ * with that in place: France refuses, horsepower answers again citing the Week
+ * recap, A-M1 and A-O1 answer. A-X9 still answers and is tracked as its own
+ * open failure; it did so identically at 0.4, so the floor never touched it.
  *
- * WHY A FLOOR AND NOT A BETTER PROMPT: the prompt already says "If NONE of the
- * candidates bear on the question, say so by returning an empty list". It said
- * that while this happened. A model's judgment is the thing being bought here,
- * and buying it does not mean handing it noise and hoping. */
-const READER_HALLUCINATION_FLOOR = 0.4
+ * ONE HONEST QUALIFICATION, because the obvious reading of that table is wrong.
+ * Cite-or-drop is NOT what refuses France. I checked by deleting it: with both
+ * the substring check and the length floor disabled and a logger on the raw
+ * model reply, the model claims NOTHING for France, twice over. What changed is
+ * that asking for a QUOTE alongside each id makes this model far more willing
+ * to return an empty list than asking for a bare id list did — a prompt effect,
+ * and prompt effects on this model have already failed twice tonight when leant
+ * on. What IS structural is the other direction: a fabricated or irrelevant
+ * claim can no longer be smuggled in behind an id, because the words have to be
+ * in the passage the model was shown.
+ *
+ * WHAT CATCHES IT IF THIS MODEL DRIFTS: France is a refusal row in the exam, and
+ * the refusal ceiling is now a THROW inside `npm run check` rather than a line
+ * in a report (`enforceRefusalCeiling`). A regression here turns the build red
+ * and names the row. That control, not this constant, is the reason 0.3 is safe
+ * to ship — and it is why the trade is worth making at all: at 0.4 a correct
+ * answer was certainly lost, where at 0.3 an incorrect one is caught if it comes
+ * back.
+ *
+ * `KNOWLEDGE_READER_MIN_SCORE` still overrides it, and still exists so the next
+ * person moves this with measurements rather than with an argument. */
+const READER_HALLUCINATION_FLOOR = 0.3
 
 /** Reciprocal-rank fusion's smoothing constant. The two arms score on scales
  * that have nothing to do with one another (a cosine and a sum of term weights),
